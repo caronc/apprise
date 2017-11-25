@@ -1,0 +1,9 @@
+chardet
+markdown
+decorator
+requests
+requests-oauthlib
+oauthlib
+urllib3
+six
+click

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<xs:schema elementFormDefault="qualified" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:element name="Notification">
+      <xs:complexType>
+         <xs:sequence>
+            <xs:element name="Version" type="xs:string" />
+            <xs:element name="MessageType" type="xs:string" />
+               <xs:simpleType>
+                  <xs:restriction base="xs:string">
+                     <xs:enumeration value="success" />
+                     <xs:enumeration value="failure" />
+                     <xs:enumeration value="info" />
+                     <xs:enumeration value="warning" />
+                  </xs:restriction>
+               </xs:simpleType>
+            </xs:element>
+            <xs:element name="Subject" type="xs:string" />
+            <xs:element name="Message" type="xs:string" />
+         </xs:sequence>
+      </xs:complexType>
+   </xs:element>
+</xs:schema>
