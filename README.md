@@ -6,6 +6,10 @@ To inform or tell (someone). To make one aware of something.
 
 *Apprise* allows you to take advantage of *just about* every notification service available to us today.  Send a notification to almost all of the most popular services out there today (such as Telegram, Slack, Twitter, etc). The ones that don't exist can be adapted and supported too!
 
+[![Build Status](https://travis-ci.org/caronc/apprise.svg?branch=master)](https://travis-ci.org/caronc/apprise)[![Coverage Status](https://coveralls.io/repos/caronc/apprise/badge.svg?branch=master)](https://coveralls.io/r/caronc/apprise?branch=master)
+[![Paypal](http://repo.nuxref.com/pub/img/paypaldonate.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=MHANV39UZNQ5E)
+[![Patreon](http://repo.nuxref.com/pub/img/patreondonate.svg)](https://www.patreon.com/lead2gold)
+
 ## Supported Notifications
 The section identifies all of the services supported by this script.
 
