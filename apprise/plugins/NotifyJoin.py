@@ -1,8 +1,8 @@
-# -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
 #
 # Join Notify Wrapper
 #
-# Copyright (C) 2014-2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -29,24 +29,16 @@
 # You can download the app for your phone here:
 #   https://play.google.com/store/apps/details?id=com.joaomgcd.join
 
-import requests
 import re
-
+import requests
 from urllib import urlencode
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import NotifyFormat
 from .NotifyBase import HTTP_ERROR_MAP
-from .NotifyBase import NotifyImageSize
-
-# Join uses the http protocol with JSON requests
-JOIN_URL = 'https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush'
+from ..common import NotifyImageSize
 
 # Token required as part of the API request
 VALIDATE_APIKEY = re.compile(r'[A-Za-z0-9]{32}')
-
-# Default User
-JOIN_DEFAULT_USER = 'apprise'
 
 # Extend HTTP Error Messages
 JOIN_HTTP_ERROR_MAP = dict(HTTP_ERROR_MAP.items() + {
@@ -75,25 +67,25 @@ class NotifyJoin(NotifyBase):
     """
 
     # The default protocol
-    PROTOCOL = 'join'
+    protocol = 'join'
 
-    # The default secure protocol
-    SECURE_PROTOCOL = 'join'
+    # Join uses the http protocol with JSON requests
+    notify_url = \
+        'https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush'
 
     def __init__(self, apikey, devices, **kwargs):
         """
         Initialize Join Object
         """
         super(NotifyJoin, self).__init__(
-            title_maxlen=250, body_maxlen=1000,
-            image_size=JOIN_IMAGE_XY,
-            notify_format=NotifyFormat.TEXT,
+            title_maxlen=250, body_maxlen=1000, image_size=JOIN_IMAGE_XY,
             **kwargs)
 
         if not VALIDATE_APIKEY.match(apikey.strip()):
             self.logger.warning(
                 'The first API Token specified (%s) is invalid.' % apikey,
             )
+
             raise TypeError(
                 'The first API Token specified (%s) is invalid.' % apikey,
             )
@@ -105,8 +97,10 @@ class NotifyJoin(NotifyBase):
             self.devices = filter(bool, DEVICE_LIST_DELIM.split(
                 devices,
             ))
+
         elif isinstance(devices, (tuple, list)):
             self.devices = devices
+
         else:
             self.devices = list()
 
@@ -114,10 +108,16 @@ class NotifyJoin(NotifyBase):
             self.logger.warning('No device(s) were specified.')
             raise TypeError('No device(s) were specified.')
 
-    def _notify(self, title, body, notify_type, **kwargs):
+    def notify(self, title, body, notify_type, **kwargs):
         """
         Perform Join Notification
         """
+
+        # Limit results to just the first 2 line otherwise
+        # there is just to much content to display
+        body = re.split('[\r\n]+', body)
+        body[0] = body[0].strip('#').strip()
+        body = '\r\n'.join(body[0:2])
 
         headers = {
             'User-Agent': self.app_id,
@@ -158,11 +158,10 @@ class NotifyJoin(NotifyBase):
                     url_args['icon'] = image_url
 
             # prepare payload
-            payload = {
-            }
+            payload = {}
 
             # Prepare the URL
-            url = '%s?%s' % (JOIN_URL, urlencode(url_args))
+            url = '%s?%s' % (self.notify_url, urlencode(url_args))
 
             self.logger.debug('Join POST URL: %s (cert_verify=%r)' % (
                 url, self.verify_certificate,
@@ -194,6 +193,7 @@ class NotifyJoin(NotifyBase):
                                 r.status_code))
 
                     # self.logger.debug('Response Details: %s' % r.raw.read())
+
                     # Return; we're done
                     has_error = True
 
@@ -210,3 +210,31 @@ class NotifyJoin(NotifyBase):
                 self.throttle()
 
         return has_error
+
+    @staticmethod
+    def parse_url(url):
+        """
+        Parses the URL and returns enough arguments that can allow
+        us to substantiate this object.
+
+        """
+        results = NotifyBase.parse_url(url)
+
+        if not results:
+            # We're done early as we couldn't load the results
+            return results
+
+        # Apply our settings now
+        try:
+            devices = ' '.join(
+                filter(bool, NotifyBase.split_path(results['fullpath'])))
+
+        except (AttributeError, IndexError):
+            # Force some bad values that will get caught
+            # in parsing later
+            devices = None
+
+        results['apikey'] = results['host']
+        results['devices'] = devices
+
+        return results

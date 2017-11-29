@@ -1,8 +1,8 @@
-# -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
 #
 # (Super) Toasty Notify Wrapper
 #
-# Copyright (C) 2014-2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -19,17 +19,14 @@
 # You should have received a copy of the GNU General Public License
 # along with apprise. If not, see <http://www.gnu.org/licenses/>.
 
-from urllib import quote
-import requests
 import re
+import requests
+from urllib import quote
+from urllib import unquote
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import NotifyFormat
-from .NotifyBase import NotifyImageSize
 from .NotifyBase import HTTP_ERROR_MAP
-
-# Toasty uses the http protocol with JSON requests
-TOASTY_URL = 'http://api.supertoasty.com/notify/'
+from ..common import NotifyImageSize
 
 # Image Support (128x128)
 TOASTY_IMAGE_XY = NotifyImageSize.XY_128
@@ -45,34 +42,34 @@ class NotifyToasty(NotifyBase):
     """
 
     # The default protocol
-    PROTOCOL = 'toasty'
+    protocol = 'toasty'
 
-    # The default secure protocol
-    SECURE_PROTOCOL = 'toasty'
+    # Toasty uses the http protocol with JSON requests
+    notify_url = 'http://api.supertoasty.com/notify/'
 
     def __init__(self, devices, **kwargs):
         """
         Initialize Toasty Object
         """
         super(NotifyToasty, self).__init__(
-            title_maxlen=250, body_maxlen=32768,
-            image_size=TOASTY_IMAGE_XY,
-            notify_format=NotifyFormat.TEXT,
+            title_maxlen=250, body_maxlen=32768, image_size=TOASTY_IMAGE_XY,
             **kwargs)
 
         if isinstance(devices, basestring):
             self.devices = filter(bool, DEVICES_LIST_DELIM.split(
                 devices,
             ))
+
         elif isinstance(devices, (tuple, list)):
             self.devices = devices
+
         else:
             raise TypeError('You must specify at least 1 device.')
 
         if not self.user:
             raise TypeError('You must specify a username.')
 
-    def _notify(self, title, body, notify_type, **kwargs):
+    def notify(self, title, body, notify_type, **kwargs):
         """
         Perform Toasty Notification
         """
@@ -105,7 +102,7 @@ class NotifyToasty(NotifyBase):
                     payload['image'] = image_url
 
             # URL to transmit content via
-            url = '%s%s' % (TOASTY_URL, device)
+            url = '%s%s' % (self.notify_url, device)
 
             self.logger.debug('Toasty POST URL: %s (cert_verify=%r)' % (
                 url, self.verify_certificate,
@@ -153,3 +150,28 @@ class NotifyToasty(NotifyBase):
                 self.throttle()
 
         return has_error
+
+    @staticmethod
+    def parse_url(url):
+        """
+        Parses the URL and returns enough arguments that can allow
+        us to substantiate this object.
+
+        """
+        results = NotifyBase.parse_url(url)
+
+        if not results:
+            # We're done early as we couldn't load the results
+            return results
+
+        # Apply our settings now
+        try:
+            devices = unquote(results['fullpath'])
+
+        except AttributeError:
+            devices = ''
+
+        # Store our devices
+        results['devices'] = '%s/%s' % (results['host'], devices)
+
+        return results

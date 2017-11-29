@@ -1,8 +1,8 @@
-# -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
 #
 # Twitter Notify Wrapper
 #
-# Copyright (C) 2014-2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -21,7 +21,6 @@
 
 from . import tweepy
 from ..NotifyBase import NotifyBase
-from ..NotifyBase import NotifyFormat
 
 # Direct Messages have not image support
 TWITTER_IMAGE_XY = None
@@ -33,11 +32,8 @@ class NotifyTwitter(NotifyBase):
 
     """
 
-    # The default protocol
-    PROTOCOL = 'tweet'
-
     # The default secure protocol
-    SECURE_PROTOCOL = 'tweet'
+    secure_protocol = 'tweet'
 
     def __init__(self, ckey, csecret, akey, asecret, **kwargs):
         """
@@ -48,9 +44,7 @@ class NotifyTwitter(NotifyBase):
         """
         super(NotifyTwitter, self).__init__(
             title_maxlen=250, body_maxlen=4096,
-            image_size=TWITTER_IMAGE_XY,
-            notify_format=NotifyFormat.TEXT,
-            **kwargs)
+            image_size=TWITTER_IMAGE_XY, **kwargs)
 
         if not ckey:
             raise TypeError(
@@ -80,6 +74,7 @@ class NotifyTwitter(NotifyBase):
         try:
             # Attempt to Establish a connection to Twitter
             self.auth = tweepy.OAuthHandler(ckey, csecret)
+
             # Apply our Access Tokens
             self.auth.set_access_token(akey, asecret)
 
@@ -91,7 +86,7 @@ class NotifyTwitter(NotifyBase):
 
         return
 
-    def _notify(self, title, body, notify_type, **kwargs):
+    def notify(self, title, body, notify_type, **kwargs):
         """
         Perform Twitter Notification
         """
@@ -114,3 +109,40 @@ class NotifyTwitter(NotifyBase):
             return False
 
         return True
+
+    @staticmethod
+    def parse_url(url):
+        """
+        Parses the URL and returns enough arguments that can allow
+        us to substantiate this object.
+
+        """
+        results = NotifyBase.parse_url(url)
+
+        if not results:
+            # We're done early as we couldn't load the results
+            return results
+
+        # Apply our settings now
+
+        # The first token is stored in the hostnamee
+        consumer_key = results['host']
+
+        # Now fetch the remaining tokens
+        try:
+            consumer_secret, access_token_key, access_token_secret = \
+                filter(bool, NotifyBase.split_path(results['fullpath']))[0:3]
+
+        except (AttributeError, IndexError):
+            # Force some bad values that will get caught
+            # in parsing later
+            consumer_secret = None
+            access_token_key = None
+            access_token_secret = None
+
+        results['ckey'] = consumer_key,
+        results['csecret'] = consumer_secret,
+        results['akey'] = access_token_key,
+        results['asecret'] = access_token_secret,
+
+        return results

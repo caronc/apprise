@@ -1,8 +1,8 @@
-# -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
 #
 # Email Notify Wrapper
 #
-# Copyright (C) 2014-2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -26,20 +26,12 @@ from smtplib import SMTP
 from smtplib import SMTPException
 from socket import error as SocketError
 
+from urllib import unquote as unquote
+
 from email.mime.text import MIMEText
 
 from .NotifyBase import NotifyBase
 from .NotifyBase import NotifyFormat
-from .NotifyBase import IS_EMAIL_RE
-
-# Default Non-Encryption Port
-EMAIL_SMTP_PORT = 25
-
-# Default Secure Port
-EMAIL_SMTPS_PORT = 587
-
-# Default SMTP Timeout (in seconds)
-SMTP_SERVER_TIMEOUT = 30
 
 
 class WebBaseLogin(object):
@@ -49,15 +41,14 @@ class WebBaseLogin(object):
     """
     # User Login must be Email Based
     EMAIL = 'Email'
+
     # User Login must UserID Based
     USERID = 'UserID'
 
 
-# To attempt to make this script stupid proof,
-# if we detect an email address that is part of the
-# this table, we can pre-use a lot more defaults if
-# they aren't otherwise specified on the users
-# input
+# To attempt to make this script stupid proof, if we detect an email address
+# that is part of the this table, we can pre-use a lot more defaults if they
+# aren't otherwise specified on the users input.
 WEBBASE_LOOKUP_TABLE = (
     # Google GMail
     (
@@ -121,11 +112,6 @@ WEBBASE_LOOKUP_TABLE = (
     ),
 )
 
-# Mail Prefix Servers (TODO)
-MAIL_SERVER_PREFIXES = (
-    'smtp', 'mail', 'smtps', 'outgoing'
-)
-
 
 class NotifyEmail(NotifyBase):
     """
@@ -134,10 +120,19 @@ class NotifyEmail(NotifyBase):
     """
 
     # The default simple (insecure) protocol
-    PROTOCOL = 'mailto'
+    protocol = 'mailto'
 
     # The default secure protocol
-    SECURE_PROTOCOL = 'mailtos'
+    secure_protocol = 'mailtos'
+
+    # Default Non-Encryption Port
+    default_port = 25
+
+    # Default Secure Port
+    default_secure_port = 587
+
+    # Default SMTP Timeout (in seconds)
+    connect_timeout = 15
 
     def __init__(self, to, notify_format, **kwargs):
         """
@@ -154,15 +149,17 @@ class NotifyEmail(NotifyBase):
         # Handle SMTP vs SMTPS (Secure vs UnSecure)
         if not self.port:
             if self.secure:
-                self.port = EMAIL_SMTPS_PORT
+                self.port = self.default_secure_port
+
             else:
-                self.port = EMAIL_SMTP_PORT
+                self.port = self.default_port
 
         # Email SMTP Server Timeout
         try:
-            self.timeout = int(kwargs.get('timeout', SMTP_SERVER_TIMEOUT))
+            self.timeout = int(kwargs.get('timeout', self.connect_timeout))
+
         except (ValueError, TypeError):
-            self.timeout = SMTP_SERVER_TIMEOUT
+            self.timeout = self.connect_timeout
 
         # Now we want to construct the To and From email
         # addresses from the URL provided
@@ -175,13 +172,13 @@ class NotifyEmail(NotifyBase):
         if not isinstance(self.to_addr, basestring):
             raise TypeError('No valid ~To~ email address specified.')
 
-        if not IS_EMAIL_RE.match(self.to_addr):
+        if not NotifyBase.is_email(self.to_addr):
             raise TypeError('Invalid ~To~ email format: %s' % self.to_addr)
 
         if not isinstance(self.from_addr, basestring):
             raise TypeError('No valid ~From~ email address specified.')
 
-        match = IS_EMAIL_RE.match(self.from_addr)
+        match = NotifyBase.is_email(self.from_addr)
         if not match:
             # Parse Source domain based on from_addr
             raise TypeError('Invalid ~From~ email format: %s' % self.to_addr)
@@ -202,10 +199,9 @@ class NotifyEmail(NotifyBase):
         """
 
         if self.smtp_host:
-            # SMTP Server was explicitly specified, therefore it
-            # is assumed the caller knows what he's doing and
-            # is intentionally over-riding any smarts to be
-            # applied
+            # SMTP Server was explicitly specified, therefore it is assumed
+            # the caller knows what he's doing and is intentionally
+            # over-riding any smarts to be applied
             return
 
         for i in range(len(WEBBASE_LOOKUP_TABLE)):
@@ -235,7 +231,7 @@ class NotifyEmail(NotifyBase):
                 login_type = WEBBASE_LOOKUP_TABLE[i][2]\
                     .get('login_type', [])
 
-                if IS_EMAIL_RE.match(self.user) and \
+                if NotifyBase.is_email(self.user) and \
                    WebBaseLogin.EMAIL not in login_type:
                     # Email specified but login type
                     # not supported; switch it to user id
@@ -248,7 +244,7 @@ class NotifyEmail(NotifyBase):
 
                 break
 
-    def _notify(self, title, body, **kwargs):
+    def notify(self, title, body, **kwargs):
         """
         Perform Email Notification
         """
@@ -263,6 +259,7 @@ class NotifyEmail(NotifyBase):
         if self.notify_format == NotifyFormat.HTML:
             email = MIMEText(body, 'html')
             email['Content-Type'] = 'text/html'
+
         else:
             email = MIMEText(body, 'text')
             email['Content-Type'] = 'text/plain'
@@ -310,8 +307,120 @@ class NotifyEmail(NotifyBase):
 
         try:
             socket.quit()
+
         except:
             # no problem
             pass
 
         return True
+
+    @staticmethod
+    def parse_url(url):
+        """
+        Parses the URL and returns enough arguments that can allow
+        us to substantiate this object.
+
+        """
+        results = NotifyBase.parse_url(url)
+
+        if not results:
+            # We're done early as we couldn't load the results
+            return results
+
+        # Apply our settings now
+
+        # Default Format is HTML
+        results['notify_format'] = NotifyFormat.HTML
+
+        to_addr = ''
+        from_addr = ''
+        smtp_host = ''
+
+        if 'format' in results['qsd'] and len(results['qsd']['format']):
+            # Extract email format (Text/Html)
+            try:
+                format = unquote(results['qsd']['format']).lower()
+                if len(format) > 0 and format[0] == 't':
+                    results['notify_format'] = NotifyFormat.TEXT
+
+            except AttributeError:
+                pass
+
+        # get 'To' email address
+        try:
+            to_addr = filter(bool, NotifyBase.split_path(results['host']))[0]
+
+        except (AttributeError, IndexError):
+            # No problem, we have other ways of getting
+            # the To address
+            pass
+
+        if not NotifyBase.is_email(to_addr):
+            if results['user']:
+                # Try to be clever and build a potential
+                # email address based on what we've been provided
+                to_addr = '%s@%s' % (
+                    re.split('[\s@]+', results['user'])[0],
+                    re.split('[\s@]+', to_addr)[-1],
+                )
+
+                if not NotifyBase.is_email(to_addr):
+                    NotifyBase.logger.error(
+                        '%s does not contain a recipient email.' %
+                        unquote(results['url'].lstrip('/')),
+                    )
+                    return None
+
+        # Attempt to detect 'from' email address
+        from_addr = to_addr
+        try:
+            if 'from' in results['qsd'] and len(results['qsd']['from']):
+                from_addr = results['qsd']['from']
+                if not NotifyBase.is_email(results['qsd']['from']):
+                    # Lets be clever and attempt to make the from
+                    # address email
+                    from_addr = '%s@%s' % (
+                        re.split('[\s@]+', from_addr)[0],
+                        re.split('[\s@]+', to_addr)[-1],
+                    )
+
+                if not NotifyBase.is_email(from_addr):
+                    NotifyBase.logger.error(
+                        '%s does not contain a from address.' %
+                        unquote(results['url'].lstrip('/')),
+                    )
+                    return None
+
+        except AttributeError:
+            pass
+
+        try:
+            if 'name' in results['qsd'] and len(results['qsd']['name']):
+                # Extract from name to associate with from address
+                results['name'] = unquote(results['qsd']['name'])
+
+        except AttributeError:
+            pass
+
+        try:
+            if 'timeout' in results['qsd'] and len(results['qsd']['timeout']):
+                # Extract the timeout to associate with smtp server
+                results['timeout'] = unquote(results['qsd']['timeout'])
+
+        except AttributeError:
+            pass
+
+        # Store SMTP Host if specified
+        try:
+            # Extract from password to associate with smtp server
+            if 'smtp' in results['qsd'] and len(results['qsd']['smtp']):
+                smtp_host = unquote(results['qsd']['smtp'])
+
+        except AttributeError:
+            pass
+
+        results['to'] = to_addr
+        results['from'] = from_addr
+        results['smtp_host'] = smtp_host
+
+        return results

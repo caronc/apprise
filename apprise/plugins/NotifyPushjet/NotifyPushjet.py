@@ -1,8 +1,8 @@
-# -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
 #
 # Pushjet Notify Wrapper
 #
-# Copyright (C) 2014-2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -23,7 +23,6 @@ from .pushjet import errors
 from .pushjet import pushjet
 
 from ..NotifyBase import NotifyBase
-from ..NotifyBase import NotifyFormat
 
 
 class NotifyPushjet(NotifyBase):
@@ -32,21 +31,19 @@ class NotifyPushjet(NotifyBase):
     """
 
     # The default protocol
-    PROTOCOL = 'pjet'
+    protocol = 'pjet'
 
     # The default secure protocol
-    SECURE_PROTOCOL = 'pjets'
+    secure_protocol = 'pjets'
 
     def __init__(self, **kwargs):
         """
         Initialize Pushjet Object
         """
         super(NotifyPushjet, self).__init__(
-            title_maxlen=250, body_maxlen=32768,
-            notify_format=NotifyFormat.TEXT,
-            **kwargs)
+            title_maxlen=250, body_maxlen=32768, **kwargs)
 
-    def _notify(self, title, body, notify_type):
+    def notify(self, title, body, notify_type):
         """
         Perform Pushjet Notification
         """
@@ -62,6 +59,7 @@ class NotifyPushjet(NotifyBase):
 
                 api = pushjet.Api(server)
                 service = api.Service(secret_key=self.user)
+
             else:
                 api = pushjet.Api(pushjet.DEFAULT_API_URL)
                 service = api.Service(secret_key=self.host)

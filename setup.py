@@ -19,6 +19,7 @@
 import os
 try:
     from setuptools import setup
+
 except ImportError:
     from distutils.core import setup
 
@@ -44,11 +45,11 @@ setup(
     author='Chris Caron',
     author_email='lead2gold@gmail.com',
     packages=find_packages(),
-    package_data={
-        'apprise': ['var/*'],
-    },
     include_package_data=True,
-    scripts=['bin/apprise.py', ],
+    package_data={
+        'apprise': ['assets'],
+    },
+    scripts=['cli/notify.py', ],
     install_requires=open('requirements.txt').readlines(),
     classifiers=(
         'Development Status :: 4 - Beta',
@@ -61,4 +62,6 @@ setup(
     ),
     entry_points={'console_scripts': console_scripts},
     python_requires='>=2.7, <3',
+    test_suite='nose.collector',
+    tests_require=['nose', 'coverage', 'pycodestyle'],
 )

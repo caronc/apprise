@@ -1,8 +1,8 @@
-# -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
 #
 # Pushalot Notify Wrapper
 #
-# Copyright (C) 2014-2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -19,17 +19,13 @@
 # You should have received a copy of the GNU General Public License
 # along with apprise. If not, see <http://www.gnu.org/licenses/>.
 
-from json import dumps
-import requests
 import re
+import requests
+from json import dumps
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import NotifyFormat
-from .NotifyBase import NotifyImageSize
 from .NotifyBase import HTTP_ERROR_MAP
-
-# Pushalot uses the http protocol with JSON requests
-PUSHALOT_URL = 'https://pushalot.com/api/sendmessage'
+from ..common import NotifyImageSize
 
 # Image Support (72x72)
 PUSHALOT_IMAGE_XY = NotifyImageSize.XY_72
@@ -50,10 +46,13 @@ class NotifyPushalot(NotifyBase):
     """
 
     # The default protocol
-    PROTOCOL = 'palot'
+    protocol = 'palot'
 
     # The default secure protocol
-    SECURE_PROTOCOL = 'palot'
+    secure_protocol = 'palot'
+
+    # Pushalot uses the http protocol with JSON requests
+    notify_url = 'https://pushalot.com/api/sendmessage'
 
     def __init__(self, authtoken, is_important=False, **kwargs):
         """
@@ -61,9 +60,7 @@ class NotifyPushalot(NotifyBase):
         """
         super(NotifyPushalot, self).__init__(
             title_maxlen=250, body_maxlen=32768,
-            image_size=PUSHALOT_IMAGE_XY,
-            notify_format=NotifyFormat.TEXT,
-            **kwargs)
+            image_size=PUSHALOT_IMAGE_XY, **kwargs)
 
         # Is Important Flag
         self.is_important = is_important
@@ -78,7 +75,7 @@ class NotifyPushalot(NotifyBase):
                 'Invalid Pushalot Authorization Token Specified.'
             )
 
-    def _notify(self, title, body, notify_type, **kwargs):
+    def notify(self, title, body, notify_type, **kwargs):
         """
         Perform Pushalot Notification
         """
@@ -105,16 +102,17 @@ class NotifyPushalot(NotifyBase):
                 payload['Image'] = image_url
 
         self.logger.debug('Pushalot POST URL: %s (cert_verify=%r)' % (
-            PUSHALOT_URL, self.verify_certificate,
+            self.notify_url, self.verify_certificate,
         ))
         self.logger.debug('Pushalot Payload: %s' % str(payload))
         try:
             r = requests.post(
-                PUSHALOT_URL,
+                self.notify_url,
                 data=dumps(payload),
                 headers=headers,
                 verify=self.verify_certificate,
             )
+
             if r.status_code != requests.codes.ok:
                 # We had a problem
                 try:
@@ -144,3 +142,21 @@ class NotifyPushalot(NotifyBase):
             return False
 
         return True
+
+    @staticmethod
+    def parse_url(url):
+        """
+        Parses the URL and returns enough arguments that can allow
+        us to substantiate this object.
+
+        """
+        results = NotifyBase.parse_url(url)
+
+        if not results:
+            # We're done early as we couldn't load the results
+            return results
+
+        # Apply our settings now
+        results['authtoken'] = results['host']
+
+        return results

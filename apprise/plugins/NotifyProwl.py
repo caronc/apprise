@@ -1,8 +1,8 @@
-# -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
 #
 # Prowl Notify Wrapper
 #
-# Copyright (C) 2014-2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -19,15 +19,11 @@
 # You should have received a copy of the GNU General Public License
 # along with apprise. If not, see <http://www.gnu.org/licenses/>.
 
-import requests
 import re
+import requests
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import NotifyFormat
 from .NotifyBase import HTTP_ERROR_MAP
-
-# Prowl uses the http protocol with JSON requests
-PROWL_URL = 'https://api.prowlapp.com/publicapi/add'
 
 # Used to validate API Key
 VALIDATE_APIKEY = re.compile(r'[A-Za-z0-9]{40}')
@@ -65,25 +61,23 @@ class NotifyProwl(NotifyBase):
     A wrapper for Prowl Notifications
     """
 
-    # The default protocol
-    PROTOCOL = 'prowl'
-
     # The default secure protocol
-    SECURE_PROTOCOL = 'prowl'
+    secure_protocol = 'prowl'
 
-    def __init__(self, apikey, providerkey=None,
-                 priority=ProwlPriority.NORMAL,
+    # Prowl uses the http protocol with JSON requests
+    notify_url = 'https://api.prowlapp.com/publicapi/add'
+
+    def __init__(self, apikey, providerkey=None, priority=ProwlPriority.NORMAL,
                  **kwargs):
         """
         Initialize Prowl Object
         """
         super(NotifyProwl, self).__init__(
-            title_maxlen=1024, body_maxlen=10000,
-            notify_format=NotifyFormat.TEXT,
-            **kwargs)
+            title_maxlen=1024, body_maxlen=10000, **kwargs)
 
         if priority not in PROWL_PRIORITIES:
             self.priority = ProwlPriority.NORMAL
+
         else:
             self.priority = priority
 
@@ -112,7 +106,7 @@ class NotifyProwl(NotifyBase):
         # Store the Provider Key
         self.providerkey = providerkey
 
-    def _notify(self, title, body, **kwargs):
+    def notify(self, title, body, **kwargs):
         """
         Perform Prowl Notification
         """
@@ -135,12 +129,12 @@ class NotifyProwl(NotifyBase):
             payload['providerkey'] = self.providerkey
 
         self.logger.debug('Prowl POST URL: %s (cert_verify=%r)' % (
-            PROWL_URL, self.verify_certificate,
+            self.notify_url, self.verify_certificate,
         ))
         self.logger.debug('Prowl Payload: %s' % str(payload))
         try:
             r = requests.post(
-                PROWL_URL,
+                self.notify_url,
                 data=payload,
                 headers=headers,
                 verify=self.verify_certificate,
@@ -161,6 +155,7 @@ class NotifyProwl(NotifyBase):
                             r.status_code))
 
                 self.logger.debug('Response Details: %s' % r.raw.read())
+
                 # Return; we're done
                 return False
             else:
@@ -175,3 +170,34 @@ class NotifyProwl(NotifyBase):
             return False
 
         return True
+
+    @staticmethod
+    def parse_url(url):
+        """
+        Parses the URL and returns enough arguments that can allow
+        us to substantiate this object.
+
+        """
+        results = NotifyBase.parse_url(url)
+
+        if not results:
+            # We're done early as we couldn't load the results
+            return results
+
+        # Apply our settings now
+
+        # optionally find the provider key
+        try:
+            providerkey = filter(
+                bool, NotifyBase.split_path(results['fullpath']))[0]
+
+            if not providerkey:
+                providerkey = None
+
+        except (AttributeError, IndexError):
+            providerkey = None
+
+        results['apikey'] = results['host']
+        results['providerkey'] = providerkey
+
+        return results

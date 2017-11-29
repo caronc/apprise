@@ -1,8 +1,8 @@
-# -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
 #
 # Notify My Android (NMA) Notify Wrapper
 #
-# Copyright (C) 2014-2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -19,15 +19,13 @@
 # You should have received a copy of the GNU General Public License
 # along with apprise. If not, see <http://www.gnu.org/licenses/>.
 
-import requests
 import re
+import requests
+from urllib import unquote
 
 from .NotifyBase import NotifyBase
 from .NotifyBase import NotifyFormat
 from .NotifyBase import HTTP_ERROR_MAP
-
-# Notify My Android uses the http protocol with JSON requests
-NMA_URL = 'https://www.notifymyandroid.com/publicapi/notify'
 
 # Extend HTTP Error Messages
 NMA_HTTP_ERROR_MAP = dict(HTTP_ERROR_MAP.items() + {
@@ -64,10 +62,10 @@ class NotifyMyAndroid(NotifyBase):
     """
 
     # The default protocol
-    PROTOCOL = 'nma'
+    protocol = 'nma'
 
-    # The default secure protocol
-    SECURE_PROTOCOL = 'nma'
+    # Notify My Android uses the http protocol with JSON requests
+    notify_url = 'https://www.notifymyandroid.com/publicapi/notify'
 
     def __init__(self, apikey, priority=NotifyMyAndroidPriority.NORMAL,
                  devapikey=None, **kwargs):
@@ -75,13 +73,12 @@ class NotifyMyAndroid(NotifyBase):
         Initialize Notify My Android Object
         """
         super(NotifyMyAndroid, self).__init__(
-            title_maxlen=1000, body_maxlen=10000,
-            notify_format=NotifyFormat.HTML,
-            **kwargs)
+            title_maxlen=1000, body_maxlen=10000, **kwargs)
 
         # The Priority of the message
         if priority not in NMA_PRIORITIES:
             self.priority = NotifyMyAndroidPriority.NORMAL
+
         else:
             self.priority = priority
 
@@ -106,7 +103,7 @@ class NotifyMyAndroid(NotifyBase):
                 )
         self.devapikey = devapikey
 
-    def _notify(self, title, body, notify_type, **kwargs):
+    def notify(self, title, body, notify_type, **kwargs):
         """
         Perform Notify My Android Notification
         """
@@ -131,12 +128,12 @@ class NotifyMyAndroid(NotifyBase):
             payload['developerkey'] = self.devapikey
 
         self.logger.debug('NMA POST URL: %s (cert_verify=%r)' % (
-            NMA_URL, self.verify_certificate,
+            self.notify_url, self.verify_certificate,
         ))
         self.logger.debug('NMA Payload: %s' % str(payload))
         try:
             r = requests.post(
-                NMA_URL,
+                self.notify_url,
                 data=payload,
                 headers=headers,
                 verify=self.verify_certificate,
@@ -171,3 +168,33 @@ class NotifyMyAndroid(NotifyBase):
             return False
 
         return True
+
+    @staticmethod
+    def parse_url(url):
+        """
+        Parses the URL and returns enough arguments that can allow
+        us to substantiate this object.
+
+        """
+        results = NotifyBase.parse_url(url)
+
+        if not results:
+            # We're done early as we couldn't load the results
+            return results
+
+        # Apply our settings now
+        results['notify_format'] = NotifyFormat.HTML
+
+        if 'format' in results['qsd'] and len(results['qsd']['format']):
+            # Extract email format (Text/Html)
+            try:
+                format = unquote(results['qsd']['format']).lower()
+                if len(format) > 0 and format[0] == 't':
+                    results['notify_format'] = NotifyFormat.TEXT
+
+            except AttributeError:
+                pass
+
+        results['apikey'] = results['host']
+
+        return results

@@ -1,8 +1,8 @@
-# -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
 #
 # XML Notify Wrapper
 #
-# Copyright (C) 2014-2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -19,14 +19,13 @@
 # You should have received a copy of the GNU General Public License
 # along with apprise. If not, see <http://www.gnu.org/licenses/>.
 
-from urllib import quote
-import requests
 import re
+import requests
+from urllib import quote
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import NotifyFormat
-from .NotifyBase import NotifyImageSize
 from .NotifyBase import HTTP_ERROR_MAP
+from ..common import NotifyImageSize
 
 # Image Support (128x128)
 XML_IMAGE_XY = NotifyImageSize.XY_128
@@ -38,10 +37,10 @@ class NotifyXML(NotifyBase):
     """
 
     # The default protocol
-    PROTOCOL = 'xml'
+    protocol = 'xml'
 
     # The default secure protocol
-    SECURE_PROTOCOL = 'xmls'
+    secure_protocol = 'xmls'
 
     def __init__(self, **kwargs):
         """
@@ -49,9 +48,7 @@ class NotifyXML(NotifyBase):
         """
         super(NotifyXML, self).__init__(
             title_maxlen=250, body_maxlen=32768,
-            image_size=XML_IMAGE_XY,
-            notify_format=NotifyFormat.TEXT,
-            **kwargs)
+            image_size=XML_IMAGE_XY, **kwargs)
 
         self.payload = """<?xml version='1.0' encoding='utf-8'?>
 <soapenv:Envelope
@@ -80,7 +77,7 @@ class NotifyXML(NotifyBase):
 
         return
 
-    def _notify(self, title, body, notify_type, **kwargs):
+    def notify(self, title, body, notify_type, **kwargs):
         """
         Perform XML Notification
         """

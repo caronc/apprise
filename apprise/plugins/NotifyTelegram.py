@@ -1,8 +1,8 @@
-# -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
 #
 # Telegram Notify Wrapper
 #
-# Copyright (C) 2016-2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -53,9 +53,6 @@ from .NotifyBase import NotifyBase
 from .NotifyBase import NotifyFormat
 from .NotifyBase import HTTP_ERROR_MAP
 
-# Telegram uses the http protocol with JSON requests
-TELEGRAM_BOT_URL = 'https://api.telegram.org/bot'
-
 # Token required as part of the API request
 # allow the word 'bot' infront
 VALIDATE_BOT_TOKEN = re.compile(
@@ -86,11 +83,11 @@ class NotifyTelegram(NotifyBase):
     A wrapper for Telegram Notifications
     """
 
-    # The default protocol
-    PROTOCOL = 'tgram'
-
     # The default secure protocol
-    SECURE_PROTOCOL = 'tgram'
+    secure_protocol = 'tgram'
+
+    # Telegram uses the http protocol with JSON requests
+    notify_url = 'https://api.telegram.org/bot'
 
     def __init__(self, bot_token, chat_ids, **kwargs):
         """
@@ -98,9 +95,7 @@ class NotifyTelegram(NotifyBase):
         """
         super(NotifyTelegram, self).__init__(
             title_maxlen=250, body_maxlen=4096,
-            image_size=TELEGRAM_IMAGE_XY,
-            notify_format=NotifyFormat.TEXT,
-            **kwargs)
+            image_size=TELEGRAM_IMAGE_XY, **kwargs)
 
         if bot_token is None:
             raise TypeError(
@@ -157,7 +152,7 @@ class NotifyTelegram(NotifyBase):
         }
 
         url = '%s%s/%s' % (
-            TELEGRAM_BOT_URL,
+            self.notify_url,
             self.bot_token,
             'getMe'
         )
@@ -209,7 +204,7 @@ class NotifyTelegram(NotifyBase):
 
         return chat_id
 
-    def _notify(self, title, body, notify_type, **kwargs):
+    def notify(self, title, body, notify_type, **kwargs):
         """
         Perform Telegram Notification
         """
@@ -224,13 +219,11 @@ class NotifyTelegram(NotifyBase):
 
         image_url = None
         if self.include_image:
-            image_content = self.image_raw(
-                notify_type,
-            )
+            image_content = self.image_raw(notify_type)
             if image_content is not None:
-                # prepare our eimage URL
+                # prepare our image URL
                 image_url = '%s%s/%s' % (
-                    TELEGRAM_BOT_URL,
+                    self.notify_url,
                     self.bot_token,
                     'sendPhoto'
                 )
@@ -239,7 +232,7 @@ class NotifyTelegram(NotifyBase):
                 files = {'photo': ('%s.png' % notify_type, image_content)}
 
         url = '%s%s/%s' % (
-            TELEGRAM_BOT_URL,
+            self.notify_url,
             self.bot_token,
             'sendMessage'
         )
@@ -410,3 +403,87 @@ class NotifyTelegram(NotifyBase):
                 self.throttle()
 
         return has_error
+
+    @staticmethod
+    def parse_url(url):
+        """
+        Parses the URL and returns enough arguments that can allow
+        us to substantiate this object.
+
+        """
+        # super() is formatted slightly different when dealing with
+        # static method inheritance
+        results = NotifyBase.parse_url(url)
+
+        if results:
+            # We're done early
+            return results
+
+        # This is a dirty hack; but it's the only work around to
+        # tgram:// messages since the bot_token has a colon in it.
+        # It invalidates an normal URL.
+
+        # This hack searches for this bogus URL and corrects it
+        # so we can properly load it further down. The other
+        # alternative is to ask users to actually change the colon
+        # into a slash (which will work too), but it's more likely
+        # to cause confusion... So this is the next best thing
+        tgram = re.match(
+            r'(?P<protocol>%s://)(bot)?(?P<prefix>([a-z0-9_-]+)'
+            r'(:[a-z0-9_-]+)?@)?(?P<btoken_a>[0-9]+):+'
+            r'(?P<remaining>.*)$' % 'tgram',
+            url, re.I)
+
+        if not tgram:
+            # Content is simply not parseable
+            return None
+
+        if tgram.group('prefix'):
+            # Try again
+            result = NotifyBase.parse_url(
+                '%s%s%s/%s' % (
+                    tgram.group('protocol'),
+                    tgram.group('prefix'),
+                    tgram.group('btoken_a'),
+                    tgram.group('remaining'),
+                ),
+            )
+
+        else:
+            # Try again
+            result = NotifyBase.parse_url(
+                '%s%s/%s' % (
+                    tgram.group('protocol'),
+                    tgram.group('btoken_a'),
+                    tgram.group('remaining'),
+                ),
+            )
+
+        # The first token is stored in the hostnamee
+        bot_token_a = result['host']
+
+        # Now fetch the remaining tokens
+        try:
+            bot_token_b = filter(
+                bool, NotifyBase.split_path(result['fullpath']))[0]
+
+            bot_token = '%s:%s' % (bot_token_a, bot_token_b)
+
+        except (AttributeError, IndexError):
+            # Force a bad value that will get caught in parsing later
+            bot_token = None
+
+        try:
+            chat_ids = ','.join(
+                filter(bool, NotifyBase.split_path(result['fullpath']))[1:])
+
+        except (AttributeError, IndexError):
+            # Force some bad values that will get caught
+            # in parsing later
+            chat_ids = None
+
+        # Return our results
+        return result + {
+            'bot_token': bot_token,
+            'chat_ids': chat_ids,
+        }.items()

@@ -10,8 +10,8 @@ programs using gntp
 import logging
 import os
 
-from . import gntp.notifier
-from . import gntp.shim
+from .gntp import notifier
+from .gntp import shim
 
 __all__ = [
 	'mini',

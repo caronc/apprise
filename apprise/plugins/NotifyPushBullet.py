@@ -1,8 +1,8 @@
-# -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
 #
 # PushBullet Notify Wrapper
 #
-# Copyright (C) 2014-2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -19,20 +19,17 @@
 # You should have received a copy of the GNU General Public License
 # along with apprise. If not, see <http://www.gnu.org/licenses/>.
 
-from json import dumps
-import requests
 import re
+import requests
+from json import dumps
+from urllib import unquote
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import NotifyFormat
 from .NotifyBase import HTTP_ERROR_MAP
 from .NotifyBase import IS_EMAIL_RE
 
 # Flag used as a placeholder to sending to all devices
 PUSHBULLET_SEND_TO_ALL = 'ALL_DEVICES'
-
-# PushBullet uses the http protocol with JSON requests
-PUSHBULLET_URL = 'https://api.pushbullet.com/v2/pushes'
 
 # Used to break apart list of potential recipients by their delimiter
 # into a usable list.
@@ -50,34 +47,37 @@ class NotifyPushBullet(NotifyBase):
     """
 
     # The default protocol
-    PROTOCOL = 'pbul'
+    protocol = 'pbul'
 
     # The default secure protocol
-    SECURE_PROTOCOL = 'pbul'
+    secure_protocol = 'pbul'
+
+    # PushBullet uses the http protocol with JSON requests
+    notify_url = 'https://api.pushbullet.com/v2/pushes'
 
     def __init__(self, accesstoken, recipients=None, **kwargs):
         """
         Initialize PushBullet Object
         """
         super(NotifyPushBullet, self).__init__(
-            title_maxlen=250, body_maxlen=32768,
-            notify_format=NotifyFormat.TEXT,
-            **kwargs)
+            title_maxlen=250, body_maxlen=32768, **kwargs)
 
         self.accesstoken = accesstoken
         if isinstance(recipients, basestring):
             self.recipients = filter(bool, RECIPIENTS_LIST_DELIM.split(
                 recipients,
             ))
+
         elif isinstance(recipients, (tuple, list)):
             self.recipients = recipients
+
         else:
             self.recipients = list()
 
         if len(self.recipients) == 0:
             self.recipients = (PUSHBULLET_SEND_TO_ALL, )
 
-    def _notify(self, title, body, **kwargs):
+    def notify(self, title, body, **kwargs):
         """
         Perform PushBullet Notification
         """
@@ -122,12 +122,12 @@ class NotifyPushBullet(NotifyBase):
                     "Recipient '%s' is a device" % recipient)
 
             self.logger.debug('PushBullet POST URL: %s (cert_verify=%r)' % (
-                PUSHBULLET_URL, self.verify_certificate,
+                self.notify_url, self.verify_certificate,
             ))
             self.logger.debug('PushBullet Payload: %s' % str(payload))
             try:
                 r = requests.post(
-                    PUSHBULLET_URL,
+                    self.notify_url,
                     data=dumps(payload),
                     headers=headers,
                     auth=auth,
@@ -165,3 +165,28 @@ class NotifyPushBullet(NotifyBase):
                 self.throttle()
 
         return not has_error
+
+    @staticmethod
+    def parse_url(url):
+        """
+        Parses the URL and returns enough arguments that can allow
+        us to substantiate this object.
+
+        """
+        results = NotifyBase.parse_url(url)
+
+        if not results:
+            # We're done early as we couldn't load the results
+            return results
+
+        # Apply our settings now
+        try:
+            recipients = unquote(results['fullpath'])
+
+        except AttributeError:
+            recipients = ''
+
+        results['accesstoken'] = results['host']
+        results['recipients'] = recipients
+
+        return results

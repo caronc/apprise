@@ -1,8 +1,8 @@
-# -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
 #
 # Our service wrappers
 #
-# Copyright (C) 2014-2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -40,11 +40,19 @@ from .NotifyTelegram import NotifyTelegram
 from .NotifyMatterMost import NotifyMatterMost
 from .NotifyPushjet import NotifyPushjet
 
+from ..common import NotifyImageSize
+from ..common import NOTIFY_IMAGE_SIZES
+from ..common import NotifyType
+from ..common import NOTIFY_TYPES
+
 __all__ = [
     # Notification Services
     'NotifyBoxcar', 'NotifyEmail', 'NotifyFaast', 'NotifyGrowl', 'NotifyJSON',
     'NotifyMyAndroid', 'NotifyProwl', 'NotifyPushalot', 'NotifyPushBullet',
     'NotifyPushover', 'NotifyRocketChat', 'NotifyToasty', 'NotifyTwitter',
     'NotifyXBMC', 'NotifyXML', 'NotifySlack', 'NotifyJoin', 'NotifyTelegram',
-    'NotifyMatterMost', 'NotifyPushjet'
+    'NotifyMatterMost', 'NotifyPushjet',
+
+    # Reference
+    'NotifyImageSize', 'NOTIFY_IMAGE_SIZES', 'NotifyType', 'NOTIFY_TYPES',
 ]

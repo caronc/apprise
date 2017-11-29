@@ -1,8 +1,8 @@
-# -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
 #
 # XBMC Notify Wrapper
 #
-# Copyright (C) 2014-2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -19,22 +19,22 @@
 # You should have received a copy of the GNU General Public License
 # along with apprise. If not, see <http://www.gnu.org/licenses/>.
 
-from json import dumps
+import re
 import requests
+from json import dumps
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import NotifyFormat
-from .NotifyBase import NotifyType
-from .NotifyBase import NotifyImageSize
 from .NotifyBase import HTTP_ERROR_MAP
+from ..common import NotifyType
+from ..common import NotifyImageSize
 
 # Image Support (128x128)
 XBMC_IMAGE_XY = NotifyImageSize.XY_128
 
-# XBMC uses the http protocol with JSON requests
-XBMC_PORT = 8080
-
+# XBMC uses v2
 XBMC_PROTOCOL_V2 = 2
+
+# Kodi uses v6
 XBMC_PROTOCOL_V6 = 6
 
 SUPPORTED_XBMC_PROTOCOLS = (
@@ -48,11 +48,14 @@ class NotifyXBMC(NotifyBase):
     A wrapper for XBMC/KODI Notifications
     """
 
-    # The default protocol
-    PROTOCOL = ('xbmc', 'kodi')
+    # The default protocols
+    protocol = ('xbmc', 'kodi')
 
-    # The default secure protocol
-    SECURE_PROTOCOL = ('xbmc', 'kodis')
+    # The default secure protocols
+    secure_protocol = ('xbmc', 'kodis')
+
+    # XBMC uses the http protocol with JSON requests
+    default_port = 8080
 
     def __init__(self, **kwargs):
         """
@@ -60,17 +63,16 @@ class NotifyXBMC(NotifyBase):
         """
         super(NotifyXBMC, self).__init__(
             title_maxlen=250, body_maxlen=32768,
-            image_size=XBMC_IMAGE_XY,
-            notify_format=NotifyFormat.TEXT,
-            **kwargs)
+            image_size=XBMC_IMAGE_XY, **kwargs)
 
         if self.secure:
             self.schema = 'https'
+
         else:
             self.schema = 'http'
 
         if not self.port:
-            self.port = XBMC_PORT
+            self.port = self.default_port
 
         self.protocol = kwargs.get('protocol', XBMC_PROTOCOL_V2)
         if self.protocol not in SUPPORTED_XBMC_PROTOCOLS:
@@ -152,10 +154,16 @@ class NotifyXBMC(NotifyBase):
 
         return (headers, dumps(payload))
 
-    def _notify(self, title, body, notify_type, **kwargs):
+    def notify(self, title, body, notify_type, **kwargs):
         """
         Perform XBMC Notification
         """
+
+        # Limit results to just the first 2 line otherwise
+        # there is just to much content to display
+        body = re.split('[\r\n]+', body)
+        body[0] = body[0].strip('#').strip()
+        body = '\r\n'.join(body[0:2])
 
         if self.protocol == XBMC_PROTOCOL_V2:
             # XBMC v2.0
@@ -205,6 +213,7 @@ class NotifyXBMC(NotifyBase):
 
                 # Return; we're done
                 return False
+
             else:
                 self.logger.info('Sent XBMC/KODI notification.')
 

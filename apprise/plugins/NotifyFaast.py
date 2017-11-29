@@ -1,4 +1,4 @@
-# -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
 #
 # Faast Notify Wrapper
 #
@@ -22,12 +22,8 @@
 import requests
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import NotifyFormat
-from .NotifyBase import NotifyImageSize
 from .NotifyBase import HTTP_ERROR_MAP
-
-# Faast uses the http protocol with JSON requests
-FAAST_URL = 'https://www.appnotifications.com/account/notifications.json'
+from ..common import NotifyImageSize
 
 # Image Support (72x72)
 FAAST_IMAGE_XY = NotifyImageSize.XY_72
@@ -39,24 +35,22 @@ class NotifyFaast(NotifyBase):
     """
 
     # The default protocol (this is secure for faast)
-    PROTOCOL = 'faast'
+    protocol = 'faast'
 
-    # The default secure protocol
-    SECURE_PROTOCOL = 'faast'
+    # Faast uses the http protocol with JSON requests
+    notify_url = 'https://www.appnotifications.com/account/notifications.json'
 
     def __init__(self, authtoken, **kwargs):
         """
         Initialize Faast Object
         """
         super(NotifyFaast, self).__init__(
-            title_maxlen=250, body_maxlen=32768,
-            image_size=FAAST_IMAGE_XY,
-            notify_format=NotifyFormat.TEXT,
+            title_maxlen=250, body_maxlen=32768, image_size=FAAST_IMAGE_XY,
             **kwargs)
 
         self.authtoken = authtoken
 
-    def _notify(self, title, body, notify_type, **kwargs):
+    def notify(self, title, body, notify_type, **kwargs):
         """
         Perform Faast Notification
         """
@@ -81,12 +75,12 @@ class NotifyFaast(NotifyBase):
                 payload['icon_url'] = image_url
 
         self.logger.debug('Faast POST URL: %s (cert_verify=%r)' % (
-            FAAST_URL, self.verify_certificate,
+            self.notify_url, self.verify_certificate,
         ))
         self.logger.debug('Faast Payload: %s' % str(payload))
         try:
             r = requests.post(
-                FAAST_URL,
+                self.notify_url,
                 data=payload,
                 headers=headers,
                 verify=self.verify_certificate,
@@ -121,3 +115,23 @@ class NotifyFaast(NotifyBase):
             return False
 
         return True
+
+    @staticmethod
+    def parse_url(url):
+        """
+        Parses the URL and returns enough arguments that can allow
+        us to substantiate this object.
+
+        """
+        results = NotifyBase.parse_url(url)
+
+        if not results:
+            # We're done early as we couldn't load the results
+            return results
+
+        # Apply our settings now
+
+        # Store our authtoken using the host
+        results['authtoken'] = results['host']
+
+        return results

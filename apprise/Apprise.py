@@ -1,17 +1,42 @@
 # -*- coding: utf-8 -*-
+#
+# Apprise Core
+#
+# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
+#
+# This file is part of apprise.
+#
+# apprise is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 2 of the License, or
+# (at your option) any later version.
+#
+# apprise is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with apprise. If not, see <http://www.gnu.org/licenses/>.
 
 import re
 import logging
 
+from .common import NotifyType
+from .common import NOTIFY_TYPES
+from .utils import parse_list
+
+from .AppriseAsset import AppriseAsset
+
 from . import plugins
-from .Utils import parse_url
-from .Utils import parse_list
-from .Utils import parse_bool
 
 logger = logging.getLogger(__name__)
 
 # Build a list of supported plugins
 SCHEMA_MAP = {}
+
+# Used for attempting to acquire the schema if the URL can't be parsed.
+GET_SCHEMA_RE = re.compile('\s*(?P<schema>[a-z0-9]+)://.*$', re.I)
 
 
 # Load our Lookup Matrix
@@ -23,20 +48,33 @@ def __load_matrix():
     """
     # to add it's mapping to our hash table
     for entry in dir(plugins):
+
         # Get our plugin
         plugin = getattr(plugins, entry)
 
-        proto = getattr(plugin, 'PROTOCOL', None)
-        protos = getattr(plugin, 'SECURE_PROTOCOL', None)
-        if not proto:
-            # Must have at least PROTOCOL defined
-            continue
+        # Load protocol(s) if defined
+        proto = getattr(plugin, 'protocol', None)
+        if isinstance(proto, basestring):
+            if proto not in SCHEMA_MAP:
+                SCHEMA_MAP[proto] = plugin
 
-        if proto not in SCHEMA_MAP:
-            SCHEMA_MAP[proto] = plugin
+        elif isinstance(proto, (set, list, tuple)):
+            # Support iterables list types
+            for p in proto:
+                if p not in SCHEMA_MAP:
+                    SCHEMA_MAP[p] = plugin
 
-        if protos and protos not in SCHEMA_MAP:
-            SCHEMA_MAP[protos] = plugin
+        # Load secure protocol(s) if defined
+        protos = getattr(plugin, 'secure_protocol', None)
+        if isinstance(protos, basestring):
+            if protos not in SCHEMA_MAP:
+                SCHEMA_MAP[protos] = plugin
+
+        if isinstance(protos, (set, list, tuple)):
+            # Support iterables list types
+            for p in protos:
+                if p not in SCHEMA_MAP:
+                    SCHEMA_MAP[p] = plugin
 
 
 # Dynamically build our module
@@ -48,24 +86,39 @@ class Apprise(object):
     Our Notification Manager
 
     """
-    def __init__(self, servers=None):
+    def __init__(self, servers=None, asset=None):
         """
-        Loads a set of server urls
+        Loads a set of server urls while applying the Asset() module to each
+        if specified.
+
+        If no asset is provided, then the default asset is used.
 
         """
 
         # Initialize a server list of URLs
         self.servers = list()
 
+        # Assigns an central asset object that will be later passed into each
+        # notification plugin.  Assets contain information such as the local
+        # directory images can be found in. It can also identify remote
+        # URL paths that contain the images you want to present to the end
+        # user. If no asset is specified, then the default one is used.
+        self.asset = asset
+        if asset is None:
+            # Load our default configuration
+            self.asset = AppriseAsset()
+
         if servers:
             self.add(servers)
 
-    def add(self, servers, include_image=True, image_url=None,
-            image_path=None):
+    def add(self, servers, asset=None):
         """
         Adds one or more server URLs into our list.
 
         """
+
+        # Initialize our return status
+        return_status = True
 
         servers = parse_list(servers)
         for _server in servers:
@@ -75,87 +128,58 @@ class Apprise(object):
             # pushbullet)
             _server = _server.replace('/#', '/%23')
 
-            # Parse our url details
-            # the server object is a dictionary containing all of the
-            # information parsed from our URL
-            server = parse_url(_server, default_schema='unknown')
-
-            # Initialize our return status
-            return_status = True
-
-            if not server:
-                # This is a dirty hack; but it's the only work around to
-                # tgram:// messages since the bot_token has a colon in it.
-                # It invalidates an normal URL.
-
-                # This hack searches for this bogus URL and corrects it
-                # so we can properly load it further down. The other
-                # alternative is to ask users to actually change the colon
-                # into a slash (which will work too), but it's more likely
-                # to cause confusion... So this is the next best thing
-                tgram = re.match(
-                    r'(?P<protocol>%s://)(bot)?(?P<prefix>([a-z0-9_-]+)'
-                    r'(:[a-z0-9_-]+)?@)?(?P<btoken_a>[0-9]+):+'
-                    r'(?P<remaining>.*)$' % 'tgram',
-                    _server, re.I)
-
-                if tgram:
-                    if tgram.group('prefix'):
-                        server = self.parse_url('%s%s%s/%s' % (
-                                tgram.group('protocol'),
-                                tgram.group('prefix'),
-                                tgram.group('btoken_a'),
-                                tgram.group('remaining'),
-                            ),
-                            default_schema='unknown',
-                        )
-
-                    else:
-                        server = self.parse_url('%s%s/%s' % (
-                                tgram.group('protocol'),
-                                tgram.group('btoken_a'),
-                                tgram.group('remaining'),
-                            ),
-                            default_schema='unknown',
-                        )
-
-            if not server:
-                # Failed to parse te server
-                self.logger.error('Could not parse URL: %s' % server)
-                return_status = False
-                continue
-
-            # Some basic validation
-            if server['schema'] not in SCHEMA_MAP:
-                self.logger.error(
-                    '%s is not a supported server type.' %
-                    server['schema'].upper(),
+            # Attempt to acquire the schema at the very least to allow
+            # our plugins to determine if they can make a better
+            # interpretation of a URL geared for them anyway.
+            schema = GET_SCHEMA_RE.match(_server)
+            if schema is None:
+                logger.error(
+                    '%s is an unparseable server url.' % _server,
                 )
                 return_status = False
                 continue
 
-            notify_args = server.copy().items() + {
-                # Logger Details
-                'logger': self.logger,
-                # Base
-                'include_image': include_image,
-                'secure': (server['schema'][-1] == 's'),
-                # Support SSL Certificate 'verify' keyword
-                # Default to being enabled (True)
-                'verify': parse_bool(server['qsd'].get('verify', True)),
-                # Overrides
-                'override_image_url': image_url,
-                'override_image_path': image_path,
-            }.items()
+            # Update the schema
+            schema = schema.group('schema').lower()
 
-            # Grant our plugin access to manipulate the dictionary
-            if not SCHEMA_MAP[server['schema']].pre_parse(notify_args):
+            # Some basic validation
+            if schema not in SCHEMA_MAP:
+                logger.error(
+                    '%s is not a supported server type.' % schema,
+                )
+                return_status = False
+                continue
+
+            # Parse our url details
+            # the server object is a dictionary containing all of the
+            # information parsed from our URL
+            results = SCHEMA_MAP[schema].parse_url(_server)
+
+            if not results:
+                # Failed to parse the server URL
+                logger.error('Could not parse URL: %s' % _server)
+                return_status = False
+                continue
+
+            try:
+                # Attempt to create an instance of our plugin using the parsed
+                # URL information
+                plugin = SCHEMA_MAP[results['schema']](**results)
+
+            except:
                 # the arguments are invalid or can not be used.
                 return_status = False
                 continue
 
-            # Add our entry to our list as it can be actioned at this point
-            self.servers.add(notify_args)
+            # Save our asset
+            if asset:
+                plugin.asset = asset
+
+            else:
+                plugin.asset = self.asset
+
+            # Add our initialized plugin to our server listings
+            self.servers.append(plugin)
 
             # Return our status
             return return_status
@@ -167,9 +191,38 @@ class Apprise(object):
         """
         self.servers.clear()
 
-    def notify(self, title='', body=''):
+    def notify(self, title, body, notify_type=NotifyType.SUCCESS, **kwargs):
         """
-        Notifies all loaded servers using the content provided.
+        This should be over-rided by the class that inherits this one.
+        """
 
-        """
-        # TODO: iterate over server entries and execute notification
+        # Initialize our return result
+        status = len(self.servers) > 0
+
+        if notify_type and notify_type not in NOTIFY_TYPES:
+            self.warning(
+                'An invalid notification type (%s) was specified.' % (
+                    notify_type))
+
+        if not isinstance(body, basestring):
+            body = ''
+
+        if not isinstance(title, basestring):
+            title = ''
+
+        # Iterate over our loaded plugins
+        for server in self.servers:
+            try:
+                # Send notification
+                if not server.notify(title=title, body=body):
+
+                    # Toggle our return status flag
+                    status = False
+
+            except:
+                # A catch all so we don't have to abort early
+                # just because one of our plugins has a bug in it.
+                # TODO: print backtrace
+                status = False
+
+        return status

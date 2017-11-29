@@ -1,4 +1,4 @@
-# -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
 #
 # Notify Rocket.Chat Notify Wrapper
 #
@@ -19,12 +19,12 @@
 # You should have received a copy of the GNU General Public License
 # along with apprise. If not, see <http://www.gnu.org/licenses/>.
 
-import requests
-import json
 import re
+import requests
+from json import loads
+from urllib import unquote
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import NotifyFormat
 from .NotifyBase import HTTP_ERROR_MAP
 
 IS_CHANNEL = re.compile(r'^#(?P<name>[A-Za-z0-9]+)$')
@@ -47,19 +47,17 @@ class NotifyRocketChat(NotifyBase):
     """
 
     # The default protocol
-    PROTOCOL = 'rocket'
+    protocol = 'rocket'
 
     # The default secure protocol
-    SECURE_PROTOCOL = 'rockets'
+    secure_protocol = 'rockets'
 
     def __init__(self, recipients=None, **kwargs):
         """
         Initialize Notify Rocket.Chat Object
         """
         super(NotifyRocketChat, self).__init__(
-            title_maxlen=200, body_maxlen=32768,
-            notify_format=NotifyFormat.TEXT,
-            **kwargs)
+            title_maxlen=200, body_maxlen=32768, **kwargs)
 
         if self.secure:
             self.schema = 'https'
@@ -127,7 +125,7 @@ class NotifyRocketChat(NotifyBase):
                 'Authentication to Rocket.Chat server failed.'
             )
 
-    def _notify(self, title, body, notify_type, **kwargs):
+    def notify(self, title, body, notify_type, **kwargs):
         """
         wrapper to send_notification since we can alert more then one channel
         """
@@ -235,7 +233,7 @@ class NotifyRocketChat(NotifyBase):
 
             else:
                 self.logger.debug('Rocket.Chat authentication successful')
-                response = json.loads(r.text)
+                response = loads(r.text)
                 if response.get('status') != "success":
                     self.logger.warning(
                         'Could not authenticate with Rocket.Chat server.')
@@ -305,3 +303,25 @@ class NotifyRocketChat(NotifyBase):
         # We're no longer authenticated now
         self.authenticated = False
         return True
+
+    @staticmethod
+    def parse_url(url):
+        """
+        Parses the URL and returns enough arguments that can allow
+        us to substantiate this object.
+
+        """
+        results = NotifyBase.parse_url(url)
+
+        if not results:
+            # We're done early as we couldn't load the results
+            return results
+
+        # Apply our settings now
+        try:
+            results['recipients'] = unquote(results['fullpath'])
+
+        except AttributeError:
+            return None
+
+        return results

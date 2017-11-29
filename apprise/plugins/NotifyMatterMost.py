@@ -1,4 +1,4 @@
-# -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
 #
 # MatterMost Notify Wrapper
 #
@@ -19,15 +19,14 @@
 # You should have received a copy of the GNU General Public License
 # along with apprise. If not, see <http://www.gnu.org/licenses/>.
 
-from json import dumps
+import re
 import requests
+from json import dumps
+from urllib import unquote as unquote
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import NotifyFormat
-from .NotifyBase import NotifyImageSize
 from .NotifyBase import HTTP_ERROR_MAP
-from .NotifyBase import NOTIFY_APPLICATION_ID
-import re
+from ..common import NotifyImageSize
 
 # Some Reference Locations:
 # - https://docs.mattermost.com/developer/webhooks-incoming.html
@@ -39,9 +38,6 @@ VALIDATE_AUTHTOKEN = re.compile(r'[A-Za-z0-9]{24,32}')
 # Image Support (72x72)
 MATTERMOST_IMAGE_XY = NotifyImageSize.XY_72
 
-# MATTERMOST uses the http protocol with JSON requests
-MATTERMOST_PORT = 8065
-
 
 class NotifyMatterMost(NotifyBase):
     """
@@ -49,23 +45,25 @@ class NotifyMatterMost(NotifyBase):
     """
 
     # The default protocol
-    PROTOCOL = 'mmost'
+    protocol = 'mmost'
 
     # The default secure protocol
-    SECURE_PROTOCOL = 'mmosts'
+    secure_protocol = 'mmosts'
+
+    # The default Mattermost port
+    default_port = 8065
 
     def __init__(self, authtoken, channel=None, **kwargs):
         """
         Initialize MatterMost Object
         """
         super(NotifyMatterMost, self).__init__(
-            title_maxlen=250, body_maxlen=4000,
-            image_size=MATTERMOST_IMAGE_XY,
-            notify_format=NotifyFormat.TEXT,
+            title_maxlen=250, body_maxlen=4000, image_size=MATTERMOST_IMAGE_XY,
             **kwargs)
 
         if self.secure:
             self.schema = 'https'
+
         else:
             self.schema = 'http'
 
@@ -93,11 +91,11 @@ class NotifyMatterMost(NotifyBase):
         self.channel = channel
 
         if not self.port:
-            self.port = MATTERMOST_PORT
+            self.port = self.default_port
 
         return
 
-    def _notify(self, title, body, notify_type, **kwargs):
+    def notify(self, title, body, notify_type, **kwargs):
         """
         Perform MatterMost Notification
         """
@@ -117,7 +115,7 @@ class NotifyMatterMost(NotifyBase):
             payload['username'] = self.user
 
         else:
-            payload['username'] = NOTIFY_APPLICATION_ID
+            payload['username'] = self.app_id
 
         if self.channel:
             payload['channel'] = self.channel
@@ -170,3 +168,44 @@ class NotifyMatterMost(NotifyBase):
             return False
 
         return True
+
+    @staticmethod
+    def parse_url(url):
+        """
+        Parses the URL and returns enough arguments that can allow
+        us to substantiate this object.
+
+        """
+        results = NotifyBase.parse_url(url)
+
+        if not results:
+            # We're done early as we couldn't load the results
+            return results
+
+        # Apply our settings now
+        try:
+            authtoken = filter(
+                bool, NotifyBase.split_path(results['fullpath']))[0]
+
+        except (AttributeError, IndexError):
+            # Force some bad values that will get caught
+            # in parsing later
+            authtoken = None
+
+        channel = None
+        if 'channel' in results['qsd'] and len(results['qsd']['channel']):
+            # Allow the user to specify the channel to post to
+            try:
+                channel = unquote(results['qsd']['channel']).strip()
+
+            except (AttributeError, TypeError, ValueError):
+                NotifyBase.logger.warning(
+                    'An invalid MatterMost channel of "%s" was specified and '
+                    'will be ignored.' % results['qsd']['channel']
+                )
+                pass
+
+        results['authtoken'] = authtoken
+        results['channel'] = channel
+
+        return results

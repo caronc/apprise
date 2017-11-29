@@ -1,8 +1,8 @@
-# -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
 #
 # Growl Notify Wrapper
 #
-# Copyright (C) 2014-2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -18,17 +18,15 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with apprise. If not, see <http://www.gnu.org/licenses/>.
-
-from ..NotifyBase import NotifyBase
-from ..NotifyBase import NotifyFormat
-from ..NotifyBase import NotifyImageSize
+import re
+from urllib import unquote
 
 from .gntp.notifier import GrowlNotifier
 from .gntp.errors import NetworkError as GrowlNetworkError
 from .gntp.errors import AuthError as GrowlAuthenticationError
 
-# Default Growl Port
-GROWL_UDP_PORT = 23053
+from ..NotifyBase import NotifyBase
+from ...common import NotifyImageSize
 
 # Image Support (72x72)
 GROWL_IMAGE_XY = NotifyImageSize.XY_72
@@ -61,10 +59,10 @@ class NotifyGrowl(NotifyBase):
     """
 
     # The default protocol
-    PROTOCOL = 'growl'
+    protocol = 'growl'
 
-    # The default secure protocol
-    SECURE_PROTOCOL = 'growl'
+    # Default Growl Port
+    default_port = 23053
 
     def __init__(self, priority=GrowlPriority.NORMAL, version=2, **kwargs):
         """
@@ -72,19 +70,18 @@ class NotifyGrowl(NotifyBase):
         """
         super(NotifyGrowl, self).__init__(
             title_maxlen=250, body_maxlen=32768,
-            image_size=GROWL_IMAGE_XY,
-            notify_format=NotifyFormat.TEXT,
-            **kwargs)
+            image_size=GROWL_IMAGE_XY, **kwargs)
 
         # A Global flag that tracks registration
         self.is_registered = False
 
         if not self.port:
-            self.port = GROWL_UDP_PORT
+            self.port = self.default_port
 
         # The Priority of the message
         if priority not in GROWL_PRIORITIES:
             self.priority = GrowlPriority.NORMAL
+
         else:
             self.priority = priority
 
@@ -130,7 +127,7 @@ class NotifyGrowl(NotifyBase):
 
         return
 
-    def _notify(self, title, body, notify_type, **kwargs):
+    def notify(self, title, body, notify_type, **kwargs):
         """
         Perform Growl Notification
         """
@@ -138,6 +135,12 @@ class NotifyGrowl(NotifyBase):
         if not self.is_registered:
             # We can't do anything
             return None
+
+        # Limit results to just the first 2 line otherwise there is just to
+        # much content to display
+        body = re.split('[\r\n]+', body)
+        body[0] = body[0].strip('#').strip()
+        body = '\r\n'.join(body[0:2])
 
         icon = None
         if self.include_image:
@@ -175,13 +178,13 @@ class NotifyGrowl(NotifyBase):
                 )
 
         except GrowlNetworkError as e:
-            # Since Growl servers listen for UDP broadcasts,
-            # it's possible that you will never get to this part
-            # of the code since there is no acknowledgement as to
-            # whether it accepted what was sent to it or not.
+            # Since Growl servers listen for UDP broadcasts, it's possible
+            # that you will never get to this part of the code since there is
+            # no acknowledgement as to whether it accepted what was sent to it
+            # or not.
 
-            # however, if the host/server is unavailable, you will
-            # get to this point of the code.
+            # However, if the host/server is unavailable, you will get to this
+            # point of the code.
             self.logger.warning(
                 'A Connection error occured sending Growl '
                 'notification to %s.' % self.host)
@@ -191,3 +194,43 @@ class NotifyGrowl(NotifyBase):
             return False
 
         return True
+
+    @staticmethod
+    def parse_url(url):
+        """
+        Parses the URL and returns enough arguments that can allow
+        us to substantiate this object.
+
+        """
+        results = NotifyBase.parse_url(url)
+
+        if not results:
+            # We're done early as we couldn't load the results
+            return results
+
+        # Apply our settings now
+        version = None
+        if 'version' in results['qsd'] and len(results['qsd']['version']):
+            # Allow the user to specify the version of the protocol to use.
+            try:
+                version = int(
+                    unquote(results['qsd']['version']).strip().split('.')[0])
+
+            except (AttributeError, IndexError, TypeError, ValueError):
+                NotifyBase.logger.warning(
+                    'An invalid Growl version of "%s" was specified and will '
+                    'be ignored.' % results['qsd']['version']
+                )
+                pass
+
+        # Because of the URL formatting, the password is actually where the
+        # username field is. For this reason, we just preform this small hack
+        # to make it (the URL) conform correctly. The following strips out the
+        # existing password entry (if exists) so that it can be swapped with
+        # the new one we specify.
+        results['user'] = None
+        results['password'] = results.get('user', None)
+        if version:
+            results['version'] = version
+
+        return results

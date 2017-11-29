@@ -1,4 +1,4 @@
-# -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
 #
 # JSON Notify Wrapper
 #
@@ -19,13 +19,12 @@
 # You should have received a copy of the GNU General Public License
 # along with apprise. If not, see <http://www.gnu.org/licenses/>.
 
-from json import dumps
 import requests
+from json import dumps
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import NotifyFormat
-from .NotifyBase import NotifyImageSize
 from .NotifyBase import HTTP_ERROR_MAP
+from ..common import NotifyImageSize
 
 # Image Support (128x128)
 JSON_IMAGE_XY = NotifyImageSize.XY_128
@@ -37,19 +36,17 @@ class NotifyJSON(NotifyBase):
     """
 
     # The default protocol
-    PROTOCOL = 'json'
+    protocol = 'json'
 
     # The default secure protocol
-    SECURE_PROTOCOL = 'jsons'
+    secure_protocol = 'jsons'
 
     def __init__(self, **kwargs):
         """
         Initialize JSON Object
         """
         super(NotifyJSON, self).__init__(
-            title_maxlen=250, body_maxlen=32768,
-            image_size=JSON_IMAGE_XY,
-            notify_format=NotifyFormat.TEXT,
+            title_maxlen=250, body_maxlen=32768, image_size=JSON_IMAGE_XY,
             **kwargs)
 
         if self.secure:
@@ -64,7 +61,7 @@ class NotifyJSON(NotifyBase):
 
         return
 
-    def _notify(self, title, body, notify_type, **kwargs):
+    def notify(self, title, body, notify_type, **kwargs):
         """
         Perform JSON Notification
         """

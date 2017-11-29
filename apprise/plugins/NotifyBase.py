@@ -1,8 +1,8 @@
-# -*- encoding: utf-8 -*-
+# -*- coding: utf-8 -*-
 #
 # Base Notify Wrapper
 #
-# Copyright (C) 2014-2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -19,19 +19,21 @@
 # You should have received a copy of the GNU General Public License
 # along with apprise. If not, see <http://www.gnu.org/licenses/>.
 
-from time import sleep
 import re
-
 import markdown
-
 import logging
-
-from os.path import join
-from os.path import dirname
-from os.path import abspath
+from time import sleep
+from urllib import unquote as _unquote
 
 # For conversion
 from chardet import detect as chardet_detect
+
+from ..utils import parse_url
+from ..utils import parse_bool
+from ..common import NOTIFY_IMAGE_SIZES
+from ..common import NOTIFY_TYPES
+
+from ..AppriseAsset import AppriseAsset
 
 # Define a general HTML Escaping
 try:
@@ -55,46 +57,6 @@ except ImportError:
         return cgi_escape(text, quote=True)
 
 
-class NotifyType(object):
-    INFO = 'info'
-    SUCCESS = 'success'
-    FAILURE = 'failure'
-    WARNING = 'warning'
-
-
-# Most Servers do not like more then 1 request per 5 seconds,
-# so 5.5 gives us a safe play range...
-NOTIFY_THROTTLE_SEC = 5.5
-
-NOTIFY_TYPES = (
-    NotifyType.INFO,
-    NotifyType.SUCCESS,
-    NotifyType.FAILURE,
-    NotifyType.WARNING,
-)
-
-# A Simple Mapping of Colors; For every NOTIFY_TYPE identified,
-# there should be a mapping to it's color here:
-HTML_NOTIFY_MAP = {
-    NotifyType.INFO: '#3AA3E3',
-    NotifyType.SUCCESS: '#3AA337',
-    NotifyType.FAILURE: '#A32037',
-    NotifyType.WARNING: '#CACF29',
-}
-
-
-class NotifyImageSize(object):
-    XY_72 = '72x72'
-    XY_128 = '128x128'
-    XY_256 = '256x256'
-
-
-NOTIFY_IMAGE_SIZES = (
-    NotifyImageSize.XY_72,
-    NotifyImageSize.XY_128,
-    NotifyImageSize.XY_256,
-)
-
 HTTP_ERROR_MAP = {
     400: 'Bad Request - Unsupported Parameters.',
     401: 'Verification Failed.',
@@ -104,32 +66,23 @@ HTTP_ERROR_MAP = {
     503: 'Servers are overloaded.',
 }
 
-# Application Identifier
-NOTIFY_APPLICATION_ID = 'apprise'
-NOTIFY_APPLICATION_DESC = 'Apprise Notifications'
-
-# Image Control
-NOTIFY_IMAGE_URL = \
-    'http://nuxref.com/apprise/apprise-{TYPE}-{XY}.png'
-
-NOTIFY_IMAGE_FILE = abspath(join(
-    dirname(__file__),
-    'var',
-    'apprise-{TYPE}-{XY}.png',
-))
-
 # HTML New Line Delimiter
-NOTIFY_NEWLINE = '\r\n'
+NOTIFY_NEWLINE = '\n'
+
+# Used to break a path list into parts
+PATHSPLIT_LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
 
 
 class NotifyFormat(object):
     TEXT = 'text'
     HTML = 'html'
+    MARKDOWN = 'markdown'
 
 
 NOTIFY_FORMATS = (
     NotifyFormat.TEXT,
     NotifyFormat.HTML,
+    NotifyFormat.MARKDOWN,
 )
 
 # Regular expression retrieved from:
@@ -152,26 +105,36 @@ class NotifyBase(object):
     # The default simple (insecure) protocol
     # all inheriting entries must provide their protocol lookup
     # protocol:// (in this example they would specify 'protocol')
-    PROTOCOL = ''
+    protocol = ''
 
     # The default secure protocol
     # all inheriting entries must provide their protocol lookup
     # protocols:// (in this example they would specify 'protocols')
-    # This value can be the same as the defined PROTOCOL.
-    SECURE_PROTOCOL = ''
+    # This value can be the same as the defined protocol.
+    secure_protocol = ''
+
+    # our Application identifier
+    app_id = 'Apprise'
+
+    # our Application description
+    app_desc = 'Apprise Notifications'
+
+    # Most Servers do not like more then 1 request per 5 seconds, so 5.5 gives
+    # us a safe play range...
+    throttle_attempt = 5.5
+
+    # Logging
+    logger = logging.getLogger(__name__)
 
     def __init__(self, title_maxlen=100, body_maxlen=512,
                  notify_format=NotifyFormat.TEXT, image_size=None,
-                 include_image=False, override_image_path=None,
-                 secure=False, **kwargs):
+                 include_image=False, secure=False, throttle=None, **kwargs):
         """
-        Initialize some general logging and common server arguments
-        that will keep things consistent when working with the
-        notifiers that will inherit this class
-        """
+        Initialize some general logging and common server arguments that will
+        keep things consistent when working with the notifiers that will
+        inherit this class.
 
-        # Logging
-        self.logger = logging.getLogger(__name__)
+        """
 
         if notify_format.lower() not in NOTIFY_FORMATS:
             self.logger.error(
@@ -189,8 +152,8 @@ class NotifyBase(object):
                 'Invalid image size %s' % image_size,
             )
 
-        self.app_id = NOTIFY_APPLICATION_ID
-        self.app_desc = NOTIFY_APPLICATION_DESC
+        # Prepare our Assets
+        self.asset = AppriseAsset()
 
         self.notify_format = notify_format.lower()
         self.title_maxlen = title_maxlen
@@ -198,6 +161,10 @@ class NotifyBase(object):
         self.image_size = image_size
         self.include_image = include_image
         self.secure = secure
+
+        if throttle:
+            # Custom throttle override
+            self.throttle_attempt = throttle
 
         # Certificate Verification (for SSL calls); default to being enabled
         self.verify_certificate = kwargs.get('verify', True)
@@ -213,16 +180,19 @@ class NotifyBase(object):
         self.user = kwargs.get('user')
         self.password = kwargs.get('password')
 
-        # Over-rides
-        self.override_image_url = kwargs.get('override_image_url')
-        self.override_image_path = kwargs.get('override_image_path')
-
-    def throttle(self, throttle_time=NOTIFY_THROTTLE_SEC):
+    def throttle(self, throttle_time=None):
         """
         A common throttle control
         """
         self.logger.debug('Throttling...')
-        sleep(throttle_time)
+
+        throttle_time = throttle_time \
+            if throttle_time is not None else self.throttle_attempt
+
+        # Perform throttle
+        if throttle_time > 0:
+            sleep(throttle_time)
+
         return
 
     def image_url(self, notify_type):
@@ -230,73 +200,46 @@ class NotifyBase(object):
         Returns Image URL if possible
         """
 
-        if self.override_image_url:
-            # Over-ride
-            return self.override_image_url
-
         if not self.image_size:
             return None
 
         if notify_type not in NOTIFY_TYPES:
             return None
 
-        re_map = {
-            '{TYPE}': notify_type,
-            '{XY}': self.image_size,
-        }
-
-        # Iterate over above list and store content accordingly
-        re_table = re.compile(
-            r'(' + '|'.join(re_map.keys()) + r')',
-            re.IGNORECASE,
+        return self.asset.image_url(
+            notify_type=notify_type,
+            image_size=self.image_size,
         )
 
-        return re_table.sub(lambda x: re_map[x.group()], NOTIFY_IMAGE_URL)
+    def image_path(self, notify_type):
+        """
+        Returns the path of the image if it can
+        """
+        if not self.image_size:
+            return None
+
+        if notify_type not in NOTIFY_TYPES:
+            return None
+
+        return self.asset.image_path(
+            notify_type=notify_type,
+            image_size=self.image_size,
+        )
 
     def image_raw(self, notify_type):
         """
         Returns the raw image if it can
         """
-        if not self.override_image_path:
-            if not self.image_size:
-                return None
-
-            if notify_type not in NOTIFY_TYPES:
-                return None
-
-            re_map = {
-                '{TYPE}': notify_type,
-                '{XY}': self.image_size,
-            }
-
-            # Iterate over above list and store content accordingly
-            re_table = re.compile(
-                r'(' + '|'.join(re_map.keys()) + r')',
-                re.IGNORECASE,
-            )
-
-            # Now we open and return the file
-            _file = re_table.sub(
-                lambda x: re_map[x.group()], NOTIFY_IMAGE_FILE)
-
-        else:
-            # Override Path Specified
-            _file = self.override_image_path
-
-        try:
-            fd = open(_file, 'rb')
-
-        except:
+        if not self.image_size:
             return None
 
-        try:
-            return fd.read()
-
-        except:
+        if notify_type not in NOTIFY_TYPES:
             return None
 
-        finally:
-            fd.close()
+        return self.asset.image_raw(
+            notify_type=notify_type,
+            image_size=self.image_size,
+        )
 
     def escape_html(self, html, convert_new_lines=False):
         """
@@ -379,67 +322,55 @@ class NotifyBase(object):
         # we always return a list
         return [html, ]
 
-    def notify(self, title, body, notify_type=NotifyType.SUCCESS,
-               **kwargs):
+    @staticmethod
+    def split_path(path, unquote=True):
         """
-        This should be over-rided by the class that
-        inherits this one.
-        """
-        if notify_type and notify_type not in NOTIFY_TYPES:
-            self.warning(
-                'An invalid notification type (%s) was specified.' % (
-                    notify_type))
-
-        if not isinstance(body, basestring):
-            body = ''
-
-        if not isinstance(title, basestring):
-            title = ''
-
-        # Ensure we're set up as UTF-8
-        title = self.to_utf8(title)
-        body = self.to_utf8(body)
-
-        if title:
-            title = title[0:self.title_maxlen]
-
-        if self.notify_format == NotifyFormat.HTML:
-            bodies = self.to_html(body=body)
-
-        elif self.notify_format == NotifyFormat.TEXT:
-            # TODO: this should split the content into
-            # multiple messages
-            bodies = [body[0:self.body_maxlen], ]
-
-        while len(bodies):
-            b = bodies.pop(0)
-            # Send Message(s)
-            if not self._notify(
-                    title=title, body=b,
-                    notify_type=notify_type,
-                    **kwargs):
-                return False
-
-            # If we got here, we sent part of the notification
-            # if there are any left, we should throttle so we
-            # don't overload the server with requests (they
-            # might not be happy with us otherwise)
-            if len(bodies):
-                self.throttle()
-
-        return True
-
-    def pre_parse(self, url, server_settings):
-        """
-        grants the ability to manipulate or additionally parse the content
-        provided in the server_settings variable.
-
-        Return True if you're satisfied with them (and may have additionally
-        changed them) and False if the settings are not acceptable or useable
-
-        Since this is the base class, plugins are not requird to overload it
-        but have the option to.  By default the configuration is always
-        accepted.
+        Splits a URL up into a list object.
 
         """
-        return True
+        if unquote:
+            return PATHSPLIT_LIST_DELIM.split(_unquote(path).lstrip('/'))
+        return PATHSPLIT_LIST_DELIM.split(path.lstrip('/'))
+
+    @staticmethod
+    def is_email(address):
+        """
+        Returns True if specified entry is an email address
+
+        """
+        return IS_EMAIL_RE.match(address) is not None
+
+    @staticmethod
+    def parse_url(url):
+        """
+        Parses the URL and returns it broken apart into a dictionary.
+
+        """
+        results = parse_url(url, default_schema='unknown')
+
+        if not results:
+            # We're done; we failed to parse our url
+            return results
+
+        # if our URL ends with an 's', then assueme our secure flag is set.
+        results['secure'] = (results['schema'][-1] == 's')
+
+        # Our default notification format
+        results['notify_format'] = NotifyFormat.TEXT
+
+        # Support SSL Certificate 'verify' keyword. Default to being enabled
+        results['verify'] = True
+
+        if 'qsd' in results:
+            if 'verify' in results['qsd']:
+                parse_bool(results['qsd'].get('verify', True))
+
+            # Password overrides
+            if 'pass' in results['qsd']:
+                results['password'] = results['qsd']['pass']
+
+            # User overrides
+            if 'user' in results['qsd']:
+                results['user'] = results['qsd']['user']
+
+        return results
