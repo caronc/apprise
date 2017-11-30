@@ -51,3 +51,44 @@ Apprise have some email services built right into it (such as hotmail, gmail, et
 | [JSON](https://github.com/caronc/apprise/wiki/Notify_Custom_JSON)       | json:// or jsons://   | (TCP) 80 or 443 | json://hostname<br />json://user@hostname<br />json://user:password@hostname:port<br />json://hostname/a/path/to/post/to
 | [XML](https://github.com/caronc/apprise/wiki/Notify_Custom_XML)         | xml:// or xmls://   | (TCP) 80 or 443 | xml://hostname<br />xml://user@hostname<br />xml://user:password@hostname:port<br />xml://hostname/a/path/to/post/to
 
+## Installation
+The easiest way is to install from pypi:
+```bash
+pip install apprise
+```
+## Command Line
+A small command line tool is also provided with this package called *notify*. If you know the server url's you wish to notify, you can simply provide them all on the command line and send your notifications that way:
+```bash
+# Send a notification to as many servers as you want to specify
+notify -t 'my title' -b 'my notification body' \
+   'mailto://myemail:mypass@gmail.com' \
+   'pbul://o.gn5kj6nfhv736I7jC3cj3QLRiyhgl98b'
+
+# If you don't specify a --body (-b) then stdin is used allowing
+# you to use the tool as part of your every day administration:
+cat /proc/cpuinfo | notify -t 'cpu info' \
+      'mailto://myemail:mypass@gmail.com'
+```
+
+## Developers
+To send a notification from within your python application, just do the following:
+```python
+import apprise
+
+# create an Apprise instance
+apobj = Apprise()
+
+# Add all of the notification services by their server url.
+# A sample email notification
+apobj.add('mailto://myemail:mypass@gmail.com')
+
+# A sample pushbullet notification
+apobj.add('pbul://o.gn5kj6nfhv736I7jC3cj3QLRiyhgl98b')
+
+# Then notify these services any time you desire. The below would
+# notify all of the services loaded into our Apprise object.
+apobj.notify(
+    title='my notification title',
+    body='what a great notification service!',
+)
+```
