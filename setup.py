@@ -34,8 +34,8 @@ else:
 
 setup(
     name='apprise',
-    version='0.0.1',
-    description='A friendly notification hub',
+    version='0.0.2',
+    description='A universal notification service',
     license='GPLv3',
     long_description=open('README.md').read(),
     url='https://github.com/caronc/apprise',
