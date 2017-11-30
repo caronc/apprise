@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 SCHEMA_MAP = {}
 
 # Used for attempting to acquire the schema if the URL can't be parsed.
-GET_SCHEMA_RE = re.compile('\s*(?P<schema>[a-z0-9]+)://.*$', re.I)
+GET_SCHEMA_RE = re.compile('\s*(?P<schema>[a-z0-9]{3,9})://.*$', re.I)
 
 
 # Load our Lookup Matrix
@@ -181,15 +181,15 @@ class Apprise(object):
             # Add our initialized plugin to our server listings
             self.servers.append(plugin)
 
-            # Return our status
-            return return_status
+        # Return our status
+        return return_status
 
-    def clear(self, urls):
+    def clear(self):
         """
         Empties our server list
 
         """
-        self.servers.clear()
+        self.servers[:] = []
 
     def notify(self, title, body, notify_type=NotifyType.SUCCESS, **kwargs):
         """
@@ -199,16 +199,8 @@ class Apprise(object):
         # Initialize our return result
         status = len(self.servers) > 0
 
-        if notify_type and notify_type not in NOTIFY_TYPES:
-            logger.warning(
-                'An invalid notification type (%s) was specified.' % (
-                    notify_type))
-
-        if not isinstance(body, basestring):
-            body = ''
-
-        if not isinstance(title, basestring):
-            title = ''
+        if not (title or body):
+            return False
 
         # Iterate over our loaded plugins
         for server in self.servers:
@@ -226,3 +218,9 @@ class Apprise(object):
                 status = False
 
         return status
+
+    def __len__(self):
+        """
+        Returns the number of servers loaded
+        """
+        return len(self.servers)

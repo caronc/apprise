@@ -42,6 +42,9 @@ class AppriseAsset(object):
         NotifyType.WARNING: '#CACF29',
     }
 
+    # The default color to return if a mapping isn't found in our table above
+    default_html_color = '#888888'
+
     # The default theme
     theme = 'default'
 
@@ -79,7 +82,7 @@ class AppriseAsset(object):
         """
         # Attempt to get the type, otherwise return a default grey
         # if we couldn't look up the entry
-        return self.html_notify_map.get(notify_type, '#888888')
+        return self.html_notify_map.get(notify_type, self.default_html_color)
 
     def image_url(self, notify_type, image_size):
         """
