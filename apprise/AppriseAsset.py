@@ -61,7 +61,8 @@ class AppriseAsset(object):
         'apprise-{TYPE}-{XY}.png',
     ))
 
-    def __init__(self, image_path_mask=None, image_url_mask=None, theme=None):
+    def __init__(self, theme='default', image_path_mask=None,
+                 image_url_mask=None):
         """
         Asset Initialization
 
@@ -89,7 +90,7 @@ class AppriseAsset(object):
 
         """
         re_map = {
-            '{THEME}': self.theme,
+            '{THEME}': self.theme if self.theme else '',
             '{TYPE}': notify_type,
             '{XY}': image_size,
         }
@@ -108,7 +109,7 @@ class AppriseAsset(object):
 
         """
         re_map = {
-            '{THEME}': self.theme,
+            '{THEME}': self.theme if self.theme else '',
             '{TYPE}': notify_type,
             '{XY}': image_size,
         }

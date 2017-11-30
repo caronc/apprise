@@ -200,7 +200,7 @@ class Apprise(object):
         status = len(self.servers) > 0
 
         if notify_type and notify_type not in NOTIFY_TYPES:
-            self.warning(
+            logger.warning(
                 'An invalid notification type (%s) was specified.' % (
                     notify_type))
 
