@@ -19,7 +19,6 @@
 import re
 import requests
 from json import dumps
-from urllib import unquote as unquote
 
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
@@ -181,8 +180,7 @@ class NotifyMatterMost(NotifyBase):
 
         # Apply our settings now
         try:
-            authtoken = filter(
-                bool, NotifyBase.split_path(results['fullpath']))[0]
+            authtoken = NotifyBase.split_path(results['fullpath'])[0]
 
         except (AttributeError, IndexError):
             # Force some bad values that will get caught
@@ -193,7 +191,7 @@ class NotifyMatterMost(NotifyBase):
         if 'channel' in results['qsd'] and len(results['qsd']['channel']):
             # Allow the user to specify the channel to post to
             try:
-                channel = unquote(results['qsd']['channel']).strip()
+                channel = NotifyBase.unquote(results['qsd']['channel']).strip()
 
             except (AttributeError, TypeError, ValueError):
                 NotifyBase.logger.warning(

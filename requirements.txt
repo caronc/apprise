@@ -1,5 +1,3 @@
-chardet
-markdown
 decorator
 requests
 requests-oauthlib

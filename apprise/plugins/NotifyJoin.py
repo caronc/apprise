@@ -28,19 +28,20 @@
 
 import re
 import requests
-from urllib import urlencode
 
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyImageSize
+from ..utils import compat_is_basestring
 
 # Token required as part of the API request
 VALIDATE_APIKEY = re.compile(r'[A-Za-z0-9]{32}')
 
 # Extend HTTP Error Messages
-JOIN_HTTP_ERROR_MAP = dict(HTTP_ERROR_MAP.items() + {
+JOIN_HTTP_ERROR_MAP = HTTP_ERROR_MAP.copy()
+JOIN_HTTP_ERROR_MAP.update({
     401: 'Unauthorized - Invalid Token.',
-}.items())
+})
 
 # Used to break path apart into list of devices
 DEVICE_LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
@@ -90,12 +91,12 @@ class NotifyJoin(NotifyBase):
         # The token associated with the account
         self.apikey = apikey.strip()
 
-        if isinstance(devices, basestring):
+        if compat_is_basestring(devices):
             self.devices = filter(bool, DEVICE_LIST_DELIM.split(
                 devices,
             ))
 
-        elif isinstance(devices, (tuple, list)):
+        elif isinstance(devices, (set, tuple, list)):
             self.devices = devices
 
         else:
@@ -158,7 +159,7 @@ class NotifyJoin(NotifyBase):
             payload = {}
 
             # Prepare the URL
-            url = '%s?%s' % (self.notify_url, urlencode(url_args))
+            url = '%s?%s' % (self.notify_url, NotifyBase.urlencode(url_args))
 
             self.logger.debug('Join POST URL: %s (cert_verify=%r)' % (
                 url, self.verify_certificate,

@@ -18,12 +18,11 @@
 
 import re
 import requests
-from urllib import quote
-from urllib import unquote
 
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyImageSize
+from ..utils import compat_is_basestring
 
 # Image Support (128x128)
 TOASTY_IMAGE_XY = NotifyImageSize.XY_128
@@ -52,7 +51,7 @@ class NotifyToasty(NotifyBase):
             title_maxlen=250, body_maxlen=32768, image_size=TOASTY_IMAGE_XY,
             **kwargs)
 
-        if isinstance(devices, basestring):
+        if compat_is_basestring(devices):
             self.devices = filter(bool, DEVICES_LIST_DELIM.split(
                 devices,
             ))
@@ -86,9 +85,9 @@ class NotifyToasty(NotifyBase):
 
             # prepare JSON Object
             payload = {
-                'sender': quote(self.user),
-                'title': quote(title),
-                'text': quote(body),
+                'sender': NotifyBase.quote(self.user),
+                'title': NotifyBase.quote(title),
+                'text': NotifyBase.quote(body),
             }
 
             if self.include_image:
@@ -163,7 +162,7 @@ class NotifyToasty(NotifyBase):
 
         # Apply our settings now
         try:
-            devices = unquote(results['fullpath'])
+            devices = NotifyBase.unquote(results['fullpath'])
 
         except AttributeError:
             devices = ''

@@ -1,0 +1,5 @@
+pytest
+coverage
+pytest-cov
+pycodestyle
+tox

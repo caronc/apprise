@@ -33,13 +33,7 @@ from .AppriseAsset import AppriseAsset
 
 # Set default logging handler to avoid "No handler found" warnings.
 import logging
-try:  # Python 2.7+
-    from logging import NullHandler
-except ImportError:
-    class NullHandler(logging.Handler):
-        def emit(self, record):
-            pass
-
+from logging import NullHandler
 logging.getLogger(__name__).addHandler(NullHandler())
 
 __all__ = [

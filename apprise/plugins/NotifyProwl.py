@@ -47,10 +47,11 @@ PROWL_PRIORITIES = (
 )
 
 # Extend HTTP Error Messages
-PROWL_HTTP_ERROR_MAP = dict(HTTP_ERROR_MAP.items() + {
+PROWL_HTTP_ERROR_MAP = HTTP_ERROR_MAP.copy()
+HTTP_ERROR_MAP.update({
     406: 'IP address has exceeded API limit',
     409: 'Request not aproved.',
-}.items())
+})
 
 
 class NotifyProwl(NotifyBase):

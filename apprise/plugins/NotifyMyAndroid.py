@@ -18,18 +18,18 @@
 
 import re
 import requests
-from urllib import unquote
 
 from .NotifyBase import NotifyBase
 from .NotifyBase import NotifyFormat
 from .NotifyBase import HTTP_ERROR_MAP
 
 # Extend HTTP Error Messages
-NMA_HTTP_ERROR_MAP = dict(HTTP_ERROR_MAP.items() + {
+NMA_HTTP_ERROR_MAP = HTTP_ERROR_MAP.copy()
+NMA_HTTP_ERROR_MAP.update({
     400: 'Data is wrong format, invalid length or null.',
     401: 'API Key provided is invalid',
     402: 'Maximum number of API calls per hour reached.',
-}.items())
+})
 
 # Used to validate Authorization Token
 VALIDATE_APIKEY = re.compile(r'[A-Za-z0-9]{48}')
@@ -185,7 +185,7 @@ class NotifyMyAndroid(NotifyBase):
         if 'format' in results['qsd'] and len(results['qsd']['format']):
             # Extract email format (Text/Html)
             try:
-                format = unquote(results['qsd']['format']).lower()
+                format = NotifyBase.unquote(results['qsd']['format']).lower()
                 if len(format) > 0 and format[0] == 't':
                     results['notify_format'] = NotifyFormat.TEXT
 

@@ -28,10 +28,11 @@ from ..common import NotifyImageSize
 PUSHALOT_IMAGE_XY = NotifyImageSize.XY_72
 
 # Extend HTTP Error Messages
-PUSHALOT_HTTP_ERROR_MAP = dict(HTTP_ERROR_MAP.items() + {
+PUSHALOT_HTTP_ERROR_MAP = HTTP_ERROR_MAP.copy()
+PUSHALOT_HTTP_ERROR_MAP.update({
     406: 'Message throttle limit hit.',
     410: 'AuthorizedToken is no longer valid.',
-}.items())
+})
 
 # Used to validate Authorization Token
 VALIDATE_AUTHTOKEN = re.compile(r'[A-Za-z0-9]{32}')

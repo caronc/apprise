@@ -17,13 +17,19 @@
 # GNU Lesser General Public License for more details.
 
 import re
-import markdown
 import logging
 from time import sleep
-from urllib import unquote as _unquote
+try:
+    # Python 2.7
+    from urllib import unquote as _unquote
+    from urllib import quote as _quote
+    from urllib import urlencode as _urlencode
 
-# For conversion
-from chardet import detect as chardet_detect
+except ImportError:
+    # Python 3.x
+    from urllib.parse import unquote as _unquote
+    from urllib.parse import quote as _quote
+    from urllib.parse import urlencode as _urlencode
 
 from ..utils import parse_url
 from ..utils import parse_bool
@@ -159,7 +165,7 @@ class NotifyBase(object):
         self.include_image = include_image
         self.secure = secure
 
-        if throttle:
+        if isinstance(throttle, (float, int)):
             # Custom throttle override
             self.throttle_attempt = throttle
 
@@ -171,6 +177,7 @@ class NotifyBase(object):
         if self.port:
             try:
                 self.port = int(self.port)
+
             except (TypeError, ValueError):
                 self.port = None
 
@@ -238,86 +245,64 @@ class NotifyBase(object):
             image_size=self.image_size,
         )
 
-    def escape_html(self, html, convert_new_lines=False):
+    @staticmethod
+    def escape_html(html, convert_new_lines=False):
         """
         Takes html text as input and escapes it so that it won't
         conflict with any xml/html wrapping characters.
         """
         escaped = _escape(html).\
             replace(u'\t', u'&emsp;').\
-            replace(u'  ', u' &nbsp;')
+            replace(u' ', u'&nbsp;')
 
         if convert_new_lines:
-            return escaped.replace(u'\n', u'<br />')
+            return escaped.replace(u'\n', u'&lt;br/&gt;')
 
         return escaped
 
-    def to_utf8(self, content):
+    @staticmethod
+    def unquote(content, encoding='utf-8', errors='replace'):
         """
-        Attempts to convert non-utf8 content to... (you guessed it) utf8
+        common unquote function
+
         """
-        if not content:
-            return ''
-
-        if isinstance(content, unicode):
-            return content.encode('utf-8')
-
-        result = chardet_detect(content)
-        encoding = result['encoding']
         try:
-            content = content.decode(
-                encoding,
-                errors='replace',
-            )
-            return content.encode('utf-8')
-
-        except UnicodeError:
-            raise ValueError(
-                '%s contains invalid characters' % (
-                    content))
-
-        except KeyError:
-            raise ValueError(
-                '%s encoding could not be detected ' % (
-                    content))
+            # Python v3.x
+            return _unquote(content, encoding=encoding, errors=errors)
 
         except TypeError:
-            try:
-                content = content.decode(
-                    encoding,
-                    'replace',
-                )
-                return content.encode('utf-8')
+            # Python v2.7
+            return _unquote(content)
 
-            except UnicodeError:
-                raise ValueError(
-                    '%s contains invalid characters' % (
-                        content))
-
-            except KeyError:
-                raise ValueError(
-                    '%s encoding could not be detected ' % (
-                        content))
-
-        return ''
-
-    def to_html(self, body):
+    @staticmethod
+    def quote(content, safe='/', encoding=None, errors=None):
         """
-        Returns the specified title in an html format and factors
-        in a titles defined max length
+        common quote function
+
         """
-        html = markdown.markdown(body)
+        try:
+            # Python v3.x
+            return _quote(content, safe=safe, encoding=encoding, errors=errors)
 
-        # TODO:
-        # This function should return multiple messages if we exceed
-        # the maximum number of characters. the second message should
+        except TypeError:
+            # Python v2.7
+            return _quote(content, safe=safe)
 
-        # The new message should factor in the title and add ' cont...'
-        # to the end of it.  It should also include the added characters
-        # put in place by the html characters. So there is a little bit
-        # of math and manipulation that needs to go on here.
-        # we always return a list
-        return [html, ]
+    @staticmethod
+    def urlencode(query, doseq=False, safe='', encoding=None, errors=None):
+        """
+        common urlencode function
+
+        """
+        try:
+            # Python v3.x
+            return _urlencode(
+                query, doseq=doseq, safe=safe, encoding=encoding,
+                errors=errors)
+
+        except TypeError:
+            # Python v2.7
+            return _urlencode(query, oseq=doseq)
 
     @staticmethod
     def split_path(path, unquote=True):
@@ -326,7 +311,8 @@ class NotifyBase(object):
 
         """
         if unquote:
-            return PATHSPLIT_LIST_DELIM.split(_unquote(path).lstrip('/'))
+            return PATHSPLIT_LIST_DELIM.split(
+                NotifyBase.unquote(path).lstrip('/'))
         return PATHSPLIT_LIST_DELIM.split(path.lstrip('/'))
 
     @staticmethod
@@ -360,7 +346,8 @@ class NotifyBase(object):
 
         if 'qsd' in results:
             if 'verify' in results['qsd']:
-                parse_bool(results['qsd'].get('verify', True))
+                results['verify'] = parse_bool(
+                    results['qsd'].get('verify', True))
 
             # Password overrides
             if 'pass' in results['qsd']:

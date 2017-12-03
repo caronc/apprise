@@ -22,6 +22,7 @@ from json import dumps
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyImageSize
+from ..utils import compat_is_basestring
 
 # Image Support (128x128)
 JSON_IMAGE_XY = NotifyImageSize.XY_128
@@ -53,7 +54,7 @@ class NotifyJSON(NotifyBase):
             self.schema = 'http'
 
         self.fullpath = kwargs.get('fullpath')
-        if not isinstance(self.fullpath, basestring):
+        if not compat_is_basestring(self.fullpath):
             self.fullpath = '/'
 
         return

@@ -142,6 +142,6 @@ class AppriseAsset(object):
 
             except (OSError, IOError):
                 # We can't access the file
-                pass
+                return None
 
         return None

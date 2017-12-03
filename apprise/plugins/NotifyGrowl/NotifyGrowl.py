@@ -17,7 +17,6 @@
 # GNU Lesser General Public License for more details.
 
 import re
-from urllib import unquote
 
 from .gntp.notifier import GrowlNotifier
 from .gntp.errors import NetworkError as GrowlNetworkError
@@ -212,7 +211,8 @@ class NotifyGrowl(NotifyBase):
             # Allow the user to specify the version of the protocol to use.
             try:
                 version = int(
-                    unquote(results['qsd']['version']).strip().split('.')[0])
+                    NotifyBase.unquote(
+                        results['qsd']['version']).strip().split('.')[0])
 
             except (AttributeError, IndexError, TypeError, ValueError):
                 NotifyBase.logger.warning(

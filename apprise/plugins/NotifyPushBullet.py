@@ -19,11 +19,12 @@
 import re
 import requests
 from json import dumps
-from urllib import unquote
 
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
 from .NotifyBase import IS_EMAIL_RE
+
+from ..utils import compat_is_basestring
 
 # Flag used as a placeholder to sending to all devices
 PUSHBULLET_SEND_TO_ALL = 'ALL_DEVICES'
@@ -33,9 +34,10 @@ PUSHBULLET_SEND_TO_ALL = 'ALL_DEVICES'
 RECIPIENTS_LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
 
 # Extend HTTP Error Messages
-PUSHBULLET_HTTP_ERROR_MAP = dict(HTTP_ERROR_MAP.items() + {
+PUSHBULLET_HTTP_ERROR_MAP = HTTP_ERROR_MAP.copy()
+PUSHBULLET_HTTP_ERROR_MAP.update({
     401: 'Unauthorized - Invalid Token.',
-}.items())
+})
 
 
 class NotifyPushBullet(NotifyBase):
@@ -60,7 +62,7 @@ class NotifyPushBullet(NotifyBase):
             title_maxlen=250, body_maxlen=32768, **kwargs)
 
         self.accesstoken = accesstoken
-        if isinstance(recipients, basestring):
+        if compat_is_basestring(recipients):
             self.recipients = filter(bool, RECIPIENTS_LIST_DELIM.split(
                 recipients,
             ))
@@ -178,7 +180,7 @@ class NotifyPushBullet(NotifyBase):
 
         # Apply our settings now
         try:
-            recipients = unquote(results['fullpath'])
+            recipients = NotifyBase.unquote(results['fullpath'])
 
         except AttributeError:
             recipients = ''

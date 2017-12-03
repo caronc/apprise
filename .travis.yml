@@ -1,15 +1,49 @@
+dist: trusty
+sudo: false
+cache:
+    directories:
+        - $HOME/.cache/pip
+
+
 language: python
-python:
-  - "2.7"
+
+
+matrix:
+  include:
+    - python: "2.7"
+      env: TOXENV=py27
+    - python: "3.4"
+      env: TOXENV=py34
+    - python: "3.5"
+      env: TOXENV=py35
+    - python: "3.6"
+      env: TOXENV=py36
+    - python: "pypy2.7-5.8.0"
+      env: TOXENV=pypy
+    - python: "pypy3.5-5.8.0"
+env: TOXENV=pypy3
+
 
 install:
   - pip install .
-  - pip install coveralls
+  - pip install tox
+  - pip install -r dev-requirements.txt
   - pip install -r requirements.txt
 
+
+before_install:
+  - pip install codecov
+
+
 after_success:
-  - coveralls
+  - tox -e coverage-report
+  - codecov
+
 
 # run tests
-script: nosetests --with-coverage --cover-package=apprise
+script:
+  - tox
 
+
+notifications:
+  email: false

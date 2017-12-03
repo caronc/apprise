@@ -19,19 +19,20 @@
 import re
 import requests
 from json import loads
-from urllib import unquote
 
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
+from ..utils import compat_is_basestring
 
 IS_CHANNEL = re.compile(r'^#(?P<name>[A-Za-z0-9]+)$')
 IS_ROOM_ID = re.compile(r'^(?P<name>[A-Za-z0-9]+)$')
 
 # Extend HTTP Error Messages
-RC_HTTP_ERROR_MAP = dict(HTTP_ERROR_MAP.items() + {
+RC_HTTP_ERROR_MAP = HTTP_ERROR_MAP.copy()
+RC_HTTP_ERROR_MAP.update({
     400: 'Channel/RoomId is wrong format, or missing from server.',
     401: 'Authentication tokens provided is invalid or missing.',
-}.items())
+})
 
 # Used to break apart list of potential tags by their delimiter
 # into a usable list.
@@ -79,12 +80,12 @@ class NotifyRocketChat(NotifyBase):
         if recipients is None:
             recipients = []
 
-        elif isinstance(recipients, basestring):
+        elif compat_is_basestring(recipients):
             recipients = filter(bool, LIST_DELIM.split(
                 recipients,
             ))
 
-        elif not isinstance(recipients, (tuple, list)):
+        elif not isinstance(recipients, (set, tuple, list)):
             recipients = []
 
         # Validate recipients and drop bad ones:
@@ -316,7 +317,7 @@ class NotifyRocketChat(NotifyBase):
 
         # Apply our settings now
         try:
-            results['recipients'] = unquote(results['fullpath'])
+            results['recipients'] = NotifyBase.unquote(results['fullpath'])
 
         except AttributeError:
             return None

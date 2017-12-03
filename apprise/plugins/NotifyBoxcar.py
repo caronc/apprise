@@ -17,12 +17,13 @@
 # GNU Lesser General Public License for more details.
 
 from json import dumps
-from urllib import unquote
 import requests
 import re
 
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
+
+from ..utils import compat_is_basestring
 
 # Used to validate Tags, Aliases and Devices
 IS_TAG = re.compile(r'^[A-Za-z0-9]{1,63}$')
@@ -70,12 +71,12 @@ class NotifyBoxcar(NotifyBase):
         if recipients is None:
             recipients = []
 
-        elif isinstance(recipients, basestring):
+        elif compat_is_basestring(recipients):
             recipients = filter(bool, TAGS_LIST_DELIM.split(
                 recipients,
             ))
 
-        elif not isinstance(recipients, (tuple, list)):
+        elif not isinstance(recipients, (set, tuple, list)):
             recipients = []
 
         # Validate recipients and drop bad ones:
@@ -189,7 +190,7 @@ class NotifyBoxcar(NotifyBase):
 
         # Acquire our recipients and include them in the response
         try:
-            recipients = unquote(results['fullpath'])
+            recipients = NotifyBase.unquote(results['fullpath'])
 
         except (AttributeError, KeyError):
             # no recipients detected

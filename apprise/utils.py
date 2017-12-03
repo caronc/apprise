@@ -20,18 +20,30 @@ import re
 
 from os.path import expanduser
 
-from urlparse import urlparse
-from urlparse import parse_qsl
-from urllib import quote
-from urllib import unquote
+try:
+    # Python 2.7
+    from urllib import unquote
+    from urllib import quote
+    from urlparse import urlparse
+    from urlparse import parse_qsl
+
+except ImportError:
+    # Python 3.x
+    from urllib.parse import unquote
+    from urllib.parse import quote
+    from urllib.parse import urlparse
+    from urllib.parse import parse_qsl
 
 import logging
 logger = logging.getLogger(__name__)
 
 # URL Indexing Table for returns via parse_url()
-VALID_URL_RE = re.compile(r'^[\s]*([^:\s]+):[/\\]*([^?]+)(\?(.+))?[\s]*$')
-VALID_HOST_RE = re.compile(r'^[\s]*([^:/\s]+)')
-VALID_QUERY_RE = re.compile(r'^(.*[/\\])([^/\\]*)$')
+VALID_URL_RE = re.compile(
+    r'^[\s]*(?P<schema>[^:\s]+):[/\\]*(?P<path>[^?]+)'
+    r'(\?(?P<kwargs>.+))?[\s]*$',
+)
+VALID_HOST_RE = re.compile(r'^[\s]*(?P<path>[^?\s]+)(\?(?P<kwargs>.+))?')
+VALID_QUERY_RE = re.compile(r'^(?P<path>.*[/\\])(?P<query>[^/\\]*)$')
 
 # delimiters used to separate values when content is passed in by string.
 # This is useful when turning a string into a list
@@ -43,7 +55,7 @@ ESCAPED_WIN_PATH_SEPARATOR = re.escape('\\')
 ESCAPED_NUX_PATH_SEPARATOR = re.escape('/')
 
 TIDY_WIN_PATH_RE = re.compile(
-    '(^[%s]{2}|[^%s\s][%s]|[\s][%s]{2}])([%s]+)' % (
+    r'(^[%s]{2}|[^%s\s][%s]|[\s][%s]{2}])([%s]+)' % (
         ESCAPED_WIN_PATH_SEPARATOR,
         ESCAPED_WIN_PATH_SEPARATOR,
         ESCAPED_WIN_PATH_SEPARATOR,
@@ -52,25 +64,39 @@ TIDY_WIN_PATH_RE = re.compile(
     ),
 )
 TIDY_WIN_TRIM_RE = re.compile(
-    '^(.+[^:][^%s])[\s%s]*$' % (
+    r'^(.+[^:][^%s])[\s%s]*$' % (
         ESCAPED_WIN_PATH_SEPARATOR,
         ESCAPED_WIN_PATH_SEPARATOR,
     ),
 )
 
 TIDY_NUX_PATH_RE = re.compile(
-    '([%s])([%s]+)' % (
+    r'([%s])([%s]+)' % (
         ESCAPED_NUX_PATH_SEPARATOR,
         ESCAPED_NUX_PATH_SEPARATOR,
     ),
 )
 
 TIDY_NUX_TRIM_RE = re.compile(
-    '([^%s])[\s%s]+$' % (
+    r'([^%s])[\s%s]+$' % (
         ESCAPED_NUX_PATH_SEPARATOR,
         ESCAPED_NUX_PATH_SEPARATOR,
     ),
 )
+
+
+def compat_is_basestring(content):
+    """
+    Python 3 support for checking if content is unicode and/or
+    of a string type
+    """
+    try:
+        # Python v2.x
+        return isinstance(content, basestring)
+
+    except NameError:
+        # Python v3.x
+        return isinstance(content, str)
 
 
 def tidy_path(path):
@@ -116,7 +142,7 @@ def parse_url(url, default_schema='http'):
      content could not be extracted.
     """
 
-    if not isinstance(url, basestring):
+    if not compat_is_basestring(url):
         # Simple error checking
         return None
 
@@ -150,32 +176,36 @@ def parse_url(url, default_schema='http'):
     match = VALID_URL_RE.search(url)
     if match:
         # Extract basic results
-        result['schema'] = match.group(1).lower().strip()
-        host = match.group(2).strip()
+        result['schema'] = match.group('schema').lower().strip()
+        host = match.group('path').strip()
         try:
-            qsdata = match.group(4).strip()
+            qsdata = match.group('kwargs').strip()
         except AttributeError:
             # No qsdata
             pass
+
     else:
         match = VALID_HOST_RE.search(url)
         if not match:
             return None
         result['schema'] = default_schema
-        host = match.group(1).strip()
-
-    if not result['schema']:
-        result['schema'] = default_schema
-
-    if not host:
-        # Invalid Hostname
-        return None
+        host = match.group('path').strip()
+        try:
+            qsdata = match.group('kwargs').strip()
+        except AttributeError:
+            # No qsdata
+            pass
 
     # Now do a proper extraction of data
     parsed = urlparse('http://%s' % host)
 
     # Parse results
     result['host'] = parsed[1].strip()
+
+    if not result['host']:
+        # Nothing more we can do without a hostname
+        return None
+
     result['fullpath'] = quote(unquote(tidy_path(parsed[2].strip())))
     try:
         # Handle trailing slashes removed by tidy_path
@@ -201,14 +231,13 @@ def parse_url(url, default_schema='http'):
     if not result['fullpath']:
         # Default
         result['fullpath'] = None
+
     else:
         # Using full path, extract query from path
         match = VALID_QUERY_RE.search(result['fullpath'])
         if match:
-            result['path'] = match.group(1)
-            result['query'] = match.group(2)
-            if not result['path']:
-                result['path'] = None
+            result['path'] = match.group('path')
+            result['query'] = match.group('query')
             if not result['query']:
                 result['query'] = None
     try:
@@ -242,18 +271,22 @@ def parse_url(url, default_schema='http'):
     if result['port']:
         try:
             result['port'] = int(result['port'])
+
         except (ValueError, TypeError):
             # Invalid Port Specified
             return None
+
         if result['port'] == 0:
             result['port'] = None
 
     # Re-assemble cleaned up version of the url
     result['url'] = '%s://' % result['schema']
-    if isinstance(result['user'], basestring):
+    if compat_is_basestring(result['user']):
         result['url'] += result['user']
-        if isinstance(result['password'], basestring):
+
+        if compat_is_basestring(result['password']):
             result['url'] += ':%s@' % result['password']
+
         else:
             result['url'] += '@'
     result['url'] += result['host']
@@ -277,7 +310,7 @@ def parse_bool(arg, default=False):
     If the content could not be parsed, then the default is returned.
     """
 
-    if isinstance(arg, basestring):
+    if compat_is_basestring(arg):
         # no = no - False
         # of = short for off - False
         # 0  = int for False
@@ -330,23 +363,20 @@ def parse_list(*args):
 
     result = []
     for arg in args:
-        if isinstance(arg, basestring):
+        if compat_is_basestring(arg):
             result += re.split(STRING_DELIMITERS, arg)
 
-        elif isinstance(arg, (list, tuple)):
-            for _arg in arg:
-                if isinstance(arg, basestring):
-                    result += re.split(STRING_DELIMITERS, arg)
-                # A list inside a list? - use recursion
-                elif isinstance(_arg, (list, tuple)):
-                    result += parse_list(_arg)
-                else:
-                    # Convert whatever it is to a string and work with it
-                    result += parse_list(str(_arg))
+        elif isinstance(arg, (set, list, tuple)):
+            result += parse_list(*arg)
+
         else:
             # Convert whatever it is to a string and work with it
             result += parse_list(str(arg))
 
-    # apply as well as make the list unique by converting it
-    # to a set() first. filter() eliminates any empty entries
-    return filter(bool, list(set(result)))
+    #
+    # filter() eliminates any empty entries
+    #
+    # Since Python v3 returns a filter (iterator) where-as Python v2 returned
+    # a list, we need to change it into a list object to remain compatible with
+    # both distribution types.
+    return sorted([x for x in filter(bool, list(set(result)))])

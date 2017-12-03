@@ -36,6 +36,7 @@ from time import time
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyImageSize
+from ..utils import compat_is_basestring
 
 # Token required as part of the API request
 #  /AAAAAAAAA/........./........................
@@ -53,9 +54,10 @@ VALIDATE_TOKEN_C = re.compile(r'[A-Za-z0-9]{24}')
 SLACK_DEFAULT_USER = 'apprise'
 
 # Extend HTTP Error Messages
-SLACK_HTTP_ERROR_MAP = dict(HTTP_ERROR_MAP.items() + {
+SLACK_HTTP_ERROR_MAP = HTTP_ERROR_MAP.copy()
+SLACK_HTTP_ERROR_MAP.update({
     401: 'Unauthorized - Invalid Token.',
-}.items())
+})
 
 # Used to break path apart into list of devices
 CHANNEL_LIST_DELIM = re.compile(r'[ \t\r\n,#\\/]+')
@@ -124,11 +126,11 @@ class NotifySlack(NotifyBase):
                 'No user was specified; using %s.' % SLACK_DEFAULT_USER)
             self.user = SLACK_DEFAULT_USER
 
-        if isinstance(channels, basestring):
+        if compat_is_basestring(channels):
             self.channels = filter(bool, CHANNEL_LIST_DELIM.split(
                 channels,
             ))
-        elif isinstance(channels, (tuple, list)):
+        elif isinstance(channels, (set, tuple, list)):
             self.channels = channels
         else:
             self.channels = list()

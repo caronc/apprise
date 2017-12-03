@@ -23,10 +23,9 @@ from smtplib import SMTP
 from smtplib import SMTPException
 from socket import error as SocketError
 
-from urllib import unquote as unquote
-
 from email.mime.text import MIMEText
 
+from ..utils import compat_is_basestring
 from .NotifyBase import NotifyBase
 from .NotifyBase import NotifyFormat
 
@@ -166,13 +165,13 @@ class NotifyEmail(NotifyBase):
             # Keep trying to be clever and make it equal to the to address
             self.from_addr = self.to_addr
 
-        if not isinstance(self.to_addr, basestring):
+        if not compat_is_basestring(self.to_addr):
             raise TypeError('No valid ~To~ email address specified.')
 
         if not NotifyBase.is_email(self.to_addr):
             raise TypeError('Invalid ~To~ email format: %s' % self.to_addr)
 
-        if not isinstance(self.from_addr, basestring):
+        if not compat_is_basestring(self.from_addr):
             raise TypeError('No valid ~From~ email address specified.')
 
         match = NotifyBase.is_email(self.from_addr)
@@ -294,7 +293,7 @@ class NotifyEmail(NotifyBase):
                 self.to_addr,
             ))
 
-        except (SocketError, SMTPException), e:
+        except (SocketError, SMTPException) as e:
             self.logger.warning(
                 'A Connection error occured sending Email '
                 'notification to %s.' % self.smtp_host)
@@ -336,7 +335,7 @@ class NotifyEmail(NotifyBase):
         if 'format' in results['qsd'] and len(results['qsd']['format']):
             # Extract email format (Text/Html)
             try:
-                format = unquote(results['qsd']['format']).lower()
+                format = NotifyBase.unquote(results['qsd']['format']).lower()
                 if len(format) > 0 and format[0] == 't':
                     results['notify_format'] = NotifyFormat.TEXT
 
@@ -364,7 +363,7 @@ class NotifyEmail(NotifyBase):
                 if not NotifyBase.is_email(to_addr):
                     NotifyBase.logger.error(
                         '%s does not contain a recipient email.' %
-                        unquote(results['url'].lstrip('/')),
+                        NotifyBase.unquote(results['url'].lstrip('/')),
                     )
                     return None
 
@@ -384,7 +383,7 @@ class NotifyEmail(NotifyBase):
                 if not NotifyBase.is_email(from_addr):
                     NotifyBase.logger.error(
                         '%s does not contain a from address.' %
-                        unquote(results['url'].lstrip('/')),
+                        NotifyBase.unquote(results['url'].lstrip('/')),
                     )
                     return None
 
@@ -394,7 +393,7 @@ class NotifyEmail(NotifyBase):
         try:
             if 'name' in results['qsd'] and len(results['qsd']['name']):
                 # Extract from name to associate with from address
-                results['name'] = unquote(results['qsd']['name'])
+                results['name'] = NotifyBase.unquote(results['qsd']['name'])
 
         except AttributeError:
             pass
@@ -402,7 +401,8 @@ class NotifyEmail(NotifyBase):
         try:
             if 'timeout' in results['qsd'] and len(results['qsd']['timeout']):
                 # Extract the timeout to associate with smtp server
-                results['timeout'] = unquote(results['qsd']['timeout'])
+                results['timeout'] = NotifyBase.unquote(
+                    results['qsd']['timeout'])
 
         except AttributeError:
             pass
@@ -411,7 +411,7 @@ class NotifyEmail(NotifyBase):
         try:
             # Extract from password to associate with smtp server
             if 'smtp' in results['qsd'] and len(results['qsd']['smtp']):
-                smtp_host = unquote(results['qsd']['smtp'])
+                smtp_host = NotifyBase.unquote(results['qsd']['smtp'])
 
         except AttributeError:
             pass

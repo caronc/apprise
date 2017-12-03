@@ -1,10 +1,31 @@
-"""API properties.
-
-"""
+# -*- coding: utf-8 -*-
+#
+# Unit Tests for common shared utility functions
+#
+# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
+#
+# This file is part of apprise.
+#
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU Lesser General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
 
 from __future__ import print_function
 from __future__ import unicode_literals
-from urllib import unquote
+try:
+    # Python 2.7
+    from urllib import unquote
+
+except ImportError:
+    # Python 3.x
+    from urllib.parse import unquote
+
 from apprise import utils
 
 
@@ -153,6 +174,54 @@ def test_parse_url():
     )
     assert(result is None)
 
+    # just hostnames
+    result = utils.parse_url(
+        'nuxref.com'
+    )
+    assert(result['schema'] == 'http')
+    assert(result['host'] == 'nuxref.com')
+    assert(result['port'] is None)
+    assert(result['user'] is None)
+    assert(result['password'] is None)
+    assert(result['fullpath'] is None)
+    assert(result['path'] is None)
+    assert(result['query'] is None)
+    assert(result['url'] == 'http://nuxref.com')
+    assert(result['qsd'] == {})
+
+    # just host and path
+    result = utils.parse_url(
+        'invalid/host'
+    )
+    assert(result['schema'] == 'http')
+    assert(result['host'] == 'invalid')
+    assert(result['port'] is None)
+    assert(result['user'] is None)
+    assert(result['password'] is None)
+    assert(result['fullpath'] == '/host')
+    assert(result['path'] == '/')
+    assert(result['query'] == 'host')
+    assert(result['url'] == 'http://invalid/host')
+    assert(result['qsd'] == {})
+
+    # just all out invalid
+    assert(utils.parse_url('?') is None)
+    assert(utils.parse_url('/') is None)
+
+    # A default port of zero is still considered valid, but
+    # is removed in the response.
+    result = utils.parse_url('http://nuxref.com:0')
+    assert(result['schema'] == 'http')
+    assert(result['host'] == 'nuxref.com')
+    assert(result['port'] is None)
+    assert(result['user'] is None)
+    assert(result['password'] is None)
+    assert(result['fullpath'] is None)
+    assert(result['path'] is None)
+    assert(result['query'] is None)
+    assert(result['url'] == 'http://nuxref.com')
+    assert(result['qsd'] == {})
+
 
 def test_parse_bool():
     "utils: parse_bool() testing """
@@ -202,21 +271,25 @@ def test_parse_list():
     results = utils.parse_list(
         '.mkv,.avi,.divx,.xvid,.mov,.wmv,.mp4,.mpg,.mpeg,.vob,.iso')
 
-    assert(results == [
+    assert(results == sorted([
         '.divx', '.iso', '.mkv', '.mov', '.mpg', '.avi', '.mpeg', '.vob',
         '.xvid', '.wmv', '.mp4',
-    ])
+    ]))
 
+    class StrangeObject(object):
+        def __str__(self):
+            return '.avi'
     # Now 2 lists with lots of duplicates and other delimiters
     results = utils.parse_list(
         '.mkv,.avi,.divx,.xvid,.mov,.wmv,.mp4,.mpg .mpeg,.vob,,; ;',
-        '.mkv,.avi,.divx,.xvid,.mov        .wmv,.mp4;.mpg,.mpeg,'
-        '.vob,.iso')
+        ('.mkv,.avi,.divx,.xvid,.mov    ', '    .wmv,.mp4;.mpg,.mpeg,'),
+        '.vob,.iso', ['.vob', ['.vob', '.mkv', StrangeObject(), ], ],
+        StrangeObject())
 
-    assert(results == [
+    assert(results == sorted([
         '.divx', '.iso', '.mkv', '.mov', '.mpg', '.avi', '.mpeg', '.vob',
         '.xvid', '.wmv', '.mp4',
-    ])
+    ]))
 
     # Now a list with extras we want to add as strings
     # empty entries are removed
@@ -224,7 +297,7 @@ def test_parse_list():
         '.divx', '.iso', '.mkv', '.mov', '', '  ', '.avi', '.mpeg', '.vob',
         '.xvid', '.mp4'], '.mov,.wmv,.mp4,.mpg')
 
-    assert(results == [
+    assert(results == sorted([
         '.divx', '.wmv', '.iso', '.mkv', '.mov', '.mpg', '.avi', '.vob',
         '.xvid', '.mpeg', '.mp4',
-    ])
+    ]))

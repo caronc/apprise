@@ -18,11 +18,11 @@
 
 import re
 import requests
-from urllib import quote
 
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyImageSize
+from ..utils import compat_is_basestring
 
 # Image Support (128x128)
 XML_IMAGE_XY = NotifyImageSize.XY_128
@@ -69,7 +69,7 @@ class NotifyXML(NotifyBase):
             self.schema = 'http'
 
         self.fullpath = kwargs.get('fullpath')
-        if not isinstance(self.fullpath, basestring):
+        if not compat_is_basestring(self.fullpath):
             self.fullpath = '/'
 
         return
@@ -86,9 +86,9 @@ class NotifyXML(NotifyBase):
         }
 
         re_map = {
-            '{MESSAGE_TYPE}': quote(notify_type),
-            '{SUBJECT}': quote(title),
-            '{MESSAGE}': quote(body),
+            '{MESSAGE_TYPE}': NotifyBase.quote(notify_type),
+            '{SUBJECT}': NotifyBase.quote(title),
+            '{MESSAGE}': NotifyBase.quote(body),
         }
 
         # Iterate over above list and store content accordingly

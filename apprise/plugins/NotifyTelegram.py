@@ -50,6 +50,8 @@ from .NotifyBase import NotifyBase
 from .NotifyBase import NotifyFormat
 from .NotifyBase import HTTP_ERROR_MAP
 
+from ..utils import compat_is_basestring
+
 # Token required as part of the API request
 # allow the word 'bot' infront
 VALIDATE_BOT_TOKEN = re.compile(
@@ -108,11 +110,12 @@ class NotifyTelegram(NotifyBase):
         # Store our API Key
         self.bot_token = result.group('key')
 
-        if isinstance(chat_ids, basestring):
+        if compat_is_basestring(chat_ids):
             self.chat_ids = filter(bool, CHAT_ID_LIST_DELIM.split(
                 chat_ids,
             ))
-        elif isinstance(chat_ids, (tuple, list)):
+
+        elif isinstance(chat_ids, (set, tuple, list)):
             self.chat_ids = list(chat_ids)
 
         else:
@@ -246,8 +249,8 @@ class NotifyTelegram(NotifyBase):
             # payload['parse_mode'] = 'Markdown'
             payload['parse_mode'] = 'HTML'
             payload['text'] = '<b>%s</b>\r\n%s' % (
-                self.escape_html(title),
-                self.escape_html(body),
+                NotifyBase.escape_html(title),
+                NotifyBase.escape_html(body),
             )
 
         # Create a copy of the chat_ids list

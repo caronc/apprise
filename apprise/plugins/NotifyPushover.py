@@ -18,8 +18,8 @@
 
 import re
 import requests
-from urllib import unquote
 
+from ..utils import compat_is_basestring
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
 
@@ -57,9 +57,10 @@ PUSHOVER_PRIORITIES = (
 DEVICE_LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
 
 # Extend HTTP Error Messages
-PUSHOVER_HTTP_ERROR_MAP = dict(HTTP_ERROR_MAP.items() + {
+PUSHOVER_HTTP_ERROR_MAP = HTTP_ERROR_MAP.copy()
+PUSHOVER_HTTP_ERROR_MAP.update({
     401: 'Unauthorized - Invalid Token.',
-}.items())
+})
 
 
 class NotifyPushover(NotifyBase):
@@ -95,12 +96,14 @@ class NotifyPushover(NotifyBase):
         # The token associated with the account
         self.token = token.strip()
 
-        if isinstance(devices, basestring):
+        if compat_is_basestring(devices):
             self.devices = filter(bool, DEVICE_LIST_DELIM.split(
                 devices,
             ))
-        elif isinstance(devices, (tuple, list)):
+
+        elif isinstance(devices, (set, tuple, list)):
             self.devices = devices
+
         else:
             self.devices = list()
 
@@ -110,6 +113,7 @@ class NotifyPushover(NotifyBase):
         # The Priority of the message
         if priority not in PUSHOVER_PRIORITIES:
             self.priority = PushoverPriority.NORMAL
+
         else:
             self.priority = priority
 
@@ -230,7 +234,7 @@ class NotifyPushover(NotifyBase):
 
         # Apply our settings now
         try:
-            devices = unquote(results['fullpath'])
+            devices = NotifyBase.unquote(results['fullpath'])
 
         except AttributeError:
             devices = ''

@@ -45,9 +45,11 @@ setup(
     author='Chris Caron',
     author_email='lead2gold@gmail.com',
     packages=find_packages(),
-    include_package_data=True,
     package_data={
-        'apprise': ['assets'],
+        'apprise': [
+            'assets/NotifyXML-1.0.xsd',
+            'assets/themes/default/*.png',
+        ],
     },
     scripts=['cli/notify.py', ],
     install_requires=open('requirements.txt').readlines(),
@@ -58,10 +60,11 @@ setup(
         'Natural Language :: English',
         'Programming Language :: Python',
         'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
         'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
     ),
     entry_points={'console_scripts': console_scripts},
-    python_requires='>=2.7, <3',
-    test_suite='nose.collector',
-    tests_require=['nose', 'coverage', 'pycodestyle'],
+    python_requires='>=2.7',
+    setup_requires=['pytest-runner', ],
+    tests_require=['pytest', 'coverage', 'pytest-cov', 'pycodestyle', 'tox'],
 )

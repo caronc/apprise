@@ -1,9 +1,25 @@
-"""API properties.
-
-"""
+# -*- coding: utf-8 -*-
+#
+# Apprise and AppriseAsset Unit Tests
+#
+# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
+#
+# This file is part of apprise.
+#
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU Lesser General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
 
 from __future__ import print_function
 from __future__ import unicode_literals
+from os import chmod
+from os.path import dirname
 from apprise import Apprise
 from apprise import AppriseAsset
 from apprise.Apprise import SCHEMA_MAP
@@ -150,7 +166,7 @@ def test_apprise():
     assert(a.notify(title="present", body="present") is False)
 
 
-def test_apprise_asset():
+def test_apprise_asset(tmpdir):
     """
     API: AppriseAsset() object
 
@@ -175,6 +191,10 @@ def test_apprise_asset():
         NotifyImageSize.XY_256,
         must_exist=False) == '/dark/info-256x256.png')
 
+    # This path doesn't exist so image_raw will fail (since we just
+    # randompyl picked it for testing)
+    assert(a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is None)
+
     assert(a.image_path(
         NotifyType.INFO,
         NotifyImageSize.XY_256,
@@ -190,3 +210,66 @@ def test_apprise_asset():
         must_exist=True) is not None)
 
     assert(a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is not None)
+
+    # Create a temporary directory
+    sub = tmpdir.mkdir("great.theme")
+
+    # Write a file
+    sub.join("{0}-{1}.png".format(
+        NotifyType.INFO,
+        NotifyImageSize.XY_256,
+    )).write("the content doesn't matter for testing.")
+
+    # Create an asset that will reference our file we just created
+    a = AppriseAsset(
+        theme='great.theme',
+        image_path_mask='%s/{THEME}/{TYPE}-{XY}.png' % dirname(sub.strpath),
+    )
+
+    # We'll be able to read file we just created
+    assert(a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is not None)
+
+    # We can retrieve the filename at this point even with must_exist set
+    # to True
+    assert(a.image_path(
+        NotifyType.INFO,
+        NotifyImageSize.XY_256,
+        must_exist=True) is not None)
+
+    # If we make the file un-readable however, we won't be able to read it
+    # This test is just showing that we won't throw an exception
+    chmod(dirname(sub.strpath), 0o000)
+    assert(a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is None)
+
+    # Our path doesn't exist anymore using this logic
+    assert(a.image_path(
+        NotifyType.INFO,
+        NotifyImageSize.XY_256,
+        must_exist=True) is None)
+
+    # Return our permission so we don't have any problems with our cleanup
+    chmod(dirname(sub.strpath), 0o700)
+
+    # Our content is retrivable again
+    assert(a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is not None)
+
+    # our file path is accessible again too
+    assert(a.image_path(
+        NotifyType.INFO,
+        NotifyImageSize.XY_256,
+        must_exist=True) is not None)
+
+    # We do the same test, but set the permission on the file
+    chmod(a.image_path(NotifyType.INFO, NotifyImageSize.XY_256), 0o000)
+
+    # our path will still exist in this case
+    assert(a.image_path(
+        NotifyType.INFO,
+        NotifyImageSize.XY_256,
+        must_exist=True) is not None)
+
+    # but we will not be able to open it
+    assert(a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is None)
+
+    # Restore our permissions
+    chmod(a.image_path(NotifyType.INFO, NotifyImageSize.XY_256), 0o640)

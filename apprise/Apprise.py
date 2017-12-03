@@ -23,8 +23,8 @@ import re
 import logging
 
 from .common import NotifyType
-from .common import NOTIFY_TYPES
 from .utils import parse_list
+from .utils import compat_is_basestring
 
 from .AppriseAsset import AppriseAsset
 
@@ -54,7 +54,7 @@ def __load_matrix():
 
         # Load protocol(s) if defined
         proto = getattr(plugin, 'protocol', None)
-        if isinstance(proto, basestring):
+        if compat_is_basestring(proto):
             if proto not in SCHEMA_MAP:
                 SCHEMA_MAP[proto] = plugin
 
@@ -66,7 +66,7 @@ def __load_matrix():
 
         # Load secure protocol(s) if defined
         protos = getattr(plugin, 'secure_protocol', None)
-        if isinstance(protos, basestring):
+        if compat_is_basestring(protos):
             if protos not in SCHEMA_MAP:
                 SCHEMA_MAP[protos] = plugin
 
@@ -191,9 +191,9 @@ class Apprise(object):
         """
         self.servers[:] = []
 
-    def notify(self, title, body, notify_type=NotifyType.SUCCESS, **kwargs):
+    def notify(self, title, body, notify_type=NotifyType.INFO):
         """
-        This should be over-rided by the class that inherits this one.
+        Send a notification to all of the plugins previously loaded
         """
 
         # Initialize our return result
@@ -206,7 +206,8 @@ class Apprise(object):
         for server in self.servers:
             try:
                 # Send notification
-                if not server.notify(title=title, body=body):
+                if not server.notify(
+                        title=title, body=body, notify_type=notify_type):
 
                     # Toggle our return status flag
                     status = False
