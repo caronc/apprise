@@ -38,26 +38,15 @@ from ..common import NOTIFY_TYPES
 
 from ..AppriseAsset import AppriseAsset
 
-# Define a general HTML Escaping
-try:
-    # use sax first because it's faster
-    from xml.sax.saxutils import escape as sax_escape
+# use sax first because it's faster
+from xml.sax.saxutils import escape as sax_escape
 
-    def _escape(text):
-        """
-        saxutil escape tool
-        """
-        return sax_escape(text, {"'": "&apos;", "\"": "&quot;"})
 
-except ImportError:
-    # if we can't, then fall back to cgi escape
-    from cgi import escape as cgi_escape
-
-    def _escape(text):
-        """
-        cgi escape tool
-        """
-        return cgi_escape(text, quote=True)
+def _escape(text):
+    """
+    saxutil escape tool
+    """
+    return sax_escape(text, {"'": "&apos;", "\"": "&quot;"})
 
 
 HTTP_ERROR_MAP = {
@@ -344,17 +333,16 @@ class NotifyBase(object):
         # Support SSL Certificate 'verify' keyword. Default to being enabled
         results['verify'] = True
 
-        if 'qsd' in results:
-            if 'verify' in results['qsd']:
-                results['verify'] = parse_bool(
-                    results['qsd'].get('verify', True))
+        if 'verify' in results['qsd']:
+            results['verify'] = parse_bool(
+                results['qsd'].get('verify', True))
 
-            # Password overrides
-            if 'pass' in results['qsd']:
-                results['password'] = results['qsd']['pass']
+        # Password overrides
+        if 'pass' in results['qsd']:
+            results['password'] = results['qsd']['pass']
 
-            # User overrides
-            if 'user' in results['qsd']:
-                results['user'] = results['qsd']['user']
+        # User overrides
+        if 'user' in results['qsd']:
+            results['user'] = results['qsd']['user']
 
         return results

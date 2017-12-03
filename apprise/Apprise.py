@@ -28,6 +28,7 @@ from .utils import compat_is_basestring
 
 from .AppriseAsset import AppriseAsset
 
+from . import NotifyBase
 from . import plugins
 
 logger = logging.getLogger(__name__)
@@ -111,6 +112,70 @@ class Apprise(object):
         if servers:
             self.add(servers)
 
+    @staticmethod
+    def instantiate(url, asset=None, suppress_exceptions=True):
+        """
+        Returns the instance of a instantiated plugin based on the provided
+        Server URL.  If the url fails to be parsed, then None is returned.
+
+        """
+        # swap hash (#) tag values with their html version
+        # This is useful for accepting channels (as arguments to pushbullet)
+        _url = url.replace('/#', '/%23')
+
+        # Attempt to acquire the schema at the very least to allow our plugins
+        # to determine if they can make a better interpretation of a URL
+        # geared for them anyway.
+        schema = GET_SCHEMA_RE.match(_url)
+        if schema is None:
+            logger.error('%s is an unparseable server url.' % url)
+            return None
+
+        # Update the schema
+        schema = schema.group('schema').lower()
+
+        # Some basic validation
+        if schema not in SCHEMA_MAP:
+            logger.error(
+                '{0} is not a supported server type (url={1}).'.format(
+                    schema,
+                    _url,
+                )
+            )
+            return None
+
+        # Parse our url details
+        # the server object is a dictionary containing all of the information
+        # parsed from our URL
+        results = SCHEMA_MAP[schema].parse_url(_url)
+
+        if not results:
+            # Failed to parse the server URL
+            logger.error('Could not parse URL: %s' % url)
+            return None
+
+        if suppress_exceptions:
+            try:
+                # Attempt to create an instance of our plugin using the parsed
+                # URL information
+                plugin = SCHEMA_MAP[results['schema']](**results)
+
+            except:
+                # the arguments are invalid or can not be used.
+                logger.error('Could not load URL: %s' % url)
+                return None
+
+        else:
+            # Attempt to create an instance of our plugin using the parsed
+            # URL information but don't wrap it in a try catch
+            plugin = SCHEMA_MAP[results['schema']](**results)
+
+        # Save our asset
+        if asset:
+            plugin.asset = asset
+
+        return plugin
+
     def add(self, servers, asset=None):
         """
         Adds one or more server URLs into our list.
@@ -120,66 +185,27 @@ class Apprise(object):
         # Initialize our return status
         return_status = True
 
+        if asset is None:
+            # prepare default asset
+            asset = self.asset
+
+        if isinstance(servers, NotifyBase):
+            # Go ahead and just add our plugin into our list
+            self.servers.append(servers)
+            return True
+
         servers = parse_list(servers)
         for _server in servers:
 
-            # swap hash (#) tag values with their html version
-            # This is useful for accepting channels (as arguments to
-            # pushbullet)
-            _server = _server.replace('/#', '/%23')
-
-            # Attempt to acquire the schema at the very least to allow
-            # our plugins to determine if they can make a better
-            # interpretation of a URL geared for them anyway.
-            schema = GET_SCHEMA_RE.match(_server)
-            if schema is None:
-                logger.error(
-                    '%s is an unparseable server url.' % _server,
-                )
+            # Instantiate ourselves an object, this function throws or
+            # returns None if it fails
+            instance = Apprise.instantiate(_server, asset=asset)
+            if not instance:
                 return_status = False
                 continue
-
-            # Update the schema
-            schema = schema.group('schema').lower()
-
-            # Some basic validation
-            if schema not in SCHEMA_MAP:
-                logger.error(
-                    '%s is not a supported server type.' % schema,
-                )
-                return_status = False
-                continue
-
-            # Parse our url details
-            # the server object is a dictionary containing all of the
-            # information parsed from our URL
-            results = SCHEMA_MAP[schema].parse_url(_server)
-
-            if not results:
-                # Failed to parse the server URL
-                logger.error('Could not parse URL: %s' % _server)
-                return_status = False
-                continue
-
-            try:
-                # Attempt to create an instance of our plugin using the parsed
-                # URL information
-                plugin = SCHEMA_MAP[results['schema']](**results)
-
-            except:
-                # the arguments are invalid or can not be used.
-                return_status = False
-                continue
-
-            # Save our asset
-            if asset:
-                plugin.asset = asset
-
-            else:
-                plugin.asset = self.asset
 
             # Add our initialized plugin to our server listings
-            self.servers.append(plugin)
+            self.servers.append(instance)
 
         # Return our status
         return return_status

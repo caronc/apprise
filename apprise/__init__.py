@@ -27,6 +27,7 @@ from .common import NOTIFY_TYPES
 from .common import NOTIFY_IMAGE_SIZES
 from .common import NotifyImageSize
 from .plugins.NotifyBase import NotifyFormat
+from .plugins.NotifyBase import NotifyBase
 
 from .Apprise import Apprise
 from .AppriseAsset import AppriseAsset
@@ -38,7 +39,7 @@ logging.getLogger(__name__).addHandler(NullHandler())
 
 __all__ = [
     # Core
-    'Apprise', 'AppriseAsset',
+    'Apprise', 'AppriseAsset', 'NotifyBase',
 
     # Reference
     'NotifyType', 'NotifyImageSize', 'NotifyFormat', 'NOTIFY_TYPES',

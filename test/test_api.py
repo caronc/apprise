@@ -23,9 +23,10 @@ from os.path import dirname
 from apprise import Apprise
 from apprise import AppriseAsset
 from apprise.Apprise import SCHEMA_MAP
-from apprise.plugins.NotifyBase import NotifyBase
+from apprise import NotifyBase
 from apprise import NotifyType
 from apprise import NotifyImageSize
+from apprise.Apprise import __load_matrix
 
 
 def test_apprise():
@@ -33,6 +34,11 @@ def test_apprise():
     API: Apprise() object
 
     """
+    # Caling load matix a second time which is an internal function causes it
+    # to skip over content already loaded into our matrix and thefore accesses
+    # other if/else parts of the code that aren't otherwise called
+    __load_matrix()
+
     a = Apprise()
 
     # no items
@@ -165,12 +171,49 @@ def test_apprise():
     # simply returns False
     assert(a.notify(title="present", body="present") is False)
 
+    # Test instantiating a plugin
+    class ThrowInstantiateNotification(NotifyBase):
+        def __init__(self, **kwargs):
+            # Pretend everything is okay
+            raise TypeError()
+    SCHEMA_MAP['throw'] = ThrowInstantiateNotification
+
+    # Reset our object
+    a.clear()
+    assert(len(a) == 0)
+
+    # Instantiate a good object
+    plugin = a.instantiate('good://localhost')
+    assert(isinstance(plugin, NotifyBase))
+
+    # We an add already substatiated instances into our Apprise object
+    a.add(plugin)
+    assert(len(a) == 1)
+
+    # Reset our object again
+    a.clear()
+    try:
+        a.instantiate('throw://localhost', suppress_exceptions=False)
+        assert(False)
+
+    except TypeError:
+        assert(True)
+    assert(len(a) == 0)
+
+    assert(a.instantiate(
+        'throw://localhost', suppress_exceptions=True) is None)
+    assert(len(a) == 0)
+
 
 def test_apprise_asset(tmpdir):
     """
     API: AppriseAsset() object
 
     """
+    a = AppriseAsset(theme=None)
+    # Default theme
+    assert(a.theme == 'default')
+
     a = AppriseAsset(
         theme='dark',
         image_path_mask='/{THEME}/{TYPE}-{XY}.png',
