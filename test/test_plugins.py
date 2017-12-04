@@ -30,6 +30,9 @@ VALID_URLS = (
     ('json://', {
         'instance': None,
     }),
+    ('jsons://', {
+        'instance': None,
+    }),
     ('json://localhost', {
         'instance': plugins.NotifyJSON,
     }),
@@ -71,7 +74,63 @@ VALID_URLS = (
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
-    })
+    }),
+
+    ##################################
+    # NotifyMatterMost
+    ##################################
+    ('mmost://', {
+        'instance': None,
+    }),
+    ('mmosts://', {
+        'instance': None,
+    }),
+    ('mmost://localhost/3ccdd113474722377935511fc85d3dd4', {
+        'instance': plugins.NotifyMatterMost,
+    }),
+    ('mmost://user@localhost/3ccdd113474722377935511fc85d3dd4?channel=test', {
+        'instance': plugins.NotifyMatterMost,
+    }),
+    ('mmost://localhost:8080/3ccdd113474722377935511fc85d3dd4', {
+        'instance': plugins.NotifyMatterMost,
+    }),
+    ('mmost://localhost:0/3ccdd113474722377935511fc85d3dd4', {
+        'instance': plugins.NotifyMatterMost,
+    }),
+    ('mmost://localhost:invalid-port/3ccdd113474722377935511fc85d3dd4', {
+        'instance': None,
+    }),
+    ('mmosts://localhost/3ccdd113474722377935511fc85d3dd4', {
+        'instance': plugins.NotifyMatterMost,
+    }),
+    ('mmosts://localhost', {
+        'instance': plugins.NotifyMatterMost,
+        # Thrown because there was no webhook id specified
+        'exception': TypeError,
+    }),
+    ('mmost://localhost/bad-web-hook', {
+        'instance': plugins.NotifyMatterMost,
+        # Thrown because the webhook is not in a valid format
+        'exception': TypeError,
+    }),
+    ('mmost://localhost/3ccdd113474722377935511fc85d3dd4', {
+        'instance': plugins.NotifyMatterMost,
+        # force a failure
+        'response': False,
+        'requests_response_code': 500,
+    }),
+    ('mmost://localhost/3ccdd113474722377935511fc85d3dd4', {
+        'instance': plugins.NotifyMatterMost,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('mmost://localhost/3ccdd113474722377935511fc85d3dd4', {
+        'instance': plugins.NotifyMatterMost,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
 )
 
 

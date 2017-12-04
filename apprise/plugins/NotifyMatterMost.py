@@ -116,10 +116,7 @@ class NotifyMatterMost(NotifyBase):
         if self.channel:
             payload['channel'] = self.channel
 
-        url = '%s://%s' % (self.schema, self.host)
-        if isinstance(self.port, int):
-            url += ':%d' % self.port
-
+        url = '%s://%s:%d' % (self.schema, self.host, self.port)
         url += '/hooks/%s' % self.authtoken
 
         self.logger.debug('MatterMost POST URL: %s (cert_verify=%r)' % (
@@ -153,7 +150,7 @@ class NotifyMatterMost(NotifyBase):
             else:
                 self.logger.info('Sent MatterMost notification.')
 
-        except requests.ConnectionError as e:
+        except requests.RequestException as e:
             self.logger.warning(
                 'A Connection error occured sending MatterMost '
                 'notification.'
@@ -190,15 +187,7 @@ class NotifyMatterMost(NotifyBase):
         channel = None
         if 'channel' in results['qsd'] and len(results['qsd']['channel']):
             # Allow the user to specify the channel to post to
-            try:
-                channel = NotifyBase.unquote(results['qsd']['channel']).strip()
-
-            except (AttributeError, TypeError, ValueError):
-                NotifyBase.logger.warning(
-                    'An invalid MatterMost channel of "%s" was specified and '
-                    'will be ignored.' % results['qsd']['channel']
-                )
-                pass
+            channel = NotifyBase.unquote(results['qsd']['channel']).strip()
 
         results['authtoken'] = authtoken
         results['channel'] = channel
