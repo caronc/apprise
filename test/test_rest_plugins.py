@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# NotifyJSON Unit Tests
+# REST Based Plugins - Unit Tests
 #
 # Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
 #
@@ -56,6 +56,9 @@ VALID_URLS = (
     }),
     ('jsons://user:pass@localhost:8080', {
         'instance': plugins.NotifyJSON,
+    }),
+    ('json://:@/', {
+        'instance': None,
     }),
     ('json://user:pass@localhost:8081', {
         'instance': plugins.NotifyJSON,
@@ -113,6 +116,9 @@ VALID_URLS = (
         # Thrown because the webhook is not in a valid format
         'exception': TypeError,
     }),
+    ('mmost://:@/', {
+        'instance': None,
+    }),
     ('mmost://localhost/3ccdd113474722377935511fc85d3dd4', {
         'instance': plugins.NotifyMatterMost,
         # force a failure
@@ -136,9 +142,9 @@ VALID_URLS = (
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugins(mock_post, mock_get):
+def test_rest_plugins(mock_post, mock_get):
     """
-    API: Plugins() object
+    API: REST Based Plugins()
 
     """
 
@@ -199,6 +205,11 @@ def test_plugins(mock_post, mock_get):
                 # We're done
                 continue
 
+            if instance is None:
+                # Expected None but didn't get it
+                print('%s instantiated %s' % (url, str(obj)))
+                assert(False)
+
             assert(isinstance(obj, instance))
 
             if self:
@@ -210,7 +221,7 @@ def test_plugins(mock_post, mock_get):
 
             try:
                 if test_requests_exceptions is False:
-                    # check tht we're as expected
+                    # check that we're as expected
                     assert obj.notify(
                         title='test', body='body',
                         notify_type=NotifyType.INFO) == response
@@ -230,10 +241,12 @@ def test_plugins(mock_post, mock_get):
 
                         except Exception as e:
                             # We can't handle this exception type
+                            print('%s / %s' % (url, str(e)))
                             assert False
 
             except AssertionError:
                 # Don't mess with these entries
+                print('%s AssertionError' % url)
                 raise
 
             except Exception as e:
@@ -242,9 +255,11 @@ def test_plugins(mock_post, mock_get):
 
         except AssertionError:
             # Don't mess with these entries
+            print('%s / %s' % (url, str(e)))
             raise
 
         except Exception as e:
             # Handle our exception
+            print('%s / %s' % (url, str(e)))
             assert(exception is not None)
             assert(isinstance(e, exception))

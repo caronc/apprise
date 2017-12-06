@@ -85,6 +85,20 @@ TIDY_NUX_TRIM_RE = re.compile(
 )
 
 
+def is_hostname(hostname):
+    """
+    Validate hostname
+    """
+    if len(hostname) > 255 or len(hostname) == 0:
+        return False
+
+    if hostname[-1] == ".":
+        hostname = hostname[:-1]
+
+    allowed = re.compile("(?!-)[A-Z\d_-]{1,63}(?<!-)$", re.IGNORECASE)
+    return all(allowed.match(x) for x in hostname.split("."))
+
+
 def compat_is_basestring(content):
     """
     Python 3 support for checking if content is unicode and/or
@@ -278,6 +292,10 @@ def parse_url(url, default_schema='http'):
 
         if result['port'] == 0:
             result['port'] = None
+
+    if not is_hostname(result['host']):
+        # Nothing more we can do without a hostname
+        return None
 
     # Re-assemble cleaned up version of the url
     result['url'] = '%s://' % result['schema']

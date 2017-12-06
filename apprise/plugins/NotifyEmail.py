@@ -19,13 +19,11 @@
 import re
 
 from datetime import datetime
-from smtplib import SMTP
-from smtplib import SMTPException
+import smtplib
 from socket import error as SocketError
 
 from email.mime.text import MIMEText
 
-from ..utils import compat_is_basestring
 from .NotifyBase import NotifyBase
 from .NotifyBase import NotifyFormat
 
@@ -49,7 +47,7 @@ WEBBASE_LOOKUP_TABLE = (
     # Google GMail
     (
         'Google Mail',
-        re.compile('^(?P<id>[^@]+)@(?P<domain>gmail\.com)$', re.I),
+        re.compile(r'^(?P<id>[^@]+)@(?P<domain>gmail\.com)$', re.I),
         {
             'port': 587,
             'smtp_host': 'smtp.gmail.com',
@@ -61,7 +59,7 @@ WEBBASE_LOOKUP_TABLE = (
     # Pronto Mail
     (
         'Pronto Mail',
-        re.compile('^(?P<id>[^@]+)@(?P<domain>prontomail\.com)$', re.I),
+        re.compile(r'^(?P<id>[^@]+)@(?P<domain>prontomail\.com)$', re.I),
         {
             'port': 465,
             'smtp_host': 'secure.emailsrvr.com',
@@ -73,7 +71,7 @@ WEBBASE_LOOKUP_TABLE = (
     # Microsoft Hotmail
     (
         'Microsoft Hotmail',
-        re.compile('^(?P<id>[^@]+)@(?P<domain>(hotmail|live)\.com)$', re.I),
+        re.compile(r'^(?P<id>[^@]+)@(?P<domain>(hotmail|live)\.com)$', re.I),
         {
             'port': 587,
             'smtp_host': 'smtp.live.com',
@@ -85,7 +83,7 @@ WEBBASE_LOOKUP_TABLE = (
     # Yahoo Mail
     (
         'Yahoo Mail',
-        re.compile('^(?P<id>[^@]+)@(?P<domain>yahoo\.(ca|com))$', re.I),
+        re.compile(r'^(?P<id>[^@]+)@(?P<domain>yahoo\.(ca|com))$', re.I),
         {
             'port': 465,
             'smtp_host': 'smtp.mail.yahoo.com',
@@ -97,7 +95,7 @@ WEBBASE_LOOKUP_TABLE = (
     # Catch All
     (
         'Custom',
-        re.compile('^(?P<id>[^@]+)@(?P<domain>.+)$', re.I),
+        re.compile(r'^(?P<id>[^@]+)@(?P<domain>.+)$', re.I),
         {
             # Setting smtp_host to None is a way of
             # auto-detecting it based on other parameters
@@ -159,20 +157,11 @@ class NotifyEmail(NotifyBase):
 
         # Now we want to construct the To and From email
         # addresses from the URL provided
-        self.from_name = kwargs.get('name', 'NZB Notification')
+        self.from_name = kwargs.get('name', NotifyBase.app_desc)
         self.from_addr = kwargs.get('from', None)
-        if not self.from_addr:
-            # Keep trying to be clever and make it equal to the to address
-            self.from_addr = self.to_addr
-
-        if not compat_is_basestring(self.to_addr):
-            raise TypeError('No valid ~To~ email address specified.')
 
         if not NotifyBase.is_email(self.to_addr):
             raise TypeError('Invalid ~To~ email format: %s' % self.to_addr)
-
-        if not compat_is_basestring(self.from_addr):
-            raise TypeError('No valid ~From~ email address specified.')
 
         match = NotifyBase.is_email(self.from_addr)
         if not match:
@@ -180,7 +169,7 @@ class NotifyEmail(NotifyBase):
             raise TypeError('Invalid ~From~ email format: %s' % self.to_addr)
 
         # Now detect the SMTP Server
-        self.smtp_host = kwargs.get('smtp_host', None)
+        self.smtp_host = kwargs.get('smtp_host', '')
 
         # Apply any defaults based on certain known configurations
         self.NotifyEmailDefaults()
@@ -269,7 +258,7 @@ class NotifyEmail(NotifyBase):
 
         try:
             self.logger.debug('Connecting to remote SMTP server...')
-            socket = SMTP(
+            socket = smtplib.SMTP(
                 self.smtp_host,
                 self.port,
                 None,
@@ -293,7 +282,7 @@ class NotifyEmail(NotifyBase):
                 self.to_addr,
             ))
 
-        except (SocketError, SMTPException) as e:
+        except (SocketError, smtplib.SMTPException, RuntimeError) as e:
             self.logger.warning(
                 'A Connection error occured sending Email '
                 'notification to %s.' % self.smtp_host)
@@ -334,87 +323,51 @@ class NotifyEmail(NotifyBase):
 
         if 'format' in results['qsd'] and len(results['qsd']['format']):
             # Extract email format (Text/Html)
+            format = NotifyBase.unquote(results['qsd']['format']).lower()
+            if len(format) > 0 and format[0] == 't':
+                results['notify_format'] = NotifyFormat.TEXT
+
+        if 'to' in results['qsd'] and len(results['qsd']['to']):
+            to_addr = NotifyBase.unquote(results['qsd']['to']).strip()
+
+        else:
+            # get 'To' email address
             try:
-                format = NotifyBase.unquote(results['qsd']['format']).lower()
-                if len(format) > 0 and format[0] == 't':
-                    results['notify_format'] = NotifyFormat.TEXT
-
-            except AttributeError:
-                pass
-
-        # get 'To' email address
-        try:
-            to_addr = filter(bool, NotifyBase.split_path(results['host']))[0]
-
-        except (AttributeError, IndexError):
-            # No problem, we have other ways of getting
-            # the To address
-            pass
-
-        if not NotifyBase.is_email(to_addr):
-            if results['user']:
-                # Try to be clever and build a potential
-                # email address based on what we've been provided
                 to_addr = '%s@%s' % (
-                    re.split('[\s@]+', results['user'])[0],
-                    re.split('[\s@]+', to_addr)[-1],
+                    re.split(
+                        '[\s@]+', NotifyBase.unquote(results['user']))[0],
+                    results.get('host', '')
                 )
 
-                if not NotifyBase.is_email(to_addr):
-                    NotifyBase.logger.error(
-                        '%s does not contain a recipient email.' %
-                        NotifyBase.unquote(results['url'].lstrip('/')),
-                    )
-                    return None
+            except (AttributeError, IndexError):
+                # No problem, we have other ways of getting
+                # the To address
+                pass
 
         # Attempt to detect 'from' email address
         from_addr = to_addr
-        try:
-            if 'from' in results['qsd'] and len(results['qsd']['from']):
-                from_addr = results['qsd']['from']
-                if not NotifyBase.is_email(results['qsd']['from']):
-                    # Lets be clever and attempt to make the from
-                    # address email
-                    from_addr = '%s@%s' % (
-                        re.split('[\s@]+', from_addr)[0],
-                        re.split('[\s@]+', to_addr)[-1],
-                    )
+        if 'from' in results['qsd'] and len(results['qsd']['from']):
+            from_addr = NotifyBase.unquote(results['qsd']['from'])
+            if not NotifyBase.is_email(from_addr):
+                # Lets be clever and attempt to make the from
+                # address an email based on the to address
+                from_addr = '%s@%s' % (
+                    re.split('[\s@]+', from_addr)[0],
+                    re.split('[\s@]+', to_addr)[-1],
+                )
 
-                if not NotifyBase.is_email(from_addr):
-                    NotifyBase.logger.error(
-                        '%s does not contain a from address.' %
-                        NotifyBase.unquote(results['url'].lstrip('/')),
-                    )
-                    return None
+        if 'name' in results['qsd'] and len(results['qsd']['name']):
+            # Extract from name to associate with from address
+            results['name'] = NotifyBase.unquote(results['qsd']['name'])
 
-        except AttributeError:
-            pass
-
-        try:
-            if 'name' in results['qsd'] and len(results['qsd']['name']):
-                # Extract from name to associate with from address
-                results['name'] = NotifyBase.unquote(results['qsd']['name'])
-
-        except AttributeError:
-            pass
-
-        try:
-            if 'timeout' in results['qsd'] and len(results['qsd']['timeout']):
-                # Extract the timeout to associate with smtp server
-                results['timeout'] = NotifyBase.unquote(
-                    results['qsd']['timeout'])
-
-        except AttributeError:
-            pass
+        if 'timeout' in results['qsd'] and len(results['qsd']['timeout']):
+            # Extract the timeout to associate with smtp server
+            results['timeout'] = results['qsd']['timeout']
 
         # Store SMTP Host if specified
-        try:
-            # Extract from password to associate with smtp server
-            if 'smtp' in results['qsd'] and len(results['qsd']['smtp']):
-                smtp_host = NotifyBase.unquote(results['qsd']['smtp'])
-
-        except AttributeError:
-            pass
+        if 'smtp' in results['qsd'] and len(results['qsd']['smtp']):
+            # Extract the smtp server
+            smtp_host = NotifyBase.unquote(results['qsd']['smtp'])
 
         results['to'] = to_addr
         results['from'] = from_addr

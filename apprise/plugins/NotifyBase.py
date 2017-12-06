@@ -33,6 +33,7 @@ except ImportError:
 
 from ..utils import parse_url
 from ..utils import parse_bool
+from ..utils import is_hostname
 from ..common import NOTIFY_IMAGE_SIZES
 from ..common import NOTIFY_TYPES
 
@@ -80,8 +81,8 @@ NOTIFY_FORMATS = (
 # Regular expression retrieved from:
 # http://www.regular-expressions.info/email.html
 IS_EMAIL_RE = re.compile(
-    r"(?P<userid>[a-z0-9!#$%&'*+/=?^_`{|}~-]+"
-    r"(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)"
+    r"(?P<userid>[a-z0-9$%+=_~-]+"
+    r"(?:\.[a-z0-9$%+=_~-]+)"
     r"*)@(?P<domain>(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+"
     r"[a-z0-9](?:[a-z0-9-]*"
     r"[a-z0-9]))?",
@@ -311,6 +312,14 @@ class NotifyBase(object):
 
         """
         return IS_EMAIL_RE.match(address) is not None
+
+    @staticmethod
+    def is_hostname(hostname):
+        """
+        Returns True if specified entry is a hostname
+
+        """
+        return is_hostname(hostname)
 
     @staticmethod
     def parse_url(url):

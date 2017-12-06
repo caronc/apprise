@@ -156,3 +156,11 @@ def test_notify_base_urls():
         'https://user:pass@localhost?user=newuser')
     assert 'user' in results
     assert results['user'] == "newuser"
+
+    # Test invalid urls
+    assert NotifyBase.parse_url('https://:@/') is None
+    assert NotifyBase.parse_url('http://:@') is None
+    assert NotifyBase.parse_url('http://@') is None
+    assert NotifyBase.parse_url('http:///') is None
+    assert NotifyBase.parse_url('http://:test/') is None
+    assert NotifyBase.parse_url('http://pass:test/') is None

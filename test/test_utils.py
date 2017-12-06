@@ -264,6 +264,24 @@ def test_parse_bool():
     assert(utils.parse_bool('OhYeah', True) is True)
 
 
+def test_is_hostname():
+    """
+    API: is_hostname() function
+
+    """
+    # Valid Hostnames
+    assert utils.is_hostname('yahoo.ca') is True
+    assert utils.is_hostname('yahoo.ca.') is True
+    assert utils.is_hostname('valid-dashes-in-host.ca') is True
+    assert utils.is_hostname('valid-underscores_in_host.ca') is True
+
+    # Invalid Hostnames
+    assert utils.is_hostname('invalid-characters_#^.ca') is False
+    assert utils.is_hostname('    spaces   ') is False
+    assert utils.is_hostname('       ') is False
+    assert utils.is_hostname('') is False
+
+
 def test_parse_list():
     "utils: parse_list() testing """
 

@@ -16,6 +16,10 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU Lesser General Public License for more details.
 
+# Used for Testing; specifically test_email_plugin.py needs access
+# to the modules WEBBASE_LOOKUP_TABLE and WebBaseLogin objects
+from . import NotifyEmail as NotifyEmailBase
+
 from .NotifyBoxcar import NotifyBoxcar
 from .NotifyEmail import NotifyEmail
 from .NotifyFaast import NotifyFaast
@@ -52,4 +56,7 @@ __all__ = [
 
     # Reference
     'NotifyImageSize', 'NOTIFY_IMAGE_SIZES', 'NotifyType', 'NOTIFY_TYPES',
+
+    # NotifyEmail Base References (used for Testing)
+    'NotifyEmailBase',
 ]
