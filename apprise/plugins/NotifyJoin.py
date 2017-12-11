@@ -148,12 +148,9 @@ class NotifyJoin(NotifyBase):
                 'text': body,
             }
 
-            if self.include_image:
-                image_url = self.image_url(
-                    notify_type,
-                )
-                if image_url:
-                    url_args['icon'] = image_url
+            image_url = self.image_url(notify_type)
+            if image_url:
+                url_args['icon'] = image_url
 
             # prepare payload
             payload = {}

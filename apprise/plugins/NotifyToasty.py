@@ -90,12 +90,9 @@ class NotifyToasty(NotifyBase):
                 'text': NotifyBase.quote(body),
             }
 
-            if self.include_image:
-                image_url = self.image_url(
-                    notify_type,
-                )
-                if image_url:
-                    payload['image'] = image_url
+            image_url = self.image_url(notify_type)
+            if image_url:
+                payload['image'] = image_url
 
             # URL to transmit content via
             url = '%s%s' % (self.notify_url, device)

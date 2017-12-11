@@ -316,3 +316,13 @@ def test_apprise_asset(tmpdir):
 
     # Restore our permissions
     chmod(a.image_path(NotifyType.INFO, NotifyImageSize.XY_256), 0o640)
+
+    # Disable all image references
+    a = AppriseAsset(image_path_mask=False, image_url_mask=False)
+    # We always return none in these calls now
+    assert(a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is None)
+    assert(a.image_url(NotifyType.INFO, NotifyImageSize.XY_256) is None)
+    assert(a.image_path(NotifyType.INFO, NotifyImageSize.XY_256,
+           must_exist=False) is None)
+    assert(a.image_path(NotifyType.INFO, NotifyImageSize.XY_256,
+           must_exist=True) is None)

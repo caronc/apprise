@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# XBMC Notify Wrapper
+# XBMC/KODI Notify Wrapper
 #
 # Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
 #
@@ -28,17 +28,6 @@ from ..common import NotifyImageSize
 # Image Support (128x128)
 XBMC_IMAGE_XY = NotifyImageSize.XY_128
 
-# XBMC uses v2
-XBMC_PROTOCOL_V2 = 2
-
-# Kodi uses v6
-XBMC_PROTOCOL_V6 = 6
-
-SUPPORTED_XBMC_PROTOCOLS = (
-    XBMC_PROTOCOL_V2,
-    XBMC_PROTOCOL_V6,
-)
-
 
 class NotifyXBMC(NotifyBase):
     """
@@ -52,7 +41,13 @@ class NotifyXBMC(NotifyBase):
     secure_protocol = ('xbmc', 'kodis')
 
     # XBMC uses the http protocol with JSON requests
-    default_port = 8080
+    xbmc_default_port = 8080
+
+    # XBMC default protocol version (v2)
+    xbmc_remote_protocol = 2
+
+    # KODI default protocol version (v6)
+    kodi_remote_protocol = 6
 
     def __init__(self, **kwargs):
         """
@@ -68,14 +63,8 @@ class NotifyXBMC(NotifyBase):
         else:
             self.schema = 'http'
 
-        if not self.port:
-            self.port = self.default_port
-
-        self.protocol = kwargs.get('protocol', XBMC_PROTOCOL_V2)
-        if self.protocol not in SUPPORTED_XBMC_PROTOCOLS:
-            raise TypeError("Invalid protocol specified.")
-
-        return
+        # Default protocol
+        self.protocol = kwargs.get('protocol', self.xbmc_remote_protocol)
 
     def _payload_60(self, title, body, notify_type, **kwargs):
         """
@@ -102,18 +91,17 @@ class NotifyXBMC(NotifyBase):
             'id': 1,
         }
 
-        if self.include_image:
-            image_url = self.image_url(
-                notify_type,
-            )
-            if image_url:
-                payload['image'] = image_url
-                if notify_type is NotifyType.Error:
-                    payload['type'] = 'error'
-                elif notify_type is NotifyType.Warning:
-                    payload['type'] = 'warning'
-                else:
-                    payload['type'] = 'info'
+        image_url = self.image_url(notify_type)
+        if image_url:
+            payload['image'] = image_url
+            if notify_type is NotifyType.FAILURE:
+                payload['type'] = 'error'
+
+            elif notify_type is NotifyType.WARNING:
+                payload['type'] = 'warning'
+
+            else:
+                payload['type'] = 'info'
 
         return (headers, dumps(payload))
 
@@ -142,18 +130,15 @@ class NotifyXBMC(NotifyBase):
             'id': 1,
         }
 
-        if self.include_image:
-            image_url = self.image_url(
-                notify_type,
-            )
-            if image_url:
-                payload['image'] = image_url
+        image_url = self.image_url(notify_type)
+        if image_url:
+            payload['image'] = image_url
 
         return (headers, dumps(payload))
 
     def notify(self, title, body, notify_type, **kwargs):
         """
-        Perform XBMC Notification
+        Perform XBMC/KODI Notification
         """
 
         # Limit results to just the first 2 line otherwise
@@ -162,13 +147,13 @@ class NotifyXBMC(NotifyBase):
         body[0] = body[0].strip('#').strip()
         body = '\r\n'.join(body[0:2])
 
-        if self.protocol == XBMC_PROTOCOL_V2:
+        if self.protocol == self.xbmc_remote_protocol:
             # XBMC v2.0
             (headers, payload) = self._payload_20(
                 title, body, notify_type, **kwargs)
 
         else:
-            # XBMC v6.0
+            # KODI v6.0
             (headers, payload) = self._payload_60(
                 title, body, notify_type, **kwargs)
 
@@ -177,7 +162,7 @@ class NotifyXBMC(NotifyBase):
             auth = (self.user, self.password)
 
         url = '%s://%s' % (self.schema, self.host)
-        if isinstance(self.port, int):
+        if self.port:
             url += ':%d' % self.port
 
         url += '/jsonrpc'
@@ -214,7 +199,7 @@ class NotifyXBMC(NotifyBase):
             else:
                 self.logger.info('Sent XBMC/KODI notification.')
 
-        except requests.ConnectionError as e:
+        except requests.RequestException as e:
             self.logger.warning(
                 'A Connection error occured sending XBMC/KODI '
                 'notification.'
@@ -225,3 +210,31 @@ class NotifyXBMC(NotifyBase):
             return False
 
         return True
+
+    @staticmethod
+    def parse_url(url):
+        """
+        Parses the URL and returns enough arguments that can allow
+        us to substantiate this object.
+
+        """
+        results = NotifyBase.parse_url(url)
+        if not results:
+            # We're done early
+            return results
+
+        # We want to set our protocol depending on whether we're using XBMC
+        # or KODI
+        if results.get('schema', '').startswith('xbmc'):
+            # XBMC Support
+            results['protocol'] = NotifyXBMC.xbmc_remote_protocol
+
+            # Assign Default XBMC Port
+            if not results['port']:
+                results['port'] = NotifyXBMC.xbmc_default_port
+
+        else:
+            # KODI Support
+            results['protocol'] = NotifyXBMC.kodi_remote_protocol
+
+        return results

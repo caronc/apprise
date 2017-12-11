@@ -78,7 +78,7 @@ def test_notify_base():
     # Create an object with an ImageSize loaded into it
     nb = NotifyBase(image_size=NotifyImageSize.XY_256)
 
-    # We'll get an object thi time around
+    # We'll get an object this time around
     assert nb.image_url(notify_type=NotifyType.INFO) is not None
     assert nb.image_path(notify_type=NotifyType.INFO) is not None
     assert nb.image_raw(notify_type=NotifyType.INFO) is not None
@@ -104,8 +104,12 @@ def test_notify_base():
         '/path/?name=Dr%20Disrespect', unquote=True) == \
         ['path', '?name=Dr', 'Disrespect']
 
+    # Test is_email
     assert NotifyBase.is_email('test@gmail.com') is True
     assert NotifyBase.is_email('invalid.com') is False
+
+    # Test is_hostname
+    assert NotifyBase.is_hostname('example.com') is True
 
 
 def test_notify_base_urls():

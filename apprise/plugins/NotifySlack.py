@@ -22,7 +22,7 @@
 # follow the wizard to pre-determine the channel(s) you want your
 # message to broadcast to, and when you're complete, you will
 # recieve a URL that looks something like this:
-# https://hooks.slack.com/services/T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7F
+# https://hooks.slack.com/services/T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ
 #                                     ^         ^               ^
 #                                     |         |               |
 #  These are important <--------------^---------^---------------^
@@ -59,11 +59,11 @@ SLACK_HTTP_ERROR_MAP.update({
     401: 'Unauthorized - Invalid Token.',
 })
 
-# Used to break path apart into list of devices
+# Used to break path apart into list of channels
 CHANNEL_LIST_DELIM = re.compile(r'[ \t\r\n,#\\/]+')
 
-# Used to detect a device
-IS_CHANNEL_RE = re.compile(r'#?([A-Za-z0-9_]{1,32})')
+# Used to detect a channel
+IS_CHANNEL_RE = re.compile(r'[+#@]?([A-Z0-9_]{1,32})', re.I)
 
 # Image Support (72x72)
 SLACK_IMAGE_XY = NotifyImageSize.XY_72
@@ -127,11 +127,13 @@ class NotifySlack(NotifyBase):
             self.user = SLACK_DEFAULT_USER
 
         if compat_is_basestring(channels):
-            self.channels = filter(bool, CHANNEL_LIST_DELIM.split(
+            self.channels = [x for x in filter(bool, CHANNEL_LIST_DELIM.split(
                 channels,
-            ))
+            ))]
+
         elif isinstance(channels, (set, tuple, list)):
             self.channels = channels
+
         else:
             self.channels = list()
 
@@ -167,13 +169,13 @@ class NotifySlack(NotifyBase):
         }
 
         # error tracking (used for function return)
-        has_error = False
+        notify_okay = True
 
         # Perform Formatting
-        title = self._re_formatting_rules.sub(
+        title = self._re_formatting_rules.sub(  # pragma: no branch
             lambda x: self._re_formatting_map[x.group()], title,
         )
-        body = self._re_formatting_rules.sub(
+        body = self._re_formatting_rules.sub(  # pragma: no branch
             lambda x: self._re_formatting_map[x.group()], body,
         )
         url = '%s/%s/%s/%s' % (
@@ -183,11 +185,7 @@ class NotifySlack(NotifyBase):
             self.token_c,
         )
 
-        image_url = None
-        if self.include_image:
-            image_url = self.image_url(
-                notify_type,
-            )
+        image_url = self.image_url(notify_type)
 
         # Create a copy of the channel list
         channels = list(self.channels)
@@ -204,9 +202,11 @@ class NotifySlack(NotifyBase):
             if len(channel) > 1 and channel[0] == '+':
                 # Treat as encoded id if prefixed with a +
                 _channel = channel[1:]
+
             elif len(channel) > 1 and channel[0] == '@':
                 # Treat @ value 'as is'
                 _channel = channel
+
             else:
                 # Prefix with channel hash tag
                 _channel = '#%s' % channel
@@ -220,7 +220,7 @@ class NotifySlack(NotifyBase):
                 'attachments': [{
                     'title': title,
                     'text': body,
-                    'color': self.asset.html_color[notify_type],
+                    'color': self.asset.html_color(notify_type),
                     # Time
                     'ts': time(),
                     'footer': self.app_id,
@@ -251,7 +251,7 @@ class NotifySlack(NotifyBase):
                                 SLACK_HTTP_ERROR_MAP[r.status_code],
                                 r.status_code))
 
-                    except IndexError:
+                    except KeyError:
                         self.logger.warning(
                             'Failed to send Slack:%s '
                             'notification (error=%s).' % (
@@ -261,21 +261,21 @@ class NotifySlack(NotifyBase):
                     # self.logger.debug('Response Details: %s' % r.raw.read())
 
                     # Return; we're done
-                    has_error = True
+                    notify_okay = False
 
-            except requests.ConnectionError as e:
+            except requests.RequestException as e:
                 self.logger.warning(
                     'A Connection error occured sending Slack:%s ' % (
                         channel) + 'notification.'
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))
-                has_error = True
+                notify_okay = False
 
             if len(channels):
                 # Prevent thrashing requests
                 self.throttle()
 
-        return has_error
+        return notify_okay
 
     @staticmethod
     def parse_url(url):
@@ -297,23 +297,15 @@ class NotifySlack(NotifyBase):
 
         # Now fetch the remaining tokens
         try:
-            token_b, token_c = filter(
-                bool, NotifyBase.split_path(results['fullpath']))[0:2]
+            token_b, token_c = [x for x in filter(
+                bool, NotifyBase.split_path(results['fullpath']))][0:2]
 
-        except (AttributeError, IndexError):
-            # Force some bad values that will get caught
-            # in parsing later
-            token_b = None
-            token_c = None
+        except (ValueError, AttributeError, IndexError):
+            # We're done
+            return None
 
-        try:
-            channels = '#'.join(filter(
-                bool, NotifyBase.split_path(results['fullpath']))[2:])
-
-        except (AttributeError, IndexError):
-            # Force some bad values that will get caught
-            # in parsing later
-            channels = None
+        channels = [x for x in filter(
+            bool, NotifyBase.split_path(results['fullpath']))][2:]
 
         results['token_a'] = token_a
         results['token_b'] = token_b

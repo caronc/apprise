@@ -45,9 +45,6 @@ class NotifyPushBullet(NotifyBase):
     A wrapper for PushBullet Notifications
     """
 
-    # The default protocol
-    protocol = 'pbul'
-
     # The default secure protocol
     secure_protocol = 'pbul'
 

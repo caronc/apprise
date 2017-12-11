@@ -70,10 +70,10 @@ class AppriseAsset(object):
         if theme:
             self.theme = theme
 
-        if image_path_mask:
+        if image_path_mask is not None:
             self.image_path_mask = image_path_mask
 
-        if image_url_mask:
+        if image_url_mask is not None:
             self.image_url_mask = image_url_mask
 
     def html_color(self, notify_type):
@@ -89,6 +89,10 @@ class AppriseAsset(object):
         Apply our mask to our image URL
 
         """
+        if not self.image_url_mask:
+            # No image to return
+            return None
+
         re_map = {
             '{THEME}': self.theme if self.theme else '',
             '{TYPE}': notify_type,
@@ -108,6 +112,11 @@ class AppriseAsset(object):
         Apply our mask to our image file path
 
         """
+
+        if not self.image_path_mask:
+            # No image to return
+            return None
+
         re_map = {
             '{THEME}': self.theme if self.theme else '',
             '{TYPE}': notify_type,

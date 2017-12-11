@@ -218,18 +218,17 @@ class NotifyTelegram(NotifyBase):
         has_error = False
 
         image_url = None
-        if self.include_image:
-            image_content = self.image_raw(notify_type)
-            if image_content is not None:
-                # prepare our image URL
-                image_url = '%s%s/%s' % (
-                    self.notify_url,
-                    self.bot_token,
-                    'sendPhoto'
-                )
+        image_content = self.image_raw(notify_type)
+        if image_content is not None:
+            # prepare our image URL
+            image_url = '%s%s/%s' % (
+                self.notify_url,
+                self.bot_token,
+                'sendPhoto'
+            )
 
-                # Set up our upload
-                files = {'photo': ('%s.png' % notify_type, image_content)}
+            # Set up our upload
+            files = {'photo': ('%s.png' % notify_type, image_content)}
 
         url = '%s%s/%s' % (
             self.notify_url,

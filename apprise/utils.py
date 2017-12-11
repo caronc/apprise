@@ -133,7 +133,7 @@ def tidy_path(path):
     return path
 
 
-def parse_url(url, default_schema='http'):
+def parse_url(url, default_schema='http', verify_host=True):
     """A function that greatly simplifies the parsing of a url
     specified by the end user.
 
@@ -293,7 +293,7 @@ def parse_url(url, default_schema='http'):
         if result['port'] == 0:
             result['port'] = None
 
-    if not is_hostname(result['host']):
+    if verify_host and not is_hostname(result['host']):
         # Nothing more we can do without a hostname
         return None
 

@@ -64,12 +64,9 @@ class NotifyFaast(NotifyBase):
             'message': body,
         }
 
-        if self.include_image:
-            image_url = self.image_url(
-                notify_type,
-            )
-            if image_url:
-                payload['icon_url'] = image_url
+        image_url = self.image_url(notify_type)
+        if image_url:
+            payload['icon_url'] = image_url
 
         self.logger.debug('Faast POST URL: %s (cert_verify=%r)' % (
             self.notify_url, self.verify_certificate,

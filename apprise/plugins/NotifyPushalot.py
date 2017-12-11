@@ -92,12 +92,9 @@ class NotifyPushalot(NotifyBase):
             'Source': self.app_id,
         }
 
-        if self.include_image:
-            image_url = self.image_url(
-                notify_type,
-            )
-            if image_url:
-                payload['Image'] = image_url
+        image_url = self.image_url(notify_type)
+        if image_url:
+            payload['Image'] = image_url
 
         self.logger.debug('Pushalot POST URL: %s (cert_verify=%r)' % (
             self.notify_url, self.verify_certificate,

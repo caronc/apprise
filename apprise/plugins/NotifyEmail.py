@@ -189,7 +189,7 @@ class NotifyEmail(NotifyBase):
             # over-riding any smarts to be applied
             return
 
-        for i in range(len(WEBBASE_LOOKUP_TABLE)):
+        for i in range(len(WEBBASE_LOOKUP_TABLE)):  # pragma: no branch
             self.logger.debug('Scanning %s against %s' % (
                 self.to_addr, WEBBASE_LOOKUP_TABLE[i][0]
             ))
@@ -290,12 +290,9 @@ class NotifyEmail(NotifyBase):
             # Return; we're done
             return False
 
-        try:
+        finally:
+            # Gracefully terminate the connection with the server
             socket.quit()
-
-        except:
-            # no problem
-            pass
 
         return True
 
@@ -332,17 +329,11 @@ class NotifyEmail(NotifyBase):
 
         else:
             # get 'To' email address
-            try:
-                to_addr = '%s@%s' % (
-                    re.split(
-                        '[\s@]+', NotifyBase.unquote(results['user']))[0],
-                    results.get('host', '')
-                )
-
-            except (AttributeError, IndexError):
-                # No problem, we have other ways of getting
-                # the To address
-                pass
+            to_addr = '%s@%s' % (
+                re.split(
+                    '[\s@]+', NotifyBase.unquote(results['user']))[0],
+                results.get('host', '')
+            )
 
         # Attempt to detect 'from' email address
         from_addr = to_addr

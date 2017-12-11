@@ -121,7 +121,7 @@ class NotifyBase(object):
 
     def __init__(self, title_maxlen=100, body_maxlen=512,
                  notify_format=NotifyFormat.TEXT, image_size=None,
-                 include_image=False, secure=False, throttle=None, **kwargs):
+                 secure=False, throttle=None, **kwargs):
         """
         Initialize some general logging and common server arguments that will
         keep things consistent when working with the notifiers that will
@@ -152,7 +152,6 @@ class NotifyBase(object):
         self.title_maxlen = title_maxlen
         self.body_maxlen = body_maxlen
         self.image_size = image_size
-        self.include_image = include_image
         self.secure = secure
 
         if isinstance(throttle, (float, int)):
@@ -256,6 +255,9 @@ class NotifyBase(object):
         common unquote function
 
         """
+        if not content:
+            return ''
+
         try:
             # Python v3.x
             return _unquote(content, encoding=encoding, errors=errors)
@@ -270,6 +272,9 @@ class NotifyBase(object):
         common quote function
 
         """
+        if not content:
+            return ''
+
         try:
             # Python v3.x
             return _quote(content, safe=safe, encoding=encoding, errors=errors)
@@ -292,7 +297,7 @@ class NotifyBase(object):
 
         except TypeError:
             # Python v2.7
-            return _urlencode(query, oseq=doseq)
+            return _urlencode(query)
 
     @staticmethod
     def split_path(path, unquote=True):
@@ -322,12 +327,13 @@ class NotifyBase(object):
         return is_hostname(hostname)
 
     @staticmethod
-    def parse_url(url):
+    def parse_url(url, verify_host=True):
         """
         Parses the URL and returns it broken apart into a dictionary.
 
         """
-        results = parse_url(url, default_schema='unknown')
+        results = parse_url(
+            url, default_schema='unknown', verify_host=verify_host)
 
         if not results:
             # We're done; we failed to parse our url

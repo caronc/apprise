@@ -140,13 +140,13 @@ class NotifyGrowl(NotifyBase):
         body = '\r\n'.join(body[0:2])
 
         icon = None
-        if self.include_image:
-            if self.version >= 2:
-                # URL Based
-                icon = self.image_url(notify_type)
-            else:
-                # Raw
-                icon = self.image_raw(notify_type)
+        if self.version >= 2:
+            # URL Based
+            icon = self.image_url(notify_type)
+
+        else:
+            # Raw
+            icon = self.image_raw(notify_type)
 
         payload = {
             'noteType': GROWL_NOTIFICATION_TYPE,

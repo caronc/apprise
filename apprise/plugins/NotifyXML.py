@@ -136,7 +136,7 @@ class NotifyXML(NotifyBase):
                 # Return; we're done
                 return False
 
-        except requests.ConnectionError as e:
+        except requests.RequestException as e:
             self.logger.warning(
                 'A Connection error occured sending XML '
                 'notification to %s.' % self.host)

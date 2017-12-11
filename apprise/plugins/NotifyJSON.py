@@ -113,8 +113,7 @@ class NotifyJSON(NotifyBase):
                 except KeyError:
                     self.logger.warning(
                         'Failed to send JSON notification '
-                        '(error=%s).' % (
-                            r.status_code))
+                        '(error=%s).' % (r.status_code))
 
                 # Return; we're done
                 return False

@@ -238,10 +238,10 @@ class Apprise(object):
                     # Toggle our return status flag
                     status = False
 
-            except:
+            except Exception:
                 # A catch all so we don't have to abort early
                 # just because one of our plugins has a bug in it.
-                # TODO: print backtrace
+                logging.exception("notification exception")
                 status = False
 
         return status
