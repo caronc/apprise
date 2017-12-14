@@ -37,7 +37,7 @@ VALIDATE_APIKEY = re.compile(r'[A-Za-z0-9]{48}')
 
 # Priorities
 class NotifyMyAndroidPriority(object):
-    VERY_LOW = -2
+    LOW = -2
     MODERATE = -1
     NORMAL = 0
     HIGH = 1
@@ -45,7 +45,7 @@ class NotifyMyAndroidPriority(object):
 
 
 NMA_PRIORITIES = (
-    NotifyMyAndroidPriority.VERY_LOW,
+    NotifyMyAndroidPriority.LOW,
     NotifyMyAndroidPriority.MODERATE,
     NotifyMyAndroidPriority.NORMAL,
     NotifyMyAndroidPriority.HIGH,
@@ -64,8 +64,7 @@ class NotifyMyAndroid(NotifyBase):
     # Notify My Android uses the http protocol with JSON requests
     notify_url = 'https://www.notifymyandroid.com/publicapi/notify'
 
-    def __init__(self, apikey, priority=NotifyMyAndroidPriority.NORMAL,
-                 devapikey=None, **kwargs):
+    def __init__(self, apikey, priority=None, devapikey=None, **kwargs):
         """
         Initialize Notify My Android Object
         """
@@ -143,7 +142,7 @@ class NotifyMyAndroid(NotifyBase):
                             NMA_HTTP_ERROR_MAP[r.status_code],
                             r.status_code))
 
-                except IndexError:
+                except KeyError:
                     self.logger.warning(
                         'Failed to send NMA notification (error=%s).' % (
                             r.status_code))
@@ -152,10 +151,10 @@ class NotifyMyAndroid(NotifyBase):
                 return False
 
             else:
-                self.logger.debug('NMA Server Response: %s.' % r.text)
+                self.logger.debug('NMA Server Response: %s.' % r.raw.read())
                 self.logger.info('Sent NMA notification.')
 
-        except requests.ConnectionError as e:
+        except requests.RequestException as e:
             self.logger.warning(
                 'A Connection error occured sending NMA notification.'
             )
@@ -191,6 +190,32 @@ class NotifyMyAndroid(NotifyBase):
 
             except AttributeError:
                 pass
+
+        if 'priority' in results['qsd'] and len(results['qsd']['priority']):
+            _map = {
+                'l': NotifyMyAndroidPriority.LOW,
+                '-2': NotifyMyAndroidPriority.LOW,
+                'm': NotifyMyAndroidPriority.MODERATE,
+                '-1': NotifyMyAndroidPriority.MODERATE,
+                'n': NotifyMyAndroidPriority.NORMAL,
+                '0': NotifyMyAndroidPriority.NORMAL,
+                'h': NotifyMyAndroidPriority.HIGH,
+                '1': NotifyMyAndroidPriority.HIGH,
+                'e': NotifyMyAndroidPriority.EMERGENCY,
+                '2': NotifyMyAndroidPriority.EMERGENCY,
+            }
+            try:
+                results['priority'] = \
+                    _map[results['qsd']['priority'][0].lower()]
+
+            except KeyError:
+                # No priority was set
+                pass
+
+        # Now fetch devapi if specified
+        devapi = NotifyBase.split_path(results['fullpath'])[0]
+        if devapi:
+            results['devapikey'] = devapi
 
         results['apikey'] = results['host']
 

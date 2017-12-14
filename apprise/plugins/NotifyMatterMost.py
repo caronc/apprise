@@ -176,13 +176,7 @@ class NotifyMatterMost(NotifyBase):
             return results
 
         # Apply our settings now
-        try:
-            authtoken = NotifyBase.split_path(results['fullpath'])[0]
-
-        except (AttributeError, IndexError):
-            # Force some bad values that will get caught
-            # in parsing later
-            authtoken = None
+        authtoken = NotifyBase.split_path(results['fullpath'])[0]
 
         channel = None
         if 'channel' in results['qsd'] and len(results['qsd']['channel']):

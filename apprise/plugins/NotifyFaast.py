@@ -88,7 +88,7 @@ class NotifyFaast(NotifyBase):
                             HTTP_ERROR_MAP[r.status_code],
                             r.status_code))
 
-                except IndexError:
+                except KeyError:
                     self.logger.warning(
                         'Failed to send Faast notification '
                         '(error=%s).' % (
@@ -96,10 +96,11 @@ class NotifyFaast(NotifyBase):
 
                 # Return; we're done
                 return False
+
             else:
                 self.logger.info('Sent Faast notification.')
 
-        except requests.ConnectionError as e:
+        except requests.RequestException as e:
             self.logger.warning(
                 'A Connection error occured sending Faast notification.',
             )

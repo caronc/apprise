@@ -18,10 +18,8 @@
 
 import re
 
-from .gntp.notifier import GrowlNotifier
-from .gntp.errors import NetworkError as GrowlNetworkError
-from .gntp.errors import AuthError as GrowlAuthenticationError
-
+from .gntp import notifier
+from .gntp import errors
 from ..NotifyBase import NotifyBase
 from ...common import NotifyImageSize
 
@@ -31,7 +29,7 @@ GROWL_IMAGE_XY = NotifyImageSize.XY_72
 
 # Priorities
 class GrowlPriority(object):
-    VERY_LOW = -2
+    LOW = -2
     MODERATE = -1
     NORMAL = 0
     HIGH = 1
@@ -39,7 +37,7 @@ class GrowlPriority(object):
 
 
 GROWL_PRIORITIES = (
-    GrowlPriority.VERY_LOW,
+    GrowlPriority.LOW,
     GrowlPriority.MODERATE,
     GrowlPriority.NORMAL,
     GrowlPriority.HIGH,
@@ -61,16 +59,13 @@ class NotifyGrowl(NotifyBase):
     # Default Growl Port
     default_port = 23053
 
-    def __init__(self, priority=GrowlPriority.NORMAL, version=2, **kwargs):
+    def __init__(self, priority=None, version=2, **kwargs):
         """
         Initialize Growl Object
         """
         super(NotifyGrowl, self).__init__(
             title_maxlen=250, body_maxlen=32768,
             image_size=GROWL_IMAGE_XY, **kwargs)
-
-        # A Global flag that tracks registration
-        self.is_registered = False
 
         if not self.port:
             self.port = self.default_port
@@ -100,27 +95,37 @@ class NotifyGrowl(NotifyBase):
             payload['password'] = self.password
 
         self.logger.debug('Growl Registration Payload: %s' % str(payload))
-        self.growl = GrowlNotifier(**payload)
+        self.growl = notifier.GrowlNotifier(**payload)
 
         try:
             self.growl.register()
-            # Toggle our flag
-            self.is_registered = True
             self.logger.debug(
                 'Growl server registration completed successfully.'
             )
 
-        except GrowlNetworkError:
+        except errors.NetworkError:
             self.logger.warning(
                 'A network error occured sending Growl '
                 'notification to %s.' % self.host)
-            return
+            raise TypeError(
+                'A network error occured sending Growl '
+                'notification to %s.' % self.host)
 
-        except GrowlAuthenticationError:
+        except errors.AuthError:
             self.logger.warning(
                 'An authentication error occured sending Growl '
                 'notification to %s.' % self.host)
-            return
+            raise TypeError(
+                'An authentication error occured sending Growl '
+                'notification to %s.' % self.host)
+
+        except errors.UnsupportedError:
+            self.logger.warning(
+                'An unsupported error occured sending Growl '
+                'notification to %s.' % self.host)
+            raise TypeError(
+                'An unsupported error occured sending Growl '
+                'notification to %s.' % self.host)
 
         return
 
@@ -128,10 +133,6 @@ class NotifyGrowl(NotifyBase):
         """
         Perform Growl Notification
         """
-
-        if not self.is_registered:
-            # We can't do anything
-            return None
 
         # Limit results to just the first 2 line otherwise there is just to
         # much content to display
@@ -158,7 +159,9 @@ class NotifyGrowl(NotifyBase):
         }
         self.logger.debug('Growl Payload: %s' % str(payload))
 
-        # Update icon of payload to be raw data
+        # Update icon of payload to be raw data; this is intentionally done
+        # here after we spit the debug message above (so we don't try to
+        # print the binary contents of an image
         payload['icon'] = icon
 
         try:
@@ -174,7 +177,7 @@ class NotifyGrowl(NotifyBase):
                     'Growl notification sent successfully.'
                 )
 
-        except GrowlNetworkError as e:
+        except errors.BaseError as e:
             # Since Growl servers listen for UDP broadcasts, it's possible
             # that you will never get to this part of the code since there is
             # no acknowledgement as to whether it accepted what was sent to it
@@ -221,13 +224,35 @@ class NotifyGrowl(NotifyBase):
                 )
                 pass
 
+        if 'priority' in results['qsd'] and len(results['qsd']['priority']):
+            _map = {
+                'l': GrowlPriority.LOW,
+                '-2': GrowlPriority.LOW,
+                'm': GrowlPriority.MODERATE,
+                '-1': GrowlPriority.MODERATE,
+                'n': GrowlPriority.NORMAL,
+                '0': GrowlPriority.NORMAL,
+                'h': GrowlPriority.HIGH,
+                '1': GrowlPriority.HIGH,
+                'e': GrowlPriority.EMERGENCY,
+                '2': GrowlPriority.EMERGENCY,
+            }
+            try:
+                results['priority'] = \
+                    _map[results['qsd']['priority'][0].lower()]
+
+            except KeyError:
+                # No priority was set
+                pass
+
         # Because of the URL formatting, the password is actually where the
         # username field is. For this reason, we just preform this small hack
         # to make it (the URL) conform correctly. The following strips out the
         # existing password entry (if exists) so that it can be swapped with
         # the new one we specify.
-        results['user'] = None
-        results['password'] = results.get('user', None)
+        if results.get('password', None) is None:
+            results['password'] = results.get('user', None)
+
         if version:
             results['version'] = version
 

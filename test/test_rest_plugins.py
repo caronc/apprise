@@ -88,6 +88,103 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifyFaast
+    ##################################
+    ('faast://', {
+        'instance': None,
+    }),
+    # Auth Token specified
+    ('faast://%s' % ('a' * 32), {
+        'instance': plugins.NotifyFaast,
+    }),
+    ('faast://%s' % ('a' * 32), {
+        'instance': plugins.NotifyFaast,
+        # don't include an image by default
+        'include_image': False,
+    }),
+    ('faast://:@/', {
+        'instance': None,
+    }),
+    ('faast://%s' % ('a' * 32), {
+        'instance': plugins.NotifyFaast,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('faast://%s' % ('a' * 32), {
+        'instance': plugins.NotifyFaast,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('faast://%s' % ('a' * 32), {
+        'instance': plugins.NotifyFaast,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
+    # NotifyJoin
+    ##################################
+    ('join://', {
+        'instance': None,
+    }),
+    # APIkey; no device
+    ('join://%s' % ('a' * 32), {
+        'instance': plugins.NotifyJoin,
+    }),
+    # Invalid APIKey
+    ('join://%s' % ('a' * 24), {
+        'instance': None,
+        # Missing a channel
+        'exception': TypeError,
+    }),
+    # APIKey + device
+    ('join://%s/%s' % ('a' * 32, 'd' * 32), {
+        'instance': plugins.NotifyJoin,
+        # don't include an image by default
+        'include_image': False,
+    }),
+    # APIKey + 2 devices
+    ('join://%s/%s/%s' % ('a' * 32, 'd' * 32, 'e' * 32), {
+        'instance': plugins.NotifyJoin,
+        # don't include an image by default
+        'include_image': False,
+    }),
+    # APIKey + 1 device and 1 group
+    ('join://%s/%s/%s' % ('a' * 32, 'd' * 32, 'group.chrome'), {
+        'instance': plugins.NotifyJoin,
+    }),
+    # APIKey + bad device
+    ('join://%s/%s' % ('a' * 32, 'd' * 10), {
+        'instance': plugins.NotifyJoin,
+    }),
+    # APIKey + bad url
+    ('join://:@/', {
+        'instance': None,
+    }),
+    ('join://%s' % ('a' * 32), {
+        'instance': plugins.NotifyJoin,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('join://%s' % ('a' * 32), {
+        'instance': plugins.NotifyJoin,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    # apikey = a
+    ('join://%s' % ('a' * 32), {
+        'instance': plugins.NotifyJoin,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifyJSON
     ##################################
     ('json://', {
@@ -266,6 +363,56 @@ TEST_URLS = (
     }),
     ('mmost://localhost/3ccdd113474722377935511fc85d3dd4', {
         'instance': plugins.NotifyMatterMost,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
+    # NotifyMyAndroid
+    ##################################
+    ('nma://', {
+        'instance': None,
+    }),
+    # APIkey; no device
+    ('nma://%s' % ('a' * 48), {
+        'instance': plugins.NotifyMyAndroid,
+    }),
+    # Invalid APIKey
+    ('nma://%s' % ('a' * 24), {
+        'instance': None,
+        # Missing a channel
+        'exception': TypeError,
+    }),
+    # APIKey
+    ('nma://%s' % ('a' * 48), {
+        'instance': plugins.NotifyMyAndroid,
+        # don't include an image by default
+        'include_image': False,
+    }),
+    # APIKey + with image
+    ('nma://%s' % ('a' * 48), {
+        'instance': plugins.NotifyMyAndroid,
+    }),
+    # bad url
+    ('nma://:@/', {
+        'instance': None,
+    }),
+    ('nma://%s' % ('a' * 48), {
+        'instance': plugins.NotifyMyAndroid,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('nma://%s' % ('a' * 48), {
+        'instance': plugins.NotifyMyAndroid,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    # apikey = a
+    ('nma://%s' % ('a' * 48), {
+        'instance': plugins.NotifyMyAndroid,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -498,8 +645,14 @@ def test_rest_plugins(mock_post, mock_get):
         test_requests_exceptions = meta.get(
             'test_requests_exceptions', False)
 
-        mock_get.return_value = requests.Request()
-        mock_post.return_value = requests.Request()
+        # A request
+        robj = mock.Mock()
+        setattr(robj, 'raw', mock.Mock())
+        # Allow raw.read() calls
+        robj.raw.read.return_value = ''
+        mock_get.return_value = robj
+        mock_post.return_value = robj
+
         if test_requests_exceptions is False:
             # Handle our default response
             mock_post.return_value.status_code = requests_response_code
@@ -527,10 +680,13 @@ def test_rest_plugins(mock_post, mock_get):
             obj = Apprise.instantiate(
                 url, asset=asset, suppress_exceptions=False)
 
-            assert(exception is None)
+            # Make sure we weren't expecting an exception and just didn't get
+            # one.
+            assert exception is None
 
             if obj is None:
-                # We're done
+                # We're done (assuming this is what we were expecting)
+                assert instance is None
                 continue
 
             if instance is None:
@@ -646,9 +802,42 @@ def test_notify_boxcar_plugin(mock_post, mock_get):
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.created
     mock_get.return_value.status_code = requests.codes.created
+
     # Test notifications without a body or a title
     p = plugins.NotifyBoxcar(access=access, secret=secret, recipients=None)
     p.notify(body=None, title=None, notify_type=NotifyType.INFO) is True
+
+
+@mock.patch('requests.get')
+@mock.patch('requests.post')
+def test_notify_join_plugin(mock_post, mock_get):
+    """
+    API: NotifyJoin() Extra Checks
+
+    """
+    # Generate some generic message types
+    device = 'A' * 32
+    group = 'group.chrome'
+    apikey = 'a' * 32
+
+    # Initializes the plugin with devices set to a string
+    plugins.NotifyJoin(apikey=apikey, devices=group)
+
+    # Initializes the plugin with devices set to None
+    plugins.NotifyJoin(apikey=apikey, devices=None)
+
+    # Initializes the plugin with devices set to a set
+    p = plugins.NotifyJoin(apikey=apikey, devices=[group, device])
+
+    # Prepare our mock responses
+    mock_get.return_value = requests.Request()
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.created
+    mock_get.return_value.status_code = requests.codes.created
+
+    # Test notifications without a body or a title; nothing to send
+    # so we return False
+    p.notify(body=None, title=None, notify_type=NotifyType.INFO) is False
 
 
 @mock.patch('requests.get')

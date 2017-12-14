@@ -92,9 +92,9 @@ class NotifyJoin(NotifyBase):
         self.apikey = apikey.strip()
 
         if compat_is_basestring(devices):
-            self.devices = filter(bool, DEVICE_LIST_DELIM.split(
+            self.devices = [x for x in filter(bool, DEVICE_LIST_DELIM.split(
                 devices,
-            ))
+            ))]
 
         elif isinstance(devices, (set, tuple, list)):
             self.devices = devices
@@ -103,19 +103,24 @@ class NotifyJoin(NotifyBase):
             self.devices = list()
 
         if len(self.devices) == 0:
-            self.logger.warning('No device(s) were specified.')
-            raise TypeError('No device(s) were specified.')
+            # Default to everyone
+            self.devices.append('group.all')
 
     def notify(self, title, body, notify_type, **kwargs):
         """
         Perform Join Notification
         """
 
-        # Limit results to just the first 2 line otherwise
-        # there is just to much content to display
-        body = re.split('[\r\n]+', body)
-        body[0] = body[0].strip('#').strip()
-        body = '\r\n'.join(body[0:2])
+        try:
+            # Limit results to just the first 2 line otherwise
+            # there is just to much content to display
+            body = re.split('[\r\n]+', body)
+            body[0] = body[0].strip('#').strip()
+            body = '\r\n'.join(body[0:2])
+
+        except (AttributeError, TypeError):
+            # body was None or not of a type string
+            body = ''
 
         headers = {
             'User-Agent': self.app_id,
@@ -123,7 +128,7 @@ class NotifyJoin(NotifyBase):
         }
 
         # error tracking (used for function return)
-        has_error = False
+        return_status = True
 
         # Create a copy of the devices list
         devices = list(self.devices)
@@ -135,7 +140,7 @@ class NotifyJoin(NotifyBase):
 
             elif not IS_DEVICE_RE.match(device):
                 self.logger.warning(
-                    "The specified device '%s' is invalid; skipping." % (
+                    "The specified device/group '%s' is invalid; skipping." % (
                         device,
                     )
                 )
@@ -180,7 +185,7 @@ class NotifyJoin(NotifyBase):
                                 JOIN_HTTP_ERROR_MAP[r.status_code],
                                 r.status_code))
 
-                    except IndexError:
+                    except KeyError:
                         self.logger.warning(
                             'Failed to send Join:%s '
                             'notification (error=%s).' % (
@@ -189,22 +194,21 @@ class NotifyJoin(NotifyBase):
 
                     # self.logger.debug('Response Details: %s' % r.raw.read())
 
-                    # Return; we're done
-                    has_error = True
+                    return_status = False
 
-            except requests.ConnectionError as e:
+            except requests.RequestException as e:
                 self.logger.warning(
                     'A Connection error occured sending Join:%s '
                     'notification.' % device
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))
-                has_error = True
+                return_status = False
 
             if len(devices):
                 # Prevent thrashing requests
                 self.throttle()
 
-        return has_error
+        return return_status
 
     @staticmethod
     def parse_url(url):
@@ -220,14 +224,8 @@ class NotifyJoin(NotifyBase):
             return results
 
         # Apply our settings now
-        try:
-            devices = ' '.join(
-                filter(bool, NotifyBase.split_path(results['fullpath'])))
-
-        except (AttributeError, IndexError):
-            # Force some bad values that will get caught
-            # in parsing later
-            devices = None
+        devices = ' '.join(
+            filter(bool, NotifyBase.split_path(results['fullpath'])))
 
         results['apikey'] = results['host']
         results['devices'] = devices

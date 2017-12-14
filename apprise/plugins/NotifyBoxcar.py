@@ -268,20 +268,11 @@ class NotifyBoxcar(NotifyBase):
         access = results['host']
 
         # Now fetch the remaining tokens
-        try:
-            secret = NotifyBase.split_path(results['fullpath'])[0]
+        secret = NotifyBase.split_path(results['fullpath'])[0]
 
-        except (AttributeError, IndexError):
-            # Force a bad value that will get caught in parsing later
-            secret = None
-
-        try:
-            recipients = ','.join(
-                NotifyBase.split_path(results['fullpath'])[1:])
-
-        except (AttributeError, IndexError):
-            # Default to not having any recipients
-            recipients = None
+        # Our recipients
+        recipients = ','.join(
+            NotifyBase.split_path(results['fullpath'])[1:])
 
         if not (access and secret):
             # If we did not recive an access and/or secret code

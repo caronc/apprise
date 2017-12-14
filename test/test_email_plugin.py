@@ -24,7 +24,7 @@ import mock
 import re
 
 
-VALID_URLS = (
+TEST_URLS = (
     ##################################
     # NotifyEmail
     ##################################
@@ -138,7 +138,7 @@ def test_email_plugin(mock_smtp):
     """
 
     # iterate over our dictionary and test it out
-    for (url, meta) in VALID_URLS:
+    for (url, meta) in TEST_URLS:
 
         # Our expected instance
         instance = meta.get('instance', None)
@@ -152,11 +152,6 @@ def test_email_plugin(mock_smtp):
         # Our expected Query response (True, False, or exception type)
         response = meta.get('response', True)
 
-        # Allow us to force the server response code to be something other then
-        # the defaults
-        smtplib_response_code = meta.get(
-            'smtplib_response_code', 200 if response else 404)
-
         test_smtplib_exceptions = meta.get(
             'test_smtplib_exceptions', False)
 
@@ -168,16 +163,7 @@ def test_email_plugin(mock_smtp):
         # Create a mock SMTP Object
         mock_smtp.return_value = mock_socket
 
-        if test_smtplib_exceptions is False:
-            pass
-            # Handle our default response
-            mock_socket.sendmail.return_value = smtplib_response_code
-            # mock_post.return_value.status_code = smtplib_response_code
-            # mock_get.return_value.status_code = smtplib_response_code
-            # mock_post.side_effect = None
-            # mock_get.side_effect = None
-
-        else:
+        if test_smtplib_exceptions:
             # Handle exception testing; first we turn the boolean flag ito
             # a list of exceptions
             test_smtplib_exceptions = (

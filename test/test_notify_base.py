@@ -111,6 +111,12 @@ def test_notify_base():
     # Test is_hostname
     assert NotifyBase.is_hostname('example.com') is True
 
+    # Test quote
+    assert NotifyBase.unquote('%20') == ' '
+    assert NotifyBase.quote(' ') == '%20'
+    assert NotifyBase.unquote(None) == ''
+    assert NotifyBase.quote(None) == ''
+
 
 def test_notify_base_urls():
     """
