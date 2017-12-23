@@ -43,10 +43,7 @@ class NotifyPushalot(NotifyBase):
     A wrapper for Pushalot Notifications
     """
 
-    # The default protocol
-    protocol = 'palot'
-
-    # The default secure protocol
+    # The default protocol is always secured
     secure_protocol = 'palot'
 
     # Pushalot uses the http protocol with JSON requests
@@ -117,7 +114,7 @@ class NotifyPushalot(NotifyBase):
                             PUSHALOT_HTTP_ERROR_MAP[r.status_code],
                             r.status_code))
 
-                except IndexError:
+                except KeyError:
                     self.logger.warning(
                         'Failed to send Pushalot notification '
                         '(error=%s).' % r.status_code)
@@ -128,7 +125,7 @@ class NotifyPushalot(NotifyBase):
             else:
                 self.logger.info('Sent Pushalot notification.')
 
-        except requests.ConnectionError as e:
+        except requests.RequestException as e:
             self.logger.warning(
                 'A Connection error occured sending Pushalot notification.')
             self.logger.debug('Socket Exception: %s' % str(e))

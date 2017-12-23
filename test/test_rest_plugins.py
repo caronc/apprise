@@ -20,9 +20,9 @@ from apprise import plugins
 from apprise import NotifyType
 from apprise import Apprise
 from apprise import AppriseAsset
+from json import dumps
 import requests
 import mock
-
 
 TEST_URLS = (
     ##################################
@@ -176,7 +176,6 @@ TEST_URLS = (
         'response': False,
         'requests_response_code': 999,
     }),
-    # apikey = a
     ('join://%s' % ('a' * 32), {
         'instance': plugins.NotifyJoin,
         # Throws a series of connection and transfer exceptions when this flag
@@ -380,8 +379,6 @@ TEST_URLS = (
     }),
     # Invalid APIKey
     ('nma://%s' % ('a' * 24), {
-        'instance': None,
-        # Missing a channel
         'exception': TypeError,
     }),
     # APIKey
@@ -389,6 +386,42 @@ TEST_URLS = (
         'instance': plugins.NotifyMyAndroid,
         # don't include an image by default
         'include_image': False,
+    }),
+    # APIKey + priority setting
+    ('nma://%s?priority=high' % ('a' * 48), {
+        'instance': plugins.NotifyMyAndroid,
+    }),
+    # APIKey + invalid priority setting
+    ('nma://%s?priority=invalid' % ('a' * 48), {
+        'instance': plugins.NotifyMyAndroid,
+    }),
+    # APIKey + priority setting (empty)
+    ('nma://%s?priority=' % ('a' * 48), {
+        'instance': plugins.NotifyMyAndroid,
+    }),
+    # APIKey + Invalid DevAPI Key
+    ('nma://%s/%s' % ('a' * 48, 'b' * 24), {
+        'exception': TypeError,
+    }),
+    # APIKey + DevAPI Key
+    ('nma://%s/%s' % ('a' * 48, 'b' * 48), {
+        'instance': plugins.NotifyMyAndroid,
+    }),
+    # Testing valid format
+    ('nma://%s?format=text' % ('a' * 48), {
+        'instance': plugins.NotifyMyAndroid,
+    }),
+    # Testing valid format
+    ('nma://%s?format=html' % ('a' * 48), {
+        'instance': plugins.NotifyMyAndroid,
+    }),
+    # Testing invalid format (fall's back to html)
+    ('nma://%s?format=invalid' % ('a' * 48), {
+        'instance': plugins.NotifyMyAndroid,
+    }),
+    # Testing empty format (falls back to html)
+    ('nma://%s?format=' % ('a' * 48), {
+        'instance': plugins.NotifyMyAndroid,
     }),
     # APIKey + with image
     ('nma://%s' % ('a' * 48), {
@@ -410,9 +443,264 @@ TEST_URLS = (
         'response': False,
         'requests_response_code': 999,
     }),
-    # apikey = a
     ('nma://%s' % ('a' * 48), {
         'instance': plugins.NotifyMyAndroid,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
+    # NotifyProwl
+    ##################################
+    ('prowl://', {
+        'instance': None,
+    }),
+    # APIkey; no device
+    ('prowl://%s' % ('a' * 40), {
+        'instance': plugins.NotifyProwl,
+    }),
+    # Invalid APIKey
+    ('prowl://%s' % ('a' * 24), {
+        'exception': TypeError,
+    }),
+    # APIKey
+    ('prowl://%s' % ('a' * 40), {
+        'instance': plugins.NotifyProwl,
+        # don't include an image by default
+        'include_image': False,
+    }),
+    # APIKey + priority setting
+    ('prowl://%s?priority=high' % ('a' * 40), {
+        'instance': plugins.NotifyProwl,
+    }),
+    # APIKey + invalid priority setting
+    ('prowl://%s?priority=invalid' % ('a' * 40), {
+        'instance': plugins.NotifyProwl,
+    }),
+    # APIKey + priority setting (empty)
+    ('prowl://%s?priority=' % ('a' * 40), {
+        'instance': plugins.NotifyProwl,
+    }),
+    # APIKey + Invalid Provider Key
+    ('prowl://%s/%s' % ('a' * 40, 'b' * 24), {
+        'exception': TypeError,
+    }),
+    # APIKey + No Provider Key (empty)
+    ('prowl://%s///' % ('a' * 40), {
+        'instance': plugins.NotifyProwl,
+    }),
+    # APIKey + Provider Key
+    ('prowl://%s/%s' % ('a' * 40, 'b' * 40), {
+        'instance': plugins.NotifyProwl,
+    }),
+    # APIKey + with image
+    ('prowl://%s' % ('a' * 40), {
+        'instance': plugins.NotifyProwl,
+    }),
+    # bad url
+    ('prowl://:@/', {
+        'instance': None,
+    }),
+    ('prowl://%s' % ('a' * 40), {
+        'instance': plugins.NotifyProwl,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('prowl://%s' % ('a' * 40), {
+        'instance': plugins.NotifyProwl,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('prowl://%s' % ('a' * 40), {
+        'instance': plugins.NotifyProwl,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
+    # NotifyPushalot
+    ##################################
+    ('palot://', {
+        'instance': None,
+    }),
+    # AuthToken
+    ('palot://%s' % ('a' * 32), {
+        'instance': plugins.NotifyPushalot,
+    }),
+    # AuthToken, no image
+    ('palot://%s' % ('a' * 32), {
+        'instance': plugins.NotifyPushalot,
+        # don't include an image by default
+        'include_image': False,
+    }),
+    # Invalid AuthToken
+    ('palot://%s' % ('a' * 24), {
+        'instance': None,
+        # Missing a channel
+        'exception': TypeError,
+    }),
+    # AuthToken + bad url
+    ('palot://:@/', {
+        'instance': None,
+    }),
+    ('palot://%s' % ('a' * 32), {
+        'instance': plugins.NotifyPushalot,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('palot://%s' % ('a' * 32), {
+        'instance': plugins.NotifyPushalot,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('palot://%s' % ('a' * 32), {
+        'instance': plugins.NotifyPushalot,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
+    # NotifyPushBullet
+    ##################################
+    ('pbul://', {
+        'instance': None,
+    }),
+    # APIkey
+    ('pbul://%s' % ('a' * 32), {
+        'instance': plugins.NotifyPushBullet,
+    }),
+    # APIKey + channel
+    ('pbul://%s/#channel/' % ('a' * 32), {
+        'instance': plugins.NotifyPushBullet,
+    }),
+    # APIKey + 2 channels
+    ('pbul://%s/#channel1/#channel2' % ('a' * 32), {
+        'instance': plugins.NotifyPushBullet,
+    }),
+    # APIKey + device
+    ('pbul://%s/device/' % ('a' * 32), {
+        'instance': plugins.NotifyPushBullet,
+    }),
+    # APIKey + 2 devices
+    ('pbul://%s/device1/device2/' % ('a' * 32), {
+        'instance': plugins.NotifyPushBullet,
+    }),
+    # APIKey + email
+    ('pbul://%s/user@example.com/' % ('a' * 32), {
+        'instance': plugins.NotifyPushBullet,
+    }),
+    # APIKey + 2 emails
+    ('pbul://%s/user@example.com/abc@def.com/' % ('a' * 32), {
+        'instance': plugins.NotifyPushBullet,
+    }),
+    # APIKey + Combo
+    ('pbul://%s/device/#channel/user@example.com/' % ('a' * 32), {
+        'instance': plugins.NotifyPushBullet,
+    }),
+    # APIKey + bad url
+    ('pbul://:@/', {
+        'instance': None,
+    }),
+    ('pbul://%s' % ('a' * 32), {
+        'instance': plugins.NotifyPushBullet,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('pbul://%s' % ('a' * 32), {
+        'instance': plugins.NotifyPushBullet,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('pbul://%s' % ('a' * 32), {
+        'instance': plugins.NotifyPushBullet,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
+    # NotifyPushover
+    ##################################
+    ('pover://', {
+        'instance': None,
+    }),
+    # APIkey; no user
+    ('pover://%s' % ('a' * 30), {
+        'exception': TypeError,
+    }),
+    # APIkey; invalid user
+    ('pover://%s@%s' % ('u' * 20, 'a' * 30), {
+        'exception': TypeError,
+    }),
+    # Invalid APIKey; valid User
+    ('pover://%s@%s' % ('u' * 30, 'a' * 24), {
+        'exception': TypeError,
+    }),
+    # APIKey + Valid User
+    ('pover://%s@%s' % ('u' * 30, 'a' * 30), {
+        'instance': plugins.NotifyPushover,
+        # don't include an image by default
+        'include_image': False,
+    }),
+    # APIKey + Valid User + 1 Device
+    ('pover://%s@%s/DEVICE' % ('u' * 30, 'a' * 30), {
+        'instance': plugins.NotifyPushover,
+    }),
+    # APIKey + Valid User + 2 Devices
+    ('pover://%s@%s/DEVICE1/DEVICE2/' % ('u' * 30, 'a' * 30), {
+        'instance': plugins.NotifyPushover,
+    }),
+    # APIKey + Valid User + invalid device
+    ('pover://%s@%s/%s/' % ('u' * 30, 'a' * 30, 'd' * 30), {
+        'instance': plugins.NotifyPushover,
+        # Notify will return False since there is a bad device in our list
+        'response': False,
+    }),
+    # APIKey + Valid User + device + invalid device
+    ('pover://%s@%s/DEVICE1/%s/' % ('u' * 30, 'a' * 30, 'd' * 30), {
+        'instance': plugins.NotifyPushover,
+        # Notify will return False since there is a bad device in our list
+        'response': False,
+    }),
+    # APIKey + priority setting
+    ('pover://%s@%s?priority=high' % ('u' * 30, 'a' * 30), {
+        'instance': plugins.NotifyPushover,
+    }),
+    # APIKey + invalid priority setting
+    ('pover://%s@%s?priority=invalid' % ('u' * 30, 'a' * 30), {
+        'instance': plugins.NotifyPushover,
+    }),
+    # APIKey + priority setting (empty)
+    ('pover://%s@%s?priority=' % ('u' * 30, 'a' * 30), {
+        'instance': plugins.NotifyPushover,
+    }),
+    # bad url
+    ('pover://:@/', {
+        'instance': None,
+    }),
+    ('pover://%s@%s' % ('u' * 30, 'a' * 30), {
+        'instance': plugins.NotifyPushover,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('pover://%s@%s' % ('u' * 30, 'a' * 30), {
+        'instance': plugins.NotifyPushover,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('pover://%s@%s' % ('u' * 30, 'a' * 30), {
+        'instance': plugins.NotifyPushover,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -481,6 +769,173 @@ TEST_URLS = (
     }),
     ('slack://notify@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#b', {
         'instance': plugins.NotifySlack,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
+    # NotifyTelegram
+    ##################################
+    ('tgram://', {
+        'instance': None,
+    }),
+    # Simple Message
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/', {
+        'instance': plugins.NotifyTelegram,
+    }),
+    # Simple Message (no images)
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/', {
+        'instance': plugins.NotifyTelegram,
+        # don't include an image by default
+        'include_image': False,
+    }),
+    # Simple Message with multiple chat names
+    ('tgram://123456789:abcdefg_hijklmnop/id1/id2/', {
+        'instance': plugins.NotifyTelegram,
+    }),
+    # Simple Message with an invalid chat ID
+    ('tgram://123456789:abcdefg_hijklmnop/%$/', {
+        'instance': plugins.NotifyTelegram,
+        # Notify will fail
+        'response': False,
+    }),
+    # Simple Message with multiple chat ids
+    ('tgram://123456789:abcdefg_hijklmnop/id1/id2/23423/-30/', {
+        'instance': plugins.NotifyTelegram,
+    }),
+    # Simple Message with multiple chat ids (no images)
+    ('tgram://123456789:abcdefg_hijklmnop/id1/id2/23423/-30/', {
+        'instance': plugins.NotifyTelegram,
+        # don't include an image by default
+        'include_image': False,
+    }),
+    # Support bot keyword prefix
+    ('tgram://bottest@123456789:abcdefg_hijklmnop/lead2gold/', {
+        'instance': plugins.NotifyTelegram,
+    }),
+    # Testing valid format
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?format=text', {
+        'instance': plugins.NotifyTelegram,
+    }),
+    # Testing valid format
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?format=html', {
+        'instance': plugins.NotifyTelegram,
+    }),
+    # Testing invalid format (fall's back to text)
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?format=invalid', {
+        'instance': plugins.NotifyTelegram,
+    }),
+    # Testing empty format (falls back to text)
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?format=', {
+        'instance': plugins.NotifyTelegram,
+    }),
+    # Simple Message without image
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/', {
+        'instance': plugins.NotifyTelegram,
+        # don't include an image by default
+        'include_image': False,
+    }),
+    # Invalid Bot Token
+    ('tgram://alpha:abcdefg_hijklmnop/lead2gold/', {
+        'instance': None,
+    }),
+    # AuthToken + bad url
+    ('tgram://:@/', {
+        'instance': None,
+    }),
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/', {
+        'instance': plugins.NotifyTelegram,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/', {
+        'instance': plugins.NotifyTelegram,
+        # force a failure without an image specified
+        'include_image': False,
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('tgram://123456789:abcdefg_hijklmnop/id1/id2/', {
+        'instance': plugins.NotifyTelegram,
+        # force a failure with multiple chat_ids
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('tgram://123456789:abcdefg_hijklmnop/id1/id2/', {
+        'instance': plugins.NotifyTelegram,
+        # force a failure without an image specified
+        'include_image': False,
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/', {
+        'instance': plugins.NotifyTelegram,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/', {
+        'instance': plugins.NotifyTelegram,
+        # throw a bizzare code forcing us to fail to look it up without
+        # having an image included
+        'include_image': False,
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/', {
+        'instance': plugins.NotifyTelegram,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/', {
+        'instance': plugins.NotifyTelegram,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them without images set
+        'include_image': False,
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
+    # NotifyToasty (SuperToasty)
+    ##################################
+    ('toasty://', {
+        'instance': None,
+    }),
+    # No username specified but contains a device
+    ('toasty://%s' % ('d' * 32), {
+        'exception': TypeError,
+    }),
+    # User + 1 device
+    ('toasty://user@device', {
+        'instance': plugins.NotifyToasty,
+    }),
+    # User + 3 devices
+    ('toasty://user@device0/device1/device2/', {
+        'instance': plugins.NotifyToasty,
+        # don't include an image by default
+        'include_image': False,
+    }),
+    # bad url
+    ('toasty://:@/', {
+        'instance': None,
+    }),
+    ('toasty://user@device', {
+        'instance': plugins.NotifyToasty,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('toasty://user@device', {
+        'instance': plugins.NotifyToasty,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('toasty://user@device', {
+        'instance': plugins.NotifyToasty,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -696,6 +1151,9 @@ def test_rest_plugins(mock_post, mock_get):
 
             assert(isinstance(obj, instance))
 
+            # Disable throttling to speed up unit tests
+            obj.throttle_attempt = 0
+
             if self:
                 # Iterate over our expected entries inside of our object
                 for key, val in self.items():
@@ -711,9 +1169,9 @@ def test_rest_plugins(mock_post, mock_get):
                         notify_type=notify_type) == response
 
                 else:
-                    for exception in test_requests_exceptions:
-                        mock_post.side_effect = exception
-                        mock_get.side_effect = exception
+                    for _exception in test_requests_exceptions:
+                        mock_post.side_effect = _exception
+                        mock_get.side_effect = _exception
                         try:
                             assert obj.notify(
                                 title='test', body='body',
@@ -805,6 +1263,10 @@ def test_notify_boxcar_plugin(mock_post, mock_get):
 
     # Test notifications without a body or a title
     p = plugins.NotifyBoxcar(access=access, secret=secret, recipients=None)
+
+    # Disable throttling to speed up unit tests
+    p.throttle_attempt = 0
+
     p.notify(body=None, title=None, notify_type=NotifyType.INFO) is True
 
 
@@ -835,6 +1297,9 @@ def test_notify_join_plugin(mock_post, mock_get):
     mock_post.return_value.status_code = requests.codes.created
     mock_get.return_value.status_code = requests.codes.created
 
+    # Disable throttling to speed up unit tests
+    p.throttle_attempt = 0
+
     # Test notifications without a body or a title; nothing to send
     # so we return False
     p.notify(body=None, title=None, notify_type=NotifyType.INFO) is False
@@ -859,6 +1324,8 @@ def test_notify_slack_plugin(mock_post, mock_get):
     obj = plugins.NotifySlack(
         token_a=token_a, token_b=token_b, token_c=token_c, channels=channels)
     assert(len(obj.channels) == 4)
+
+    # Prepare Mock
     mock_get.return_value = requests.Request()
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.ok
@@ -880,6 +1347,271 @@ def test_notify_slack_plugin(mock_post, mock_get):
         token_a=token_a, token_b=token_b, token_c=token_c, channels=channels,
         include_image=True)
 
+    # Disable throttling to speed up unit tests
+    obj.throttle_attempt = 0
+
     # This call includes an image with it's payload:
     assert obj.notify(title='title', body='body',
                       notify_type=NotifyType.INFO) is True
+
+
+@mock.patch('requests.get')
+@mock.patch('requests.post')
+def test_notify_pushbullet_plugin(mock_post, mock_get):
+    """
+    API: NotifyPushBullet() Extra Checks
+
+    """
+
+    # Initialize some generic (but valid) tokens
+    accesstoken = 'a' * 32
+
+    # Support strings
+    recipients = '#chan1,#chan2,device,user@example.com,,,'
+
+    # Prepare Mock
+    mock_get.return_value = requests.Request()
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_get.return_value.status_code = requests.codes.ok
+
+    obj = plugins.NotifyPushBullet(
+        accesstoken=accesstoken, recipients=recipients)
+    assert(isinstance(obj, plugins.NotifyPushBullet))
+    assert(len(obj.recipients) == 4)
+
+    obj = plugins.NotifyPushBullet(accesstoken=accesstoken)
+    assert(isinstance(obj, plugins.NotifyPushBullet))
+    # Default is to send to all devices, so there will be a
+    # recipient here
+    assert(len(obj.recipients) == 1)
+
+    obj = plugins.NotifyPushBullet(accesstoken=accesstoken, recipients=set())
+    assert(isinstance(obj, plugins.NotifyPushBullet))
+    # Default is to send to all devices, so there will be a
+    # recipient here
+    assert(len(obj.recipients) == 1)
+
+    # Support the handling of an empty and invalid URL strings
+    assert(plugins.NotifyPushBullet.parse_url(None) is None)
+    assert(plugins.NotifyPushBullet.parse_url('') is None)
+    assert(plugins.NotifyPushBullet.parse_url(42) is None)
+
+
+@mock.patch('requests.get')
+@mock.patch('requests.post')
+def test_notify_pushover_plugin(mock_post, mock_get):
+    """
+    API: NotifyPushover() Extra Checks
+
+    """
+
+    # Initialize some generic (but valid) tokens
+    token = 'a' * 30
+    user = 'u' * 30
+
+    invalid_device = 'd' * 35
+
+    # Support strings
+    devices = 'device1,device2,,,,%s' % invalid_device
+
+    # Prepare Mock
+    mock_get.return_value = requests.Request()
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_get.return_value.status_code = requests.codes.ok
+
+    try:
+        obj = plugins.NotifyPushover(user=user, token=None)
+        # No token specified
+        assert(False)
+
+    except TypeError:
+        # Exception should be thrown about the fact no token was specified
+        assert(True)
+
+    obj = plugins.NotifyPushover(user=user, token=token, devices=devices)
+    assert(isinstance(obj, plugins.NotifyPushover))
+    assert(len(obj.devices) == 3)
+
+    # Disable throttling to speed up unit tests
+    obj.throttle_attempt = 0
+
+    # This call fails because there is 1 invalid device
+    assert obj.notify(title='title', body='body',
+                      notify_type=NotifyType.INFO) is False
+
+    obj = plugins.NotifyPushover(user=user, token=token)
+    assert(isinstance(obj, plugins.NotifyPushover))
+    # Default is to send to all devices, so there will be a
+    # device defined here
+    assert(len(obj.devices) == 1)
+
+    # Disable throttling to speed up unit tests
+    obj.throttle_attempt = 0
+
+    # This call succeeds because all of the devices are valid
+    assert obj.notify(title='title', body='body',
+                      notify_type=NotifyType.INFO) is True
+
+    obj = plugins.NotifyPushover(user=user, token=token, devices=set())
+    assert(isinstance(obj, plugins.NotifyPushover))
+    # Default is to send to all devices, so there will be a
+    # device defined here
+    assert(len(obj.devices) == 1)
+
+    # Support the handling of an empty and invalid URL strings
+    assert(plugins.NotifyPushover.parse_url(None) is None)
+    assert(plugins.NotifyPushover.parse_url('') is None)
+    assert(plugins.NotifyPushover.parse_url(42) is None)
+
+
+@mock.patch('requests.get')
+@mock.patch('requests.post')
+def test_notify_toasty_plugin(mock_post, mock_get):
+    """
+    API: NotifyToasty() Extra Checks
+
+    """
+
+    # Support strings
+    devices = 'device1,device2,,,,'
+
+    # User
+    user = 'l2g'
+
+    # Prepare Mock
+    mock_get.return_value = requests.Request()
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_get.return_value.status_code = requests.codes.ok
+
+    try:
+        obj = plugins.NotifyToasty(user=user, devices=None)
+        # No devices specified
+        assert(False)
+
+    except TypeError:
+        # Exception should be thrown about the fact no token was specified
+        assert(True)
+
+    try:
+        obj = plugins.NotifyToasty(user=user, devices=set())
+        # No devices specified
+        assert(False)
+
+    except TypeError:
+        # Exception should be thrown about the fact no token was specified
+        assert(True)
+
+    obj = plugins.NotifyToasty(user=user, devices=devices)
+    assert(isinstance(obj, plugins.NotifyToasty))
+    assert(len(obj.devices) == 2)
+
+    # Support the handling of an empty and invalid URL strings
+    assert(plugins.NotifyToasty.parse_url(None) is None)
+    assert(plugins.NotifyToasty.parse_url('') is None)
+    assert(plugins.NotifyToasty.parse_url(42) is None)
+
+
+@mock.patch('requests.get')
+@mock.patch('requests.post')
+def test_notify_telegram_plugin(mock_post, mock_get):
+    """
+    API: NotifyTelegram() Extra Checks
+
+    """
+    # Bot Token
+    bot_token = '123456789:abcdefg_hijklmnop'
+    invalid_bot_token = 'abcd:123'
+
+    # Chat ID
+    chat_ids = 'l2g, lead2gold'
+
+    # Prepare Mock
+    mock_get.return_value = requests.Request()
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_get.return_value.status_code = requests.codes.ok
+
+    try:
+        obj = plugins.NotifyTelegram(bot_token=None, chat_ids=chat_ids)
+        # invalid bot token (None)
+        assert(False)
+
+    except TypeError:
+        # Exception should be thrown about the fact no token was specified
+        assert(True)
+
+    try:
+        obj = plugins.NotifyTelegram(
+            bot_token=invalid_bot_token, chat_ids=chat_ids)
+        # invalid bot token
+        assert(False)
+
+    except TypeError:
+        # Exception should be thrown about the fact an invalid token was
+        # specified
+        assert(True)
+
+    try:
+        obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids=None)
+        # No chat_ids specified
+        assert(False)
+
+    except TypeError:
+        # Exception should be thrown about the fact no token was specified
+        assert(True)
+
+    try:
+        obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids=set())
+        # No chat_ids specified
+        assert(False)
+
+    except TypeError:
+        # Exception should be thrown about the fact no token was specified
+        assert(True)
+
+    obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids=chat_ids)
+    assert(isinstance(obj, plugins.NotifyTelegram))
+    assert(len(obj.chat_ids) == 2)
+
+    # Support the handling of an empty and invalid URL strings
+    assert(plugins.NotifyTelegram.parse_url(None) is None)
+    assert(plugins.NotifyTelegram.parse_url('') is None)
+    assert(plugins.NotifyTelegram.parse_url(42) is None)
+
+    # Prepare Mock to fail
+    response = mock.Mock()
+    response.status_code = requests.codes.internal_server_error
+
+    # a error response
+    response.text = dumps({
+        'description': 'test',
+    })
+    mock_get.return_value = response
+    mock_post.return_value = response
+
+    # No image asset
+    nimg_obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids=chat_ids)
+    nimg_obj.asset = AppriseAsset(image_path_mask=False, image_url_mask=False)
+
+    # Disable throttling to speed up unit tests
+    nimg_obj.throttle_attempt = 0
+    obj.throttle_attempt = 0
+
+    # This tests erroneous messages involving multiple chat ids
+    assert obj.notify(
+        title='title', body='body', notify_type=NotifyType.INFO) is False
+    assert nimg_obj.notify(
+        title='title', body='body', notify_type=NotifyType.INFO) is False
+
+    # This tests erroneous messages involving a single chat id
+    obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids='l2g')
+    nimg_obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids='l2g')
+    nimg_obj.asset = AppriseAsset(image_path_mask=False, image_url_mask=False)
+
+    assert obj.notify(
+        title='title', body='body', notify_type=NotifyType.INFO) is False
+    assert nimg_obj.notify(
+        title='title', body='body', notify_type=NotifyType.INFO) is False

@@ -173,7 +173,7 @@ class NotifyRocketChat(NotifyBase):
                         '%s (error=%s).' % (
                             RC_HTTP_ERROR_MAP[r.status_code],
                             r.status_code))
-                except IndexError:
+                except KeyError:
                     self.logger.warning(
                         'Failed to send Rocket.Chat notification ' +
                         '(error=%s).' % (
@@ -186,7 +186,7 @@ class NotifyRocketChat(NotifyBase):
                 self.logger.debug('Rocket.Chat Server Response: %s.' % r.text)
                 self.logger.info('Sent Rocket.Chat notification.')
 
-        except requests.ConnectionError as e:
+        except requests.RequestException as e:
             self.logger.warning(
                 'A Connection error occured sending Rocket.Chat ' +
                 'notification.')
@@ -277,6 +277,7 @@ class NotifyRocketChat(NotifyBase):
                         '%s (error=%s).' % (
                             RC_HTTP_ERROR_MAP[r.status_code],
                             r.status_code))
+
                 except IndexError:
                     self.logger.warning(
                         'Failed to log off Rocket.Chat server ' +
@@ -316,10 +317,6 @@ class NotifyRocketChat(NotifyBase):
             return results
 
         # Apply our settings now
-        try:
-            results['recipients'] = NotifyBase.unquote(results['fullpath'])
-
-        except AttributeError:
-            return None
+        results['recipients'] = NotifyBase.unquote(results['fullpath'])
 
         return results

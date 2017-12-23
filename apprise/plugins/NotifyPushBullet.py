@@ -60,11 +60,10 @@ class NotifyPushBullet(NotifyBase):
 
         self.accesstoken = accesstoken
         if compat_is_basestring(recipients):
-            self.recipients = filter(bool, RECIPIENTS_LIST_DELIM.split(
-                recipients,
-            ))
+            self.recipients = [x for x in filter(
+                bool, RECIPIENTS_LIST_DELIM.split(recipients))]
 
-        elif isinstance(recipients, (tuple, list)):
+        elif isinstance(recipients, (set, tuple, list)):
             self.recipients = recipients
 
         else:
@@ -138,7 +137,7 @@ class NotifyPushBullet(NotifyBase):
                                 PUSHBULLET_HTTP_ERROR_MAP[r.status_code],
                                 r.status_code))
 
-                    except IndexError:
+                    except KeyError:
                         self.logger.warning(
                             'Failed to send PushBullet notification '
                             '(error=%s).' % r.status_code)
@@ -148,7 +147,7 @@ class NotifyPushBullet(NotifyBase):
                     # Return; we're done
                     has_error = True
 
-            except requests.ConnectionError as e:
+            except requests.RequestException as e:
                 self.logger.warning(
                     'A Connection error occured sending PushBullet '
                     'notification.'
@@ -176,11 +175,7 @@ class NotifyPushBullet(NotifyBase):
             return results
 
         # Apply our settings now
-        try:
-            recipients = NotifyBase.unquote(results['fullpath'])
-
-        except AttributeError:
-            recipients = ''
+        recipients = NotifyBase.unquote(results['fullpath'])
 
         results['accesstoken'] = results['host']
         results['recipients'] = recipients

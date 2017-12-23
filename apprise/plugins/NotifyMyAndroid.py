@@ -183,13 +183,9 @@ class NotifyMyAndroid(NotifyBase):
 
         if 'format' in results['qsd'] and len(results['qsd']['format']):
             # Extract email format (Text/Html)
-            try:
-                format = NotifyBase.unquote(results['qsd']['format']).lower()
-                if len(format) > 0 and format[0] == 't':
-                    results['notify_format'] = NotifyFormat.TEXT
-
-            except AttributeError:
-                pass
+            format = NotifyBase.unquote(results['qsd']['format']).lower()
+            if len(format) > 0 and format[0] == 't':
+                results['notify_format'] = NotifyFormat.TEXT
 
         if 'priority' in results['qsd'] and len(results['qsd']['priority']):
             _map = {

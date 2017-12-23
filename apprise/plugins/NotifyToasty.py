@@ -52,14 +52,17 @@ class NotifyToasty(NotifyBase):
             **kwargs)
 
         if compat_is_basestring(devices):
-            self.devices = filter(bool, DEVICES_LIST_DELIM.split(
+            self.devices = [x for x in filter(bool, DEVICES_LIST_DELIM.split(
                 devices,
-            ))
+            ))]
 
-        elif isinstance(devices, (tuple, list)):
+        elif isinstance(devices, (set, tuple, list)):
             self.devices = devices
 
         else:
+            self.devices = list()
+
+        if len(devices) == 0:
             raise TypeError('You must specify at least 1 device.')
 
         if not self.user:
@@ -118,7 +121,7 @@ class NotifyToasty(NotifyBase):
                                 HTTP_ERROR_MAP[r.status_code],
                                 r.status_code))
 
-                    except IndexError:
+                    except KeyError:
                         self.logger.warning(
                             'Failed to send Toasty:%s '
                             'notification (error=%s).' % (
@@ -130,7 +133,7 @@ class NotifyToasty(NotifyBase):
                     # Return; we're done
                     has_error = True
 
-            except requests.ConnectionError as e:
+            except requests.RequestException as e:
                 self.logger.warning(
                     'A Connection error occured sending Toasty:%s ' % (
                         device) + 'notification.'
@@ -142,7 +145,7 @@ class NotifyToasty(NotifyBase):
                 # Prevent thrashing requests
                 self.throttle()
 
-        return has_error
+        return not has_error
 
     @staticmethod
     def parse_url(url):
@@ -158,11 +161,7 @@ class NotifyToasty(NotifyBase):
             return results
 
         # Apply our settings now
-        try:
-            devices = NotifyBase.unquote(results['fullpath'])
-
-        except AttributeError:
-            devices = ''
+        devices = NotifyBase.unquote(results['fullpath'])
 
         # Store our devices
         results['devices'] = '%s/%s' % (results['host'], devices)

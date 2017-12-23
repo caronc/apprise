@@ -27,18 +27,18 @@ from .NotifyBase import HTTP_ERROR_MAP
 PUSHOVER_SEND_TO_ALL = 'ALL_DEVICES'
 
 # Used to validate API Key
-VALIDATE_TOKEN = re.compile(r'[A-Za-z0-9]{30}')
+VALIDATE_TOKEN = re.compile(r'^[a-z0-9]{30}$', re.I)
 
 # Used to detect a User and/or Group
-VALIDATE_USERGROUP = re.compile(r'[A-Za-z0-9]{30}')
+VALIDATE_USERGROUP = re.compile(r'^[a-z0-9]{30}$', re.I)
 
 # Used to detect a User and/or Group
-VALIDATE_DEVICE = re.compile(r'[A-Za-z0-9_]{1,25}')
+VALIDATE_DEVICE = re.compile(r'^[a-z0-9_]{1,25}$', re.I)
 
 
 # Priorities
 class PushoverPriority(object):
-    VERY_LOW = -2
+    LOW = -2
     MODERATE = -1
     NORMAL = 0
     HIGH = 1
@@ -46,7 +46,7 @@ class PushoverPriority(object):
 
 
 PUSHOVER_PRIORITIES = (
-    PushoverPriority.VERY_LOW,
+    PushoverPriority.LOW,
     PushoverPriority.MODERATE,
     PushoverPriority.NORMAL,
     PushoverPriority.HIGH,
@@ -68,24 +68,29 @@ class NotifyPushover(NotifyBase):
     A wrapper for Pushover Notifications
     """
 
-    # The default protocol
-    protocol = 'pover'
-
-    # The default secure protocol
+    # All pushover requests are secure
     secure_protocol = 'pover'
 
     # Pushover uses the http protocol with JSON requests
     notify_url = 'https://api.pushover.net/1/messages.json'
 
-    def __init__(self, token, devices=None,
-                 priority=PushoverPriority.NORMAL, **kwargs):
+    def __init__(self, token, devices=None, priority=None, **kwargs):
         """
         Initialize Pushover Object
         """
         super(NotifyPushover, self).__init__(
             title_maxlen=250, body_maxlen=512, **kwargs)
 
-        if not VALIDATE_TOKEN.match(token.strip()):
+        try:
+            # The token associated with the account
+            self.token = token.strip()
+
+        except AttributeError:
+            # Token was None
+            self.logger.warning('No API Token was specified.')
+            raise TypeError('No API Token was specified.')
+
+        if not VALIDATE_TOKEN.match(self.token):
             self.logger.warning(
                 'The API Token specified (%s) is invalid.' % token,
             )
@@ -93,13 +98,10 @@ class NotifyPushover(NotifyBase):
                 'The API Token specified (%s) is invalid.' % token,
             )
 
-        # The token associated with the account
-        self.token = token.strip()
-
         if compat_is_basestring(devices):
-            self.devices = filter(bool, DEVICE_LIST_DELIM.split(
+            self.devices = [x for x in filter(bool, DEVICE_LIST_DELIM.split(
                 devices,
-            ))
+            ))]
 
         elif isinstance(devices, (set, tuple, list)):
             self.devices = devices
@@ -120,10 +122,6 @@ class NotifyPushover(NotifyBase):
         if not self.user:
             self.logger.warning('No user was specified.')
             raise TypeError('No user was specified.')
-
-        if not self.token:
-            self.logger.warning('No token was specified.')
-            raise TypeError('No token was specified.')
 
         if not VALIDATE_USERGROUP.match(self.user):
             self.logger.warning(
@@ -152,6 +150,13 @@ class NotifyPushover(NotifyBase):
         while len(devices):
             device = devices.pop(0)
 
+            if VALIDATE_DEVICE.match(device) is None:
+                self.logger.warning(
+                    'The device specified (%s) is invalid.' % device,
+                )
+                has_error = True
+                continue
+
             # prepare JSON Object
             payload = {
                 'token': self.token,
@@ -159,17 +164,8 @@ class NotifyPushover(NotifyBase):
                 'priority': str(self.priority),
                 'title': title,
                 'message': body,
+                'device': device,
             }
-
-            if device != PUSHOVER_SEND_TO_ALL:
-                if not VALIDATE_DEVICE.match(device):
-                    self.logger.warning(
-                        'The device specified (%s) is invalid.' % device,
-                    )
-                    has_error = True
-                    continue
-
-                payload['device'] = device
 
             self.logger.debug('Pushover POST URL: %s (cert_verify=%r)' % (
                 self.notify_url, self.verify_certificate,
@@ -193,7 +189,7 @@ class NotifyPushover(NotifyBase):
                                 PUSHOVER_HTTP_ERROR_MAP[r.status_code],
                                 r.status_code))
 
-                    except IndexError:
+                    except KeyError:
                         self.logger.warning(
                             'Failed to send Pushover:%s '
                             'notification (error=%s).' % (
@@ -205,7 +201,7 @@ class NotifyPushover(NotifyBase):
                     # Return; we're done
                     has_error = True
 
-            except requests.ConnectionError as e:
+            except requests.RequestException as e:
                 self.logger.warning(
                     'A Connection error occured sending Pushover:%s ' % (
                         device) + 'notification.'
@@ -217,7 +213,7 @@ class NotifyPushover(NotifyBase):
                 # Prevent thrashing requests
                 self.throttle()
 
-        return has_error
+        return not has_error
 
     @staticmethod
     def parse_url(url):
@@ -233,11 +229,28 @@ class NotifyPushover(NotifyBase):
             return results
 
         # Apply our settings now
-        try:
-            devices = NotifyBase.unquote(results['fullpath'])
+        devices = NotifyBase.unquote(results['fullpath'])
 
-        except AttributeError:
-            devices = ''
+        if 'priority' in results['qsd'] and len(results['qsd']['priority']):
+            _map = {
+                'l': PushoverPriority.LOW,
+                '-2': PushoverPriority.LOW,
+                'm': PushoverPriority.MODERATE,
+                '-1': PushoverPriority.MODERATE,
+                'n': PushoverPriority.NORMAL,
+                '0': PushoverPriority.NORMAL,
+                'h': PushoverPriority.HIGH,
+                '1': PushoverPriority.HIGH,
+                'e': PushoverPriority.EMERGENCY,
+                '2': PushoverPriority.EMERGENCY,
+            }
+            try:
+                results['priority'] = \
+                    _map[results['qsd']['priority'][0].lower()]
+
+            except KeyError:
+                # No priority was set
+                pass
 
         results['token'] = results['host']
         results['devices'] = devices

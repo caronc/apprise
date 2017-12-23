@@ -41,12 +41,14 @@ class NotifyImageSize(object):
     A list of pre-defined image sizes to make it easier to work with defined
     plugins.
     """
+    XY_32 = '32x32'
     XY_72 = '72x72'
     XY_128 = '128x128'
     XY_256 = '256x256'
 
 
 NOTIFY_IMAGE_SIZES = (
+    NotifyImageSize.XY_32,
     NotifyImageSize.XY_72,
     NotifyImageSize.XY_128,
     NotifyImageSize.XY_256,

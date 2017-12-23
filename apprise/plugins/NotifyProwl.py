@@ -31,7 +31,7 @@ VALIDATE_PROVIDERKEY = re.compile(r'[A-Za-z0-9]{40}')
 
 # Priorities
 class ProwlPriority(object):
-    VERY_LOW = -2
+    LOW = -2
     MODERATE = -1
     NORMAL = 0
     HIGH = 1
@@ -39,7 +39,7 @@ class ProwlPriority(object):
 
 
 PROWL_PRIORITIES = (
-    ProwlPriority.VERY_LOW,
+    ProwlPriority.LOW,
     ProwlPriority.MODERATE,
     ProwlPriority.NORMAL,
     ProwlPriority.HIGH,
@@ -65,8 +65,7 @@ class NotifyProwl(NotifyBase):
     # Prowl uses the http protocol with JSON requests
     notify_url = 'https://api.prowlapp.com/publicapi/add'
 
-    def __init__(self, apikey, providerkey=None, priority=ProwlPriority.NORMAL,
-                 **kwargs):
+    def __init__(self, apikey, providerkey=None, priority=None, **kwargs):
         """
         Initialize Prowl Object
         """
@@ -146,7 +145,7 @@ class NotifyProwl(NotifyBase):
                             PROWL_HTTP_ERROR_MAP[r.status_code],
                             r.status_code))
 
-                except IndexError:
+                except KeyError:
                     self.logger.warning(
                         'Failed to send Prowl notification '
                         '(error=%s).' % (
@@ -159,7 +158,7 @@ class NotifyProwl(NotifyBase):
             else:
                 self.logger.info('Sent Prowl notification.')
 
-        except requests.ConnectionError as e:
+        except requests.RequestException as e:
             self.logger.warning(
                 'A Connection error occured sending Prowl notification.')
             self.logger.debug('Socket Exception: %s' % str(e))
@@ -186,14 +185,32 @@ class NotifyProwl(NotifyBase):
 
         # optionally find the provider key
         try:
-            providerkey = filter(
-                bool, NotifyBase.split_path(results['fullpath']))[0]
-
-            if not providerkey:
-                providerkey = None
+            providerkey = [x for x in filter(
+                bool, NotifyBase.split_path(results['fullpath']))][0]
 
         except (AttributeError, IndexError):
             providerkey = None
+
+        if 'priority' in results['qsd'] and len(results['qsd']['priority']):
+            _map = {
+                'l': ProwlPriority.LOW,
+                '-2': ProwlPriority.LOW,
+                'm': ProwlPriority.MODERATE,
+                '-1': ProwlPriority.MODERATE,
+                'n': ProwlPriority.NORMAL,
+                '0': ProwlPriority.NORMAL,
+                'h': ProwlPriority.HIGH,
+                '1': ProwlPriority.HIGH,
+                'e': ProwlPriority.EMERGENCY,
+                '2': ProwlPriority.EMERGENCY,
+            }
+            try:
+                results['priority'] = \
+                    _map[results['qsd']['priority'][0].lower()]
+
+            except KeyError:
+                # No priority was set
+                pass
 
         results['apikey'] = results['host']
         results['providerkey'] = providerkey
