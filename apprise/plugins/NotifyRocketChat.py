@@ -74,16 +74,16 @@ class NotifyRocketChat(NotifyBase):
         # Initialize channels list
         self.channels = list()
 
-        # Initialize room_id list
-        self.room_ids = list()
+        # Initialize room list
+        self.rooms = list()
 
         if recipients is None:
             recipients = []
 
         elif compat_is_basestring(recipients):
-            recipients = filter(bool, LIST_DELIM.split(
+            recipients = [x for x in filter(bool, LIST_DELIM.split(
                 recipients,
-            ))
+            ))]
 
         elif not isinstance(recipients, (set, tuple, list)):
             recipients = []
@@ -98,61 +98,87 @@ class NotifyRocketChat(NotifyBase):
 
             result = IS_ROOM_ID.match(recipient)
             if result:
-                # store valid room_id
-                self.channels.append(result.group('name'))
+                # store valid room
+                self.rooms.append(result.group('name'))
                 continue
 
             self.logger.warning(
-                'Dropped invalid channel/room_id ' +
+                'Dropped invalid channel/room ' +
                 '(%s) specified.' % recipient,
             )
 
-        if len(self.room_ids) == 0 and len(self.channels) == 0:
+        if len(self.rooms) == 0 and len(self.channels) == 0:
             raise TypeError(
-                'No Rocket.Chat room_id and/or channels specified to notify.'
+                'No Rocket.Chat room and/or channels specified to notify.'
             )
 
         # Used to track token headers upon authentication (if successful)
         self.headers = {}
-
-        # Track whether we authenticated okay
-        self.authenticated = self.login()
-
-        if not self.authenticated:
-            raise TypeError(
-                'Authentication to Rocket.Chat server failed.'
-            )
 
     def notify(self, title, body, notify_type, **kwargs):
         """
         wrapper to send_notification since we can alert more then one channel
         """
 
+        # Track whether we authenticated okay
+
+        if not self.login():
+            return False
+
         # Prepare our message
         text = '*%s*\r\n%s' % (title.replace('*', '\*'), body)
 
-        # Send all our defined channels
-        for channel in self.channels:
-            self.send_notification({
-                'text': text,
-                'channel': channel,
-            }, notify_type=notify_type, **kwargs)
+        # Initiaize our error tracking
+        has_error = False
+
+        # Create a copy of our rooms and channels to notify against
+        channels = list(self.channels)
+        rooms = list(self.rooms)
+
+        while len(channels) > 0:
+            # Get Channel
+            channel = channels.pop(0)
+
+            if not self.send_notification(
+                    {
+                        'text': text,
+                        'channel': channel,
+                    }, notify_type=notify_type, **kwargs):
+
+                # toggle flag
+                has_error = True
+
+            if len(channels) + len(rooms) > 0:
+                # Prevent thrashing requests
+                self.throttle()
 
         # Send all our defined room id's
-        for room_id in self.room_ids:
-            self.send_notification({
-                'text': text,
-                'roomId': room_id,
-            }, notify_type=notify_type, **kwargs)
+        while len(rooms):
+            # Get Room
+            room = rooms.pop(0)
+
+            if not self.send_notification(
+                    {
+                        'text': text,
+                        'roomId': room,
+                    }, notify_type=notify_type, **kwargs):
+
+                # toggle flag
+                has_error = True
+
+            if len(rooms) > 0:
+                # Prevent thrashing requests
+                self.throttle()
+
+        # logout
+        self.logout()
+
+        return not has_error
 
     def send_notification(self, payload, notify_type, **kwargs):
         """
         Perform Notify Rocket.Chat Notification
         """
-
-        if not self.authenticated:
-            # We couldn't authenticate; we're done
-            return False
 
         self.logger.debug('Rocket.Chat POST URL: %s (cert_verify=%r)' % (
             self.api_url + 'chat.postMessage', self.verify_certificate,
@@ -173,6 +199,7 @@ class NotifyRocketChat(NotifyBase):
                         '%s (error=%s).' % (
                             RC_HTTP_ERROR_MAP[r.status_code],
                             r.status_code))
+
                 except KeyError:
                     self.logger.warning(
                         'Failed to send Rocket.Chat notification ' +
@@ -200,6 +227,7 @@ class NotifyRocketChat(NotifyBase):
     def login(self):
         """
         login to our server
+
         """
         payload = {
             'username': self.user,
@@ -220,7 +248,8 @@ class NotifyRocketChat(NotifyBase):
                         '%s (error=%s).' % (
                             RC_HTTP_ERROR_MAP[r.status_code],
                             r.status_code))
-                except IndexError:
+
+                except KeyError:
                     self.logger.warning(
                         'Failed to authenticate with Rocket.Chat server ' +
                         '(error=%s).' % (
@@ -238,15 +267,12 @@ class NotifyRocketChat(NotifyBase):
                     return False
 
                 # Set our headers for further communication
-                self.headers['X-Auth-Token'] = \
-                    response.get('data').get('authToken')
-                self.headers['X-User-Id'] = \
-                    response.get('data').get('userId')
+                self.headers['X-Auth-Token'] = response.get(
+                    'data', {'authToken': None}).get('authToken')
+                self.headers['X-User-Id'] = response.get(
+                    'data', {'userId': None}).get('userId')
 
-                # We're authenticated now
-                self.authenticated = True
-
-        except requests.ConnectionError as e:
+        except requests.RequestException as e:
             self.logger.warning(
                 'A Connection error occured authenticating to the ' +
                 'Rocket.Chat server.')
@@ -259,10 +285,6 @@ class NotifyRocketChat(NotifyBase):
         """
         logout of our server
         """
-        if not self.authenticated:
-            # Nothing to do
-            return True
-
         try:
             r = requests.post(
                 self.api_url + 'logout',
@@ -278,7 +300,7 @@ class NotifyRocketChat(NotifyBase):
                             RC_HTTP_ERROR_MAP[r.status_code],
                             r.status_code))
 
-                except IndexError:
+                except KeyError:
                     self.logger.warning(
                         'Failed to log off Rocket.Chat server ' +
                         '(error=%s).' % (
@@ -292,15 +314,13 @@ class NotifyRocketChat(NotifyBase):
                     'Rocket.Chat log off successful; response %s.' % (
                         r.text))
 
-        except requests.ConnectionError as e:
+        except requests.RequestException as e:
             self.logger.warning(
                 'A Connection error occured logging off the ' +
                 'Rocket.Chat server')
             self.logger.debug('Socket Exception: %s' % str(e))
             return False
 
-        # We're no longer authenticated now
-        self.authenticated = False
         return True
 
     @staticmethod

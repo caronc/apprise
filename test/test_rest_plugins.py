@@ -20,6 +20,7 @@ from apprise import plugins
 from apprise import NotifyType
 from apprise import Apprise
 from apprise import AppriseAsset
+from apprise.utils import compat_is_basestring
 from json import dumps
 import requests
 import mock
@@ -37,9 +38,8 @@ TEST_URLS = (
     }),
     # An invalid access and secret key specified
     ('boxcar://access.key/secret.key/', {
-        'instance': plugins.NotifyBoxcar,
         # Thrown because there were no recipients specified
-        'exception': TypeError,
+        'instance': TypeError,
     }),
     # Provide both an access and a secret
     ('boxcar://%s/%s' % ('a' * 64, 'b' * 64), {
@@ -136,9 +136,8 @@ TEST_URLS = (
     }),
     # Invalid APIKey
     ('join://%s' % ('a' * 24), {
-        'instance': None,
         # Missing a channel
-        'exception': TypeError,
+        'instance': TypeError,
     }),
     # APIKey + device
     ('join://%s/%s' % ('a' * 32, 'd' * 32), {
@@ -336,14 +335,12 @@ TEST_URLS = (
         'instance': plugins.NotifyMatterMost,
     }),
     ('mmosts://localhost', {
-        'instance': plugins.NotifyMatterMost,
         # Thrown because there was no webhook id specified
-        'exception': TypeError,
+        'instance': TypeError,
     }),
     ('mmost://localhost/bad-web-hook', {
-        'instance': plugins.NotifyMatterMost,
         # Thrown because the webhook is not in a valid format
-        'exception': TypeError,
+        'instance': TypeError,
     }),
     ('mmost://:@/', {
         'instance': None,
@@ -379,7 +376,7 @@ TEST_URLS = (
     }),
     # Invalid APIKey
     ('nma://%s' % ('a' * 24), {
-        'exception': TypeError,
+        'instance': TypeError,
     }),
     # APIKey
     ('nma://%s' % ('a' * 48), {
@@ -401,7 +398,7 @@ TEST_URLS = (
     }),
     # APIKey + Invalid DevAPI Key
     ('nma://%s/%s' % ('a' * 48, 'b' * 24), {
-        'exception': TypeError,
+        'instance': TypeError,
     }),
     # APIKey + DevAPI Key
     ('nma://%s/%s' % ('a' * 48, 'b' * 48), {
@@ -462,7 +459,7 @@ TEST_URLS = (
     }),
     # Invalid APIKey
     ('prowl://%s' % ('a' * 24), {
-        'exception': TypeError,
+        'instance': TypeError,
     }),
     # APIKey
     ('prowl://%s' % ('a' * 40), {
@@ -484,7 +481,7 @@ TEST_URLS = (
     }),
     # APIKey + Invalid Provider Key
     ('prowl://%s/%s' % ('a' * 40, 'b' * 24), {
-        'exception': TypeError,
+        'instance': TypeError,
     }),
     # APIKey + No Provider Key (empty)
     ('prowl://%s///' % ('a' * 40), {
@@ -539,9 +536,8 @@ TEST_URLS = (
     }),
     # Invalid AuthToken
     ('palot://%s' % ('a' * 24), {
-        'instance': None,
         # Missing a channel
-        'exception': TypeError,
+        'instance': TypeError,
     }),
     # AuthToken + bad url
     ('palot://:@/', {
@@ -635,15 +631,15 @@ TEST_URLS = (
     }),
     # APIkey; no user
     ('pover://%s' % ('a' * 30), {
-        'exception': TypeError,
+        'instance': TypeError,
     }),
     # APIkey; invalid user
     ('pover://%s@%s' % ('u' * 20, 'a' * 30), {
-        'exception': TypeError,
+        'instance': TypeError,
     }),
     # Invalid APIKey; valid User
     ('pover://%s@%s' % ('u' * 30, 'a' * 24), {
-        'exception': TypeError,
+        'instance': TypeError,
     }),
     # APIKey + Valid User
     ('pover://%s@%s' % ('u' * 30, 'a' * 30), {
@@ -707,6 +703,122 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifyRocketChat
+    ##################################
+    ('rocket://', {
+        'instance': None,
+    }),
+    ('rockets://', {
+        'instance': None,
+    }),
+    # No username or pass
+    ('rocket://localhost', {
+        'instance': TypeError,
+    }),
+    # No room or channel
+    ('rocket://user:pass@localhost', {
+        'instance': TypeError,
+    }),
+    # No valid rooms or channels
+    ('rocket://user:pass@localhost/#/!/@', {
+        'instance': TypeError,
+    }),
+    # A room and port identifier
+    ('rocket://user:pass@localhost:8080/room/', {
+        'instance': plugins.NotifyRocketChat,
+        # The response text is expected to be the following on a success
+        'requests_response_text': {
+            'status': 'success',
+            'data': {
+                'authToken': 'abcd',
+                'userId': 'user',
+            },
+        },
+    }),
+    # A channel
+    ('rockets://user:pass@localhost/#channel', {
+        'instance': plugins.NotifyRocketChat,
+        # The response text is expected to be the following on a success
+        'requests_response_text': {
+            'status': 'success',
+            'data': {
+                'authToken': 'abcd',
+                'userId': 'user',
+            },
+        },
+    }),
+    # Several channels
+    ('rocket://user:pass@localhost/#channel1/#channel2/', {
+        'instance': plugins.NotifyRocketChat,
+        # The response text is expected to be the following on a success
+        'requests_response_text': {
+            'status': 'success',
+            'data': {
+                'authToken': 'abcd',
+                'userId': 'user',
+            },
+        },
+    }),
+    # Several Rooms
+    ('rocket://user:pass@localhost/room1/room2', {
+        'instance': plugins.NotifyRocketChat,
+        # The response text is expected to be the following on a success
+        'requests_response_text': {
+            'status': 'success',
+            'data': {
+                'authToken': 'abcd',
+                'userId': 'user',
+            },
+        },
+    }),
+    # A room and channel
+    ('rocket://user:pass@localhost/room/#channel', {
+        'instance': plugins.NotifyRocketChat,
+        # The response text is expected to be the following on a success
+        'requests_response_text': {
+            'status': 'success',
+            'data': {
+                'authToken': 'abcd',
+                'userId': 'user',
+            },
+        },
+    }),
+    ('rocket://:@/', {
+        'instance': None,
+    }),
+    # A room and channel
+    ('rockets://user:pass@localhost/rooma/#channela', {
+        # The response text is expected to be the following on a success
+        'requests_response_code': requests.codes.ok,
+        'requests_response_text': {
+            # return something other then a success message type
+            'status': 'failure',
+        },
+        # Exception is thrown in this case
+        'instance': plugins.NotifyRocketChat,
+        # Notifications will fail in this event
+        'response': False,
+    }),
+    ('rocket://user:pass@localhost:8081/room1/room2', {
+        'instance': plugins.NotifyRocketChat,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('rocket://user:pass@localhost:8082/#channel', {
+        'instance': plugins.NotifyRocketChat,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('rocket://user:pass@localhost:8083/#chan1/#chan2/room', {
+        'instance': plugins.NotifyRocketChat,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifySlack
     ##################################
     ('slack://', {
@@ -741,19 +853,19 @@ TEST_URLS = (
     }),
     ('slack://username@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ', {
         # Missing a channel
-        'exception': TypeError,
+        'instance': TypeError,
     }),
     ('slack://username@INVALID/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#cool', {
         # invalid 1st Token
-        'exception': TypeError,
+        'instance': TypeError,
     }),
     ('slack://username@T1JJ3T3L2/INVALID/TIiajkdnlazkcOXrIdevi7FQ/#great', {
         # invalid 2rd Token
-        'exception': TypeError,
+        'instance': TypeError,
     }),
     ('slack://username@T1JJ3T3L2/A1BRTD4JD/INVALID/#channel', {
         # invalid 3rd Token
-        'exception': TypeError,
+        'instance': TypeError,
     }),
     ('slack://l2g@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#usenet', {
         'instance': plugins.NotifySlack,
@@ -906,7 +1018,7 @@ TEST_URLS = (
     }),
     # No username specified but contains a device
     ('toasty://%s' % ('d' * 32), {
-        'exception': TypeError,
+        'instance': TypeError,
     }),
     # User + 1 device
     ('toasty://user@device', {
@@ -1067,9 +1179,6 @@ def test_rest_plugins(mock_post, mock_get):
         # Our expected instance
         instance = meta.get('instance', None)
 
-        # Our expected exception
-        exception = meta.get('exception', None)
-
         # Our expected server objects
         self = meta.get('self', None)
 
@@ -1082,6 +1191,13 @@ def test_rest_plugins(mock_post, mock_get):
             'requests_response_code',
             requests.codes.ok if response else requests.codes.not_found,
         )
+
+        # Allow us to force the server response text to be something other then
+        # the defaults
+        requests_response_text = meta.get('requests_response_text')
+        if not compat_is_basestring(requests_response_text):
+            # Convert to string
+            requests_response_text = dumps(requests_response_text)
 
         # Allow notification type override, otherwise default to INFO
         notify_type = meta.get('notify_type', NotifyType.INFO)
@@ -1112,6 +1228,12 @@ def test_rest_plugins(mock_post, mock_get):
             # Handle our default response
             mock_post.return_value.status_code = requests_response_code
             mock_get.return_value.status_code = requests_response_code
+
+            # Handle our default text response
+            mock_get.return_value.text = requests_response_text
+            mock_post.return_value.text = requests_response_text
+
+            # Ensure there is no side effect set
             mock_post.side_effect = None
             mock_get.side_effect = None
 
@@ -1135,19 +1257,10 @@ def test_rest_plugins(mock_post, mock_get):
             obj = Apprise.instantiate(
                 url, asset=asset, suppress_exceptions=False)
 
-            # Make sure we weren't expecting an exception and just didn't get
-            # one.
-            assert exception is None
-
             if obj is None:
                 # We're done (assuming this is what we were expecting)
                 assert instance is None
                 continue
-
-            if instance is None:
-                # Expected None but didn't get it
-                print('%s instantiated %s' % (url, str(obj)))
-                assert(False)
 
             assert(isinstance(obj, instance))
 
@@ -1172,6 +1285,7 @@ def test_rest_plugins(mock_post, mock_get):
                     for _exception in test_requests_exceptions:
                         mock_post.side_effect = _exception
                         mock_get.side_effect = _exception
+
                         try:
                             assert obj.notify(
                                 title='test', body='body',
@@ -1203,8 +1317,8 @@ def test_rest_plugins(mock_post, mock_get):
         except Exception as e:
             # Handle our exception
             print('%s / %s' % (url, str(e)))
-            assert(exception is not None)
-            assert(isinstance(e, exception))
+            assert(instance is not None)
+            assert(isinstance(e, instance))
 
 
 @mock.patch('requests.get')
@@ -1464,6 +1578,133 @@ def test_notify_pushover_plugin(mock_post, mock_get):
     assert(plugins.NotifyPushover.parse_url(None) is None)
     assert(plugins.NotifyPushover.parse_url('') is None)
     assert(plugins.NotifyPushover.parse_url(42) is None)
+
+
+@mock.patch('requests.get')
+@mock.patch('requests.post')
+def test_notify_rocketchat_plugin(mock_post, mock_get):
+    """
+    API: NotifyRocketChat() Extra Checks
+
+    """
+    # Chat ID
+    recipients = 'l2g, lead2gold, #channel, #channel2'
+
+    # Prepare Mock
+    mock_get.return_value = requests.Request()
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_get.return_value.status_code = requests.codes.ok
+    mock_post.return_value.text = ''
+    mock_get.return_value.text = ''
+
+    try:
+        obj = plugins.NotifyRocketChat(recipients=None)
+        # invalid recipients list (None)
+        assert(False)
+
+    except TypeError:
+        # Exception should be thrown about the fact no recipients were
+        # specified
+        assert(True)
+
+    try:
+        obj = plugins.NotifyRocketChat(recipients=object())
+        # invalid recipients list (object)
+        assert(False)
+
+    except TypeError:
+        # Exception should be thrown about the fact no recipients were
+        # specified
+        assert(True)
+
+    try:
+        obj = plugins.NotifyRocketChat(recipients=set())
+        # invalid recipient list/set (no entries)
+        assert(False)
+
+    except TypeError:
+        # Exception should be thrown about the fact no recipients were
+        # specified
+        assert(True)
+
+    obj = plugins.NotifyRocketChat(recipients=recipients)
+    assert(isinstance(obj, plugins.NotifyRocketChat))
+    assert(len(obj.channels) == 2)
+    assert(len(obj.rooms) == 2)
+
+    # Disable throttling to speed up unit tests
+    obj.throttle_attempt = 0
+
+    #
+    # Logout
+    #
+    assert obj.logout() is True
+
+    # Support the handling of an empty and invalid URL strings
+    assert plugins.NotifyRocketChat.parse_url(None) is None
+    assert plugins.NotifyRocketChat.parse_url('') is None
+    assert plugins.NotifyRocketChat.parse_url(42) is None
+
+    # Prepare Mock to fail
+    mock_post.return_value.status_code = requests.codes.internal_server_error
+    mock_get.return_value.status_code = requests.codes.internal_server_error
+    mock_post.return_value.text = ''
+    mock_get.return_value.text = ''
+
+    #
+    # Send Notification
+    #
+    assert obj.notify(
+        title='title', body='body', notify_type=NotifyType.INFO) is False
+    assert obj.send_notification(
+        payload='test', notify_type=NotifyType.INFO) is False
+
+    #
+    # Logout
+    #
+    assert obj.logout() is False
+
+    # KeyError handling
+    mock_post.return_value.status_code = 999
+    mock_get.return_value.status_code = 999
+
+    #
+    # Send Notification
+    #
+    assert obj.notify(
+        title='title', body='body', notify_type=NotifyType.INFO) is False
+    assert obj.send_notification(
+        payload='test', notify_type=NotifyType.INFO) is False
+
+    #
+    # Logout
+    #
+    assert obj.logout() is False
+
+    mock_post.return_value.text = ''
+    # Generate exceptions
+    mock_get.side_effect = requests.ConnectionError(
+        0, 'requests.ConnectionError() not handled')
+    mock_post.side_effect = mock_get.side_effect
+    mock_get.return_value.text = ''
+    mock_post.return_value.text = ''
+
+    #
+    # Send Notification
+    #
+    assert obj.send_notification(
+        payload='test', notify_type=NotifyType.INFO) is False
+
+    # Attempt the check again but fake a successful login
+    obj.login = mock.Mock()
+    obj.login.return_value = True
+    assert obj.notify(
+        title='title', body='body', notify_type=NotifyType.INFO) is False
+    #
+    # Logout
+    #
+    assert obj.logout() is False
 
 
 @mock.patch('requests.get')

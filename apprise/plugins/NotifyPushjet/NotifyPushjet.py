@@ -15,11 +15,16 @@
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU Lesser General Public License for more details.
-
+import re
 from .pushjet import errors
 from .pushjet import pushjet
 
 from ..NotifyBase import NotifyBase
+
+PUBLIC_KEY_RE = re.compile(
+    r'^[a-z0-9]{4}-[a-z0-9]{6}-[a-z0-9]{12}-[a-z0-9]{5}-[a-z0-9]{9}$', re.I)
+
+SECRET_KEY_RE = re.compile(r'^[a-z0-9]{32}$', re.I)
 
 
 class NotifyPushjet(NotifyBase):

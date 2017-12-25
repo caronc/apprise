@@ -68,18 +68,11 @@ class NotifyTwitter(NotifyBase):
                 'No user was specified.'
             )
 
-        try:
-            # Attempt to Establish a connection to Twitter
-            self.auth = tweepy.OAuthHandler(ckey, csecret)
-
-            # Apply our Access Tokens
-            self.auth.set_access_token(akey, asecret)
-
-        except Exception:
-            raise TypeError(
-                'Twitter authentication failed; '
-                'please verify your configuration.'
-            )
+        # Store our data
+        self.ckey = ckey
+        self.csecret = csecret
+        self.akey = akey
+        self.asecret = asecret
 
         return
 
@@ -87,6 +80,20 @@ class NotifyTwitter(NotifyBase):
         """
         Perform Twitter Notification
         """
+
+        try:
+            # Attempt to Establish a connection to Twitter
+            self.auth = tweepy.OAuthHandler(self.ckey, self.csecret)
+
+            # Apply our Access Tokens
+            self.auth.set_access_token(self.akey, self.asecret)
+
+        except Exception:
+            self.logger.warning(
+                'Twitter authentication failed; '
+                'please verify your configuration.'
+            )
+            return False
 
         text = '%s\r\n%s' % (title, body)
         try:
@@ -128,18 +135,19 @@ class NotifyTwitter(NotifyBase):
         # Now fetch the remaining tokens
         try:
             consumer_secret, access_token_key, access_token_secret = \
-                filter(bool, NotifyBase.split_path(results['fullpath']))[0:3]
+                [x for x in filter(bool, NotifyBase.split_path(
+                    results['fullpath']))][0:3]
 
-        except (AttributeError, IndexError):
+        except (ValueError, AttributeError, IndexError):
             # Force some bad values that will get caught
             # in parsing later
             consumer_secret = None
             access_token_key = None
             access_token_secret = None
 
-        results['ckey'] = consumer_key,
-        results['csecret'] = consumer_secret,
-        results['akey'] = access_token_key,
-        results['asecret'] = access_token_secret,
+        results['ckey'] = consumer_key
+        results['csecret'] = consumer_secret
+        results['akey'] = access_token_key
+        results['asecret'] = access_token_secret
 
         return results

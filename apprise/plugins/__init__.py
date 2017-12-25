@@ -26,21 +26,23 @@ from .NotifyFaast import NotifyFaast
 from .NotifyGrowl.NotifyGrowl import NotifyGrowl
 from .NotifyGrowl import gntp
 from .NotifyJSON import NotifyJSON
+from .NotifyMatterMost import NotifyMatterMost
 from .NotifyMyAndroid import NotifyMyAndroid
 from .NotifyProwl import NotifyProwl
 from .NotifyPushalot import NotifyPushalot
 from .NotifyPushBullet import NotifyPushBullet
+from .NotifyPushjet.NotifyPushjet import NotifyPushjet
+from .NotifyPushjet import pushjet
 from .NotifyPushover import NotifyPushover
 from .NotifyRocketChat import NotifyRocketChat
+from .NotifyTelegram import NotifyTelegram
 from .NotifyToasty import NotifyToasty
 from .NotifyTwitter.NotifyTwitter import NotifyTwitter
+from .NotifyTwitter import tweepy
 from .NotifyXBMC import NotifyXBMC
 from .NotifyXML import NotifyXML
 from .NotifySlack import NotifySlack
 from .NotifyJoin import NotifyJoin
-from .NotifyTelegram import NotifyTelegram
-from .NotifyMatterMost import NotifyMatterMost
-from .NotifyPushjet.NotifyPushjet import NotifyPushjet
 
 from ..common import NotifyImageSize
 from ..common import NOTIFY_IMAGE_SIZES
@@ -61,6 +63,12 @@ __all__ = [
     # NotifyEmail Base References (used for Testing)
     'NotifyEmailBase',
 
-    # gntp (used for Testing)
+    # gntp (used for NotifyGrowl Testing)
     'gntp',
+
+    # pushjet (used for NotifyPushjet Testing)
+    'pushjet',
+
+    # tweepy (used for NotifyTwitter Testing)
+    'tweepy',
 ]
