@@ -34,7 +34,7 @@ else:
 
 setup(
     name='apprise',
-    version='0.0.5',
+    version='0.0.6',
     description='A universal notification service',
     license='GPLv3',
     long_description=open('README.md').read(),
@@ -54,7 +54,7 @@ setup(
     scripts=['cli/notify.py', ],
     install_requires=open('requirements.txt').readlines(),
     classifiers=(
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
         'Operating System :: OS Independent',
         'Natural Language :: English',
