@@ -67,12 +67,6 @@ IS_CHAT_ID_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Disable image support for now
-# The stickers/images are kind of big and consume a lot of space
-# It's not as appealing as just having the post not contain
-# an image at all.
-TELEGRAM_IMAGE_XY = NotifyImageSize.XY_32
-
 # Used to break path apart into list of chat identifiers
 CHAT_ID_LIST_DELIM = re.compile(r'[ \t\r\n,#\\/]+')
 
@@ -95,7 +89,7 @@ class NotifyTelegram(NotifyBase):
         """
         super(NotifyTelegram, self).__init__(
             title_maxlen=250, body_maxlen=4096,
-            image_size=TELEGRAM_IMAGE_XY, notify_format=notify_format,
+            notify_format=notify_format,
             **kwargs)
 
         try:
@@ -133,94 +127,6 @@ class NotifyTelegram(NotifyBase):
         if len(self.chat_ids) == 0:
             self.logger.warning('No chat_id(s) were specified.')
             raise TypeError('No chat_id(s) were specified.')
-
-    def notify_image(self, chat_id, notify_type, **kwargs):
-        """
-        Sends the notification image based on the specified chat id
-
-        """
-        image_content = self.image_raw(notify_type)
-        if image_content is None:
-            # Nothing to do
-            return True
-
-        # prepare our image URL
-        url = '%s%s/%s' % (
-            self.notify_url,
-            self.bot_token,
-            'sendPhoto'
-        )
-
-        # Set up our upload
-        files = {'photo': ('%s.png' % notify_type, image_content)}
-
-        payload = {
-            'chat_id': chat_id,
-            'disable_notification': True,
-        }
-
-        self.logger.debug(
-            'Telegram (image) POST URL: %s (cert_verify=%r)' % (
-                url, self.verify_certificate))
-
-        self.logger.debug(
-            'Telegram (image) Payload: %s' % str(payload))
-
-        try:
-            r = requests.post(
-                url,
-                data=payload,
-                headers={
-                    'User-Agent': self.app_id,
-                },
-                files=files,
-                verify=self.verify_certificate,
-            )
-
-            if r.status_code != requests.codes.ok:
-                # We had a problem
-                try:
-                    # Try to get the error message if we can:
-                    error_msg = loads(r.text)['description']
-
-                except:
-                    error_msg = None
-
-                try:
-                    if error_msg:
-                        self.logger.warning(
-                            'Failed to send Telegram Image:%s '
-                            'notification: (%s) %s.' % (
-                                payload['chat_id'],
-                                r.status_code, error_msg))
-
-                    else:
-                        self.logger.warning(
-                            'Failed to send Telegram Image:%s '
-                            'notification: %s (error=%s).' % (
-                                payload['chat_id'],
-                                HTTP_ERROR_MAP[r.status_code],
-                                r.status_code))
-
-                except KeyError:
-                    self.logger.warning(
-                        'Failed to send Telegram Image:%s '
-                        'notification (error=%s).' % (
-                            payload['chat_id'],
-                            r.status_code))
-
-                return False
-
-        except requests.RequestException as e:
-            self.logger.warning(
-                'A Connection error occured sending Telegram:%s ' % (
-                    payload['chat_id']) + 'notification.'
-            )
-            self.logger.debug('Socket Exception: %s' % str(e))
-            return False
-
-        # We were successful
-        return True
 
     def notify(self, title, body, notify_type, **kwargs):
         """
@@ -278,20 +184,6 @@ class NotifyTelegram(NotifyBase):
             else:
                 # ID
                 payload['chat_id'] = chat_id.group('idno')
-
-            if not self.notify_image(
-                    chat_id=payload['chat_id'], notify_type=notify_type):
-                # Uh oh... The image failed to post if we get here
-
-                if len(chat_ids) > 0:
-                    # Prevent thrashing requests
-                    self.throttle()
-
-                # Flag our error
-                has_error = True
-
-                # Move along
-                continue
 
             self.logger.debug('Telegram POST URL: %s' % url)
             self.logger.debug('Telegram POST URL: %s (cert_verify=%r)' % (
