@@ -25,7 +25,7 @@ from socket import error as SocketError
 from email.mime.text import MIMEText
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import NotifyFormat
+from ..common import NotifyFormat
 
 
 class WebBaseLogin(object):

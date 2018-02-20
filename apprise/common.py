@@ -53,3 +53,20 @@ NOTIFY_IMAGE_SIZES = (
     NotifyImageSize.XY_128,
     NotifyImageSize.XY_256,
 )
+
+
+class NotifyFormat(object):
+    """
+    A list of pre-defined text message formats that can be passed via the
+    apprise library.
+    """
+    TEXT = 'text'
+    HTML = 'html'
+    MARKDOWN = 'markdown'
+
+
+NOTIFY_FORMATS = (
+    NotifyFormat.TEXT,
+    NotifyFormat.HTML,
+    NotifyFormat.MARKDOWN,
+)

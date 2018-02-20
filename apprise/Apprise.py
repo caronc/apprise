@@ -21,8 +21,10 @@
 
 import re
 import logging
+from markdown import markdown
 
 from .common import NotifyType
+from .common import NotifyFormat
 from .utils import parse_list
 from .utils import compat_is_basestring
 
@@ -217,9 +219,14 @@ class Apprise(object):
         """
         self.servers[:] = []
 
-    def notify(self, title, body, notify_type=NotifyType.INFO):
+    def notify(self, title, body, notify_type=NotifyType.INFO,
+               body_format=None):
         """
-        Send a notification to all of the plugins previously loaded
+        Send a notification to all of the plugins previously loaded.
+
+        If the body_format specified is NotifyFormat.MARKDOWN, it will
+        be converted to HTML if the Notification type expects this.
+
         """
 
         # Initialize our return result
@@ -228,12 +235,28 @@ class Apprise(object):
         if not (title or body):
             return False
 
+        # Tracks conversions
+        conversion_map = dict()
+
         # Iterate over our loaded plugins
         for server in self.servers:
+            if server.notify_format not in conversion_map:
+                if body_format == NotifyFormat.MARKDOWN and \
+                        server.notify_format == NotifyFormat.HTML:
+
+                    # Apply Markdown
+                    conversion_map[server.notify_format] = markdown(body)
+
+                else:
+                    # Store entry directly
+                    conversion_map[server.notify_format] = body
+
             try:
                 # Send notification
                 if not server.notify(
-                        title=title, body=body, notify_type=notify_type):
+                        title=title,
+                        body=conversion_map[server.notify_format],
+                        notify_type=notify_type):
 
                     # Toggle our return status flag
                     status = False

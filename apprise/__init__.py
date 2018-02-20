@@ -24,9 +24,10 @@ __copywrite__ = 'Copyright 2017 Chris Caron <lead2gold@gmail.com>'
 
 from .common import NotifyType
 from .common import NOTIFY_TYPES
-from .common import NOTIFY_IMAGE_SIZES
 from .common import NotifyImageSize
-from .plugins.NotifyBase import NotifyFormat
+from .common import NOTIFY_IMAGE_SIZES
+from .common import NotifyFormat
+from .common import NOTIFY_FORMATS
 from .plugins.NotifyBase import NotifyBase
 
 from .Apprise import Apprise
@@ -43,5 +44,5 @@ __all__ = [
 
     # Reference
     'NotifyType', 'NotifyImageSize', 'NotifyFormat', 'NOTIFY_TYPES',
-    'NOTIFY_IMAGE_SIZES',
+    'NOTIFY_IMAGE_SIZES', 'NOTIFY_FORMATS',
 ]

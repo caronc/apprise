@@ -20,8 +20,8 @@ import re
 import requests
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import NotifyFormat
 from .NotifyBase import HTTP_ERROR_MAP
+from ..common import NotifyFormat
 
 # Extend HTTP Error Messages
 NMA_HTTP_ERROR_MAP = HTTP_ERROR_MAP.copy()

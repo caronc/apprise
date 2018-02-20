@@ -47,8 +47,8 @@ from json import loads
 from json import dumps
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import NotifyFormat
 from .NotifyBase import HTTP_ERROR_MAP
+from ..common import NotifyFormat
 from ..common import NotifyImageSize
 from ..utils import compat_is_basestring
 

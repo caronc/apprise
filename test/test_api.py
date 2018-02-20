@@ -25,6 +25,7 @@ from apprise import AppriseAsset
 from apprise.Apprise import SCHEMA_MAP
 from apprise import NotifyBase
 from apprise import NotifyType
+from apprise import NotifyFormat
 from apprise import NotifyImageSize
 from apprise.Apprise import __load_matrix
 
@@ -107,7 +108,8 @@ def test_apprise():
 
     class GoodNotification(NotifyBase):
         def __init__(self, **kwargs):
-            super(GoodNotification, self).__init__()
+            super(GoodNotification, self).__init__(
+                notify_format=NotifyFormat.HTML)
 
         def notify(self, **kwargs):
             # Pretend everything is okay
@@ -203,6 +205,79 @@ def test_apprise():
     assert(a.instantiate(
         'throw://localhost', suppress_exceptions=True) is None)
     assert(len(a) == 0)
+
+
+def test_apprise_notify_formats(tmpdir):
+    """
+    API: Apprise() TextFormat tests
+
+    """
+    # Caling load matix a second time which is an internal function causes it
+    # to skip over content already loaded into our matrix and thefore accesses
+    # other if/else parts of the code that aren't otherwise called
+    __load_matrix()
+
+    a = Apprise()
+
+    # no items
+    assert(len(a) == 0)
+
+    class TextNotification(NotifyBase):
+        def __init__(self, **kwargs):
+            super(TextNotification, self).__init__(
+                notify_format=NotifyFormat.TEXT)
+
+        def notify(self, **kwargs):
+            # Pretend everything is okay
+            return True
+
+    class HtmlNotification(NotifyBase):
+        def __init__(self, **kwargs):
+            super(HtmlNotification, self).__init__(
+                notify_format=NotifyFormat.HTML)
+
+        def notify(self, **kwargs):
+            # Pretend everything is okay
+            return True
+
+    class MarkDownNotification(NotifyBase):
+        def __init__(self, **kwargs):
+            super(MarkDownNotification, self).__init__(
+                notify_format=NotifyFormat.MARKDOWN)
+
+        def notify(self, **kwargs):
+            # Pretend everything is okay
+            return True
+
+    # Store our notifications into our schema map
+    SCHEMA_MAP['text'] = TextNotification
+    SCHEMA_MAP['html'] = HtmlNotification
+    SCHEMA_MAP['markdown'] = MarkDownNotification
+
+    # Test Markdown; the above calls the markdown because our good://
+    # defined plugin above was defined to default to HTML which triggers
+    # a markdown to take place if the body_format specified on the notify
+    # call
+    assert(a.add('html://localhost') is True)
+    assert(a.add('html://another.server') is True)
+    assert(a.add('html://and.another') is True)
+    assert(a.add('text://localhost') is True)
+    assert(a.add('text://another.server') is True)
+    assert(a.add('text://and.another') is True)
+    assert(a.add('markdown://localhost') is True)
+    assert(a.add('markdown://another.server') is True)
+    assert(a.add('markdown://and.another') is True)
+
+    assert(len(a) == 9)
+
+    assert(a.notify(title="markdown", body="## Testing Markdown",
+           body_format=NotifyFormat.MARKDOWN) is True)
+
+    assert(a.notify(title="text", body="Testing Text",
+           body_format=NotifyFormat.TEXT) is True)
+
+    assert(a.notify(title="html", body="<b>HTML</b>",
+           body_format=NotifyFormat.HTML) is True)
 
 
 def test_apprise_asset(tmpdir):

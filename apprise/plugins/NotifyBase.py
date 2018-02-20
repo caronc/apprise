@@ -36,6 +36,8 @@ from ..utils import parse_bool
 from ..utils import is_hostname
 from ..common import NOTIFY_IMAGE_SIZES
 from ..common import NOTIFY_TYPES
+from ..common import NotifyFormat
+from ..common import NOTIFY_FORMATS
 
 from ..AppriseAsset import AppriseAsset
 
@@ -60,23 +62,10 @@ HTTP_ERROR_MAP = {
 }
 
 # HTML New Line Delimiter
-NOTIFY_NEWLINE = '\n'
+NOTIFY_NEWLINE = '\r\n'
 
 # Used to break a path list into parts
 PATHSPLIT_LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
-
-
-class NotifyFormat(object):
-    TEXT = 'text'
-    HTML = 'html'
-    MARKDOWN = 'markdown'
-
-
-NOTIFY_FORMATS = (
-    NotifyFormat.TEXT,
-    NotifyFormat.HTML,
-    NotifyFormat.MARKDOWN,
-)
 
 # Regular expression retrieved from:
 # http://www.regular-expressions.info/email.html
@@ -327,7 +316,7 @@ class NotifyBase(object):
         return is_hostname(hostname)
 
     @staticmethod
-    def parse_url(url, verify_host=True):
+    def parse_url(url, verify_host=True, default_format=NotifyFormat.TEXT):
         """
         Parses the URL and returns it broken apart into a dictionary.
 
@@ -343,10 +332,10 @@ class NotifyBase(object):
         results['secure'] = (results['schema'][-1] == 's')
 
         # Our default notification format
-        results['notify_format'] = NotifyFormat.TEXT
+        results['notify_format'] = default_format
 
         # Support SSL Certificate 'verify' keyword. Default to being enabled
-        results['verify'] = True
+        results['verify'] = verify_host
 
         if 'verify' in results['qsd']:
             results['verify'] = parse_bool(
