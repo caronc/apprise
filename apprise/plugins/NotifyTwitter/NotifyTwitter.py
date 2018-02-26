@@ -129,7 +129,7 @@ class NotifyTwitter(NotifyBase):
 
         # Apply our settings now
 
-        # The first token is stored in the hostnamee
+        # The first token is stored in the hostname
         consumer_key = results['host']
 
         # Now fetch the remaining tokens

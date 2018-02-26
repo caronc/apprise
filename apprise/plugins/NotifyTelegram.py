@@ -303,7 +303,7 @@ class NotifyTelegram(NotifyBase):
                 ),
             )
 
-        # The first token is stored in the hostnamee
+        # The first token is stored in the hostname
         bot_token_a = results['host']
 
         # Now fetch the remaining tokens

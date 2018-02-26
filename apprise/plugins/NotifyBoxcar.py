@@ -264,7 +264,7 @@ class NotifyBoxcar(NotifyBase):
             # We're done early
             return None
 
-        # The first token is stored in the hostnamee
+        # The first token is stored in the hostname
         access = results['host']
 
         # Now fetch the remaining tokens
