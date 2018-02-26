@@ -75,7 +75,7 @@ def _main(title, body, urls, notification_type, theme, verbose):
         logger.setLevel(logging.INFO)
 
     else:
-        logger.setLevel(logging.NONE)
+        logger.setLevel(logging.ERROR)
 
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     ch.setFormatter(formatter)
