@@ -88,6 +88,65 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifyDiscord
+    ##################################
+    ('discord://', {
+        'instance': None,
+    }),
+    # No webhook_token specified
+    ('discord://%s' % ('i' * 24), {
+        'instance': TypeError,
+    }),
+    # Provide both an webhook id and a webhook token
+    ('discord://%s/%s' % ('i' * 24, 't' * 64), {
+        'instance': plugins.NotifyDiscord,
+        'requests_response_code': requests.codes.no_content,
+    }),
+    # Provide a temporary username
+    ('discord://l2g@%s/%s' % ('i' * 24, 't' * 64), {
+        'instance': plugins.NotifyDiscord,
+        'requests_response_code': requests.codes.no_content,
+    }),
+    # Enable other options
+    ('discord://%s/%s?footer=Yes&thumbnail=Yes' % ('i' * 24, 't' * 64), {
+        'instance': plugins.NotifyDiscord,
+        'requests_response_code': requests.codes.no_content,
+    }),
+    ('discord://%s/%s?avatar=No&footer=No' % ('i' * 24, 't' * 64), {
+        'instance': plugins.NotifyDiscord,
+        'requests_response_code': requests.codes.no_content,
+    }),
+    # Test without image set
+    ('discord://%s/%s' % ('i' * 24, 't' * 64), {
+        'instance': plugins.NotifyDiscord,
+        'requests_response_code': requests.codes.no_content,
+        # don't include an image by default
+        'include_image': False,
+    }),
+    # An invalid url
+    ('discord://:@/', {
+        'instance': None,
+    }),
+    ('discord://%s/%s/' % ('a' * 24, 'b' * 64), {
+        'instance': plugins.NotifyDiscord,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('discord://%s/%s/' % ('a' * 24, 'b' * 64), {
+        'instance': plugins.NotifyDiscord,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('discord://%s/%s/' % ('a' * 24, 'b' * 64), {
+        'instance': plugins.NotifyDiscord,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifyFaast
     ##################################
     ('faast://', {
@@ -1382,6 +1441,51 @@ def test_notify_boxcar_plugin(mock_post, mock_get):
     p.throttle_attempt = 0
 
     p.notify(body=None, title=None, notify_type=NotifyType.INFO) is True
+
+
+@mock.patch('requests.get')
+@mock.patch('requests.post')
+def test_notify_discord_plugin(mock_post, mock_get):
+    """
+    API: NotifyDiscord() Extra Checks
+
+    """
+
+    # Initialize some generic (but valid) tokens
+    webhook_id = 'A' * 24
+    webhook_token = 'B' * 64
+
+    # Prepare Mock
+    mock_get.return_value = requests.Request()
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_get.return_value.status_code = requests.codes.ok
+
+    # Empty Channel list
+    try:
+        plugins.NotifyDiscord(webhook_id=None, webhook_token=webhook_token)
+        assert(False)
+
+    except TypeError:
+        # we'll thrown because no webhook_id was specified
+        assert(True)
+
+    obj = plugins.NotifyDiscord(
+        webhook_id=webhook_id,
+        webhook_token=webhook_token,
+        footer=True, thumbnail=False)
+
+    # Disable throttling to speed up unit tests
+    obj.throttle_attempt = 0
+
+    # This call includes an image with it's payload:
+    assert obj.notify(title='title', body='body',
+                      notify_type=NotifyType.INFO) is True
+
+    # Toggle our logo availability
+    obj.asset.image_url_logo = None
+    assert obj.notify(title='title', body='body',
+                      notify_type=NotifyType.INFO) is True
 
 
 @mock.patch('requests.get')

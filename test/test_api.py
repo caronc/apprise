@@ -298,8 +298,30 @@ def test_apprise_asset(tmpdir):
     a.default_html_color = '#abcabc'
     a.html_notify_map[NotifyType.INFO] = '#aaaaaa'
 
-    assert(a.html_color('invalid') == '#abcabc')
-    assert(a.html_color(NotifyType.INFO) == '#aaaaaa')
+    assert(a.color('invalid', tuple) == (171, 202, 188))
+    assert(a.color(NotifyType.INFO, tuple) == (170, 170, 170))
+
+    assert(a.color('invalid', int) == 11258556)
+    assert(a.color(NotifyType.INFO, int) == 11184810)
+
+    assert(a.color('invalid', None) == '#abcabc')
+    assert(a.color(NotifyType.INFO, None) == '#aaaaaa')
+    # None is the default
+    assert(a.color(NotifyType.INFO) == '#aaaaaa')
+
+    # Invalid Type
+    try:
+        a.color(NotifyType.INFO, dict)
+        # We should not get here (exception should be thrown)
+        assert(False)
+
+    except ValueError:
+        # The exception we expect since dict is not supported
+        assert(True)
+
+    except:
+        # Any other exception is not good
+        assert(False)
 
     assert(a.image_url(NotifyType.INFO, NotifyImageSize.XY_256) ==
            'http://localhost/dark/info-256x256.png')

@@ -220,7 +220,7 @@ class NotifySlack(NotifyBase):
                 'attachments': [{
                     'title': title,
                     'text': body,
-                    'color': self.asset.html_color(notify_type),
+                    'color': self.color(notify_type),
                     # Time
                     'ts': time(),
                     'footer': self.app_id,

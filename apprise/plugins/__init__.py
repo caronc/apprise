@@ -21,6 +21,7 @@
 from . import NotifyEmail as NotifyEmailBase
 
 from .NotifyBoxcar import NotifyBoxcar
+from .NotifyDiscord import NotifyDiscord
 from .NotifyEmail import NotifyEmail
 from .NotifyFaast import NotifyFaast
 from .NotifyGrowl.NotifyGrowl import NotifyGrowl
@@ -55,7 +56,7 @@ __all__ = [
     'NotifyMyAndroid', 'NotifyProwl', 'NotifyPushalot', 'NotifyPushBullet',
     'NotifyPushover', 'NotifyRocketChat', 'NotifyToasty', 'NotifyTwitter',
     'NotifyXBMC', 'NotifyXML', 'NotifySlack', 'NotifyJoin', 'NotifyTelegram',
-    'NotifyMatterMost', 'NotifyPushjet',
+    'NotifyMatterMost', 'NotifyPushjet', 'NotifyDiscord',
 
     # Reference
     'NotifyImageSize', 'NOTIFY_IMAGE_SIZES', 'NotifyType', 'NOTIFY_TYPES',

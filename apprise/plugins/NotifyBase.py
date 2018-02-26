@@ -95,12 +95,6 @@ class NotifyBase(object):
     # This value can be the same as the defined protocol.
     secure_protocol = ''
 
-    # our Application identifier
-    app_id = 'Apprise'
-
-    # our Application description
-    app_desc = 'Apprise Notifications'
-
     # Most Servers do not like more then 1 request per 5 seconds, so 5.5 gives
     # us a safe play range...
     throttle_attempt = 5.5
@@ -177,7 +171,7 @@ class NotifyBase(object):
 
         return
 
-    def image_url(self, notify_type):
+    def image_url(self, notify_type, logo=False):
         """
         Returns Image URL if possible
         """
@@ -191,6 +185,7 @@ class NotifyBase(object):
         return self.asset.image_url(
             notify_type=notify_type,
             image_size=self.image_size,
+            logo=logo,
         )
 
     def image_path(self, notify_type):
@@ -222,6 +217,30 @@ class NotifyBase(object):
             notify_type=notify_type,
             image_size=self.image_size,
         )
+
+    def color(self, notify_type, color_type=None):
+        """
+        Returns the html color (hex code) associated with the notify_type
+        """
+        if notify_type not in NOTIFY_TYPES:
+            return None
+
+        return self.asset.color(
+            notify_type=notify_type,
+            color_type=color_type,
+        )
+
+    @property
+    def app_id(self):
+        return self.asset.app_id
+
+    @property
+    def app_desc(self):
+        return self.asset.app_desc
+
+    @property
+    def app_url(self):
+        return self.asset.app_url
 
     @staticmethod
     def escape_html(html, convert_new_lines=False):
