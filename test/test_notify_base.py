@@ -20,6 +20,7 @@ from apprise.plugins.NotifyBase import NotifyBase
 from apprise import NotifyType
 from apprise import NotifyImageSize
 from timeit import default_timer
+from apprise.utils import compat_is_basestring
 
 
 def test_notify_base():
@@ -74,6 +75,15 @@ def test_notify_base():
     assert nb.image_url(notify_type=NotifyType.INFO) is None
     assert nb.image_path(notify_type=NotifyType.INFO) is None
     assert nb.image_raw(notify_type=NotifyType.INFO) is None
+
+    # Color handling
+    assert nb.color(notify_type='invalid') is None
+    assert compat_is_basestring(
+        nb.color(notify_type=NotifyType.INFO, color_type=None))
+    assert isinstance(
+        nb.color(notify_type=NotifyType.INFO, color_type=int), int)
+    assert isinstance(
+        nb.color(notify_type=NotifyType.INFO, color_type=tuple), tuple)
 
     # Create an object with an ImageSize loaded into it
     nb = NotifyBase(image_size=NotifyImageSize.XY_256)
