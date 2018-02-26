@@ -128,29 +128,35 @@ class NotifyPushBullet(NotifyBase):
                     auth=auth,
                     verify=self.verify_certificate,
                 )
+
                 if r.status_code != requests.codes.ok:
                     # We had a problem
                     try:
                         self.logger.warning(
-                            'Failed to send PushBullet notification: '
-                            '%s (error=%s).' % (
+                            'Failed to send PushBullet notification to '
+                            '"%s": %s (error=%s).' % (
+                                recipient,
                                 PUSHBULLET_HTTP_ERROR_MAP[r.status_code],
                                 r.status_code))
 
                     except KeyError:
                         self.logger.warning(
-                            'Failed to send PushBullet notification '
-                            '(error=%s).' % r.status_code)
+                            'Failed to send PushBullet notification to '
+                            '"%s" (error=%s).' % (recipient, r.status_code))
 
                     # self.logger.debug('Response Details: %s' % r.raw.read())
 
                     # Return; we're done
                     has_error = True
 
+                else:
+                    self.logger.info(
+                        'Sent PushBullet notification to "%s".' % (recipient))
+
             except requests.RequestException as e:
                 self.logger.warning(
                     'A Connection error occured sending PushBullet '
-                    'notification.'
+                    'notification to "%s".' % (recipient),
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))
                 has_error = True
