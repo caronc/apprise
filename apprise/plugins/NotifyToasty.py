@@ -2,7 +2,7 @@
 #
 # (Super) Toasty Notify Wrapper
 #
-# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017-2018 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -132,6 +132,10 @@ class NotifyToasty(NotifyBase):
 
                     # Return; we're done
                     has_error = True
+
+                else:
+                    self.logger.info(
+                        'Sent Toasty notification to %s.' % device)
 
             except requests.RequestException as e:
                 self.logger.warning(

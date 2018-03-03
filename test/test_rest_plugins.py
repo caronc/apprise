@@ -2,7 +2,7 @@
 #
 # REST Based Plugins - Unit Tests
 #
-# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017-2018 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -985,19 +985,15 @@ TEST_URLS = (
     ('tgram://bottest@123456789:abcdefg_hijklmnop/lead2gold/', {
         'instance': plugins.NotifyTelegram,
     }),
-    # Testing valid format
-    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?format=text', {
+    # Testing image
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?image=Yes', {
         'instance': plugins.NotifyTelegram,
     }),
-    # Testing valid format
-    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?format=html', {
-        'instance': plugins.NotifyTelegram,
-    }),
-    # Testing invalid format (fall's back to text)
+    # Testing invalid format (fall's back to html)
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?format=invalid', {
         'instance': plugins.NotifyTelegram,
     }),
-    # Testing empty format (falls back to text)
+    # Testing empty format (falls back to html)
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?format=', {
         'instance': plugins.NotifyTelegram,
     }),
@@ -1021,7 +1017,7 @@ TEST_URLS = (
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
-    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/', {
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?image=Yes', {
         'instance': plugins.NotifyTelegram,
         # force a failure without an image specified
         'include_image': False,
@@ -1055,17 +1051,26 @@ TEST_URLS = (
         'response': False,
         'requests_response_code': 999,
     }),
+    # Test with image set
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?image=Yes', {
+        'instance': plugins.NotifyTelegram,
+        # throw a bizzare code forcing us to fail to look it up without
+        # having an image included
+        'include_image': True,
+        'response': False,
+        'requests_response_code': 999,
+    }),
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/', {
         'instance': plugins.NotifyTelegram,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
     }),
-    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/', {
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?image=Yes', {
         'instance': plugins.NotifyTelegram,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them without images set
-        'include_image': False,
+        'include_image': True,
         'test_requests_exceptions': True,
     }),
 
@@ -1878,6 +1883,8 @@ def test_notify_telegram_plugin(mock_post, mock_get):
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.ok
     mock_get.return_value.status_code = requests.codes.ok
+    mock_get.return_value.content = '{}'
+    mock_post.return_value.content = '{}'
 
     try:
         obj = plugins.NotifyTelegram(bot_token=None, chat_ids=chat_ids)
@@ -1960,3 +1967,127 @@ def test_notify_telegram_plugin(mock_post, mock_get):
         title='title', body='body', notify_type=NotifyType.INFO) is False
     assert nimg_obj.notify(
         title='title', body='body', notify_type=NotifyType.INFO) is False
+
+    # Bot Token Detection
+    # Just to make it clear to people reading this code and trying to learn
+    # what is going on.  Apprise tries to detect the bot owner if you don't
+    # specify a user to message.  The idea is to just default to messaging
+    # the bot owner himself (it makes it easier for people).  So we're testing
+    # the creating of a Telegram Notification without providing a chat ID.
+    # We're testing the error handling of this bot detection section of the
+    # code
+    mock_post.return_value.content = dumps({
+        "ok": True,
+        "result": [{
+            "update_id": 645421321,
+            "message": {
+                "message_id": 1,
+                "from": {
+                    "id": 532389719,
+                    "is_bot": False,
+                    "first_name": "Chris",
+                    "language_code": "en-US"
+                },
+                "chat": {
+                    "id": 532389719,
+                    "first_name": "Chris",
+                    "type": "private"
+                },
+                "date": 1519694394,
+                "text": "/start",
+                "entities": [{
+                    "offset": 0,
+                    "length": 6,
+                    "type": "bot_command",
+                }],
+            }},
+        ],
+    })
+    mock_post.return_value.status_code = requests.codes.ok
+
+    obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids=None)
+    assert(len(obj.chat_ids) == 1)
+    assert(obj.chat_ids[0] == '532389719')
+
+    # Do the test again, but without the expected (parsed response)
+    mock_post.return_value.content = dumps({
+        "ok": True,
+        "result": [{
+            "message": {
+                "text": "/ignored.entry",
+            }},
+        ],
+    })
+    try:
+        obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids=None)
+        # No chat_ids specified
+        assert(False)
+
+    except TypeError:
+        # Exception should be thrown about the fact no token was specified
+        assert(True)
+
+    # Test our bot detection with a internal server error
+    mock_post.return_value.status_code = requests.codes.internal_server_error
+    try:
+        obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids=None)
+        # No chat_ids specified
+        assert(False)
+
+    except TypeError:
+        # Exception should be thrown about the fact no token was specified
+        assert(True)
+
+    # Test our bot detection with an unmappable html error
+    mock_post.return_value.status_code = 999
+    try:
+        obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids=None)
+        # No chat_ids specified
+        assert(False)
+
+    except TypeError:
+        # Exception should be thrown about the fact no token was specified
+        assert(True)
+
+    # Do it again but this time provide a failure message
+    mock_post.return_value.content = dumps({'description': 'Failure Message'})
+    try:
+        obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids=None)
+        # No chat_ids specified
+        assert(False)
+
+    except TypeError:
+        # Exception should be thrown about the fact no token was specified
+        assert(True)
+
+    # Do it again but this time provide a failure message and perform a
+    # notification without a bot detection by providing at least 1 chat id
+    obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids=['@abcd'])
+    assert nimg_obj.notify(
+        title='title', body='body', notify_type=NotifyType.INFO) is False
+
+    # Test our exception handling with bot detection
+    test_requests_exceptions = (
+        requests.ConnectionError(
+            0, 'requests.ConnectionError() not handled'),
+        requests.RequestException(
+            0, 'requests.RequestException() not handled'),
+        requests.HTTPError(
+            0, 'requests.HTTPError() not handled'),
+        requests.ReadTimeout(
+            0, 'requests.ReadTimeout() not handled'),
+        requests.TooManyRedirects(
+            0, 'requests.TooManyRedirects() not handled'),
+    )
+
+    # iterate over our exceptions and test them
+    for _exception in test_requests_exceptions:
+        mock_post.side_effect = _exception
+        try:
+            obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids=None)
+            # No chat_ids specified
+            assert(False)
+
+        except TypeError:
+            # Exception should be thrown about the fact no token was specified
+            assert(True)

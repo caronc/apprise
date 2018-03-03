@@ -2,7 +2,7 @@
 #
 # Base Notify Wrapper
 #
-# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017-2018 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -243,14 +243,18 @@ class NotifyBase(object):
         return self.asset.app_url
 
     @staticmethod
-    def escape_html(html, convert_new_lines=False):
+    def escape_html(html, convert_new_lines=False, whitespace=True):
         """
         Takes html text as input and escapes it so that it won't
         conflict with any xml/html wrapping characters.
         """
-        escaped = _escape(html).\
-            replace(u'\t', u'&emsp;').\
-            replace(u' ', u'&nbsp;')
+        escaped = _escape(html)
+
+        if whitespace:
+            # Tidy up whitespace too
+            escaped = escaped\
+                .replace(u'\t', u'&emsp;')\
+                .replace(u' ', u'&nbsp;')
 
         if convert_new_lines:
             return escaped.replace(u'\n', u'&lt;br/&gt;')
@@ -335,7 +339,7 @@ class NotifyBase(object):
         return is_hostname(hostname)
 
     @staticmethod
-    def parse_url(url, verify_host=True, default_format=NotifyFormat.TEXT):
+    def parse_url(url, verify_host=True):
         """
         Parses the URL and returns it broken apart into a dictionary.
 
@@ -350,15 +354,21 @@ class NotifyBase(object):
         # if our URL ends with an 's', then assueme our secure flag is set.
         results['secure'] = (results['schema'][-1] == 's')
 
-        # Our default notification format
-        results['notify_format'] = default_format
-
         # Support SSL Certificate 'verify' keyword. Default to being enabled
         results['verify'] = verify_host
 
         if 'verify' in results['qsd']:
             results['verify'] = parse_bool(
                 results['qsd'].get('verify', True))
+
+        # Allow overriding the default format
+        if 'format' in results['qsd']:
+            results['format'] = results['qsd'].get('format')
+            if results['format'] not in NOTIFY_FORMATS:
+                NotifyBase.logger.warning(
+                    'Unsupported format specified {}'.format(
+                        results['format']))
+                del results['format']
 
         # Password overrides
         if 'pass' in results['qsd']:

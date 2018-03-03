@@ -155,6 +155,7 @@ class NotifyProwl(NotifyBase):
 
                 # Return; we're done
                 return False
+
             else:
                 self.logger.info('Sent Prowl notification.')
 

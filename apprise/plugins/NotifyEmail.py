@@ -2,7 +2,7 @@
 #
 # Email Notify Wrapper
 #
-# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017-2018 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -157,7 +157,7 @@ class NotifyEmail(NotifyBase):
 
         # Now we want to construct the To and From email
         # addresses from the URL provided
-        self.from_name = kwargs.get('name', NotifyBase.app_desc)
+        self.from_name = kwargs.get('name', self.app_desc)
         self.from_addr = kwargs.get('from', None)
 
         if not NotifyBase.is_email(self.to_addr):

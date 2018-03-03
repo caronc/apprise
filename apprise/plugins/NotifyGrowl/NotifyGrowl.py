@@ -2,7 +2,7 @@
 #
 # Growl Notify Wrapper
 #
-# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017-2018 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -173,9 +173,7 @@ class NotifyGrowl(NotifyBase):
                 )
 
             else:
-                self.logger.debug(
-                    'Growl notification sent successfully.'
-                )
+                self.logger.info('Sent Growl notification.')
 
         except errors.BaseError as e:
             # Since Growl servers listen for UDP broadcasts, it's possible

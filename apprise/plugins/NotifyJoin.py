@@ -2,7 +2,7 @@
 #
 # Join Notify Wrapper
 #
-# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017-2018 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -195,6 +195,9 @@ class NotifyJoin(NotifyBase):
                     # self.logger.debug('Response Details: %s' % r.raw.read())
 
                     return_status = False
+
+                else:
+                    self.logger.info('Sent Join notification to %s.' % device)
 
             except requests.RequestException as e:
                 self.logger.warning(

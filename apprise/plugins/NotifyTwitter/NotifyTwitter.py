@@ -2,7 +2,7 @@
 #
 # Twitter Notify Wrapper
 #
-# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017-2018 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -102,6 +102,7 @@ class NotifyTwitter(NotifyBase):
 
             # Send our Direct Message
             api.send_direct_message(self.user, text=text)
+            self.logger.info('Sent Twitter DM notification.')
 
         except Exception as e:
             self.logger.warning(

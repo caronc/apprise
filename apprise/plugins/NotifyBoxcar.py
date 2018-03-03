@@ -2,7 +2,7 @@
 #
 # Boxcar Notify Wrapper
 #
-# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017-2018 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -239,6 +239,9 @@ class NotifyBoxcar(NotifyBase):
 
                 # Return; we're done
                 return False
+
+            else:
+                self.logger.info('Sent Boxcar notification.')
 
         except requests.RequestException as e:
             self.logger.warning(

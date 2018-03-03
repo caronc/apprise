@@ -2,7 +2,7 @@
 #
 # Pushjet Notify Wrapper
 #
-# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017-2018 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -67,6 +67,7 @@ class NotifyPushjet(NotifyBase):
                 service = api.Service(secret_key=self.host)
 
             service.send(body, title)
+            self.logger.info('Sent Pushjet notification.')
 
         except (errors.PushjetError, ValueError) as e:
             self.logger.warning('Failed to send Pushjet notification.')
