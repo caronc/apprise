@@ -25,6 +25,20 @@ from json import dumps
 import requests
 import mock
 
+# Some exception handling we'll use
+REQUEST_EXCEPTIONS = (
+    requests.ConnectionError(
+        0, 'requests.ConnectionError() not handled'),
+    requests.RequestException(
+        0, 'requests.RequestException() not handled'),
+    requests.HTTPError(
+        0, 'requests.HTTPError() not handled'),
+    requests.ReadTimeout(
+        0, 'requests.ReadTimeout() not handled'),
+    requests.TooManyRedirects(
+        0, 'requests.TooManyRedirects() not handled'),
+)
+
 TEST_URLS = (
     ##################################
     # NotifyBoxcar
@@ -145,6 +159,42 @@ TEST_URLS = (
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
     }),
+
+    ##################################
+    # NotifyEmby
+    ##################################
+    # Insecure Request; no hostname specified
+    ('emby://', {
+        'instance': None,
+    }),
+    # Secure Emby Request; no hostname specified
+    ('embys://', {
+        'instance': None,
+    }),
+    # No user specified
+    ('emby://localhost', {
+        # Missing a username
+        'instance': TypeError,
+    }),
+    ('emby://:@/', {
+        'instance': None,
+    }),
+    # Valid Authentication
+    ('emby://l2g@localhost', {
+        'instance': plugins.NotifyEmby,
+        # our response will be False because our authentication can't be
+        # tested very well using this matrix.  It will resume in
+        # in test_notify_emby_plugin()
+        'response': False,
+    }),
+    ('embys://l2g:password@localhost', {
+        'instance': plugins.NotifyEmby,
+        # our response will be False because our authentication can't be
+        # tested very well using this matrix.  It will resume in
+        # in test_notify_emby_plugin()
+        'response': False,
+    }),
+    # The rest of the emby tests are in test_notify_emby_plugin()
 
     ##################################
     # NotifyFaast
@@ -1239,7 +1289,6 @@ def test_rest_plugins(mock_post, mock_get):
 
     # iterate over our dictionary and test it out
     for (url, meta) in TEST_URLS:
-
         # Our expected instance
         instance = meta.get('instance', None)
 
@@ -1285,6 +1334,8 @@ def test_rest_plugins(mock_post, mock_get):
         setattr(robj, 'raw', mock.Mock())
         # Allow raw.read() calls
         robj.raw.read.return_value = ''
+        robj.text = ''
+        robj.content = ''
         mock_get.return_value = robj
         mock_post.return_value = robj
 
@@ -1304,18 +1355,7 @@ def test_rest_plugins(mock_post, mock_get):
         else:
             # Handle exception testing; first we turn the boolean flag ito
             # a list of exceptions
-            test_requests_exceptions = (
-                requests.ConnectionError(
-                    0, 'requests.ConnectionError() not handled'),
-                requests.RequestException(
-                    0, 'requests.RequestException() not handled'),
-                requests.HTTPError(
-                    0, 'requests.HTTPError() not handled'),
-                requests.ReadTimeout(
-                    0, 'requests.ReadTimeout() not handled'),
-                requests.TooManyRedirects(
-                    0, 'requests.TooManyRedirects() not handled'),
-            )
+            test_requests_exceptions = REQUEST_EXCEPTIONS
 
         try:
             obj = Apprise.instantiate(
@@ -1346,7 +1386,7 @@ def test_rest_plugins(mock_post, mock_get):
                         notify_type=notify_type) == response
 
                 else:
-                    for _exception in test_requests_exceptions:
+                    for _exception in REQUEST_EXCEPTIONS:
                         mock_post.side_effect = _exception
                         mock_get.side_effect = _exception
 
@@ -1491,6 +1531,375 @@ def test_notify_discord_plugin(mock_post, mock_get):
     obj.asset.image_url_logo = None
     assert obj.notify(title='title', body='body',
                       notify_type=NotifyType.INFO) is True
+
+
+@mock.patch('requests.get')
+@mock.patch('requests.post')
+def test_notify_emby_plugin_login(mock_post, mock_get):
+    """
+    API: NotifyEmby.login()
+
+    """
+
+    # Prepare Mock
+    mock_get.return_value = requests.Request()
+    mock_post.return_value = requests.Request()
+
+    obj = Apprise.instantiate('emby://l2g:l2gpass@localhost')
+    assert isinstance(obj, plugins.NotifyEmby)
+
+    # Test our exception handling
+    for _exception in REQUEST_EXCEPTIONS:
+        mock_post.side_effect = _exception
+        mock_get.side_effect = _exception
+        # We'll fail to log in each time
+        assert obj.login() is False
+
+    # Disable Exceptions
+    mock_post.side_effect = None
+    mock_get.side_effect = None
+
+    # Our login flat out fails if we don't have proper parseable content
+    mock_post.return_value.content = u''
+    mock_post.return_value.text = ''
+    mock_get.return_value.content = mock_post.return_value.content
+    mock_get.return_value.text = mock_post.return_value.text
+
+    # KeyError handling
+    mock_post.return_value.status_code = 999
+    mock_get.return_value.status_code = 999
+    assert obj.login() is False
+
+    # General Internal Server Error
+    mock_post.return_value.status_code = requests.codes.internal_server_error
+    mock_get.return_value.status_code = requests.codes.internal_server_error
+    assert obj.login() is False
+
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_get.return_value.status_code = requests.codes.ok
+
+    obj = Apprise.instantiate('emby://l2g:l2gpass@localhost:%d' % (
+        # Increment our port so it will always be something different than
+        # the default
+        plugins.NotifyEmby.emby_default_port + 1))
+    assert isinstance(obj, plugins.NotifyEmby)
+    assert obj.port == (plugins.NotifyEmby.emby_default_port + 1)
+
+    # The login will fail because '' is not a parseable JSON response
+    assert obj.login() is False
+
+    # Disable the port completely
+    obj.port = None
+    assert obj.login() is False
+
+    # Default port assigments
+    obj = Apprise.instantiate('emby://l2g:l2gpass@localhost')
+    assert isinstance(obj, plugins.NotifyEmby)
+    assert obj.port == plugins.NotifyEmby.emby_default_port
+
+    # The login will (still) fail because '' is not a parseable JSON response
+    assert obj.login() is False
+
+    # Our login flat out fails if we don't have proper parseable content
+    mock_post.return_value.content = dumps({
+        u'AccessToken': u'0000-0000-0000-0000',
+    })
+    mock_post.return_value.text = str(mock_post.return_value.content)
+    mock_get.return_value.content = mock_post.return_value.content
+    mock_get.return_value.text = mock_post.return_value.text
+
+    obj = Apprise.instantiate('emby://l2g:l2gpass@localhost')
+    assert isinstance(obj, plugins.NotifyEmby)
+
+    # The login will fail because the 'User' or 'Id' field wasn't parsed
+    assert obj.login() is False
+
+    # Our text content (we intentionally reverse the 2 locations
+    # that store the same thing; we do this so we can test which
+    # one it defaults to if both are present
+    mock_post.return_value.content = dumps({
+        u'User': {
+            u'Id': u'abcd123',
+        },
+        u'Id': u'123abc',
+        u'AccessToken': u'0000-0000-0000-0000',
+    })
+    mock_post.return_value.text = str(mock_post.return_value.content)
+    mock_get.return_value.content = mock_post.return_value.content
+    mock_get.return_value.text = mock_post.return_value.text
+
+    obj = Apprise.instantiate('emby://l2g:l2gpass@localhost')
+    assert isinstance(obj, plugins.NotifyEmby)
+
+    # Login
+    assert obj.login() is True
+    assert obj.user_id == '123abc'
+    assert obj.access_token == '0000-0000-0000-0000'
+
+    # We're going to log in a second time which checks that we logout
+    # first before logging in again. But this time we'll scrap the
+    # 'Id' area and use the one found in the User area if detected
+    mock_post.return_value.content = dumps({
+        u'User': {
+            u'Id': u'abcd123',
+        },
+        u'AccessToken': u'0000-0000-0000-0000',
+    })
+    mock_post.return_value.text = str(mock_post.return_value.content)
+    mock_get.return_value.content = mock_post.return_value.content
+    mock_get.return_value.text = mock_post.return_value.text
+
+    # Login
+    assert obj.login() is True
+    assert obj.user_id == 'abcd123'
+    assert obj.access_token == '0000-0000-0000-0000'
+
+
+@mock.patch('apprise.plugins.NotifyEmby.login')
+@mock.patch('apprise.plugins.NotifyEmby.logout')
+@mock.patch('requests.get')
+@mock.patch('requests.post')
+def test_notify_emby_plugin_sessions(mock_post, mock_get, mock_logout,
+                                     mock_login):
+    """
+    API: NotifyEmby.sessions()
+
+    """
+
+    # Prepare Mock
+    mock_get.return_value = requests.Request()
+    mock_post.return_value = requests.Request()
+
+    # This is done so we don't obstruct our access_token and user_id values
+    mock_login.return_value = True
+    mock_logout.return_value = True
+
+    obj = Apprise.instantiate('emby://l2g:l2gpass@localhost')
+    assert isinstance(obj, plugins.NotifyEmby)
+    obj.access_token = 'abc'
+    obj.user_id = '123'
+
+    # Test our exception handling
+    for _exception in REQUEST_EXCEPTIONS:
+        mock_post.side_effect = _exception
+        mock_get.side_effect = _exception
+        # We'll fail to log in each time
+        sessions = obj.sessions()
+        assert isinstance(sessions, dict) is True
+        assert len(sessions) == 0
+
+    # Disable Exceptions
+    mock_post.side_effect = None
+    mock_get.side_effect = None
+
+    # Our login flat out fails if we don't have proper parseable content
+    mock_post.return_value.content = u''
+    mock_post.return_value.text = ''
+    mock_get.return_value.content = mock_post.return_value.content
+    mock_get.return_value.text = mock_post.return_value.text
+
+    # KeyError handling
+    mock_post.return_value.status_code = 999
+    mock_get.return_value.status_code = 999
+    sessions = obj.sessions()
+    assert isinstance(sessions, dict) is True
+    assert len(sessions) == 0
+
+    # General Internal Server Error
+    mock_post.return_value.status_code = requests.codes.internal_server_error
+    mock_get.return_value.status_code = requests.codes.internal_server_error
+    sessions = obj.sessions()
+    assert isinstance(sessions, dict) is True
+    assert len(sessions) == 0
+
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_get.return_value.status_code = requests.codes.ok
+    mock_post.return_value.text = str(mock_post.return_value.content)
+    mock_get.return_value.content = mock_post.return_value.content
+    mock_get.return_value.text = mock_post.return_value.text
+
+    # Disable the port completely
+    obj.port = None
+
+    sessions = obj.sessions()
+    assert isinstance(sessions, dict) is True
+    assert len(sessions) == 0
+
+    # Let's get some results
+    mock_post.return_value.content = dumps([
+        {
+            u'Id': u'abc123',
+        },
+        {
+            u'Id': u'def456',
+        },
+        {
+            u'InvalidEntry': None,
+        },
+    ])
+    mock_post.return_value.text = str(mock_post.return_value.content)
+    mock_get.return_value.content = mock_post.return_value.content
+    mock_get.return_value.text = mock_post.return_value.text
+
+    sessions = obj.sessions(user_controlled=True)
+    assert isinstance(sessions, dict) is True
+    assert len(sessions) == 2
+
+    # Test it without setting user-controlled sessions
+    sessions = obj.sessions(user_controlled=False)
+    assert isinstance(sessions, dict) is True
+    assert len(sessions) == 2
+
+    # Triggers an authentication failure
+    obj.user_id = None
+    mock_login.return_value = False
+    sessions = obj.sessions()
+    assert isinstance(sessions, dict) is True
+    assert len(sessions) == 0
+
+
+@mock.patch('apprise.plugins.NotifyEmby.login')
+@mock.patch('requests.get')
+@mock.patch('requests.post')
+def test_notify_emby_plugin_logout(mock_post, mock_get, mock_login):
+    """
+    API: NotifyEmby.sessions()
+
+    """
+
+    # Prepare Mock
+    mock_get.return_value = requests.Request()
+    mock_post.return_value = requests.Request()
+
+    # This is done so we don't obstruct our access_token and user_id values
+    mock_login.return_value = True
+
+    obj = Apprise.instantiate('emby://l2g:l2gpass@localhost')
+    assert isinstance(obj, plugins.NotifyEmby)
+    obj.access_token = 'abc'
+    obj.user_id = '123'
+
+    # Test our exception handling
+    for _exception in REQUEST_EXCEPTIONS:
+        mock_post.side_effect = _exception
+        mock_get.side_effect = _exception
+        # We'll fail to log in each time
+        obj.logout()
+        obj.access_token = 'abc'
+        obj.user_id = '123'
+
+    # Disable Exceptions
+    mock_post.side_effect = None
+    mock_get.side_effect = None
+
+    # Our login flat out fails if we don't have proper parseable content
+    mock_post.return_value.content = u''
+    mock_post.return_value.text = ''
+    mock_get.return_value.content = mock_post.return_value.content
+    mock_get.return_value.text = mock_post.return_value.text
+
+    # KeyError handling
+    mock_post.return_value.status_code = 999
+    mock_get.return_value.status_code = 999
+    obj.logout()
+    obj.access_token = 'abc'
+    obj.user_id = '123'
+
+    # General Internal Server Error
+    mock_post.return_value.status_code = requests.codes.internal_server_error
+    mock_get.return_value.status_code = requests.codes.internal_server_error
+    obj.logout()
+    obj.access_token = 'abc'
+    obj.user_id = '123'
+
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_get.return_value.status_code = requests.codes.ok
+    mock_post.return_value.text = str(mock_post.return_value.content)
+    mock_get.return_value.content = mock_post.return_value.content
+    mock_get.return_value.text = mock_post.return_value.text
+
+    # Disable the port completely
+    obj.port = None
+    obj.logout()
+
+
+@mock.patch('apprise.plugins.NotifyEmby.sessions')
+@mock.patch('apprise.plugins.NotifyEmby.login')
+@mock.patch('apprise.plugins.NotifyEmby.logout')
+@mock.patch('requests.get')
+@mock.patch('requests.post')
+def test_notify_emby_plugin_notify(mock_post, mock_get, mock_logout,
+                                   mock_login, mock_sessions):
+    """
+    API: NotifyEmby.notify()
+
+    """
+
+    # Prepare Mock
+    mock_get.return_value = requests.Request()
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_get.return_value.status_code = requests.codes.ok
+
+    # This is done so we don't obstruct our access_token and user_id values
+    mock_login.return_value = True
+    mock_logout.return_value = True
+    mock_sessions.return_value = {'abcd': {}}
+
+    obj = Apprise.instantiate('emby://l2g:l2gpass@localhost?modal=False')
+    assert isinstance(obj, plugins.NotifyEmby)
+    assert obj.notify('title', 'body', 'info') is True
+    obj.access_token = 'abc'
+    obj.user_id = '123'
+
+    # Test Modal support
+    obj = Apprise.instantiate('emby://l2g:l2gpass@localhost?modal=True')
+    assert isinstance(obj, plugins.NotifyEmby)
+    assert obj.notify('title', 'body', 'info') is True
+    obj.access_token = 'abc'
+    obj.user_id = '123'
+
+    # Test our exception handling
+    for _exception in REQUEST_EXCEPTIONS:
+        mock_post.side_effect = _exception
+        mock_get.side_effect = _exception
+        # We'll fail to log in each time
+        assert obj.notify('title', 'body', 'info') is False
+
+    # Disable Exceptions
+    mock_post.side_effect = None
+    mock_get.side_effect = None
+
+    # Our login flat out fails if we don't have proper parseable content
+    mock_post.return_value.content = u''
+    mock_post.return_value.text = ''
+    mock_get.return_value.content = mock_post.return_value.content
+    mock_get.return_value.text = mock_post.return_value.text
+
+    # KeyError handling
+    mock_post.return_value.status_code = 999
+    mock_get.return_value.status_code = 999
+    assert obj.notify('title', 'body', 'info') is False
+
+    # General Internal Server Error
+    mock_post.return_value.status_code = requests.codes.internal_server_error
+    mock_get.return_value.status_code = requests.codes.internal_server_error
+    assert obj.notify('title', 'body', 'info') is False
+
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_get.return_value.status_code = requests.codes.ok
+    mock_post.return_value.text = str(mock_post.return_value.content)
+    mock_get.return_value.content = mock_post.return_value.content
+    mock_get.return_value.text = mock_post.return_value.text
+
+    # Disable the port completely
+    obj.port = None
+    assert obj.notify('title', 'body', 'info') is True
+
+    # An Empty return set (no query is made, but notification will still
+    # succeed
+    mock_sessions.return_value = {}
+    assert obj.notify('title', 'body', 'info') is True
 
 
 @mock.patch('requests.get')
@@ -2066,22 +2475,8 @@ def test_notify_telegram_plugin(mock_post, mock_get):
     assert nimg_obj.notify(
         title='title', body='body', notify_type=NotifyType.INFO) is False
 
-    # Test our exception handling with bot detection
-    test_requests_exceptions = (
-        requests.ConnectionError(
-            0, 'requests.ConnectionError() not handled'),
-        requests.RequestException(
-            0, 'requests.RequestException() not handled'),
-        requests.HTTPError(
-            0, 'requests.HTTPError() not handled'),
-        requests.ReadTimeout(
-            0, 'requests.ReadTimeout() not handled'),
-        requests.TooManyRedirects(
-            0, 'requests.TooManyRedirects() not handled'),
-    )
-
     # iterate over our exceptions and test them
-    for _exception in test_requests_exceptions:
+    for _exception in REQUEST_EXCEPTIONS:
         mock_post.side_effect = _exception
         try:
             obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids=None)

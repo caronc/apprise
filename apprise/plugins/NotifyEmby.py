@@ -1,0 +1,578 @@
+# -*- coding: utf-8 -*-
+#
+# Emby Notify Wrapper
+#
+# Copyright (C) 2017-2018 Chris Caron <lead2gold@gmail.com>
+#
+# This file is part of apprise.
+#
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU Lesser General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Lesser General Public License for more details.
+
+# For this plugin to work correct, the Emby server must be set up to allow
+# for remote connections.
+
+# Emby Docker configuration: https://hub.docker.com/r/emby/embyserver/
+# Authentication: https://github.com/MediaBrowser/Emby/wiki/Authentication
+# Notifications: https://github.com/MediaBrowser/Emby/wiki/Remote-control
+import requests
+import hashlib
+from json import dumps
+from json import loads
+
+from .NotifyBase import NotifyBase
+from .NotifyBase import HTTP_ERROR_MAP
+from ..utils import parse_bool
+from .. import __version__ as VERSION
+
+
+class NotifyEmby(NotifyBase):
+    """
+    A wrapper for Emby Notifications
+    """
+
+    # The default protocol
+    protocol = 'emby'
+
+    # The default secure protocol
+    secure_protocol = 'embys'
+
+    # Emby uses the http protocol with JSON requests
+    emby_default_port = 8096
+
+    # By default Emby requires you to provide it a device id
+    # The following was just a random uuid4 generated one.  There
+    # is no real reason to change this, but hey; that's what open
+    # source is for right?
+    emby_device_id = '48df9504-6843-49be-9f2d-a685e25a0bc8'
+
+    # The Emby message timeout; basically it is how long should our message be
+    # displayed for.  The value is in milli-seconds
+    emby_message_timeout_ms = 60000
+
+    def __init__(self, modal=False, **kwargs):
+        """
+        Initialize Emby Object
+
+        """
+        super(NotifyEmby, self).__init__(
+            title_maxlen=250, body_maxlen=32768, **kwargs)
+
+        if self.secure:
+            self.schema = 'https'
+
+        else:
+            self.schema = 'http'
+
+        # Our access token does not get created until we first
+        # authenticate with our Emby server. The same goes for the
+        # user id below.
+        self.access_token = None
+        self.user_id = None
+
+        # Whether or not our popup dialog is a timed notification
+        # or a modal type box (requires an Okay acknowledgement)
+        self.modal = modal
+
+        if not self.user:
+            # Token was None
+            self.logger.warning('No Username was specified.')
+            raise TypeError('No Username was specified.')
+
+        return
+
+    def login(self, **kwargs):
+        """
+        Creates our authentication token and prepares our header
+
+        """
+
+        if self.is_authenticated:
+            # Log out first before we log back in
+            self.logout()
+
+        # Prepare our login url
+        url = '%s://%s' % (self.schema, self.host)
+        if self.port:
+            url += ':%d' % self.port
+
+        url += '/Users/AuthenticateByName'
+
+        # Initialize our payload
+        payload = {
+            'Username': self.user
+        }
+
+        headers = {
+            'User-Agent': self.app_id,
+            'Content-Type': 'application/json',
+            'X-Emby-Authorization': self.emby_auth_header,
+        }
+
+        if self.password:
+            # Source: https://github.com/MediaBrowser/Emby/wiki/Authentication
+            # We require the following during our authentication
+            #    pw - password in plain text
+            #    password - password in Sha1
+            #    passwordMd5 - password in MD5
+            payload['pw'] = self.password
+
+            password_md5 = hashlib.md5()
+            password_md5.update(self.password.encode('utf-8'))
+            payload['passwordMd5'] = password_md5.hexdigest()
+
+            password_sha1 = hashlib.sha1()
+            password_sha1.update(self.password.encode('utf-8'))
+            payload['password'] = password_sha1.hexdigest()
+
+        else:
+            # Backwards compatibility
+            payload['password'] = ''
+            payload['passwordMd5'] = ''
+
+            # April 1st, 2018 and newer requirement:
+            payload['pw'] = ''
+
+        self.logger.debug(
+            'Emby login() POST URL: %s (cert_verify=%r)' % (
+                url, self.verify_certificate))
+
+        try:
+            r = requests.post(
+                url,
+                headers=headers,
+                data=dumps(payload),
+                verify=self.verify_certificate,
+            )
+
+            if r.status_code != requests.codes.ok:
+                try:
+                    self.logger.warning(
+                        'Failed to authenticate user %s details: '
+                        '%s (error=%s).' % (
+                            self.user,
+                            HTTP_ERROR_MAP[r.status_code],
+                            r.status_code))
+
+                except KeyError:
+                    self.logger.warning(
+                        'Failed to authenticate user %s details: '
+                        '(error=%s).' % (self.user, r.status_code))
+
+                self.logger.debug('Emby Response:\r\n%s' % r.text)
+
+                # Return; we're done
+                return False
+
+        except requests.RequestException as e:
+            self.logger.warning(
+                'A Connection error occured authenticating a user with Emby '
+                'at %s.' % self.host)
+            self.logger.debug('Socket Exception: %s' % str(e))
+
+            # Return; we're done
+            return False
+
+        # Load our results
+        try:
+            results = loads(r.content)
+
+        except ValueError:
+            # A string like '' would cause this; basicallly the content
+            # that was provided was not a JSON string. We can stop here
+            return False
+
+        # Acquire our Access Token
+        self.access_token = results.get('AccessToken')
+
+        # Acquire our UserId. It can be in one (or both) of the
+        # following locations in the response:
+        #   {
+        #      'User': {
+        #         ...
+        #         'Id': 'the_user_id_can_be_here',
+        #         ...
+        #       },
+        #      'Id': 'the_user_id_can_be_found_here_too',
+        #   }
+        #
+        # The below just safely covers both grounds.
+        self.user_id = results.get('Id')
+        if not self.user_id:
+            if 'User' in results:
+                self.user_id = results['User'].get('Id')
+
+        # No user was found matching the specified
+        return self.is_authenticated
+
+    def sessions(self, user_controlled=True):
+        """
+        Acquire our Session Identifiers and store them in a dictionary
+        indexed by the session id itself.
+
+        """
+        # A single session might look like this:
+        # {
+        #    u'AdditionalUsers': [],
+        #    u'ApplicationVersion': u'3.3.1.0',
+        #    u'Client': u'Emby Mobile',
+        #    u'DeviceId': u'00c901e90ae814c00f81c75ae06a1c8a4381f45b',
+        #    u'DeviceName': u'Firefox',
+        #    u'Id': u'e37151ea06d7eb636639fded5a80f223',
+        #    u'LastActivityDate': u'2018-03-04T21:29:02.5590200Z',
+        #    u'PlayState': {
+        #       u'CanSeek': False,
+        #       u'IsMuted': False,
+        #       u'IsPaused': False,
+        #       u'RepeatMode': u'RepeatNone',
+        #    },
+        #    u'PlayableMediaTypes': [u'Audio', u'Video'],
+        #    u'RemoteEndPoint': u'172.17.0.1',
+        #    u'ServerId': u'4470e977ea704a08b264628c24127d43',
+        #    u'SupportedCommands': [
+        #       u'MoveUp',
+        #       u'MoveDown',
+        #       u'MoveLeft',
+        #       u'MoveRight',
+        #       u'PageUp',
+        #       u'PageDown',
+        #       u'PreviousLetter',
+        #       u'NextLetter',
+        #       u'ToggleOsd',
+        #       u'ToggleContextMenu',
+        #       u'Select',
+        #       u'Back',
+        #       u'SendKey',
+        #       u'SendString',
+        #       u'GoHome',
+        #       u'GoToSettings',
+        #       u'VolumeUp',
+        #       u'VolumeDown',
+        #       u'Mute',
+        #       u'Unmute',
+        #       u'ToggleMute',
+        #       u'SetVolume',
+        #       u'SetAudioStreamIndex',
+        #       u'SetSubtitleStreamIndex',
+        #       u'DisplayContent',
+        #       u'GoToSearch',
+        #       u'DisplayMessage',
+        #       u'SetRepeatMode',
+        #       u'ChannelUp',
+        #       u'ChannelDown',
+        #       u'PlayMediaSource',
+        #    ],
+        #    u'SupportsRemoteControl': True,
+        #    u'UserId': u'6f98d12cb10f48209ee282787daf7af6',
+        #    u'UserName': u'l2g'
+        #    }
+
+        # Prepare a dict() object to control our sessions; the keys are
+        # the sessions while the details associated with the session
+        # are stored inside.
+        sessions = dict()
+
+        if not self.is_authenticated and not self.login():
+            # Authenticate if we aren't already
+            return sessions
+
+        # Prepare our login url
+        url = '%s://%s' % (self.schema, self.host)
+        if self.port:
+            url += ':%d' % self.port
+
+        url += '/Sessions'
+
+        if user_controlled is True:
+            # Only return sessions that can be managed by the current Emby
+            # user.
+            url += '?ControllableByUserId=%s' % self.user_id
+
+        headers = {
+            'User-Agent': self.app_id,
+            'Content-Type': 'application/json',
+            'X-Emby-Authorization': self.emby_auth_header,
+            'X-MediaBrowser-Token': self.access_token,
+        }
+
+        self.logger.debug(
+            'Emby session() GET URL: %s (cert_verify=%r)' % (
+                url, self.verify_certificate))
+
+        try:
+            r = requests.get(
+                url,
+                headers=headers,
+                verify=self.verify_certificate,
+            )
+
+            if r.status_code != requests.codes.ok:
+                try:
+                    self.logger.warning(
+                        'Failed to acquire session for user %s details: '
+                        '%s (error=%s).' % (
+                            self.user,
+                            HTTP_ERROR_MAP[r.status_code],
+                            r.status_code))
+
+                except KeyError:
+                    self.logger.warning(
+                        'Failed to acquire session for user %s details: '
+                        '(error=%s).' % (self.user, r.status_code))
+
+                self.logger.debug('Emby Response:\r\n%s' % r.text)
+
+                # Return; we're done
+                return sessions
+
+        except requests.RequestException as e:
+            self.logger.warning(
+                'A Connection error occured querying Emby '
+                'for session information at %s.' % self.host)
+            self.logger.debug('Socket Exception: %s' % str(e))
+
+            # Return; we're done
+            return sessions
+
+        # Load our results
+        try:
+            results = loads(r.content)
+
+        except ValueError:
+            # A string like '' would cause this; basicallly the content
+            # that was provided was not a JSON string. There is nothing
+            # more we can do at this point
+            return sessions
+
+        for entry in results:
+            session = entry.get('Id')
+            if session:
+                sessions[session] = entry
+
+        return sessions
+
+    def logout(self, **kwargs):
+        """
+        Logs out of an already-authenticated session
+
+        """
+        if not self.is_authenticated:
+            # We're not authenticated; there is nothing to do
+            return True
+
+        # Prepare our login url
+        url = '%s://%s' % (self.schema, self.host)
+        if self.port:
+            url += ':%d' % self.port
+
+        url += '/Sessions/Logout'
+
+        headers = {
+            'User-Agent': self.app_id,
+            'Content-Type': 'application/json',
+            'X-Emby-Authorization': self.emby_auth_header,
+            'X-MediaBrowser-Token': self.access_token,
+        }
+
+        self.logger.debug(
+            'Emby logout() POST URL: %s (cert_verify=%r)' % (
+                url, self.verify_certificate))
+        try:
+            r = requests.post(
+                url,
+                headers=headers,
+                verify=self.verify_certificate,
+            )
+
+            if r.status_code not in (
+                    # We're already logged out
+                    requests.codes.unauthorized,
+                    # The below show up if we were 'just' logged out
+                    requests.codes.ok,
+                    requests.codes.no_content):
+                try:
+                    self.logger.warning(
+                        'Failed to logoff user %s details: '
+                        '%s (error=%s).' % (
+                            self.user,
+                            HTTP_ERROR_MAP[r.status_code],
+                            r.status_code))
+
+                except KeyError:
+                    self.logger.warning(
+                        'Failed to logoff user %s details: '
+                        '(error=%s).' % (self.user, r.status_code))
+
+                self.logger.debug('Emby Response:\r\n%s' % r.text)
+
+                # Return; we're done
+                return False
+
+        except requests.RequestException as e:
+            self.logger.warning(
+                'A Connection error occured querying Emby '
+                'to logoff user %s at %s.' % (self.user, self.host))
+            self.logger.debug('Socket Exception: %s' % str(e))
+
+            # Return; we're done
+            return False
+
+        # We logged our successfully if we reached here
+
+        # Reset our variables
+        self.access_token = None
+        self.user_id = None
+        return True
+
+    def notify(self, title, body, notify_type, **kwargs):
+        """
+        Perform Emby Notification
+        """
+        if not self.is_authenticated and not self.login():
+            # Authenticate if we aren't already
+            return False
+
+        # Acquire our list of sessions
+        sessions = self.sessions().keys()
+        if not sessions:
+            self.logger.warning('There were no Emby sessions to notify.')
+            # We don't need to fail; there really is no one to notify
+            return True
+
+        url = '%s://%s' % (self.schema, self.host)
+        if self.port:
+            url += ':%d' % self.port
+
+        # Append our remaining path
+        url += '/Sessions/%s/Message'
+
+        # Prepare Emby Object
+        payload = {
+            'Header': title,
+            'Text': body,
+        }
+
+        if not self.modal:
+            payload['TimeoutMs'] = self.emby_message_timeout_ms
+
+        headers = {
+            'User-Agent': self.app_id,
+            'Content-Type': 'application/json',
+            'X-Emby-Authorization': self.emby_auth_header,
+            'X-MediaBrowser-Token': self.access_token,
+        }
+
+        # Track whether or not we had a failure or not.
+        has_error = False
+
+        for session in sessions:
+            # Update our session
+            session_url = url % session
+
+            self.logger.debug('Emby POST URL: %s (cert_verify=%r)' % (
+                session_url, self.verify_certificate,
+            ))
+            self.logger.debug('Emby Payload: %s' % str(payload))
+            try:
+                r = requests.post(
+                    session_url,
+                    data=dumps(payload),
+                    headers=headers,
+                    verify=self.verify_certificate,
+                )
+                if r.status_code not in (
+                        requests.codes.ok,
+                        requests.codes.no_content):
+                    try:
+                        self.logger.warning(
+                            'Failed to send Emby notification: '
+                            '%s (error=%s).' % (
+                                HTTP_ERROR_MAP[r.status_code],
+                                r.status_code))
+
+                    except KeyError:
+                        self.logger.warning(
+                            'Failed to send Emby notification '
+                            '(error=%s).' % (r.status_code))
+
+                    # Mark our failure
+                    has_error = True
+                    continue
+
+                else:
+                    self.logger.info('Sent Emby notification.')
+
+            except requests.RequestException as e:
+                self.logger.warning(
+                    'A Connection error occured sending Emby '
+                    'notification to %s.' % self.host)
+                self.logger.debug('Socket Exception: %s' % str(e))
+
+                # Mark our failure
+                has_error = True
+                continue
+
+        return not has_error
+
+    @property
+    def is_authenticated(self):
+        """
+        Returns True if we're authenticated and False if not.
+
+        """
+        return True if self.access_token and self.user_id else False
+
+    @property
+    def emby_auth_header(self):
+        """
+        Generates the X-Emby-Authorization header response based on whether
+        we're authenticated or not.
+
+        """
+        # Specific to Emby
+        header_args = [
+            ('MediaBrowser Client', self.app_id),
+            ('Device', self.app_id),
+            ('DeviceId', self.emby_device_id),
+            ('Version', str(VERSION)),
+        ]
+
+        if self.user_id:
+            # Append UserId variable if we're authenticated
+            header_args.append(('UserId', self.user))
+
+        return ', '.join(['%s="%s"' % (k, v) for k, v in header_args])
+
+    @staticmethod
+    def parse_url(url):
+        """
+        Parses the URL and returns enough arguments that can allow
+        us to substantiate this object.
+
+        """
+        results = NotifyBase.parse_url(url)
+        if not results:
+            # We're done early
+            return results
+
+        # Assign Default Emby Port
+        if not results['port']:
+            results['port'] = NotifyEmby.emby_default_port
+
+        # Modal type popup (default False)
+        results['modal'] = parse_bool(results['qsd'].get('modal', False))
+
+        return results
+
+    def __del__(self):
+        """
+        Deconstructor
+        """
+        self.logout()

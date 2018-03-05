@@ -2,7 +2,7 @@
 #
 # Our service wrappers
 #
-# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017-2018 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -23,6 +23,7 @@ from . import NotifyEmail as NotifyEmailBase
 from .NotifyBoxcar import NotifyBoxcar
 from .NotifyDiscord import NotifyDiscord
 from .NotifyEmail import NotifyEmail
+from .NotifyEmby import NotifyEmby
 from .NotifyFaast import NotifyFaast
 from .NotifyGrowl.NotifyGrowl import NotifyGrowl
 from .NotifyGrowl import gntp
@@ -52,11 +53,12 @@ from ..common import NOTIFY_TYPES
 
 __all__ = [
     # Notification Services
-    'NotifyBoxcar', 'NotifyEmail', 'NotifyFaast', 'NotifyGrowl', 'NotifyJSON',
-    'NotifyMyAndroid', 'NotifyProwl', 'NotifyPushalot', 'NotifyPushBullet',
-    'NotifyPushover', 'NotifyRocketChat', 'NotifyToasty', 'NotifyTwitter',
-    'NotifyXBMC', 'NotifyXML', 'NotifySlack', 'NotifyJoin', 'NotifyTelegram',
-    'NotifyMatterMost', 'NotifyPushjet', 'NotifyDiscord',
+    'NotifyBoxcar', 'NotifyEmail', 'NotifyEmby', 'NotifyDiscord',
+    'NotifyFaast', 'NotifyGrowl', 'NotifyJoin', 'NotifyJSON',
+    'NotifyMatterMost', 'NotifyMyAndroid', 'NotifyProwl', 'NotifyPushalot',
+    'NotifyPushBullet', 'NotifyPushjet', 'NotifyPushover', 'NotifyRocketChat',
+    'NotifySlack', 'NotifyToasty', 'NotifyTwitter', 'NotifyTelegram',
+    'NotifyXBMC', 'NotifyXML',
 
     # Reference
     'NotifyImageSize', 'NOTIFY_IMAGE_SIZES', 'NotifyType', 'NOTIFY_TYPES',
