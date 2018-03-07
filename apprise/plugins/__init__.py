@@ -26,7 +26,7 @@ from .NotifyEmail import NotifyEmail
 from .NotifyEmby import NotifyEmby
 from .NotifyFaast import NotifyFaast
 from .NotifyGrowl.NotifyGrowl import NotifyGrowl
-from .NotifyGrowl import gntp
+from .NotifyJoin import NotifyJoin
 from .NotifyJSON import NotifyJSON
 from .NotifyMatterMost import NotifyMatterMost
 from .NotifyMyAndroid import NotifyMyAndroid
@@ -34,17 +34,19 @@ from .NotifyProwl import NotifyProwl
 from .NotifyPushalot import NotifyPushalot
 from .NotifyPushBullet import NotifyPushBullet
 from .NotifyPushjet.NotifyPushjet import NotifyPushjet
-from .NotifyPushjet import pushjet
 from .NotifyPushover import NotifyPushover
 from .NotifyRocketChat import NotifyRocketChat
+from .NotifySlack import NotifySlack
+from .NotifyStride import NotifyStride
 from .NotifyTelegram import NotifyTelegram
 from .NotifyToasty import NotifyToasty
 from .NotifyTwitter.NotifyTwitter import NotifyTwitter
-from .NotifyTwitter import tweepy
 from .NotifyXBMC import NotifyXBMC
 from .NotifyXML import NotifyXML
-from .NotifySlack import NotifySlack
-from .NotifyJoin import NotifyJoin
+
+from .NotifyPushjet import pushjet
+from .NotifyGrowl import gntp
+from .NotifyTwitter import tweepy
 
 from ..common import NotifyImageSize
 from ..common import NOTIFY_IMAGE_SIZES
@@ -57,8 +59,8 @@ __all__ = [
     'NotifyFaast', 'NotifyGrowl', 'NotifyJoin', 'NotifyJSON',
     'NotifyMatterMost', 'NotifyMyAndroid', 'NotifyProwl', 'NotifyPushalot',
     'NotifyPushBullet', 'NotifyPushjet', 'NotifyPushover', 'NotifyRocketChat',
-    'NotifySlack', 'NotifyToasty', 'NotifyTwitter', 'NotifyTelegram',
-    'NotifyXBMC', 'NotifyXML',
+    'NotifySlack', 'NotifyStride', 'NotifyToasty', 'NotifyTwitter',
+    'NotifyTelegram', 'NotifyXBMC', 'NotifyXML',
 
     # Reference
     'NotifyImageSize', 'NOTIFY_IMAGE_SIZES', 'NotifyType', 'NOTIFY_TYPES',
