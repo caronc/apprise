@@ -150,44 +150,6 @@ class NotifyStride(NotifyBase):
             }
         }
 
-        # payload = {
-        #     # Text-To-Speech
-        #     'notify': self.tts,
-
-        #     # If Text-To-Speech is set to True, then we do not want to wait
-        #     # for the whole message before continuing. Otherwise, we wait
-        #     'wait': self.tts is False,
-
-        #     # Our color associated with our notification
-        #     'color': self.color(notify_type, int),
-
-        #     'embeds': [{
-        #         'provider': {
-        #             'name': self.app_id,
-        #             'url': self.app_url,
-        #         },
-        #         'title': title,
-        #         'type': 'rich',
-        #         'description': body,
-        #     }]
-        # }
-
-        # image_url = self.image_url(notify_type)
-        # if image_url:
-        #     if self.thumbnail:
-        #         payload['embeds'][0]['thumbnail'] = {
-        #             'url': image_url,
-        #             'height': 256,
-        #             'width': 256,
-        #         }
-
-        #     if self.avatar:
-        #         payload['avatar_url'] = image_url
-
-        # if self.user:
-        #     # Optionally override the default username of the webhook
-        #     payload['username'] = self.user
-
         # Construct Notify URL
         notify_url = self.notify_url.format(
             cloud_id=self.cloud_id,
