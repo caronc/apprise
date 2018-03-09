@@ -292,6 +292,72 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifyIFTTT - If This Than That
+    ##################################
+    ('ifttt://', {
+        'instance': None,
+    }),
+    # No User
+    ('ifttt://EventID/', {
+        'instance': TypeError,
+    }),
+    # Value1 gets assigned Entry1
+    # Title = <assigned title>
+    # Body = <assigned body>
+    ('ifttt://WebHookID@EventID/Entry1/', {
+        'instance': plugins.NotifyIFTTT,
+    }),
+    # Value1, Value2, and Value2, the below assigns:
+    #   Value1 = Entry1
+    #   Value2 = AnotherEntry
+    #   Value3 = ThirdValue
+    #   Title = <assigned title>
+    #   Body = <assigned body>
+    ('ifttt://WebHookID@EventID/Entry1/AnotherEntry/ThirdValue', {
+        'instance': plugins.NotifyIFTTT,
+    }),
+    # Mix and match content, the below assigns:
+    #   Value1 = FirstValue
+    #   AnotherKey = Hello
+    #   Value5 = test
+    #   Title = <assigned title>
+    #   Body = <assigned body>
+    ('ifttt://WebHookID@EventID/FirstValue/?AnotherKey=Hello&Value5=test', {
+        'instance': plugins.NotifyIFTTT,
+    }),
+    # This would assign:
+    #   Value1 = FirstValue
+    #   Title = <blank> - disable the one passed by the notify call
+    #   Body = <blank> - disable the one passed by the notify call
+    # The idea here is maybe you just want to use the apprise IFTTTT hook
+    # to trigger something and not nessisarily pass text along to it
+    ('ifttt://WebHookID@EventID/FirstValue/?Title=&Body=', {
+        'instance': plugins.NotifyIFTTT,
+    }),
+    ('ifttt://:@/', {
+        'instance': None,
+    }),
+    # Test website connection failures
+    ('ifttt://WebHookID@EventID', {
+        'instance': plugins.NotifyIFTTT,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('ifttt://WebHookID@EventID', {
+        'instance': plugins.NotifyIFTTT,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('ifttt://WebHookID@EventID', {
+        'instance': plugins.NotifyIFTTT,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifyJoin
     ##################################
     ('join://', {
@@ -1958,6 +2024,46 @@ def test_notify_emby_plugin_notify(mock_post, mock_get, mock_logout,
     # succeed
     mock_sessions.return_value = {}
     assert obj.notify('title', 'body', 'info') is True
+
+
+@mock.patch('requests.get')
+@mock.patch('requests.post')
+def test_notify_ifttt_plugin(mock_post, mock_get):
+    """
+    API: NotifyIFTTT() Extra Checks
+
+    """
+
+    # Initialize some generic (but valid) tokens
+    apikey = 'webhookid'
+    event = 'event'
+
+    # Prepare Mock
+    mock_get.return_value = requests.Request()
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_get.return_value.status_code = requests.codes.ok
+    mock_get.return_value.content = '{}'
+    mock_post.return_value.content = '{}'
+
+    try:
+        obj = plugins.NotifyIFTTT(apikey=apikey, event=None, event_args=None)
+        # No token specified
+        assert(False)
+
+    except TypeError:
+        # Exception should be thrown about the fact no token was specified
+        assert(True)
+
+    obj = plugins.NotifyIFTTT(apikey=apikey, event=event, event_args=None)
+    assert(isinstance(obj, plugins.NotifyIFTTT))
+    assert(len(obj.event_args) == 0)
+
+    # Disable throttling to speed up unit tests
+    obj.throttle_attempt = 0
+
+    assert obj.notify(title='title', body='body',
+                      notify_type=NotifyType.INFO) is True
 
 
 def test_notify_stride_plugin():
