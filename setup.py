@@ -3,7 +3,7 @@
 #
 # SetupTools Script
 #
-# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017-2018 Chris Caron <lead2gold@gmail.com>
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of the GNU Lesser General Public License as published by
@@ -34,14 +34,15 @@ else:
 
 setup(
     name='apprise',
-    version='0.0.6',
+    version='0.0.7',
     description='A universal notification service',
     license='GPLv3',
-    long_description=open('README.md').read(),
+    long_description=open('README').read(),
     url='https://github.com/caronc/apprise',
     keywords='push notifications email boxcar faast growl Join KODI '
         'Mattermost NotifyMyAndroid Prowl Pushalot PushBullet Pushjet '
-        'Pushover Rocket.Chat Slack Toasty Telegram Twitter XBMC ',
+        'Pushover Rocket.Chat Slack Toasty Telegram Twitter XBMC Stride '
+        'Emby IFTTT',
     author='Chris Caron',
     author_email='lead2gold@gmail.com',
     packages=find_packages(),

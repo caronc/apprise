@@ -1,0 +1,192 @@
+ap·prise / verb
+To inform or tell (someone). To make one aware of something.
+
+Apprise allows you to take advantage of just about every notification service available to us today.  Send a notification to almost all of the most popular services out there today (such as Telegram, Slack, Twitter, etc). The ones that don't exist can be adapted and supported too!
+
+Supported Notifications
+=======================
+The section identifies all of the services supported by this script.
+
+Popular Notification Services
+-----------------------------
+The table below identifies the services this tool supports and some example service urls you need to use in order to take advantage of it.
+* Boxcar
+	boxcar://hostname
+	boxcar://hostname/@tag
+	boxcar://hostname/device_token
+	boxcar://hostname/device_token1/device_token2/device_tokenN
+	boxcar://hostname/@tag/@tag2/device_token
+
+* Discord
+	discord://webhook_id/webhook_token
+	discord://avatar@webhook_id/webhook_token
+
+* Emby
+	emby://user@hostname/
+	emby://user:password@hostname
+
+* Faast
+	faast://authorizationtoken
+
+* Growl
+	growl://hostname
+	growl://hostname:portno
+	growl://password@hostname
+	growl://password@hostname:port
+
+  Note: you can also use the get parameter version which can allow the growl request to behave using the older v1.x protocol. An example would look like:
+	growl://hostname?version=1
+
+* IFTTT
+	ifttt://webhooksID/EventToTrigger
+	ifttt://webhooksID/EventToTrigger/Value1/Value2/Value3
+	ifttt://webhooksID/EventToTrigger/?Value3=NewEntry&Value2=AnotherValue
+
+* Join
+	join://apikey/device
+	join://apikey/device1/device2/deviceN/
+	join://apikey/group
+	join://apikey/groupA/groupB/groupN
+	join://apikey/DeviceA/groupA/groupN/DeviceN/
+
+* KODI
+	kodi://hostname
+	kodi://user@hostname
+	kodi://user:password@hostname:port
+
+* Mattermost
+	mmost://hostname/authkey
+	mmost://hostname:80/authkey
+	mmost://user@hostname:80/authkey
+	mmost://hostname/authkey?channel=channel
+	mmosts://hostname/authkey
+	mmosts://user@hostname/authkey
+
+* Notify My Android
+	nma://apikey
+
+* Prowl
+	prowl://apikey
+	prowl://apikey/providerkey
+
+* Pushalot
+	palot://authorizationtoken
+
+* PushBullet
+	pbul://accesstoken
+	pbul://accesstoken/#channel
+	pbul://accesstoken/A_DEVICE_ID
+	pbul://accesstoken/email@address.com
+	pbul://accesstoken/#channel/#channel2/email@address.net/DEVICE
+
+* Pushjet
+	pjet://secret
+	pjet://secret@hostname
+	pjet://secret@hostname:port
+	pjets://secret@hostname
+	pjets://secret@hostname:port
+
+  Note: if no hostname defined https://api.pushjet.io will be used
+
+* Pushover
+	pover://user@token
+	pover://user@token/DEVICE
+	pover://user@token/DEVICE1/DEVICE2/DEVICEN
+
+* Rocket.Chat
+	rocket://user:password@hostname/RoomID/Channel
+	rockets://user:password@hostname:443/Channel1/Channel1/RoomID
+	rocket://user:password@hostname/Channel
+
+* Slack
+	slack://TokenA/TokenB/TokenC/Channel
+	slack://botname@TokenA/TokenB/TokenC/Channel
+	slack://user@TokenA/TokenB/TokenC/Channel1/Channel2/ChannelN
+
+* Stride
+	stride://auth_token/cloud_id/convo_id
+
+* Super Toasty
+	toasty://user@DEVICE
+	toasty://user@DEVICE1/DEVICE2/DEVICEN
+
+* Telegram
+	tgram://bottoken/ChatID
+	tgram://bottoken/ChatID1/ChatID2/ChatIDN
+
+* Twitter
+	tweet://user@CKey/CSecret/AKey/ASecret
+
+* XBMC
+	xbmc://hostname
+	xbmc://user@hostname
+	xbmc://user:password@hostname:port
+
+Email Support
+-------------
+* mailto://
+   mailto://userid:pass@domain.commailto://domain.com?user=userid&pass=password
+   mailto://domain.com:2525?user=userid&pass=password
+   mailto://user@gmail.com&pass=passwordmailto://userid:password@example.com?smtp=mail.example.com&from=noreply@example.com&name=no%20reply
+
+* mailtos//
+   mailtos://userid:pass@domain.com
+   mailtos://domain.com?user=userid&pass=password
+   mailtos://domain.com:465?user=userid&pass=passwordmailtos://user@hotmail.com&pass=password
+   mailtos://userid:password@example.com?smtp=mail.example.com&from=noreply@example.com&name=no%20reply
+
+Apprise have some email services built right into it (such as hotmail, gmail, etc) that greatly simplify the mailto:// service.
+
+Custom Notifications
+--------------------
+* JSON
+	json://hostnamejson://user@hostname
+	json://user:password@hostname:port
+	json://hostname/a/path/to/post/to
+
+* XML
+	xml://hostname
+	xml://user@hostname
+	xml://user:password@hostname:port
+	xml://hostname/a/path/to/post/to
+
+Installation
+============
+The easiest way is to install from pypi:
+	pip install apprise
+
+Command Line
+============
+A small command line tool is also provided with this package called notify. If you know the server url's you wish to notify, you can simply provide them all on the command line and send your notifications that way:
+
+Send a notification to as many servers as you want to specify
+	notify -t 'my title' -b 'my notification body' \
+	   'mailto://myemail:mypass@gmail.com' \
+	   'pbul://o.gn5kj6nfhv736I7jC3cj3QLRiyhgl98b'
+
+If you don't specify a --body (-b) then stdin is used allowing you to use the tool as part of your every day administration:
+	cat /proc/cpuinfo | notify -t 'cpu info' \
+	      'mailto://myemail:mypass@gmail.com'
+
+Developers
+==========
+To send a notification from within your python application, just do the following:
+	import apprise
+
+	# Create an Apprise instance
+	apobj = apprise.Apprise()
+
+	# Add all of the notification services by their server url.
+
+	# A sample email notification
+	apobj.add('mailto://myemail:mypass@gmail.com')
+
+	# A sample pushbullet notification
+	apobj.add('pbul://o.gn5kj6nfhv736I7jC3cj3QLRiyhgl98b')
+
+	# Then notify these services any time you desire. The below would
+	# notify all of the services loaded into our Apprise object.
+	apobj.notify(
+	    title='my notification title',
+	    body='what a great notification service!',
+	)
