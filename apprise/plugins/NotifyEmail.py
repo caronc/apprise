@@ -157,7 +157,7 @@ class NotifyEmail(NotifyBase):
 
         # Now we want to construct the To and From email
         # addresses from the URL provided
-        self.from_name = kwargs.get('name', self.app_desc)
+        self.from_name = kwargs.get('name', None)
         self.from_addr = kwargs.get('from', None)
 
         if not NotifyBase.is_email(self.to_addr):
@@ -234,8 +234,12 @@ class NotifyEmail(NotifyBase):
         Perform Email Notification
         """
 
+        from_name = self.from_name
+        if not from_name:
+            from_name = self.app_desc
+
         self.logger.debug('Email From: %s <%s>' % (
-            self.from_addr, self.from_name))
+            self.from_addr, from_name))
         self.logger.debug('Email To: %s' % (self.to_addr))
         self.logger.debug('Login ID: %s' % (self.user))
         self.logger.debug('Delivery: %s:%d' % (self.smtp_host, self.port))
@@ -250,7 +254,7 @@ class NotifyEmail(NotifyBase):
             email['Content-Type'] = 'text/plain'
 
         email['Subject'] = title
-        email['From'] = '%s <%s>' % (self.from_name, self.from_addr)
+        email['From'] = '%s <%s>' % (from_name, self.from_addr)
         email['To'] = self.to_addr
         email['Date'] = datetime.utcnow()\
                                 .strftime("%a, %d %b %Y %H:%M:%S +0000")
