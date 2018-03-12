@@ -42,7 +42,7 @@ setup(
     keywords='push notifications email boxcar faast growl Join KODI '
         'Mattermost NotifyMyAndroid Prowl Pushalot PushBullet Pushjet '
         'Pushover Rocket.Chat Slack Toasty Telegram Twitter XBMC Stride '
-        'Emby IFTTT',
+        'Emby IFTTT Discord',
     author='Chris Caron',
     author_email='lead2gold@gmail.com',
     packages=find_packages(),
@@ -67,5 +67,5 @@ setup(
     entry_points={'console_scripts': console_scripts},
     python_requires='>=2.7',
     setup_requires=['pytest-runner', ],
-    tests_require=['pytest', 'coverage', 'pytest-cov', 'pycodestyle', 'tox'],
+    tests_require=open('dev-requirements.txt').readlines(),
 )
