@@ -157,15 +157,15 @@ The easiest way is to install from pypi:
 
 Command Line
 ============
-A small command line tool is also provided with this package called notify. If you know the server url's you wish to notify, you can simply provide them all on the command line and send your notifications that way:
+A small command line tool is also provided with this package called apprise. If you know the server url's you wish to notify, you can simply provide them all on the command line and send your notifications that way:
 
 Send a notification to as many servers as you want to specify
-	notify -t 'my title' -b 'my notification body' \
+	apprise -t 'my title' -b 'my notification body' \
 	   'mailto://myemail:mypass@gmail.com' \
 	   'pbul://o.gn5kj6nfhv736I7jC3cj3QLRiyhgl98b'
 
 If you don't specify a --body (-b) then stdin is used allowing you to use the tool as part of your every day administration:
-	cat /proc/cpuinfo | notify -t 'cpu info' \
+	cat /proc/cpuinfo | apprise -t 'cpu info' \
 	      'mailto://myemail:mypass@gmail.com'
 
 Developers

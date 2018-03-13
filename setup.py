@@ -29,8 +29,10 @@ install_options = os.environ.get("APPRISE_INSTALL", "").split(",")
 libonly_flags = set(["lib-only", "libonly", "no-cli", "without-cli"])
 if libonly_flags.intersection(install_options):
     console_scripts = []
+
 else:
-    console_scripts = ['apprise = apprise:_main']
+    # Load our CLI
+    console_scripts = ['apprise = apprise.cli:main']
 
 setup(
     name='apprise',
@@ -52,7 +54,6 @@ setup(
             'assets/themes/default/*.png',
         ],
     },
-    scripts=['cli/notify.py', ],
     install_requires=open('requirements.txt').readlines(),
     classifiers=(
         'Development Status :: 5 - Production/Stable',

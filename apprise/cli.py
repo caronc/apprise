@@ -1,12 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Apprise notify CLI tool
+# Apprise CLI Tool
 #
-#
-# Apprise Core
-#
-# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017-2018 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -27,8 +24,9 @@ import click
 import logging
 import sys
 
-from apprise import NotifyType
-import apprise
+from . import NotifyType
+from . import Apprise
+from . import AppriseAsset
 
 # Logging
 logger = logging.getLogger('apprise.plugins.NotifyBase')
@@ -59,12 +57,15 @@ def print_help_msg(command):
 @click.option('-v', '--verbose', count=True)
 @click.argument('urls', nargs=-1,
                 metavar='SERVER_URL [SERVER_URL2 [SERVER_URL3]]',)
-def _main(title, body, urls, notification_type, theme, verbose):
+def main(title, body, urls, notification_type, theme, verbose):
     """
     Send a notification to all of the specified servers identified by their
     URLs the content provided within the title, body and notification-type.
 
     """
+    # Note: Click ignores the return values of functions it wraps, If you
+    #       want to return a specific error code, you must call sys.exit()
+    #       as you will see below.
 
     # Logging
     ch = logging.StreamHandler(sys.stdout)
@@ -83,14 +84,14 @@ def _main(title, body, urls, notification_type, theme, verbose):
 
     if not urls:
         logger.error('You must specify at least one server URL.')
-        print_help_msg(_main)
-        return 1
+        print_help_msg(main)
+        sys.exit(1)
 
     # Prepare our asset
-    asset = apprise.AppriseAsset(theme=theme)
+    asset = AppriseAsset(theme=theme)
 
     # Create our object
-    a = apprise.Apprise(asset=asset)
+    a = Apprise(asset=asset)
 
     # Load our inventory up
     for url in urls:
@@ -102,9 +103,5 @@ def _main(title, body, urls, notification_type, theme, verbose):
 
     # now print it out
     if a.notify(title=title, body=body, notify_type=notification_type):
-        return 0
-    return 1
-
-
-if __name__ == '__main__':
-    exit(_main())
+        sys.exit(0)
+    sys.exit(1)
