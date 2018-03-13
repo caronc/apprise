@@ -2,7 +2,7 @@
 #
 # Apprise and AppriseAsset Unit Tests
 #
-# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017-2018 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -19,6 +19,7 @@
 from __future__ import print_function
 from __future__ import unicode_literals
 from os import chmod
+from os import getuid
 from os.path import dirname
 from apprise import Apprise
 from apprise import AppriseAsset
@@ -28,6 +29,7 @@ from apprise import NotifyType
 from apprise import NotifyFormat
 from apprise import NotifyImageSize
 from apprise.Apprise import __load_matrix
+import pytest
 
 
 def test_apprise():
@@ -378,6 +380,11 @@ def test_apprise_asset(tmpdir):
 
     # If we make the file un-readable however, we won't be able to read it
     # This test is just showing that we won't throw an exception
+    if getuid() == 0:
+        # Root always over-rides 0x000 permission settings making the below
+        # tests futile
+        pytest.skip('The Root user can not run file permission tests.')
+
     chmod(dirname(sub.strpath), 0o000)
     assert(a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is None)
 
