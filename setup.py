@@ -36,7 +36,7 @@ else:
 
 setup(
     name='apprise',
-    version='0.0.7',
+    version='0.0.8',
     description='A universal notification service',
     license='GPLv3',
     long_description=open('README').read(),
