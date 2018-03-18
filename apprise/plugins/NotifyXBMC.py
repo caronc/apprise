@@ -80,7 +80,7 @@ class NotifyXBMC(NotifyBase):
 
         # prepare JSON Object
         payload = {
-            'jsonrpc': '6.0',
+            'jsonrpc': '2.0',
             'method': 'GUI.ShowNotification',
             'params': {
                 'title': title,
