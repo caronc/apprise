@@ -21,6 +21,8 @@ from apprise import NotifyType
 from apprise import Apprise
 from apprise import AppriseAsset
 from apprise.utils import compat_is_basestring
+from apprise.common import NotifyFormat
+
 from json import dumps
 import uuid
 import requests
@@ -1653,6 +1655,39 @@ def test_notify_discord_plugin(mock_post, mock_get):
 
     # Toggle our logo availability
     obj.asset.image_url_logo = None
+    assert obj.notify(title='title', body='body',
+                      notify_type=NotifyType.INFO) is True
+
+    # Test our header parsing
+    test_markdown = "## Heading one\nbody body\n\n" + \
+        "# Heading 2 ##\n\nTest\n\n" + \
+        "more content\n" + \
+        "even more content  \t\r\n\n\n" + \
+        "# Heading 3 ##\n\n\n" + \
+        "normal content\n" + \
+        "# heading 4\n" + \
+        "#### Heading 5"
+
+    results = obj.extract_markdown_sections(test_markdown)
+    assert(isinstance(results, list))
+    # We should have 5 sections (since there are 5 headers identified above)
+    assert(len(results) == 5)
+
+    # Use our test markdown string during a notification
+    assert obj.notify(title='title', body=test_markdown,
+                      notify_type=NotifyType.INFO) is True
+
+    # Our processing is slightly different when we aren't using markdown
+    # as we do not pre-parse content during our notifications
+    obj = plugins.NotifyDiscord(
+        webhook_id=webhook_id,
+        webhook_token=webhook_token,
+        notify_format=NotifyFormat.TEXT)
+
+    # Disable throttling to speed up unit tests
+    obj.throttle_attempt = 0
+
+    # This call includes an image with it's payload:
     assert obj.notify(title='title', body='body',
                       notify_type=NotifyType.INFO) is True
 

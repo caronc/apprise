@@ -33,12 +33,14 @@
 # API Documentation on Webhooks:
 #    - https://discordapp.com/developers/docs/resources/webhook
 #
+import re
 import requests
 from json import dumps
 
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyImageSize
+from ..common import NotifyFormat
 from ..utils import parse_bool
 
 # Image Support (256x256)
@@ -58,13 +60,15 @@ class NotifyDiscord(NotifyBase):
     notify_url = 'https://discordapp.com/api/webhooks'
 
     def __init__(self, webhook_id, webhook_token, tts=False, avatar=True,
-                 footer=False, thumbnail=True, **kwargs):
+                 footer=False, thumbnail=True,
+                 notify_format=NotifyFormat.MARKDOWN, **kwargs):
         """
         Initialize Discord Object
 
         """
         super(NotifyDiscord, self).__init__(
             title_maxlen=250, body_maxlen=2000,
+            notify_format=notify_format,
             image_size=DISCORD_IMAGE_XY, **kwargs)
 
         if not webhook_id:
@@ -127,6 +131,17 @@ class NotifyDiscord(NotifyBase):
                 'description': body,
             }]
         }
+
+        if self.notify_format == NotifyFormat.MARKDOWN:
+            fields = self.extract_markdown_sections(body)
+
+            if len(fields) > 0:
+                # Apply our additional parsing for a better presentation
+
+                # Swap first entry for description
+                payload['embeds'][0]['description'] = \
+                    fields[0].get('name') + fields[0].get('value')
+                payload['embeds'][0]['fields'] = fields[1:]
 
         if self.footer:
             logo_url = self.image_url(notify_type, logo=True)
@@ -249,3 +264,27 @@ class NotifyDiscord(NotifyBase):
             parse_bool(results['qsd'].get('thumbnail', True))
 
         return results
+
+    @staticmethod
+    def extract_markdown_sections(markdown):
+        """
+        Takes a string in a markdown type format and extracts
+        the headers and their corresponding sections into individual
+        fields that get passed as an embed entry to Discord.
+
+        """
+        regex = re.compile(
+            r'\s*#+\s*(?P<name>[^#\n]+)([ \r\t\v#]*)'
+            r'(?P<value>(.+?)(\n(?!\s#))|\s*$)', flags=re.S)
+
+        common = regex.finditer(markdown)
+        fields = list()
+        for el in common:
+            d = el.groupdict()
+
+            fields.append({
+                'name': d.get('name', '').strip(),
+                'value': '```md\n' + d.get('value', '').strip() + '\n```'
+            })
+
+        return fields
