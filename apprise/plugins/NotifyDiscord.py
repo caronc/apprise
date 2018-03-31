@@ -43,9 +43,6 @@ from ..common import NotifyImageSize
 from ..common import NotifyFormat
 from ..utils import parse_bool
 
-# Image Support (256x256)
-DISCORD_IMAGE_XY = NotifyImageSize.XY_256
-
 
 class NotifyDiscord(NotifyBase):
     """
@@ -59,17 +56,22 @@ class NotifyDiscord(NotifyBase):
     # Discord Webhook
     notify_url = 'https://discordapp.com/api/webhooks'
 
+    # Allows the user to specify the NotifyImageSize object
+    image_size = NotifyImageSize.XY_256
+
+    # The maximum allowable characters allowed in the body per message
+    body_maxlen = 2000
+
+    # Default Notify Format
+    notify_format = NotifyFormat.MARKDOWN
+
     def __init__(self, webhook_id, webhook_token, tts=False, avatar=True,
-                 footer=False, thumbnail=True,
-                 notify_format=NotifyFormat.MARKDOWN, **kwargs):
+                 footer=False, thumbnail=True, **kwargs):
         """
         Initialize Discord Object
 
         """
-        super(NotifyDiscord, self).__init__(
-            title_maxlen=250, body_maxlen=2000,
-            notify_format=notify_format,
-            image_size=DISCORD_IMAGE_XY, **kwargs)
+        super(NotifyDiscord, self).__init__(**kwargs)
 
         if not webhook_id:
             raise TypeError(

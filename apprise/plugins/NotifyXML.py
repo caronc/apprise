@@ -24,9 +24,6 @@ from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyImageSize
 from ..utils import compat_is_basestring
 
-# Image Support (128x128)
-XML_IMAGE_XY = NotifyImageSize.XY_128
-
 
 class NotifyXML(NotifyBase):
     """
@@ -39,13 +36,14 @@ class NotifyXML(NotifyBase):
     # The default secure protocol
     secure_protocol = 'xmls'
 
+    # Allows the user to specify the NotifyImageSize object
+    image_size = NotifyImageSize.XY_128
+
     def __init__(self, **kwargs):
         """
         Initialize XML Object
         """
-        super(NotifyXML, self).__init__(
-            title_maxlen=250, body_maxlen=32768,
-            image_size=XML_IMAGE_XY, **kwargs)
+        super(NotifyXML, self).__init__(**kwargs)
 
         self.payload = """<?xml version='1.0' encoding='utf-8'?>
 <soapenv:Envelope

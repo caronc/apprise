@@ -24,9 +24,6 @@ from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyImageSize
 from ..utils import compat_is_basestring
 
-# Image Support (128x128)
-TOASTY_IMAGE_XY = NotifyImageSize.XY_128
-
 # Used to break apart list of potential devices by their delimiter
 # into a usable list.
 DEVICES_LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
@@ -43,13 +40,14 @@ class NotifyToasty(NotifyBase):
     # Toasty uses the http protocol with JSON requests
     notify_url = 'http://api.supertoasty.com/notify/'
 
+    # Allows the user to specify the NotifyImageSize object
+    image_size = NotifyImageSize.XY_128
+
     def __init__(self, devices, **kwargs):
         """
         Initialize Toasty Object
         """
-        super(NotifyToasty, self).__init__(
-            title_maxlen=250, body_maxlen=32768, image_size=TOASTY_IMAGE_XY,
-            **kwargs)
+        super(NotifyToasty, self).__init__(**kwargs)
 
         if compat_is_basestring(devices):
             self.devices = [x for x in filter(bool, DEVICES_LIST_DELIM.split(

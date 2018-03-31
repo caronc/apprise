@@ -2,7 +2,7 @@
 #
 # MatterMost Notify Wrapper
 #
-# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017-2018 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -31,9 +31,6 @@ from ..common import NotifyImageSize
 # Used to validate Authorization Token
 VALIDATE_AUTHTOKEN = re.compile(r'[A-Za-z0-9]{24,32}')
 
-# Image Support (72x72)
-MATTERMOST_IMAGE_XY = NotifyImageSize.XY_72
-
 
 class NotifyMatterMost(NotifyBase):
     """
@@ -49,13 +46,17 @@ class NotifyMatterMost(NotifyBase):
     # The default Mattermost port
     default_port = 8065
 
+    # Allows the user to specify the NotifyImageSize object
+    image_size = NotifyImageSize.XY_72
+
+    # The maximum allowable characters allowed in the body per message
+    body_maxlen = 4000
+
     def __init__(self, authtoken, channel=None, **kwargs):
         """
         Initialize MatterMost Object
         """
-        super(NotifyMatterMost, self).__init__(
-            title_maxlen=250, body_maxlen=4000, image_size=MATTERMOST_IMAGE_XY,
-            **kwargs)
+        super(NotifyMatterMost, self).__init__(**kwargs)
 
         if self.secure:
             self.schema = 'https'

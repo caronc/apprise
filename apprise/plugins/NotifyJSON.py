@@ -24,9 +24,6 @@ from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyImageSize
 from ..utils import compat_is_basestring
 
-# Image Support (128x128)
-JSON_IMAGE_XY = NotifyImageSize.XY_128
-
 
 class NotifyJSON(NotifyBase):
     """
@@ -39,13 +36,14 @@ class NotifyJSON(NotifyBase):
     # The default secure protocol
     secure_protocol = 'jsons'
 
+    # Allows the user to specify the NotifyImageSize object
+    image_size = NotifyImageSize.XY_128
+
     def __init__(self, **kwargs):
         """
         Initialize JSON Object
         """
-        super(NotifyJSON, self).__init__(
-            title_maxlen=250, body_maxlen=32768, image_size=JSON_IMAGE_XY,
-            **kwargs)
+        super(NotifyJSON, self).__init__(**kwargs)
 
         if self.secure:
             self.schema = 'https'

@@ -2594,6 +2594,15 @@ def test_notify_telegram_plugin(mock_post, mock_get):
     nimg_obj.throttle_attempt = 0
     obj.throttle_attempt = 0
 
+    # Test that our default settings over-ride base settings since they are
+    # not the same as the one specified in the base; this check merely
+    # ensures our plugin inheritance is working properly
+    assert obj.body_maxlen == plugins.NotifyTelegram.body_maxlen
+
+    # We don't override the title maxlen so we should be set to the same
+    # as our parent class in this case
+    assert obj.title_maxlen == plugins.NotifyBase.NotifyBase.title_maxlen
+
     # This tests erroneous messages involving multiple chat ids
     assert obj.notify(
         title='title', body='body', notify_type=NotifyType.INFO) is False

@@ -74,12 +74,14 @@ class NotifyPushover(NotifyBase):
     # Pushover uses the http protocol with JSON requests
     notify_url = 'https://api.pushover.net/1/messages.json'
 
+    # The maximum allowable characters allowed in the body per message
+    body_maxlen = 512
+
     def __init__(self, token, devices=None, priority=None, **kwargs):
         """
         Initialize Pushover Object
         """
-        super(NotifyPushover, self).__init__(
-            title_maxlen=250, body_maxlen=512, **kwargs)
+        super(NotifyPushover, self).__init__(**kwargs)
 
         try:
             # The token associated with the account

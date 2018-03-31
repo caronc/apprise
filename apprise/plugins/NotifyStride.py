@@ -50,9 +50,6 @@ from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyImageSize
 
-# Image Support (256x256)
-STRIDE_IMAGE_XY = NotifyImageSize.XY_256
-
 # A Simple UUID4 checker
 IS_VALID_TOKEN = re.compile(
     r'([0-9a-f]{8})-*([0-9a-f]{4})-*(4[0-9a-f]{3})-*'
@@ -72,14 +69,18 @@ class NotifyStride(NotifyBase):
     notify_url = 'https://api.atlassian.com/site/{cloud_id}/' \
                  'conversation/{convo_id}/message'
 
+    # Allows the user to specify the NotifyImageSize object
+    image_size = NotifyImageSize.XY_256
+
+    # The maximum allowable characters allowed in the body per message
+    body_maxlen = 2000
+
     def __init__(self, auth_token, cloud_id, convo_id, **kwargs):
         """
         Initialize Stride Object
 
         """
-        super(NotifyStride, self).__init__(
-            title_maxlen=250, body_maxlen=2000,
-            image_size=STRIDE_IMAGE_XY, **kwargs)
+        super(NotifyStride, self).__init__(**kwargs)
 
         if not auth_token:
             raise TypeError(

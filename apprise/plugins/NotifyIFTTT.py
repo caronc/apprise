@@ -76,8 +76,7 @@ class NotifyIFTTT(NotifyBase):
         Initialize IFTTT Object
 
         """
-        super(NotifyIFTTT, self).__init__(
-            title_maxlen=250, body_maxlen=32768, **kwargs)
+        super(NotifyIFTTT, self).__init__(**kwargs)
 
         if not apikey:
             raise TypeError('You must specify the Webhooks apikey.')

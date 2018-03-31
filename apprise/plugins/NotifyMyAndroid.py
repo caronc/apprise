@@ -2,7 +2,7 @@
 #
 # Notify My Android (NMA) Notify Wrapper
 #
-# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017-2018 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -64,12 +64,17 @@ class NotifyMyAndroid(NotifyBase):
     # Notify My Android uses the http protocol with JSON requests
     notify_url = 'https://www.notifymyandroid.com/publicapi/notify'
 
+    # The maximum allowable characters allowed in the body per message
+    body_maxlen = 10000
+
+    # Defines the maximum allowable characters in the title
+    title_maxlen = 1000
+
     def __init__(self, apikey, priority=None, devapikey=None, **kwargs):
         """
         Initialize Notify My Android Object
         """
-        super(NotifyMyAndroid, self).__init__(
-            title_maxlen=1000, body_maxlen=10000, **kwargs)
+        super(NotifyMyAndroid, self).__init__(**kwargs)
 
         # The Priority of the message
         if priority not in NMA_PRIORITIES:

@@ -423,6 +423,7 @@ def test_apprise_asset(tmpdir):
 
     # Disable all image references
     a = AppriseAsset(image_path_mask=False, image_url_mask=False)
+
     # We always return none in these calls now
     assert(a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is None)
     assert(a.image_url(NotifyType.INFO, NotifyImageSize.XY_256) is None)

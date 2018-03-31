@@ -2,7 +2,7 @@
 #
 # Prowl Notify Wrapper
 #
-# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017-2018 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -65,12 +65,17 @@ class NotifyProwl(NotifyBase):
     # Prowl uses the http protocol with JSON requests
     notify_url = 'https://api.prowlapp.com/publicapi/add'
 
+    # The maximum allowable characters allowed in the body per message
+    body_maxlen = 10000
+
+    # Defines the maximum allowable characters in the title
+    title_maxlen = 1024
+
     def __init__(self, apikey, providerkey=None, priority=None, **kwargs):
         """
         Initialize Prowl Object
         """
-        super(NotifyProwl, self).__init__(
-            title_maxlen=1024, body_maxlen=10000, **kwargs)
+        super(NotifyProwl, self).__init__(**kwargs)
 
         if priority not in PROWL_PRIORITIES:
             self.priority = ProwlPriority.NORMAL

@@ -23,9 +23,6 @@ from .gntp import errors
 from ..NotifyBase import NotifyBase
 from ...common import NotifyImageSize
 
-# Image Support (72x72)
-GROWL_IMAGE_XY = NotifyImageSize.XY_72
-
 
 # Priorities
 class GrowlPriority(object):
@@ -59,13 +56,14 @@ class NotifyGrowl(NotifyBase):
     # Default Growl Port
     default_port = 23053
 
+    # Allows the user to specify the NotifyImageSize object
+    image_size = NotifyImageSize.XY_72
+
     def __init__(self, priority=None, version=2, **kwargs):
         """
         Initialize Growl Object
         """
-        super(NotifyGrowl, self).__init__(
-            title_maxlen=250, body_maxlen=32768,
-            image_size=GROWL_IMAGE_XY, **kwargs)
+        super(NotifyGrowl, self).__init__(**kwargs)
 
         if not self.port:
             self.port = self.default_port

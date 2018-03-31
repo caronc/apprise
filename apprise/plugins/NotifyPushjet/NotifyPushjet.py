@@ -42,8 +42,7 @@ class NotifyPushjet(NotifyBase):
         """
         Initialize Pushjet Object
         """
-        super(NotifyPushjet, self).__init__(
-            title_maxlen=250, body_maxlen=32768, **kwargs)
+        super(NotifyPushjet, self).__init__(**kwargs)
 
     def notify(self, title, body, notify_type):
         """

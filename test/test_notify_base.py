@@ -2,7 +2,7 @@
 #
 # NotifyBase Unit Tests
 #
-# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017-2018 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -38,14 +38,6 @@ def test_notify_base():
     except TypeError:
         assert(True)
 
-    try:
-        nb = NotifyBase(image_size='invalid')
-        # We should never reach here as an exception should be thrown
-        assert(False)
-
-    except TypeError:
-        assert(True)
-
     # Bad port information
     nb = NotifyBase(port='invalid')
     assert nb.port is None
@@ -54,7 +46,8 @@ def test_notify_base():
     assert nb.port == 10
 
     # Throttle overrides..
-    nb = NotifyBase(throttle=0)
+    nb = NotifyBase()
+    nb.throttle_attempt = 0.0
     start_time = default_timer()
     nb.throttle()
     elapsed = default_timer() - start_time
@@ -85,8 +78,10 @@ def test_notify_base():
     assert isinstance(
         nb.color(notify_type=NotifyType.INFO, color_type=tuple), tuple)
 
-    # Create an object with an ImageSize loaded into it
-    nb = NotifyBase(image_size=NotifyImageSize.XY_256)
+    # Create an object
+    nb = NotifyBase()
+    # Force an image size since the default doesn't have one
+    nb.image_size = NotifyImageSize.XY_256
 
     # We'll get an object this time around
     assert nb.image_url(notify_type=NotifyType.INFO) is not None

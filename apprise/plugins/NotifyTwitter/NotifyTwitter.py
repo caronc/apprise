@@ -19,9 +19,6 @@
 from . import tweepy
 from ..NotifyBase import NotifyBase
 
-# Direct Messages have not image support
-TWITTER_IMAGE_XY = None
-
 
 class NotifyTwitter(NotifyBase):
     """
@@ -32,16 +29,17 @@ class NotifyTwitter(NotifyBase):
     # The default secure protocol
     secure_protocol = 'tweet'
 
+    # The maximum allowable characters allowed in the body per message
+    # This is used during a Private DM Message Size (not Public Tweets
+    # which are limited to 240 characters)
+    body_maxlen = 4096
+
     def __init__(self, ckey, csecret, akey, asecret, **kwargs):
         """
         Initialize Twitter Object
 
-        Tweets are restriced to 140 (soon to be 240), but DM messages
-        do not have any restriction on them
         """
-        super(NotifyTwitter, self).__init__(
-            title_maxlen=250, body_maxlen=4096,
-            image_size=TWITTER_IMAGE_XY, **kwargs)
+        super(NotifyTwitter, self).__init__(**kwargs)
 
         if not ckey:
             raise TypeError(

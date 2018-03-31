@@ -99,12 +99,22 @@ class NotifyBase(object):
     # us a safe play range...
     throttle_attempt = 5.5
 
+    # Allows the user to specify the NotifyImageSize object
+    image_size = None
+
+    # The maximum allowable characters allowed in the body per message
+    body_maxlen = 32768
+
+    # Defines the maximum allowable characters in the title
+    title_maxlen = 250
+
+    # Default Notify Format
+    notify_format = NotifyFormat.TEXT
+
     # Logging
     logger = logging.getLogger(__name__)
 
-    def __init__(self, title_maxlen=100, body_maxlen=512,
-                 notify_format=NotifyFormat.TEXT, image_size=None,
-                 secure=False, throttle=None, **kwargs):
+    def __init__(self, **kwargs):
         """
         Initialize some general logging and common server arguments that will
         keep things consistent when working with the notifiers that will
@@ -112,37 +122,14 @@ class NotifyBase(object):
 
         """
 
-        if notify_format.lower() not in NOTIFY_FORMATS:
-            self.logger.error(
-                'Invalid notification format %s' % notify_format,
-            )
-            raise TypeError(
-                'Invalid notification format %s' % notify_format,
-            )
-
-        if image_size and image_size not in NOTIFY_IMAGE_SIZES:
-            self.logger.error(
-                'Invalid image size %s' % image_size,
-            )
-            raise TypeError(
-                'Invalid image size %s' % image_size,
-            )
-
         # Prepare our Assets
         self.asset = AppriseAsset()
 
-        self.notify_format = notify_format.lower()
-        self.title_maxlen = title_maxlen
-        self.body_maxlen = body_maxlen
-        self.image_size = image_size
-        self.secure = secure
-
-        if isinstance(throttle, (float, int)):
-            # Custom throttle override
-            self.throttle_attempt = throttle
-
         # Certificate Verification (for SSL calls); default to being enabled
         self.verify_certificate = kwargs.get('verify', True)
+
+        # Secure Mode
+        self.secure = kwargs.get('secure', False)
 
         self.host = kwargs.get('host', '')
         self.port = kwargs.get('port')
@@ -155,6 +142,19 @@ class NotifyBase(object):
 
         self.user = kwargs.get('user')
         self.password = kwargs.get('password')
+
+        if 'notify_format' in kwargs:
+            # Store the specified notify_format if specified
+            notify_format = kwargs.get('notify_format')
+            if notify_format.lower() not in NOTIFY_FORMATS:
+                self.logger.error(
+                    'Invalid notification format %s' % notify_format,
+                )
+                raise TypeError(
+                    'Invalid notification format %s' % notify_format,
+                )
+            # Provide override
+            self.notify_format = notify_format
 
     def throttle(self, throttle_time=None):
         """

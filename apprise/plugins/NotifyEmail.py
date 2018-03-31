@@ -128,14 +128,11 @@ class NotifyEmail(NotifyBase):
     # Default SMTP Timeout (in seconds)
     connect_timeout = 15
 
-    def __init__(self, to, notify_format, **kwargs):
+    def __init__(self, to, **kwargs):
         """
         Initialize Email Object
         """
-        super(NotifyEmail, self).__init__(
-            title_maxlen=250, body_maxlen=32768,
-            notify_format=notify_format,
-            **kwargs)
+        super(NotifyEmail, self).__init__(**kwargs)
 
         # Store To Addr
         self.to_addr = to

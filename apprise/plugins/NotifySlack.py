@@ -65,9 +65,6 @@ CHANNEL_LIST_DELIM = re.compile(r'[ \t\r\n,#\\/]+')
 # Used to detect a channel
 IS_CHANNEL_RE = re.compile(r'[+#@]?([A-Z0-9_]{1,32})', re.I)
 
-# Image Support (72x72)
-SLACK_IMAGE_XY = NotifyImageSize.XY_72
-
 
 class NotifySlack(NotifyBase):
     """
@@ -80,13 +77,17 @@ class NotifySlack(NotifyBase):
     # Slack uses the http protocol with JSON requests
     notify_url = 'https://hooks.slack.com/services'
 
+    # Allows the user to specify the NotifyImageSize object
+    image_size = NotifyImageSize.XY_72
+
+    # The maximum allowable characters allowed in the body per message
+    body_maxlen = 1000
+
     def __init__(self, token_a, token_b, token_c, channels, **kwargs):
         """
         Initialize Slack Object
         """
-        super(NotifySlack, self).__init__(
-            title_maxlen=250, body_maxlen=1000,
-            image_size=SLACK_IMAGE_XY, **kwargs)
+        super(NotifySlack, self).__init__(**kwargs)
 
         if not VALIDATE_TOKEN_A.match(token_a.strip()):
             self.logger.warning(

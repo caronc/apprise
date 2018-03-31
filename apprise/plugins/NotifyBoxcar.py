@@ -57,9 +57,6 @@ VALIDATE_SECRET = re.compile(r'[A-Z0-9_-]{64}', re.I)
 # into a usable list.
 TAGS_LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
 
-# Image Support (72x72)
-BOXCAR_IMAGE_XY = NotifyImageSize.XY_72
-
 
 class NotifyBoxcar(NotifyBase):
     """
@@ -72,13 +69,17 @@ class NotifyBoxcar(NotifyBase):
     # Boxcar URL
     notify_url = 'https://boxcar-api.io/api/push/'
 
+    # Allows the user to specify the NotifyImageSize object
+    image_size = NotifyImageSize.XY_72
+
+    # The maximum allowable characters allowed in the body per message
+    body_maxlen = 10000
+
     def __init__(self, access, secret, recipients=None, **kwargs):
         """
         Initialize Boxcar Object
         """
-        super(NotifyBoxcar, self).__init__(
-            title_maxlen=250, body_maxlen=10000,
-            image_size=BOXCAR_IMAGE_XY, **kwargs)
+        super(NotifyBoxcar, self).__init__(**kwargs)
 
         # Initialize tag list
         self.tags = list()

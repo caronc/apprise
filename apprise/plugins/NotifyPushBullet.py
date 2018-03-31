@@ -2,7 +2,7 @@
 #
 # PushBullet Notify Wrapper
 #
-# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017-2018 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -55,8 +55,7 @@ class NotifyPushBullet(NotifyBase):
         """
         Initialize PushBullet Object
         """
-        super(NotifyPushBullet, self).__init__(
-            title_maxlen=250, body_maxlen=32768, **kwargs)
+        super(NotifyPushBullet, self).__init__(**kwargs)
 
         self.accesstoken = accesstoken
         if compat_is_basestring(recipients):

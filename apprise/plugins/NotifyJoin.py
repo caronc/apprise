@@ -71,13 +71,17 @@ class NotifyJoin(NotifyBase):
     notify_url = \
         'https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush'
 
+    # Allows the user to specify the NotifyImageSize object
+    image_size = NotifyImageSize.XY_72
+
+    # The maximum allowable characters allowed in the body per message
+    body_maxlen = 1000
+
     def __init__(self, apikey, devices, **kwargs):
         """
         Initialize Join Object
         """
-        super(NotifyJoin, self).__init__(
-            title_maxlen=250, body_maxlen=1000, image_size=JOIN_IMAGE_XY,
-            **kwargs)
+        super(NotifyJoin, self).__init__(**kwargs)
 
         if not VALIDATE_APIKEY.match(apikey.strip()):
             self.logger.warning(

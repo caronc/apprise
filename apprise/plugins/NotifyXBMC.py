@@ -25,9 +25,6 @@ from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyType
 from ..common import NotifyImageSize
 
-# Image Support (128x128)
-XBMC_IMAGE_XY = NotifyImageSize.XY_128
-
 
 class NotifyXBMC(NotifyBase):
     """
@@ -43,6 +40,9 @@ class NotifyXBMC(NotifyBase):
     # XBMC uses the http protocol with JSON requests
     xbmc_default_port = 8080
 
+    # Allows the user to specify the NotifyImageSize object
+    image_size = NotifyImageSize.XY_128
+
     # XBMC default protocol version (v2)
     xbmc_remote_protocol = 2
 
@@ -53,9 +53,7 @@ class NotifyXBMC(NotifyBase):
         """
         Initialize XBMC/KODI Object
         """
-        super(NotifyXBMC, self).__init__(
-            title_maxlen=250, body_maxlen=32768,
-            image_size=XBMC_IMAGE_XY, **kwargs)
+        super(NotifyXBMC, self).__init__(**kwargs)
 
         if self.secure:
             self.schema = 'https'

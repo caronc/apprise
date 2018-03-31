@@ -62,8 +62,7 @@ class NotifyEmby(NotifyBase):
         Initialize Emby Object
 
         """
-        super(NotifyEmby, self).__init__(
-            title_maxlen=250, body_maxlen=32768, **kwargs)
+        super(NotifyEmby, self).__init__(**kwargs)
 
         if self.secure:
             self.schema = 'https'

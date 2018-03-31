@@ -2,7 +2,7 @@
 #
 # Pushalot Notify Wrapper
 #
-# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017-2018 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -23,9 +23,6 @@ from json import dumps
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyImageSize
-
-# Image Support (72x72)
-PUSHALOT_IMAGE_XY = NotifyImageSize.XY_72
 
 # Extend HTTP Error Messages
 PUSHALOT_HTTP_ERROR_MAP = HTTP_ERROR_MAP.copy()
@@ -49,13 +46,14 @@ class NotifyPushalot(NotifyBase):
     # Pushalot uses the http protocol with JSON requests
     notify_url = 'https://pushalot.com/api/sendmessage'
 
+    # Allows the user to specify the NotifyImageSize object
+    image_size = NotifyImageSize.XY_72
+
     def __init__(self, authtoken, is_important=False, **kwargs):
         """
         Initialize Pushalot Object
         """
-        super(NotifyPushalot, self).__init__(
-            title_maxlen=250, body_maxlen=32768,
-            image_size=PUSHALOT_IMAGE_XY, **kwargs)
+        super(NotifyPushalot, self).__init__(**kwargs)
 
         # Is Important Flag
         self.is_important = is_important

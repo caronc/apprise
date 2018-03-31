@@ -53,7 +53,6 @@ from json import dumps
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyImageSize
-from ..common import NotifyFormat
 from ..utils import compat_is_basestring
 from ..utils import parse_bool
 
@@ -89,15 +88,18 @@ class NotifyTelegram(NotifyBase):
     # Telegram uses the http protocol with JSON requests
     notify_url = 'https://api.telegram.org/bot'
 
-    def __init__(self, bot_token, chat_ids, notify_format=NotifyFormat.TEXT,
-                 detect_bot_owner=True, include_image=True, **kwargs):
+    # Allows the user to specify the NotifyImageSize object
+    image_size = NotifyImageSize.XY_256
+
+    # The maximum allowable characters allowed in the body per message
+    body_maxlen = 4096
+
+    def __init__(self, bot_token, chat_ids, detect_bot_owner=True,
+                 include_image=True, **kwargs):
         """
         Initialize Telegram Object
         """
-        super(NotifyTelegram, self).__init__(
-            title_maxlen=250, body_maxlen=4096,
-            notify_format=notify_format,
-            image_size=TELEGRAM_IMAGE_XY, **kwargs)
+        super(NotifyTelegram, self).__init__(**kwargs)
 
         try:
             self.bot_token = bot_token.strip()

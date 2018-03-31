@@ -2,7 +2,7 @@
 #
 # Notify Rocket.Chat Notify Wrapper
 #
-# Copyright (C) 2017 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2017-2018 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -50,12 +50,14 @@ class NotifyRocketChat(NotifyBase):
     # The default secure protocol
     secure_protocol = 'rockets'
 
+    # Defines the maximum allowable characters in the title
+    title_maxlen = 200
+
     def __init__(self, recipients=None, **kwargs):
         """
         Initialize Notify Rocket.Chat Object
         """
-        super(NotifyRocketChat, self).__init__(
-            title_maxlen=200, body_maxlen=32768, **kwargs)
+        super(NotifyRocketChat, self).__init__(**kwargs)
 
         if self.secure:
             self.schema = 'https'
