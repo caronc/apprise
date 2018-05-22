@@ -30,7 +30,6 @@ from .NotifyIFTTT import NotifyIFTTT
 from .NotifyJoin import NotifyJoin
 from .NotifyJSON import NotifyJSON
 from .NotifyMatterMost import NotifyMatterMost
-from .NotifyMyAndroid import NotifyMyAndroid
 from .NotifyProwl import NotifyProwl
 from .NotifyPushalot import NotifyPushalot
 from .NotifyPushBullet import NotifyPushBullet
@@ -58,7 +57,7 @@ __all__ = [
     # Notification Services
     'NotifyBoxcar', 'NotifyEmail', 'NotifyEmby', 'NotifyDiscord',
     'NotifyFaast', 'NotifyGrowl', 'NotifyIFTTT', 'NotifyJoin', 'NotifyJSON',
-    'NotifyMatterMost', 'NotifyMyAndroid', 'NotifyProwl', 'NotifyPushalot',
+    'NotifyMatterMost', 'NotifyProwl', 'NotifyPushalot',
     'NotifyPushBullet', 'NotifyPushjet', 'NotifyPushover', 'NotifyRocketChat',
     'NotifySlack', 'NotifyStride', 'NotifyToasty', 'NotifyTwitter',
     'NotifyTelegram', 'NotifyXBMC', 'NotifyXML',
