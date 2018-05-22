@@ -42,7 +42,7 @@ setup(
     long_description=open('README').read(),
     url='https://github.com/caronc/apprise',
     keywords='push notifications email boxcar faast growl Join KODI '
-        'Mattermost NotifyMyAndroid Prowl Pushalot PushBullet Pushjet '
+        'Mattermost Prowl Pushalot PushBullet Pushjet '
         'Pushover Rocket.Chat Slack Toasty Telegram Twitter XBMC Stride '
         'Emby IFTTT Discord',
     author='Chris Caron',
