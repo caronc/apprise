@@ -62,9 +62,6 @@ The table below identifies the services this tool supports and some example serv
 	mmosts://hostname/authkey
 	mmosts://user@hostname/authkey
 
-* Notify My Android
-	nma://apikey
-
 * Prowl
 	prowl://apikey
 	prowl://apikey/providerkey
