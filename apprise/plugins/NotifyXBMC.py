@@ -61,6 +61,12 @@ class NotifyXBMC(NotifyBase):
         else:
             self.schema = 'http'
 
+        # Prepare the default header
+        self.headers = {
+            'User-Agent': self.app_id,
+            'Content-Type': 'application/json'
+        }
+
         # Default protocol
         self.protocol = kwargs.get('protocol', self.xbmc_remote_protocol)
 
@@ -71,11 +77,6 @@ class NotifyXBMC(NotifyBase):
         Returns (headers, payload)
         """
 
-        headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/json'
-        }
-
         # prepare JSON Object
         payload = {
             'jsonrpc': '2.0',
@@ -91,7 +92,7 @@ class NotifyXBMC(NotifyBase):
 
         image_url = self.image_url(notify_type)
         if image_url:
-            payload['image'] = image_url
+            payload['params']['image'] = image_url
             if notify_type is NotifyType.FAILURE:
                 payload['type'] = 'error'
 
@@ -101,7 +102,7 @@ class NotifyXBMC(NotifyBase):
             else:
                 payload['type'] = 'info'
 
-        return (headers, dumps(payload))
+        return (self.headers, dumps(payload))
 
     def _payload_20(self, title, body, notify_type, **kwargs):
         """
@@ -109,11 +110,6 @@ class NotifyXBMC(NotifyBase):
 
         Returns (headers, payload)
         """
-
-        headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/json'
-        }
 
         # prepare JSON Object
         payload = {
@@ -130,9 +126,9 @@ class NotifyXBMC(NotifyBase):
 
         image_url = self.image_url(notify_type)
         if image_url:
-            payload['image'] = image_url
+            payload['params']['image'] = image_url
 
-        return (headers, dumps(payload))
+        return (self.headers, dumps(payload))
 
     def notify(self, title, body, notify_type, **kwargs):
         """
