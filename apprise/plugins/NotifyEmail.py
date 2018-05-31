@@ -128,14 +128,11 @@ class NotifyEmail(NotifyBase):
     # Default SMTP Timeout (in seconds)
     connect_timeout = 15
 
-    def __init__(self, to, **kwargs):
+    def __init__(self, **kwargs):
         """
         Initialize Email Object
         """
         super(NotifyEmail, self).__init__(**kwargs)
-
-        # Store To Addr
-        self.to_addr = to
 
         # Handle SMTP vs SMTPS (Secure vs UnSecure)
         if not self.port:
@@ -156,14 +153,14 @@ class NotifyEmail(NotifyBase):
         # addresses from the URL provided
         self.from_name = kwargs.get('name', None)
         self.from_addr = kwargs.get('from', None)
+        self.to_addr = kwargs.get('to', self.from_addr)
+
+        if not NotifyBase.is_email(self.from_addr):
+            # Parse Source domain based on from_addr
+            raise TypeError('Invalid ~From~ email format: %s' % self.from_addr)
 
         if not NotifyBase.is_email(self.to_addr):
             raise TypeError('Invalid ~To~ email format: %s' % self.to_addr)
-
-        match = NotifyBase.is_email(self.from_addr)
-        if not match:
-            # Parse Source domain based on from_addr
-            raise TypeError('Invalid ~From~ email format: %s' % self.to_addr)
 
         # Now detect the SMTP Server
         self.smtp_host = kwargs.get('smtp_host', '')
@@ -171,7 +168,6 @@ class NotifyEmail(NotifyBase):
         # Apply any defaults based on certain known configurations
         self.NotifyEmailDefaults()
 
-        # Using the match, we want to extract the user id and domain
         return
 
     def NotifyEmailDefaults(self):
@@ -190,7 +186,7 @@ class NotifyEmail(NotifyBase):
             self.logger.debug('Scanning %s against %s' % (
                 self.to_addr, WEBBASE_LOOKUP_TABLE[i][0]
             ))
-            match = WEBBASE_LOOKUP_TABLE[i][1].match(self.to_addr)
+            match = WEBBASE_LOOKUP_TABLE[i][1].match(self.from_addr)
             if match:
                 self.logger.info(
                     'Applying %s Defaults' %
@@ -325,28 +321,31 @@ class NotifyEmail(NotifyBase):
             if len(format) > 0 and format[0] == 't':
                 results['notify_format'] = NotifyFormat.TEXT
 
-        if 'to' in results['qsd'] and len(results['qsd']['to']):
-            to_addr = NotifyBase.unquote(results['qsd']['to']).strip()
+        # Attempt to detect 'from' email address
+        if 'from' in results['qsd'] and len(results['qsd']['from']):
+            from_addr = NotifyBase.unquote(results['qsd']['from'])
 
         else:
             # get 'To' email address
-            to_addr = '%s@%s' % (
+            from_addr = '%s@%s' % (
                 re.split(
                     '[\s@]+', NotifyBase.unquote(results['user']))[0],
                 results.get('host', '')
             )
+            # Lets be clever and attempt to make the from
+            # address an email based on the to address
+            from_addr = '%s@%s' % (
+                re.split('[\s@]+', from_addr)[0],
+                re.split('[\s@]+', from_addr)[-1],
+            )
 
-        # Attempt to detect 'from' email address
-        from_addr = to_addr
-        if 'from' in results['qsd'] and len(results['qsd']['from']):
-            from_addr = NotifyBase.unquote(results['qsd']['from'])
-            if not NotifyBase.is_email(from_addr):
-                # Lets be clever and attempt to make the from
-                # address an email based on the to address
-                from_addr = '%s@%s' % (
-                    re.split('[\s@]+', from_addr)[0],
-                    re.split('[\s@]+', to_addr)[-1],
-                )
+        # Attempt to detect 'to' email address
+        if 'to' in results['qsd'] and len(results['qsd']['to']):
+            to_addr = NotifyBase.unquote(results['qsd']['to']).strip()
+
+        if not to_addr:
+            # Send to ourselves if not otherwise specified to do so
+            to_addr = from_addr
 
         if 'name' in results['qsd'] and len(results['qsd']['name']):
             # Extract from name to associate with from address

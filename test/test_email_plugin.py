@@ -101,19 +101,23 @@ TEST_URLS = (
     ('mailtos://user:@nuxref.com', {
         'instance': plugins.NotifyEmail,
     }),
-    # Invalid From Address (falls back to using To Address)
+    # Invalid From Address
     ('mailtos://user:pass@nuxref.com?from=@', {
         'exception': TypeError,
     }),
-    # Invalid To Address
+    # Invalid From Address
     ('mailtos://nuxref.com?user=&pass=.', {
+        'exception': TypeError,
+    }),
+    # Invalid To Address
+    ('mailtos://user:pass@nuxref.com?to=@', {
         'exception': TypeError,
     }),
     # Valid URL, but can't structure a proper email
     ('mailtos://nuxref.com?user=%20!&pass=.', {
         'exception': TypeError,
     }),
-    # Invalid To Address
+    # Invalid From (and To) Address
     ('mailtos://nuxref.com?to=test', {
         'exception': TypeError,
     }),
