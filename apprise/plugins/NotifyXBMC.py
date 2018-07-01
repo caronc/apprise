@@ -55,6 +55,9 @@ class NotifyXBMC(NotifyBase):
         """
         super(NotifyXBMC, self).__init__(**kwargs)
 
+        # Number of micro-seconds to display notification for
+        self.duration = 12000
+
         if self.secure:
             self.schema = 'https'
 
@@ -85,7 +88,7 @@ class NotifyXBMC(NotifyBase):
                 'title': title,
                 'message': body,
                 # displaytime is defined in microseconds
-                'displaytime': 12000,
+                'displaytime': self.duration,
             },
             'id': 1,
         }
@@ -119,7 +122,7 @@ class NotifyXBMC(NotifyBase):
                 'title': title,
                 'message': body,
                 # displaytime is defined in microseconds
-                'displaytime': 12000,
+                'displaytime': self.duration,
             },
             'id': 1,
         }

@@ -204,6 +204,8 @@ class Apprise(object):
             instance = Apprise.instantiate(_server, asset=asset)
             if not instance:
                 return_status = False
+                logging.error(
+                        "Failed to load notification url: {}".format(_server))
                 continue
 
             # Add our initialized plugin to our server listings
@@ -261,10 +263,15 @@ class Apprise(object):
                     # Toggle our return status flag
                     status = False
 
+            except TypeError:
+                # These our our internally thrown notifications
+                # TODO: Change this to a custom one such as AppriseNotifyError
+                status = False
+
             except Exception:
                 # A catch all so we don't have to abort early
                 # just because one of our plugins has a bug in it.
-                logging.exception("notification exception")
+                logging.exception("Notification Exception")
                 status = False
 
         return status

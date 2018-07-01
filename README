@@ -119,6 +119,10 @@ The table below identifies the services this tool supports and some example serv
 	xbmc://user@hostname
 	xbmc://user:password@hostname:port
 
+
+* Windows Notifications
+	windows://
+
 Email Support
 -------------
 * mailto://
