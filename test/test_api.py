@@ -293,8 +293,8 @@ def test_apprise_asset(tmpdir):
 
     a = AppriseAsset(
         theme='dark',
-        image_path_mask='/{THEME}/{TYPE}-{XY}.png',
-        image_url_mask='http://localhost/{THEME}/{TYPE}-{XY}.png',
+        image_path_mask='/{THEME}/{TYPE}-{XY}{EXTENSION}',
+        image_url_mask='http://localhost/{THEME}/{TYPE}-{XY}{EXTENSION}',
     )
 
     a.default_html_color = '#abcabc'
@@ -431,3 +431,32 @@ def test_apprise_asset(tmpdir):
            must_exist=False) is None)
     assert(a.image_path(NotifyType.INFO, NotifyImageSize.XY_256,
            must_exist=True) is None)
+
+    # Test our default extension out
+    a = AppriseAsset(
+        image_path_mask='/{THEME}/{TYPE}-{XY}{EXTENSION}',
+        image_url_mask='http://localhost/{THEME}/{TYPE}-{XY}{EXTENSION}',
+        default_extension='.jpeg',
+    )
+    assert(a.image_path(
+        NotifyType.INFO,
+        NotifyImageSize.XY_256,
+        must_exist=False) == '/default/info-256x256.jpeg')
+
+    assert(a.image_url(
+        NotifyType.INFO,
+        NotifyImageSize.XY_256) == 'http://localhost/'
+                                   'default/info-256x256.jpeg')
+
+    # extension support
+    assert(a.image_path(
+        NotifyType.INFO,
+        NotifyImageSize.XY_128,
+        must_exist=False,
+        extension='.ico') == '/default/info-128x128.ico')
+
+    assert(a.image_url(
+        NotifyType.INFO,
+        NotifyImageSize.XY_256,
+        extension='.test') == 'http://localhost/'
+                              'default/info-256x256.test')
