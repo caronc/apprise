@@ -171,7 +171,7 @@ class NotifyBase(object):
 
         return
 
-    def image_url(self, notify_type, logo=False):
+    def image_url(self, notify_type, logo=False, extension=None):
         """
         Returns Image URL if possible
         """
@@ -186,9 +186,10 @@ class NotifyBase(object):
             notify_type=notify_type,
             image_size=self.image_size,
             logo=logo,
+            extension=extension,
         )
 
-    def image_path(self, notify_type):
+    def image_path(self, notify_type, extension=None):
         """
         Returns the path of the image if it can
         """
@@ -201,9 +202,10 @@ class NotifyBase(object):
         return self.asset.image_path(
             notify_type=notify_type,
             image_size=self.image_size,
+            extension=extension,
         )
 
-    def image_raw(self, notify_type):
+    def image_raw(self, notify_type, extension=None):
         """
         Returns the raw image if it can
         """
@@ -216,6 +218,7 @@ class NotifyBase(object):
         return self.asset.image_raw(
             notify_type=notify_type,
             image_size=self.image_size,
+            extension=extension,
         )
 
     def color(self, notify_type, color_type=None):

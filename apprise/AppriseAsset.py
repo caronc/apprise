@@ -54,12 +54,16 @@ class AppriseAsset(object):
     # The default color to return if a mapping isn't found in our table above
     default_html_color = '#888888'
 
+    # The default image extension to use
+    default_extension = '.png'
+
     # The default theme
     theme = 'default'
 
     # Image URL Mask
     image_url_mask = \
-        'http://nuxref.com/apprise/themes/{THEME}/apprise-{TYPE}-{XY}.png'
+        'http://nuxref.com/apprise/themes/{THEME}/' \
+        'apprise-{TYPE}-{XY}{EXTENSION}'
 
     # Application Logo
     image_url_logo = \
@@ -71,11 +75,11 @@ class AppriseAsset(object):
         'assets',
         'themes',
         '{THEME}',
-        'apprise-{TYPE}-{XY}.png',
+        'apprise-{TYPE}-{XY}{EXTENSION}',
     ))
 
     def __init__(self, theme='default', image_path_mask=None,
-                 image_url_mask=None):
+                 image_url_mask=None, default_extension=None):
         """
         Asset Initialization
 
@@ -88,6 +92,9 @@ class AppriseAsset(object):
 
         if image_url_mask is not None:
             self.image_url_mask = image_url_mask
+
+        if default_extension is not None:
+            self.default_extension = default_extension
 
     def color(self, notify_type, color_type=None):
         """
@@ -121,7 +128,7 @@ class AppriseAsset(object):
         raise ValueError(
             'AppriseAsset html_color(): An invalid color_type was specified.')
 
-    def image_url(self, notify_type, image_size, logo=False):
+    def image_url(self, notify_type, image_size, logo=False, extension=None):
         """
         Apply our mask to our image URL
 
@@ -134,10 +141,14 @@ class AppriseAsset(object):
             # No image to return
             return None
 
+        if extension is None:
+            extension = self.default_extension
+
         re_map = {
             '{THEME}': self.theme if self.theme else '',
             '{TYPE}': notify_type,
             '{XY}': image_size,
+            '{EXTENSION}': extension,
         }
 
         # Iterate over above list and store content accordingly
@@ -148,7 +159,8 @@ class AppriseAsset(object):
 
         return re_table.sub(lambda x: re_map[x.group()], url_mask)
 
-    def image_path(self, notify_type, image_size, must_exist=True):
+    def image_path(self, notify_type, image_size, must_exist=True,
+                   extension=None):
         """
         Apply our mask to our image file path
 
@@ -158,10 +170,14 @@ class AppriseAsset(object):
             # No image to return
             return None
 
+        if extension is None:
+            extension = self.default_extension
+
         re_map = {
             '{THEME}': self.theme if self.theme else '',
             '{TYPE}': notify_type,
             '{XY}': image_size,
+            '{EXTENSION}': extension,
         }
 
         # Iterate over above list and store content accordingly
@@ -178,13 +194,17 @@ class AppriseAsset(object):
         # Return what we parsed
         return path
 
-    def image_raw(self, notify_type, image_size):
+    def image_raw(self, notify_type, image_size, extension=None):
         """
         Returns the raw image if it can (otherwise the function returns None)
 
         """
 
-        path = self.image_path(notify_type=notify_type, image_size=image_size)
+        path = self.image_path(
+            notify_type=notify_type,
+            image_size=image_size,
+            extension=extension,
+        )
         if path:
             try:
                 with open(path, 'rb') as fd:
