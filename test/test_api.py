@@ -155,6 +155,11 @@ def test_apprise():
             # Pretend everything is okay
             raise TypeError()
 
+    class RuntimeNotification(NotifyBase):
+        def notify(self, **kwargs):
+            # Pretend everything is okay
+            raise RuntimeError()
+
     class FailNotification(NotifyBase):
 
         def notify(self, **kwargs):
@@ -167,15 +172,19 @@ def test_apprise():
     # Store our good notification in our schema map
     SCHEMA_MAP['fail'] = FailNotification
 
+    # Store our good notification in our schema map
+    SCHEMA_MAP['runtime'] = RuntimeNotification
+
+    assert(a.add('runtime://localhost') is True)
     assert(a.add('throw://localhost') is True)
     assert(a.add('fail://localhost') is True)
-    assert(len(a) == 2)
+    assert(len(a) == 3)
 
     # Test when our notify both throws an exception and or just
     # simply returns False
     assert(a.notify(title="present", body="present") is False)
 
-    # Test instantiating a plugin
+    # Create a Notification that throws an unexected exception
     class ThrowInstantiateNotification(NotifyBase):
         def __init__(self, **kwargs):
             # Pretend everything is okay
