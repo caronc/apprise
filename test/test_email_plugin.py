@@ -290,3 +290,57 @@ def test_webbase_lookup(mock_smtp):
     assert obj.secure is True
     assert obj.port == 123
     assert obj.smtp_host == 'smtp.l2g.com'
+
+@mock.patch('smtplib.SMTP')
+def test_smtplib_init_fail(mock_smtplib):
+    """
+    API: Test exception handling when calling smtplib.SMTP()
+
+    """
+
+    from apprise.plugins import NotifyEmailBase
+
+    obj = Apprise.instantiate(
+        'mailto://user:pass@gmail.com', suppress_exceptions=False)
+    assert(isinstance(obj, plugins.NotifyEmail))
+
+    # Support Exception handling of smtplib.SMTP
+    mock_smtplib.side_effect = TypeError('Test')
+
+    try:
+        obj.notify(
+            title='test', body='body',
+            notify_type=NotifyType.INFO)
+
+        # We should have thrown an exception
+        assert False
+
+    except TypeError:
+        # Exception thrown as expected
+        assert True
+
+    except Exception:
+        # Un-Expected
+        assert False
+
+
+@mock.patch('smtplib.SMTP')
+def test_smtplib_send_okay(mock_smtplib):
+    """
+    API: Test a successfully sent email
+
+    """
+
+    from apprise.plugins import NotifyEmailBase
+
+    obj = Apprise.instantiate(
+        'mailto://user:pass@gmail.com', suppress_exceptions=False)
+    assert(isinstance(obj, plugins.NotifyEmail))
+
+    # Support an email simulation where we can correctly quit
+    mock_smtplib.starttls.return_value = True
+    mock_smtplib.login.return_value = True
+    mock_smtplib.sendmail.return_value = True
+    mock_smtplib.quit.return_value = True
+
+    obj.notify(title='test', body='body', notify_type=NotifyType.INFO)
