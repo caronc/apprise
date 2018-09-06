@@ -253,6 +253,8 @@ class NotifyEmail(NotifyBase):
                                 .strftime("%a, %d %b %Y %H:%M:%S +0000")
         email['X-Application'] = self.app_id
 
+        # bind the socket variable to the current namespace
+        socket = None
         try:
             self.logger.debug('Connecting to remote SMTP server...')
             socket = smtplib.SMTP(
@@ -289,7 +291,8 @@ class NotifyEmail(NotifyBase):
 
         finally:
             # Gracefully terminate the connection with the server
-            socket.quit()
+            if socket is not None: # pragma: no branch
+                socket.quit()
 
         return True
 
