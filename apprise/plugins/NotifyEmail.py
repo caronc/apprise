@@ -291,7 +291,7 @@ class NotifyEmail(NotifyBase):
 
         finally:
             # Gracefully terminate the connection with the server
-            if socket is not None: # pragma: no branch
+            if socket is not None:  # pragma: no branch
                 socket.quit()
 
         return True

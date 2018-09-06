@@ -291,6 +291,7 @@ def test_webbase_lookup(mock_smtp):
     assert obj.port == 123
     assert obj.smtp_host == 'smtp.l2g.com'
 
+
 @mock.patch('smtplib.SMTP')
 def test_smtplib_init_fail(mock_smtplib):
     """
@@ -322,6 +323,11 @@ def test_smtplib_init_fail(mock_smtplib):
     except Exception:
         # Un-Expected
         assert False
+
+    # A handled and expected exception
+    mock_smtplib.side_effect = smtplib.SMTPException('Test')
+    assert obj.notify(title='test', body='body',
+                      notify_type=NotifyType.INFO) is False
 
 
 @mock.patch('smtplib.SMTP')

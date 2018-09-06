@@ -72,11 +72,9 @@ def test_apprise_cli():
     assert result.exit_code == 0
 
     result = runner.invoke(cli.main, [
-            '-t', 'test title',
-            'good://localhost',
-        ],
-        input='test stdin body\n',
-    )
+        '-t', 'test title',
+        'good://localhost',
+    ], input='test stdin body\n')
     assert result.exit_code == 0
 
     result = runner.invoke(cli.main, [
