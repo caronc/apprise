@@ -7,7 +7,7 @@ from __future__ import print_function
 import time
 import re
 
-from six.moves.urllib.parse import quote
+from six.moves.urllib.parse import quote, urlencode
 import requests
 
 import logging
@@ -15,6 +15,8 @@ import logging
 from .error import TweepError, RateLimitError, is_rate_limit_error_message
 from .utils import convert_to_utf8_str
 from .models import Model
+import six
+import sys
 
 
 re_path_template = re.compile('{\w+}')
@@ -104,7 +106,7 @@ def bind_api(**config):
 
                 self.session.params[k] = convert_to_utf8_str(arg)
 
-            log.info("PARAMS: %r", self.session.params)
+            log.debug("PARAMS: %r", self.session.params)
 
         def build_path(self):
             for variable in re_path_template.findall(self.path):
@@ -132,7 +134,7 @@ def bind_api(**config):
             # Query the cache if one is available
             # and this request uses a GET method.
             if self.use_cache and self.api.cache and self.method == 'GET':
-                cache_result = self.api.cache.get(url)
+                cache_result = self.api.cache.get('%s?%s' % (url, urlencode(self.session.params)))
                 # if cache result found and not expired, return it
                 if cache_result:
                     # must restore api reference
@@ -158,7 +160,7 @@ def bind_api(**config):
                                 sleep_time = self._reset_time - int(time.time())
                                 if sleep_time > 0:
                                     if self.wait_on_rate_limit_notify:
-                                        print("Rate limit reached. Sleeping for:", sleep_time)
+                                        log.warning("Rate limit reached. Sleeping for: %d" % sleep_time)
                                     time.sleep(sleep_time + 5)  # sleep for few extra sec
 
                 # if self.wait_on_rate_limit and self._reset_time is not None and \
@@ -166,10 +168,11 @@ def bind_api(**config):
                 #     sleep_time = self._reset_time - int(time.time())
                 #     if sleep_time > 0:
                 #         if self.wait_on_rate_limit_notify:
-                #             print("Rate limit reached. Sleeping for: " + str(sleep_time))
+                #             log.warning("Rate limit reached. Sleeping for: %d" % sleep_time)
                 #         time.sleep(sleep_time + 5)  # sleep for few extra sec
 
                 # Apply authentication
+                auth = None
                 if self.api.auth:
                     auth = self.api.auth.apply_auth()
 
@@ -186,8 +189,10 @@ def bind_api(**config):
                                                 auth=auth,
                                                 proxies=self.api.proxy)
                 except Exception as e:
-                    raise TweepError('Failed to send request: %s' % e)
+                    six.reraise(TweepError, TweepError('Failed to send request: %s' % e), sys.exc_info()[2])
+
                 rem_calls = resp.headers.get('x-rate-limit-remaining')
+
                 if rem_calls is not None:
                     self._remaining_calls = int(rem_calls)
                 elif isinstance(self._remaining_calls, int):
@@ -233,7 +238,7 @@ def bind_api(**config):
 
             # Store result into cache if one is available.
             if self.use_cache and self.api.cache and self.method == 'GET' and result:
-                self.api.cache.store(url, result)
+                self.api.cache.store('%s?%s' % (url, urlencode(self.session.params)), result)
 
             return result
 

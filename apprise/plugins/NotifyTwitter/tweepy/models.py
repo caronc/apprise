@@ -93,6 +93,8 @@ class Status(Model):
                     setattr(status, 'source_url', None)
             elif k == 'retweeted_status':
                 setattr(status, k, Status.parse(api, v))
+            elif k == 'quoted_status':
+                setattr(status, k, Status.parse(api, v))
             elif k == 'place':
                 if v is not None:
                     setattr(status, k, Place.parse(api, v))
