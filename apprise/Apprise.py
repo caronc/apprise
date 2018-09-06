@@ -205,7 +205,8 @@ class Apprise(object):
             if not instance:
                 return_status = False
                 logging.error(
-                        "Failed to load notification url: {}".format(_server))
+                    "Failed to load notification url: {}".format(_server),
+                )
                 continue
 
             # Add our initialized plugin to our server listings
