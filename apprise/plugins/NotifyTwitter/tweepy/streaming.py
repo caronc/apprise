@@ -9,6 +9,7 @@ from __future__ import absolute_import, print_function
 import logging
 import re
 import requests
+import sys
 from requests.exceptions import Timeout
 from threading import Thread
 from time import sleep
@@ -161,6 +162,7 @@ class ReadBuffer(object):
                 return self._pop(length)
             read_len = max(self._chunk_size, length - len(self._buffer))
             self._buffer += self._stream.read(read_len)
+        return six.b('')
 
     def read_line(self, sep=six.b('\n')):
         """Read the data stream until a given separator is found (default \n)
@@ -177,6 +179,7 @@ class ReadBuffer(object):
             else:
                 start = len(self._buffer)
             self._buffer += self._stream.read(self._chunk_size)
+        return six.b('')
 
     def _pop(self, length):
         r = self._buffer[:length]
@@ -217,6 +220,9 @@ class Stream(object):
         self.body = None
         self.retry_time = self.retry_time_start
         self.snooze_time = self.snooze_time_step
+        
+        # Example: proxies = {'http': 'http://localhost:1080', 'https': 'http://localhost:1080'}
+        self.proxies = options.get("proxies")
 
     def new_session(self):
         self.session = requests.Session()
@@ -230,7 +236,7 @@ class Stream(object):
         # Connect and process the stream
         error_counter = 0
         resp = None
-        exception = None
+        exc_info = None
         while self.running:
             if self.retry_count is not None:
                 if error_counter > self.retry_count:
@@ -244,7 +250,8 @@ class Stream(object):
                                             timeout=self.timeout,
                                             stream=True,
                                             auth=auth,
-                                            verify=self.verify)
+                                            verify=self.verify,
+                                            proxies = self.proxies)
                 if resp.status_code != 200:
                     if self.listener.on_error(resp.status_code) is False:
                         break
@@ -267,7 +274,7 @@ class Stream(object):
                 # If it's not time out treat it like any other exception
                 if isinstance(exc, ssl.SSLError):
                     if not (exc.args and 'timed out' in str(exc.args[0])):
-                        exception = exc
+                        exc_info = sys.exc_info()
                         break
                 if self.listener.on_timeout() is False:
                     break
@@ -277,7 +284,7 @@ class Stream(object):
                 self.snooze_time = min(self.snooze_time + self.snooze_time_step,
                                        self.snooze_time_cap)
             except Exception as exc:
-                exception = exc
+                exc_info = sys.exc_info()
                 # any other exception is fatal, so kill loop
                 break
 
@@ -288,10 +295,10 @@ class Stream(object):
 
         self.new_session()
 
-        if exception:
+        if exc_info:
             # call a handler first so that the exception can be logged.
-            self.listener.on_exception(exception)
-            raise exception
+            self.listener.on_exception(exc_info[1])
+            six.reraise(*exc_info)
 
     def _data(self, data):
         if self.listener.on_data(data) is False:
@@ -310,17 +317,18 @@ class Stream(object):
         while self.running and not resp.raw.closed:
             length = 0
             while not resp.raw.closed:
-                line = buf.read_line().strip()
-                if not line:
+                line = buf.read_line()
+                stripped_line = line.strip() if line else line # line is sometimes None so we need to check here
+                if not stripped_line:
                     self.listener.keep_alive()  # keep-alive new lines are expected
-                elif line.isdigit():
-                    length = int(line)
+                elif stripped_line.isdigit():
+                    length = int(stripped_line)
                     break
                 else:
                     raise TweepError('Expecting length, unexpected value found')
 
             next_status_obj = buf.read_len(length)
-            if self.running:
+            if self.running and next_status_obj:
                 self._data(next_status_obj)
 
             # # Note: keep-alive newlines might be inserted before each length value.
@@ -352,9 +360,9 @@ class Stream(object):
         if resp.raw.closed:
             self.on_closed(resp)
 
-    def _start(self, async):
+    def _start(self, is_async):
         self.running = True
-        if async:
+        if is_async:
             self._thread = Thread(target=self._run)
             self._thread.start()
         else:
@@ -370,7 +378,7 @@ class Stream(object):
                    replies=None,
                    track=None,
                    locations=None,
-                   async=False,
+                   is_async=False,
                    encoding='utf8'):
         self.session.params = {'delimited': 'length'}
         if self.running:
@@ -391,34 +399,36 @@ class Stream(object):
         if track:
             self.session.params['track'] = u','.join(track).encode(encoding)
 
-        self._start(async)
+        self._start(is_async)
 
-    def firehose(self, count=None, async=False):
+    def firehose(self, count=None, is_async=False):
         self.session.params = {'delimited': 'length'}
         if self.running:
             raise TweepError('Stream object already connected!')
         self.url = '/%s/statuses/firehose.json' % STREAM_VERSION
         if count:
             self.url += '&count=%s' % count
-        self._start(async)
+        self._start(is_async)
 
-    def retweet(self, async=False):
+    def retweet(self, is_async=False):
         self.session.params = {'delimited': 'length'}
         if self.running:
             raise TweepError('Stream object already connected!')
         self.url = '/%s/statuses/retweet.json' % STREAM_VERSION
-        self._start(async)
+        self._start(is_async)
 
-    def sample(self, async=False, languages=None):
+    def sample(self, is_async=False, languages=None, stall_warnings=False):
         self.session.params = {'delimited': 'length'}
         if self.running:
             raise TweepError('Stream object already connected!')
         self.url = '/%s/statuses/sample.json' % STREAM_VERSION
         if languages:
             self.session.params['language'] = ','.join(map(str, languages))
-        self._start(async)
+        if stall_warnings:
+            self.session.params['stall_warnings'] = 'true'
+        self._start(is_async)
 
-    def filter(self, follow=None, track=None, async=False, locations=None,
+    def filter(self, follow=None, track=None, is_async=False, locations=None,
                stall_warnings=False, languages=None, encoding='utf8', filter_level=None):
         self.body = {}
         self.session.headers['Content-type'] = "application/x-www-form-urlencoded"
@@ -439,13 +449,13 @@ class Stream(object):
         if languages:
             self.body['language'] = u','.join(map(str, languages))
         if filter_level:
-            self.body['filter_level'] = unicode(filter_level, encoding)
+            self.body['filter_level'] = filter_level.encode(encoding)
         self.session.params = {'delimited': 'length'}
         self.host = 'stream.twitter.com'
-        self._start(async)
+        self._start(is_async)
 
     def sitestream(self, follow, stall_warnings=False,
-                   with_='user', replies=False, async=False):
+                   with_='user', replies=False, is_async=False):
         self.body = {}
         if self.running:
             raise TweepError('Stream object already connected!')
@@ -458,7 +468,7 @@ class Stream(object):
             self.body['with'] = with_
         if replies:
             self.body['replies'] = replies
-        self._start(async)
+        self._start(is_async)
 
     def disconnect(self):
         if self.running is False:

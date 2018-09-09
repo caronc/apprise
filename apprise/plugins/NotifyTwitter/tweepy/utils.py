@@ -7,7 +7,6 @@ from __future__ import print_function
 from datetime import datetime
 
 import six
-from six.moves.urllib.parse import quote
 
 from email.utils import parsedate
 
@@ -41,14 +40,7 @@ def import_simplejson():
     try:
         import simplejson as json
     except ImportError:
-        try:
-            import json  # Python 2.6+
-        except ImportError:
-            try:
-                # Google App Engine
-                from django.utils import simplejson as json
-            except ImportError:
-                raise ImportError("Can't load a json library")
+        import json
 
     return json
 

@@ -6,19 +6,15 @@ from __future__ import print_function
 
 import time
 import datetime
+import hashlib
 import threading
 import os
+import logging
 
 try:
     import cPickle as pickle
 except ImportError:
     import pickle
-
-try:
-    import hashlib
-except ImportError:
-    # python 2.4
-    import md5 as hashlib
 
 try:
     import fcntl
@@ -27,6 +23,7 @@ except ImportError:
     # TODO: use win32file
     pass
 
+log = logging.getLogger('tweepy.cache')
 
 class Cache(object):
     """Cache interface"""
@@ -157,7 +154,7 @@ class FileCache(Cache):
             self._lock_file = self._lock_file_win32
             self._unlock_file = self._unlock_file_win32
         else:
-            print('Warning! FileCache locking not supported on this system!')
+            log.warning('FileCache locking not supported on this system!')
             self._lock_file = self._lock_file_dummy
             self._unlock_file = self._unlock_file_dummy
 
