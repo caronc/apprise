@@ -154,6 +154,11 @@ def test_apprise():
             # Pretend everything is okay
             raise TypeError()
 
+    class RuntimeNotification(NotifyBase):
+        def notify(self, **kwargs):
+            # Pretend everything is okay
+            raise RuntimeError()
+
     class FailNotification(NotifyBase):
 
         def notify(self, **kwargs):
@@ -166,15 +171,19 @@ def test_apprise():
     # Store our good notification in our schema map
     SCHEMA_MAP['fail'] = FailNotification
 
+    # Store our good notification in our schema map
+    SCHEMA_MAP['runtime'] = RuntimeNotification
+
+    assert(a.add('runtime://localhost') is True)
     assert(a.add('throw://localhost') is True)
     assert(a.add('fail://localhost') is True)
-    assert(len(a) == 2)
+    assert(len(a) == 3)
 
     # Test when our notify both throws an exception and or just
     # simply returns False
     assert(a.notify(title="present", body="present") is False)
 
-    # Test instantiating a plugin
+    # Create a Notification that throws an unexected exception
     class ThrowInstantiateNotification(NotifyBase):
         def __init__(self, **kwargs):
             # Pretend everything is okay
@@ -292,8 +301,8 @@ def test_apprise_asset(tmpdir):
 
     a = AppriseAsset(
         theme='dark',
-        image_path_mask='/{THEME}/{TYPE}-{XY}.png',
-        image_url_mask='http://localhost/{THEME}/{TYPE}-{XY}.png',
+        image_path_mask='/{THEME}/{TYPE}-{XY}{EXTENSION}',
+        image_url_mask='http://localhost/{THEME}/{TYPE}-{XY}{EXTENSION}',
     )
 
     a.default_html_color = '#abcabc'
@@ -430,3 +439,32 @@ def test_apprise_asset(tmpdir):
            must_exist=False) is None)
     assert(a.image_path(NotifyType.INFO, NotifyImageSize.XY_256,
            must_exist=True) is None)
+
+    # Test our default extension out
+    a = AppriseAsset(
+        image_path_mask='/{THEME}/{TYPE}-{XY}{EXTENSION}',
+        image_url_mask='http://localhost/{THEME}/{TYPE}-{XY}{EXTENSION}',
+        default_extension='.jpeg',
+    )
+    assert(a.image_path(
+        NotifyType.INFO,
+        NotifyImageSize.XY_256,
+        must_exist=False) == '/default/info-256x256.jpeg')
+
+    assert(a.image_url(
+        NotifyType.INFO,
+        NotifyImageSize.XY_256) == 'http://localhost/'
+                                   'default/info-256x256.jpeg')
+
+    # extension support
+    assert(a.image_path(
+        NotifyType.INFO,
+        NotifyImageSize.XY_128,
+        must_exist=False,
+        extension='.ico') == '/default/info-128x128.ico')
+
+    assert(a.image_url(
+        NotifyType.INFO,
+        NotifyImageSize.XY_256,
+        extension='.test') == 'http://localhost/'
+                              'default/info-256x256.test')

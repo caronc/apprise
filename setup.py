@@ -17,6 +17,7 @@
 #
 
 import os
+import platform
 try:
     from setuptools import setup
 
@@ -26,6 +27,11 @@ except ImportError:
 from setuptools import find_packages
 
 install_options = os.environ.get("APPRISE_INSTALL", "").split(",")
+install_requires = open('requirements.txt').readlines()
+if platform.system().lower().startswith('win'):
+    # Windows Notification Support
+    install_requires += open('win-requirements.txt').readlines()
+
 libonly_flags = set(["lib-only", "libonly", "no-cli", "without-cli"])
 if libonly_flags.intersection(install_options):
     console_scripts = []
@@ -52,9 +58,10 @@ setup(
         'apprise': [
             'assets/NotifyXML-1.0.xsd',
             'assets/themes/default/*.png',
+            'assets/themes/default/*.ico',
         ],
     },
-    install_requires=open('requirements.txt').readlines(),
+    install_requires=install_requires,
     classifiers=(
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',

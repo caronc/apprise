@@ -43,6 +43,7 @@ from .NotifyToasty import NotifyToasty
 from .NotifyTwitter.NotifyTwitter import NotifyTwitter
 from .NotifyXBMC import NotifyXBMC
 from .NotifyXML import NotifyXML
+from .NotifyWindows import NotifyWindows
 
 from .NotifyPushjet import pushjet
 from .NotifyGrowl import gntp
@@ -60,7 +61,7 @@ __all__ = [
     'NotifyMatterMost', 'NotifyProwl', 'NotifyPushalot',
     'NotifyPushBullet', 'NotifyPushjet', 'NotifyPushover', 'NotifyRocketChat',
     'NotifySlack', 'NotifyStride', 'NotifyToasty', 'NotifyTwitter',
-    'NotifyTelegram', 'NotifyXBMC', 'NotifyXML',
+    'NotifyTelegram', 'NotifyXBMC', 'NotifyXML', 'NotifyWindows',
 
     # Reference
     'NotifyImageSize', 'NOTIFY_IMAGE_SIZES', 'NotifyType', 'NOTIFY_TYPES',
