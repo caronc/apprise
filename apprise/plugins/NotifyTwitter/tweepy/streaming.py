@@ -306,7 +306,7 @@ class Stream(object):
 
     def _read_loop(self, resp):
         charset = resp.headers.get('content-type', default='')
-        enc_search = re.search('charset=(?P<enc>\S*)', charset)
+        enc_search = re.search(r'charset=(?P<enc>\S*)', charset)
         if enc_search is not None:
             encoding = enc_search.group('enc')
         else:

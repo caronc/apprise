@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import unicode_literals
-
 import requests
 from functools import partial
 
@@ -221,7 +219,7 @@ class Device(PushjetModel):
     def get_subscriptions(self):
         """Get all the subscriptions the device has.
 
-        :return: A list of :class:`~pushjet.Subscription`\ s.
+        :return: A list of :class:`~pushjet.Subscription`.
         """
         _, response = self._request('subscription', 'GET')
         subscriptions = []
@@ -232,7 +230,7 @@ class Device(PushjetModel):
     def get_messages(self):
         """Get all new (that is, as of yet unretrieved) messages.
         
-        :return: A list of :class:`~pushjet.Message`\ s.
+        :return: A list of :class:`~pushjet.Message`.
         """
         _, response = self._request('message', 'GET')
         messages = []

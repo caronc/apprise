@@ -17,7 +17,6 @@
 # GNU Lesser General Public License for more details.
 
 from __future__ import print_function
-from __future__ import unicode_literals
 from os import chmod
 from os import getuid
 from os.path import dirname

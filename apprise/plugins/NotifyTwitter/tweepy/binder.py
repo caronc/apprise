@@ -19,7 +19,7 @@ import six
 import sys
 
 
-re_path_template = re.compile('{\w+}')
+re_path_template = re.compile(r'{\w+}')
 
 log = logging.getLogger('tweepy.binder')
 

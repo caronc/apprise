@@ -95,7 +95,7 @@ def is_hostname(hostname):
     if hostname[-1] == ".":
         hostname = hostname[:-1]
 
-    allowed = re.compile("(?!-)[A-Z\d_-]{1,63}(?<!-)$", re.IGNORECASE)
+    allowed = re.compile(r'(?!-)[A-Z\d_-]{1,63}(?<!-)$', re.IGNORECASE)
     return all(allowed.match(x) for x in hostname.split("."))
 
 
@@ -256,7 +256,7 @@ def parse_url(url, default_schema='http', verify_host=True):
                 result['query'] = None
     try:
         (result['user'], result['host']) = \
-            re.split('[\s@]+', result['host'])[:2]
+            re.split(r'[\s@]+', result['host'])[:2]
 
     except ValueError:
         # no problem then, host only exists
@@ -266,7 +266,7 @@ def parse_url(url, default_schema='http', verify_host=True):
     if result['user'] is not None:
         try:
             (result['user'], result['password']) = \
-                re.split('[:\s]+', result['user'])[:2]
+                re.split(r'[:\s]+', result['user'])[:2]
 
         except ValueError:
             # no problem then, user only exists
@@ -275,7 +275,7 @@ def parse_url(url, default_schema='http', verify_host=True):
 
     try:
         (result['host'], result['port']) = \
-            re.split('[\s:]+', result['host'])[:2]
+            re.split(r'[\s:]+', result['host'])[:2]
 
     except ValueError:
         # no problem then, user only exists

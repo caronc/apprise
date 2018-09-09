@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 SCHEMA_MAP = {}
 
 # Used for attempting to acquire the schema if the URL can't be parsed.
-GET_SCHEMA_RE = re.compile('\s*(?P<schema>[a-z0-9]{3,9})://.*$', re.I)
+GET_SCHEMA_RE = re.compile(r'\s*(?P<schema>[a-z0-9]{3,9})://.*$', re.I)
 
 
 # Load our Lookup Matrix

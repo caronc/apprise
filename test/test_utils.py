@@ -17,7 +17,6 @@
 # GNU Lesser General Public License for more details.
 
 from __future__ import print_function
-from __future__ import unicode_literals
 try:
     # Python 2.7
     from urllib import unquote

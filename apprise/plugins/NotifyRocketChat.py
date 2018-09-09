@@ -128,7 +128,7 @@ class NotifyRocketChat(NotifyBase):
             return False
 
         # Prepare our message
-        text = '*%s*\r\n%s' % (title.replace('*', '\*'), body)
+        text = '*%s*\r\n%s' % (title.replace('*', '\\*'), body)
 
         # Initiaize our error tracking
         has_error = False

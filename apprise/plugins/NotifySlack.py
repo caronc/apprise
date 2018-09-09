@@ -146,11 +146,11 @@ class NotifySlack(NotifyBase):
         # https://api.slack.com/docs/message-formatting
         self._re_formatting_map = {
             # New lines must become the string version
-            '\r\*\n': '\\n',
+            r'\r\*\n': '\\n',
             # Escape other special characters
-            '&': '&amp;',
-            '<': '&lt;',
-            '>': '&gt;',
+            r'&': '&amp;',
+            r'<': '&lt;',
+            r'>': '&gt;',
         }
 
         # Iterate over above list and store content accordingly

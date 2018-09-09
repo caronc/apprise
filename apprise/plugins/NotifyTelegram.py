@@ -302,7 +302,7 @@ class NotifyTelegram(NotifyBase):
         # Load our response and attempt to fetch our userid
         response = loads(r.content)
         if 'ok' in response and response['ok'] is True:
-            start = re.compile('^\s*\/start', re.I)
+            start = re.compile(r'^\s*\/start', re.I)
             for _msg in iter(response['result']):
                 # Find /start
                 if not start.search(_msg['message']['text']):
