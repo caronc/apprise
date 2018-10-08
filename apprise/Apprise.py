@@ -32,6 +32,7 @@ from .AppriseAsset import AppriseAsset
 
 from . import NotifyBase
 from . import plugins
+from . import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -276,6 +277,38 @@ class Apprise(object):
                 status = False
 
         return status
+
+    def details(self):
+        """
+        Returns the details associated with the Apprise object
+
+        """
+
+        # general object returned
+        response = {
+            # Defines the current version of Apprise
+            'version': __version__,
+            # Lists all of the currently supported Notifications
+            'schemas': [],
+            # Includes the configured asset details
+            'asset': self.asset.details(),
+        }
+
+        # to add it's mapping to our hash table
+        for entry in sorted(dir(plugins)):
+
+            # Get our plugin
+            plugin = getattr(plugins, entry)
+
+            # Build our response object
+            response['schemas'].append({
+                'service_name': getattr(plugin, 'service_name', None),
+                'service_url': getattr(plugin, 'service_url', None),
+                'protocol': getattr(plugin, 'protocol', None),
+                'secure_protocol': getattr(plugin, 'secure_protocol', None),
+            })
+
+        return response
 
     def __len__(self):
         """

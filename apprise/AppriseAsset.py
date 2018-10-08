@@ -216,6 +216,21 @@ class AppriseAsset(object):
 
         return None
 
+    def details(self):
+        """
+        Returns the details associated with the AppriseAsset object
+
+        """
+        return {
+            'app_id': self.app_id,
+            'app_desc': self.app_desc,
+            'default_extension': self.default_extension,
+            'theme': self.theme,
+            'image_path_mask': self.image_url_mask,
+            'image_url_mask': self.image_url_mask,
+            'image_url_logo': self.image_url_logo,
+        }
+
     @staticmethod
     def hex_to_rgb(value):
         """

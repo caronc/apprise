@@ -37,12 +37,20 @@ class NotifyEmby(NotifyBase):
     """
     A wrapper for Emby Notifications
     """
+    # The default descriptive name associated with the Notification
+    service_name = 'Emby'
+
+    # The services URL
+    service_url = 'https://emby.media/'
 
     # The default protocol
     protocol = 'emby'
 
     # The default secure protocol
     secure_protocol = 'embys'
+
+    # A URL that takes you to the setup/help of the specific protocol
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_emby'
 
     # Emby uses the http protocol with JSON requests
     emby_default_port = 8096

@@ -63,8 +63,17 @@ class NotifyBoxcar(NotifyBase):
     A wrapper for Boxcar Notifications
     """
 
+    # The default descriptive name associated with the Notification
+    service_name = 'Boxcar'
+
+    # The services URL
+    service_url = 'https://boxcar.io/'
+
     # All boxcar notifications are secure
     secure_protocol = 'boxcar'
+
+    # A URL that takes you to the setup/help of the specific protocol
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_boxcar'
 
     # Boxcar URL
     notify_url = 'https://boxcar-api.io/api/push/'
