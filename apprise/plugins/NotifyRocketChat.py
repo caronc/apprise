@@ -44,11 +44,20 @@ class NotifyRocketChat(NotifyBase):
     A wrapper for Notify Rocket.Chat Notifications
     """
 
+    # The default descriptive name associated with the Notification
+    service_name = 'Rocket.Chat'
+
+    # The services URL
+    service_url = 'https://rocket.chat/'
+
     # The default protocol
     protocol = 'rocket'
 
     # The default secure protocol
     secure_protocol = 'rockets'
+
+    # A URL that takes you to the setup/help of the specific protocol
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_rocketchat'
 
     # Defines the maximum allowable characters in the title
     title_maxlen = 200

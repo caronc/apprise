@@ -68,8 +68,17 @@ class NotifyPushover(NotifyBase):
     A wrapper for Pushover Notifications
     """
 
+    # The default descriptive name associated with the Notification
+    service_name = 'Pushover'
+
+    # The services URL
+    service_url = 'https://pushover.net/'
+
     # All pushover requests are secure
     secure_protocol = 'pover'
+
+    # A URL that takes you to the setup/help of the specific protocol
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_pushover'
 
     # Pushover uses the http protocol with JSON requests
     notify_url = 'https://api.pushover.net/1/messages.json'

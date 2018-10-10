@@ -40,8 +40,17 @@ class NotifyPushalot(NotifyBase):
     A wrapper for Pushalot Notifications
     """
 
+    # The default descriptive name associated with the Notification
+    service_name = 'Pushalot'
+
+    # The services URL
+    service_url = 'https://pushalot.com/'
+
     # The default protocol is always secured
     secure_protocol = 'palot'
+
+    # A URL that takes you to the setup/help of the specific protocol
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_pushalot'
 
     # Pushalot uses the http protocol with JSON requests
     notify_url = 'https://pushalot.com/api/sendmessage'

@@ -26,8 +26,17 @@ class NotifyTwitter(NotifyBase):
 
     """
 
+    # The default descriptive name associated with the Notification
+    service_name = 'Twitter'
+
+    # The services URL
+    service_url = 'https://twitter.com/'
+
     # The default secure protocol
     secure_protocol = 'tweet'
+
+    # A URL that takes you to the setup/help of the specific protocol
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_twitter'
 
     # The maximum allowable characters allowed in the body per message
     # This is used during a Private DM Message Size (not Public Tweets

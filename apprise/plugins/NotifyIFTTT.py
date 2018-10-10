@@ -43,6 +43,18 @@ class NotifyIFTTT(NotifyBase):
 
     """
 
+    # The default descriptive name associated with the Notification
+    service_name = 'IFTTT'
+
+    # The services URL
+    service_url = 'https://ifttt.com/'
+
+    # The default protocol
+    protocol = 'ifttt'
+
+    # A URL that takes you to the setup/help of the specific protocol
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_ifttt'
+
     # Even though you'll add 'Ingredients' as {{ Value1 }} to your Applets,
     # you must use their lowercase value in the HTTP POST.
     ifttt_default_key_prefix = 'value'
@@ -64,9 +76,6 @@ class NotifyIFTTT(NotifyBase):
     # change it to another Ingredient Name (in 2018, you were limited to have
     # value1, value2, and value3).
     ifttt_default_type_key = 'value3'
-
-    # The default protocol
-    protocol = 'ifttt'
 
     # IFTTT uses the http protocol with JSON requests
     notify_url = 'https://maker.ifttt.com/trigger/{event}/with/key/{apikey}'

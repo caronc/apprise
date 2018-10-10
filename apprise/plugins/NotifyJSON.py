@@ -30,11 +30,17 @@ class NotifyJSON(NotifyBase):
     A wrapper for JSON Notifications
     """
 
+    # The default descriptive name associated with the Notification
+    service_name = 'JSON'
+
     # The default protocol
     protocol = 'json'
 
     # The default secure protocol
     secure_protocol = 'jsons'
+
+    # A URL that takes you to the setup/help of the specific protocol
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_Custom_JSON'
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_128

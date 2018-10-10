@@ -71,8 +71,17 @@ class NotifySlack(NotifyBase):
     A wrapper for Slack Notifications
     """
 
+    # The default descriptive name associated with the Notification
+    service_name = 'Slack'
+
+    # The services URL
+    service_url = 'https://slack.com/'
+
     # The default secure protocol
     secure_protocol = 'slack'
+
+    # A URL that takes you to the setup/help of the specific protocol
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_slack'
 
     # Slack uses the http protocol with JSON requests
     notify_url = 'https://hooks.slack.com/services'

@@ -30,11 +30,17 @@ class NotifyXML(NotifyBase):
     A wrapper for XML Notifications
     """
 
+    # The default descriptive name associated with the Notification
+    service_name = 'XML'
+
     # The default protocol
     protocol = 'xml'
 
     # The default secure protocol
     secure_protocol = 'xmls'
+
+    # A URL that takes you to the setup/help of the specific protocol
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_Custom_XML'
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_128

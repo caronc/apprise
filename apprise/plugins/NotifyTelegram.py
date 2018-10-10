@@ -81,9 +81,17 @@ class NotifyTelegram(NotifyBase):
     """
     A wrapper for Telegram Notifications
     """
+    # The default descriptive name associated with the Notification
+    service_name = 'Telegram'
+
+    # The services URL
+    service_url = 'https://telegram.org/'
 
     # The default secure protocol
     secure_protocol = 'tgram'
+
+    # A URL that takes you to the setup/help of the specific protocol
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_telegram'
 
     # Telegram uses the http protocol with JSON requests
     notify_url = 'https://api.telegram.org/bot'

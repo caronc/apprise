@@ -32,11 +32,20 @@ class NotifyPushjet(NotifyBase):
     A wrapper for Pushjet Notifications
     """
 
+    # The default descriptive name associated with the Notification
+    service_name = 'Pushjet'
+
+    # The services URL
+    service_url = 'https://pushjet.io/'
+
     # The default protocol
     protocol = 'pjet'
 
     # The default secure protocol
     secure_protocol = 'pjets'
+
+    # A URL that takes you to the setup/help of the specific protocol
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_pushjet'
 
     def __init__(self, **kwargs):
         """

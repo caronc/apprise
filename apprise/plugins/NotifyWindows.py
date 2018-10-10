@@ -47,8 +47,14 @@ class NotifyWindows(NotifyBase):
     A wrapper for local Windows Notifications
     """
 
+    # The default descriptive name associated with the Notification
+    service_name = 'Windows Notification'
+
     # The default protocol
     protocol = 'windows'
+
+    # A URL that takes you to the setup/help of the specific protocol
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_windows'
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_128

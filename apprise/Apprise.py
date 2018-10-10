@@ -55,6 +55,9 @@ def __load_matrix():
 
         # Get our plugin
         plugin = getattr(plugins, entry)
+        if not hasattr(plugin, 'app_id'): # pragma: no branch
+            # Filter out non-notification modules
+            continue
 
         # Load protocol(s) if defined
         proto = getattr(plugin, 'protocol', None)
@@ -299,13 +302,27 @@ class Apprise(object):
 
             # Get our plugin
             plugin = getattr(plugins, entry)
+            if not hasattr(plugin, 'app_id'): # pragma: no branch
+                # Filter out non-notification modules
+                continue
+
+            # Standard protocol(s) should be None or a tuple
+            protocols = getattr(plugin, 'protocol', None)
+            if compat_is_basestring(protocols):
+                protocols = (protocols, )
+
+            # Secure protocol(s) should be None or a tuple
+            secure_protocols = getattr(plugin, 'secure_protocol', None)
+            if compat_is_basestring(secure_protocols):
+                secure_protocols = (secure_protocols, )
 
             # Build our response object
             response['schemas'].append({
                 'service_name': getattr(plugin, 'service_name', None),
                 'service_url': getattr(plugin, 'service_url', None),
-                'protocol': getattr(plugin, 'protocol', None),
-                'secure_protocol': getattr(plugin, 'secure_protocol', None),
+                'setup_url': getattr(plugin, 'setup_url', None),
+                'protocols': protocols,
+                'secure_protocols': secure_protocols,
             })
 
         return response

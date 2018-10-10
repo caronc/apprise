@@ -22,6 +22,7 @@ from os import getuid
 from os.path import dirname
 from apprise import Apprise
 from apprise import AppriseAsset
+from apprise.utils import compat_is_basestring
 from apprise.Apprise import SCHEMA_MAP
 from apprise import NotifyBase
 from apprise import NotifyType
@@ -500,8 +501,6 @@ def test_apprise_details():
     assert isinstance(details.get('schemas'), list)
 
     # We have an entry per defined plugin
-    assert len(details.get('schemas')) == len(dir(plugins))
-
     assert 'asset' in details
     assert isinstance(details.get('asset'), dict)
     assert 'app_id' in details['asset']
@@ -511,3 +510,8 @@ def test_apprise_details():
     assert 'image_path_mask' in details['asset']
     assert 'image_url_mask' in details['asset']
     assert 'image_url_logo' in details['asset']
+
+    # All plugins must have a name defined; the below generates
+    # a list of entrys that do not have a string defined.
+    assert(not len([x['service_name'] for x in details['schemas']
+                   if not compat_is_basestring(x['service_name'])]))
