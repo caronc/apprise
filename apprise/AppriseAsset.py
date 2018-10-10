@@ -62,12 +62,13 @@ class AppriseAsset(object):
 
     # Image URL Mask
     image_url_mask = \
-        'http://nuxref.com/apprise/themes/{THEME}/' \
-        'apprise-{TYPE}-{XY}{EXTENSION}'
+        'https://github.com/caronc/apprise/raw/master/apprise/assets/' \
+        'themes/{THEME}/apprise-{TYPE}-{XY}{EXTENSION}'
 
     # Application Logo
     image_url_logo = \
-        'http://nuxref.com/apprise/themes/{THEME}/apprise-logo.png'
+        'https://github.com/caronc/apprise/raw/master/apprise/assets/' \
+        'themes/{THEME}/apprise-logo.png'
 
     # Image Path Mask
     image_path_mask = abspath(join(
