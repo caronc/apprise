@@ -50,8 +50,17 @@ class NotifyGrowl(NotifyBase):
 
     """
 
+    # The default descriptive name associated with the Notification
+    service_name = 'Growl'
+
+    # The services URL
+    service_url = 'http://growl.info/'
+
     # The default protocol
     protocol = 'growl'
+
+    # A URL that takes you to the setup/help of the specific protocol
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_growl'
 
     # Default Growl Port
     default_port = 23053

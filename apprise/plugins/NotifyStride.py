@@ -61,9 +61,17 @@ class NotifyStride(NotifyBase):
     A wrapper to Stride Notifications
 
     """
+    # The default descriptive name associated with the Notification
+    service_name = 'Stride'
+
+    # The services URL
+    service_url = 'https://www.stride.com/'
 
     # The default secure protocol
     secure_protocol = 'stride'
+
+    # A URL that takes you to the setup/help of the specific protocol
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_stride'
 
     # Stride Webhook
     notify_url = 'https://api.atlassian.com/site/{cloud_id}/' \

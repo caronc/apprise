@@ -64,8 +64,17 @@ class NotifyJoin(NotifyBase):
     A wrapper for Join Notifications
     """
 
+    # The default descriptive name associated with the Notification
+    service_name = 'Join'
+
+    # The services URL
+    service_url = 'https://joaoapps.com/join/'
+
     # The default protocol
     protocol = 'join'
+
+    # A URL that takes you to the setup/help of the specific protocol
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_join'
 
     # Join uses the http protocol with JSON requests
     notify_url = \

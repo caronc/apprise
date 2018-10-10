@@ -34,8 +34,17 @@ class NotifyToasty(NotifyBase):
     A wrapper for Toasty Notifications
     """
 
+    # The default descriptive name associated with the Notification
+    service_name = 'Toasty'
+
+    # The services URL
+    service_url = 'http://supertoasty.com/'
+
     # The default protocol
     protocol = 'toasty'
+
+    # A URL that takes you to the setup/help of the specific protocol
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_toasty'
 
     # Toasty uses the http protocol with JSON requests
     notify_url = 'http://api.supertoasty.com/notify/'

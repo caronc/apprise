@@ -32,6 +32,7 @@ from .AppriseAsset import AppriseAsset
 
 from . import NotifyBase
 from . import plugins
+from . import __version__
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +55,9 @@ def __load_matrix():
 
         # Get our plugin
         plugin = getattr(plugins, entry)
+        if not hasattr(plugin, 'app_id'): # pragma: no branch
+            # Filter out non-notification modules
+            continue
 
         # Load protocol(s) if defined
         proto = getattr(plugin, 'protocol', None)
@@ -276,6 +280,52 @@ class Apprise(object):
                 status = False
 
         return status
+
+    def details(self):
+        """
+        Returns the details associated with the Apprise object
+
+        """
+
+        # general object returned
+        response = {
+            # Defines the current version of Apprise
+            'version': __version__,
+            # Lists all of the currently supported Notifications
+            'schemas': [],
+            # Includes the configured asset details
+            'asset': self.asset.details(),
+        }
+
+        # to add it's mapping to our hash table
+        for entry in sorted(dir(plugins)):
+
+            # Get our plugin
+            plugin = getattr(plugins, entry)
+            if not hasattr(plugin, 'app_id'): # pragma: no branch
+                # Filter out non-notification modules
+                continue
+
+            # Standard protocol(s) should be None or a tuple
+            protocols = getattr(plugin, 'protocol', None)
+            if compat_is_basestring(protocols):
+                protocols = (protocols, )
+
+            # Secure protocol(s) should be None or a tuple
+            secure_protocols = getattr(plugin, 'secure_protocol', None)
+            if compat_is_basestring(secure_protocols):
+                secure_protocols = (secure_protocols, )
+
+            # Build our response object
+            response['schemas'].append({
+                'service_name': getattr(plugin, 'service_name', None),
+                'service_url': getattr(plugin, 'service_url', None),
+                'setup_url': getattr(plugin, 'setup_url', None),
+                'protocols': protocols,
+                'secure_protocols': secure_protocols,
+            })
+
+        return response
 
     def __len__(self):
         """

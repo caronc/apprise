@@ -28,8 +28,17 @@ class NotifyFaast(NotifyBase):
     A wrapper for Faast Notifications
     """
 
+    # The default descriptive name associated with the Notification
+    service_name = 'Faast'
+
+    # The services URL
+    service_url = 'http://www.faast.io/'
+
     # The default protocol (this is secure for faast)
     protocol = 'faast'
+
+    # A URL that takes you to the setup/help of the specific protocol
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_faast'
 
     # Faast uses the http protocol with JSON requests
     notify_url = 'https://www.appnotifications.com/account/notifications.json'

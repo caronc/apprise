@@ -22,11 +22,14 @@ from os import getuid
 from os.path import dirname
 from apprise import Apprise
 from apprise import AppriseAsset
+from apprise.utils import compat_is_basestring
 from apprise.Apprise import SCHEMA_MAP
 from apprise import NotifyBase
 from apprise import NotifyType
 from apprise import NotifyFormat
 from apprise import NotifyImageSize
+from apprise import plugins
+from apprise import __version__
 from apprise.Apprise import __load_matrix
 import pytest
 
@@ -468,3 +471,47 @@ def test_apprise_asset(tmpdir):
         NotifyImageSize.XY_256,
         extension='.test') == 'http://localhost/'
                               'default/info-256x256.test')
+
+
+def test_apprise_details():
+    """
+    API: Apprise() Details
+
+    """
+
+    # Caling load matix a second time which is an internal function causes it
+    # to skip over content already loaded into our matrix and thefore accesses
+    # other if/else parts of the code that aren't otherwise called
+    __load_matrix()
+
+    a = Apprise()
+
+    # Details object
+    details = a.details()
+
+    # Dictionary response
+    assert isinstance(details, dict)
+
+    # Apprise version
+    assert 'version' in details
+    assert details.get('version') == __version__
+
+    # Defined schemas identify each plugin
+    assert 'schemas' in details
+    assert isinstance(details.get('schemas'), list)
+
+    # We have an entry per defined plugin
+    assert 'asset' in details
+    assert isinstance(details.get('asset'), dict)
+    assert 'app_id' in details['asset']
+    assert 'app_desc' in details['asset']
+    assert 'default_extension' in details['asset']
+    assert 'theme' in details['asset']
+    assert 'image_path_mask' in details['asset']
+    assert 'image_url_mask' in details['asset']
+    assert 'image_url_logo' in details['asset']
+
+    # All plugins must have a name defined; the below generates
+    # a list of entrys that do not have a string defined.
+    assert(not len([x['service_name'] for x in details['schemas']
+                   if not compat_is_basestring(x['service_name'])]))

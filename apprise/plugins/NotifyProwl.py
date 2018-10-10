@@ -59,8 +59,17 @@ class NotifyProwl(NotifyBase):
     A wrapper for Prowl Notifications
     """
 
+    # The default descriptive name associated with the Notification
+    service_name = 'Prowl'
+
+    # The services URL
+    service_url = 'https://www.prowlapp.com/'
+
     # The default secure protocol
     secure_protocol = 'prowl'
+
+    # A URL that takes you to the setup/help of the specific protocol
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_prowl'
 
     # Prowl uses the http protocol with JSON requests
     notify_url = 'https://api.prowlapp.com/publicapi/add'

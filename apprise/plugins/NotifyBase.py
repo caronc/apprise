@@ -34,7 +34,6 @@ except ImportError:
 from ..utils import parse_url
 from ..utils import parse_bool
 from ..utils import is_hostname
-from ..common import NOTIFY_IMAGE_SIZES
 from ..common import NOTIFY_TYPES
 from ..common import NotifyFormat
 from ..common import NOTIFY_FORMATS
@@ -70,7 +69,8 @@ PATHSPLIT_LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
 # Regular expression retrieved from:
 # http://www.regular-expressions.info/email.html
 IS_EMAIL_RE = re.compile(
-    r"(?P<userid>[a-z0-9$%+=_~-]+"
+    r"((?P<label>[^+]+)\+)?"
+    r"(?P<userid>[a-z0-9$%=_~-]+"
     r"(?:\.[a-z0-9$%+=_~-]+)"
     r"*)@(?P<domain>(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+"
     r"[a-z0-9](?:[a-z0-9-]*"
@@ -84,16 +84,25 @@ class NotifyBase(object):
     This is the base class for all notification services
     """
 
+    # The default descriptive name associated with the Notification
+    service_name = None
+
+    # The services URL
+    service_url = None
+
     # The default simple (insecure) protocol
     # all inheriting entries must provide their protocol lookup
     # protocol:// (in this example they would specify 'protocol')
-    protocol = ''
+    protocol = None
 
     # The default secure protocol
     # all inheriting entries must provide their protocol lookup
     # protocols:// (in this example they would specify 'protocols')
     # This value can be the same as the defined protocol.
-    secure_protocol = ''
+    secure_protocol = None
+
+    # A URL that takes you to the setup/help of the specific protocol
+    setup_url = None
 
     # Most Servers do not like more then 1 request per 5 seconds, so 5.5 gives
     # us a safe play range...

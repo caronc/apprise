@@ -37,11 +37,20 @@ class NotifyMatterMost(NotifyBase):
     A wrapper for MatterMost Notifications
     """
 
+    # The default descriptive name associated with the Notification
+    service_name = 'MatterMost'
+
+    # The services URL
+    service_url = 'https://mattermost.com/'
+
     # The default protocol
     protocol = 'mmost'
 
     # The default secure protocol
     secure_protocol = 'mmosts'
+
+    # A URL that takes you to the setup/help of the specific protocol
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_mattermost'
 
     # The default Mattermost port
     default_port = 8065

@@ -49,9 +49,17 @@ class NotifyDiscord(NotifyBase):
     A wrapper to Discord Notifications
 
     """
+    # The default descriptive name associated with the Notification
+    service_name = 'Discord'
+
+    # The services URL
+    service_url = 'https://discordapp.com/'
 
     # The default secure protocol
     secure_protocol = 'discord'
+
+    # A URL that takes you to the setup/help of the specific protocol
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_discored'
 
     # Discord Webhook
     notify_url = 'https://discordapp.com/api/webhooks'

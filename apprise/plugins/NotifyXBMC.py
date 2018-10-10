@@ -31,11 +31,20 @@ class NotifyXBMC(NotifyBase):
     A wrapper for XBMC/KODI Notifications
     """
 
+    # The default descriptive name associated with the Notification
+    service_name = 'Kodi/XBMC'
+
+    # The services URL
+    service_url = 'http://kodi.tv/'
+
     # The default protocols
     protocol = ('xbmc', 'kodi')
 
     # The default secure protocols
     secure_protocol = ('xbmc', 'kodis')
+
+    # A URL that takes you to the setup/help of the specific protocol
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_kodi'
 
     # XBMC uses the http protocol with JSON requests
     xbmc_default_port = 8080

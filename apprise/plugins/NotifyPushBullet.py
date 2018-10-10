@@ -45,8 +45,17 @@ class NotifyPushBullet(NotifyBase):
     A wrapper for PushBullet Notifications
     """
 
+    # The default descriptive name associated with the Notification
+    service_name = 'Pushbullet'
+
+    # The services URL
+    service_url = 'https://www.pushbullet.com/'
+
     # The default secure protocol
     secure_protocol = 'pbul'
+
+    # A URL that takes you to the setup/help of the specific protocol
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_pushbullet'
 
     # PushBullet uses the http protocol with JSON requests
     notify_url = 'https://api.pushbullet.com/v2/pushes'
