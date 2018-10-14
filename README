@@ -1,7 +1,15 @@
 ap·prise / verb
 To inform or tell (someone). To make one aware of something.
 
-Apprise allows you to take advantage of just about every notification service available to us today.  Send a notification to almost all of the most popular services out there today (such as Telegram, Slack, Twitter, etc). The ones that don't exist can be adapted and supported too!
+Apprise allows you to send a notification to *almost* all of the most popular notification services available to us today such as: Telegram, Pushbullet, Slack, Twitter, etc.
+
+* One notification library to rule them all.
+* A common and intuitive notification syntax.
+* Supports the handling of images (to the notification services that will accept them).
+
+System owners who wish to provide a notification service no longer need to research each and every new notification service as they come along. They just need to include this one library and then they can immediately gain access to a wide range of notifications services.
+
+System Administrators who wish to send a notification from a scheduled task or from the command line also no longer need to find the right tool for the job.  Everything is already wrapped and supported within the *apprise* script that ships with this product.
 
 Supported Notifications
 =======================
