@@ -55,7 +55,7 @@ def __load_matrix():
 
         # Get our plugin
         plugin = getattr(plugins, entry)
-        if not hasattr(plugin, 'app_id'): # pragma: no branch
+        if not hasattr(plugin, 'app_id'):  # pragma: no branch
             # Filter out non-notification modules
             continue
 
@@ -302,7 +302,7 @@ class Apprise(object):
 
             # Get our plugin
             plugin = getattr(plugins, entry)
-            if not hasattr(plugin, 'app_id'): # pragma: no branch
+            if not hasattr(plugin, 'app_id'):  # pragma: no branch
                 # Filter out non-notification modules
                 continue
 

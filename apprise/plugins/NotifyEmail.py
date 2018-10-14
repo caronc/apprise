@@ -47,7 +47,9 @@ WEBBASE_LOOKUP_TABLE = (
     # Google GMail
     (
         'Google Mail',
-        re.compile(r'^((?P<label>[^+]+)\+)?(?P<id>[^@]+)@(?P<domain>gmail\.com)$', re.I),
+        re.compile(
+            r'^((?P<label>[^+]+)\+)?(?P<id>[^@]+)@'
+            r'(?P<domain>gmail\.com)$', re.I),
         {
             'port': 587,
             'smtp_host': 'smtp.gmail.com',
@@ -59,7 +61,9 @@ WEBBASE_LOOKUP_TABLE = (
     # Pronto Mail
     (
         'Pronto Mail',
-        re.compile(r'^((?P<label>[^+]+)\+)?(?P<id>[^@]+)@(?P<domain>prontomail\.com)$', re.I),
+        re.compile(
+            r'^((?P<label>[^+]+)\+)?(?P<id>[^@]+)@'
+            r'(?P<domain>prontomail\.com)$', re.I),
         {
             'port': 465,
             'smtp_host': 'secure.emailsrvr.com',
@@ -71,7 +75,9 @@ WEBBASE_LOOKUP_TABLE = (
     # Microsoft Hotmail
     (
         'Microsoft Hotmail',
-        re.compile(r'^((?P<label>[^+]+)\+)?(?P<id>[^@]+)@(?P<domain>(hotmail|live)\.com)$', re.I),
+        re.compile(
+            r'^((?P<label>[^+]+)\+)?(?P<id>[^@]+)@'
+            r'(?P<domain>(hotmail|live)\.com)$', re.I),
         {
             'port': 587,
             'smtp_host': 'smtp.live.com',
@@ -83,7 +89,9 @@ WEBBASE_LOOKUP_TABLE = (
     # Yahoo Mail
     (
         'Yahoo Mail',
-        re.compile(r'^((?P<label>[^+]+)\+)?(?P<id>[^@]+)@(?P<domain>yahoo\.(ca|com))$', re.I),
+        re.compile(
+            r'^((?P<label>[^+]+)\+)?(?P<id>[^@]+)@'
+            r'(?P<domain>yahoo\.(ca|com))$', re.I),
         {
             'port': 465,
             'smtp_host': 'smtp.mail.yahoo.com',
@@ -95,7 +103,9 @@ WEBBASE_LOOKUP_TABLE = (
     # Catch All
     (
         'Custom',
-        re.compile(r'^((?P<label>[^+]+)\+)?(?P<id>[^@]+)@(?P<domain>.+)$', re.I),
+        re.compile(
+            r'^((?P<label>[^+]+)\+)?(?P<id>[^@]+)@'
+            r'(?P<domain>.+)$', re.I),
         {
             # Setting smtp_host to None is a way of
             # auto-detecting it based on other parameters
