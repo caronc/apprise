@@ -18,10 +18,6 @@
 
 import os
 import platform
-import sys
-from os.path import join
-from os.path import abspath
-from os.path import dirname
 try:
     from setuptools import setup
 
@@ -29,11 +25,6 @@ except ImportError:
     from distutils.core import setup
 
 from setuptools import find_packages
-
-# Include 'this' library to allow a single location for
-# version referencing
-sys.path.insert(0, join(dirname(abspath(__file__)), 'apprise'))
-from apprise import __version__ as version
 
 install_options = os.environ.get("APPRISE_INSTALL", "").split(",")
 install_requires = open('requirements.txt').readlines()
@@ -51,7 +42,7 @@ else:
 
 setup(
     name='apprise',
-    version=version,
+    version='0.5.2',
     description='A universal notification service',
     license='GPLv3',
     long_description=open('README').read(),

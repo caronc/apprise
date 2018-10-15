@@ -17,7 +17,7 @@
 # GNU Lesser General Public License for more details.
 
 __title__ = 'apprise'
-__version__ = '0.5.1'
+__version__ = '0.5.2'
 __author__ = 'Chris Caron <lead2gold@gmail.com>'
 __license__ = 'GPLv3'
 __copywrite__ = 'Copyright 2017-2018 Chris Caron <lead2gold@gmail.com>'
