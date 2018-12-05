@@ -59,7 +59,7 @@ class NotifyDiscord(NotifyBase):
     secure_protocol = 'discord'
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_discored'
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_discord'
 
     # Discord Webhook
     notify_url = 'https://discordapp.com/api/webhooks'
