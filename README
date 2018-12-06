@@ -144,7 +144,7 @@ Email Support
    mailtos://domain.com:465?user=userid&pass=passwordmailtos://user@hotmail.com&pass=password
    mailtos://userid:password@example.com?smtp=mail.example.com&from=noreply@example.com&name=no%20reply
 
-Apprise have some email services built right into it (such as hotmail, gmail, etc) that greatly simplify the mailto:// service.
+Apprise have some email services built right into it (such as yahoo, fastmail, hotmail, gmail, etc) that greatly simplify the mailto:// service.
 
 Custom Notifications
 --------------------
