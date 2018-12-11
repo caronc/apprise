@@ -26,6 +26,7 @@ from email.mime.text import MIMEText
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyFormat
+from ..utils import parse_bool
 
 
 class WebBaseLogin(object):
@@ -144,6 +145,9 @@ class NotifyEmail(NotifyBase):
     # Default SMTP Timeout (in seconds)
     connect_timeout = 15
 
+    # Default use STARTTLS setting
+    starttls = True
+
     def __init__(self, **kwargs):
         """
         Initialize Email Object
@@ -180,6 +184,9 @@ class NotifyEmail(NotifyBase):
 
         # Now detect the SMTP Server
         self.smtp_host = kwargs.get('smtp_host', '')
+
+        # Now detect the STARTTLS setting
+        self.starttls = kwargs.get('starttls', self.starttls)
 
         # Apply any defaults based on certain known configurations
         self.NotifyEmailDefaults()
@@ -273,14 +280,19 @@ class NotifyEmail(NotifyBase):
         socket = None
         try:
             self.logger.debug('Connecting to remote SMTP server...')
-            socket = smtplib.SMTP(
+
+            lib_class = smtplib.SMTP
+            if (not self.starttls) and self.secure:
+                lib_class = smtplib.SMTP_SSL
+
+            socket = lib_class(
                 self.smtp_host,
                 self.port,
                 None,
                 timeout=self.timeout,
             )
 
-            if self.secure:
+            if self.secure and self.starttls:
                 # Handle Secure Connections
                 self.logger.debug('Securing connection with TLS...')
                 socket.starttls()
@@ -378,6 +390,9 @@ class NotifyEmail(NotifyBase):
         if 'smtp' in results['qsd'] and len(results['qsd']['smtp']):
             # Extract the smtp server
             smtp_host = NotifyBase.unquote(results['qsd']['smtp'])
+
+        if 'starttls' in results['qsd'] and len(results['qsd']['starttls']):
+            results['starttls'] = parse_bool(results['qsd']['starttls'])
 
         results['to'] = to_addr
         results['from'] = from_addr
