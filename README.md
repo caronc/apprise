@@ -22,7 +22,7 @@ System Administrators who wish to send a notification from a scheduled task or f
 [![Patreon](http://repo.nuxref.com/pub/img/patreondonate.svg)](https://www.patreon.com/lead2gold)
 
 ## Supported Notifications
-The section identifies all of the services supported by this script.
+The section identifies all of the services supported by this library. [Check out the wiki for more information on the supported modules here](https://github.com/caronc/apprise/wiki).
 
 ### Popular Notification Services
 The table below identifies the services this tool supports and some example service urls you need to use in order to take advantage of it.
@@ -108,3 +108,5 @@ apobj.notify(
     body='what a great notification service!',
 )
 ```
+
+If you're interesting in reading more about this and methods on how to customize your own notifications, please check out the wiki at https://github.com/caronc/apprise/wiki/Development_API

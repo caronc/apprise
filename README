@@ -13,7 +13,7 @@ System Administrators who wish to send a notification from a scheduled task or f
 
 Supported Notifications
 =======================
-The section identifies all of the services supported by this script.
+The section identifies all of the services supported by this script. For more indepth details on how each of these notification services work, check out the wiki here: https://github.com/caronc/apprise/wiki/
 
 Popular Notification Services
 -----------------------------
@@ -199,3 +199,5 @@ To send a notification from within your python application, just do the followin
 	    title='my notification title',
 	    body='what a great notification service!',
 	)
+
+If you're interesting in reading more about this and methods on how to customize your own notifications, please check out the wiki at https://github.com/caronc/apprise/wiki/Development_API
