@@ -40,6 +40,18 @@ class WebBaseLogin(object):
     USERID = 'UserID'
 
 
+# Secure Email Modes
+class SecureMailMode(object):
+    SSL = "ssl"
+    STARTTLS = "starttls"
+
+
+# Define all of the secure modes (used during validation)
+SECURE_MODES = (
+    SecureMailMode.SSL,
+    SecureMailMode.STARTTLS,
+)
+
 # To attempt to make this script stupid proof, if we detect an email address
 # that is part of the this table, we can pre-use a lot more defaults if they
 # aren't otherwise specified on the users input.
@@ -54,6 +66,7 @@ WEBBASE_LOOKUP_TABLE = (
             'port': 587,
             'smtp_host': 'smtp.gmail.com',
             'secure': True,
+            'secure_mode': SecureMailMode.STARTTLS,
             'login_type': (WebBaseLogin.EMAIL, )
         },
     ),
@@ -68,6 +81,7 @@ WEBBASE_LOOKUP_TABLE = (
             'port': 465,
             'smtp_host': 'secure.emailsrvr.com',
             'secure': True,
+            'secure_mode': SecureMailMode.STARTTLS,
             'login_type': (WebBaseLogin.EMAIL, )
         },
     ),
@@ -82,6 +96,7 @@ WEBBASE_LOOKUP_TABLE = (
             'port': 587,
             'smtp_host': 'smtp.live.com',
             'secure': True,
+            'secure_mode': SecureMailMode.STARTTLS,
             'login_type': (WebBaseLogin.EMAIL, )
         },
     ),
@@ -96,6 +111,60 @@ WEBBASE_LOOKUP_TABLE = (
             'port': 465,
             'smtp_host': 'smtp.mail.yahoo.com',
             'secure': True,
+            'secure_mode': SecureMailMode.STARTTLS,
+            'login_type': (WebBaseLogin.EMAIL, )
+        },
+    ),
+
+    # Fast Mail (Series 1)
+    (
+        'Fast Mail',
+        re.compile(
+            r'^((?P<label>[^+]+)\+)?(?P<id>[^@]+)@'
+            r'(?P<domain>fastmail\.(com|cn|co\.uk|com\.au|de|es|fm|fr|im|'
+            r'in|jp|mx|net|nl|org|se|to|tw|uk|us))$', re.I),
+        {
+            'port': 465,
+            'smtp_host': 'smtp.fastmail.com',
+            'secure': True,
+            'secure_mode': SecureMailMode.SSL,
+            'login_type': (WebBaseLogin.EMAIL, )
+        },
+    ),
+    # Fast Mail (Series 2)
+    (
+        'Fast Mail Extended Addresses',
+        re.compile(
+            r'^((?P<label>[^+]+)\+)?(?P<id>[^@]+)@'
+            r'(?P<domain>123mail\.org|airpost\.net|eml\.cc|fmail\.co\.uk|'
+            r'fmgirl\.com|fmguy\.com|mailbolt\.com|mailcan\.com|'
+            r'mailhaven\.com|mailmight\.com|ml1\.net|mm\.st|myfastmail\.com|'
+            r'proinbox\.com|promessage\.com|rushpost\.com|sent\.(as|at|com)|'
+            r'speedymail\.org|warpmail\.net|xsmail\.com|150mail\.com|'
+            r'150ml\.com|16mail\.com|2-mail\.com|4email\.net|50mail\.com|'
+            r'allmail\.net|bestmail\.us|cluemail\.com|elitemail\.org|'
+            r'emailcorner\.net|emailengine\.(net|org)|emailgroups\.net|'
+            r'emailplus\.org|emailuser\.net|f-m\.fm|fast-email\.com|'
+            r'fast-mail\.org|fastem\.com|fastemail\.us|fastemailer\.com|'
+            r'fastest\.cc|fastimap\.com|fastmailbox\.net|fastmessaging\.com|'
+            r'fea\.st|fmailbox\.com|ftml\.net|h-mail\.us|hailmail\.net|'
+            r'imap-mail\.com|imap\.cc|imapmail\.org|inoutbox\.com|'
+            r'internet-e-mail\.com|internet-mail\.org|internetemails\.net|'
+            r'internetmailing\.net|jetemail\.net|justemail\.net|'
+            r'letterboxes\.org|mail-central\.com|mail-page\.com|'
+            r'mailandftp\.com|mailas\.com|mailc\.net|mailforce\.net|'
+            r'mailftp\.com|mailingaddress\.org|mailite\.com|mailnew\.com|'
+            r'mailsent\.net|mailservice\.ms|mailup\.net|mailworks\.org|'
+            r'mymacmail\.com|nospammail\.net|ownmail\.net|petml\.com|'
+            r'postinbox\.com|postpro\.net|realemail\.net|reallyfast\.biz|'
+            r'reallyfast\.info|speedpost\.net|ssl-mail\.com|swift-mail\.com|'
+            r'the-fastest\.net|the-quickest\.com|theinternetemail\.com|'
+            r'veryfast\.biz|veryspeedy\.net|yepmail\.net)$', re.I),
+        {
+            'port': 465,
+            'smtp_host': 'smtp.fastmail.com',
+            'secure': True,
+            'secure_mode': SecureMailMode.SSL,
             'login_type': (WebBaseLogin.EMAIL, )
         },
     ),
@@ -141,6 +210,9 @@ class NotifyEmail(NotifyBase):
     # Default Secure Port
     default_secure_port = 587
 
+    # Default Secure Mode
+    default_secure_mode = SecureMailMode.STARTTLS
+
     # Default SMTP Timeout (in seconds)
     connect_timeout = 15
 
@@ -181,6 +253,13 @@ class NotifyEmail(NotifyBase):
         # Now detect the SMTP Server
         self.smtp_host = kwargs.get('smtp_host', '')
 
+        # Now detect secure mode
+        self.secure_mode = kwargs.get('secure_mode', self.default_secure_mode)
+
+        if self.secure_mode not in SECURE_MODES:
+            raise TypeError(
+                'Invalid secure mode specified: %s.' % self.secure_mode)
+
         # Apply any defaults based on certain known configurations
         self.NotifyEmailDefaults()
 
@@ -212,7 +291,8 @@ class NotifyEmail(NotifyBase):
                     .get('port', self.port)
                 self.secure = WEBBASE_LOOKUP_TABLE[i][2]\
                     .get('secure', self.secure)
-
+                self.secure_mode = WEBBASE_LOOKUP_TABLE[i][2]\
+                    .get('secure_mode', self.secure_mode)
                 self.smtp_host = WEBBASE_LOOKUP_TABLE[i][2]\
                     .get('smtp_host', self.smtp_host)
 
@@ -273,16 +353,21 @@ class NotifyEmail(NotifyBase):
         socket = None
         try:
             self.logger.debug('Connecting to remote SMTP server...')
-            socket = smtplib.SMTP(
+            socket_func = smtplib.SMTP
+            if self.secure and self.secure_mode == SecureMailMode.SSL:
+                self.logger.debug('Securing connection with SSL...')
+                socket_func = smtplib.SMTP_SSL
+
+            socket = socket_func(
                 self.smtp_host,
                 self.port,
                 None,
                 timeout=self.timeout,
             )
 
-            if self.secure:
+            if self.secure and self.secure_mode == SecureMailMode.STARTTLS:
                 # Handle Secure Connections
-                self.logger.debug('Securing connection with TLS...')
+                self.logger.debug('Securing connection with STARTTLS...')
                 socket.starttls()
 
             if self.user and self.password:
@@ -329,6 +414,7 @@ class NotifyEmail(NotifyBase):
 
         # Default Format is HTML
         results['notify_format'] = NotifyFormat.HTML
+        results['secure_mode'] = NotifyEmail.default_secure_mode
 
         to_addr = ''
         from_addr = ''
@@ -378,6 +464,10 @@ class NotifyEmail(NotifyBase):
         if 'smtp' in results['qsd'] and len(results['qsd']['smtp']):
             # Extract the smtp server
             smtp_host = NotifyBase.unquote(results['qsd']['smtp'])
+
+        if 'mode' in results['qsd'] and len(results['qsd']['mode']):
+            # Extract the secure mode to over-ride the default
+            results['secure_mode'] = results['qsd']['mode'].lower()
 
         results['to'] = to_addr
         results['from'] = from_addr

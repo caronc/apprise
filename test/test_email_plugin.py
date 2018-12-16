@@ -62,6 +62,9 @@ TEST_URLS = (
     ('mailto://user:pass@yahoo.ca', {
         'instance': plugins.NotifyEmail,
     }),
+    ('mailto://user:pass@fastmail.com', {
+        'instance': plugins.NotifyEmail,
+    }),
 
     # Custom Emails
     ('mailtos://user:pass@nuxref.com:567', {
@@ -121,6 +124,18 @@ TEST_URLS = (
     ('mailtos://nuxref.com?to=test', {
         'exception': TypeError,
     }),
+    # Invalid Secure Mode
+    ('mailtos://user:pass@example.com?mode=notamode', {
+        'exception': TypeError,
+    }),
+    # STARTTLS flag checking
+    ('mailtos://user:pass@gmail.com?mode=starttls', {
+        'instance': plugins.NotifyEmail,
+    }),
+    # SSL flag checking
+    ('mailtos://user:pass@gmail.com?mode=ssl', {
+        'instance': plugins.NotifyEmail,
+    }),
     # Can make a To address using what we have (l2g@nuxref.com)
     ('mailtos://nuxref.com?user=l2g&pass=.', {
         'instance': plugins.NotifyEmail,
@@ -135,7 +150,8 @@ TEST_URLS = (
 
 
 @mock.patch('smtplib.SMTP')
-def test_email_plugin(mock_smtp):
+@mock.patch('smtplib.SMTP_SSL')
+def test_email_plugin(mock_smtp, mock_smtpssl):
     """
     API: NotifyEmail Plugin()
 
@@ -166,6 +182,7 @@ def test_email_plugin(mock_smtp):
 
         # Create a mock SMTP Object
         mock_smtp.return_value = mock_socket
+        mock_smtpssl.return_value = mock_socket
 
         if test_smtplib_exceptions:
             # Handle exception testing; first we turn the boolean flag ito
@@ -256,7 +273,8 @@ def test_email_plugin(mock_smtp):
 
 
 @mock.patch('smtplib.SMTP')
-def test_webbase_lookup(mock_smtp):
+@mock.patch('smtplib.SMTP_SSL')
+def test_webbase_lookup(mock_smtp, mock_smtpssl):
     """
     API: Web Based Lookup Tests
 
