@@ -114,7 +114,7 @@ class NotifyRocketChat(NotifyBase):
                 continue
 
             self.logger.warning(
-                'Dropped invalid channel/room ' +
+                'Dropped invalid channel/room '
                 '(%s) specified.' % recipient,
             )
 
@@ -206,14 +206,14 @@ class NotifyRocketChat(NotifyBase):
                 # We had a problem
                 try:
                     self.logger.warning(
-                        'Failed to send Rocket.Chat notification: ' +
+                        'Failed to send Rocket.Chat notification: '
                         '%s (error=%s).' % (
                             RC_HTTP_ERROR_MAP[r.status_code],
                             r.status_code))
 
                 except KeyError:
                     self.logger.warning(
-                        'Failed to send Rocket.Chat notification ' +
+                        'Failed to send Rocket.Chat notification '
                         '(error=%s).' % (
                             r.status_code))
 
@@ -226,7 +226,7 @@ class NotifyRocketChat(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured sending Rocket.Chat ' +
+                'A Connection error occured sending Rocket.Chat '
                 'notification.')
             self.logger.debug('Socket Exception: %s' % str(e))
 
@@ -255,14 +255,14 @@ class NotifyRocketChat(NotifyBase):
                 # We had a problem
                 try:
                     self.logger.warning(
-                        'Failed to authenticate with Rocket.Chat server: ' +
+                        'Failed to authenticate with Rocket.Chat server: '
                         '%s (error=%s).' % (
                             RC_HTTP_ERROR_MAP[r.status_code],
                             r.status_code))
 
                 except KeyError:
                     self.logger.warning(
-                        'Failed to authenticate with Rocket.Chat server ' +
+                        'Failed to authenticate with Rocket.Chat server '
                         '(error=%s).' % (
                             r.status_code))
 
@@ -285,7 +285,7 @@ class NotifyRocketChat(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured authenticating to the ' +
+                'A Connection error occured authenticating to the '
                 'Rocket.Chat server.')
             self.logger.debug('Socket Exception: %s' % str(e))
             return False
@@ -306,14 +306,14 @@ class NotifyRocketChat(NotifyBase):
                 # We had a problem
                 try:
                     self.logger.warning(
-                        'Failed to log off Rocket.Chat server: ' +
+                        'Failed to log off Rocket.Chat server: '
                         '%s (error=%s).' % (
                             RC_HTTP_ERROR_MAP[r.status_code],
                             r.status_code))
 
                 except KeyError:
                     self.logger.warning(
-                        'Failed to log off Rocket.Chat server ' +
+                        'Failed to log off Rocket.Chat server '
                         '(error=%s).' % (
                             r.status_code))
 
@@ -327,7 +327,7 @@ class NotifyRocketChat(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured logging off the ' +
+                'A Connection error occured logging off the '
                 'Rocket.Chat server')
             self.logger.debug('Socket Exception: %s' % str(e))
             return False
