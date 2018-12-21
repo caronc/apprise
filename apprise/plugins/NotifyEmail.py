@@ -131,6 +131,7 @@ WEBBASE_LOOKUP_TABLE = (
             'login_type': (WebBaseLogin.EMAIL, )
         },
     ),
+
     # Fast Mail (Series 2)
     (
         'Fast Mail Extended Addresses',
@@ -163,6 +164,21 @@ WEBBASE_LOOKUP_TABLE = (
         {
             'port': 465,
             'smtp_host': 'smtp.fastmail.com',
+            'secure': True,
+            'secure_mode': SecureMailMode.SSL,
+            'login_type': (WebBaseLogin.EMAIL, )
+        },
+    ),
+
+    # Zoho Mail
+    (
+        'Zoho Mail',
+        re.compile(
+            r'^((?P<label>[^+]+)\+)?(?P<id>[^@]+)@'
+            r'(?P<domain>zoho\.com)$', re.I),
+        {
+            'port': 465,
+            'smtp_host': 'smtp.zoho.com',
             'secure': True,
             'secure_mode': SecureMailMode.SSL,
             'login_type': (WebBaseLogin.EMAIL, )
