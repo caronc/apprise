@@ -29,6 +29,7 @@ from .NotifyGrowl.NotifyGrowl import NotifyGrowl
 from .NotifyIFTTT import NotifyIFTTT
 from .NotifyJoin import NotifyJoin
 from .NotifyJSON import NotifyJSON
+from .NotifyMatrix import NotifyMatrix
 from .NotifyMatterMost import NotifyMatterMost
 from .NotifyProwl import NotifyProwl
 from .NotifyPushalot import NotifyPushalot
