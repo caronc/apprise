@@ -543,6 +543,63 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifyMatrix
+    ##################################
+    ('matrix://', {
+        'instance': None,
+    }),
+    ('matrixs://', {
+        'instance': None,
+    }),
+    # No token
+    ('matrix://localhost', {
+        'instance': TypeError,
+    }),
+    ('matrix://user@localhost', {
+        'instance': TypeError,
+    }),
+    ('matrix://localhost/%s' % ('a' * 64), {
+        'instance': plugins.NotifyMatrix,
+    }),
+    # Name and token
+    ('matrix://user@localhost/%s' % ('a' * 64), {
+        'instance': plugins.NotifyMatrix,
+    }),
+    # Name, port and token (secure)
+    ('matrixs://user@localhost:9000/%s' % ('a' * 64), {
+        'instance': plugins.NotifyMatrix,
+    }),
+    # Name, port, token and slack mode
+    ('matrix://user@localhost:9000/%s?mode=slack' % ('a' * 64), {
+        'instance': plugins.NotifyMatrix,
+    }),
+    # Name, port, token and matrix mode
+    ('matrix://user@localhost:9000/%s?mode=matrix' % ('a' * 64), {
+        'instance': plugins.NotifyMatrix,
+    }),
+    # Name, port, token and invalid mode
+    ('matrix://user@localhost:9000/%s?mode=foo' % ('a' * 64), {
+        'instance': plugins.NotifyMatrix,
+    }),
+    ('matrix://user@localhost:9000/%s?mode=slack' % ('a' * 64), {
+        'instance': plugins.NotifyMatrix,
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('matrix://user@localhost:9000/%s?mode=slack' % ('a' * 64), {
+        'instance': plugins.NotifyMatrix,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('matrix://user@localhost:9000/%s?mode=slack' % ('a' * 64), {
+        'instance': plugins.NotifyMatrix,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifyMatterMost
     ##################################
     ('mmost://', {
