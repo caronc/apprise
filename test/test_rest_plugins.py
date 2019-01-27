@@ -579,7 +579,7 @@ TEST_URLS = (
     }),
     # Name, port, token and invalid mode
     ('matrix://user@localhost:9000/%s?mode=foo' % ('a' * 64), {
-        'instance': plugins.NotifyMatrix,
+        'instance': TypeError,
     }),
     ('matrix://user@localhost:9000/%s?mode=slack' % ('a' * 64), {
         'instance': plugins.NotifyMatrix,

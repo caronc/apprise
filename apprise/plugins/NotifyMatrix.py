@@ -2,7 +2,7 @@
 #
 # Matrix WebHook Notify Wrapper
 #
-# Copyright (C) 2018 Chris Caron <lead2gold@gmail.com>, Wim de With <wf@dewith.io>
+# Copyright (C) 2018-2019 Chris Caron <lead2gold@gmail.com>
 #
 # This file is part of apprise.
 #
@@ -30,8 +30,6 @@ from time import time
 
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
-from ..common import NotifyImageSize
-from ..utils import compat_is_basestring
 
 # Token required as part of the API request
 VALIDATE_TOKEN = re.compile(r'[A-Za-z0-9]{64}')
@@ -45,14 +43,17 @@ MATRIX_HTTP_ERROR_MAP.update({
     403: 'Unauthorized - Invalid Token.',
 })
 
+
 class MatrixNotificationMode(object):
-    SLACK = 0
-    MATRIX = 1
+    SLACK = "slack"
+    MATRIX = "matrix"
+
 
 MATRIX_NOTIFICATION_MODES = (
     MatrixNotificationMode.SLACK,
     MatrixNotificationMode.MATRIX,
 )
+
 
 class NotifyMatrix(NotifyBase):
     """
@@ -77,7 +78,7 @@ class NotifyMatrix(NotifyBase):
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 1000
 
-    def __init__(self, token, mode=None, **kwargs):
+    def __init__(self, token, mode=MatrixNotificationMode.MATRIX, **kwargs):
         """
         Initialize Matrix Object
         """
@@ -90,10 +91,12 @@ class NotifyMatrix(NotifyBase):
             self.schema = 'http'
 
         if not isinstance(self.port, int):
-            self.notify_url = '%s://%s/api/v1/matrix/hook' % (self.schema, self.host)
+            self.notify_url = '%s://%s/api/v1/matrix/hook' % (
+                self.schema, self.host)
 
         else:
-            self.notify_url = '%s://%s:%d/api/v1/matrix/hook' % (self.schema, self.host, self.port)
+            self.notify_url = '%s://%s:%d/api/v1/matrix/hook' % (
+                self.schema, self.host, self.port)
 
         if not VALIDATE_TOKEN.match(token.strip()):
             self.logger.warning(
@@ -111,13 +114,11 @@ class NotifyMatrix(NotifyBase):
                 'No user was specified; using %s.' % MATRIX_DEFAULT_USER)
             self.user = MATRIX_DEFAULT_USER
 
-        if not mode:
-            self.logger.warning(
-                'No mode was specified, using Slack mode')
-            self.mode = MatrixNotificationMode.SLACK
+        if mode not in MATRIX_NOTIFICATION_MODES:
+            self.logger.warning('The mode specified (%s) is invalid.' % mode)
+            raise TypeError('The mode specified (%s) is invalid.' % mode)
 
-        else:
-            self.mode = mode
+        self.mode = mode
 
         self._re_formatting_map = {
             # New lines must become the string version
@@ -159,7 +160,7 @@ class NotifyMatrix(NotifyBase):
             self.token,
         )
 
-        if self.mode is MatrixNotificationMode.MATRIX:
+        if self.mode == MatrixNotificationMode.MATRIX:
             payload = self.__matrix_mode_payload(title, body, notify_type)
 
         else:
@@ -188,8 +189,7 @@ class NotifyMatrix(NotifyBase):
                 except KeyError:
                     self.logger.warning(
                         'Failed to send Matrix '
-                        'notification (error=%s).' %
-                            r.status_code)
+                        'notification (error=%s).' % r.status_code)
 
                 # Return; we're done
                 notify_okay = False
@@ -254,13 +254,7 @@ class NotifyMatrix(NotifyBase):
         results['token'] = NotifyBase.unquote(results['query'])
 
         if 'mode' in results['qsd'] and len(results['qsd']['mode']):
-            _map = {
-                'slack': MatrixNotificationMode.SLACK,
-                'matrix': MatrixNotificationMode.MATRIX,
-            }
-            try:
-                results['mode'] = _map[results['qsd']['mode'].lower()]
-            except KeyError:
-                pass
+            results['mode'] = results['qsd']\
+                .get('mode', MatrixNotificationMode.MATRIX).lower()
 
         return results

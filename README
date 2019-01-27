@@ -62,6 +62,12 @@ The table below identifies the services this tool supports and some example serv
 	kodi://user@hostname
 	kodi://user:password@hostname:port
 
+* Matrix
+	matrix://token
+	matrix://user@token
+	matrixs://token?mode=slack
+	matrixs://user@token?mode=matrix
+
 * Mattermost
 	mmost://hostname/authkey
 	mmost://hostname:80/authkey
