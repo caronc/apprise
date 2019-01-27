@@ -254,6 +254,39 @@ class Apprise(object):
                     # Apply Markdown
                     conversion_map[server.notify_format] = markdown(body)
 
+                elif body_format == NotifyFormat.TEXT and \
+                        server.notify_format == NotifyFormat.HTML:
+
+                    # Basic TEXT to HTML format map; supports keys only
+                    re_map = {
+                        # Support Ampersand
+                        r'&': '&amp;',
+
+                        # Spaces to &nbsp; for formatting purposes since
+                        # multiple spaces are treated as one an this may not
+                        # be the callers intention
+                        r' ': '&nbsp;',
+
+                        # Tab support
+                        r'\t': '&nbsp;&nbsp;&nbsp;',
+
+                        # Greater than and Less than Characters
+                        r'>': '&gt;',
+                        r'<': '&lt;',
+                    }
+
+                    # Compile our map
+                    re_table = re.compile(
+                        r'(' + '|'.join(map(re.escape, re_map.keys())) + r')',
+                        re.IGNORECASE,
+                    )
+
+                    # Execute our map against our body in addition to swapping
+                    # out new lines and replacing them with <br/>
+                    conversion_map[server.notify_format] = \
+                        re.sub(r'\r*\n', '<br/>\r\n',
+                               re_table.sub(lambda x: re_map[x.group()], body))
+
                 else:
                     # Store entry directly
                     conversion_map[server.notify_format] = body
