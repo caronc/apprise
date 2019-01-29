@@ -1,6 +1,6 @@
-pytest
 coverage
-pytest-cov
-pycodestyle
+flake8
 mock
+pytest
+pytest-cov
 tox

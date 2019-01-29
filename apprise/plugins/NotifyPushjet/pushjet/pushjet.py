@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 
+import sys
 import requests
 from functools import partial
+
+from six import text_type
+from six.moves.urllib.parse import urljoin
 
 from .utilities import (
     NoNoneDict,
@@ -9,14 +13,6 @@ from .utilities import (
     is_valid_uuid, is_valid_public_key, is_valid_secret_key, repr_format
 )
 from .errors import NonexistentError, SubscriptionError, RequestError, ServerError
-
-import sys
-if sys.version_info[0] >= 3:
-    from urllib.parse import urljoin
-    unicode_type = str
-else:
-    from urlparse import urljoin
-    unicode_type = unicode
 
 DEFAULT_API_URL = 'https://api.pushjet.io/'
 
@@ -52,8 +48,8 @@ class Service(PushjetModel):
             raise ValueError("Invalid secret key provided.")
         elif public_key and not is_valid_public_key(public_key):
             raise ValueError("Invalid public key provided.")
-        self.secret_key = unicode_type(secret_key) if secret_key else None
-        self.public_key = unicode_type(public_key) if public_key else None
+        self.secret_key = text_type(secret_key) if secret_key else None
+        self.public_key = text_type(public_key) if public_key else None
         self.refresh()
     
     def _request(self, endpoint, method, is_secret, params=None, data=None):
@@ -97,8 +93,8 @@ class Service(PushjetModel):
         if not data:
             return
         self._request('service', 'PATCH', is_secret=True, data=data)
-        self.name = unicode_type(name)
-        self.icon_url = unicode_type(icon_url)
+        self.name = text_type(name)
+        self.icon_url = text_type(icon_url)
 
     @requires_secret_key
     def delete(self):
@@ -171,10 +167,10 @@ class Device(PushjetModel):
         return "<Pushjet Device: {}>".format(self.uuid)
 
     def __init__(self, uuid):
-        uuid = unicode_type(uuid)
+        uuid = text_type(uuid)
         if not is_valid_uuid(uuid):
             raise ValueError("Invalid UUID provided. Try uuid.uuid4().")
-        self.uuid = unicode_type(uuid)
+        self.uuid = text_type(uuid)
     
     def _request(self, endpoint, method, params=None, data=None):
         params = (params or {})
@@ -292,7 +288,7 @@ class Api(object):
         return "<Pushjet Api: {}>".format(self.url).encode(sys.stdout.encoding, errors='replace')
 
     def __init__(self, url):
-        self.url = unicode_type(url)
+        self.url = text_type(url)
         self.Service = with_api_bound(Service, self)
         self.Device = with_api_bound(Device, self)
     
