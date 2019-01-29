@@ -18,28 +18,24 @@ matrix:
     - python: "pypy2.7-5.8.0"
       env: TOXENV=pypy
     - python: "pypy3.5-5.8.0"
-env: TOXENV=pypy3
+      env: TOXENV=pypy3
 
 
 install:
   - pip install .
-  - pip install tox
+  - pip install codecov tox
   - pip install -r dev-requirements.txt
   - pip install -r requirements.txt
-
-
-before_install:
-  - pip install codecov
-
-
-after_success:
-  - tox -e coverage-report
-  - codecov
 
 
 # run tests
 script:
   - tox
+
+
+after_success:
+  - tox -e coverage-report
+  - codecov
 
 
 notifications:
