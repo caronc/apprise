@@ -352,11 +352,9 @@ class NotifyEmail(NotifyBase):
         # Prepare Email Message
         if self.notify_format == NotifyFormat.HTML:
             email = MIMEText(body, 'html')
-            email['Content-Type'] = 'text/html'
 
         else:
-            email = MIMEText(body, 'text')
-            email['Content-Type'] = 'text/plain'
+            email = MIMEText(body, 'plain')
 
         email['Subject'] = title
         email['From'] = '%s <%s>' % (from_name, self.from_addr)
