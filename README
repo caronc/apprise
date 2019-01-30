@@ -36,6 +36,9 @@ The table below identifies the services this tool supports and some example serv
 * Faast
 	faast://authorizationtoken
 
+* Gnome Notifications
+	gnome://
+
 * Growl
 	growl://hostname
 	growl://hostname:portno
