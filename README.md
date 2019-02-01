@@ -12,7 +12,7 @@ To inform or tell (someone). To make one aware of something.
 * A common and intuitive notification syntax.
 * Supports the handling of images (to the notification services that will accept them).
 
-System owners who wish to provide a notification service no longer need to research each and every new notification service as they come along. They just need to include this one library and then they can immediately gain access to a wide range of notifications services.
+System owners who wish to provide a notification service no longer need to research each and every new one as they appear. They just need to include this one library and then they can immediately gain access to almost all of the notifications services available to us today.
 
 System Administrators who wish to send a notification from a scheduled task or from the command line also no longer need to find the right tool for the job.  Everything is already wrapped and supported within the *apprise* script that ships with this product.
 
@@ -69,7 +69,7 @@ Apprise have some email services built right into it (such as yahoo, fastmail, h
 | [XML](https://github.com/caronc/apprise/wiki/Notify_Custom_XML)         | xml:// or xmls://   | (TCP) 80 or 443 | xml://hostname<br />xml://user@hostname<br />xml://user:password@hostname:port<br />xml://hostname/a/path/to/post/to
 
 ## Installation
-The easiest way is to install from pypi:
+The easiest way is to install this package is from pypi:
 ```bash
 pip install apprise
 ```
@@ -77,6 +77,7 @@ pip install apprise
 A small command line tool is also provided with this package called *apprise*. If you know the server url's you wish to notify, you can simply provide them all on the command line and send your notifications that way:
 ```bash
 # Send a notification to as many servers as you want to specify
+# as you can easily chain them together:
 apprise -t 'my title' -b 'my notification body' \
    'mailto://myemail:mypass@gmail.com' \
    'pbul://o.gn5kj6nfhv736I7jC3cj3QLRiyhgl98b'
@@ -110,4 +111,4 @@ apobj.notify(
 )
 ```
 
-If you're interesting in reading more about this and methods on how to customize your own notifications, please check out the wiki at https://github.com/caronc/apprise/wiki/Development_API
+If you're interested in reading more about this and methods on how to customize your own notifications, please check out the wiki at https://github.com/caronc/apprise/wiki/Development_API
