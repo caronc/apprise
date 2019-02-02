@@ -66,7 +66,7 @@ __all__ = [
     # Notification Services
     'NotifyBoxcar', 'NotifyEmail', 'NotifyEmby', 'NotifyDiscord',
     'NotifyFaast', 'NotifyGrowl', 'NotifyIFTTT', 'NotifyJoin', 'NotifyJSON',
-    'NotifyMatterMost', 'NotifyProwl', 'NotifyPushalot',
+    'NotifyMatrix', 'NotifyMatterMost', 'NotifyProwl', 'NotifyPushalot',
     'NotifyPushBullet', 'NotifyPushjet', 'NotifyPushover', 'NotifyRocketChat',
     'NotifySlack', 'NotifyStride', 'NotifyToasty', 'NotifyTwitter',
     'NotifyTelegram', 'NotifyXBMC', 'NotifyXML', 'NotifyWindows',
