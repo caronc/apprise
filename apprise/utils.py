@@ -91,6 +91,9 @@ TIDY_NUX_TRIM_RE = re.compile(
     ),
 )
 
+# Used for attempting to acquire the schema if the URL can't be parsed.
+GET_SCHEMA_RE = re.compile(r'\s*(?P<schema>[a-z0-9]{2,9})://.*$', re.I)
+
 
 def is_hostname(hostname):
     """

@@ -31,6 +31,7 @@ from .common import NotifyType
 from .common import NotifyFormat
 from .utils import parse_list
 from .utils import compat_is_basestring
+from .utils import GET_SCHEMA_RE
 
 from .AppriseAsset import AppriseAsset
 
@@ -42,9 +43,6 @@ logger = logging.getLogger(__name__)
 
 # Build a list of supported plugins
 SCHEMA_MAP = {}
-
-# Used for attempting to acquire the schema if the URL can't be parsed.
-GET_SCHEMA_RE = re.compile(r'\s*(?P<schema>[a-z0-9]{3,9})://.*$', re.I)
 
 
 # Load our Lookup Matrix

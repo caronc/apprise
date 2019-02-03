@@ -1,5 +1,11 @@
 language: python
 
+dist: xenial
+
+addons:
+  apt:
+    packages:
+      - libdbus-1-dev
 
 matrix:
   include:
@@ -12,30 +18,27 @@ matrix:
     - python: "3.6"
       env: TOXENV=py36
     - python: "3.7"
-      dist: xenial
       env: TOXENV=py37
-    - python: "pypy2.7-5.8.0"
+    - python: "pypy2.7-6.0"
       env: TOXENV=pypy
-    - python: "pypy3.5-5.8.0"
+    - python: "pypy3.5-6.0"
       env: TOXENV=pypy3
-
 
 install:
   - pip install .
   - pip install codecov tox
   - pip install -r dev-requirements.txt
   - pip install -r requirements.txt
+  - if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then travis_retry pip install dbus-python; fi
 
 
 # run tests
 script:
   - tox
 
-
 after_success:
   - tox -e coverage-report
   - codecov
-
 
 notifications:
   email: false
