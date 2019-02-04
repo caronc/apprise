@@ -234,7 +234,7 @@ class AppriseAsset(object):
             'app_desc': self.app_desc,
             'default_extension': self.default_extension,
             'theme': self.theme,
-            'image_path_mask': self.image_url_mask,
+            'image_path_mask': self.image_path_mask,
             'image_url_mask': self.image_url_mask,
             'image_url_logo': self.image_url_logo,
         }
