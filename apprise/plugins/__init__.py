@@ -67,10 +67,11 @@ __all__ = [
     # Notification Services
     'NotifyBoxcar', 'NotifyEmail', 'NotifyEmby', 'NotifyDiscord',
     'NotifyFaast', 'NotifyGnome', 'NotifyGrowl', 'NotifyIFTTT', 'NotifyJoin',
-    'NotifyJSON', 'NotifyMatterMost', 'NotifyProwl', 'NotifyPushalot',
-    'NotifyPushBullet', 'NotifyPushjet', 'NotifyPushover', 'NotifyRocketChat',
-    'NotifySlack', 'NotifyStride', 'NotifyToasty', 'NotifyTwitter',
-    'NotifyTelegram', 'NotifyXBMC', 'NotifyXML', 'NotifyWindows',
+    'NotifyJSON', 'NotifyMatrix', 'NotifyMatterMost', 'NotifyProwl',
+    'NotifyPushalot', 'NotifyPushBullet', 'NotifyPushjet', 'NotifyPushover',
+    'NotifyRocketChat', 'NotifySlack', 'NotifyStride', 'NotifyToasty',
+    'NotifyTwitter', 'NotifyTelegram', 'NotifyXBMC', 'NotifyXML',
+    'NotifyWindows',
 
     # Reference
     'NotifyImageSize', 'NOTIFY_IMAGE_SIZES', 'NotifyType', 'NOTIFY_TYPES',

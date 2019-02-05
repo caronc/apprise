@@ -65,7 +65,6 @@ def test_gnome_plugin():
     gi = types.ModuleType(gi_name)
     gi.repository = types.ModuleType(gi_name + '.repository')
     gi.module = types.ModuleType(gi_name + '.module')
-    gi.module.mock_parent = mock.Mock()
 
     mock_pixbuf = mock.Mock()
     mock_notify = mock.Mock()

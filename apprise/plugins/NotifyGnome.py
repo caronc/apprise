@@ -1,11 +1,5 @@
 # -*- coding: utf-8 -*-
 #
-# Gnome Notify Wrapper
-#
-# Copyright (C) 2019 Chris Caron <lead2gold@gmail.com>
-#
-# -*- coding: utf-8 -*-
-#
 # Copyright (C) 2019 Chris Caron <lead2gold@gmail.com>
 # All rights reserved.
 #
