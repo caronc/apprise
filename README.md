@@ -16,10 +16,12 @@ System owners who wish to provide a notification service no longer need to resea
 
 System Administrators who wish to send a notification from a scheduled task or from the command line also no longer need to find the right tool for the job.  Everything is already wrapped and supported within the *apprise* script that ships with this product.
 
+[![Paypal](https://img.shields.io/badge/paypal-donate-green.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=MHANV39UZNQ5E)
+[![Patreon](https://img.shields.io/badge/patreon-donate-green.svg)](https://www.patreon.com/caronc)<br/>
+[![Python](https://img.shields.io/pypi/pyversions/apprise.svg?style=flat-square)](https://www.patreon.com/lead2gold)
 [![Build Status](https://travis-ci.org/caronc/apprise.svg?branch=master)](https://travis-ci.org/caronc/apprise)
 [![CodeCov Status](https://codecov.io/github/caronc/apprise/branch/master/graph/badge.svg)](https://codecov.io/github/caronc/apprise)
-[![Paypal](http://repo.nuxref.com/pub/img/paypaldonate.svg)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=MHANV39UZNQ5E)
-[![Patreon](http://repo.nuxref.com/pub/img/patreondonate.svg)](https://www.patreon.com/lead2gold)
+[![PyPi](https://img.shields.io/pypi/dm/apprise.svg?style=flat-square)](https://pypi.org/project/apprise/)
 
 ## Supported Notifications
 The section identifies all of the services supported by this library. [Check out the wiki for more information on the supported modules here](https://github.com/caronc/apprise/wiki).

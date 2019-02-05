@@ -1,6 +1,5 @@
 include LICENSE
 include README.md
-include README
 include requirements.txt
 include win-requirements.txt
 include dev-requirements.txt

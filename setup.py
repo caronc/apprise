@@ -53,7 +53,8 @@ setup(
     version='0.5.2',
     description='A universal notification service',
     license='MIT',
-    long_description=open('README').read(),
+    long_description=open('README.md').read(),
+    long_description_content_type='text/markdown',
     url='https://github.com/caronc/apprise',
     keywords='push notifications email boxcar faast growl Join KODI '
         'Mattermost Prowl Pushalot PushBullet Pushjet '
