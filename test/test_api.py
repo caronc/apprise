@@ -35,7 +35,6 @@ from apprise import NotifyBase
 from apprise import NotifyType
 from apprise import NotifyFormat
 from apprise import NotifyImageSize
-from apprise import plugins
 from apprise import __version__
 from apprise.Apprise import __load_matrix
 import pytest
@@ -243,27 +242,35 @@ def test_apprise_notify_formats(tmpdir):
     assert(len(a) == 0)
 
     class TextNotification(NotifyBase):
+        # set our default notification format
+        notify_format = NotifyFormat.TEXT
+
         def __init__(self, **kwargs):
-            super(TextNotification, self).__init__(
-                notify_format=NotifyFormat.TEXT)
+            super(TextNotification, self).__init__()
 
         def notify(self, **kwargs):
             # Pretend everything is okay
             return True
 
     class HtmlNotification(NotifyBase):
+
+        # set our default notification format
+        notify_format = NotifyFormat.HTML
+
         def __init__(self, **kwargs):
-            super(HtmlNotification, self).__init__(
-                notify_format=NotifyFormat.HTML)
+            super(HtmlNotification, self).__init__()
 
         def notify(self, **kwargs):
             # Pretend everything is okay
             return True
 
     class MarkDownNotification(NotifyBase):
+
+        # set our default notification format
+        notify_format = NotifyFormat.MARKDOWN
+
         def __init__(self, **kwargs):
-            super(MarkDownNotification, self).__init__(
-                notify_format=NotifyFormat.MARKDOWN)
+            super(MarkDownNotification, self).__init__()
 
         def notify(self, **kwargs):
             # Pretend everything is okay
@@ -339,7 +346,7 @@ def test_apprise_asset(tmpdir):
         # The exception we expect since dict is not supported
         assert(True)
 
-    except:
+    except Exception:
         # Any other exception is not good
         assert(False)
 

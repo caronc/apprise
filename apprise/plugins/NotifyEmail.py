@@ -227,6 +227,9 @@ class NotifyEmail(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_email'
 
+    # Default Notify Format
+    notify_format = NotifyFormat.HTML
+
     # Default Non-Encryption Port
     default_port = 25
 
@@ -433,19 +436,9 @@ class NotifyEmail(NotifyBase):
 
         # Apply our settings now
 
-        # Default Format is HTML
-        results['notify_format'] = NotifyFormat.HTML
-        results['secure_mode'] = NotifyEmail.default_secure_mode
-
         to_addr = ''
         from_addr = ''
         smtp_host = ''
-
-        if 'format' in results['qsd'] and len(results['qsd']['format']):
-            # Extract email format (Text/Html)
-            format = NotifyBase.unquote(results['qsd']['format']).lower()
-            if len(format) > 0 and format[0] == 't':
-                results['notify_format'] = NotifyFormat.TEXT
 
         # Attempt to detect 'from' email address
         if 'from' in results['qsd'] and len(results['qsd']['from']):

@@ -62,6 +62,7 @@ from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyImageSize
 from ..utils import compat_is_basestring
 from ..utils import parse_bool
+from ..common import NotifyFormat
 
 TELEGRAM_IMAGE_XY = NotifyImageSize.XY_256
 
@@ -262,7 +263,7 @@ class NotifyTelegram(NotifyBase):
                     # Try to get the error message if we can:
                     error_msg = loads(r.content)['description']
 
-                except:
+                except Exception:
                     error_msg = None
 
                 try:
@@ -356,24 +357,50 @@ class NotifyTelegram(NotifyBase):
 
         payload = {}
 
-        # HTML Spaces (&nbsp;) and tabs (&emsp;) aren't supported
-        # See https://core.telegram.org/bots/api#html-style
-        title = re.sub('&nbsp;?', ' ', title, re.I)
-        body = re.sub('&nbsp;?', ' ', body, re.I)
-        # Tabs become 3 spaces
-        title = re.sub('&emsp;?', '   ', title, re.I)
-        body = re.sub('&emsp;?', '   ', body, re.I)
+        # Prepare Email Message
+        if self.notify_format == NotifyFormat.MARKDOWN:
+            payload['parse_mode'] = 'MARKDOWN'
 
-        # HTML
-        title = NotifyBase.escape_html(title, whitespace=False)
-        body = NotifyBase.escape_html(body, whitespace=False)
+        else:
+            # Either TEXT or HTML; if TEXT we'll make it HTML
+            payload['parse_mode'] = 'HTML'
 
-        payload['parse_mode'] = 'HTML'
+            # HTML Spaces (&nbsp;) and tabs (&emsp;) aren't supported
+            # See https://core.telegram.org/bots/api#html-style
+            body = re.sub('&nbsp;?', ' ', body, re.I)
 
-        payload['text'] = '<b>%s</b>\r\n%s' % (
-            title,
-            body,
-        )
+            # Tabs become 3 spaces
+            body = re.sub('&emsp;?', '   ', body, re.I)
+
+            if title:
+                # HTML Spaces (&nbsp;) and tabs (&emsp;) aren't supported
+                # See https://core.telegram.org/bots/api#html-style
+                title = re.sub('&nbsp;?', ' ', title, re.I)
+
+                # Tabs become 3 spaces
+                title = re.sub('&emsp;?', '   ', title, re.I)
+
+            # HTML
+            title = NotifyBase.escape_html(title, whitespace=False)
+            body = NotifyBase.escape_html(body, whitespace=False)
+
+        # Assign the body
+        payload['text'] = body
+
+        if title and self.notify_format == NotifyFormat.TEXT:
+            # Text HTML Formatting
+            payload['text'] = '<b>%s</b>\r\n%s' % (
+                title,
+                body,
+            )
+
+        elif title:
+            # Already HTML; trust developer has wrapped
+            # the title appropriately
+            payload['text'] = '%s\r\n%s' % (
+                title,
+                body,
+            )
 
         # Create a copy of the chat_ids list
         chat_ids = list(self.chat_ids)
@@ -426,7 +453,7 @@ class NotifyTelegram(NotifyBase):
                         # Try to get the error message if we can:
                         error_msg = loads(r.content)['description']
 
-                    except:
+                    except Exception:
                         error_msg = None
 
                     try:
