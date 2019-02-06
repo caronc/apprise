@@ -278,7 +278,7 @@ class NotifyDiscord(NotifyBase):
 
         # Use Thumbnail
         results['thumbnail'] = \
-            parse_bool(results['qsd'].get('thumbnail', True))
+            parse_bool(results['qsd'].get('thumbnail', False))
 
         return results
 
