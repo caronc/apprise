@@ -77,9 +77,6 @@ class NotifyDiscord(NotifyBase):
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 2000
 
-    # Default Notify Format
-    notify_format = NotifyFormat.MARKDOWN
-
     def __init__(self, webhook_id, webhook_token, tts=False, avatar=True,
                  footer=False, thumbnail=True, **kwargs):
         """
@@ -136,9 +133,15 @@ class NotifyDiscord(NotifyBase):
             'wait': self.tts is False,
 
             # Our color associated with our notification
-            'color': self.color(notify_type, int),
+            'color': self.color(notify_type, int)
+        }
 
-            'embeds': [{
+        # Acquire image_url
+        image_url = self.image_url(notify_type)
+
+        if self.notify_format == NotifyFormat.MARKDOWN:
+            # Use embeds for payload
+            payload['embeds'] = [{
                 'provider': {
                     'name': self.app_id,
                     'url': self.app_url,
@@ -147,9 +150,8 @@ class NotifyDiscord(NotifyBase):
                 'type': 'rich',
                 'description': body,
             }]
-        }
 
-        if self.notify_format == NotifyFormat.MARKDOWN:
+            # Break titles out so that we can sort them in embeds
             fields = self.extract_markdown_sections(body)
 
             if len(fields) > 0:
@@ -160,25 +162,29 @@ class NotifyDiscord(NotifyBase):
                     fields[0].get('name') + fields[0].get('value')
                 payload['embeds'][0]['fields'] = fields[1:]
 
-        if self.footer:
-            logo_url = self.image_url(notify_type, logo=True)
-            payload['embeds'][0]['footer'] = {
-                'text': self.app_desc,
-            }
-            if logo_url:
-                payload['embeds'][0]['footer']['icon_url'] = logo_url
+            if self.footer:
+                logo_url = self.image_url(notify_type, logo=True)
+                payload['embeds'][0]['footer'] = {
+                    'text': self.app_desc,
+                }
 
-        image_url = self.image_url(notify_type)
-        if image_url:
-            if self.thumbnail:
+                if logo_url:
+                    payload['embeds'][0]['footer']['icon_url'] = logo_url
+
+            if self.thumbnail and image_url:
                 payload['embeds'][0]['thumbnail'] = {
                     'url': image_url,
                     'height': 256,
                     'width': 256,
                 }
 
-            if self.avatar:
-                payload['avatar_url'] = image_url
+        else:
+            # not markdown
+            payload['content'] = body if not title \
+                    else "{}\r\n{}".format(title, body)
+
+        if self.avatar and image_url:
+            payload['avatar_url'] = image_url
 
         if self.user:
             # Optionally override the default username of the webhook
@@ -291,8 +297,8 @@ class NotifyDiscord(NotifyBase):
 
         """
         regex = re.compile(
-            r'\s*#+\s*(?P<name>[^#\n]+)([ \r\t\v#]*)'
-            r'(?P<value>(.+?)(\n(?!\s#))|\s*$)', flags=re.S)
+            r'^\s*#+\s*(?P<name>[^#\n]+)([ \r\t\v#])?'
+            r'(?P<value>([^ \r\t\v#].+?)(\n(?!\s#))|\s*$)', flags=re.S|re.M)
 
         common = regex.finditer(markdown)
         fields = list()
