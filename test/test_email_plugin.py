@@ -26,6 +26,8 @@
 from apprise import plugins
 from apprise import NotifyType
 from apprise import Apprise
+from apprise.plugins import NotifyEmailBase
+
 import smtplib
 import mock
 import re
@@ -287,8 +289,6 @@ def test_webbase_lookup(mock_smtp, mock_smtpssl):
 
     """
 
-    from apprise.plugins import NotifyEmailBase
-
     # Insert a test email at the head of our table
     NotifyEmailBase.WEBBASE_LOOKUP_TABLE = (
         (
@@ -323,8 +323,6 @@ def test_smtplib_init_fail(mock_smtplib):
     API: Test exception handling when calling smtplib.SMTP()
 
     """
-
-    from apprise.plugins import NotifyEmailBase
 
     obj = Apprise.instantiate(
         'mailto://user:pass@gmail.com', suppress_exceptions=False)
@@ -362,8 +360,7 @@ def test_smtplib_send_okay(mock_smtplib):
 
     """
 
-    from apprise.plugins import NotifyEmailBase
-
+    # Defaults to HTML
     obj = Apprise.instantiate(
         'mailto://user:pass@gmail.com', suppress_exceptions=False)
     assert(isinstance(obj, plugins.NotifyEmail))
@@ -374,4 +371,13 @@ def test_smtplib_send_okay(mock_smtplib):
     mock_smtplib.sendmail.return_value = True
     mock_smtplib.quit.return_value = True
 
-    obj.notify(title='test', body='body', notify_type=NotifyType.INFO)
+    assert(obj.notify(
+        title='test', body='body', notify_type=NotifyType.INFO) is True)
+
+    # Set Text
+    obj = Apprise.instantiate(
+        'mailto://user:pass@gmail.com?format=text', suppress_exceptions=False)
+    assert(isinstance(obj, plugins.NotifyEmail))
+
+    assert(obj.notify(
+        title='test', body='body', notify_type=NotifyType.INFO) is True)

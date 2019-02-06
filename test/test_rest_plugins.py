@@ -140,6 +140,15 @@ TEST_URLS = (
         'instance': plugins.NotifyDiscord,
         'requests_response_code': requests.codes.no_content,
     }),
+    # different format support
+    ('discord://%s/%s?format=markdown' % ('i' * 24, 't' * 64), {
+        'instance': plugins.NotifyDiscord,
+        'requests_response_code': requests.codes.no_content,
+    }),
+    ('discord://%s/%s?format=text' % ('i' * 24, 't' * 64), {
+        'instance': plugins.NotifyDiscord,
+        'requests_response_code': requests.codes.no_content,
+    }),
     # Test without image set
     ('discord://%s/%s' % ('i' * 24, 't' * 64), {
         'instance': plugins.NotifyDiscord,
@@ -1155,6 +1164,16 @@ TEST_URLS = (
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?format=', {
         'instance': plugins.NotifyTelegram,
     }),
+    # Testing valid formats
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?format=markdown', {
+        'instance': plugins.NotifyTelegram,
+    }),
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?format=html', {
+        'instance': plugins.NotifyTelegram,
+    }),
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?format=text', {
+        'instance': plugins.NotifyTelegram,
+    }),
     # Simple Message without image
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/', {
         'instance': plugins.NotifyTelegram,
@@ -1486,6 +1505,9 @@ def test_rest_plugins(mock_post, mock_get):
                     assert(hasattr(key, obj))
                     assert(getattr(key, obj) == val)
 
+            #
+            # Stage 1: with title defined
+            #
             try:
                 if test_requests_exceptions is False:
                     # check that we're as expected
@@ -1501,6 +1523,44 @@ def test_rest_plugins(mock_post, mock_get):
                         try:
                             assert obj.notify(
                                 title='test', body='body',
+                                notify_type=NotifyType.INFO) is False
+
+                        except AssertionError:
+                            # Don't mess with these entries
+                            raise
+
+                        except Exception as e:
+                            # We can't handle this exception type
+                            print('%s / %s' % (url, str(e)))
+                            assert False
+
+            except AssertionError:
+                # Don't mess with these entries
+                print('%s AssertionError' % url)
+                raise
+
+            except Exception as e:
+                # Check that we were expecting this exception to happen
+                assert isinstance(e, response)
+
+            #
+            # Stage 1: without title defined
+            #
+            try:
+                if test_requests_exceptions is False:
+                    # check that we're as expected
+                    assert obj.notify(
+                        title='', body='body',
+                        notify_type=notify_type) == response
+
+                else:
+                    for _exception in REQUEST_EXCEPTIONS:
+                        mock_post.side_effect = _exception
+                        mock_get.side_effect = _exception
+
+                        try:
+                            assert obj.notify(
+                                title='', body='body',
                                 notify_type=NotifyType.INFO) is False
 
                         except AssertionError:

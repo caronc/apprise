@@ -159,9 +159,9 @@ class NotifyBase(object):
         self.user = kwargs.get('user')
         self.password = kwargs.get('password')
 
-        if 'notify_format' in kwargs:
-            # Store the specified notify_format if specified
-            notify_format = kwargs.get('notify_format')
+        if 'format' in kwargs:
+            # Store the specified format if specified
+            notify_format = kwargs.get('format', '')
             if notify_format.lower() not in NOTIFY_FORMATS:
                 self.logger.error(
                     'Invalid notification format %s' % notify_format,

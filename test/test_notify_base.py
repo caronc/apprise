@@ -38,7 +38,7 @@ def test_notify_base():
 
     # invalid types throw exceptions
     try:
-        nb = NotifyBase(notify_format='invalid')
+        nb = NotifyBase(**{'format': 'invalid'})
         # We should never reach here as an exception should be thrown
         assert(False)
 
