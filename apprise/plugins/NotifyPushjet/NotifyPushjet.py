@@ -43,9 +43,6 @@ class NotifyPushjet(NotifyBase):
     # The default descriptive name associated with the Notification
     service_name = 'Pushjet'
 
-    # The services URL
-    service_url = 'https://pushjet.io/'
-
     # The default protocol
     protocol = 'pjet'
 
@@ -66,21 +63,16 @@ class NotifyPushjet(NotifyBase):
         Perform Pushjet Notification
         """
         try:
-            if self.user and self.host:
-                server = "http://"
-                if self.secure:
-                    server = "https://"
+            server = "http://"
+            if self.secure:
+                server = "https://"
 
-                server += self.host
-                if self.port:
-                    server += ":" + str(self.port)
+            server += self.host
+            if self.port:
+                server += ":" + str(self.port)
 
-                api = pushjet.Api(server)
-                service = api.Service(secret_key=self.user)
-
-            else:
-                api = pushjet.Api(pushjet.DEFAULT_API_URL)
-                service = api.Service(secret_key=self.host)
+            api = pushjet.Api(server)
+            service = api.Service(secret_key=self.user)
 
             service.send(body, title)
             self.logger.info('Sent Pushjet notification.')
@@ -91,3 +83,28 @@ class NotifyPushjet(NotifyBase):
             return False
 
         return True
+
+    @staticmethod
+    def parse_url(url):
+        """
+        Parses the URL and returns enough arguments that can allow
+        us to substantiate this object.
+
+        Syntax:
+           pjet://secret@hostname
+           pjet://secret@hostname:port
+           pjets://secret@hostname
+           pjets://secret@hostname:port
+
+        """
+        results = NotifyBase.parse_url(url)
+
+        if not results:
+            # We're done early as we couldn't load the results
+            return results
+
+        if not results.get('user'):
+            # a username is required
+            return None
+
+        return results
