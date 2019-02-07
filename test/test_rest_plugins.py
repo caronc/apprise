@@ -31,7 +31,6 @@ from apprise.utils import compat_is_basestring
 from apprise.common import NotifyFormat
 
 from json import dumps
-import uuid
 import requests
 import mock
 
@@ -247,63 +246,6 @@ TEST_URLS = (
     }),
     ('faast://%s' % ('a' * 32), {
         'instance': plugins.NotifyFaast,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
-
-    ##################################
-    # NotifyStride
-    ##################################
-    # no auth_key specified
-    ('stride://', {
-        'instance': None,
-    }),
-    # No token_a specified
-    ('stride://auth_key', {
-        # Missing a token
-        'instance': TypeError,
-    }),
-    # No token_b specified
-    ('stride://auth_key/{0}'.format(
-        str(uuid.uuid4())), {
-        'instance': TypeError,
-    }),
-    # invalid uuid entries
-    ('stride://auth_key/{0}/{1}'.format(
-        'invalid-uuid', str(uuid.uuid4())), {
-        'instance': TypeError,
-    }),
-    ('stride://auth_key/{0}/{1}'.format(
-        str(uuid.uuid4()), 'invalid-uuid'), {
-        'instance': TypeError,
-    }),
-    # A valid url
-    ('stride://auth_key/{0}/{1}'.format(
-        str(uuid.uuid4()), str(uuid.uuid4())), {
-        'instance': plugins.NotifyStride,
-    }),
-    # A very invalid URL
-    ('stride://:@/', {
-        'instance': None,
-    }),
-    ('stride://auth_key/{0}/{1}'.format(
-        str(uuid.uuid4()), str(uuid.uuid4())), {
-        'instance': plugins.NotifyStride,
-        # force a failure
-        'response': False,
-        'requests_response_code': requests.codes.internal_server_error,
-    }),
-    ('stride://auth_key/{0}/{1}'.format(
-        str(uuid.uuid4()), str(uuid.uuid4())), {
-        'instance': plugins.NotifyStride,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('stride://auth_key/{0}/{1}'.format(
-        str(uuid.uuid4()), str(uuid.uuid4())), {
-        'instance': plugins.NotifyStride,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -2141,40 +2083,6 @@ def test_notify_ifttt_plugin(mock_post, mock_get):
 
     assert obj.notify(title='title', body='body',
                       notify_type=NotifyType.INFO) is True
-
-
-def test_notify_stride_plugin():
-    """
-    API: NotifyStride() Extra Checks
-
-    """
-    try:
-        # Initializes the plugin with devices set to a string
-        plugins.NotifyStride(
-            auth_token=None,
-            cloud_id=str(uuid.uuid4()),
-            convo_id=str(uuid.uuid4()),
-        )
-        # The code shouldn't make it here, we should throw an exception
-        # on the previous line
-        assert False
-
-    except TypeError:
-        assert True
-
-    try:
-        # Initializes the plugin with devices set to a string
-        plugins.NotifyStride(
-            auth_token='key',
-            cloud_id=str(uuid.uuid4()),
-            convo_id=None,
-        )
-        # The code shouldn't make it here, we should throw an exception
-        # on the previous line
-        assert False
-
-    except TypeError:
-        assert True
 
 
 @mock.patch('requests.get')
