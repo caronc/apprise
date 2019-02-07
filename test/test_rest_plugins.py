@@ -1362,49 +1362,6 @@ TEST_URLS = (
     }),
 
     ##################################
-    # NotifyToasty (SuperToasty)
-    ##################################
-    ('toasty://', {
-        'instance': None,
-    }),
-    # No username specified but contains a device
-    ('toasty://%s' % ('d' * 32), {
-        'instance': TypeError,
-    }),
-    # User + 1 device
-    ('toasty://user@device', {
-        'instance': plugins.NotifyToasty,
-    }),
-    # User + 3 devices
-    ('toasty://user@device0/device1/device2/', {
-        'instance': plugins.NotifyToasty,
-        # don't include an image by default
-        'include_image': False,
-    }),
-    # bad url
-    ('toasty://:@/', {
-        'instance': None,
-    }),
-    ('toasty://user@device', {
-        'instance': plugins.NotifyToasty,
-        # force a failure
-        'response': False,
-        'requests_response_code': requests.codes.internal_server_error,
-    }),
-    ('toasty://user@device', {
-        'instance': plugins.NotifyToasty,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('toasty://user@device', {
-        'instance': plugins.NotifyToasty,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
-
-    ##################################
     # NotifyKODI
     ##################################
     ('xbmc://', {
@@ -2708,54 +2665,6 @@ def test_notify_rocketchat_plugin(mock_post, mock_get):
     # Logout
     #
     assert obj.logout() is False
-
-
-@mock.patch('requests.get')
-@mock.patch('requests.post')
-def test_notify_toasty_plugin(mock_post, mock_get):
-    """
-    API: NotifyToasty() Extra Checks
-
-    """
-
-    # Support strings
-    devices = 'device1,device2,,,,'
-
-    # User
-    user = 'l2g'
-
-    # Prepare Mock
-    mock_get.return_value = requests.Request()
-    mock_post.return_value = requests.Request()
-    mock_post.return_value.status_code = requests.codes.ok
-    mock_get.return_value.status_code = requests.codes.ok
-
-    try:
-        obj = plugins.NotifyToasty(user=user, devices=None)
-        # No devices specified
-        assert(False)
-
-    except TypeError:
-        # Exception should be thrown about the fact no token was specified
-        assert(True)
-
-    try:
-        obj = plugins.NotifyToasty(user=user, devices=set())
-        # No devices specified
-        assert(False)
-
-    except TypeError:
-        # Exception should be thrown about the fact no token was specified
-        assert(True)
-
-    obj = plugins.NotifyToasty(user=user, devices=devices)
-    assert(isinstance(obj, plugins.NotifyToasty))
-    assert(len(obj.devices) == 2)
-
-    # Support the handling of an empty and invalid URL strings
-    assert(plugins.NotifyToasty.parse_url(None) is None)
-    assert(plugins.NotifyToasty.parse_url('') is None)
-    assert(plugins.NotifyToasty.parse_url(42) is None)
 
 
 @mock.patch('requests.get')
