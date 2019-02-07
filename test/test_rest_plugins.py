@@ -687,50 +687,6 @@ TEST_URLS = (
     }),
 
     ##################################
-    # NotifyPushalot
-    ##################################
-    ('palot://', {
-        'instance': None,
-    }),
-    # AuthToken
-    ('palot://%s' % ('a' * 32), {
-        'instance': plugins.NotifyPushalot,
-    }),
-    # AuthToken, no image
-    ('palot://%s' % ('a' * 32), {
-        'instance': plugins.NotifyPushalot,
-        # don't include an image by default
-        'include_image': False,
-    }),
-    # Invalid AuthToken
-    ('palot://%s' % ('a' * 24), {
-        # Missing a channel
-        'instance': TypeError,
-    }),
-    # AuthToken + bad url
-    ('palot://:@/', {
-        'instance': None,
-    }),
-    ('palot://%s' % ('a' * 32), {
-        'instance': plugins.NotifyPushalot,
-        # force a failure
-        'response': False,
-        'requests_response_code': requests.codes.internal_server_error,
-    }),
-    ('palot://%s' % ('a' * 32), {
-        'instance': plugins.NotifyPushalot,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('palot://%s' % ('a' * 32), {
-        'instance': plugins.NotifyPushalot,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
-
-    ##################################
     # NotifyPushBullet
     ##################################
     ('pbul://', {
@@ -768,7 +724,25 @@ TEST_URLS = (
     ('pbul://%s/device/#channel/user@example.com/' % ('a' * 32), {
         'instance': plugins.NotifyPushBullet,
     }),
-    # APIKey + bad url
+    # ,
+    ('pbul://%s' % ('a' * 32), {
+        'instance': plugins.NotifyPushBullet,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('pbul://%s' % ('a' * 32), {
+        'instance': plugins.NotifyPushBullet,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('pbul://%s' % ('a' * 32), {
+        'instance': plugins.NotifyPushBullet,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
     ('pbul://:@/', {
         'instance': None,
     }),
@@ -786,6 +760,98 @@ TEST_URLS = (
     }),
     ('pbul://%s' % ('a' * 32), {
         'instance': plugins.NotifyPushBullet,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+
+    ##################################
+    # NotifyPushed
+    ##################################
+    ('pushed://', {
+        'instance': None,
+    }),
+    # Application Key Only
+    ('pushed://%s' % ('a' * 32), {
+        'instance': TypeError,
+    }),
+    # Application Key+Secret
+    ('pushed://%s/%s' % ('a' * 32, 'a' * 64), {
+        'instance': plugins.NotifyPushed,
+    }),
+    # Application Key+Secret + channel
+    ('pushed://%s/%s/#channel/' % ('a' * 32, 'a' * 64), {
+        'instance': plugins.NotifyPushed,
+    }),
+    # Application Key+Secret + dropped entry
+    ('pushed://%s/%s/dropped/' % ('a' * 32, 'a' * 64), {
+        'instance': plugins.NotifyPushed,
+    }),
+    # Application Key+Secret + 2 channels
+    ('pushed://%s/%s/#channel1/#channel2' % ('a' * 32, 'a' * 64), {
+        'instance': plugins.NotifyPushed,
+    }),
+    # Application Key+Secret + User Pushed ID
+    ('pushed://%s/%s/@ABCD/' % ('a' * 32, 'a' * 64), {
+        'instance': plugins.NotifyPushed,
+    }),
+    # Application Key+Secret + 2 devices
+    ('pushed://%s/%s/@ABCD/@DEFG/' % ('a' * 32, 'a' * 64), {
+        'instance': plugins.NotifyPushed,
+    }),
+    # Application Key+Secret + Combo
+    ('pushed://%s/%s/@ABCD/#channel' % ('a' * 32, 'a' * 64), {
+        'instance': plugins.NotifyPushed,
+    }),
+    # ,
+    ('pushed://%s/%s' % ('a' * 32, 'a' * 64), {
+        'instance': plugins.NotifyPushed,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('pushed://%s/%s' % ('a' * 32, 'a' * 64), {
+        'instance': plugins.NotifyPushed,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('pushed://%s/%s' % ('a' * 32, 'a' * 64), {
+        'instance': plugins.NotifyPushed,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+    ('pushed://:@/', {
+        'instance': None,
+    }),
+    ('pushed://%s/%s' % ('a' * 32, 'a' * 64), {
+        'instance': plugins.NotifyPushed,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('pushed://%s/%s' % ('a' * 32, 'a' * 64), {
+        'instance': plugins.NotifyPushed,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('pushed://%s/%s/#channel' % ('a' * 32, 'a' * 64), {
+        'instance': plugins.NotifyPushed,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('pushed://%s/%s/@user' % ('a' * 32, 'a' * 64), {
+        'instance': plugins.NotifyPushed,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('pushed://%s/%s' % ('a' * 32, 'a' * 64), {
+        'instance': plugins.NotifyPushed,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -1190,49 +1256,6 @@ TEST_URLS = (
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them without images set
         'include_image': True,
-        'test_requests_exceptions': True,
-    }),
-
-    ##################################
-    # NotifyToasty (SuperToasty)
-    ##################################
-    ('toasty://', {
-        'instance': None,
-    }),
-    # No username specified but contains a device
-    ('toasty://%s' % ('d' * 32), {
-        'instance': TypeError,
-    }),
-    # User + 1 device
-    ('toasty://user@device', {
-        'instance': plugins.NotifyToasty,
-    }),
-    # User + 3 devices
-    ('toasty://user@device0/device1/device2/', {
-        'instance': plugins.NotifyToasty,
-        # don't include an image by default
-        'include_image': False,
-    }),
-    # bad url
-    ('toasty://:@/', {
-        'instance': None,
-    }),
-    ('toasty://user@device', {
-        'instance': plugins.NotifyToasty,
-        # force a failure
-        'response': False,
-        'requests_response_code': requests.codes.internal_server_error,
-    }),
-    ('toasty://user@device', {
-        'instance': plugins.NotifyToasty,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('toasty://user@device', {
-        'instance': plugins.NotifyToasty,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
     }),
 
@@ -2215,6 +2238,106 @@ def test_notify_pushbullet_plugin(mock_post, mock_get):
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
+def test_notify_pushed_plugin(mock_post, mock_get):
+    """
+    API: NotifyPushed() Extra Checks
+
+    """
+    # Chat ID
+    recipients = '@ABCDEFG, @DEFGHIJ, #channel, #channel2'
+
+    # Some required input
+    app_key = 'ABCDEFG'
+    app_secret = 'ABCDEFG'
+
+    # Prepare Mock
+    mock_get.return_value = requests.Request()
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_get.return_value.status_code = requests.codes.ok
+    mock_post.return_value.text = ''
+    mock_get.return_value.text = ''
+
+    try:
+        obj = plugins.NotifyPushed(
+            app_key=app_key,
+            app_secret=None,
+            recipients=None,
+        )
+        assert(False)
+
+    except TypeError:
+        # No application Secret was specified; it's a good thing if
+        # this exception was thrown
+        assert(True)
+
+    try:
+        obj = plugins.NotifyPushed(
+            app_key=app_key,
+            app_secret=app_secret,
+            recipients=None,
+        )
+        # recipients list set to (None) is perfectly fine; in this
+        # case it will notify the App
+        assert(True)
+
+    except TypeError:
+        # Exception should never be thrown!
+        assert(False)
+
+    try:
+        obj = plugins.NotifyPushed(
+            app_key=app_key,
+            app_secret=app_secret,
+            recipients=object(),
+        )
+        # invalid recipients list (object)
+        assert(False)
+
+    except TypeError:
+        # Exception should be thrown about the fact no recipients were
+        # specified
+        assert(True)
+
+    try:
+        obj = plugins.NotifyPushed(
+            app_key=app_key,
+            app_secret=app_secret,
+            recipients=set(),
+        )
+        # Any empty set is acceptable
+        assert(True)
+
+    except TypeError:
+        # Exception should never be thrown
+        assert(False)
+
+    obj = plugins.NotifyPushed(
+        app_key=app_key,
+        app_secret=app_secret,
+        recipients=recipients,
+    )
+    assert(isinstance(obj, plugins.NotifyPushed))
+    assert(len(obj.channels) == 2)
+    assert(len(obj.users) == 2)
+
+    # Disable throttling to speed up unit tests
+    obj.throttle_attempt = 0
+
+    # Support the handling of an empty and invalid URL strings
+    assert plugins.NotifyPushed.parse_url(None) is None
+    assert plugins.NotifyPushed.parse_url('') is None
+    assert plugins.NotifyPushed.parse_url(42) is None
+
+    # Prepare Mock to fail
+    mock_post.return_value.status_code = requests.codes.internal_server_error
+    mock_get.return_value.status_code = requests.codes.internal_server_error
+    mock_post.return_value.text = ''
+    mock_get.return_value.text = ''
+
+
+@mock.patch('requests.get')
+@mock.patch('requests.post')
 def test_notify_pushover_plugin(mock_post, mock_get):
     """
     API: NotifyPushover() Extra Checks
@@ -2406,54 +2529,6 @@ def test_notify_rocketchat_plugin(mock_post, mock_get):
     # Logout
     #
     assert obj.logout() is False
-
-
-@mock.patch('requests.get')
-@mock.patch('requests.post')
-def test_notify_toasty_plugin(mock_post, mock_get):
-    """
-    API: NotifyToasty() Extra Checks
-
-    """
-
-    # Support strings
-    devices = 'device1,device2,,,,'
-
-    # User
-    user = 'l2g'
-
-    # Prepare Mock
-    mock_get.return_value = requests.Request()
-    mock_post.return_value = requests.Request()
-    mock_post.return_value.status_code = requests.codes.ok
-    mock_get.return_value.status_code = requests.codes.ok
-
-    try:
-        obj = plugins.NotifyToasty(user=user, devices=None)
-        # No devices specified
-        assert(False)
-
-    except TypeError:
-        # Exception should be thrown about the fact no token was specified
-        assert(True)
-
-    try:
-        obj = plugins.NotifyToasty(user=user, devices=set())
-        # No devices specified
-        assert(False)
-
-    except TypeError:
-        # Exception should be thrown about the fact no token was specified
-        assert(True)
-
-    obj = plugins.NotifyToasty(user=user, devices=devices)
-    assert(isinstance(obj, plugins.NotifyToasty))
-    assert(len(obj.devices) == 2)
-
-    # Support the handling of an empty and invalid URL strings
-    assert(plugins.NotifyToasty.parse_url(None) is None)
-    assert(plugins.NotifyToasty.parse_url('') is None)
-    assert(plugins.NotifyToasty.parse_url(42) is None)
 
 
 @mock.patch('requests.get')
