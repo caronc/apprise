@@ -65,19 +65,18 @@ def test_apprise():
     servers = [
         'faast://abcdefghijklmnop-abcdefg',
         'kodi://kodi.server.local',
-        'palot://1f418df7577e32b89ac6511f2eb9aa68',
     ]
 
     a = Apprise(servers=servers)
 
     # 3 servers loaded
-    assert(len(a) == 3)
+    assert(len(a) == 2)
 
     # We can add another server
     assert(
         a.add('mmosts://mattermost.server.local/'
               '3ccdd113474722377935511fc85d3dd4') is True)
-    assert(len(a) == 4)
+    assert(len(a) == 3)
 
     # We can empty our set
     a.clear()

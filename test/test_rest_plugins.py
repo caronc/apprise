@@ -745,50 +745,6 @@ TEST_URLS = (
     }),
 
     ##################################
-    # NotifyPushalot
-    ##################################
-    ('palot://', {
-        'instance': None,
-    }),
-    # AuthToken
-    ('palot://%s' % ('a' * 32), {
-        'instance': plugins.NotifyPushalot,
-    }),
-    # AuthToken, no image
-    ('palot://%s' % ('a' * 32), {
-        'instance': plugins.NotifyPushalot,
-        # don't include an image by default
-        'include_image': False,
-    }),
-    # Invalid AuthToken
-    ('palot://%s' % ('a' * 24), {
-        # Missing a channel
-        'instance': TypeError,
-    }),
-    # AuthToken + bad url
-    ('palot://:@/', {
-        'instance': None,
-    }),
-    ('palot://%s' % ('a' * 32), {
-        'instance': plugins.NotifyPushalot,
-        # force a failure
-        'response': False,
-        'requests_response_code': requests.codes.internal_server_error,
-    }),
-    ('palot://%s' % ('a' * 32), {
-        'instance': plugins.NotifyPushalot,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('palot://%s' % ('a' * 32), {
-        'instance': plugins.NotifyPushalot,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
-
-    ##################################
     # NotifyPushBullet
     ##################################
     ('pbul://', {
