@@ -31,7 +31,7 @@ import mock
 
 TEST_URLS = (
     ##################################
-    # NotifyPushjet
+    # NotifyTwitter
     ##################################
     ('tweet://', {
         'instance': None,
@@ -189,7 +189,7 @@ def test_twitter_plugin_init(set_access_token, send_direct_message):
     set_access_token.side_effect = None
     set_access_token.return_value = True
     send_direct_message.side_effect = plugins.tweepy.error.TweepError(
-        0, 'pushjet.TweepyError() not handled'),
+        0, 'tweepy.error.TweepyError() not handled'),
 
     assert obj.notify(
         title='test', body='body',
