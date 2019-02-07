@@ -40,6 +40,7 @@ from .NotifyJSON import NotifyJSON
 from .NotifyMatrix import NotifyMatrix
 from .NotifyMatterMost import NotifyMatterMost
 from .NotifyProwl import NotifyProwl
+from .NotifyPushed import NotifyPushed
 from .NotifyPushBullet import NotifyPushBullet
 from .NotifyPushjet.NotifyPushjet import NotifyPushjet
 from .NotifyPushover import NotifyPushover
@@ -47,7 +48,6 @@ from .NotifyRocketChat import NotifyRocketChat
 from .NotifySlack import NotifySlack
 from .NotifyStride import NotifyStride
 from .NotifyTelegram import NotifyTelegram
-from .NotifyToasty import NotifyToasty
 from .NotifyTwitter.NotifyTwitter import NotifyTwitter
 from .NotifyXBMC import NotifyXBMC
 from .NotifyXML import NotifyXML
@@ -67,10 +67,10 @@ __all__ = [
     'NotifyBoxcar', 'NotifyEmail', 'NotifyEmby', 'NotifyDiscord',
     'NotifyFaast', 'NotifyGnome', 'NotifyGrowl', 'NotifyIFTTT', 'NotifyJoin',
     'NotifyJSON', 'NotifyMatrix', 'NotifyMatterMost', 'NotifyProwl',
-    'NotifyPushBullet', 'NotifyPushjet', 'NotifyPushover',
-    'NotifyRocketChat', 'NotifySlack', 'NotifyStride', 'NotifyToasty',
-    'NotifyTwitter', 'NotifyTelegram', 'NotifyXBMC', 'NotifyXML',
-    'NotifyWindows',
+    'NotifyPushed', 'NotifyPushBullet', 'NotifyPushjet',
+    'NotifyPushover', 'NotifyRocketChat', 'NotifySlack', 'NotifyStride',
+    'NotifyTwitter', 'NotifyTelegram', 'NotifyXBMC',
+    'NotifyXML', 'NotifyWindows',
 
     # Reference
     'NotifyImageSize', 'NOTIFY_IMAGE_SIZES', 'NotifyType', 'NOTIFY_TYPES',

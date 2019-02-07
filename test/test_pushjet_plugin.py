@@ -38,9 +38,9 @@ TEST_URLS = (
     ('pjets://', {
         'instance': None,
     }),
-    # Default query (uses pushjet server)
+    #  You must specify a username
     ('pjet://%s' % ('a' * 32), {
-        'instance': plugins.NotifyPushjet,
+        'instance': None,
     }),
     # Specify your own server
     ('pjet://%s@localhost' % ('a' * 32), {
