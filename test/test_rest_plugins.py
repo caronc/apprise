@@ -131,13 +131,15 @@ TEST_URLS = (
         'requests_response_code': requests.codes.no_content,
     }),
     # Enable other options
-    ('discord://%s/%s?footer=Yes&thumbnail=Yes' % ('i' * 24, 't' * 64), {
-        'instance': plugins.NotifyDiscord,
-        'requests_response_code': requests.codes.no_content,
+    ('discord://%s/%s?format=markdown&footer=Yes&thumbnail=Yes' % (
+        'i' * 24, 't' * 64), {
+            'instance': plugins.NotifyDiscord,
+            'requests_response_code': requests.codes.no_content,
     }),
-    ('discord://%s/%s?avatar=No&footer=No' % ('i' * 24, 't' * 64), {
-        'instance': plugins.NotifyDiscord,
-        'requests_response_code': requests.codes.no_content,
+    ('discord://%s/%s?format=markdown&avatar=No&footer=No' % (
+        'i' * 24, 't' * 64), {
+            'instance': plugins.NotifyDiscord,
+            'requests_response_code': requests.codes.no_content,
     }),
     # different format support
     ('discord://%s/%s?format=markdown' % ('i' * 24, 't' * 64), {
@@ -1660,11 +1662,6 @@ def test_notify_discord_plugin(mock_post, mock_get):
     assert obj.notify(title='title', body='body',
                       notify_type=NotifyType.INFO) is True
 
-    # Toggle our logo availability
-    obj.asset.image_url_logo = None
-    assert obj.notify(title='title', body='body',
-                      notify_type=NotifyType.INFO) is True
-
     # Test our header parsing
     test_markdown = "## Heading one\nbody body\n\n" + \
         "# Heading 2 ##\n\nTest\n\n" + \
@@ -1684,19 +1681,30 @@ def test_notify_discord_plugin(mock_post, mock_get):
     assert obj.notify(title='title', body=test_markdown,
                       notify_type=NotifyType.INFO) is True
 
+    # Create an apprise instance
+    a = Apprise()
+
     # Our processing is slightly different when we aren't using markdown
     # as we do not pre-parse content during our notifications
-    obj = plugins.NotifyDiscord(
-        webhook_id=webhook_id,
-        webhook_token=webhook_token,
-        notify_format=NotifyFormat.TEXT)
-
-    # Disable throttling to speed up unit tests
-    obj.throttle_attempt = 0
+    assert a.add(
+        'discord://{webhook_id}/{webhook_token}/'
+        '?format=markdown&footer=Yes'.format(
+            webhook_id=webhook_id,
+            webhook_token=webhook_token)) is True
 
     # This call includes an image with it's payload:
-    assert obj.notify(title='title', body='body',
-                      notify_type=NotifyType.INFO) is True
+    assert a.notify(title='title', body=test_markdown,
+                    notify_type=NotifyType.INFO,
+                    body_format=NotifyFormat.TEXT) is True
+
+    assert a.notify(title='title', body=test_markdown,
+                    notify_type=NotifyType.INFO,
+                    body_format=NotifyFormat.MARKDOWN) is True
+
+    # Toggle our logo availability
+    a.asset.image_url_logo = None
+    assert a.notify(title='title', body='body',
+                    notify_type=NotifyType.INFO) is True
 
 
 @mock.patch('requests.get')

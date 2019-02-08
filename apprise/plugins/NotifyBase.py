@@ -267,6 +267,10 @@ class NotifyBase(object):
         Takes html text as input and escapes it so that it won't
         conflict with any xml/html wrapping characters.
         """
+        if not html:
+            # nothing more to do; return object as is
+            return html
+
         escaped = _escape(html)
 
         if whitespace:
