@@ -123,7 +123,7 @@ class Apprise(object):
             self.add(servers)
 
     @staticmethod
-    def instantiate(url, asset=None, suppress_exceptions=True):
+    def instantiate(url, asset=None, tag=None, suppress_exceptions=True):
         """
         Returns the instance of a instantiated plugin based on the provided
         Server URL.  If the url fails to be parsed, then None is returned.
@@ -164,6 +164,9 @@ class Apprise(object):
             logger.error('Could not parse URL: %s' % url)
             return None
 
+        # Build a list of tags to associate with the newly added notifications
+        results['tag'] = set(parse_list(tag))
+
         if suppress_exceptions:
             try:
                 # Attempt to create an instance of our plugin using the parsed
@@ -186,10 +189,16 @@ class Apprise(object):
 
         return plugin
 
-    def add(self, servers, asset=None):
+    def add(self, servers, asset=None, tag=None):
         """
         Adds one or more server URLs into our list.
 
+        You can override the global asset if you wish by including it with the
+        server(s) that you add.
+
+        The tag allows you to associate 1 or more tag values to the server(s)
+        being added. tagging a service allows you to exclusively access them
+        when calling the notify() function.
         """
 
         # Initialize our return status
@@ -204,12 +213,13 @@ class Apprise(object):
             self.servers.append(servers)
             return True
 
+        # build our server listings
         servers = parse_list(servers)
         for _server in servers:
 
             # Instantiate ourselves an object, this function throws or
             # returns None if it fails
-            instance = Apprise.instantiate(_server, asset=asset)
+            instance = Apprise.instantiate(_server, asset=asset, tag=tag)
             if not instance:
                 return_status = False
                 logging.error(
@@ -231,12 +241,17 @@ class Apprise(object):
         self.servers[:] = []
 
     def notify(self, title, body, notify_type=NotifyType.INFO,
-               body_format=None):
+               body_format=None, tag=None):
         """
         Send a notification to all of the plugins previously loaded.
 
         If the body_format specified is NotifyFormat.MARKDOWN, it will
         be converted to HTML if the Notification type expects this.
+
+        if the tag is specified (either a string or a set/list/tuple
+        of strings), then only the notifications flagged with that
+        tagged value are notified.  By default all added services
+        are notified (tag=None)
 
         """
 
@@ -249,8 +264,63 @@ class Apprise(object):
         # Tracks conversions
         conversion_map = dict()
 
+        # Build our tag setup
+        #   - top level entries are treated as an 'or'
+        #   - second level (or more) entries are treated as 'and'
+        #
+        #   examples:
+        #     tag="tagA, tagB"                = tagA or tagB
+        #     tag=['tagA', 'tagB']            = tagA or tagB
+        #     tag=[('tagA', 'tagC'), 'tagB']  = (tagA and tagC) or tagB
+        #     tag=[('tagB', 'tagC')]          = tagB and tagC
+
         # Iterate over our loaded plugins
         for server in self.servers:
+
+            if tag is not None:
+
+                if isinstance(tag, (list, tuple, set)):
+                    # using the tags detected; determine if we'll allow the
+                    # notification to be sent or not
+                    matched = False
+
+                    # Every entry here will be or'ed with the next
+                    for entry in tag:
+                        if isinstance(entry, (list, tuple, set)):
+
+                            # treat these entries as though all elements found
+                            # must exist in the notification service
+                            tags = set(parse_list(entry))
+
+                            if len(tags.intersection(
+                                   server.tags)) == len(tags):
+                                # our set contains all of the entries found
+                                # in our notification server object
+                                matched = True
+                                break
+
+                        elif entry in server:
+                            # our entr(ies) match what was found in our server
+                            # object.
+                            matched = True
+                            break
+
+                        # else: keep looking
+
+                    if not matched:
+                        # We did not meet any of our and'ed criteria
+                        continue
+
+                elif tag not in server:
+                    # one or more tags were defined and they didn't match the
+                    # entry in the current service; move along...
+                    continue
+
+                # else: our content was found inside the server, so we're good
+
+            # If our code reaches here, we either did not define a tag (it was
+            # set to None), or we did define a tag and the logic above
+            # determined we need to notify the service it's associated with
             if server.notify_format not in conversion_map:
                 if body_format == NotifyFormat.MARKDOWN and \
                         server.notify_format == NotifyFormat.HTML:
