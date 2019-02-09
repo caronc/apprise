@@ -28,6 +28,7 @@
 from . import NotifyEmail as NotifyEmailBase
 
 from .NotifyBoxcar import NotifyBoxcar
+from .NotifyDBus import NotifyDBus
 from .NotifyDiscord import NotifyDiscord
 from .NotifyEmail import NotifyEmail
 from .NotifyEmby import NotifyEmby
@@ -63,7 +64,7 @@ from ..common import NOTIFY_TYPES
 
 __all__ = [
     # Notification Services
-    'NotifyBoxcar', 'NotifyEmail', 'NotifyEmby', 'NotifyDiscord',
+    'NotifyBoxcar', 'NotifyDBus', 'NotifyEmail', 'NotifyEmby', 'NotifyDiscord',
     'NotifyFaast', 'NotifyGnome', 'NotifyGrowl', 'NotifyIFTTT', 'NotifyJoin',
     'NotifyJSON', 'NotifyMatrix', 'NotifyMatterMost', 'NotifyProwl',
     'NotifyPushed', 'NotifyPushBullet', 'NotifyPushjet',
