@@ -38,6 +38,8 @@ from apprise import NotifyImageSize
 from apprise import __version__
 from apprise.Apprise import __load_matrix
 import pytest
+import requests
+import mock
 
 
 def test_apprise():
@@ -110,7 +112,7 @@ def test_apprise():
 
     class BadNotification(NotifyBase):
         def __init__(self, **kwargs):
-            super(BadNotification, self).__init__()
+            super(BadNotification, self).__init__(**kwargs)
 
             # We fail whenever we're initialized
             raise TypeError()
@@ -118,7 +120,7 @@ def test_apprise():
     class GoodNotification(NotifyBase):
         def __init__(self, **kwargs):
             super(GoodNotification, self).__init__(
-                notify_format=NotifyFormat.HTML)
+                notify_format=NotifyFormat.HTML, **kwargs)
 
         def notify(self, **kwargs):
             # Pretend everything is okay
@@ -203,8 +205,19 @@ def test_apprise():
     assert(len(a) == 0)
 
     # Instantiate a good object
-    plugin = a.instantiate('good://localhost')
+    plugin = a.instantiate('good://localhost', tag="good")
     assert(isinstance(plugin, NotifyBase))
+
+    # Test simple tagging inside of the object
+    assert("good" in plugin)
+    assert("bad" not in plugin)
+
+    # the in (__contains__ override) is based on or'ed content; so although
+    # 'bad' isn't tagged as being in the plugin, 'good' is, so the return
+    # value of this is True
+    assert(["bad", "good"] in plugin)
+    assert(set(["bad", "good"]) in plugin)
+    assert(("bad", "good") in plugin)
 
     # We an add already substatiated instances into our Apprise object
     a.add(plugin)
@@ -223,6 +236,106 @@ def test_apprise():
     assert(a.instantiate(
         'throw://localhost', suppress_exceptions=True) is None)
     assert(len(a) == 0)
+
+
+@mock.patch('requests.get')
+@mock.patch('requests.post')
+def test_apprise_tagging(mock_post, mock_get):
+    """
+    API: Apprise() object tagging functionality
+
+    """
+
+    # A request
+    robj = mock.Mock()
+    setattr(robj, 'raw', mock.Mock())
+    # Allow raw.read() calls
+    robj.raw.read.return_value = ''
+    robj.text = ''
+    robj.content = ''
+    mock_get.return_value = robj
+    mock_post.return_value = robj
+
+    # Simulate a successful notification
+    mock_get.return_value.status_code = requests.codes.ok
+    mock_post.return_value.status_code = requests.codes.ok
+
+    # Create our object
+    a = Apprise()
+
+    # Add entry and assign it to a tag called 'awesome'
+    assert(a.add('json://localhost/path1/', tag='awesome') is True)
+
+    # Add another notification and assign it to a tag called 'awesome'
+    # and another tag called 'local'
+    assert(a.add('json://localhost/path2/', tag=['mmost', 'awesome']) is True)
+
+    # notify the awesome tag; this would notify both services behind the
+    # scenes
+    assert(a.notify(title="my title", body="my body", tag='awesome') is True)
+
+    # notify all of the tags
+    assert(a.notify(
+        title="my title", body="my body", tag=['awesome', 'mmost']) is True)
+
+    # there is nothing to notify using tags 'missing'. However we intentionally
+    # don't fail as there is value in identifying a tag that simply have
+    # nothing to notify from while the object itself contains items
+    assert(a.notify(
+        title="my title", body="my body", tag='missing') is True)
+
+    # Now to test the ability to and and/or notifications
+    a = Apprise()
+
+    # Add a tag by tuple
+    assert(a.add('json://localhost/tagA/', tag=("TagA", )) is True)
+    # Add 2 tags by string
+    assert(a.add('json://localhost/tagAB/', tag="TagA, TagB") is True)
+    # Add a tag using a set
+    assert(a.add('json://localhost/tagB/', tag=set(["TagB"])) is True)
+    # Add a tag by string (again)
+    assert(a.add('json://localhost/tagC/', tag="TagC") is True)
+    # Add 2 tags using a list
+    assert(a.add('json://localhost/tagCD/', tag=["TagC", "TagD"]) is True)
+    # Add a tag by string (again)
+    assert(a.add('json://localhost/tagD/', tag="TagD") is True)
+    # add a tag set by set (again)
+    assert(a.add('json://localhost/tagCDE/',
+           tag=set(["TagC", "TagD", "TagE"])) is True)
+
+    # Expression: TagC and TagD
+    # Matches the following only:
+    #   - json://localhost/tagCD/
+    #   - json://localhost/tagCDE/
+    assert(a.notify(
+        title="my title", body="my body", tag=[('TagC', 'TagD')]) is True)
+
+    # Expression: (TagY and TagZ) or TagX
+    # Matches nothing
+    assert(a.notify(
+        title="my title", body="my body",
+        tag=[('TagY', 'TagZ'), 'TagX']) is True)
+
+    # Expression: (TagY and TagZ) or TagA
+    # Matches the following only:
+    #   - json://localhost/tagAB/
+    assert(a.notify(
+        title="my title", body="my body",
+        tag=[('TagY', 'TagZ'), 'TagA']) is True)
+
+    # Expression: (TagE and TagD) or TagB
+    # Matches the following only:
+    #   - json://localhost/tagCDE/
+    #   - json://localhost/tagAB/
+    #   - json://localhost/tagB/
+    assert(a.notify(
+        title="my title", body="my body",
+        tag=[('TagE', 'TagD'), 'TagB']) is True)
+
+    # Garbage Entries
+    assert(a.notify(
+        title="my title", body="my body",
+        tag=[(object, ), ]) is True)
 
 
 def test_apprise_notify_formats(tmpdir):

@@ -40,6 +40,7 @@ except ImportError:
 
 from ..utils import parse_url
 from ..utils import parse_bool
+from ..utils import parse_list
 from ..utils import is_hostname
 from ..common import NOTIFY_TYPES
 from ..common import NotifyFormat
@@ -127,6 +128,9 @@ class NotifyBase(object):
     # Default Notify Format
     notify_format = NotifyFormat.TEXT
 
+    # Maintain a set of tags to associate with this specific notification
+    tags = set()
+
     # Logging
     logger = logging.getLogger(__name__)
 
@@ -171,6 +175,12 @@ class NotifyBase(object):
                 )
             # Provide override
             self.notify_format = notify_format
+
+        if 'tag' in kwargs:
+            # We want to associate some tags with our notification service.
+            # the code below gets the 'tag' argument if defined, otherwise
+            # it just falls back to whatever was already defined globally
+            self.tags = set(parse_list(kwargs.get('tag', self.tags)))
 
     def throttle(self, throttle_time=None):
         """
@@ -248,6 +258,19 @@ class NotifyBase(object):
             notify_type=notify_type,
             color_type=color_type,
         )
+
+    def __contains__(self, tags):
+        """
+        Returns true if the tag specified is associated with this notification.
+
+        tag can also be a tuple, set, and/or list
+
+        """
+        if isinstance(tags, (tuple, set, list)):
+            return bool(set(tags) & self.tags)
+
+        # return any match
+        return tags in self.tags
 
     @property
     def app_id(self):
