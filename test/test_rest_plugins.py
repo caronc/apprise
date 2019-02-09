@@ -1055,6 +1055,64 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifyRyver
+    ##################################
+    ('ryver://', {
+        'instance': None,
+    }),
+    ('ryver://:@/', {
+        'instance': None,
+    }),
+    ('ryver://apprise', {
+        # Just org provided (no token)
+        'instance': None,
+    }),
+    ('ryver://abc,#/ckhrjW8w672m6HG', {
+        # Invalid org provided
+        'instance': None,
+    }),
+    ('ryver://a/ckhrjW8w672m6HG', {
+        # org is too short
+        'instance': TypeError,
+    }),
+    ('ryver://apprise/ckhrjW8w67HG', {
+        # Invalid token specified
+        'instance': TypeError,
+    }),
+    ('ryver://apprise/ckhrjW8w672m6HG?webhook=invalid', {
+        # Invalid webhook provided
+        'instance': TypeError,
+    }),
+    ('ryver://apprise/ckhrjW8w672m6HG?webhook=slack', {
+        # No username specified; this is still okay as we use whatever
+        # the user told the webhook to use; set our slack mode
+        'instance': plugins.NotifyRyver,
+    }),
+    ('ryver://caronc@apprise/ckhrjW8w672m6HG', {
+        'instance': plugins.NotifyRyver,
+        # don't include an image by default
+        'include_image': False,
+    }),
+    ('ryver://apprise/ckhrjW8w672m6HG', {
+        'instance': plugins.NotifyRyver,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('ryver://apprise/ckhrjW8w672m6HG', {
+        'instance': plugins.NotifyRyver,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('ryver://apprise/ckhrjW8w672m6HG', {
+        'instance': plugins.NotifyRyver,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifySlack
     ##################################
     ('slack://', {
