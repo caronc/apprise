@@ -25,12 +25,15 @@
 
 import re
 
-# Phase 1; use boto3 for a proof of concept
-import boto3
-from botocore.exceptions import ClientError
-from botocore.exceptions import EndpointConnectionError
+import hmac
+import requests
+from hashlib import sha256
+from datetime import datetime
+from collections import OrderedDict
+from xml.etree import ElementTree
 
 from .NotifyBase import NotifyBase
+from .NotifyBase import HTTP_ERROR_MAP
 from ..utils import compat_is_basestring
 
 # Some Phone Number Detection
@@ -58,6 +61,12 @@ LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
 IS_REGION = re.compile(
         r'^\s*(?P<country>[a-z]{2})-(?P<area>[a-z]+)-(?P<no>[0-9]+)\s*$', re.I)
 
+# Extend HTTP Error Messages
+AWS_HTTP_ERROR_MAP = HTTP_ERROR_MAP.copy()
+AWS_HTTP_ERROR_MAP.update({
+    403: 'Unauthorized - Invalid Access/Secret Key Combination.',
+})
+
 
 class NotifySNS(NotifyBase):
     """
@@ -77,7 +86,8 @@ class NotifySNS(NotifyBase):
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_sns'
 
     # The maximum length of the body
-    body_maxlen = 256
+    # Source: https://docs.aws.amazon.com/sns/latest/api/API_Publish.html
+    body_maxlen = 140
 
     def __init__(self, access_key_id, secret_access_key, region_name,
                  recipients=None, **kwargs):
@@ -85,22 +95,6 @@ class NotifySNS(NotifyBase):
         Initialize Notify AWS SNS Object
         """
         super(NotifySNS, self).__init__(**kwargs)
-
-        # Initialize topic list
-        self.topics = list()
-
-        # Initialize numbers list
-        self.phone = list()
-
-        # Store our AWS API Key
-        self.access_key_id = access_key_id
-
-        # Store our AWS API Secret Access key
-        self.secret_access_key = secret_access_key
-
-        # Acquire our AWS Region Name:
-        # eg. us-east-1, cn-north-1, us-west-2, ...
-        self.region_name = region_name
 
         if not access_key_id:
             raise TypeError(
@@ -116,6 +110,35 @@ class NotifySNS(NotifyBase):
             raise TypeError(
                 'An invalid AWS Region was specified.'
             )
+
+        # Initialize topic list
+        self.topics = list()
+
+        # Initialize numbers list
+        self.phone = list()
+
+        # Store our AWS API Key
+        self.aws_access_key_id = access_key_id
+
+        # Store our AWS API Secret Access key
+        self.aws_secret_access_key = secret_access_key
+
+        # Acquire our AWS Region Name:
+        # eg. us-east-1, cn-north-1, us-west-2, ...
+        self.aws_region_name = region_name
+
+        # Set our notify_url based on our region
+        self.notify_url = 'https://sns.{}.amazonaws.com/'\
+            .format(self.aws_region_name)
+
+        # AWS Service Details
+        self.aws_service_name = 'sns'
+        self.aws_canonical_uri = '/'
+
+        # AWS Authentication Details
+        self.aws_auth_version = 'AWS4'
+        self.aws_auth_algorithm = 'AWS4-HMAC-SHA256'
+        self.aws_auth_request = 'aws4_request'
 
         if recipients is None:
             recipients = []
@@ -167,97 +190,336 @@ class NotifySNS(NotifyBase):
         wrapper to send_notification since we can alert more then one channel
         """
 
-        # Create an SNS client
-        client = boto3.client(
-            "sns",
-            aws_access_key_id=self.access_key_id,
-            aws_secret_access_key=self.secret_access_key,
-            region_name=self.region_name,
-        )
-
         # Initiaize our error tracking
-        has_error = False
+        error_count = 0
 
-        # Create a copy of our phone #'s and topics to notify against
+        # Create a copy of our phone #'s to notify against
         phone = list(self.phone)
         topics = list(self.topics)
 
         while len(phone) > 0:
+
             # Get Phone No
             no = phone.pop(0)
 
-            try:
-                if not client.publish(PhoneNumber=no, Message=body):
+            # Prepare SNS Message Payload
+            payload = {
+                'Action': u'Publish',
+                'Message': body,
+                'Version': u'2010-03-31',
+                'PhoneNumber': no,
+            }
 
-                    # toggle flag
-                    has_error = True
+            (result, _) = self._post(payload=payload, to=no)
+            if not result:
+                error_count += 1
 
-            except ClientError as e:
-                self.logger.warning("The credentials specified were invalid.")
-                self.logger.debug('AWS Exception: %s' % str(e))
-
-                # We can take an early exit at this point since there
-                # is no need to potentialy get this error message again
-                # for the remaining (if any) topic/phone to process
-                return False
-
-            except EndpointConnectionError as e:
-                self.logger.warning(
-                    "The region specified is invalid.")
-                self.logger.debug('AWS Exception: %s' % str(e))
-
-                # We can take an early exit at this point since there
-                # is no need to potentialy get this error message again
-                # for the remaining (if any) topic/phone to process
-                return False
-
-            if len(phone) + len(topics) > 0:
+            if len(phone) > 0:
                 # Prevent thrashing requests
                 self.throttle()
 
         # Send all our defined topic id's
         while len(topics):
+
             # Get Topic
             topic = topics.pop(0)
 
-            # Create the topic if it doesn't exist; nothing breaks if it does
-            topic = client.create_topic(Name=topic)
+            # First ensure our topic exists, if it doesn't, it gets created
+            payload = {
+                'Action': u'CreateTopic',
+                'Version': u'2010-03-31',
+                'Name': topic,
+            }
+
+            (result, response) = self._post(payload=payload, to=topic)
+            if not result:
+                error_count += 1
+                continue
 
             # Get the Amazon Resource Name
-            topic_arn = topic['TopicArn']
+            topic_arn = response.get('topic_arn')
+            if not topic_arn:
+                # Could not acquire our topic; we're done
+                error_count += 1
+                continue
 
-            # Publish a message.
-            try:
-                if not client.publish(Message=body, TopicArn=topic_arn):
+            # Build our payload now that we know our topic_arn
+            payload = {
+                'Action': u'Publish',
+                'Version': u'2010-03-31',
+                'TopicArn': topic_arn,
+                'Message': body,
+            }
 
-                    # toggle flag
-                    has_error = True
-
-            except ClientError as e:
-                self.logger.warning(
-                    "The credentials specified were invalid.")
-                self.logger.debug('AWS Exception: %s' % str(e))
-
-                # We can take an early exit at this point since there
-                # is no need to potentialy get this error message again
-                # for the remaining (if any) topics to process
-                return False
-
-            except EndpointConnectionError as e:
-                self.logger.warning(
-                    "The region specified is invalid.")
-                self.logger.debug('AWS Exception: %s' % str(e))
-
-                # We can take an early exit at this point since there
-                # is no need to potentialy get this error message again
-                # for the remaining (if any) topic/phone to process
-                return False
+            # Send our payload to AWS
+            (result, _) = self._post(payload=payload, to=topic)
+            if not result:
+                error_count += 1
 
             if len(topics) > 0:
                 # Prevent thrashing requests
                 self.throttle()
 
-        return not has_error
+        return error_count == 0
+
+    def _post(self, payload, to):
+        """
+        Wrapper to request.post() to manage it's response better and make
+        the notify() function cleaner and easier to maintain.
+
+        This function returns True if the _post was successful and False
+        if it wasn't.
+        """
+
+        # Convert our payload from a dict() into a urlencoded string
+        payload = self.urlencode(payload)
+
+        # Prepare our Notification URL
+        # Prepare our AWS Headers based on our payload
+        headers = self.aws_prepare_request(payload)
+
+        self.logger.debug('AWS POST URL: %s (cert_verify=%r)' % (
+            self.notify_url, self.verify_certificate,
+        ))
+        self.logger.debug('AWS Payload: %s' % str(payload))
+        try:
+            r = requests.post(
+                self.notify_url,
+                data=payload,
+                headers=headers,
+                verify=self.verify_certificate,
+            )
+
+            if r.status_code != requests.codes.ok:
+                # We had a problem
+                try:
+                    self.logger.warning(
+                        'Failed to send AWS notification to '
+                        '"%s": %s (error=%s).' % (
+                            to,
+                            AWS_HTTP_ERROR_MAP[r.status_code],
+                            r.status_code))
+
+                except KeyError:
+                    self.logger.warning(
+                        'Failed to send AWS notification to '
+                        '"%s" (error=%s).' % (to, r.status_code))
+
+                    self.logger.debug('Response Details: %s' % r.text)
+
+                return (False, NotifySNS.aws_response_to_dict(r.text))
+
+            else:
+                self.logger.info(
+                    'Sent AWS notification to "%s".' % (to))
+
+        except requests.RequestException as e:
+            self.logger.warning(
+                'A Connection error occured sending AWS '
+                'notification to "%s".' % (to),
+            )
+            self.logger.debug('Socket Exception: %s' % str(e))
+            return (False, NotifySNS.aws_response_to_dict(None))
+
+        return (True, NotifySNS.aws_response_to_dict(r.text))
+
+    def aws_prepare_request(self, payload, reference=None):
+        """
+        Takes the intended payload and returns the headers for it.
+
+        The payload is presumed to have been already urlencoded()
+
+        """
+
+        # Define our AWS header
+        headers = {
+            'User-Agent': self.app_id,
+            'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
+
+            # Populated below
+            'Content-Length': 0,
+            'Authorization': None,
+            'X-Amz-Date': None,
+        }
+
+        # Get a reference time (used for header construction)
+        reference = datetime.utcnow()
+
+        # Provide Content-Length
+        headers['Content-Length'] = str(len(payload))
+
+        # Amazon Date Format
+        amzdate = reference.strftime('%Y%m%dT%H%M%SZ')
+        headers['X-Amz-Date'] = amzdate
+
+        # Credential Scope
+        scope = '{date}/{region}/{service}/{request}'.format(
+            date=reference.strftime('%Y%m%d'),
+            region=self.aws_region_name,
+            service=self.aws_service_name,
+            request=self.aws_auth_request,
+        )
+
+        # Similar to headers; but a subset.  keys must be lowercase
+        signed_headers = OrderedDict([
+            ('content-type', headers['Content-Type']),
+            ('host', '{service}.{region}.amazonaws.com'.format(
+                service=self.aws_service_name,
+                region=self.aws_region_name)),
+            ('x-amz-date', headers['X-Amz-Date']),
+        ])
+
+        #
+        # Build Canonical Request Object
+        #
+        canonical_request = '\n'.join([
+            # Method
+            u'POST',
+
+            # URL
+            self.aws_canonical_uri,
+
+            # Query String (none set for POST)
+            '',
+
+            # Header Content (must include \n at end!)
+            # All entries except characters in amazon date must be
+            # lowercase
+            '\n'.join(['%s:%s' % (k, v)
+                      for k, v in signed_headers.items()]) + '\n',
+
+            # Header Entries (in same order identified above)
+            ';'.join(signed_headers.keys()),
+
+            # Payload
+            sha256(payload.encode('utf-8')).hexdigest(),
+        ])
+
+        # Prepare Unsigned Signature
+        to_sign = '\n'.join([
+            self.aws_auth_algorithm,
+            amzdate,
+            scope,
+            sha256(canonical_request.encode('utf-8')).hexdigest(),
+        ])
+
+        # Our Authorization header
+        headers['Authorization'] = ', '.join([
+            '{algorithm} Credential={key}/{scope}'.format(
+                algorithm=self.aws_auth_algorithm,
+                key=self.aws_access_key_id,
+                scope=scope,
+            ),
+            'SignedHeaders={signed_headers}'.format(
+                signed_headers=';'.join(signed_headers.keys()),
+            ),
+            'Signature={signature}'.format(
+                signature=self.aws_auth_signature(to_sign, reference)
+            ),
+        ])
+
+        return headers
+
+    def aws_auth_signature(self, to_sign, reference):
+        """
+        Generates a AWS v4 signature based on provided payload
+        which should be in the form of a string.
+        """
+
+        def _sign(key, msg, to_hex=False):
+            """
+            Perform AWS Signing
+            """
+            if to_hex:
+                return hmac.new(key, msg.encode('utf-8'), sha256).hexdigest()
+            return hmac.new(key, msg.encode('utf-8'), sha256).digest()
+
+        _date = _sign((
+            self.aws_auth_version +
+            self.aws_secret_access_key).encode('utf-8'),
+            reference.strftime('%Y%m%d'))
+
+        _region = _sign(_date, self.aws_region_name)
+        _service = _sign(_region, self.aws_service_name)
+        _signed = _sign(_service, self.aws_auth_request)
+        return _sign(_signed, to_sign, to_hex=True)
+
+    @staticmethod
+    def aws_response_to_dict(aws_response):
+        """
+        Takes an AWS Response object as input and returns it as a dictionary
+        but not befor extracting out what is useful to us first.
+
+        eg:
+          IN:
+            <CreateTopicResponse
+                  xmlns="http://sns.amazonaws.com/doc/2010-03-31/">
+              <CreateTopicResult>
+                <TopicArn>arn:aws:sns:us-east-1:000000000000:abcd</TopicArn>
+                   </CreateTopicResult>
+               <ResponseMetadata>
+               <RequestId>604bef0f-369c-50c5-a7a4-bbd474c83d6a</RequestId>
+               </ResponseMetadata>
+           </CreateTopicResponse>
+
+          OUT:
+           {
+              type: 'CreateTopicResponse',
+              request_id: '604bef0f-369c-50c5-a7a4-bbd474c83d6a',
+              topic_arn: 'arn:aws:sns:us-east-1:000000000000:abcd',
+           }
+        """
+
+        # Define ourselves a set of directives we want to keep if found and
+        # then identify the value we want to map them to in our response
+        # object
+        aws_keep_map = {
+            'RequestId': 'request_id',
+            'TopicArn': 'topic_arn',
+            'MessageId': 'message_id',
+
+            # Error Message Handling
+            'Type': 'error_type',
+            'Code': 'error_code',
+            'Message': 'error_message',
+        }
+
+        # A default response object that we'll manipulate as we pull more data
+        # from our AWS Response object
+        response = {
+            'type': None,
+            'request_id': None,
+        }
+
+        try:
+            # we build our tree, but not before first eliminating any
+            # reference to namespacing (if present) as it makes parsing
+            # the tree so much easier.
+            root = ElementTree.fromstring(
+                re.sub(' xmlns="[^"]+"', '', aws_response, count=1))
+
+            # Store our response tag object name
+            response['type'] = str(root.tag)
+
+            def _xml_iter(root, response):
+                if len(root) > 0:
+                    for child in root:
+                        # use recursion to parse everything
+                        _xml_iter(child, response)
+
+                elif root.tag in aws_keep_map.keys():
+                    response[aws_keep_map[root.tag]] = (root.text).strip()
+
+            # Recursivly iterate over our AWS Response to extract the
+            # fields we're interested in in efforts to populate our response
+            # object.
+            _xml_iter(root, response)
+
+        except (ElementTree.ParseError, TypeError):
+            # bad data just causes us to generate a bad response
+            pass
+
+        return response
 
     @staticmethod
     def parse_url(url):
