@@ -1123,6 +1123,48 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifySNS (AWS)
+    ##################################
+    ('sns://', {
+        'instance': None,
+    }),
+    ('sns://:@/', {
+        'instance': None,
+    }),
+    ('sns://T1JJ3T3L2', {
+        # Just Token 1 provided
+        'instance': TypeError,
+    }),
+    ('sns://T1JJ3TD4JD/TIiajkdnlazk7FQ/', {
+        # Missing a region
+        'instance': TypeError,
+    }),
+    ('sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcevi7FQ/us-west-2/12223334444', {
+        # we have a valid URL here
+        'instance': plugins.NotifySNS,
+    }),
+    ('sns://T1JJ3TD4JD/TIiajkdnlazk7FQ/us-west-2/12223334444/12223334445', {
+        # Multi SNS Suppport
+        'instance': plugins.NotifySNS,
+    }),
+    ('sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/us-east-1', {
+        # Missing a topic and/or phone No
+        'instance': plugins.NotifySNS,
+    }),
+    ('sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcevi7FQ/us-west-2/12223334444', {
+        'instance': plugins.NotifySNS,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcevi7FQ/us-west-2/15556667777', {
+        'instance': plugins.NotifySNS,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifyTelegram
     ##################################
     ('tgram://', {
@@ -1511,7 +1553,7 @@ def test_rest_plugins(mock_post, mock_get):
                 assert isinstance(e, response)
 
             #
-            # Stage 1: without title defined
+            # Stage 2: without title defined
             #
             try:
                 if test_requests_exceptions is False:
