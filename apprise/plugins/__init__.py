@@ -46,6 +46,7 @@ from .NotifyPushBullet import NotifyPushBullet
 from .NotifyPushjet.NotifyPushjet import NotifyPushjet
 from .NotifyPushover import NotifyPushover
 from .NotifyRocketChat import NotifyRocketChat
+from .NotifyRyver import NotifyRyver
 from .NotifySlack import NotifySlack
 from .NotifySNS import NotifySNS
 from .NotifyTelegram import NotifyTelegram
@@ -69,8 +70,8 @@ __all__ = [
     'NotifyFaast', 'NotifyGnome', 'NotifyGrowl', 'NotifyIFTTT', 'NotifyJoin',
     'NotifyJSON', 'NotifyMatrix', 'NotifyMatterMost', 'NotifyProwl',
     'NotifyPushed', 'NotifyPushBullet', 'NotifyPushjet',
-    'NotifyPushover', 'NotifyRocketChat', 'NotifySlack', 'NotifySNS',
-    'NotifyTwitter', 'NotifyTelegram', 'NotifyXBMC',
+    'NotifyPushover', 'NotifyRocketChat', 'NotifyRyver', 'NotifySlack',
+    'NotifySNS', 'NotifyTwitter', 'NotifyTelegram', 'NotifyXBMC',
     'NotifyXML', 'NotifyWindows',
 
     # Reference
