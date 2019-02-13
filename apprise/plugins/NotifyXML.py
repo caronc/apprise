@@ -85,6 +85,39 @@ class NotifyXML(NotifyBase):
 
         return
 
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+        }
+
+        # Determine Authentication
+        auth = ''
+        if self.user and self.password:
+            auth = '{user}:{password}@'.format(
+                user=self.quote(self.user, safe=''),
+                password=self.quote(self.password, safe=''),
+            )
+        elif self.user:
+            auth = '{user}@'.format(
+                user=self.quote(self.user, safe=''),
+            )
+
+        default_port = 443 if self.secure else 80
+
+        return '{schema}://{auth}{hostname}{port}/?{args}'.format(
+            schema=self.secure_protocol if self.secure else self.protocol,
+            auth=auth,
+            hostname=self.host,
+            port='' if self.port is None or self.port == default_port
+                 else ':{}'.format(self.port),
+            args=self.urlencode(args),
+        )
+
     def notify(self, title, body, notify_type, **kwargs):
         """
         Perform XML Notification

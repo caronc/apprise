@@ -124,6 +124,22 @@ class NotifyFaast(NotifyBase):
 
         return True
 
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+        }
+
+        return '{schema}://{authtoken}/?{args}'.format(
+            schema=self.protocol,
+            authtoken=self.quote(self.authtoken, safe=''),
+            args=self.urlencode(args),
+        )
+
     @staticmethod
     def parse_url(url):
         """

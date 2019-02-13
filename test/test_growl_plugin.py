@@ -26,6 +26,8 @@
 from apprise import plugins
 from apprise import NotifyType
 from apprise import Apprise
+from apprise.utils import compat_is_basestring
+
 import mock
 import re
 
@@ -195,7 +197,6 @@ def test_growl_plugin(mock_gntp):
 
                 except Exception as e:
                     # We can't handle this exception type
-                    print('%s / %s' % (url, str(e)))
                     assert False
 
             # We're done this part of the test
@@ -216,10 +217,27 @@ def test_growl_plugin(mock_gntp):
 
             if instance is None:
                 # Expected None but didn't get it
-                print('%s instantiated %s' % (url, str(obj)))
                 assert(False)
 
-            assert(isinstance(obj, instance))
+            assert(isinstance(obj, instance) is True)
+
+            if isinstance(obj, plugins.NotifyBase.NotifyBase):
+                # We loaded okay; now lets make sure we can reverse this url
+                assert(compat_is_basestring(obj.url()) is True)
+
+                # Instantiate the exact same object again using the URL from
+                # the one that was already created properly
+                obj_cmp = Apprise.instantiate(obj.url())
+
+                # Our object should be the same instance as what we had
+                # originally expected above.
+                if not isinstance(obj_cmp, plugins.NotifyBase.NotifyBase):
+                    # Assert messages are hard to trace back with the way
+                    # these tests work. Just printing before throwing our
+                    # assertion failure makes things easier to debug later on
+                    print('TEST FAIL: {} regenerated as {}'.format(
+                        url, obj.url()))
+                    assert(False)
 
             if self:
                 # Iterate over our expected entries inside of our object

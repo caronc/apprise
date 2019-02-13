@@ -28,6 +28,7 @@ import mock
 import sys
 import types
 import apprise
+from apprise.utils import compat_is_basestring
 
 try:
     # Python v3.4+
@@ -222,6 +223,9 @@ def test_dbus_plugin(mock_mainloop, mock_byte, mock_bytearray,
     obj = apprise.Apprise.instantiate('glib://', suppress_exceptions=False)
     assert(isinstance(obj, apprise.plugins.NotifyDBus) is True)
     obj.duration = 0
+
+    # Test url() call
+    assert(compat_is_basestring(obj.url()) is True)
 
     # Our notification succeeds even though the gi library was not loaded
     assert(obj.notify(title='title', body='body',

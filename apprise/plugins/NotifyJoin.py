@@ -78,7 +78,7 @@ class NotifyJoin(NotifyBase):
     service_url = 'https://joaoapps.com/join/'
 
     # The default protocol
-    protocol = 'join'
+    secure_protocol = 'join'
 
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_join'
@@ -232,6 +232,22 @@ class NotifyJoin(NotifyBase):
                 self.throttle()
 
         return return_status
+
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+        }
+
+        return '{schema}://{apikey}/{devices}/?{args}'.format(
+            schema=self.secure_protocol,
+            apikey=self.quote(self.apikey, safe=''),
+            devices='/'.join([self.quote(x) for x in self.devices]),
+            args=self.urlencode(args))
 
     @staticmethod
     def parse_url(url):

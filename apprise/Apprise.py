@@ -171,7 +171,7 @@ class Apprise(object):
                 # URL information
                 plugin = SCHEMA_MAP[results['schema']](**results)
 
-            except:
+            except Exception:
                 # the arguments are invalid or can not be used.
                 logger.error('Could not load URL: %s' % url)
                 return None
@@ -431,6 +431,33 @@ class Apprise(object):
             })
 
         return response
+
+    def urls(self):
+        """
+        Returns all of the loaded URLs defined in this apprise object.
+        """
+        return [x.url() for x in self.servers]
+
+    def pop(self, index):
+        """
+        Removes an indexed Notification Service from the stack and
+        returns it.
+        """
+
+        # Remove our entry
+        return self.servers.pop(index)
+
+    def __getitem__(self, index):
+        """
+        Returns the indexed server entry of a loaded notification server
+        """
+        return self.servers[index]
+
+    def __iter__(self):
+        """
+        Returns an iterator to our server list
+        """
+        return iter(self.servers)
 
     def __len__(self):
         """

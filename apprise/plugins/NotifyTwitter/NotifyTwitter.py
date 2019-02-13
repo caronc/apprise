@@ -109,7 +109,9 @@ class NotifyTwitter(NotifyBase):
             )
             return False
 
-        text = '%s\r\n%s' % (title, body)
+        # Only set title if it was specified
+        text = body if not title else '%s\r\n%s' % (title, body)
+
         try:
             # Get our API
             api = tweepy.API(self.auth)

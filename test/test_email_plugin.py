@@ -26,6 +26,7 @@
 from apprise import plugins
 from apprise import NotifyType
 from apprise import Apprise
+from apprise.utils import compat_is_basestring
 from apprise.plugins import NotifyEmailBase
 
 import smtplib
@@ -49,7 +50,7 @@ TEST_URLS = (
     # No Username
     ('mailtos://:pass@nuxref.com:567', {
         # Can't prepare a To address using this expression
-        'exception': TypeError,
+        'instance': TypeError,
     }),
 
     # Pre-Configured Email Services
@@ -115,27 +116,27 @@ TEST_URLS = (
     }),
     # Invalid From Address
     ('mailtos://user:pass@nuxref.com?from=@', {
-        'exception': TypeError,
+        'instance': TypeError,
     }),
     # Invalid From Address
     ('mailtos://nuxref.com?user=&pass=.', {
-        'exception': TypeError,
+        'instance': TypeError,
     }),
     # Invalid To Address
     ('mailtos://user:pass@nuxref.com?to=@', {
-        'exception': TypeError,
+        'instance': TypeError,
     }),
     # Valid URL, but can't structure a proper email
     ('mailtos://nuxref.com?user=%20!&pass=.', {
-        'exception': TypeError,
+        'instance': TypeError,
     }),
     # Invalid From (and To) Address
     ('mailtos://nuxref.com?to=test', {
-        'exception': TypeError,
+        'instance': TypeError,
     }),
     # Invalid Secure Mode
     ('mailtos://user:pass@example.com?mode=notamode', {
-        'exception': TypeError,
+        'instance': TypeError,
     }),
     # STARTTLS flag checking
     ('mailtos://user:pass@gmail.com?mode=starttls', {
@@ -171,9 +172,6 @@ def test_email_plugin(mock_smtp, mock_smtpssl):
 
         # Our expected instance
         instance = meta.get('instance', None)
-
-        # Our expected exception
-        exception = meta.get('exception', None)
 
         # Our expected server objects
         self = meta.get('self', None)
@@ -217,18 +215,36 @@ def test_email_plugin(mock_smtp, mock_smtpssl):
         try:
             obj = Apprise.instantiate(url, suppress_exceptions=False)
 
-            assert(exception is None)
-
             if obj is None:
-                # We're done
+                # We're done (assuming this is what we were expecting)
+                assert instance is None
                 continue
 
             if instance is None:
                 # Expected None but didn't get it
-                print('%s instantiated %s' % (url, str(obj)))
+                print('%s instantiated %s (but expected None)' % (
+                    url, str(obj)))
                 assert(False)
 
             assert(isinstance(obj, instance))
+
+            if isinstance(obj, plugins.NotifyBase.NotifyBase):
+                # We loaded okay; now lets make sure we can reverse this url
+                assert(compat_is_basestring(obj.url()) is True)
+
+                # Instantiate the exact same object again using the URL from
+                # the one that was already created properly
+                obj_cmp = Apprise.instantiate(obj.url())
+
+                # Our object should be the same instance as what we had
+                # originally expected above.
+                if not isinstance(obj_cmp, plugins.NotifyBase.NotifyBase):
+                    # Assert messages are hard to trace back with the way
+                    # these tests work. Just printing before throwing our
+                    # assertion failure makes things easier to debug later on
+                    print('TEST FAIL: {} regenerated as {}'.format(
+                        url, obj.url()))
+                    assert(False)
 
             if self:
                 # Iterate over our expected entries inside of our object
@@ -258,16 +274,17 @@ def test_email_plugin(mock_smtp, mock_smtpssl):
 
                         except Exception as e:
                             # We can't handle this exception type
-                            print('%s / %s' % (url, str(e)))
-                            assert False
+                            raise
 
             except AssertionError:
                 # Don't mess with these entries
+                print('%s AssertionError' % url)
                 raise
 
             except Exception as e:
                 # Check that we were expecting this exception to happen
-                assert isinstance(e, response)
+                if not isinstance(e, response):
+                    raise
 
         except AssertionError:
             # Don't mess with these entries
@@ -276,9 +293,11 @@ def test_email_plugin(mock_smtp, mock_smtpssl):
 
         except Exception as e:
             # Handle our exception
-            print('%s / %s' % (url, str(e)))
-            assert(exception is not None)
-            assert(isinstance(e, exception))
+            if(instance is None):
+                raise
+
+            if not isinstance(e, instance):
+                raise
 
 
 @mock.patch('smtplib.SMTP')

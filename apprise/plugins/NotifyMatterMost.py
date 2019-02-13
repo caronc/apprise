@@ -179,6 +179,28 @@ class NotifyMatterMost(NotifyBase):
 
         return True
 
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+        }
+
+        default_port = 443 if self.secure else self.default_port
+        default_schema = self.secure_protocol if self.secure else self.protocol
+
+        return '{schema}://{hostname}{port}/{authtoken}/?{args}'.format(
+            schema=default_schema,
+            hostname=self.host,
+            port='' if not self.port or self.port == default_port
+                 else ':{}'.format(self.port),
+            authtoken=self.quote(self.authtoken, safe=''),
+            args=self.urlencode(args),
+        )
+
     @staticmethod
     def parse_url(url):
         """

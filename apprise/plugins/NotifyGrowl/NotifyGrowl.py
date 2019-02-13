@@ -207,6 +207,43 @@ class NotifyGrowl(NotifyBase):
 
         return True
 
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        _map = {
+            GrowlPriority.LOW: 'low',
+            GrowlPriority.MODERATE: 'moderate',
+            GrowlPriority.NORMAL: 'normal',
+            GrowlPriority.HIGH: 'high',
+            GrowlPriority.EMERGENCY: 'emergency',
+        }
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'priority':
+                _map[GrowlPriority.NORMAL] if self.priority not in _map
+                else _map[self.priority],
+            'version': self.version,
+        }
+
+        auth = ''
+        if self.password:
+            auth = '{password}@'.format(
+                password=self.quote(self.user, safe=''),
+            )
+
+        return '{schema}://{auth}{hostname}{port}/?{args}'.format(
+            schema=self.secure_protocol if self.secure else self.protocol,
+            auth=auth,
+            hostname=self.host,
+            port='' if self.port is None or self.port == self.default_port
+                 else ':{}'.format(self.port),
+            args=self.urlencode(args),
+        )
+
     @staticmethod
     def parse_url(url):
         """
@@ -239,15 +276,10 @@ class NotifyGrowl(NotifyBase):
         if 'priority' in results['qsd'] and len(results['qsd']['priority']):
             _map = {
                 'l': GrowlPriority.LOW,
-                '-2': GrowlPriority.LOW,
                 'm': GrowlPriority.MODERATE,
-                '-1': GrowlPriority.MODERATE,
                 'n': GrowlPriority.NORMAL,
-                '0': GrowlPriority.NORMAL,
                 'h': GrowlPriority.HIGH,
-                '1': GrowlPriority.HIGH,
                 'e': GrowlPriority.EMERGENCY,
-                '2': GrowlPriority.EMERGENCY,
             }
             try:
                 results['priority'] = \

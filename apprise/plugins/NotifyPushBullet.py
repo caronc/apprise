@@ -182,6 +182,28 @@ class NotifyPushBullet(NotifyBase):
 
         return not has_error
 
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+        }
+
+        recipients = '/'.join([self.quote(x) for x in self.recipients])
+        if recipients == PUSHBULLET_SEND_TO_ALL:
+            # keyword is reserved for internal usage only; it's safe to remove
+            # it from the recipients list
+            recipients = ''
+
+        return '{schema}://{accesstoken}/{recipients}/?{args}'.format(
+            schema=self.secure_protocol,
+            accesstoken=self.quote(self.accesstoken, safe=''),
+            recipients=recipients,
+            args=self.urlencode(args))
+
     @staticmethod
     def parse_url(url):
         """

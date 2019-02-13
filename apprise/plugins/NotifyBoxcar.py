@@ -29,6 +29,7 @@ import re
 from time import time
 import hmac
 from hashlib import sha1
+from itertools import chain
 try:
     from urlparse import urlparse
 
@@ -271,6 +272,26 @@ class NotifyBoxcar(NotifyBase):
             return False
 
         return True
+
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format
+        }
+
+        return '{schema}://{access}/{secret}/{recipients}/?{args}'.format(
+            schema=self.secure_protocol,
+            access=self.quote(self.access),
+            secret=self.quote(self.secret),
+            recipients='/'.join([
+                self.quote(x) for x in chain(
+                    self.tags, self.device_tokens) if x != DEFAULT_TAG]),
+            args=self.urlencode(args),
+        )
 
     @staticmethod
     def parse_url(url):

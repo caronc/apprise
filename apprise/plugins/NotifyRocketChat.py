@@ -26,6 +26,7 @@
 import re
 import requests
 from json import loads
+from itertools import chain
 
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
@@ -106,6 +107,12 @@ class NotifyRocketChat(NotifyBase):
         elif not isinstance(recipients, (set, tuple, list)):
             recipients = []
 
+        if not (self.user and self.password):
+            # Username & Password is required for Rocket Chat to work
+            raise TypeError(
+                'No Rocket.Chat user/pass combo specified.'
+            )
+
         # Validate recipients and drop bad ones:
         for recipient in recipients:
             result = IS_CHANNEL.match(recipient)
@@ -132,6 +139,40 @@ class NotifyRocketChat(NotifyBase):
 
         # Used to track token headers upon authentication (if successful)
         self.headers = {}
+
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+        }
+
+        # Determine Authentication
+        auth = '{user}:{password}@'.format(
+            user=self.quote(self.user, safe=''),
+            password=self.quote(self.password, safe=''),
+        )
+
+        default_port = 443 if self.secure else 80
+
+        return '{schema}://{auth}{hostname}{port}/{targets}/?{args}'.format(
+            schema=self.secure_protocol if self.secure else self.protocol,
+            auth=auth,
+            hostname=self.host,
+            port='' if self.port is None or self.port == default_port
+                 else ':{}'.format(self.port),
+            targets='/'.join(
+                [self.quote(x) for x in chain(
+                    # Channels are prefixed with a pound/hashtag symbol
+                    ['#{}'.format(x) for x in self.channels],
+                    # Rooms are as is
+                    self.rooms,
+                )]),
+            args=self.urlencode(args),
+        )
 
     def notify(self, title, body, notify_type, **kwargs):
         """

@@ -397,6 +397,10 @@ def parse_list(*args):
         elif isinstance(arg, (set, list, tuple)):
             result += parse_list(*arg)
 
+        elif arg is None:
+            # Ignore
+            continue
+
         else:
             # Convert whatever it is to a string and work with it
             result += parse_list(str(arg))

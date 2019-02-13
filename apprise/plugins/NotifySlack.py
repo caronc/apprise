@@ -141,7 +141,6 @@ class NotifySlack(NotifyBase):
         if not self.user:
             self.logger.warning(
                 'No user was specified; using %s.' % SLACK_DEFAULT_USER)
-            self.user = SLACK_DEFAULT_USER
 
         if compat_is_basestring(channels):
             self.channels = [x for x in filter(bool, CHANNEL_LIST_DELIM.split(
@@ -231,7 +230,7 @@ class NotifySlack(NotifyBase):
             # prepare JSON Object
             payload = {
                 'channel': _channel,
-                'username': self.user,
+                'username': self.user if self.user else SLACK_DEFAULT_USER,
                 # Use Markdown language
                 'mrkdwn': True,
                 'attachments': [{
@@ -296,6 +295,35 @@ class NotifySlack(NotifyBase):
                 self.throttle()
 
         return notify_okay
+
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+        }
+
+        # Determine if there is a botname present
+        botname = ''
+        if self.user:
+            botname = '{botname}@'.format(
+                botname=self.quote(self.user, safe=''),
+            )
+
+        return '{schema}://{botname}{token_a}/{token_b}/{token_c}/{targets}/'\
+            '?{args}'.format(
+                schema=self.secure_protocol,
+                botname=botname,
+                token_a=self.quote(self.token_a, safe=''),
+                token_b=self.quote(self.token_b, safe=''),
+                token_c=self.quote(self.token_c, safe=''),
+                targets='/'.join(
+                    [self.quote(x, safe='') for x in self.channels]),
+                args=self.urlencode(args),
+            )
 
     @staticmethod
     def parse_url(url):

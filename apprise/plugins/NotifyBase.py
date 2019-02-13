@@ -260,6 +260,14 @@ class NotifyBase(object):
             color_type=color_type,
         )
 
+    def url(self):
+        """
+        Assembles the URL associated with the notification based on the
+        arguments provied.
+
+        """
+        raise NotImplementedError("This is implimented by the child class.")
+
     def __contains__(self, tags):
         """
         Returns true if the tag specified is associated with this notification.
@@ -347,16 +355,20 @@ class NotifyBase(object):
         """
         common urlencode function
 
+        The query should always be a dictionary.
+
         """
+        # Tidy query by eliminating any records set to None
+        _query = {k: v for (k, v) in query.items() if v is not None}
         try:
             # Python v3.x
             return _urlencode(
-                query, doseq=doseq, safe=safe, encoding=encoding,
+                _query, doseq=doseq, safe=safe, encoding=encoding,
                 errors=errors)
 
         except TypeError:
             # Python v2.7
-            return _urlencode(query)
+            return _urlencode(_query)
 
     @staticmethod
     def split_path(path, unquote=True):

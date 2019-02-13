@@ -175,6 +175,13 @@ class NotifyWindows(NotifyBase):
 
         return True
 
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        return '{schema}://'.format(schema=self.protocol)
+
     @staticmethod
     def parse_url(url):
         """

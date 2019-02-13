@@ -263,41 +263,12 @@ TEST_URLS = (
     ('ifttt://EventID/', {
         'instance': TypeError,
     }),
-    # Value1 gets assigned Entry1
-    # Title = <assigned title>
-    # Body = <assigned body>
-    ('ifttt://WebHookID@EventID/Entry1/', {
-        'instance': plugins.NotifyIFTTT,
-    }),
-    # Value1, Value2, and Value2, the below assigns:
-    #   Value1 = Entry1
-    #   Value2 = AnotherEntry
-    #   Value3 = ThirdValue
-    #   Title = <assigned title>
-    #   Body = <assigned body>
-    ('ifttt://WebHookID@EventID/Entry1/AnotherEntry/ThirdValue', {
-        'instance': plugins.NotifyIFTTT,
-    }),
-    # Mix and match content, the below assigns:
-    #   Value1 = FirstValue
-    #   AnotherKey = Hello
-    #   Value5 = test
-    #   Title = <assigned title>
-    #   Body = <assigned body>
-    ('ifttt://WebHookID@EventID/FirstValue/?AnotherKey=Hello&Value5=test', {
-        'instance': plugins.NotifyIFTTT,
-    }),
-    # This would assign:
-    #   Value1 = FirstValue
-    #   Title = <blank> - disable the one passed by the notify call
-    #   Body = <blank> - disable the one passed by the notify call
-    # The idea here is maybe you just want to use the apprise IFTTTT hook
-    # to trigger something and not nessisarily pass text along to it
-    ('ifttt://WebHookID@EventID/FirstValue/?Title=&Body=', {
-        'instance': plugins.NotifyIFTTT,
-    }),
     ('ifttt://:@/', {
         'instance': None,
+    }),
+    # A nicely formed ifttt url with 2 events defined:
+    ('ifttt://WebHookID@EventID/EventID2/', {
+        'instance': plugins.NotifyIFTTT,
     }),
     # Test website connection failures
     ('ifttt://WebHookID@EventID', {
@@ -390,6 +361,9 @@ TEST_URLS = (
         'instance': plugins.NotifyJSON,
     }),
     ('json://user:pass@localhost', {
+        'instance': plugins.NotifyJSON,
+    }),
+    ('json://user@localhost', {
         'instance': plugins.NotifyJSON,
     }),
     ('json://localhost:8080', {
@@ -529,8 +503,8 @@ TEST_URLS = (
     ('matrix://user@localhost/%s' % ('a' * 64), {
         'instance': plugins.NotifyMatrix,
     }),
-    # Name, port and token (secure)
-    ('matrixs://user@localhost:9000/%s' % ('a' * 64), {
+    # port and token (secure)
+    ('matrixs://localhost:9000/%s' % ('a' * 64), {
         'instance': plugins.NotifyMatrix,
     }),
     # Name, port, token and slack mode
@@ -963,6 +937,14 @@ TEST_URLS = (
     ('rocket://user:pass@localhost/#/!/@', {
         'instance': TypeError,
     }),
+    # No user/pass combo
+    ('rocket://user@localhost/room/', {
+        'instance': TypeError,
+    }),
+    # No user/pass combo
+    ('rocket://localhost/room/', {
+        'instance': TypeError,
+    }),
     # A room and port identifier
     ('rocket://user:pass@localhost:8080/room/', {
         'instance': plugins.NotifyRocketChat,
@@ -1383,7 +1365,7 @@ TEST_URLS = (
     ('xbmc://user:pass@localhost:8080', {
         'instance': plugins.NotifyXBMC,
     }),
-    ('xbmc://localhost', {
+    ('xbmc://user@localhost', {
         'instance': plugins.NotifyXBMC,
         # don't include an image by default
         'include_image': False,
@@ -1430,6 +1412,9 @@ TEST_URLS = (
         'instance': None,
     }),
     ('xml://localhost', {
+        'instance': plugins.NotifyXML,
+    }),
+    ('xml://user@localhost', {
         'instance': plugins.NotifyXML,
     }),
     ('xml://user:pass@localhost', {
@@ -1487,6 +1472,8 @@ def test_rest_plugins(mock_post, mock_get):
     API: REST Based Plugins()
 
     """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.NotifyBase.throttle_attempt = 0
 
     # iterate over our dictionary and test it out
     for (url, meta) in TEST_URLS:
@@ -1567,10 +1554,31 @@ def test_rest_plugins(mock_post, mock_get):
                 assert instance is None
                 continue
 
+            if instance is None:
+                # Expected None but didn't get it
+                print('%s instantiated %s (but expected None)' % (
+                    url, str(obj)))
+                assert(False)
+
             assert(isinstance(obj, instance))
 
-            # Disable throttling to speed up unit tests
-            obj.throttle_attempt = 0
+            if isinstance(obj, plugins.NotifyBase.NotifyBase):
+                # We loaded okay; now lets make sure we can reverse this url
+                assert(compat_is_basestring(obj.url()) is True)
+
+                # Instantiate the exact same object again using the URL from
+                # the one that was already created properly
+                obj_cmp = Apprise.instantiate(obj.url())
+
+                # Our object should be the same instance as what we had
+                # originally expected above.
+                if not isinstance(obj_cmp, plugins.NotifyBase.NotifyBase):
+                    # Assert messages are hard to trace back with the way
+                    # these tests work. Just printing before throwing our
+                    # assertion failure makes things easier to debug later on
+                    print('TEST FAIL: {} regenerated as {}'.format(
+                        url, obj.url()))
+                    assert(False)
 
             if self:
                 # Iterate over our expected entries inside of our object
@@ -1605,8 +1613,7 @@ def test_rest_plugins(mock_post, mock_get):
 
                         except Exception as e:
                             # We can't handle this exception type
-                            print('%s / %s' % (url, str(e)))
-                            assert False
+                            raise
 
             except AssertionError:
                 # Don't mess with these entries
@@ -1615,7 +1622,8 @@ def test_rest_plugins(mock_post, mock_get):
 
             except Exception as e:
                 # Check that we were expecting this exception to happen
-                assert isinstance(e, response)
+                if not isinstance(e, response):
+                    raise
 
             #
             # Stage 2: without title defined
@@ -1643,8 +1651,7 @@ def test_rest_plugins(mock_post, mock_get):
 
                         except Exception as e:
                             # We can't handle this exception type
-                            print('%s / %s' % (url, str(e)))
-                            assert False
+                            raise
 
             except AssertionError:
                 # Don't mess with these entries
@@ -1653,7 +1660,8 @@ def test_rest_plugins(mock_post, mock_get):
 
             except Exception as e:
                 # Check that we were expecting this exception to happen
-                assert isinstance(e, response)
+                if not isinstance(e, response):
+                    raise
 
         except AssertionError:
             # Don't mess with these entries
@@ -1662,9 +1670,11 @@ def test_rest_plugins(mock_post, mock_get):
 
         except Exception as e:
             # Handle our exception
-            print('%s / %s' % (url, str(e)))
-            assert(instance is not None)
-            assert(isinstance(e, instance))
+            if(instance is None):
+                raise
+
+            if not isinstance(e, instance):
+                raise
 
 
 @mock.patch('requests.get')
@@ -1674,6 +1684,9 @@ def test_notify_boxcar_plugin(mock_post, mock_get):
     API: NotifyBoxcar() Extra Checks
 
     """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.NotifyBase.throttle_attempt = 0
+
     # Generate some generic message types
     device = 'A' * 64
     tag = '@B' * 63
@@ -1724,9 +1737,6 @@ def test_notify_boxcar_plugin(mock_post, mock_get):
     # Test notifications without a body or a title
     p = plugins.NotifyBoxcar(access=access, secret=secret, recipients=None)
 
-    # Disable throttling to speed up unit tests
-    p.throttle_attempt = 0
-
     p.notify(body=None, title=None, notify_type=NotifyType.INFO) is True
 
 
@@ -1737,6 +1747,8 @@ def test_notify_discord_plugin(mock_post, mock_get):
     API: NotifyDiscord() Extra Checks
 
     """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.NotifyBase.throttle_attempt = 0
 
     # Initialize some generic (but valid) tokens
     webhook_id = 'A' * 24
@@ -1761,9 +1773,6 @@ def test_notify_discord_plugin(mock_post, mock_get):
         webhook_id=webhook_id,
         webhook_token=webhook_token,
         footer=True, thumbnail=False)
-
-    # Disable throttling to speed up unit tests
-    obj.throttle_attempt = 0
 
     # This call includes an image with it's payload:
     assert obj.notify(title='title', body='body',
@@ -2190,10 +2199,12 @@ def test_notify_ifttt_plugin(mock_post, mock_get):
     API: NotifyIFTTT() Extra Checks
 
     """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.NotifyBase.throttle_attempt = 0
 
     # Initialize some generic (but valid) tokens
-    apikey = 'webhookid'
-    event = 'event'
+    webhook_id = 'webhookid'
+    events = ['event1', 'event2']
 
     # Prepare Mock
     mock_get.return_value = requests.Request()
@@ -2204,7 +2215,7 @@ def test_notify_ifttt_plugin(mock_post, mock_get):
     mock_post.return_value.content = '{}'
 
     try:
-        obj = plugins.NotifyIFTTT(apikey=apikey, event=None, event_args=None)
+        obj = plugins.NotifyIFTTT(webhook_id=webhook_id, events=None)
         # No token specified
         assert(False)
 
@@ -2212,12 +2223,8 @@ def test_notify_ifttt_plugin(mock_post, mock_get):
         # Exception should be thrown about the fact no token was specified
         assert(True)
 
-    obj = plugins.NotifyIFTTT(apikey=apikey, event=event, event_args=None)
+    obj = plugins.NotifyIFTTT(webhook_id=webhook_id, events=events)
     assert(isinstance(obj, plugins.NotifyIFTTT))
-    assert(len(obj.event_args) == 0)
-
-    # Disable throttling to speed up unit tests
-    obj.throttle_attempt = 0
 
     assert obj.notify(title='title', body='body',
                       notify_type=NotifyType.INFO) is True
@@ -2230,6 +2237,9 @@ def test_notify_join_plugin(mock_post, mock_get):
     API: NotifyJoin() Extra Checks
 
     """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.NotifyBase.throttle_attempt = 0
+
     # Generate some generic message types
     device = 'A' * 32
     group = 'group.chrome'
@@ -2250,9 +2260,6 @@ def test_notify_join_plugin(mock_post, mock_get):
     mock_post.return_value.status_code = requests.codes.created
     mock_get.return_value.status_code = requests.codes.created
 
-    # Disable throttling to speed up unit tests
-    p.throttle_attempt = 0
-
     # Test notifications without a body or a title; nothing to send
     # so we return False
     p.notify(body=None, title=None, notify_type=NotifyType.INFO) is False
@@ -2265,6 +2272,8 @@ def test_notify_slack_plugin(mock_post, mock_get):
     API: NotifySlack() Extra Checks
 
     """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.NotifyBase.throttle_attempt = 0
 
     # Initialize some generic (but valid) tokens
     token_a = 'A' * 9
@@ -2299,9 +2308,6 @@ def test_notify_slack_plugin(mock_post, mock_get):
     obj = plugins.NotifySlack(
         token_a=token_a, token_b=token_b, token_c=token_c, channels=channels,
         include_image=True)
-
-    # Disable throttling to speed up unit tests
-    obj.throttle_attempt = 0
 
     # This call includes an image with it's payload:
     assert obj.notify(title='title', body='body',
@@ -2358,6 +2364,9 @@ def test_notify_pushed_plugin(mock_post, mock_get):
     API: NotifyPushed() Extra Checks
 
     """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.NotifyBase.throttle_attempt = 0
+
     # Chat ID
     recipients = '@ABCDEFG, @DEFGHIJ, #channel, #channel2'
 
@@ -2436,9 +2445,6 @@ def test_notify_pushed_plugin(mock_post, mock_get):
     assert(len(obj.channels) == 2)
     assert(len(obj.users) == 2)
 
-    # Disable throttling to speed up unit tests
-    obj.throttle_attempt = 0
-
     # Support the handling of an empty and invalid URL strings
     assert plugins.NotifyPushed.parse_url(None) is None
     assert plugins.NotifyPushed.parse_url('') is None
@@ -2458,6 +2464,8 @@ def test_notify_pushover_plugin(mock_post, mock_get):
     API: NotifyPushover() Extra Checks
 
     """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.NotifyBase.throttle_attempt = 0
 
     # Initialize some generic (but valid) tokens
     token = 'a' * 30
@@ -2487,9 +2495,6 @@ def test_notify_pushover_plugin(mock_post, mock_get):
     assert(isinstance(obj, plugins.NotifyPushover))
     assert(len(obj.devices) == 3)
 
-    # Disable throttling to speed up unit tests
-    obj.throttle_attempt = 0
-
     # This call fails because there is 1 invalid device
     assert obj.notify(title='title', body='body',
                       notify_type=NotifyType.INFO) is False
@@ -2499,9 +2504,6 @@ def test_notify_pushover_plugin(mock_post, mock_get):
     # Default is to send to all devices, so there will be a
     # device defined here
     assert(len(obj.devices) == 1)
-
-    # Disable throttling to speed up unit tests
-    obj.throttle_attempt = 0
 
     # This call succeeds because all of the devices are valid
     assert obj.notify(title='title', body='body',
@@ -2526,8 +2528,15 @@ def test_notify_rocketchat_plugin(mock_post, mock_get):
     API: NotifyRocketChat() Extra Checks
 
     """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.NotifyBase.throttle_attempt = 0
+
     # Chat ID
     recipients = 'l2g, lead2gold, #channel, #channel2'
+
+    # Authentication
+    user = 'myuser'
+    password = 'mypass'
 
     # Prepare Mock
     mock_get.return_value = requests.Request()
@@ -2538,7 +2547,8 @@ def test_notify_rocketchat_plugin(mock_post, mock_get):
     mock_get.return_value.text = ''
 
     try:
-        obj = plugins.NotifyRocketChat(recipients=None)
+        obj = plugins.NotifyRocketChat(
+            user=user, password=password, recipients=None)
         # invalid recipients list (None)
         assert(False)
 
@@ -2548,7 +2558,8 @@ def test_notify_rocketchat_plugin(mock_post, mock_get):
         assert(True)
 
     try:
-        obj = plugins.NotifyRocketChat(recipients=object())
+        obj = plugins.NotifyRocketChat(
+            user=user, password=password, recipients=object())
         # invalid recipients list (object)
         assert(False)
 
@@ -2558,7 +2569,8 @@ def test_notify_rocketchat_plugin(mock_post, mock_get):
         assert(True)
 
     try:
-        obj = plugins.NotifyRocketChat(recipients=set())
+        obj = plugins.NotifyRocketChat(
+            user=user, password=password, recipients=set())
         # invalid recipient list/set (no entries)
         assert(False)
 
@@ -2567,13 +2579,11 @@ def test_notify_rocketchat_plugin(mock_post, mock_get):
         # specified
         assert(True)
 
-    obj = plugins.NotifyRocketChat(recipients=recipients)
+    obj = plugins.NotifyRocketChat(
+        user=user, password=password, recipients=recipients)
     assert(isinstance(obj, plugins.NotifyRocketChat))
     assert(len(obj.channels) == 2)
     assert(len(obj.rooms) == 2)
-
-    # Disable throttling to speed up unit tests
-    obj.throttle_attempt = 0
 
     #
     # Logout
@@ -2653,6 +2663,9 @@ def test_notify_telegram_plugin(mock_post, mock_get):
     API: NotifyTelegram() Extra Checks
 
     """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.NotifyBase.throttle_attempt = 0
+
     # Bot Token
     bot_token = '123456789:abcdefg_hijklmnop'
     invalid_bot_token = 'abcd:123'
@@ -2710,6 +2723,12 @@ def test_notify_telegram_plugin(mock_post, mock_get):
     assert(isinstance(obj, plugins.NotifyTelegram))
     assert(len(obj.chat_ids) == 2)
 
+    # test url call
+    assert(compat_is_basestring(obj.url()))
+    # Test that we can load the string we generate back:
+    obj = plugins.NotifyTelegram(**plugins.NotifyTelegram.parse_url(obj.url()))
+    assert(isinstance(obj, plugins.NotifyTelegram))
+
     # Support the handling of an empty and invalid URL strings
     assert(plugins.NotifyTelegram.parse_url(None) is None)
     assert(plugins.NotifyTelegram.parse_url('') is None)
@@ -2729,10 +2748,6 @@ def test_notify_telegram_plugin(mock_post, mock_get):
     # No image asset
     nimg_obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids=chat_ids)
     nimg_obj.asset = AppriseAsset(image_path_mask=False, image_url_mask=False)
-
-    # Disable throttling to speed up unit tests
-    nimg_obj.throttle_attempt = 0
-    obj.throttle_attempt = 0
 
     # Test that our default settings over-ride base settings since they are
     # not the same as the one specified in the base; this check merely

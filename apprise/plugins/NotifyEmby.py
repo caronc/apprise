@@ -535,6 +535,38 @@ class NotifyEmby(NotifyBase):
 
         return not has_error
 
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'modal': 'yes' if self.modal else 'no',
+        }
+
+        # Determine Authentication
+        auth = ''
+        if self.user and self.password:
+            auth = '{user}:{password}@'.format(
+                user=self.quote(self.user, safe=''),
+                password=self.quote(self.password, safe=''),
+            )
+        else:  # self.user is set
+            auth = '{user}@'.format(
+                user=self.quote(self.user, safe=''),
+            )
+
+        return '{schema}://{auth}{hostname}{port}/?{args}'.format(
+            schema=self.secure_protocol if self.secure else self.protocol,
+            auth=auth,
+            hostname=self.host,
+            port='' if self.port is None or self.port == self.emby_default_port
+                 else ':{}'.format(self.port),
+            args=self.urlencode(args),
+        )
+
     @property
     def is_authenticated(self):
         """

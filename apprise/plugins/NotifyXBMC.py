@@ -44,11 +44,16 @@ class NotifyXBMC(NotifyBase):
     # The services URL
     service_url = 'http://kodi.tv/'
 
+    xbmc_protocol = 'xbmc'
+    xbmc_secure_protocol = 'xbmcs'
+    kodi_protocol = 'kodi'
+    kodi_secure_protocol = 'kodis'
+
     # The default protocols
-    protocol = ('xbmc', 'kodi')
+    protocol = (xbmc_protocol, kodi_protocol)
 
     # The default secure protocols
-    secure_protocol = ('xbmc', 'kodis')
+    secure_protocol = (xbmc_secure_protocol, kodi_secure_protocol)
 
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_kodi'
@@ -223,6 +228,44 @@ class NotifyXBMC(NotifyBase):
             return False
 
         return True
+
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+        }
+
+        # Determine Authentication
+        auth = ''
+        if self.user and self.password:
+            auth = '{user}:{password}@'.format(
+                user=self.quote(self.user, safe=''),
+                password=self.quote(self.password, safe=''),
+            )
+        elif self.user:
+            auth = '{user}@'.format(
+                user=self.quote(self.user, safe=''),
+            )
+
+        default_schema = self.xbmc_protocol if (
+            self.protocol <= self.xbmc_remote_protocol) else self.kodi_protocol
+        default_port = 443 if self.secure else self.xbmc_default_port
+        if self.secure:
+            # Append 's' to schema
+            default_schema + 's'
+
+        return '{schema}://{auth}{hostname}{port}/?{args}'.format(
+            schema=default_schema,
+            auth=auth,
+            hostname=self.host,
+            port='' if not self.port or self.port == default_port
+                 else ':{}'.format(self.port),
+            args=self.urlencode(args),
+        )
 
     @staticmethod
     def parse_url(url):

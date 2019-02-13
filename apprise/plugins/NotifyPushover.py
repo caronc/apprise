@@ -237,6 +237,41 @@ class NotifyPushover(NotifyBase):
 
         return not has_error
 
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        _map = {
+            PushoverPriority.LOW: 'low',
+            PushoverPriority.MODERATE: 'moderate',
+            PushoverPriority.NORMAL: 'normal',
+            PushoverPriority.HIGH: 'high',
+            PushoverPriority.EMERGENCY: 'emergency',
+        }
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'priority':
+                _map[PushoverPriority.NORMAL] if self.priority not in _map
+                else _map[self.priority],
+        }
+
+        devices = '/'.join([self.quote(x) for x in self.devices])
+        if devices == PUSHOVER_SEND_TO_ALL:
+            # keyword is reserved for internal usage only; it's safe to remove
+            # it from the devices list
+            devices = ''
+
+        return '{schema}://{auth}{token}/{devices}/?{args}'.format(
+            schema=self.secure_protocol,
+            auth='' if not self.user
+                 else '{user}@'.format(user=self.quote(self.user, safe='')),
+            token=self.quote(self.token, safe=''),
+            devices=devices,
+            args=self.urlencode(args))
+
     @staticmethod
     def parse_url(url):
         """

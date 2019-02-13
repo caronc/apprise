@@ -221,6 +221,32 @@ class NotifyRyver(NotifyBase):
 
         return True
 
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'webhook': self.webhook,
+        }
+
+        # Determine if there is a botname present
+        botname = ''
+        if self.user:
+            botname = '{botname}@'.format(
+                botname=self.quote(self.user, safe=''),
+            )
+
+        return '{schema}://{botname}{organization}/{token}/?{args}'.format(
+            schema=self.secure_protocol,
+            botname=botname,
+            organization=self.quote(self.organization, safe=''),
+            token=self.quote(self.token, safe=''),
+            args=self.urlencode(args),
+        )
+
     @staticmethod
     def parse_url(url):
         """

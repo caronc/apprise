@@ -26,6 +26,8 @@
 from apprise import plugins
 from apprise import NotifyType
 from apprise import Apprise
+from apprise.utils import compat_is_basestring
+
 import mock
 
 TEST_URLS = (
@@ -104,12 +106,36 @@ def test_plugin(mock_refresh, mock_send):
         try:
             obj = Apprise.instantiate(url, suppress_exceptions=False)
 
-            if instance is None:
-                # Check that we got what we came for
-                assert obj is instance
+            if obj is None:
+                # We're done (assuming this is what we were expecting)
+                assert instance is None
                 continue
 
+            if instance is None:
+                # Expected None but didn't get it
+                print('%s instantiated %s (but expected None)' % (
+                    url, str(obj)))
+                assert(False)
+
             assert(isinstance(obj, instance))
+
+            if isinstance(obj, plugins.NotifyBase.NotifyBase):
+                # We loaded okay; now lets make sure we can reverse this url
+                assert(compat_is_basestring(obj.url()) is True)
+
+                # Instantiate the exact same object again using the URL from
+                # the one that was already created properly
+                obj_cmp = Apprise.instantiate(obj.url())
+
+                # Our object should be the same instance as what we had
+                # originally expected above.
+                if not isinstance(obj_cmp, plugins.NotifyBase.NotifyBase):
+                    # Assert messages are hard to trace back with the way
+                    # these tests work. Just printing before throwing our
+                    # assertion failure makes things easier to debug later on
+                    print('TEST FAIL: {} regenerated as {}'.format(
+                        url, obj.url()))
+                    assert(False)
 
             if self:
                 # Iterate over our expected entries inside of our object
@@ -144,21 +170,27 @@ def test_plugin(mock_refresh, mock_send):
 
                         except Exception as e:
                             # We can't handle this exception type
-                            assert False
+                            raise
 
             except AssertionError:
                 # Don't mess with these entries
+                print('%s AssertionError' % url)
                 raise
 
             except Exception as e:
                 # Check that we were expecting this exception to happen
-                assert isinstance(e, response)
+                if not isinstance(e, response):
+                    raise
 
         except AssertionError:
             # Don't mess with these entries
+            print('%s AssertionError' % url)
             raise
 
         except Exception as e:
             # Handle our exception
-            assert(instance is not None)
-            assert(isinstance(e, instance))
+            if(instance is None):
+                raise
+
+            if not isinstance(e, instance):
+                raise

@@ -31,6 +31,7 @@ from hashlib import sha256
 from datetime import datetime
 from collections import OrderedDict
 from xml.etree import ElementTree
+from itertools import chain
 
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
@@ -58,8 +59,8 @@ LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
 # region as a delimiter. This is a bit hacky; but it's much easier than having
 # users of this product search though this Access Key Secret and escape all
 # of the forward slashes!
-IS_REGION = re.compile(r'^\s*(?P<country>[a-z]{2})-'
-                       r'(?P<area>[a-z]+)-(?P<no>[0-9]+)\s*$', re.I)
+IS_REGION = re.compile(
+    r'^\s*(?P<country>[a-z]{2})-(?P<area>[a-z]+)-(?P<no>[0-9]+)\s*$', re.I)
 
 # Extend HTTP Error Messages
 AWS_HTTP_ERROR_MAP = HTTP_ERROR_MAP.copy()
@@ -520,6 +521,32 @@ class NotifySNS(NotifyBase):
             pass
 
         return response
+
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+        }
+
+        return '{schema}://{key_id}/{key_secret}/{region}/{targets}/'\
+            '?{args}'.format(
+                schema=self.secure_protocol,
+                key_id=self.quote(self.aws_access_key_id, safe=''),
+                key_secret=self.quote(self.aws_secret_access_key, safe=''),
+                region=self.quote(self.aws_region_name, safe=''),
+                targets='/'.join(
+                    [self.quote(x) for x in chain(
+                        # Phone # are prefixed with a plus symbol
+                        ['+{}'.format(x) for x in self.phone],
+                        # Topics are prefixed with a pound/hashtag symbol
+                        ['#{}'.format(x) for x in self.topics],
+                    )]),
+                args=self.urlencode(args),
+            )
 
     @staticmethod
     def parse_url(url):

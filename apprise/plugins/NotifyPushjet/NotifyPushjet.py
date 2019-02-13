@@ -52,11 +52,14 @@ class NotifyPushjet(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_pushjet'
 
-    def __init__(self, **kwargs):
+    def __init__(self, secret_key, **kwargs):
         """
         Initialize Pushjet Object
         """
         super(NotifyPushjet, self).__init__(**kwargs)
+
+        # store our key
+        self.secret_key = secret_key
 
     def notify(self, title, body, notify_type):
         """
@@ -72,7 +75,7 @@ class NotifyPushjet(NotifyBase):
                 server += ":" + str(self.port)
 
             api = pushjet.Api(server)
-            service = api.Service(secret_key=self.user)
+            service = api.Service(secret_key=self.secret_key)
 
             service.send(body, title)
             self.logger.info('Sent Pushjet notification.')
@@ -84,6 +87,27 @@ class NotifyPushjet(NotifyBase):
 
         return True
 
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+        }
+
+        default_port = 443 if self.secure else 80
+
+        return '{schema}://{secret_key}@{hostname}{port}/?{args}'.format(
+            schema=self.secure_protocol if self.secure else self.protocol,
+            secret_key=self.quote(self.secret_key, safe=''),
+            hostname=self.host,
+            port='' if self.port is None or self.port == default_port
+                 else ':{}'.format(self.port),
+            args=self.urlencode(args),
+        )
+
     @staticmethod
     def parse_url(url):
         """
@@ -91,10 +115,10 @@ class NotifyPushjet(NotifyBase):
         us to substantiate this object.
 
         Syntax:
-           pjet://secret@hostname
-           pjet://secret@hostname:port
-           pjets://secret@hostname
-           pjets://secret@hostname:port
+           pjet://secret_key@hostname
+           pjet://secret_key@hostname:port
+           pjets://secret_key@hostname
+           pjets://secret_key@hostname:port
 
         """
         results = NotifyBase.parse_url(url)
@@ -106,5 +130,8 @@ class NotifyPushjet(NotifyBase):
         if not results.get('user'):
             # a username is required
             return None
+
+        # Store it as it's value
+        results['secret_key'] = results.get('user')
 
         return results

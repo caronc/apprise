@@ -190,6 +190,34 @@ class NotifyProwl(NotifyBase):
 
         return True
 
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        _map = {
+            ProwlPriority.LOW: 'low',
+            ProwlPriority.MODERATE: 'moderate',
+            ProwlPriority.NORMAL: 'normal',
+            ProwlPriority.HIGH: 'high',
+            ProwlPriority.EMERGENCY: 'emergency',
+        }
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'priority': 'normal' if self.priority not in _map
+                        else _map[self.priority]
+        }
+
+        return '{schema}://{apikey}/{providerkey}/?{args}'.format(
+            schema=self.secure_protocol,
+            apikey=self.quote(self.apikey, safe=''),
+            providerkey='' if not self.providerkey
+                        else self.quote(self.providerkey, safe=''),
+            args=self.urlencode(args),
+        )
+
     @staticmethod
     def parse_url(url):
         """
@@ -216,15 +244,10 @@ class NotifyProwl(NotifyBase):
         if 'priority' in results['qsd'] and len(results['qsd']['priority']):
             _map = {
                 'l': ProwlPriority.LOW,
-                '-2': ProwlPriority.LOW,
                 'm': ProwlPriority.MODERATE,
-                '-1': ProwlPriority.MODERATE,
                 'n': ProwlPriority.NORMAL,
-                '0': ProwlPriority.NORMAL,
                 'h': ProwlPriority.HIGH,
-                '1': ProwlPriority.HIGH,
                 'e': ProwlPriority.EMERGENCY,
-                '2': ProwlPriority.EMERGENCY,
             }
             try:
                 results['priority'] = \

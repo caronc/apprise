@@ -26,6 +26,7 @@
 import re
 import requests
 from json import dumps
+from itertools import chain
 
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
@@ -255,6 +256,29 @@ class NotifyPushed(NotifyBase):
             return False
 
         return True
+
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+        }
+
+        return '{schema}://{app_key}/{app_secret}/{targets}/?{args}'.format(
+            schema=self.secure_protocol,
+            app_key=self.quote(self.app_key, safe=''),
+            app_secret=self.quote(self.app_secret, safe=''),
+            targets='/'.join(
+                [self.quote(x) for x in chain(
+                    # Channels are prefixed with a pound/hashtag symbol
+                    ['#{}'.format(x) for x in self.channels],
+                    # Users are prefixed with an @ symbol
+                    ['@{}'.format(x) for x in self.users],
+                )]),
+            args=self.urlencode(args))
 
     @staticmethod
     def parse_url(url):

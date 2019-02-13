@@ -52,6 +52,16 @@ def test_notify_base():
     nb = NotifyBase(port=10)
     assert nb.port == 10
 
+    try:
+        nb.url()
+        assert False
+
+    except NotImplementedError:
+        # Each sub-module is that inherits this as a parent is required to
+        # over-ride this function. So direct calls to this throws a not
+        # implemented error intentionally
+        assert True
+
     # Throttle overrides..
     nb = NotifyBase()
     nb.throttle_attempt = 0.0

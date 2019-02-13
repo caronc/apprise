@@ -421,6 +421,52 @@ class NotifyEmail(NotifyBase):
 
         return True
 
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'to': self.to_addr,
+            'from': self.from_addr,
+            'name': self.from_name,
+            'mode': self.secure_mode,
+            'smtp': self.smtp_host,
+            'timeout': self.timeout,
+            'user': self.user,
+        }
+
+        # pull email suffix from username (if present)
+        user = self.user.split('@')[0]
+
+        # Determine Authentication
+        auth = ''
+        if self.user and self.password:
+            auth = '{user}:{password}@'.format(
+                user=self.quote(user, safe=''),
+                password=self.quote(self.password, safe=''),
+            )
+        else:
+            # user url
+            auth = '{user}@'.format(
+                user=self.quote(user, safe=''),
+            )
+
+        # Default Port setup
+        default_port = \
+            self.default_secure_port if self.secure else self.default_port
+
+        return '{schema}://{auth}{hostname}{port}/?{args}'.format(
+            schema=self.secure_protocol if self.secure else self.protocol,
+            auth=auth,
+            hostname=self.host,
+            port='' if self.port is None or self.port == default_port
+                 else ':{}'.format(self.port),
+            args=self.urlencode(args),
+        )
+
     @staticmethod
     def parse_url(url):
         """

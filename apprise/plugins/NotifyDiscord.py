@@ -180,8 +180,8 @@ class NotifyDiscord(NotifyBase):
 
         else:
             # not markdown
-            payload['content'] = body if not title \
-                else "{}\r\n{}".format(title, body)
+            payload['content'] = \
+                body if not title else "{}\r\n{}".format(title, body)
 
         if self.avatar and image_url:
             payload['avatar_url'] = image_url
@@ -240,6 +240,27 @@ class NotifyDiscord(NotifyBase):
             return False
 
         return True
+
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'tts': 'yes' if self.tts else 'no',
+            'avatar': 'yes' if self.avatar else 'no',
+            'footer': 'yes' if self.footer else 'no',
+            'thumbnail': 'yes' if self.thumbnail else 'no',
+        }
+
+        return '{schema}://{webhook_id}/{webhook_token}/?{args}'.format(
+            schema=self.secure_protocol,
+            webhook_id=self.quote(self.webhook_id),
+            webhook_token=self.quote(self.webhook_token),
+            args=self.urlencode(args),
+        )
 
     @staticmethod
     def parse_url(url):
