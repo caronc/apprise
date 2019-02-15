@@ -166,6 +166,12 @@ def test_notify_base_urls():
     assert 'password' in results
     assert results['password'] == "newpassword"
 
+    # pass headers
+    results = NotifyBase.parse_url(
+        'https://localhost:8080?-HeaderKey=HeaderValue')
+    assert 'headerkey' in results['headers']
+    assert results['headers']['headerkey'] == 'HeaderValue'
+
     # User Handling
 
     # user keyword over-rides default password

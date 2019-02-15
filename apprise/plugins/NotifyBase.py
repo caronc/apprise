@@ -425,5 +425,6 @@ class NotifyBase(object):
         if 'user' in results['qsd']:
             results['user'] = results['qsd']['user']
 
-        results['headers'] = {k[1:]: v for k, v in results['qsd'].items() if re.match(r'^-.', k)}
+        results['headers'] = {k[1:]: v for k, v in results['qsd'].items()
+                              if re.match(r'^-.', k)}
         return results

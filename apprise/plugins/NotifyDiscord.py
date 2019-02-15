@@ -181,7 +181,7 @@ class NotifyDiscord(NotifyBase):
         else:
             # not markdown
             payload['content'] = body if not title \
-                    else "{}\r\n{}".format(title, body)
+                else "{}\r\n{}".format(title, body)
 
         if self.avatar and image_url:
             payload['avatar_url'] = image_url
@@ -298,7 +298,7 @@ class NotifyDiscord(NotifyBase):
         """
         regex = re.compile(
             r'^\s*#+\s*(?P<name>[^#\n]+)([ \r\t\v#])?'
-            r'(?P<value>([^ \r\t\v#].+?)(\n(?!\s#))|\s*$)', flags=re.S|re.M)
+            r'(?P<value>([^ \r\t\v#].+?)(\n(?!\s#))|\s*$)', flags=re.S | re.M)
 
         common = regex.finditer(markdown)
         fields = list()
