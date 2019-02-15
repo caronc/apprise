@@ -96,6 +96,9 @@ class NotifyXML(NotifyBase):
             'Content-Type': 'application/xml'
         }
 
+        if self.headers:
+            headers.update(self.headers)
+
         re_map = {
             '{MESSAGE_TYPE}': NotifyBase.quote(notify_type),
             '{SUBJECT}': NotifyBase.quote(title),
