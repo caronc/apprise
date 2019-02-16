@@ -206,6 +206,7 @@ class NotifyProwl(NotifyBase):
         # Define any arguments set
         args = {
             'format': self.notify_format,
+            'overflow': self.overflow_mode,
             'priority': 'normal' if self.priority not in _map
                         else _map[self.priority]
         }

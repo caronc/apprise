@@ -23,7 +23,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import re
 import requests
 from json import dumps
 
@@ -57,6 +56,10 @@ class NotifyXBMC(NotifyBase):
 
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_kodi'
+
+    # Limit results to just the first 2 line otherwise there is just to much
+    # content to display
+    body_max_line_count = 2
 
     # XBMC uses the http protocol with JSON requests
     xbmc_default_port = 8080
@@ -159,12 +162,6 @@ class NotifyXBMC(NotifyBase):
         Perform XBMC/KODI Notification
         """
 
-        # Limit results to just the first 2 line otherwise
-        # there is just to much content to display
-        body = re.split('[\r\n]+', body)
-        body[0] = body[0].strip('#').strip()
-        body = '\r\n'.join(body[0:2])
-
         if self.protocol == self.xbmc_remote_protocol:
             # XBMC v2.0
             (headers, payload) = self._payload_20(
@@ -237,6 +234,7 @@ class NotifyXBMC(NotifyBase):
         # Define any arguments set
         args = {
             'format': self.notify_format,
+            'overflow': self.overflow_mode,
         }
 
         # Determine Authentication

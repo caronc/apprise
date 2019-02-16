@@ -90,6 +90,10 @@ class NotifyJoin(NotifyBase):
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_72
 
+    # Limit results to just the first 2 line otherwise there is just to much
+    # content to display
+    body_max_line_count = 2
+
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 1000
 
@@ -130,17 +134,6 @@ class NotifyJoin(NotifyBase):
         """
         Perform Join Notification
         """
-
-        try:
-            # Limit results to just the first 2 line otherwise
-            # there is just to much content to display
-            body = re.split('[\r\n]+', body)
-            body[0] = body[0].strip('#').strip()
-            body = '\r\n'.join(body[0:2])
-
-        except (AttributeError, TypeError):
-            # body was None or not of a type string
-            body = ''
 
         headers = {
             'User-Agent': self.app_id,
@@ -241,6 +234,7 @@ class NotifyJoin(NotifyBase):
         # Define any arguments set
         args = {
             'format': self.notify_format,
+            'overflow': self.overflow_mode,
         }
 
         return '{schema}://{apikey}/{devices}/?{args}'.format(

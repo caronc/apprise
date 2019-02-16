@@ -304,6 +304,7 @@ class NotifySlack(NotifyBase):
         # Define any arguments set
         args = {
             'format': self.notify_format,
+            'overflow': self.overflow_mode,
         }
 
         # Determine if there is a botname present

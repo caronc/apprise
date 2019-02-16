@@ -249,6 +249,7 @@ class NotifyDiscord(NotifyBase):
         # Define any arguments set
         args = {
             'format': self.notify_format,
+            'overflow': self.overflow_mode,
             'tts': 'yes' if self.tts else 'no',
             'avatar': 'yes' if self.avatar else 'no',
             'footer': 'yes' if self.footer else 'no',

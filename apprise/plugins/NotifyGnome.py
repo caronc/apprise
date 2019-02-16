@@ -26,8 +26,6 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
-import re
-
 from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
 
@@ -86,6 +84,14 @@ class NotifyGnome(NotifyBase):
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_128
 
+    # Limit results to just the first 10 line otherwise there is just to much
+    # content to display
+    body_max_line_count = 10
+
+    # A title can not be used for SMS Messages.  Setting this to zero will
+    # cause any title (if defined) to get placed into the message body.
+    title_maxlen = 0
+
     # This entry is a bit hacky, but it allows us to unit-test this library
     # in an environment that simply doesn't have the gnome packages
     # available to us.  It also allows us to handle situations where the
@@ -118,15 +124,6 @@ class NotifyGnome(NotifyBase):
             self.logger.warning(
                 "Gnome Notifications are not supported by this system.")
             return False
-
-        # Limit results to just the first 10 line otherwise
-        # there is just to much content to display
-        body = re.split('[\r\n]+', body)
-        if title:
-            # Place title on first line if it exists
-            body.insert(0, title)
-
-        body = '\r\n'.join(body[0:10])
 
         try:
             # App initialization

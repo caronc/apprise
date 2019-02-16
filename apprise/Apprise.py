@@ -363,26 +363,30 @@ class Apprise(object):
                     # Store entry directly
                     conversion_map[server.notify_format] = body
 
-            try:
-                # Send notification
-                if not server.notify(
-                        title=title,
-                        body=conversion_map[server.notify_format],
-                        notify_type=notify_type):
+            # Apply our overflow (if defined)
+            for chunk in server._apply_overflow(
+                    body=conversion_map[server.notify_format], title=title):
+                try:
+                    # Send notification
+                    if not server.notify(
+                            title=chunk['title'],
+                            body=chunk['body'],
+                            notify_type=notify_type):
 
-                    # Toggle our return status flag
+                        # Toggle our return status flag
+                        status = False
+
+                except TypeError:
+                    # These our our internally thrown notifications
+                    # TODO: Change this to a custom one such as
+                    #       AppriseNotifyError
                     status = False
 
-            except TypeError:
-                # These our our internally thrown notifications
-                # TODO: Change this to a custom one such as AppriseNotifyError
-                status = False
-
-            except Exception:
-                # A catch all so we don't have to abort early
-                # just because one of our plugins has a bug in it.
-                logging.exception("Notification Exception")
-                status = False
+                except Exception:
+                    # A catch all so we don't have to abort early
+                    # just because one of our plugins has a bug in it.
+                    logging.exception("Notification Exception")
+                    status = False
 
         return status
 

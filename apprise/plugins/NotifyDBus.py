@@ -148,6 +148,14 @@ class NotifyDBus(NotifyBase):
     # The number of seconds to keep the message present for
     message_timeout_ms = 13000
 
+    # Limit results to just the first 10 line otherwise there is just to much
+    # content to display
+    body_max_line_count = 10
+
+    # A title can not be used for SMS Messages.  Setting this to zero will
+    # cause any title (if defined) to get placed into the message body.
+    title_maxlen = 0
+
     # This entry is a bit hacky, but it allows us to unit-test this library
     # in an environment that simply doesn't have the gnome packages
     # available to us.  It also allows us to handle situations where the
@@ -248,15 +256,6 @@ class NotifyDBus(NotifyBase):
                 self.logger.warning(
                     "Could not load Gnome notification icon ({}): {}"
                     .format(icon_path, e))
-
-        # Limit results to just the first 10 line otherwise
-        # there is just to much content to display
-        body = re.split('[\r\n]+', body)
-        if title:
-            # Place title on first line if it exists
-            body.insert(0, title)
-
-        body = '\r\n'.join(body[0:10])
 
         try:
             dbus_iface.Notify(

@@ -223,6 +223,7 @@ class NotifyGrowl(NotifyBase):
         # Define any arguments set
         args = {
             'format': self.notify_format,
+            'overflow': self.overflow_mode,
             'priority':
                 _map[GrowlPriority.NORMAL] if self.priority not in _map
                 else _map[self.priority],

@@ -429,6 +429,7 @@ class NotifyEmail(NotifyBase):
         # Define any arguments set
         args = {
             'format': self.notify_format,
+            'overflow': self.overflow_mode,
             'to': self.to_addr,
             'from': self.from_addr,
             'name': self.from_name,

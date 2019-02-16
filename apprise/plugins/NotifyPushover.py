@@ -253,6 +253,7 @@ class NotifyPushover(NotifyBase):
         # Define any arguments set
         args = {
             'format': self.notify_format,
+            'overflow': self.overflow_mode,
             'priority':
                 _map[PushoverPriority.NORMAL] if self.priority not in _map
                 else _map[self.priority],

@@ -45,6 +45,8 @@ from ..utils import is_hostname
 from ..common import NOTIFY_TYPES
 from ..common import NotifyFormat
 from ..common import NOTIFY_FORMATS
+from ..common import OverflowMode
+from ..common import OVERFLOW_MODES
 
 from ..AppriseAsset import AppriseAsset
 
@@ -120,13 +122,25 @@ class NotifyBase(object):
     image_size = None
 
     # The maximum allowable characters allowed in the body per message
-    body_maxlen = 32768
+    # We set it to what would virtually be an infinite value really
+    # 2^63 - 1 = 9223372036854775807
+    body_maxlen = 9223372036854775807
 
-    # Defines the maximum allowable characters in the title
+    # Defines the maximum allowable characters in the title; set this to zero
+    # if a title can't be used. Titles that are not used but are defined are
+    # automatically placed into the body
     title_maxlen = 250
+
+    # Set the maximum line count; if this is set to anything larger then zero
+    # the message (prior to it being sent) will be truncated to this number
+    # of lines. Setting this to zero disables this feature.
+    body_max_line_count = 0
 
     # Default Notify Format
     notify_format = NotifyFormat.TEXT
+
+    # Default Overflow Mode
+    overflow_mode = OverflowMode.UPSTREAM
 
     # Maintain a set of tags to associate with this specific notification
     tags = set()
@@ -176,6 +190,19 @@ class NotifyBase(object):
                 )
             # Provide override
             self.notify_format = notify_format
+
+        if 'overflow' in kwargs:
+            # Store the specified format if specified
+            overflow_mode = kwargs.get('overflow', '')
+            if overflow_mode.lower() not in OVERFLOW_MODES:
+                self.logger.error(
+                    'Invalid overflow method %s' % overflow_mode,
+                )
+                raise TypeError(
+                    'Invalid overflow method %s' % overflow_mode,
+                )
+            # Provide override
+            self.overflow_mode = overflow_mode
 
         if 'tag' in kwargs:
             # We want to associate some tags with our notification service.
@@ -259,6 +286,78 @@ class NotifyBase(object):
             notify_type=notify_type,
             color_type=color_type,
         )
+
+    def _apply_overflow(self, body, title=None):
+        """
+        Takes the message body and title as input.  This function then
+        applies any defined overflow restrictions associated with the
+        notification service and may alter the message if/as required.
+
+        The function will always return a list object in the following
+        structure:
+            [
+                {
+                    title: 'the title goes here',
+                    body: 'the message body goes here',
+                },
+                {
+                    title: 'the title goes here',
+                    body: 'the message body goes here',
+                },
+
+            ]
+        """
+
+        response = list()
+
+        if self.title_maxlen <= 0:
+            # Content is appended to body
+            body = '{}\r\n{}'.format(title, body)
+            title = ''
+
+        # Enforce the line count first always
+        if self.body_max_line_count > 0:
+            # Limit results to just the first 2 line otherwise
+            # there is just to much content to display
+            body = re.split('\r*\n', body)
+            body = '\r\n'.join(body[0:self.body_max_line_count])
+
+        if self.overflow_mode == OverflowMode.UPSTREAM:
+            # Nothing to do
+            response.append({
+                'body': body,
+                'title': title,
+            })
+            return response
+
+        elif len(title) > self.title_maxlen:
+            # Truncate our Title
+            title = title[:self.title_maxlen]
+
+        if self.body_maxlen > 0 and len(body) <= self.body_maxlen:
+            response.append({
+                'body': body,
+                'title': title,
+            })
+            return response
+
+        if self.overflow_mode == OverflowMode.TRUNCATE:
+            # Truncate our body and return
+            response.append({
+                'body': body[:self.body_maxlen],
+                'title': title,
+            })
+            # For truncate mode, we're done now
+            return response
+
+        # If we reach here, then we are in SPLIT mode.
+        # For here, we want to split the message as many times as we have to
+        # in order to fit it within the designated limits.
+        response = [{
+            'body': body[i: i + self.body_maxlen],
+            'title': title} for i in range(0, len(body), self.body_maxlen)]
+
+        return response
 
     def url(self):
         """

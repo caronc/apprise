@@ -214,6 +214,7 @@ class NotifyIFTTT(NotifyBase):
         # Define any arguments set
         args = {
             'format': self.notify_format,
+            'overflow': self.overflow_mode,
         }
 
         return '{schema}://{webhook_id}@{events}/?{args}'.format(

@@ -190,6 +190,7 @@ class NotifyPushBullet(NotifyBase):
         # Define any arguments set
         args = {
             'format': self.notify_format,
+            'overflow': self.overflow_mode,
         }
 
         recipients = '/'.join([self.quote(x) for x in self.recipients])

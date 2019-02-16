@@ -280,7 +280,8 @@ class NotifyBoxcar(NotifyBase):
 
         # Define any arguments set
         args = {
-            'format': self.notify_format
+            'format': self.notify_format,
+            'overflow': self.overflow_mode,
         }
 
         return '{schema}://{access}/{secret}/{recipients}/?{args}'.format(

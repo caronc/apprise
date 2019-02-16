@@ -26,7 +26,6 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
-import re
 from time import sleep
 
 from .NotifyBase import NotifyBase
@@ -66,6 +65,10 @@ class NotifyWindows(NotifyBase):
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_128
+
+    # Limit results to just the first 2 line otherwise there is just to much
+    # content to display
+    body_max_line_count = 2
 
     # This entry is a bit hacky, but it allows us to unit-test this library
     # in an environment that simply doesn't have the windows packages
@@ -109,12 +112,6 @@ class NotifyWindows(NotifyBase):
             self.logger.warning(
                 "Windows Notifications are not supported by this system.")
             return False
-
-        # Limit results to just the first 2 line otherwise
-        # there is just to much content to display
-        body = re.split('[\r\n]+', body)
-        body[0] = body[0].strip('#').strip()
-        body = '\r\n'.join(body[0:2])
 
         try:
             # Register destruction callback

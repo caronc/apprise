@@ -265,6 +265,7 @@ class NotifyPushed(NotifyBase):
         # Define any arguments set
         args = {
             'format': self.notify_format,
+            'overflow': self.overflow_mode,
         }
 
         return '{schema}://{app_key}/{app_secret}/{targets}/?{args}'.format(

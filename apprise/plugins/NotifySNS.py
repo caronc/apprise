@@ -90,6 +90,10 @@ class NotifySNS(NotifyBase):
     # Source: https://docs.aws.amazon.com/sns/latest/api/API_Publish.html
     body_maxlen = 140
 
+    # A title can not be used for SMS Messages.  Setting this to zero will
+    # cause any title (if defined) to get placed into the message body.
+    title_maxlen = 0
+
     def __init__(self, access_key_id, secret_access_key, region_name,
                  recipients=None, **kwargs):
         """
@@ -530,6 +534,7 @@ class NotifySNS(NotifyBase):
         # Define any arguments set
         args = {
             'format': self.notify_format,
+            'overflow': self.overflow_mode,
         }
 
         return '{schema}://{key_id}/{key_secret}/{region}/{targets}/'\

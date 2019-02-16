@@ -95,6 +95,7 @@ class NotifyPushjet(NotifyBase):
         # Define any arguments set
         args = {
             'format': self.notify_format,
+            'overflow': self.overflow_mode,
         }
 
         default_port = 443 if self.secure else 80

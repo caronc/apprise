@@ -25,12 +25,18 @@
 
 from apprise import plugins
 from apprise import NotifyType
+from apprise import NotifyBase
 from apprise import Apprise
 from apprise import AppriseAsset
 from apprise.utils import compat_is_basestring
 from apprise.common import NotifyFormat
+from apprise.common import OverflowMode
 
 from json import dumps
+from random import choice
+from string import ascii_uppercase as str_alpha
+from string import digits as str_num
+
 import requests
 import mock
 
@@ -2883,3 +2889,338 @@ def test_notify_telegram_plugin(mock_post, mock_get):
         except TypeError:
             # Exception should be thrown about the fact no token was specified
             assert(True)
+
+
+def test_notify_overflow_truncate():
+    """
+    API: Overflow Truncate Functionality Testing
+
+    """
+    #
+    # A little preparation
+    #
+
+    # Number of characters per line
+    row = 24
+
+    # Some variables we use to control the data we work with
+    body_len = 1024
+    title_len = 1024
+
+    # Create a large body and title with random data
+    body = ''.join(choice(str_alpha + str_num + ' ') for _ in range(body_len))
+    body = '\r\n'.join([body[i: i + row] for i in range(0, len(body), row)])
+
+    # the new lines add a large amount to our body; lets force the content
+    # back to being 1024 characters.
+    body = body[0:1024]
+
+    # Create our title using random data
+    title = ''.join(choice(str_alpha + str_num) for _ in range(title_len))
+
+    #
+    # First Test: Truncated Title
+    #
+    class TestNotification(NotifyBase):
+
+        # Test title max length
+        title_maxlen = 10
+
+        def __init__(self, *args, **kwargs):
+            super(TestNotification, self).__init__(**kwargs)
+
+        def notify(self, *args, **kwargs):
+            # Pretend everything is okay
+            return True
+
+    try:
+        # Load our object
+        obj = TestNotification(overflow='invalid')
+
+        # We should have thrown an exception because our specified overflow
+        # is wrong.
+        assert False
+
+    except TypeError:
+        # Expected to be here
+        assert True
+
+    # Load our object
+    obj = TestNotification(overflow=OverflowMode.TRUNCATE)
+    assert obj is not None
+
+    # Verify that we break the title to a max length of our title_max
+    # and that the body remains untouched
+    chunks = obj._apply_overflow(body=body, title=title)
+    assert len(chunks) == 1
+    assert body == chunks[0].get('body')
+    assert title[0:TestNotification.title_maxlen] == chunks[0].get('title')
+
+    #
+    # Next Test: Line Count Control
+    #
+
+    class TestNotification(NotifyBase):
+
+        # Test title max length
+        title_maxlen = 5
+
+        # Maximum number of lines
+        body_max_line_count = 5
+
+        def __init__(self, *args, **kwargs):
+            super(TestNotification, self).__init__(**kwargs)
+
+        def notify(self, *args, **kwargs):
+            # Pretend everything is okay
+            return True
+
+    # Load our object
+    obj = TestNotification(overflow=OverflowMode.TRUNCATE)
+    assert obj is not None
+
+    # Verify that we break the title to a max length of our title_max
+    # and that the body remains untouched
+    chunks = obj._apply_overflow(body=body, title=title)
+    assert len(chunks) == 1
+    assert len(chunks[0].get('body').split('\n')) == \
+        TestNotification.body_max_line_count
+    assert title[0:TestNotification.title_maxlen] == chunks[0].get('title')
+
+    #
+    # Next Test: Truncated body
+    #
+
+    class TestNotification(NotifyBase):
+
+        # Test title max length
+        title_maxlen = title_len
+
+        # Enforce a body length of just 10
+        body_maxlen = 10
+
+        def __init__(self, *args, **kwargs):
+            super(TestNotification, self).__init__(**kwargs)
+
+        def notify(self, *args, **kwargs):
+            # Pretend everything is okay
+            return True
+
+    # Load our object
+    obj = TestNotification(overflow=OverflowMode.TRUNCATE)
+    assert obj is not None
+
+    # Verify that we break the title to a max length of our title_max
+    # and that the body remains untouched
+    chunks = obj._apply_overflow(body=body, title=title)
+    assert len(chunks) == 1
+    assert body[0:TestNotification.body_maxlen] == chunks[0].get('body')
+    assert title == chunks[0].get('title')
+
+    #
+    # Next Test: Append title to body + Truncated body
+    #
+
+    class TestNotification(NotifyBase):
+
+        # Enforce no title
+        title_maxlen = 0
+
+        # Enforce a body length of just 100
+        body_maxlen = 100
+
+        def __init__(self, *args, **kwargs):
+            super(TestNotification, self).__init__(**kwargs)
+
+        def notify(self, *args, **kwargs):
+            # Pretend everything is okay
+            return True
+
+    # Load our object
+    obj = TestNotification(overflow=OverflowMode.TRUNCATE)
+    assert obj is not None
+
+    # Verify that we break the title to a max length of our title_max
+    # and that the body remains untouched
+    chunks = obj._apply_overflow(body=body, title=title)
+    assert len(chunks) == 1
+
+    # The below line should be read carefully... We're actually testing to see
+    # that our title is matched against our body. Behind the scenes, the title
+    # was appended to the body. The body was then truncated to the maxlen.
+    # The thing is, since the title is so large, all of the body was lost
+    # and a good chunk of the title was too.  The message sent will just be a
+    # small portion of the title
+    assert len(chunks[0].get('body')) == TestNotification.body_maxlen
+    assert title[0:TestNotification.body_maxlen] == chunks[0].get('body')
+
+
+def test_notify_overflow_split():
+    """
+    API: Overflow Split Functionality Testing
+
+    """
+
+    #
+    # A little preparation
+    #
+
+    # Number of characters per line
+    row = 24
+
+    # Some variables we use to control the data we work with
+    body_len = 1024
+    title_len = 1024
+
+    # Create a large body and title with random data
+    body = ''.join(choice(str_alpha + str_num + ' ') for _ in range(body_len))
+    body = '\r\n'.join([body[i: i + row] for i in range(0, len(body), row)])
+
+    # the new lines add a large amount to our body; lets force the content
+    # back to being 1024 characters.
+    body = body[0:1024]
+
+    # Create our title using random data
+    title = ''.join(choice(str_alpha + str_num) for _ in range(title_len))
+
+    #
+    # First Test: Truncated Title
+    #
+    class TestNotification(NotifyBase):
+
+        # Test title max length
+        title_maxlen = 10
+
+        def __init__(self, *args, **kwargs):
+            super(TestNotification, self).__init__(**kwargs)
+
+        def notify(self, *args, **kwargs):
+            # Pretend everything is okay
+            return True
+
+    # Load our object
+    obj = TestNotification(overflow=OverflowMode.SPLIT)
+    assert obj is not None
+
+    # Verify that we break the title to a max length of our title_max
+    # and that the body remains untouched
+    chunks = obj._apply_overflow(body=body, title=title)
+    assert len(chunks) == 1
+    assert body == chunks[0].get('body')
+    assert title[0:TestNotification.title_maxlen] == chunks[0].get('title')
+
+    #
+    # Next Test: Line Count Control
+    #
+
+    class TestNotification(NotifyBase):
+
+        # Test title max length
+        title_maxlen = 5
+
+        # Maximum number of lines
+        body_max_line_count = 5
+
+        def __init__(self, *args, **kwargs):
+            super(TestNotification, self).__init__(**kwargs)
+
+        def notify(self, *args, **kwargs):
+            # Pretend everything is okay
+            return True
+
+    # Load our object
+    obj = TestNotification(overflow=OverflowMode.SPLIT)
+    assert obj is not None
+
+    # Verify that we break the title to a max length of our title_max
+    # and that the body remains untouched
+    chunks = obj._apply_overflow(body=body, title=title)
+    assert len(chunks) == 1
+    assert len(chunks[0].get('body').split('\n')) == \
+        TestNotification.body_max_line_count
+    assert title[0:TestNotification.title_maxlen] == chunks[0].get('title')
+
+    #
+    # Next Test: Split body
+    #
+
+    class TestNotification(NotifyBase):
+
+        # Test title max length
+        title_maxlen = title_len
+
+        # Enforce a body length
+        body_maxlen = (body_len / 4)
+
+        def __init__(self, *args, **kwargs):
+            super(TestNotification, self).__init__(**kwargs)
+
+        def notify(self, *args, **kwargs):
+            # Pretend everything is okay
+            return True
+
+    # Load our object
+    obj = TestNotification(overflow=OverflowMode.SPLIT)
+    assert obj is not None
+
+    # Verify that we break the title to a max length of our title_max
+    # and that the body remains untouched
+    chunks = obj._apply_overflow(body=body, title=title)
+    offset = 0
+    assert len(chunks) == 4
+    for chunk in chunks:
+        # Our title never changes
+        assert title == chunk.get('title')
+
+        # Our body is only broken up; not lost
+        _body = chunk.get('body')
+        assert body[offset: len(_body) + offset] == _body
+        offset += len(_body)
+
+    #
+    # Next Test: Append title to body + split body
+    #
+
+    class TestNotification(NotifyBase):
+
+        # Enforce no title
+        title_maxlen = 0
+
+        # Enforce a body length
+        body_maxlen = (title_len / 4)
+
+        def __init__(self, *args, **kwargs):
+            super(TestNotification, self).__init__(**kwargs)
+
+        def notify(self, *args, **kwargs):
+            # Pretend everything is okay
+            return True
+
+    # Load our object
+    obj = TestNotification(overflow=OverflowMode.SPLIT)
+    assert obj is not None
+
+    # Verify that we break the title to a max length of our title_max
+    # and that the body remains untouched
+    chunks = obj._apply_overflow(body=body, title=title)
+
+    # Our final product is that our title has been appended to our body to
+    # create one great big body. As a result we'll get quite a few lines back
+    # now.
+    offset = 0
+
+    # Our body will look like this in small chunks at the end of the day
+    bulk = title + '\r\n' + body
+
+    # Due to the new line added to the end
+    assert len(chunks) == (
+        (len(bulk) / TestNotification.body_maxlen) +
+        (1 if len(bulk) % TestNotification.body_maxlen else 0))
+
+    for chunk in chunks:
+        # Our title is empty every time
+        assert chunk.get('title') == ''
+
+        _body = chunk.get('body')
+        assert bulk[offset:len(_body)+offset] == _body
+        offset += len(_body)

@@ -244,6 +244,7 @@ class NotifyMatrix(NotifyBase):
         # Define any arguments set
         args = {
             'format': self.notify_format,
+            'overflow': self.overflow_mode,
             'mode': self.mode,
         }
 
