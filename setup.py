@@ -50,7 +50,7 @@ else:
 
 setup(
     name='apprise',
-    version='0.5.2',
+    version='0.7.0',
     description='A universal notification service',
     license='MIT',
     long_description=open('README.md').read(),
