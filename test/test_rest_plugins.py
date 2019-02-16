@@ -431,6 +431,10 @@ TEST_URLS = (
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
     }),
+    ('json://localhost:8080/path?-HeaderKey=HeaderValue', {
+        'instance': plugins.NotifyJSON,
+    }),
+
 
     ##################################
     # NotifyKODI
@@ -1469,6 +1473,9 @@ TEST_URLS = (
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
+    }),
+    ('xml://localhost:8080/path?-HeaderKey=HeaderValue', {
+        'instance': plugins.NotifyXML,
     }),
 )
 

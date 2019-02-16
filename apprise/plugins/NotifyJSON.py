@@ -91,6 +91,9 @@ class NotifyJSON(NotifyBase):
             'Content-Type': 'application/json'
         }
 
+        if self.headers:
+            headers.update(self.headers)
+
         auth = None
         if self.user:
             auth = (self.user, self.password)

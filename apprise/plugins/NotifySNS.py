@@ -58,8 +58,8 @@ LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
 # region as a delimiter. This is a bit hacky; but it's much easier than having
 # users of this product search though this Access Key Secret and escape all
 # of the forward slashes!
-IS_REGION = re.compile(
-        r'^\s*(?P<country>[a-z]{2})-(?P<area>[a-z]+)-(?P<no>[0-9]+)\s*$', re.I)
+IS_REGION = re.compile(r'^\s*(?P<country>[a-z]{2})-'
+                       r'(?P<area>[a-z]+)-(?P<no>[0-9]+)\s*$', re.I)
 
 # Extend HTTP Error Messages
 AWS_HTTP_ERROR_MAP = HTTP_ERROR_MAP.copy()
