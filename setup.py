@@ -50,16 +50,16 @@ else:
 
 setup(
     name='apprise',
-    version='0.7.0',
-    description='A universal notification service',
+    version='0.7.3',
+    description='Push Notifications that work with just about every platform!',
     license='MIT',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     url='https://github.com/caronc/apprise',
-    keywords='push notifications email boxcar faast growl Join KODI '
-        'Mattermost Prowl Pushalot PushBullet Pushjet '
-        'Pushover Rocket.Chat Slack Toasty Telegram Twitter XBMC Stride '
-        'Emby IFTTT Discord',
+    keywords='Push Notifications Email AWS SNS Boxcar Discord Dbus Emby Faast '
+        'Gnome Growl IFTTT Join KODI Matrix Mattermost Prowl PushBullet '
+        'Pushjet Pushed Pushover Rocket.Chat Ryver Slack Telegram Twiiter '
+        'XBMC Microsoft Windows CLI API',
     author='Chris Caron',
     author_email='lead2gold@gmail.com',
     packages=find_packages(),
@@ -74,6 +74,7 @@ setup(
     classifiers=(
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
+        'Intended Audience :: System Administrators',
         'Operating System :: OS Independent',
         'Natural Language :: English',
         'Programming Language :: Python',
