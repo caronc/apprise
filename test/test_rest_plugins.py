@@ -272,6 +272,14 @@ TEST_URLS = (
     ('ifttt://:@/', {
         'instance': None,
     }),
+    # A nicely formed ifttt url with 1 event and a new key/value store
+    ('ifttt://WebHookID@EventID/?+TemplateKey=TemplateVal', {
+        'instance': plugins.NotifyIFTTT,
+    }),
+    # Removing certain keys:
+    ('ifttt://WebHookID@EventID/?-Value1=&-Value2', {
+        'instance': plugins.NotifyIFTTT,
+    }),
     # A nicely formed ifttt url with 2 events defined:
     ('ifttt://WebHookID@EventID/EventID2/', {
         'instance': plugins.NotifyIFTTT,
@@ -2236,6 +2244,52 @@ def test_notify_ifttt_plugin(mock_post, mock_get):
                       notify_type=NotifyType.INFO) is True
 
 
+    # Test the addition of tokens
+    obj = plugins.NotifyIFTTT(
+        webhook_id=webhook_id, events=events,
+        add_tokens={'Test':'ValueA', 'Test2': 'ValueB'})
+
+    assert(isinstance(obj, plugins.NotifyIFTTT))
+
+    assert obj.notify(title='title', body='body',
+                      notify_type=NotifyType.INFO) is True
+
+    try:
+        # Invalid del_tokens entry
+        obj = plugins.NotifyIFTTT(
+            webhook_id=webhook_id, events=events,
+            del_tokens=plugins.NotifyIFTTT.ifttt_default_title_key)
+
+        # we shouldn't reach here
+        assert False
+
+    except TypeError:
+        # del_tokens must be a list, so passing a string will throw
+        # an exception.
+        assert True
+
+    assert(isinstance(obj, plugins.NotifyIFTTT))
+
+    assert obj.notify(title='title', body='body',
+                      notify_type=NotifyType.INFO) is True
+
+    # Test removal of tokens by a list
+    obj = plugins.NotifyIFTTT(
+        webhook_id=webhook_id, events=events,
+        add_tokens={
+            'MyKey': 'MyValue'
+        },
+        del_tokens=(
+            plugins.NotifyIFTTT.ifttt_default_title_key,
+            plugins.NotifyIFTTT.ifttt_default_body_key,
+            plugins.NotifyIFTTT.ifttt_default_type_key,
+            ))
+
+    assert(isinstance(obj, plugins.NotifyIFTTT))
+
+    assert obj.notify(title='title', body='body',
+                      notify_type=NotifyType.INFO) is True
+
 @mock.patch('requests.get')
 @mock.patch('requests.post')
 def test_notify_join_plugin(mock_post, mock_get):
@@ -3150,7 +3204,8 @@ def test_notify_overflow_split():
         title_maxlen = title_len
 
         # Enforce a body length
-        body_maxlen = (body_len / 4)
+        # Wrap in int() so Python v3 doesn't convert the response into a float
+        body_maxlen = int(body_len / 4)
 
         def __init__(self, *args, **kwargs):
             super(TestNotification, self).__init__(**kwargs)
@@ -3186,8 +3241,9 @@ def test_notify_overflow_split():
         # Enforce no title
         title_maxlen = 0
 
-        # Enforce a body length
-        body_maxlen = (title_len / 4)
+        # Enforce a body length based on the title
+        # Wrap in int() so Python v3 doesn't convert the response into a float
+        body_maxlen = int(title_len / 4)
 
         def __init__(self, *args, **kwargs):
             super(TestNotification, self).__init__(**kwargs)
@@ -3214,7 +3270,9 @@ def test_notify_overflow_split():
 
     # Due to the new line added to the end
     assert len(chunks) == (
-        (len(bulk) / TestNotification.body_maxlen) +
+        # wrap division in int() so Python 3 doesn't convert it to a float on
+        # us
+        int(len(bulk) / TestNotification.body_maxlen) +
         (1 if len(bulk) % TestNotification.body_maxlen else 0))
 
     for chunk in chunks:

@@ -32,14 +32,12 @@ try:
     from urllib import unquote
     from urllib import quote
     from urlparse import urlparse
-    from urlparse import parse_qsl
 
 except ImportError:
     # Python 3.x
     from urllib.parse import unquote
     from urllib.parse import quote
     from urllib.parse import urlparse
-    from urllib.parse import parse_qsl
 
 import logging
 logger = logging.getLogger(__name__)
@@ -90,6 +88,12 @@ TIDY_NUX_TRIM_RE = re.compile(
         ESCAPED_NUX_PATH_SEPARATOR,
     ),
 )
+
+# The handling of custom arguments passed in the URL; we treat any
+# argument (which would otherwise appear in the qsd area of our parse_url()
+# function differently if they start with a + or - value
+NOTIFY_CUSTOM_ADD_TOKENS = re.compile(r'^( |\+)(?P<key>.*)\s*')
+NOTIFY_CUSTOM_DEL_TOKENS = re.compile(r'^-(?P<key>.*)\s*')
 
 # Used for attempting to acquire the schema if the URL can't be parsed.
 GET_SCHEMA_RE = re.compile(r'\s*(?P<schema>[a-z0-9]{2,9})://.*$', re.I)
@@ -143,6 +147,81 @@ def tidy_path(path):
     return path
 
 
+def parse_qsd(qs):
+    """
+    Query String Dictionary Builder
+
+    A custom implimentation of the parse_qsl() function already provided
+    by Python.  This function is slightly more light weight and gives us
+    more control over parsing out arguments such as the plus/+ symbol
+    at the head of a key/value pair.
+
+    qs should be a query string part made up as part of the URL such as
+       a=1&c=2&d=
+
+        a=1 gets interpreted as { 'a': '1' }
+        a=  gets interpreted as { 'a': '' }
+        a   gets interpreted as { 'a': '' }
+
+
+    This function returns a result object that fits with the apprise
+    expected parameters (populating the 'qsd' portion of the dictionary
+    """
+
+    # Our return result set:
+    result = {
+        # The arguments passed in (the parsed query). This is in a dictionary
+        # of {'key': 'val', etc }.  Keys are all made lowercase before storing
+        # to simplify access to them.
+        'qsd': {},
+
+        # Detected Entries that start with + or - are additionally stored in
+        # these values (un-touched).  The +/- however are stripped from their
+        # name before they are stored here.
+        'qsd+': {},
+        'qsd-': {},
+    }
+
+    pairs = [s2 for s1 in qs.split('&') for s2 in s1.split(';')]
+    for name_value in pairs:
+        nv = name_value.split('=', 1)
+        # Handle case of a control-name with no equal sign
+        if len(nv) != 2:
+            nv.append('')
+
+        # Apprise keys can start with a + symbol; so we need to skip over
+        # the very first entry
+        key = '{}{}'.format(
+            '' if len(nv[0]) == 0 else nv[0][0],
+            '' if len(nv[0]) <= 1 else nv[0][1:].replace('+', ' '),
+        )
+
+        key = unquote(key)
+        key = '' if not key else key
+
+        val = nv[1].replace('+', ' ')
+        val = unquote(val)
+        val = '' if not val else val.strip()
+
+        # Always Query String Dictionary (qsd) for every entry we have
+        # content is always made lowercase for easy indexing
+        result['qsd'][key.lower().strip()] = val
+
+        # Check for tokens that start with a addition/plus symbol (+)
+        k = NOTIFY_CUSTOM_ADD_TOKENS.match(key)
+        if k is not None:
+            # Store content 'as-is'
+            result['qsd+'][k.group('key')] = val
+
+        # Check for tokens that start with a subtraction/hyphen symbol (-)
+        k = NOTIFY_CUSTOM_DEL_TOKENS.match(key)
+        if k is not None:
+            # Store content 'as-is'
+            result['qsd-'][k.group('key')] = val
+
+    return result
+
+
 def parse_url(url, default_schema='http', verify_host=True):
     """A function that greatly simplifies the parsing of a url
     specified by the end user.
@@ -190,10 +269,17 @@ def parse_url(url, default_schema='http', verify_host=True):
         'schema': None,
         # The schema
         'url': None,
-        # The arguments passed in (the parsed query)
-        # This is in a dictionary of {'key': 'val', etc }
+        # The arguments passed in (the parsed query). This is in a dictionary
+        # of {'key': 'val', etc }.  Keys are all made lowercase before storing
+        # to simplify access to them.
         # qsd = Query String Dictionary
-        'qsd': {}
+        'qsd': {},
+
+        # Detected Entries that start with + or - are additionally stored in
+        # these values (un-touched).  The +/- however are stripped from their
+        # name before they are stored here.
+        'qsd+': {},
+        'qsd-': {},
     }
 
     qsdata = ''
@@ -220,6 +306,11 @@ def parse_url(url, default_schema='http', verify_host=True):
             # No qsdata
             pass
 
+    # Parse Query Arugments ?val=key&key=val
+    # while ensuring that all keys are lowercase
+    if qsdata:
+        result.update(parse_qsd(qsdata))
+
     # Now do a proper extraction of data
     parsed = urlparse('http://%s' % host)
 
@@ -231,6 +322,7 @@ def parse_url(url, default_schema='http', verify_host=True):
         return None
 
     result['fullpath'] = quote(unquote(tidy_path(parsed[2].strip())))
+
     try:
         # Handle trailing slashes removed by tidy_path
         if result['fullpath'][-1] not in ('/', '\\') and \
@@ -241,16 +333,6 @@ def parse_url(url, default_schema='http', verify_host=True):
         # No problem, there simply isn't any returned results
         # and therefore, no trailing slash
         pass
-
-    # Parse Query Arugments ?val=key&key=val
-    # while ensureing that all keys are lowercase
-    if qsdata:
-        result['qsd'] = dict([(k.lower().strip(), v.strip())
-                              for k, v in parse_qsl(
-            qsdata,
-            keep_blank_values=True,
-            strict_parsing=False,
-        )])
 
     if not result['fullpath']:
         # Default

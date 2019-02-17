@@ -52,9 +52,13 @@ class NotifyXML(NotifyBase):
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_128
 
-    def __init__(self, **kwargs):
+    def __init__(self, headers=None, **kwargs):
         """
         Initialize XML Object
+
+        headers can be a dictionary of key/value pairs that you want to
+        additionally include as part of the server headers to post with
+
         """
         super(NotifyXML, self).__init__(**kwargs)
 
@@ -83,6 +87,11 @@ class NotifyXML(NotifyBase):
         if not compat_is_basestring(self.fullpath):
             self.fullpath = '/'
 
+        self.headers = {}
+        if headers:
+            # Store our extra headers
+            self.headers.update(headers)
+
         return
 
     def url(self):
@@ -95,6 +104,9 @@ class NotifyXML(NotifyBase):
             'format': self.notify_format,
             'overflow': self.overflow_mode,
         }
+
+        # Append our headers into our args
+        args.update({'+{}'.format(k): v for k, v in self.headers.items()})
 
         # Determine Authentication
         auth = ''
@@ -130,8 +142,8 @@ class NotifyXML(NotifyBase):
             'Content-Type': 'application/xml'
         }
 
-        if self.headers:
-            headers.update(self.headers)
+        # Apply any/all header over-rides defined
+        headers.update(self.headers)
 
         re_map = {
             '{MESSAGE_TYPE}': NotifyBase.quote(notify_type),
@@ -197,3 +209,23 @@ class NotifyXML(NotifyBase):
             return False
 
         return True
+
+    @staticmethod
+    def parse_url(url):
+        """
+        Parses the URL and returns enough arguments that can allow
+        us to substantiate this object.
+
+        """
+        results = NotifyBase.parse_url(url)
+
+        if not results:
+            # We're done early as we couldn't load the results
+            return results
+
+        # Add our headers that the user can potentially over-ride if they wish
+        # to to our returned result set
+        results['headers'] = results['qsd-']
+        results['headers'].update(results['qsd+'])
+
+        return results

@@ -35,6 +35,26 @@ except ImportError:
 from apprise import utils
 
 
+def test_parse_qsd():
+    "utils: parse_qsd() testing """
+
+    result = utils.parse_qsd('a=1&b=&c&d=abcd')
+    assert(isinstance(result, dict) is True)
+    assert(len(result) == 3)
+    assert 'qsd' in result
+    assert 'qsd+' in result
+    assert 'qsd-' in result
+
+    assert(len(result['qsd']) == 4)
+    assert 'a' in result['qsd']
+    assert 'b' in result['qsd']
+    assert 'c' in result['qsd']
+    assert 'd' in result['qsd']
+
+    assert(len(result['qsd-']) == 0)
+    assert(len(result['qsd+']) == 0)
+
+
 def test_parse_url():
     "utils: parse_url() testing """
 
@@ -49,6 +69,8 @@ def test_parse_url():
     assert(result['query'] is None)
     assert(result['url'] == 'http://hostname')
     assert(result['qsd'] == {})
+    assert(result['qsd-'] == {})
+    assert(result['qsd+'] == {})
 
     result = utils.parse_url('http://hostname/')
     assert(result['schema'] == 'http')
@@ -61,6 +83,8 @@ def test_parse_url():
     assert(result['query'] is None)
     assert(result['url'] == 'http://hostname/')
     assert(result['qsd'] == {})
+    assert(result['qsd-'] == {})
+    assert(result['qsd+'] == {})
 
     result = utils.parse_url('hostname')
     assert(result['schema'] == 'http')
@@ -73,6 +97,61 @@ def test_parse_url():
     assert(result['query'] is None)
     assert(result['url'] == 'http://hostname')
     assert(result['qsd'] == {})
+    assert(result['qsd-'] == {})
+    assert(result['qsd+'] == {})
+
+    result = utils.parse_url('http://hostname/?-KeY=Value')
+    assert(result['schema'] == 'http')
+    assert(result['host'] == 'hostname')
+    assert(result['port'] is None)
+    assert(result['user'] is None)
+    assert(result['password'] is None)
+    assert(result['fullpath'] == '/')
+    assert(result['path'] == '/')
+    assert(result['query'] is None)
+    assert(result['url'] == 'http://hostname/')
+    assert('-key' in result['qsd'])
+    assert(unquote(result['qsd']['-key']) == 'Value')
+    assert('KeY' in result['qsd-'])
+    assert(unquote(result['qsd-']['KeY']) == 'Value')
+    assert(result['qsd+'] == {})
+
+    result = utils.parse_url('http://hostname/?+KeY=Value')
+    assert(result['schema'] == 'http')
+    assert(result['host'] == 'hostname')
+    assert(result['port'] is None)
+    assert(result['user'] is None)
+    assert(result['password'] is None)
+    assert(result['fullpath'] == '/')
+    assert(result['path'] == '/')
+    assert(result['query'] is None)
+    assert(result['url'] == 'http://hostname/')
+    assert('+key' in result['qsd'])
+    assert('KeY' in result['qsd+'])
+    assert(result['qsd+']['KeY'] == 'Value')
+    assert(result['qsd-'] == {})
+
+    result = utils.parse_url(
+        'http://hostname/?+KeY=ValueA&-kEy=ValueB&KEY=Value%20+C')
+    assert(result['schema'] == 'http')
+    assert(result['host'] == 'hostname')
+    assert(result['port'] is None)
+    assert(result['user'] is None)
+    assert(result['password'] is None)
+    assert(result['fullpath'] == '/')
+    assert(result['path'] == '/')
+    assert(result['query'] is None)
+    assert(result['url'] == 'http://hostname/')
+    assert('+key' in result['qsd'])
+    assert('-key' in result['qsd'])
+    assert('key' in result['qsd'])
+    assert('KeY' in result['qsd+'])
+    assert(result['qsd+']['KeY'] == 'ValueA')
+    assert('kEy' in result['qsd-'])
+    assert(result['qsd-']['kEy'] == 'ValueB')
+    assert(result['qsd']['key'] == 'Value  C')
+    assert(result['qsd']['+key'] == result['qsd+']['KeY'])
+    assert(result['qsd']['-key'] == result['qsd-']['kEy'])
 
     result = utils.parse_url('http://hostname////')
     assert(result['schema'] == 'http')
@@ -85,6 +164,8 @@ def test_parse_url():
     assert(result['query'] is None)
     assert(result['url'] == 'http://hostname/')
     assert(result['qsd'] == {})
+    assert(result['qsd-'] == {})
+    assert(result['qsd+'] == {})
 
     result = utils.parse_url('http://hostname:40////')
     assert(result['schema'] == 'http')
@@ -97,6 +178,8 @@ def test_parse_url():
     assert(result['query'] is None)
     assert(result['url'] == 'http://hostname:40/')
     assert(result['qsd'] == {})
+    assert(result['qsd-'] == {})
+    assert(result['qsd+'] == {})
 
     result = utils.parse_url('HTTP://HoStNaMe:40/test.php')
     assert(result['schema'] == 'http')
@@ -109,6 +192,8 @@ def test_parse_url():
     assert(result['query'] == 'test.php')
     assert(result['url'] == 'http://HoStNaMe:40/test.php')
     assert(result['qsd'] == {})
+    assert(result['qsd-'] == {})
+    assert(result['qsd+'] == {})
 
     result = utils.parse_url('HTTPS://user@hostname/test.py')
     assert(result['schema'] == 'https')
@@ -121,6 +206,8 @@ def test_parse_url():
     assert(result['query'] == 'test.py')
     assert(result['url'] == 'https://user@hostname/test.py')
     assert(result['qsd'] == {})
+    assert(result['qsd-'] == {})
+    assert(result['qsd+'] == {})
 
     result = utils.parse_url('  HTTPS://///user@@@hostname///test.py  ')
     assert(result['schema'] == 'https')
@@ -133,6 +220,8 @@ def test_parse_url():
     assert(result['query'] == 'test.py')
     assert(result['url'] == 'https://user@hostname/test.py')
     assert(result['qsd'] == {})
+    assert(result['qsd-'] == {})
+    assert(result['qsd+'] == {})
 
     result = utils.parse_url(
         'HTTPS://user:password@otherHost/full///path/name/',
@@ -147,6 +236,8 @@ def test_parse_url():
     assert(result['query'] is None)
     assert(result['url'] == 'https://user:password@otherHost/full/path/name/')
     assert(result['qsd'] == {})
+    assert(result['qsd-'] == {})
+    assert(result['qsd+'] == {})
 
     # Handle garbage
     assert(utils.parse_url(None) is None)
@@ -173,6 +264,8 @@ def test_parse_url():
     assert(unquote(result['qsd']['from']) == 'test@test.com')
     assert('format' in result['qsd'])
     assert(unquote(result['qsd']['format']) == 'text')
+    assert(result['qsd-'] == {})
+    assert(result['qsd+'] == {})
 
     # Test Passwords with question marks ?; not supported
     result = utils.parse_url(
@@ -194,6 +287,8 @@ def test_parse_url():
     assert(result['query'] is None)
     assert(result['url'] == 'http://nuxref.com')
     assert(result['qsd'] == {})
+    assert(result['qsd-'] == {})
+    assert(result['qsd+'] == {})
 
     # just host and path
     result = utils.parse_url(
@@ -209,6 +304,8 @@ def test_parse_url():
     assert(result['query'] == 'host')
     assert(result['url'] == 'http://invalid/host')
     assert(result['qsd'] == {})
+    assert(result['qsd-'] == {})
+    assert(result['qsd+'] == {})
 
     # just all out invalid
     assert(utils.parse_url('?') is None)
@@ -227,6 +324,8 @@ def test_parse_url():
     assert(result['query'] is None)
     assert(result['url'] == 'http://nuxref.com')
     assert(result['qsd'] == {})
+    assert(result['qsd-'] == {})
+    assert(result['qsd+'] == {})
 
 
 def test_parse_bool():

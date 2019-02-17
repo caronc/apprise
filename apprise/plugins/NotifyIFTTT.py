@@ -91,9 +91,18 @@ class NotifyIFTTT(NotifyBase):
     notify_url = 'https://maker.ifttt.com/' \
                  'trigger/{event}/with/key/{webhook_id}'
 
-    def __init__(self, webhook_id, events, **kwargs):
+    def __init__(self, webhook_id, events, add_tokens=None, del_tokens=None,
+                 **kwargs):
         """
         Initialize IFTTT Object
+
+        add_tokens can optionally be a dictionary of key/value pairs
+        that you want to include in the IFTTT post to the server.
+
+        del_tokens can optionally be a list/tuple/set of tokens
+        that you want to eliminate from the IFTTT post.  There isn't
+        much real functionality to this one unless you want to remove
+        reference to Value1, Value2, and/or Value3
 
         """
         super(NotifyIFTTT, self).__init__(**kwargs)
@@ -110,6 +119,22 @@ class NotifyIFTTT(NotifyBase):
 
         # Store our APIKey
         self.webhook_id = webhook_id
+
+        # Tokens to include in post
+        self.add_tokens = {}
+        if add_tokens:
+            self.add_tokens.update(add_tokens)
+
+        # Tokens to remove
+        self.del_tokens = []
+        if del_tokens is not None:
+            if isinstance(del_tokens, (list, tuple, set)):
+                self.del_tokens = del_tokens
+
+            else:
+                raise TypeError(
+                    'del_token must be a list; {} was provided'.format(
+                        str(type(del_tokens))))
 
     def notify(self, title, body, notify_type, **kwargs):
         """
@@ -128,10 +153,13 @@ class NotifyIFTTT(NotifyBase):
             self.ifttt_default_type_key: notify_type,
         }
 
-        # Eliminate empty fields; users wishing to cancel the use of the
-        # self.ifttt_default_ entries can preset these keys to being
-        # empty so that they get caught here and removed.
-        payload = {x: y for x, y in payload.items() if y}
+        # Add any new tokens expected (this can also potentially override
+        # any entries defined above)
+        payload.update(self.add_tokens)
+
+        # Eliminate fields flagged for removal
+        payload = {x: y for x, y in payload.items()
+                   if x not in self.del_tokens}
 
         # Track our failures
         error_count = 0
@@ -216,6 +244,10 @@ class NotifyIFTTT(NotifyBase):
             'format': self.notify_format,
             'overflow': self.overflow_mode,
         }
+
+        # Store any new key/value pairs added to our list
+        args.update({'+{}'.format(k): v for k, v in self.add_tokens})
+        args.update({'-{}'.format(k): '' for k in self.del_tokens})
 
         return '{schema}://{webhook_id}@{events}/?{args}'.format(
             schema=self.secure_protocol,

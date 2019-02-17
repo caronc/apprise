@@ -176,7 +176,6 @@ class NotifyBase(object):
 
         self.user = kwargs.get('user')
         self.password = kwargs.get('password')
-        self.headers = kwargs.get('headers')
 
         if 'format' in kwargs:
             # Store the specified format if specified
@@ -536,6 +535,4 @@ class NotifyBase(object):
         if 'user' in results['qsd']:
             results['user'] = results['qsd']['user']
 
-        results['headers'] = {k[1:]: v for k, v in results['qsd'].items()
-                              if re.match(r'^-.', k)}
         return results
