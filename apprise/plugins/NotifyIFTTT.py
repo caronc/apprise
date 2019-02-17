@@ -190,8 +190,6 @@ class NotifyIFTTT(NotifyBase):
                     verify=self.verify_certificate,
                 )
                 self.logger.debug(
-                    u"IFTTT HTTP response status: %r" % r.status_code)
-                self.logger.debug(
                     u"IFTTT HTTP response headers: %r" % r.headers)
                 self.logger.debug(
                     u"IFTTT HTTP response body: %r" % r.content)
