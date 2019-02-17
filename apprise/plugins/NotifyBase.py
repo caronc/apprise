@@ -26,6 +26,8 @@
 import re
 import logging
 from time import sleep
+from datetime import datetime
+
 try:
     # Python 2.7
     from urllib import unquote as _unquote
@@ -115,8 +117,8 @@ class NotifyBase(object):
     setup_url = None
 
     # Most Servers do not like more then 1 request per 5 seconds, so 5.5 gives
-    # us a safe play range...
-    throttle_attempt = 5.5
+    # us a safe play range.
+    request_rate_per_sec = 5.5
 
     # Allows the user to specify the NotifyImageSize object
     image_size = None
@@ -209,19 +211,45 @@ class NotifyBase(object):
             # it just falls back to whatever was already defined globally
             self.tags = set(parse_list(kwargs.get('tag', self.tags)))
 
-    def throttle(self, throttle_time=None):
+        # Tracks the time any i/o was made to the remote server.  This value
+        # is automatically set and controlled through the throttle() call.
+        self._last_io_datetime = None
+
+    def throttle(self, last_io=None):
         """
         A common throttle control
         """
-        self.logger.debug('Throttling...')
 
-        throttle_time = throttle_time \
-            if throttle_time is not None else self.throttle_attempt
+        if last_io is not None:
+            # Assume specified last_io
+            self._last_io_datetime = last_io
 
-        # Perform throttle
-        if throttle_time > 0:
-            sleep(throttle_time)
+        # Get ourselves a reference time of 'now'
+        reference = datetime.now()
 
+        if self._last_io_datetime is None:
+            # Set time to 'now' and no need to throttle
+            self._last_io_datetime = reference
+            return
+
+        if self.request_rate_per_sec <= 0.0:
+            # We're done if there is no throttle limit set
+            return
+
+        # If we reach here, we need to do additional logic.
+        # If the difference between the reference time and 'now' is less than
+        # the defined request_rate_per_sec then we need to throttle for the
+        # remaining balance of this time.
+
+        elapsed = (reference - self._last_io_datetime).total_seconds()
+
+        if elapsed < self.request_rate_per_sec:
+            self.logger.debug('Throttling for {}s...'.format(
+                self.request_rate_per_sec - elapsed))
+            sleep(self.request_rate_per_sec - elapsed)
+
+        # Update our timestamp before we leave
+        self._last_io_datetime = reference
         return
 
     def image_url(self, notify_type, logo=False, extension=None):

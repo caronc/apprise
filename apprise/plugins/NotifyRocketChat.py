@@ -67,8 +67,11 @@ class NotifyRocketChat(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_rocketchat'
 
-    # Defines the maximum allowable characters in the title
-    title_maxlen = 200
+    # The title is not used
+    title_maxlen = 0
+
+    # The maximum size of the message
+    body_maxlen = 200
 
     def __init__(self, recipients=None, **kwargs):
         """
@@ -185,8 +188,8 @@ class NotifyRocketChat(NotifyBase):
         if not self.login():
             return False
 
-        # Prepare our message
-        text = '*%s*\r\n%s' % (title.replace('*', '\\*'), body)
+        # Prepare our message using the body only
+        text = body
 
         # Initiaize our error tracking
         has_error = False
@@ -208,10 +211,6 @@ class NotifyRocketChat(NotifyBase):
                 # toggle flag
                 has_error = True
 
-            if len(channels) + len(rooms) > 0:
-                # Prevent thrashing requests
-                self.throttle()
-
         # Send all our defined room id's
         while len(rooms):
             # Get Room
@@ -225,10 +224,6 @@ class NotifyRocketChat(NotifyBase):
 
                 # toggle flag
                 has_error = True
-
-            if len(rooms) > 0:
-                # Prevent thrashing requests
-                self.throttle()
 
         # logout
         self.logout()
@@ -244,6 +239,10 @@ class NotifyRocketChat(NotifyBase):
             self.api_url + 'chat.postMessage', self.verify_certificate,
         ))
         self.logger.debug('Rocket.Chat Payload: %s' % str(payload))
+
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+
         try:
             r = requests.post(
                 self.api_url + 'chat.postMessage',

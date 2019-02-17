@@ -57,6 +57,10 @@ class NotifyXBMC(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_kodi'
 
+    # Disable throttle rate for XBMC/KODI requests since they are normally
+    # local anyway
+    request_rate_per_sec = 0
+
     # Limit results to just the first 2 line otherwise there is just to much
     # content to display
     body_max_line_count = 2
@@ -186,6 +190,10 @@ class NotifyXBMC(NotifyBase):
             url, self.verify_certificate,
         ))
         self.logger.debug('XBMC/KODI Payload: %s' % str(payload))
+
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+
         try:
             r = requests.post(
                 url,

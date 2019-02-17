@@ -178,6 +178,10 @@ class NotifyRyver(NotifyBase):
             url, self.verify_certificate,
         ))
         self.logger.debug('Ryver Payload: %s' % str(payload))
+
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+
         try:
             r = requests.post(
                 url,

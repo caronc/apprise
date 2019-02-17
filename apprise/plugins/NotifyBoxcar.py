@@ -230,6 +230,9 @@ class NotifyBoxcar(NotifyBase):
         ))
         self.logger.debug('Boxcar Payload: %s' % str(payload))
 
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+
         try:
             r = requests.post(
                 notify_url,

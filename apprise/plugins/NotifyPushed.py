@@ -177,10 +177,6 @@ class NotifyPushed(NotifyBase):
                 # toggle flag
                 has_error = True
 
-            if len(channels) + len(users) > 0:
-                # Prevent thrashing requests
-                self.throttle()
-
         # Copy our payload
         _payload = dict(payload)
         _payload['target_type'] = 'pushed_id'
@@ -189,15 +185,12 @@ class NotifyPushed(NotifyBase):
         while len(users):
             # Get User's Pushed ID
             _payload['pushed_id'] = users.pop(0)
+
             if not self.send_notification(
                     payload=_payload, notify_type=notify_type, **kwargs):
 
                 # toggle flag
                 has_error = True
-
-            if len(users) > 0:
-                # Prevent thrashing requests
-                self.throttle()
 
         return not has_error
 
@@ -217,6 +210,10 @@ class NotifyPushed(NotifyBase):
             self.notify_url, self.verify_certificate,
         ))
         self.logger.debug('Pushed Payload: %s' % str(payload))
+
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+
         try:
             r = requests.post(
                 self.notify_url,

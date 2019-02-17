@@ -250,6 +250,9 @@ class NotifySlack(NotifyBase):
                 url, self.verify_certificate,
             ))
             self.logger.debug('Slack Payload: %s' % str(payload))
+
+            # Always call throttle before any remote server i/o is made
+            self.throttle()
             try:
                 r = requests.post(
                     url,
@@ -274,7 +277,7 @@ class NotifySlack(NotifyBase):
                                 channel,
                                 r.status_code))
 
-                    # self.logger.debug('Response Details: %s' % r.raw.read())
+                    # self.logger.debug('Response Details: %s' % r.content)
 
                     # Return; we're done
                     notify_okay = False
@@ -289,10 +292,6 @@ class NotifySlack(NotifyBase):
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))
                 notify_okay = False
-
-            if len(channels):
-                # Prevent thrashing requests
-                self.throttle()
 
         return notify_okay
 

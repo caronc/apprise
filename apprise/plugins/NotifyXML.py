@@ -52,6 +52,10 @@ class NotifyXML(NotifyBase):
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_128
 
+    # Disable throttle rate for JSON requests since they are normally
+    # local anyway
+    request_rate_per_sec = 0
+
     def __init__(self, headers=None, **kwargs):
         """
         Initialize XML Object
@@ -172,6 +176,10 @@ class NotifyXML(NotifyBase):
             url, self.verify_certificate,
         ))
         self.logger.debug('XML Payload: %s' % str(payload))
+
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+
         try:
             r = requests.post(
                 url,

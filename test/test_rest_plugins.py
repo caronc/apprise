@@ -1487,7 +1487,7 @@ def test_rest_plugins(mock_post, mock_get):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyBase.NotifyBase.throttle_attempt = 0
+    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
 
     # iterate over our dictionary and test it out
     for (url, meta) in TEST_URLS:
@@ -1606,12 +1606,18 @@ def test_rest_plugins(mock_post, mock_get):
             #
             try:
                 if test_requests_exceptions is False:
+                    # Disable throttling
+                    obj.request_rate_per_sec = 0
+
                     # check that we're as expected
                     assert obj.notify(
                         title='test', body='body',
                         notify_type=notify_type) == response
 
                 else:
+                    # Disable throttling
+                    obj.request_rate_per_sec = 0
+
                     for _exception in REQUEST_EXCEPTIONS:
                         mock_post.side_effect = _exception
                         mock_get.side_effect = _exception
@@ -1699,7 +1705,7 @@ def test_notify_boxcar_plugin(mock_post, mock_get):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyBase.NotifyBase.throttle_attempt = 0
+    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
 
     # Generate some generic message types
     device = 'A' * 64
@@ -1762,7 +1768,7 @@ def test_notify_discord_plugin(mock_post, mock_get):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyBase.NotifyBase.throttle_attempt = 0
+    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
 
     # Initialize some generic (but valid) tokens
     webhook_id = 'A' * 24
@@ -1844,6 +1850,8 @@ def test_notify_emby_plugin_login(mock_post, mock_get):
     API: NotifyEmby.login()
 
     """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
 
     # Prepare Mock
     mock_get.return_value = requests.Request()
@@ -1969,6 +1977,8 @@ def test_notify_emby_plugin_sessions(mock_post, mock_get, mock_logout,
     API: NotifyEmby.sessions()
 
     """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
 
     # Prepare Mock
     mock_get.return_value = requests.Request()
@@ -2070,6 +2080,8 @@ def test_notify_emby_plugin_logout(mock_post, mock_get, mock_login):
     API: NotifyEmby.sessions()
 
     """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
 
     # Prepare Mock
     mock_get.return_value = requests.Request()
@@ -2138,6 +2150,8 @@ def test_notify_emby_plugin_notify(mock_post, mock_get, mock_logout,
     API: NotifyEmby.notify()
 
     """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
 
     # Prepare Mock
     mock_get.return_value = requests.Request()
@@ -2214,7 +2228,7 @@ def test_notify_ifttt_plugin(mock_post, mock_get):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyBase.NotifyBase.throttle_attempt = 0
+    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
 
     # Initialize some generic (but valid) tokens
     webhook_id = 'webhookid'
@@ -2243,11 +2257,10 @@ def test_notify_ifttt_plugin(mock_post, mock_get):
     assert obj.notify(title='title', body='body',
                       notify_type=NotifyType.INFO) is True
 
-
     # Test the addition of tokens
     obj = plugins.NotifyIFTTT(
         webhook_id=webhook_id, events=events,
-        add_tokens={'Test':'ValueA', 'Test2': 'ValueB'})
+        add_tokens={'Test': 'ValueA', 'Test2': 'ValueB'})
 
     assert(isinstance(obj, plugins.NotifyIFTTT))
 
@@ -2282,13 +2295,13 @@ def test_notify_ifttt_plugin(mock_post, mock_get):
         del_tokens=(
             plugins.NotifyIFTTT.ifttt_default_title_key,
             plugins.NotifyIFTTT.ifttt_default_body_key,
-            plugins.NotifyIFTTT.ifttt_default_type_key,
-            ))
+            plugins.NotifyIFTTT.ifttt_default_type_key))
 
     assert(isinstance(obj, plugins.NotifyIFTTT))
 
     assert obj.notify(title='title', body='body',
                       notify_type=NotifyType.INFO) is True
+
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
@@ -2298,7 +2311,7 @@ def test_notify_join_plugin(mock_post, mock_get):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyBase.NotifyBase.throttle_attempt = 0
+    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
 
     # Generate some generic message types
     device = 'A' * 32
@@ -2333,7 +2346,7 @@ def test_notify_slack_plugin(mock_post, mock_get):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyBase.NotifyBase.throttle_attempt = 0
+    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
 
     # Initialize some generic (but valid) tokens
     token_a = 'A' * 9
@@ -2381,6 +2394,8 @@ def test_notify_pushbullet_plugin(mock_post, mock_get):
     API: NotifyPushBullet() Extra Checks
 
     """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
 
     # Initialize some generic (but valid) tokens
     accesstoken = 'a' * 32
@@ -2425,7 +2440,7 @@ def test_notify_pushed_plugin(mock_post, mock_get):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyBase.NotifyBase.throttle_attempt = 0
+    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
 
     # Chat ID
     recipients = '@ABCDEFG, @DEFGHIJ, #channel, #channel2'
@@ -2525,7 +2540,7 @@ def test_notify_pushover_plugin(mock_post, mock_get):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyBase.NotifyBase.throttle_attempt = 0
+    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
 
     # Initialize some generic (but valid) tokens
     token = 'a' * 30
@@ -2589,7 +2604,7 @@ def test_notify_rocketchat_plugin(mock_post, mock_get):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyBase.NotifyBase.throttle_attempt = 0
+    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
 
     # Chat ID
     recipients = 'l2g, lead2gold, #channel, #channel2'
@@ -2724,7 +2739,7 @@ def test_notify_telegram_plugin(mock_post, mock_get):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyBase.NotifyBase.throttle_attempt = 0
+    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
 
     # Bot Token
     bot_token = '123456789:abcdefg_hijklmnop'
@@ -2954,6 +2969,9 @@ def test_notify_overflow_truncate():
     # A little preparation
     #
 
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
+
     # Number of characters per line
     row = 24
 
@@ -3119,6 +3137,9 @@ def test_notify_overflow_split():
     # A little preparation
     #
 
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
+
     # Number of characters per line
     row = 24
 
@@ -3280,5 +3301,5 @@ def test_notify_overflow_split():
         assert chunk.get('title') == ''
 
         _body = chunk.get('body')
-        assert bulk[offset:len(_body)+offset] == _body
+        assert bulk[offset: len(_body) + offset] == _body
         offset += len(_body)

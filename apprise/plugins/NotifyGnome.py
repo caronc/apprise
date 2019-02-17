@@ -84,6 +84,10 @@ class NotifyGnome(NotifyBase):
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_128
 
+    # Disable throttle rate for Gnome requests since they are normally
+    # local anyway
+    request_rate_per_sec = 0
+
     # Limit results to just the first 10 line otherwise there is just to much
     # content to display
     body_max_line_count = 10
@@ -137,6 +141,9 @@ class NotifyGnome(NotifyBase):
 
             # Assign urgency
             notification.set_urgency(self.urgency)
+
+            # Always call throttle before any remote server i/o is made
+            self.throttle()
 
             try:
                 # Use Pixbuf to create the proper image type

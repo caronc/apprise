@@ -166,6 +166,8 @@ def test_email_plugin(mock_smtp, mock_smtpssl):
     API: NotifyEmail Plugin()
 
     """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
 
     # iterate over our dictionary and test it out
     for (url, meta) in TEST_URLS:
@@ -342,6 +344,8 @@ def test_smtplib_init_fail(mock_smtplib):
     API: Test exception handling when calling smtplib.SMTP()
 
     """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
 
     obj = Apprise.instantiate(
         'mailto://user:pass@gmail.com', suppress_exceptions=False)
@@ -378,6 +382,8 @@ def test_smtplib_send_okay(mock_smtplib):
     API: Test a successfully sent email
 
     """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
 
     # Defaults to HTML
     obj = Apprise.instantiate(

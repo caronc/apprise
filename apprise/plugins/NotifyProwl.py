@@ -81,6 +81,10 @@ class NotifyProwl(NotifyBase):
     # Prowl uses the http protocol with JSON requests
     notify_url = 'https://api.prowlapp.com/publicapi/add'
 
+    # Disable throttle rate for Prowl requests since they are normally
+    # local anyway
+    request_rate_per_sec = 0
+
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 10000
 
@@ -150,6 +154,10 @@ class NotifyProwl(NotifyBase):
             self.notify_url, self.verify_certificate,
         ))
         self.logger.debug('Prowl Payload: %s' % str(payload))
+
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+
         try:
             r = requests.post(
                 self.notify_url,

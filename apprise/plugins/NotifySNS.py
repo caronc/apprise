@@ -86,6 +86,10 @@ class NotifySNS(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_sns'
 
+    # AWS is pretty good for handling data load so request limits
+    # can occur in much shorter bursts
+    request_rate_per_sec = 2.5
+
     # The maximum length of the body
     # Source: https://docs.aws.amazon.com/sns/latest/api/API_Publish.html
     body_maxlen = 140
@@ -219,10 +223,6 @@ class NotifySNS(NotifyBase):
             if not result:
                 error_count += 1
 
-            if len(phone) > 0:
-                # Prevent thrashing requests
-                self.throttle()
-
         # Send all our defined topic id's
         while len(topics):
 
@@ -261,10 +261,6 @@ class NotifySNS(NotifyBase):
             if not result:
                 error_count += 1
 
-            if len(topics) > 0:
-                # Prevent thrashing requests
-                self.throttle()
-
         return error_count == 0
 
     def _post(self, payload, to):
@@ -275,6 +271,13 @@ class NotifySNS(NotifyBase):
         This function returns True if the _post was successful and False
         if it wasn't.
         """
+
+        # Always call throttle before any remote server i/o is made; for AWS
+        # time plays a huge factor in the headers being sent with the payload.
+        # So for AWS (SNS) requests we must throttle before they're generated
+        # and not directly before the i/o call like other notification
+        # services do.
+        self.throttle()
 
         # Convert our payload from a dict() into a urlencoded string
         payload = self.urlencode(payload)
@@ -287,6 +290,7 @@ class NotifySNS(NotifyBase):
             self.notify_url, self.verify_certificate,
         ))
         self.logger.debug('AWS Payload: %s' % str(payload))
+
         try:
             r = requests.post(
                 self.notify_url,

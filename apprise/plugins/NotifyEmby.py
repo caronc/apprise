@@ -494,6 +494,10 @@ class NotifyEmby(NotifyBase):
                 session_url, self.verify_certificate,
             ))
             self.logger.debug('Emby Payload: %s' % str(payload))
+
+            # Always call throttle before the requests are made
+            self.throttle()
+
             try:
                 r = requests.post(
                     session_url,

@@ -182,6 +182,10 @@ class NotifyIFTTT(NotifyBase):
                 url, self.verify_certificate,
             ))
             self.logger.debug('IFTTT Payload: %s' % str(payload))
+
+            # Always call throttle before any remote server i/o is made
+            self.throttle()
+
             try:
                 r = requests.post(
                     url,
@@ -224,11 +228,6 @@ class NotifyIFTTT(NotifyBase):
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))
                 error_count += 1
-
-            finally:
-                if len(events):
-                    # Prevent thrashing requests
-                    self.throttle()
 
         return (error_count == 0)
 

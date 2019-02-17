@@ -375,6 +375,10 @@ class NotifyEmail(NotifyBase):
 
         # bind the socket variable to the current namespace
         socket = None
+
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+
         try:
             self.logger.debug('Connecting to remote SMTP server...')
             socket_func = smtplib.SMTP

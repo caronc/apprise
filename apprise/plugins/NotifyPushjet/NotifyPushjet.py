@@ -52,6 +52,10 @@ class NotifyPushjet(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_pushjet'
 
+    # Disable throttle rate for Pushjet requests since they are normally
+    # local anyway (the remote/online service is no more)
+    request_rate_per_sec = 0
+
     def __init__(self, secret_key, **kwargs):
         """
         Initialize Pushjet Object
@@ -65,15 +69,16 @@ class NotifyPushjet(NotifyBase):
         """
         Perform Pushjet Notification
         """
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+
+        server = "https://" if self.secure else "http://"
+
+        server += self.host
+        if self.port:
+            server += ":" + str(self.port)
+
         try:
-            server = "http://"
-            if self.secure:
-                server = "https://"
-
-            server += self.host
-            if self.port:
-                server += ":" + str(self.port)
-
             api = pushjet.Api(server)
             service = api.Service(secret_key=self.secret_key)
 

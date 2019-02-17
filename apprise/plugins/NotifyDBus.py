@@ -142,6 +142,9 @@ class NotifyDBus(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_dbus'
 
+    # No throttling required for DBus queries
+    request_rate_per_sec = 0
+
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_128
 
@@ -258,6 +261,9 @@ class NotifyDBus(NotifyBase):
                     .format(icon_path, e))
 
         try:
+            # Always call throttle() before any remote execution is made
+            self.throttle()
+
             dbus_iface.Notify(
                 # Application Identifier
                 self.app_id,

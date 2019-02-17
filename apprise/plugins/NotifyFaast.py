@@ -85,6 +85,10 @@ class NotifyFaast(NotifyBase):
             self.notify_url, self.verify_certificate,
         ))
         self.logger.debug('Faast Payload: %s' % str(payload))
+
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+
         try:
             r = requests.post(
                 self.notify_url,

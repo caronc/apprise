@@ -50,6 +50,9 @@ class NotifyTwitter(NotifyBase):
     # which are limited to 240 characters)
     body_maxlen = 4096
 
+    # Twitter does have titles when creating a message
+    title_maxlen = 0
+
     def __init__(self, ckey, csecret, akey, asecret, **kwargs):
         """
         Initialize Twitter Object
@@ -109,15 +112,16 @@ class NotifyTwitter(NotifyBase):
             )
             return False
 
-        # Only set title if it was specified
-        text = body if not title else '%s\r\n%s' % (title, body)
+        # Always call throttle before any remote server i/o is made to avoid
+        # thrashing the remote server and risk being blocked.
+        self.throttle()
 
         try:
             # Get our API
             api = tweepy.API(self.auth)
 
             # Send our Direct Message
-            api.send_direct_message(self.user, text=text)
+            api.send_direct_message(self.user, text=body)
             self.logger.info('Sent Twitter DM notification.')
 
         except Exception as e:

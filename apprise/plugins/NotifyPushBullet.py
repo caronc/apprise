@@ -135,6 +135,10 @@ class NotifyPushBullet(NotifyBase):
                 self.notify_url, self.verify_certificate,
             ))
             self.logger.debug('PushBullet Payload: %s' % str(payload))
+
+            # Always call throttle before any remote server i/o is made
+            self.throttle()
+
             try:
                 r = requests.post(
                     self.notify_url,
@@ -175,10 +179,6 @@ class NotifyPushBullet(NotifyBase):
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))
                 has_error = True
-
-            if len(recipients):
-                # Prevent thrashing requests
-                self.throttle()
 
         return not has_error
 

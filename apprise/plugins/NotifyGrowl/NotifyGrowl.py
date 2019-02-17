@@ -69,6 +69,10 @@ class NotifyGrowl(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_growl'
 
+    # Disable throttle rate for Growl requests since they are normally
+    # local anyway
+    request_rate_per_sec = 0
+
     # Default Growl Port
     default_port = 23053
 
@@ -177,6 +181,9 @@ class NotifyGrowl(NotifyBase):
         # here after we spit the debug message above (so we don't try to
         # print the binary contents of an image
         payload['icon'] = icon
+
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
 
         try:
             response = self.growl.notify(**payload)

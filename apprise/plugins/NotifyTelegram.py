@@ -413,14 +413,14 @@ class NotifyTelegram(NotifyBase):
                 # ID
                 payload['chat_id'] = int(chat_id.group('idno'))
 
+            # Always call throttle before any remote server i/o is made;
+            # Telegram throttles to occur before sending the image so that
+            # content can arrive together.
+            self.throttle()
+
             if self.include_image is True:
                 # Send an image
-                if self.send_image(
-                        payload['chat_id'], notify_type) is not None:
-                    # We sent a post (whether we were successful or not)
-                    # we still hit the remote server... just throttle
-                    # before our next hit server query
-                    self.throttle()
+                self.send_image(payload['chat_id'], notify_type)
 
             self.logger.debug('Telegram POST URL: %s (cert_verify=%r)' % (
                 url, self.verify_certificate,
@@ -482,11 +482,6 @@ class NotifyTelegram(NotifyBase):
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))
                 has_error = True
-
-            finally:
-                if len(chat_ids):
-                    # Prevent thrashing requests
-                    self.throttle()
 
         return not has_error
 

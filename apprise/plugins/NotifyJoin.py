@@ -181,6 +181,9 @@ class NotifyJoin(NotifyBase):
             ))
             self.logger.debug('Join Payload: %s' % str(payload))
 
+            # Always call throttle before any remote server i/o is made
+            self.throttle()
+
             try:
                 r = requests.post(
                     url,
@@ -219,10 +222,6 @@ class NotifyJoin(NotifyBase):
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))
                 return_status = False
-
-            if len(devices):
-                # Prevent thrashing requests
-                self.throttle()
 
         return return_status
 

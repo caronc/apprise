@@ -23,6 +23,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+from datetime import datetime
+from datetime import timedelta
+
 from apprise.plugins.NotifyBase import NotifyBase
 from apprise import NotifyType
 from apprise import NotifyImageSize
@@ -64,7 +67,7 @@ def test_notify_base():
 
     # Throttle overrides..
     nb = NotifyBase()
-    nb.throttle_attempt = 0.0
+    nb.request_rate_per_sec = 0.0
     start_time = default_timer()
     nb.throttle()
     elapsed = default_timer() - start_time
@@ -73,13 +76,57 @@ def test_notify_base():
     # then other
     assert elapsed < 0.5
 
+    # Concurrent calls should achieve the same response
     start_time = default_timer()
-    nb.throttle(1.0)
+    nb.throttle()
+    elapsed = default_timer() - start_time
+    assert elapsed < 0.5
+
+    nb = NotifyBase()
+    nb.request_rate_per_sec = 1.0
+
+    # Set our time to now
+    start_time = default_timer()
+    nb.throttle()
+    elapsed = default_timer() - start_time
+    # A first call to throttle (Without telling it a time previously ran) does
+    # not block for any length of time; it just merely sets us up for
+    # concurrent calls to block
+    assert elapsed < 0.5
+
+    # Concurrent calls could take up to the rate_per_sec though...
+    start_time = default_timer()
+    nb.throttle(last_io=datetime.now())
+    elapsed = default_timer() - start_time
+    assert elapsed > 0.5 and elapsed < 1.5
+
+    nb = NotifyBase()
+    nb.request_rate_per_sec = 1.0
+
+    # Set our time to now
+    start_time = default_timer()
+    nb.throttle(last_io=datetime.now())
+    elapsed = default_timer() - start_time
+    # because we told it that we had already done a previous action (now)
+    # the throttle holds out until the right time has passed
+    assert elapsed > 0.5 and elapsed < 1.5
+
+    # Concurrent calls could take up to the rate_per_sec though...
+    start_time = default_timer()
+    nb.throttle(last_io=datetime.now())
+    elapsed = default_timer() - start_time
+    assert elapsed > 0.5 and elapsed < 1.5
+
+    nb = NotifyBase()
+    start_time = default_timer()
+    nb.request_rate_per_sec = 1.0
+    # Force a time in the past
+    nb.throttle(last_io=(datetime.now() - timedelta(seconds=20)))
     elapsed = default_timer() - start_time
     # Should be a very fast response time since we set it to zero but we'll
     # check for less then 500 to be fair as some testing systems may be slower
     # then other
-    assert elapsed < 1.5
+    assert elapsed < 0.5
 
     # our NotifyBase wasn't initialized with an ImageSize so this will fail
     assert nb.image_url(notify_type=NotifyType.INFO) is None

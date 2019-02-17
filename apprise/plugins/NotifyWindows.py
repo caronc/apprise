@@ -63,6 +63,10 @@ class NotifyWindows(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_windows'
 
+    # Disable throttle rate for Windows requests since they are normally
+    # local anyway
+    request_rate_per_sec = 0
+
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_128
 
@@ -112,6 +116,9 @@ class NotifyWindows(NotifyBase):
             self.logger.warning(
                 "Windows Notifications are not supported by this system.")
             return False
+
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
 
         try:
             # Register destruction callback
