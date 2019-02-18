@@ -28,6 +28,7 @@ from .pushjet import errors
 from .pushjet import pushjet
 
 from ..NotifyBase import NotifyBase
+from ...common import NotifyType
 
 PUBLIC_KEY_RE = re.compile(
     r'^[a-z0-9]{4}-[a-z0-9]{6}-[a-z0-9]{12}-[a-z0-9]{5}-[a-z0-9]{9}$', re.I)
@@ -65,7 +66,7 @@ class NotifyPushjet(NotifyBase):
         # store our key
         self.secret_key = secret_key
 
-    def notify(self, title, body, notify_type):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Pushjet Notification
         """

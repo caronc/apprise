@@ -25,6 +25,7 @@
 
 from . import tweepy
 from ..NotifyBase import NotifyBase
+from ...common import NotifyType
 
 
 class NotifyTwitter(NotifyBase):
@@ -93,7 +94,7 @@ class NotifyTwitter(NotifyBase):
 
         return
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Twitter Notification
         """

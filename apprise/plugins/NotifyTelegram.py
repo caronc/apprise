@@ -59,10 +59,11 @@ from json import dumps
 
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
+from ..common import NotifyType
 from ..common import NotifyImageSize
+from ..common import NotifyFormat
 from ..utils import parse_bool
 from ..utils import parse_list
-from ..common import NotifyFormat
 
 TELEGRAM_IMAGE_XY = NotifyImageSize.XY_256
 
@@ -325,7 +326,7 @@ class NotifyTelegram(NotifyBase):
 
         return 0
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Telegram Notification
         """

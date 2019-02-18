@@ -40,10 +40,11 @@
 # For each event you create you will assign it a name (this will be known as
 # the {event} when building your URL.
 import requests
-
 from json import dumps
+
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
+from ..common import NotifyType
 from ..utils import parse_list
 
 
@@ -136,7 +137,7 @@ class NotifyIFTTT(NotifyBase):
                     'del_token must be a list; {} was provided'.format(
                         str(type(del_tokens))))
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform IFTTT Notification
         """

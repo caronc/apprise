@@ -28,6 +28,7 @@ import requests
 
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
+from ..common import NotifyType
 
 # Used to validate API Key
 VALIDATE_APIKEY = re.compile(r'[A-Za-z0-9]{40}')
@@ -128,7 +129,7 @@ class NotifyProwl(NotifyBase):
         # Store the Provider Key
         self.providerkey = providerkey
 
-    def notify(self, title, body, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Prowl Notification
         """

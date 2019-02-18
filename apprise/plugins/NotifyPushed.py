@@ -30,6 +30,7 @@ from itertools import chain
 
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
+from ..common import NotifyType
 from ..utils import compat_is_basestring
 
 # Used to detect and parse channels
@@ -128,7 +129,7 @@ class NotifyPushed(NotifyBase):
 
         return
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Pushed Notification
         """
@@ -153,7 +154,7 @@ class NotifyPushed(NotifyBase):
 
         if len(self.channels) + len(self.users) == 0:
             # Just notify the app
-            return self.send_notification(
+            return self._send(
                 payload=payload, notify_type=notify_type, **kwargs)
 
         # If our code reaches here, we want to target channels and users (by
@@ -171,7 +172,7 @@ class NotifyPushed(NotifyBase):
             # Get Channel
             _payload['target_alias'] = channels.pop(0)
 
-            if not self.send_notification(
+            if not self._send(
                     payload=_payload, notify_type=notify_type, **kwargs):
 
                 # toggle flag
@@ -186,7 +187,7 @@ class NotifyPushed(NotifyBase):
             # Get User's Pushed ID
             _payload['pushed_id'] = users.pop(0)
 
-            if not self.send_notification(
+            if not self._send(
                     payload=_payload, notify_type=notify_type, **kwargs):
 
                 # toggle flag
@@ -194,11 +195,11 @@ class NotifyPushed(NotifyBase):
 
         return not has_error
 
-    def send_notification(self, payload, notify_type, **kwargs):
+    def _send(self, payload, notify_type, **kwargs):
         """
         A lower level call that directly pushes a payload to the Pushed
         Notification servers.  This should never be called directly; it is
-        referenced automatically through the notify() function.
+        referenced automatically through the send() function.
         """
 
         headers = {

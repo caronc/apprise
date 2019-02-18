@@ -37,6 +37,7 @@ from json import loads
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
 from ..utils import parse_bool
+from ..common import NotifyType
 from .. import __version__ as VERSION
 
 
@@ -445,7 +446,7 @@ class NotifyEmby(NotifyBase):
         self.user_id = None
         return True
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Emby Notification
         """

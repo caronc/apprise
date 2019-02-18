@@ -30,6 +30,7 @@ from json import dumps
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyImageSize
+from ..common import NotifyType
 
 # Some Reference Locations:
 # - https://docs.mattermost.com/developer/webhooks-incoming.html
@@ -111,7 +112,7 @@ class NotifyMatterMost(NotifyBase):
 
         return
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform MatterMost Notification
         """

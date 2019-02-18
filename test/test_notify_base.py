@@ -48,6 +48,15 @@ def test_notify_base():
     except TypeError:
         assert(True)
 
+    # invalid types throw exceptions
+    try:
+        nb = NotifyBase(**{'overflow': 'invalid'})
+        # We should never reach here as an exception should be thrown
+        assert(False)
+
+    except TypeError:
+        assert(True)
+
     # Bad port information
     nb = NotifyBase(port='invalid')
     assert nb.port is None
@@ -57,6 +66,16 @@ def test_notify_base():
 
     try:
         nb.url()
+        assert False
+
+    except NotImplementedError:
+        # Each sub-module is that inherits this as a parent is required to
+        # over-ride this function. So direct calls to this throws a not
+        # implemented error intentionally
+        assert True
+
+    try:
+        nb.send('test message')
         assert False
 
     except NotImplementedError:
@@ -222,6 +241,31 @@ def test_notify_base_urls():
         'https://user:pass@localhost?pass=newpassword')
     assert 'password' in results
     assert results['password'] == "newpassword"
+
+    # Options
+    results = NotifyBase.parse_url('https://localhost?format=invalid')
+    assert 'format' not in results
+    results = NotifyBase.parse_url('https://localhost?format=text')
+    assert 'format' in results
+    assert results['format'] == 'text'
+    results = NotifyBase.parse_url('https://localhost?format=markdown')
+    assert 'format' in results
+    assert results['format'] == 'markdown'
+    results = NotifyBase.parse_url('https://localhost?format=html')
+    assert 'format' in results
+    assert results['format'] == 'html'
+
+    results = NotifyBase.parse_url('https://localhost?overflow=invalid')
+    assert 'overflow' not in results
+    results = NotifyBase.parse_url('https://localhost?overflow=upstream')
+    assert 'overflow' in results
+    assert results['overflow'] == 'upstream'
+    results = NotifyBase.parse_url('https://localhost?overflow=split')
+    assert 'overflow' in results
+    assert results['overflow'] == 'split'
+    results = NotifyBase.parse_url('https://localhost?overflow=truncate')
+    assert 'overflow' in results
+    assert results['overflow'] == 'truncate'
 
     # User Handling
 

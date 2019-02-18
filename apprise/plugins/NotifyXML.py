@@ -29,6 +29,7 @@ import requests
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyImageSize
+from ..common import NotifyType
 from ..utils import compat_is_basestring
 
 
@@ -135,7 +136,7 @@ class NotifyXML(NotifyBase):
             args=self.urlencode(args),
         )
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform XML Notification
         """

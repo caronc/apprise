@@ -28,6 +28,7 @@ from __future__ import print_function
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
+from ..common import NotifyType
 
 # Default our global support flag
 NOTIFY_GNOME_SUPPORT_ENABLED = False
@@ -119,7 +120,7 @@ class NotifyGnome(NotifyBase):
         else:
             self.urgency = urgency
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Gnome Notification
         """

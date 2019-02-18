@@ -30,6 +30,7 @@ from time import sleep
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
+from ..common import NotifyType
 
 # Default our global support flag
 NOTIFY_WINDOWS_SUPPORT_ENABLED = False
@@ -107,7 +108,7 @@ class NotifyWindows(NotifyBase):
 
         return None
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Windows Notification
         """

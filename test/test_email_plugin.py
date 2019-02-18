@@ -352,28 +352,15 @@ def test_smtplib_init_fail(mock_smtplib):
     assert(isinstance(obj, plugins.NotifyEmail))
 
     # Support Exception handling of smtplib.SMTP
-    mock_smtplib.side_effect = TypeError('Test')
+    mock_smtplib.side_effect = RuntimeError('Test')
 
-    try:
-        obj.notify(
-            title='test', body='body',
-            notify_type=NotifyType.INFO)
-
-        # We should have thrown an exception
-        assert False
-
-    except TypeError:
-        # Exception thrown as expected
-        assert True
-
-    except Exception:
-        # Un-Expected
-        assert False
+    assert obj.notify(
+        body='body', title='test', notify_type=NotifyType.INFO) is False
 
     # A handled and expected exception
     mock_smtplib.side_effect = smtplib.SMTPException('Test')
-    assert obj.notify(title='test', body='body',
-                      notify_type=NotifyType.INFO) is False
+    assert obj.notify(
+        body='body', title='test', notify_type=NotifyType.INFO) is False
 
 
 @mock.patch('smtplib.SMTP')
@@ -397,7 +384,7 @@ def test_smtplib_send_okay(mock_smtplib):
     mock_smtplib.quit.return_value = True
 
     assert(obj.notify(
-        title='test', body='body', notify_type=NotifyType.INFO) is True)
+        body='body', title='test', notify_type=NotifyType.INFO) is True)
 
     # Set Text
     obj = Apprise.instantiate(
@@ -405,4 +392,4 @@ def test_smtplib_send_okay(mock_smtplib):
     assert(isinstance(obj, plugins.NotifyEmail))
 
     assert(obj.notify(
-        title='test', body='body', notify_type=NotifyType.INFO) is True)
+        body='body', title='test', notify_type=NotifyType.INFO) is True)

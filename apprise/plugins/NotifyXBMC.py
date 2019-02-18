@@ -161,7 +161,7 @@ class NotifyXBMC(NotifyBase):
 
         return (self.headers, dumps(payload))
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform XBMC/KODI Notification
         """

@@ -43,6 +43,7 @@ from time import time
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyImageSize
+from ..common import NotifyType
 from ..utils import compat_is_basestring
 
 # Token required as part of the API request
@@ -174,7 +175,7 @@ class NotifySlack(NotifyBase):
             re.IGNORECASE,
         )
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Slack Notification
         """

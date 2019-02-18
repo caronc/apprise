@@ -48,6 +48,7 @@ from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyImageSize
 from ..common import NotifyFormat
+from ..common import NotifyType
 from ..utils import parse_bool
 
 
@@ -113,7 +114,7 @@ class NotifyDiscord(NotifyBase):
 
         return
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Discord Notification
         """

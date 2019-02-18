@@ -110,8 +110,8 @@ apobj.add('pbul://o.gn5kj6nfhv736I7jC3cj3QLRiyhgl98b')
 # Then notify these services any time you desire. The below would
 # notify all of the services loaded into our Apprise object.
 apobj.notify(
-    title='my notification title',
     body='what a great notification service!',
+    title='my notification title',
 )
 ```
 

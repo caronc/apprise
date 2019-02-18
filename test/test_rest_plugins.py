@@ -1489,6 +1489,20 @@ def test_rest_plugins(mock_post, mock_get):
     # Disable Throttling to speed testing
     plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
 
+    # Define how many characters exist per line
+    row = 80
+
+    # Some variables we use to control the data we work with
+    body_len = 1024
+    title_len = 1024
+
+    # Create a large body and title with random data
+    body = ''.join(choice(str_alpha + str_num + ' ') for _ in range(body_len))
+    body = '\r\n'.join([body[i: i + row] for i in range(0, len(body), row)])
+
+    # Create our title using random data
+    title = ''.join(choice(str_alpha + str_num) for _ in range(title_len))
+
     # iterate over our dictionary and test it out
     for (url, meta) in TEST_URLS:
         # Our expected instance
@@ -1611,8 +1625,23 @@ def test_rest_plugins(mock_post, mock_get):
 
                     # check that we're as expected
                     assert obj.notify(
-                        title='test', body='body',
+                        body=body, title=title,
                         notify_type=notify_type) == response
+
+                    # check that this doesn't change using different overflow
+                    # methods
+                    assert obj.notify(
+                        body=body, title=title,
+                        notify_type=notify_type,
+                        overflow=OverflowMode.UPSTREAM) == response
+                    assert obj.notify(
+                        body=body, title=title,
+                        notify_type=notify_type,
+                        overflow=OverflowMode.TRUNCATE) == response
+                    assert obj.notify(
+                        body=body, title=title,
+                        notify_type=notify_type,
+                        overflow=OverflowMode.SPLIT) == response
 
                 else:
                     # Disable throttling
@@ -1624,7 +1653,7 @@ def test_rest_plugins(mock_post, mock_get):
 
                         try:
                             assert obj.notify(
-                                title='test', body='body',
+                                body=body, title=title,
                                 notify_type=NotifyType.INFO) is False
 
                         except AssertionError:
@@ -1652,8 +1681,7 @@ def test_rest_plugins(mock_post, mock_get):
                 if test_requests_exceptions is False:
                     # check that we're as expected
                     assert obj.notify(
-                        title='', body='body',
-                        notify_type=notify_type) == response
+                        body='body', notify_type=notify_type) == response
 
                 else:
                     for _exception in REQUEST_EXCEPTIONS:
@@ -1662,7 +1690,7 @@ def test_rest_plugins(mock_post, mock_get):
 
                         try:
                             assert obj.notify(
-                                title='', body='body',
+                                body=body,
                                 notify_type=NotifyType.INFO) is False
 
                         except AssertionError:
@@ -1795,8 +1823,8 @@ def test_notify_discord_plugin(mock_post, mock_get):
         footer=True, thumbnail=False)
 
     # This call includes an image with it's payload:
-    assert obj.notify(title='title', body='body',
-                      notify_type=NotifyType.INFO) is True
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
 
     # Test our header parsing
     test_markdown = "## Heading one\nbody body\n\n" + \
@@ -1814,8 +1842,8 @@ def test_notify_discord_plugin(mock_post, mock_get):
     assert(len(results) == 5)
 
     # Use our test markdown string during a notification
-    assert obj.notify(title='title', body=test_markdown,
-                      notify_type=NotifyType.INFO) is True
+    assert obj.notify(
+        body=test_markdown, title='title', notify_type=NotifyType.INFO) is True
 
     # Create an apprise instance
     a = Apprise()
@@ -1829,18 +1857,18 @@ def test_notify_discord_plugin(mock_post, mock_get):
             webhook_token=webhook_token)) is True
 
     # This call includes an image with it's payload:
-    assert a.notify(title='title', body=test_markdown,
+    assert a.notify(body=test_markdown, title='title',
                     notify_type=NotifyType.INFO,
                     body_format=NotifyFormat.TEXT) is True
 
-    assert a.notify(title='title', body=test_markdown,
+    assert a.notify(body=test_markdown, title='title',
                     notify_type=NotifyType.INFO,
                     body_format=NotifyFormat.MARKDOWN) is True
 
     # Toggle our logo availability
     a.asset.image_url_logo = None
-    assert a.notify(title='title', body='body',
-                    notify_type=NotifyType.INFO) is True
+    assert a.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
 
 
 @mock.patch('requests.get')
@@ -2254,8 +2282,8 @@ def test_notify_ifttt_plugin(mock_post, mock_get):
     obj = plugins.NotifyIFTTT(webhook_id=webhook_id, events=events)
     assert(isinstance(obj, plugins.NotifyIFTTT))
 
-    assert obj.notify(title='title', body='body',
-                      notify_type=NotifyType.INFO) is True
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
 
     # Test the addition of tokens
     obj = plugins.NotifyIFTTT(
@@ -2264,8 +2292,8 @@ def test_notify_ifttt_plugin(mock_post, mock_get):
 
     assert(isinstance(obj, plugins.NotifyIFTTT))
 
-    assert obj.notify(title='title', body='body',
-                      notify_type=NotifyType.INFO) is True
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
 
     try:
         # Invalid del_tokens entry
@@ -2283,8 +2311,8 @@ def test_notify_ifttt_plugin(mock_post, mock_get):
 
     assert(isinstance(obj, plugins.NotifyIFTTT))
 
-    assert obj.notify(title='title', body='body',
-                      notify_type=NotifyType.INFO) is True
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
 
     # Test removal of tokens by a list
     obj = plugins.NotifyIFTTT(
@@ -2299,8 +2327,8 @@ def test_notify_ifttt_plugin(mock_post, mock_get):
 
     assert(isinstance(obj, plugins.NotifyIFTTT))
 
-    assert obj.notify(title='title', body='body',
-                      notify_type=NotifyType.INFO) is True
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
 
 
 @mock.patch('requests.get')
@@ -2383,8 +2411,8 @@ def test_notify_slack_plugin(mock_post, mock_get):
         include_image=True)
 
     # This call includes an image with it's payload:
-    assert obj.notify(title='title', body='body',
-                      notify_type=NotifyType.INFO) is True
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
 
 
 @mock.patch('requests.get')
@@ -2571,8 +2599,8 @@ def test_notify_pushover_plugin(mock_post, mock_get):
     assert(len(obj.devices) == 3)
 
     # This call fails because there is 1 invalid device
-    assert obj.notify(title='title', body='body',
-                      notify_type=NotifyType.INFO) is False
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is False
 
     obj = plugins.NotifyPushover(user=user, token=token)
     assert(isinstance(obj, plugins.NotifyPushover))
@@ -2581,8 +2609,8 @@ def test_notify_pushover_plugin(mock_post, mock_get):
     assert(len(obj.devices) == 1)
 
     # This call succeeds because all of the devices are valid
-    assert obj.notify(title='title', body='body',
-                      notify_type=NotifyType.INFO) is True
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
 
     obj = plugins.NotifyPushover(user=user, token=token, devices=set())
     assert(isinstance(obj, plugins.NotifyPushover))
@@ -2680,9 +2708,8 @@ def test_notify_rocketchat_plugin(mock_post, mock_get):
     # Send Notification
     #
     assert obj.notify(
-        title='title', body='body', notify_type=NotifyType.INFO) is False
-    assert obj.send_notification(
-        payload='test', notify_type=NotifyType.INFO) is False
+        body='body', title='title', notify_type=NotifyType.INFO) is False
+    assert obj._send(payload='test', notify_type=NotifyType.INFO) is False
 
     #
     # Logout
@@ -2697,9 +2724,8 @@ def test_notify_rocketchat_plugin(mock_post, mock_get):
     # Send Notification
     #
     assert obj.notify(
-        title='title', body='body', notify_type=NotifyType.INFO) is False
-    assert obj.send_notification(
-        payload='test', notify_type=NotifyType.INFO) is False
+        body='body', title='title', notify_type=NotifyType.INFO) is False
+    assert obj._send(payload='test', notify_type=NotifyType.INFO) is False
 
     #
     # Logout
@@ -2717,14 +2743,13 @@ def test_notify_rocketchat_plugin(mock_post, mock_get):
     #
     # Send Notification
     #
-    assert obj.send_notification(
-        payload='test', notify_type=NotifyType.INFO) is False
+    assert obj._send(payload='test', notify_type=NotifyType.INFO) is False
 
     # Attempt the check again but fake a successful login
     obj.login = mock.Mock()
     obj.login.return_value = True
     assert obj.notify(
-        title='title', body='body', notify_type=NotifyType.INFO) is False
+        body='body', title='title', notify_type=NotifyType.INFO) is False
     #
     # Logout
     #
@@ -2835,9 +2860,11 @@ def test_notify_telegram_plugin(mock_post, mock_get):
 
     # This tests erroneous messages involving multiple chat ids
     assert obj.notify(
-        title='title', body='body', notify_type=NotifyType.INFO) is False
+        body='body', title='title', notify_type=NotifyType.INFO) is False
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is False
     assert nimg_obj.notify(
-        title='title', body='body', notify_type=NotifyType.INFO) is False
+        body='body', title='title', notify_type=NotifyType.INFO) is False
 
     # This tests erroneous messages involving a single chat id
     obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids='l2g')
@@ -2845,9 +2872,9 @@ def test_notify_telegram_plugin(mock_post, mock_get):
     nimg_obj.asset = AppriseAsset(image_path_mask=False, image_url_mask=False)
 
     assert obj.notify(
-        title='title', body='body', notify_type=NotifyType.INFO) is False
+        body='body', title='title', notify_type=NotifyType.INFO) is False
     assert nimg_obj.notify(
-        title='title', body='body', notify_type=NotifyType.INFO) is False
+        body='body', title='title', notify_type=NotifyType.INFO) is False
 
     # Bot Token Detection
     # Just to make it clear to people reading this code and trying to learn
@@ -2945,7 +2972,7 @@ def test_notify_telegram_plugin(mock_post, mock_get):
     # notification without a bot detection by providing at least 1 chat id
     obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids=['@abcd'])
     assert nimg_obj.notify(
-        title='title', body='body', notify_type=NotifyType.INFO) is False
+        body='body', title='title', notify_type=NotifyType.INFO) is False
 
     # iterate over our exceptions and test them
     for _exception in REQUEST_EXCEPTIONS:
@@ -3023,7 +3050,9 @@ def test_notify_overflow_truncate():
 
     # Verify that we break the title to a max length of our title_max
     # and that the body remains untouched
-    chunks = obj._apply_overflow(body=body, title=title)
+    chunks = obj._apply_overflow(body=body, title=title, overflow=None)
+    chunks = obj._apply_overflow(
+        body=body, title=title, overflow=OverflowMode.SPLIT)
     assert len(chunks) == 1
     assert body == chunks[0].get('body')
     assert title[0:TestNotification.title_maxlen] == chunks[0].get('title')

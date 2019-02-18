@@ -27,6 +27,7 @@ import requests
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyImageSize
+from ..common import NotifyType
 
 
 class NotifyFaast(NotifyBase):
@@ -60,7 +61,7 @@ class NotifyFaast(NotifyBase):
 
         self.authtoken = authtoken
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Faast Notification
         """

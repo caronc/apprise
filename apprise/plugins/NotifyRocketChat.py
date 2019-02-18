@@ -30,6 +30,7 @@ from itertools import chain
 
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
+from ..common import NotifyType
 from ..utils import compat_is_basestring
 
 IS_CHANNEL = re.compile(r'^#(?P<name>[A-Za-z0-9]+)$')
@@ -178,9 +179,9 @@ class NotifyRocketChat(NotifyBase):
             args=self.urlencode(args),
         )
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
-        wrapper to send_notification since we can alert more then one channel
+        wrapper to _send since we can alert more then one channel
         """
 
         # Track whether we authenticated okay
@@ -202,7 +203,7 @@ class NotifyRocketChat(NotifyBase):
             # Get Channel
             channel = channels.pop(0)
 
-            if not self.send_notification(
+            if not self._send(
                     {
                         'text': text,
                         'channel': channel,
@@ -216,7 +217,7 @@ class NotifyRocketChat(NotifyBase):
             # Get Room
             room = rooms.pop(0)
 
-            if not self.send_notification(
+            if not self._send(
                     {
                         'text': text,
                         'roomId': room,
@@ -230,7 +231,7 @@ class NotifyRocketChat(NotifyBase):
 
         return not has_error
 
-    def send_notification(self, payload, notify_type, **kwargs):
+    def _send(self, payload, notify_type, **kwargs):
         """
         Perform Notify Rocket.Chat Notification
         """

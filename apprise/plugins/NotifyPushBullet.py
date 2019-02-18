@@ -30,7 +30,7 @@ from json import dumps
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
 from .NotifyBase import IS_EMAIL_RE
-
+from ..common import NotifyType
 from ..utils import compat_is_basestring
 
 # Flag used as a placeholder to sending to all devices
@@ -87,7 +87,7 @@ class NotifyPushBullet(NotifyBase):
         if len(self.recipients) == 0:
             self.recipients = (PUSHBULLET_SEND_TO_ALL, )
 
-    def notify(self, title, body, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform PushBullet Notification
         """

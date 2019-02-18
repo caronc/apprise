@@ -26,10 +26,9 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
-import re
-
 from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
+from ..common import NotifyType
 from ..utils import GET_SCHEMA_RE
 
 # Default our global support flag
@@ -201,7 +200,7 @@ class NotifyDBus(NotifyBase):
         self.x_axis = x_axis
         self.y_axis = y_axis
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform DBus Notification
         """

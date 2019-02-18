@@ -44,6 +44,7 @@ from ..utils import parse_url
 from ..utils import parse_bool
 from ..utils import parse_list
 from ..utils import is_hostname
+from ..common import NotifyType
 from ..common import NOTIFY_TYPES
 from ..common import NotifyFormat
 from ..common import NOTIFY_FORMATS
@@ -194,16 +195,16 @@ class NotifyBase(object):
 
         if 'overflow' in kwargs:
             # Store the specified format if specified
-            overflow_mode = kwargs.get('overflow', '')
-            if overflow_mode.lower() not in OVERFLOW_MODES:
+            overflow = kwargs.get('overflow', '')
+            if overflow.lower() not in OVERFLOW_MODES:
                 self.logger.error(
-                    'Invalid overflow method %s' % overflow_mode,
+                    'Invalid overflow method %s' % overflow,
                 )
                 raise TypeError(
-                    'Invalid overflow method %s' % overflow_mode,
+                    'Invalid overflow method %s' % overflow,
                 )
             # Provide override
-            self.overflow_mode = overflow_mode
+            self.overflow_mode = overflow
 
         if 'tag' in kwargs:
             # We want to associate some tags with our notification service.
@@ -314,7 +315,29 @@ class NotifyBase(object):
             color_type=color_type,
         )
 
-    def _apply_overflow(self, body, title=None):
+    def notify(self, body, title=None, notify_type=NotifyType.INFO,
+               overflow=None, **kwargs):
+        """
+        Performs notification
+
+        """
+
+        # Handle situations where the title is None
+        title = '' if not title else title
+
+        # Apply our overflow (if defined)
+        for chunk in self._apply_overflow(body=body, title=title,
+                                          overflow=overflow):
+            # Send notification
+            if not self.send(body=chunk['body'], title=chunk['title'],
+                             notify_type=notify_type):
+
+                # Toggle our return status flag
+                return False
+
+        return True
+
+    def _apply_overflow(self, body, title=None, overflow=None):
         """
         Takes the message body and title as input.  This function then
         applies any defined overflow restrictions associated with the
@@ -337,6 +360,14 @@ class NotifyBase(object):
 
         response = list()
 
+        # safety
+        title = '' if not title else title.strip()
+        body = '' if not body else body.rstrip()
+
+        if overflow is None:
+            # default
+            overflow = self.overflow_mode
+
         if self.title_maxlen <= 0:
             # Content is appended to body
             body = '{}\r\n{}'.format(title, body)
@@ -349,12 +380,9 @@ class NotifyBase(object):
             body = re.split('\r*\n', body)
             body = '\r\n'.join(body[0:self.body_max_line_count])
 
-        if self.overflow_mode == OverflowMode.UPSTREAM:
-            # Nothing to do
-            response.append({
-                'body': body,
-                'title': title,
-            })
+        if overflow == OverflowMode.UPSTREAM:
+            # Nothing more to do
+            response.append({'body': body, 'title': title})
             return response
 
         elif len(title) > self.title_maxlen:
@@ -362,13 +390,10 @@ class NotifyBase(object):
             title = title[:self.title_maxlen]
 
         if self.body_maxlen > 0 and len(body) <= self.body_maxlen:
-            response.append({
-                'body': body,
-                'title': title,
-            })
+            response.append({'body': body, 'title': title})
             return response
 
-        if self.overflow_mode == OverflowMode.TRUNCATE:
+        if overflow == OverflowMode.TRUNCATE:
             # Truncate our body and return
             response.append({
                 'body': body[:self.body_maxlen],
@@ -386,13 +411,20 @@ class NotifyBase(object):
 
         return response
 
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
+        """
+        Should preform the actual notification itself.
+
+        """
+        raise NotImplementedError("send() is implimented by the child class.")
+
     def url(self):
         """
         Assembles the URL associated with the notification based on the
         arguments provied.
 
         """
-        raise NotImplementedError("This is implimented by the child class.")
+        raise NotImplementedError("url() is implimented by the child class.")
 
     def __contains__(self, tags):
         """
@@ -554,6 +586,15 @@ class NotifyBase(object):
                     'Unsupported format specified {}'.format(
                         results['format']))
                 del results['format']
+
+        # Allow overriding the default overflow
+        if 'overflow' in results['qsd']:
+            results['overflow'] = results['qsd'].get('overflow')
+            if results['overflow'] not in OVERFLOW_MODES:
+                NotifyBase.logger.warning(
+                    'Unsupported overflow specified {}'.format(
+                        results['overflow']))
+                del results['overflow']
 
         # Password overrides
         if 'pass' in results['qsd']:

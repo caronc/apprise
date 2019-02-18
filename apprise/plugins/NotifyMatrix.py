@@ -30,6 +30,7 @@ from time import time
 
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
+from ..common import NotifyType
 
 # Token required as part of the API request
 VALIDATE_TOKEN = re.compile(r'[A-Za-z0-9]{64}')
@@ -134,7 +135,7 @@ class NotifyMatrix(NotifyBase):
             re.IGNORECASE,
         )
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Matrix Notification
         """

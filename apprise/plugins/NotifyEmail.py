@@ -24,15 +24,14 @@
 # THE SOFTWARE.
 
 import re
-
-from datetime import datetime
 import smtplib
-from socket import error as SocketError
-
 from email.mime.text import MIMEText
+from socket import error as SocketError
+from datetime import datetime
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyFormat
+from ..common import NotifyType
 
 
 class WebBaseLogin(object):
@@ -344,7 +343,7 @@ class NotifyEmail(NotifyBase):
 
                 break
 
-    def notify(self, title, body, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Email Notification
         """

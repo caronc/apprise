@@ -23,11 +23,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-from json import dumps
-import requests
 import re
-from time import time
+import requests
 import hmac
+from json import dumps
+from time import time
 from hashlib import sha1
 from itertools import chain
 try:
@@ -38,7 +38,7 @@ except ImportError:
 
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
-
+from ..common import NotifyType
 from ..common import NotifyImageSize
 from ..utils import compat_is_basestring
 
@@ -169,7 +169,7 @@ class NotifyBoxcar(NotifyBase):
                     '(%s) specified.' % recipient,
                 )
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Boxcar Notification
         """

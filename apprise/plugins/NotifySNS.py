@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import re
-
 import hmac
 import requests
 from hashlib import sha256
@@ -35,6 +34,7 @@ from itertools import chain
 
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
+from ..common import NotifyType
 from ..utils import compat_is_basestring
 
 # Some Phone Number Detection
@@ -194,7 +194,7 @@ class NotifySNS(NotifyBase):
             self.logger.warning(
                 'There are no valid recipient identified to notify.')
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         wrapper to send_notification since we can alert more then one channel
         """
@@ -266,7 +266,7 @@ class NotifySNS(NotifyBase):
     def _post(self, payload, to):
         """
         Wrapper to request.post() to manage it's response better and make
-        the notify() function cleaner and easier to maintain.
+        the send() function cleaner and easier to maintain.
 
         This function returns True if the _post was successful and False
         if it wasn't.

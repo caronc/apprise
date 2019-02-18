@@ -26,9 +26,10 @@
 import re
 import requests
 
-from ..utils import compat_is_basestring
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
+from ..common import NotifyType
+from ..utils import compat_is_basestring
 
 # Flag used as a placeholder to sending to all devices
 PUSHOVER_SEND_TO_ALL = 'ALL_DEVICES'
@@ -149,7 +150,7 @@ class NotifyPushover(NotifyBase):
                 'The user/group specified (%s) is invalid.' % self.user,
             )
 
-    def notify(self, title, body, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Pushover Notification
         """
