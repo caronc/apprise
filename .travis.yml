@@ -26,7 +26,7 @@ matrix:
 
 install:
   - pip install .
-  - pip install codecov tox
+  - pip install codecov
   - pip install -r dev-requirements.txt
   - pip install -r requirements.txt
   - if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then travis_retry pip install dbus-python; fi

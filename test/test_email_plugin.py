@@ -274,7 +274,7 @@ def test_email_plugin(mock_smtp, mock_smtpssl):
                             # Don't mess with these entries
                             raise
 
-                        except Exception as e:
+                        except Exception:
                             # We can't handle this exception type
                             raise
 

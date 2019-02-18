@@ -29,7 +29,6 @@ from apprise import Apprise
 from apprise.utils import compat_is_basestring
 
 import mock
-import re
 
 
 TEST_URLS = (
@@ -195,7 +194,7 @@ def test_growl_plugin(mock_gntp):
                     # This is the response we expect
                     assert True
 
-                except Exception as e:
+                except Exception:
                     # We can't handle this exception type
                     assert False
 

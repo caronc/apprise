@@ -168,7 +168,7 @@ def test_plugin(mock_refresh, mock_send):
                             # Don't mess with these entries
                             raise
 
-                        except Exception as e:
+                        except Exception:
                             # We can't handle this exception type
                             raise
 

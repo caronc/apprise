@@ -284,7 +284,7 @@ class NotifyDBus(NotifyBase):
 
             self.logger.info('Sent DBus notification.')
 
-        except Exception as e:
+        except Exception:
             self.logger.warning('Failed to send DBus notification.')
             self.logger.exception('DBus Exception')
             return False

@@ -162,7 +162,7 @@ class NotifyGnome(NotifyBase):
             notification.show()
             self.logger.info('Sent Gnome notification.')
 
-        except Exception as e:
+        except Exception:
             self.logger.warning('Failed to send Gnome notification.')
             self.logger.exception('Gnome Exception')
             return False
