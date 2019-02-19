@@ -3177,7 +3177,7 @@ def test_notify_overflow_split():
     title_len = 1024
 
     # Create a large body and title with random data
-    body = ''.join(choice(str_alpha + str_num + ' ') for _ in range(body_len))
+    body = ''.join(choice(str_alpha + str_num) for _ in range(body_len))
     body = '\r\n'.join([body[i: i + row] for i in range(0, len(body), row)])
 
     # the new lines add a large amount to our body; lets force the content

@@ -57,13 +57,6 @@ from ..AppriseAsset import AppriseAsset
 from xml.sax.saxutils import escape as sax_escape
 
 
-def _escape(text):
-    """
-    saxutil escape tool
-    """
-    return sax_escape(text, {"'": "&apos;", "\"": "&quot;"})
-
-
 HTTP_ERROR_MAP = {
     400: 'Bad Request - Unsupported Parameters.',
     401: 'Verification Failed.',
@@ -360,7 +353,7 @@ class NotifyBase(object):
 
         response = list()
 
-        # safety
+        # tidy
         title = '' if not title else title.strip()
         body = '' if not body else body.rstrip()
 
@@ -377,7 +370,7 @@ class NotifyBase(object):
         if self.body_max_line_count > 0:
             # Limit results to just the first 2 line otherwise
             # there is just to much content to display
-            body = re.split('\r*\n', body)
+            body = re.split(r'\r*\n', body)
             body = '\r\n'.join(body[0:self.body_max_line_count])
 
         if overflow == OverflowMode.UPSTREAM:
@@ -456,12 +449,21 @@ class NotifyBase(object):
         """
         Takes html text as input and escapes it so that it won't
         conflict with any xml/html wrapping characters.
+
+        Args:
+            html (str): The HTML code to escape
+            convert_new_lines (:obj:`bool`, optional): escape new lines (\n)
+            whitespace (:obj:`bool`, optional): escape whitespace
+
+        Returns:
+            str: The escaped html
         """
         if not html:
             # nothing more to do; return object as is
             return html
 
-        escaped = _escape(html)
+        # Escape HTML
+        escaped = sax_escape(html, {"'": "&apos;", "\"": "&quot;"})
 
         if whitespace:
             # Tidy up whitespace too
@@ -477,8 +479,25 @@ class NotifyBase(object):
     @staticmethod
     def unquote(content, encoding='utf-8', errors='replace'):
         """
-        common unquote function
+        Replace %xx escapes by their single-character equivalent. The optional
+        encoding and errors parameters specify how to decode percent-encoded
+        sequences.
 
+        Wrapper to Python's unquote while remaining compatible with both
+        Python 2 & 3 since the reference to this function changed between
+        versions.
+
+        Note: errors set to 'replace' means that invalid sequences are
+              replaced by a placeholder character.
+
+        Args:
+            content (str): The quoted URI string you wish to unquote
+            encoding (:obj:`str`, optional): encoding type
+            errors (:obj:`str`, errors): how to handle invalid character found
+                in encoded string (defined by encoding)
+
+        Returns:
+            str: The unquoted URI string
         """
         if not content:
             return ''
@@ -493,9 +512,25 @@ class NotifyBase(object):
 
     @staticmethod
     def quote(content, safe='/', encoding=None, errors=None):
-        """
-        common quote function
+        """ Replaces single character non-ascii characters and URI specific
+        ones by their %xx code.
 
+        Wrapper to Python's unquote while remaining compatible with both
+        Python 2 & 3 since the reference to this function changed between
+        versions.
+
+        Args:
+            content (str): The URI string you wish to quote
+            safe (str): non-ascii characters and URI specific ones that you
+                        do not wish to escape (if detected). Setting this
+                        string to an empty one causes everything to be
+                        escaped.
+            encoding (:obj:`str`, optional): encoding type
+            errors (:obj:`str`, errors): how to handle invalid character found
+                in encoded string (defined by encoding)
+
+        Returns:
+            str: The quoted URI string
         """
         if not content:
             return ''
@@ -510,11 +545,32 @@ class NotifyBase(object):
 
     @staticmethod
     def urlencode(query, doseq=False, safe='', encoding=None, errors=None):
-        """
-        common urlencode function
+        """Convert a mapping object or a sequence of two-element tuples
 
-        The query should always be a dictionary.
+        Wrapper to Python's unquote while remaining compatible with both
+        Python 2 & 3 since the reference to this function changed between
+        versions.
 
+        The resulting string is a series of key=value pairs separated by '&'
+        characters, where both key and value are quoted using the quote()
+        function.
+
+        Note: If the dictionary entry contains an entry that is set to None
+              it is not included in the final result set. If you want to
+              pass in an empty variable, set it to an empty string.
+
+        Args:
+            query (str): The dictionary to encode
+            doseq (:obj:`bool`, optional): Handle sequences
+            safe (:obj:`str`): non-ascii characters and URI specific ones that
+                you do not wish to escape (if detected). Setting this string
+                to an empty one causes everything to be escaped.
+            encoding (:obj:`str`, optional): encoding type
+            errors (:obj:`str`, errors): how to handle invalid character found
+                in encoded string (defined by encoding)
+
+        Returns:
+            str: The escaped parameters returned as a string
         """
         # Tidy query by eliminating any records set to None
         _query = {k: v for (k, v) in query.items() if v is not None}
@@ -530,10 +586,19 @@ class NotifyBase(object):
 
     @staticmethod
     def split_path(path, unquote=True):
-        """
-        Splits a URL up into a list object.
+        """Splits a URL up into a list object.
 
+        Parses a specified URL and breaks it into a list.
+
+        Args:
+            path (str): The path to split up into a list.
+            unquote (:obj:`bool`, optional): call unquote on each element
+                 added to the returned list.
+
+        Returns:
+            list: A list containing all of the elements in the path
         """
+
         if unquote:
             return PATHSPLIT_LIST_DELIM.split(
                 NotifyBase.unquote(path).lstrip('/'))
@@ -541,26 +606,51 @@ class NotifyBase(object):
 
     @staticmethod
     def is_email(address):
-        """
-        Returns True if specified entry is an email address
+        """Determine if the specified entry is an email address
 
+        Args:
+            address (str): The string you want to check.
+
+        Returns:
+            bool: Returns True if the address specified is an email address
+                  and False if it isn't.
         """
+
         return IS_EMAIL_RE.match(address) is not None
 
     @staticmethod
     def is_hostname(hostname):
-        """
-        Returns True if specified entry is a hostname
+        """Determine if the specified entry is a hostname
 
+        Args:
+            hostname (str): The string you want to check.
+
+        Returns:
+            bool: Returns True if the hostname specified is in fact a hostame
+                  and False if it isn't.
         """
         return is_hostname(hostname)
 
     @staticmethod
     def parse_url(url, verify_host=True):
-        """
-        Parses the URL and returns it broken apart into a dictionary.
+        """Parses the URL and returns it broken apart into a dictionary.
 
+        This is very specific and customized for Apprise.
+
+
+        Args:
+            url (str): The URL you want to fully parse.
+            verify_host (:obj:`bool`, optional): a flag kept with the parsed
+                 URL which some child classes will later use to verify SSL
+                 keys (if SSL transactions take place).  Unless under very
+                 specific circumstances, it is strongly recomended that
+                 you leave this default value set to True.
+
+        Returns:
+            A dictionary is returned containing the URL fully parsed if
+            successful, otherwise None is returned.
         """
+
         results = parse_url(
             url, default_schema='unknown', verify_host=verify_host)
 
