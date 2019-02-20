@@ -24,16 +24,17 @@
 # THE SOFTWARE.
 
 import re
-
 import hmac
 import requests
 from hashlib import sha256
 from datetime import datetime
 from collections import OrderedDict
 from xml.etree import ElementTree
+from itertools import chain
 
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
+from ..common import NotifyType
 from ..utils import compat_is_basestring
 
 # Some Phone Number Detection
@@ -58,8 +59,8 @@ LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
 # region as a delimiter. This is a bit hacky; but it's much easier than having
 # users of this product search though this Access Key Secret and escape all
 # of the forward slashes!
-IS_REGION = re.compile(r'^\s*(?P<country>[a-z]{2})-'
-                       r'(?P<area>[a-z]+)-(?P<no>[0-9]+)\s*$', re.I)
+IS_REGION = re.compile(
+    r'^\s*(?P<country>[a-z]{2})-(?P<area>[a-z]+)-(?P<no>[0-9]+)\s*$', re.I)
 
 # Extend HTTP Error Messages
 AWS_HTTP_ERROR_MAP = HTTP_ERROR_MAP.copy()
@@ -85,9 +86,17 @@ class NotifySNS(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_sns'
 
+    # AWS is pretty good for handling data load so request limits
+    # can occur in much shorter bursts
+    request_rate_per_sec = 2.5
+
     # The maximum length of the body
     # Source: https://docs.aws.amazon.com/sns/latest/api/API_Publish.html
     body_maxlen = 140
+
+    # A title can not be used for SMS Messages.  Setting this to zero will
+    # cause any title (if defined) to get placed into the message body.
+    title_maxlen = 0
 
     def __init__(self, access_key_id, secret_access_key, region_name,
                  recipients=None, **kwargs):
@@ -185,7 +194,7 @@ class NotifySNS(NotifyBase):
             self.logger.warning(
                 'There are no valid recipient identified to notify.')
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         wrapper to send_notification since we can alert more then one channel
         """
@@ -213,10 +222,6 @@ class NotifySNS(NotifyBase):
             (result, _) = self._post(payload=payload, to=no)
             if not result:
                 error_count += 1
-
-            if len(phone) > 0:
-                # Prevent thrashing requests
-                self.throttle()
 
         # Send all our defined topic id's
         while len(topics):
@@ -256,20 +261,23 @@ class NotifySNS(NotifyBase):
             if not result:
                 error_count += 1
 
-            if len(topics) > 0:
-                # Prevent thrashing requests
-                self.throttle()
-
         return error_count == 0
 
     def _post(self, payload, to):
         """
         Wrapper to request.post() to manage it's response better and make
-        the notify() function cleaner and easier to maintain.
+        the send() function cleaner and easier to maintain.
 
         This function returns True if the _post was successful and False
         if it wasn't.
         """
+
+        # Always call throttle before any remote server i/o is made; for AWS
+        # time plays a huge factor in the headers being sent with the payload.
+        # So for AWS (SNS) requests we must throttle before they're generated
+        # and not directly before the i/o call like other notification
+        # services do.
+        self.throttle()
 
         # Convert our payload from a dict() into a urlencoded string
         payload = self.urlencode(payload)
@@ -282,6 +290,7 @@ class NotifySNS(NotifyBase):
             self.notify_url, self.verify_certificate,
         ))
         self.logger.debug('AWS Payload: %s' % str(payload))
+
         try:
             r = requests.post(
                 self.notify_url,
@@ -520,6 +529,33 @@ class NotifySNS(NotifyBase):
             pass
 
         return response
+
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'overflow': self.overflow_mode,
+        }
+
+        return '{schema}://{key_id}/{key_secret}/{region}/{targets}/'\
+            '?{args}'.format(
+                schema=self.secure_protocol,
+                key_id=self.quote(self.aws_access_key_id, safe=''),
+                key_secret=self.quote(self.aws_secret_access_key, safe=''),
+                region=self.quote(self.aws_region_name, safe=''),
+                targets='/'.join(
+                    [self.quote(x) for x in chain(
+                        # Phone # are prefixed with a plus symbol
+                        ['+{}'.format(x) for x in self.phone],
+                        # Topics are prefixed with a pound/hashtag symbol
+                        ['#{}'.format(x) for x in self.topics],
+                    )]),
+                args=self.urlencode(args),
+            )
 
     @staticmethod
     def parse_url(url):

@@ -29,6 +29,7 @@ import requests
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyImageSize
+from ..common import NotifyType
 from ..utils import compat_is_basestring
 
 
@@ -52,9 +53,17 @@ class NotifyXML(NotifyBase):
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_128
 
-    def __init__(self, **kwargs):
+    # Disable throttle rate for JSON requests since they are normally
+    # local anyway
+    request_rate_per_sec = 0
+
+    def __init__(self, headers=None, **kwargs):
         """
         Initialize XML Object
+
+        headers can be a dictionary of key/value pairs that you want to
+        additionally include as part of the server headers to post with
+
         """
         super(NotifyXML, self).__init__(**kwargs)
 
@@ -83,9 +92,51 @@ class NotifyXML(NotifyBase):
         if not compat_is_basestring(self.fullpath):
             self.fullpath = '/'
 
+        self.headers = {}
+        if headers:
+            # Store our extra headers
+            self.headers.update(headers)
+
         return
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'overflow': self.overflow_mode,
+        }
+
+        # Append our headers into our args
+        args.update({'+{}'.format(k): v for k, v in self.headers.items()})
+
+        # Determine Authentication
+        auth = ''
+        if self.user and self.password:
+            auth = '{user}:{password}@'.format(
+                user=self.quote(self.user, safe=''),
+                password=self.quote(self.password, safe=''),
+            )
+        elif self.user:
+            auth = '{user}@'.format(
+                user=self.quote(self.user, safe=''),
+            )
+
+        default_port = 443 if self.secure else 80
+
+        return '{schema}://{auth}{hostname}{port}/?{args}'.format(
+            schema=self.secure_protocol if self.secure else self.protocol,
+            auth=auth,
+            hostname=self.host,
+            port='' if self.port is None or self.port == default_port
+                 else ':{}'.format(self.port),
+            args=self.urlencode(args),
+        )
+
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform XML Notification
         """
@@ -96,8 +147,8 @@ class NotifyXML(NotifyBase):
             'Content-Type': 'application/xml'
         }
 
-        if self.headers:
-            headers.update(self.headers)
+        # Apply any/all header over-rides defined
+        headers.update(self.headers)
 
         re_map = {
             '{MESSAGE_TYPE}': NotifyBase.quote(notify_type),
@@ -126,6 +177,10 @@ class NotifyXML(NotifyBase):
             url, self.verify_certificate,
         ))
         self.logger.debug('XML Payload: %s' % str(payload))
+
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+
         try:
             r = requests.post(
                 url,
@@ -163,3 +218,23 @@ class NotifyXML(NotifyBase):
             return False
 
         return True
+
+    @staticmethod
+    def parse_url(url):
+        """
+        Parses the URL and returns enough arguments that can allow
+        us to substantiate this object.
+
+        """
+        results = NotifyBase.parse_url(url)
+
+        if not results:
+            # We're done early as we couldn't load the results
+            return results
+
+        # Add our headers that the user can potentially over-ride if they wish
+        # to to our returned result set
+        results['headers'] = results['qsd-']
+        results['headers'].update(results['qsd+'])
+
+        return results

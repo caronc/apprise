@@ -28,6 +28,7 @@ import requests
 
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
+from ..common import NotifyType
 
 # Used to validate API Key
 VALIDATE_APIKEY = re.compile(r'[A-Za-z0-9]{40}')
@@ -81,6 +82,10 @@ class NotifyProwl(NotifyBase):
     # Prowl uses the http protocol with JSON requests
     notify_url = 'https://api.prowlapp.com/publicapi/add'
 
+    # Disable throttle rate for Prowl requests since they are normally
+    # local anyway
+    request_rate_per_sec = 0
+
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 10000
 
@@ -124,7 +129,7 @@ class NotifyProwl(NotifyBase):
         # Store the Provider Key
         self.providerkey = providerkey
 
-    def notify(self, title, body, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Prowl Notification
         """
@@ -150,6 +155,10 @@ class NotifyProwl(NotifyBase):
             self.notify_url, self.verify_certificate,
         ))
         self.logger.debug('Prowl Payload: %s' % str(payload))
+
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+
         try:
             r = requests.post(
                 self.notify_url,
@@ -190,6 +199,35 @@ class NotifyProwl(NotifyBase):
 
         return True
 
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        _map = {
+            ProwlPriority.LOW: 'low',
+            ProwlPriority.MODERATE: 'moderate',
+            ProwlPriority.NORMAL: 'normal',
+            ProwlPriority.HIGH: 'high',
+            ProwlPriority.EMERGENCY: 'emergency',
+        }
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'overflow': self.overflow_mode,
+            'priority': 'normal' if self.priority not in _map
+                        else _map[self.priority]
+        }
+
+        return '{schema}://{apikey}/{providerkey}/?{args}'.format(
+            schema=self.secure_protocol,
+            apikey=self.quote(self.apikey, safe=''),
+            providerkey='' if not self.providerkey
+                        else self.quote(self.providerkey, safe=''),
+            args=self.urlencode(args),
+        )
+
     @staticmethod
     def parse_url(url):
         """
@@ -216,15 +254,10 @@ class NotifyProwl(NotifyBase):
         if 'priority' in results['qsd'] and len(results['qsd']['priority']):
             _map = {
                 'l': ProwlPriority.LOW,
-                '-2': ProwlPriority.LOW,
                 'm': ProwlPriority.MODERATE,
-                '-1': ProwlPriority.MODERATE,
                 'n': ProwlPriority.NORMAL,
-                '0': ProwlPriority.NORMAL,
                 'h': ProwlPriority.HIGH,
-                '1': ProwlPriority.HIGH,
                 'e': ProwlPriority.EMERGENCY,
-                '2': ProwlPriority.EMERGENCY,
             }
             try:
                 results['priority'] = \

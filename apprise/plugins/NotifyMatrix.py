@@ -30,6 +30,7 @@ from time import time
 
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
+from ..common import NotifyType
 
 # Token required as part of the API request
 VALIDATE_TOKEN = re.compile(r'[A-Za-z0-9]{64}')
@@ -112,7 +113,6 @@ class NotifyMatrix(NotifyBase):
         if not self.user:
             self.logger.warning(
                 'No user was specified; using %s.' % MATRIX_DEFAULT_USER)
-            self.user = MATRIX_DEFAULT_USER
 
         if mode not in MATRIX_NOTIFICATION_MODES:
             self.logger.warning('The mode specified (%s) is invalid.' % mode)
@@ -135,7 +135,7 @@ class NotifyMatrix(NotifyBase):
             re.IGNORECASE,
         )
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Matrix Notification
         """
@@ -170,6 +170,10 @@ class NotifyMatrix(NotifyBase):
             url, self.verify_certificate,
         ))
         self.logger.debug('Matrix Payload: %s' % str(payload))
+
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+
         try:
             r = requests.post(
                 url,
@@ -209,7 +213,7 @@ class NotifyMatrix(NotifyBase):
     def __slack_mode_payload(self, title, body, notify_type):
         # prepare JSON Object
         payload = {
-            'username': self.user,
+            'username': self.user if self.user else MATRIX_DEFAULT_USER,
             # Use Markdown language
             'mrkdwn': True,
             'attachments': [{
@@ -230,12 +234,43 @@ class NotifyMatrix(NotifyBase):
         msg = '<h4>%s</h4>%s<br/>' % (title, body)
 
         payload = {
-            'displayName': self.user,
+            'displayName': self.user if self.user else MATRIX_DEFAULT_USER,
             'format': 'html',
             'text': msg,
         }
 
         return payload
+
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'overflow': self.overflow_mode,
+            'mode': self.mode,
+        }
+
+        # Determine Authentication
+        auth = ''
+        if self.user:
+            auth = '{user}@'.format(
+                user=self.quote(self.user, safe=''),
+            )
+
+        default_port = 443 if self.secure else 80
+
+        return '{schema}://{auth}{host}/{token}{port}/?{args}'.format(
+            schema=self.secure_protocol if self.secure else self.protocol,
+            host=self.host,
+            auth=auth,
+            token=self.token,
+            port='' if self.port is None or self.port == default_port
+                 else ':{}'.format(self.port),
+            args=self.urlencode(args),
+        )
 
     @staticmethod
     def parse_url(url):

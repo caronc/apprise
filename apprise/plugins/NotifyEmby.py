@@ -37,6 +37,7 @@ from json import loads
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
 from ..utils import parse_bool
+from ..common import NotifyType
 from .. import __version__ as VERSION
 
 
@@ -445,7 +446,7 @@ class NotifyEmby(NotifyBase):
         self.user_id = None
         return True
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Emby Notification
         """
@@ -494,6 +495,10 @@ class NotifyEmby(NotifyBase):
                 session_url, self.verify_certificate,
             ))
             self.logger.debug('Emby Payload: %s' % str(payload))
+
+            # Always call throttle before the requests are made
+            self.throttle()
+
             try:
                 r = requests.post(
                     session_url,
@@ -534,6 +539,39 @@ class NotifyEmby(NotifyBase):
                 continue
 
         return not has_error
+
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'overflow': self.overflow_mode,
+            'modal': 'yes' if self.modal else 'no',
+        }
+
+        # Determine Authentication
+        auth = ''
+        if self.user and self.password:
+            auth = '{user}:{password}@'.format(
+                user=self.quote(self.user, safe=''),
+                password=self.quote(self.password, safe=''),
+            )
+        else:  # self.user is set
+            auth = '{user}@'.format(
+                user=self.quote(self.user, safe=''),
+            )
+
+        return '{schema}://{auth}{hostname}{port}/?{args}'.format(
+            schema=self.secure_protocol if self.secure else self.protocol,
+            auth=auth,
+            hostname=self.host,
+            port='' if self.port is None or self.port == self.emby_default_port
+                 else ':{}'.format(self.port),
+            args=self.urlencode(args),
+        )
 
     @property
     def is_authenticated(self):

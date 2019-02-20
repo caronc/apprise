@@ -30,6 +30,7 @@ from json import dumps
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyImageSize
+from ..common import NotifyType
 
 # Some Reference Locations:
 # - https://docs.mattermost.com/developer/webhooks-incoming.html
@@ -67,6 +68,9 @@ class NotifyMatterMost(NotifyBase):
 
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 4000
+
+    # Mattermost does not have a title
+    title_maxlen = 0
 
     def __init__(self, authtoken, channel=None, **kwargs):
         """
@@ -108,7 +112,7 @@ class NotifyMatterMost(NotifyBase):
 
         return
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform MatterMost Notification
         """
@@ -120,7 +124,7 @@ class NotifyMatterMost(NotifyBase):
 
         # prepare JSON Object
         payload = {
-            'text': '###### %s\n%s' % (title, body),
+            'text': body,
             'icon_url': self.image_url(notify_type),
         }
 
@@ -140,6 +144,10 @@ class NotifyMatterMost(NotifyBase):
             url, self.verify_certificate,
         ))
         self.logger.debug('MatterMost Payload: %s' % str(payload))
+
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+
         try:
             r = requests.post(
                 url,
@@ -178,6 +186,29 @@ class NotifyMatterMost(NotifyBase):
             return False
 
         return True
+
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'overflow': self.overflow_mode,
+        }
+
+        default_port = 443 if self.secure else self.default_port
+        default_schema = self.secure_protocol if self.secure else self.protocol
+
+        return '{schema}://{hostname}{port}/{authtoken}/?{args}'.format(
+            schema=default_schema,
+            hostname=self.host,
+            port='' if not self.port or self.port == default_port
+                 else ':{}'.format(self.port),
+            authtoken=self.quote(self.authtoken, safe=''),
+            args=self.urlencode(args),
+        )
 
     @staticmethod
     def parse_url(url):

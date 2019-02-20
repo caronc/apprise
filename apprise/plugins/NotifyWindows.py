@@ -26,11 +26,11 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
-import re
 from time import sleep
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
+from ..common import NotifyType
 
 # Default our global support flag
 NOTIFY_WINDOWS_SUPPORT_ENABLED = False
@@ -64,8 +64,16 @@ class NotifyWindows(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_windows'
 
+    # Disable throttle rate for Windows requests since they are normally
+    # local anyway
+    request_rate_per_sec = 0
+
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_128
+
+    # Limit results to just the first 2 line otherwise there is just to much
+    # content to display
+    body_max_line_count = 2
 
     # This entry is a bit hacky, but it allows us to unit-test this library
     # in an environment that simply doesn't have the windows packages
@@ -100,7 +108,7 @@ class NotifyWindows(NotifyBase):
 
         return None
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Windows Notification
         """
@@ -110,11 +118,8 @@ class NotifyWindows(NotifyBase):
                 "Windows Notifications are not supported by this system.")
             return False
 
-        # Limit results to just the first 2 line otherwise
-        # there is just to much content to display
-        body = re.split('[\r\n]+', body)
-        body[0] = body[0].strip('#').strip()
-        body = '\r\n'.join(body[0:2])
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
 
         try:
             # Register destruction callback
@@ -168,12 +173,19 @@ class NotifyWindows(NotifyBase):
 
             self.logger.info('Sent Windows notification.')
 
-        except Exception as e:
+        except Exception:
             self.logger.warning('Failed to send Windows notification.')
             self.logger.exception('Windows Exception')
             return False
 
         return True
+
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        return '{schema}://'.format(schema=self.protocol)
 
     @staticmethod
     def parse_url(url):

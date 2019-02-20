@@ -171,7 +171,7 @@ class Apprise(object):
                 # URL information
                 plugin = SCHEMA_MAP[results['schema']](**results)
 
-            except:
+            except Exception:
                 # the arguments are invalid or can not be used.
                 logger.error('Could not load URL: %s' % url)
                 return None
@@ -238,7 +238,7 @@ class Apprise(object):
         """
         self.servers[:] = []
 
-    def notify(self, title, body, notify_type=NotifyType.INFO,
+    def notify(self, body, title='', notify_type=NotifyType.INFO,
                body_format=None, tag=None):
         """
         Send a notification to all of the plugins previously loaded.
@@ -366,8 +366,8 @@ class Apprise(object):
             try:
                 # Send notification
                 if not server.notify(
-                        title=title,
                         body=conversion_map[server.notify_format],
+                        title=title,
                         notify_type=notify_type):
 
                     # Toggle our return status flag
@@ -375,7 +375,6 @@ class Apprise(object):
 
             except TypeError:
                 # These our our internally thrown notifications
-                # TODO: Change this to a custom one such as AppriseNotifyError
                 status = False
 
             except Exception:
@@ -431,6 +430,33 @@ class Apprise(object):
             })
 
         return response
+
+    def urls(self):
+        """
+        Returns all of the loaded URLs defined in this apprise object.
+        """
+        return [x.url() for x in self.servers]
+
+    def pop(self, index):
+        """
+        Removes an indexed Notification Service from the stack and
+        returns it.
+        """
+
+        # Remove our entry
+        return self.servers.pop(index)
+
+    def __getitem__(self, index):
+        """
+        Returns the indexed server entry of a loaded notification server
+        """
+        return self.servers[index]
+
+    def __iter__(self):
+        """
+        Returns an iterator to our server list
+        """
+        return iter(self.servers)
 
     def __len__(self):
         """

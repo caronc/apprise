@@ -23,6 +23,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+from datetime import datetime
+from datetime import timedelta
+
 from apprise.plugins.NotifyBase import NotifyBase
 from apprise import NotifyType
 from apprise import NotifyImageSize
@@ -45,6 +48,15 @@ def test_notify_base():
     except TypeError:
         assert(True)
 
+    # invalid types throw exceptions
+    try:
+        nb = NotifyBase(**{'overflow': 'invalid'})
+        # We should never reach here as an exception should be thrown
+        assert(False)
+
+    except TypeError:
+        assert(True)
+
     # Bad port information
     nb = NotifyBase(port='invalid')
     assert nb.port is None
@@ -52,9 +64,29 @@ def test_notify_base():
     nb = NotifyBase(port=10)
     assert nb.port == 10
 
+    try:
+        nb.url()
+        assert False
+
+    except NotImplementedError:
+        # Each sub-module is that inherits this as a parent is required to
+        # over-ride this function. So direct calls to this throws a not
+        # implemented error intentionally
+        assert True
+
+    try:
+        nb.send('test message')
+        assert False
+
+    except NotImplementedError:
+        # Each sub-module is that inherits this as a parent is required to
+        # over-ride this function. So direct calls to this throws a not
+        # implemented error intentionally
+        assert True
+
     # Throttle overrides..
     nb = NotifyBase()
-    nb.throttle_attempt = 0.0
+    nb.request_rate_per_sec = 0.0
     start_time = default_timer()
     nb.throttle()
     elapsed = default_timer() - start_time
@@ -63,13 +95,57 @@ def test_notify_base():
     # then other
     assert elapsed < 0.5
 
+    # Concurrent calls should achieve the same response
     start_time = default_timer()
-    nb.throttle(1.0)
+    nb.throttle()
+    elapsed = default_timer() - start_time
+    assert elapsed < 0.5
+
+    nb = NotifyBase()
+    nb.request_rate_per_sec = 1.0
+
+    # Set our time to now
+    start_time = default_timer()
+    nb.throttle()
+    elapsed = default_timer() - start_time
+    # A first call to throttle (Without telling it a time previously ran) does
+    # not block for any length of time; it just merely sets us up for
+    # concurrent calls to block
+    assert elapsed < 0.5
+
+    # Concurrent calls could take up to the rate_per_sec though...
+    start_time = default_timer()
+    nb.throttle(last_io=datetime.now())
+    elapsed = default_timer() - start_time
+    assert elapsed > 0.5 and elapsed < 1.5
+
+    nb = NotifyBase()
+    nb.request_rate_per_sec = 1.0
+
+    # Set our time to now
+    start_time = default_timer()
+    nb.throttle(last_io=datetime.now())
+    elapsed = default_timer() - start_time
+    # because we told it that we had already done a previous action (now)
+    # the throttle holds out until the right time has passed
+    assert elapsed > 0.5 and elapsed < 1.5
+
+    # Concurrent calls could take up to the rate_per_sec though...
+    start_time = default_timer()
+    nb.throttle(last_io=datetime.now())
+    elapsed = default_timer() - start_time
+    assert elapsed > 0.5 and elapsed < 1.5
+
+    nb = NotifyBase()
+    start_time = default_timer()
+    nb.request_rate_per_sec = 1.0
+    # Force a time in the past
+    nb.throttle(last_io=(datetime.now() - timedelta(seconds=20)))
     elapsed = default_timer() - start_time
     # Should be a very fast response time since we set it to zero but we'll
     # check for less then 500 to be fair as some testing systems may be slower
     # then other
-    assert elapsed < 1.5
+    assert elapsed < 0.5
 
     # our NotifyBase wasn't initialized with an ImageSize so this will fail
     assert nb.image_url(notify_type=NotifyType.INFO) is None
@@ -166,11 +242,30 @@ def test_notify_base_urls():
     assert 'password' in results
     assert results['password'] == "newpassword"
 
-    # pass headers
-    results = NotifyBase.parse_url(
-        'https://localhost:8080?-HeaderKey=HeaderValue')
-    assert 'headerkey' in results['headers']
-    assert results['headers']['headerkey'] == 'HeaderValue'
+    # Options
+    results = NotifyBase.parse_url('https://localhost?format=invalid')
+    assert 'format' not in results
+    results = NotifyBase.parse_url('https://localhost?format=text')
+    assert 'format' in results
+    assert results['format'] == 'text'
+    results = NotifyBase.parse_url('https://localhost?format=markdown')
+    assert 'format' in results
+    assert results['format'] == 'markdown'
+    results = NotifyBase.parse_url('https://localhost?format=html')
+    assert 'format' in results
+    assert results['format'] == 'html'
+
+    results = NotifyBase.parse_url('https://localhost?overflow=invalid')
+    assert 'overflow' not in results
+    results = NotifyBase.parse_url('https://localhost?overflow=upstream')
+    assert 'overflow' in results
+    assert results['overflow'] == 'upstream'
+    results = NotifyBase.parse_url('https://localhost?overflow=split')
+    assert 'overflow' in results
+    assert results['overflow'] == 'split'
+    results = NotifyBase.parse_url('https://localhost?overflow=truncate')
+    assert 'overflow' in results
+    assert results['overflow'] == 'truncate'
 
     # User Handling
 

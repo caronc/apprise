@@ -29,6 +29,7 @@ import types
 
 # Rebuild our Apprise environment
 import apprise
+from apprise.utils import compat_is_basestring
 
 try:
     # Python v3.4+
@@ -106,6 +107,9 @@ def test_windows_plugin():
     # Create our instance
     obj = apprise.Apprise.instantiate('windows://', suppress_exceptions=False)
     obj.duration = 0
+
+    # Test URL functionality
+    assert(compat_is_basestring(obj.url()) is True)
 
     # Check that it found our mocked environments
     assert(obj._enabled is True)

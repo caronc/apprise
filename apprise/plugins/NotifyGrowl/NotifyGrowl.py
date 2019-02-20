@@ -23,12 +23,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import re
-
 from .gntp import notifier
 from .gntp import errors
 from ..NotifyBase import NotifyBase
 from ...common import NotifyImageSize
+from ...common import NotifyType
 
 
 # Priorities
@@ -69,11 +68,23 @@ class NotifyGrowl(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_growl'
 
-    # Default Growl Port
-    default_port = 23053
-
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_72
+
+    # Disable throttle rate for Growl requests since they are normally
+    # local anyway
+    request_rate_per_sec = 0
+
+    # A title can not be used for Growl Messages.  Setting this to zero will
+    # cause any title (if defined) to get placed into the message body.
+    title_maxlen = 0
+
+    # Limit results to just the first 10 line otherwise there is just to much
+    # content to display
+    body_max_line_count = 2
+
+    # Default Growl Port
+    default_port = 23053
 
     def __init__(self, priority=None, version=2, **kwargs):
         """
@@ -143,16 +154,10 @@ class NotifyGrowl(NotifyBase):
 
         return
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Growl Notification
         """
-
-        # Limit results to just the first 2 line otherwise there is just to
-        # much content to display
-        body = re.split('[\r\n]+', body)
-        body[0] = body[0].strip('#').strip()
-        body = '\r\n'.join(body[0:2])
 
         icon = None
         if self.version >= 2:
@@ -177,6 +182,9 @@ class NotifyGrowl(NotifyBase):
         # here after we spit the debug message above (so we don't try to
         # print the binary contents of an image
         payload['icon'] = icon
+
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
 
         try:
             response = self.growl.notify(**payload)
@@ -206,6 +214,44 @@ class NotifyGrowl(NotifyBase):
             return False
 
         return True
+
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        _map = {
+            GrowlPriority.LOW: 'low',
+            GrowlPriority.MODERATE: 'moderate',
+            GrowlPriority.NORMAL: 'normal',
+            GrowlPriority.HIGH: 'high',
+            GrowlPriority.EMERGENCY: 'emergency',
+        }
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'overflow': self.overflow_mode,
+            'priority':
+                _map[GrowlPriority.NORMAL] if self.priority not in _map
+                else _map[self.priority],
+            'version': self.version,
+        }
+
+        auth = ''
+        if self.password:
+            auth = '{password}@'.format(
+                password=self.quote(self.user, safe=''),
+            )
+
+        return '{schema}://{auth}{hostname}{port}/?{args}'.format(
+            schema=self.secure_protocol if self.secure else self.protocol,
+            auth=auth,
+            hostname=self.host,
+            port='' if self.port is None or self.port == self.default_port
+                 else ':{}'.format(self.port),
+            args=self.urlencode(args),
+        )
 
     @staticmethod
     def parse_url(url):
@@ -239,15 +285,10 @@ class NotifyGrowl(NotifyBase):
         if 'priority' in results['qsd'] and len(results['qsd']['priority']):
             _map = {
                 'l': GrowlPriority.LOW,
-                '-2': GrowlPriority.LOW,
                 'm': GrowlPriority.MODERATE,
-                '-1': GrowlPriority.MODERATE,
                 'n': GrowlPriority.NORMAL,
-                '0': GrowlPriority.NORMAL,
                 'h': GrowlPriority.HIGH,
-                '1': GrowlPriority.HIGH,
                 'e': GrowlPriority.EMERGENCY,
-                '2': GrowlPriority.EMERGENCY,
             }
             try:
                 results['priority'] = \

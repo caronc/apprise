@@ -26,10 +26,9 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
-import re
-
 from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
+from ..common import NotifyType
 from ..utils import GET_SCHEMA_RE
 
 # Default our global support flag
@@ -142,11 +141,22 @@ class NotifyDBus(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_dbus'
 
+    # No throttling required for DBus queries
+    request_rate_per_sec = 0
+
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_128
 
     # The number of seconds to keep the message present for
     message_timeout_ms = 13000
+
+    # Limit results to just the first 10 line otherwise there is just to much
+    # content to display
+    body_max_line_count = 10
+
+    # A title can not be used for SMS Messages.  Setting this to zero will
+    # cause any title (if defined) to get placed into the message body.
+    title_maxlen = 0
 
     # This entry is a bit hacky, but it allows us to unit-test this library
     # in an environment that simply doesn't have the gnome packages
@@ -190,7 +200,7 @@ class NotifyDBus(NotifyBase):
         self.x_axis = x_axis
         self.y_axis = y_axis
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform DBus Notification
         """
@@ -249,16 +259,10 @@ class NotifyDBus(NotifyBase):
                     "Could not load Gnome notification icon ({}): {}"
                     .format(icon_path, e))
 
-        # Limit results to just the first 10 line otherwise
-        # there is just to much content to display
-        body = re.split('[\r\n]+', body)
-        if title:
-            # Place title on first line if it exists
-            body.insert(0, title)
-
-        body = '\r\n'.join(body[0:10])
-
         try:
+            # Always call throttle() before any remote execution is made
+            self.throttle()
+
             dbus_iface.Notify(
                 # Application Identifier
                 self.app_id,
@@ -280,12 +284,19 @@ class NotifyDBus(NotifyBase):
 
             self.logger.info('Sent DBus notification.')
 
-        except Exception as e:
+        except Exception:
             self.logger.warning('Failed to send DBus notification.')
             self.logger.exception('DBus Exception')
             return False
 
         return True
+
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        return '{schema}://'.format(schema=self.schema)
 
     @staticmethod
     def parse_url(url):

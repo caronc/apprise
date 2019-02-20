@@ -37,6 +37,8 @@ from .common import NotifyImageSize
 from .common import NOTIFY_IMAGE_SIZES
 from .common import NotifyFormat
 from .common import NOTIFY_FORMATS
+from .common import OverflowMode
+from .common import OVERFLOW_MODES
 from .plugins.NotifyBase import NotifyBase
 
 from .Apprise import Apprise
@@ -52,6 +54,6 @@ __all__ = [
     'Apprise', 'AppriseAsset', 'NotifyBase',
 
     # Reference
-    'NotifyType', 'NotifyImageSize', 'NotifyFormat', 'NOTIFY_TYPES',
-    'NOTIFY_IMAGE_SIZES', 'NOTIFY_FORMATS',
+    'NotifyType', 'NotifyImageSize', 'NotifyFormat', 'OverflowMode',
+    'NOTIFY_TYPES', 'NOTIFY_IMAGE_SIZES', 'NOTIFY_FORMATS', 'OVERFLOW_MODES',
 ]

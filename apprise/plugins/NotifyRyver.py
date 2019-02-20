@@ -38,6 +38,7 @@ from json import dumps
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyImageSize
+from ..common import NotifyType
 
 # Token required as part of the API request
 VALIDATE_TOKEN = re.compile(r'[A-Za-z0-9]{15}')
@@ -141,7 +142,7 @@ class NotifyRyver(NotifyBase):
             re.IGNORECASE,
         )
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Ryver Notification
         """
@@ -178,6 +179,10 @@ class NotifyRyver(NotifyBase):
             url, self.verify_certificate,
         ))
         self.logger.debug('Ryver Payload: %s' % str(payload))
+
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+
         try:
             r = requests.post(
                 url,
@@ -220,6 +225,33 @@ class NotifyRyver(NotifyBase):
             return False
 
         return True
+
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'overflow': self.overflow_mode,
+            'webhook': self.webhook,
+        }
+
+        # Determine if there is a botname present
+        botname = ''
+        if self.user:
+            botname = '{botname}@'.format(
+                botname=self.quote(self.user, safe=''),
+            )
+
+        return '{schema}://{botname}{organization}/{token}/?{args}'.format(
+            schema=self.secure_protocol,
+            botname=botname,
+            organization=self.quote(self.organization, safe=''),
+            token=self.quote(self.token, safe=''),
+            args=self.urlencode(args),
+        )
 
     @staticmethod
     def parse_url(url):

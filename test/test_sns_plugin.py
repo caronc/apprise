@@ -303,6 +303,8 @@ def test_aws_topic_handling(mock_post):
     API: NotifySNS Plugin() AWS Topic Handling
 
     """
+    # Disable Throttling to speed testing
+    plugins.NotifySNS.request_rate_per_sec = 0
 
     arn_response = \
         """
@@ -335,9 +337,6 @@ def test_aws_topic_handling(mock_post):
 
     # Assign ourselves a new function
     mock_post.side_effect = post
-
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.NotifyBase.throttle_attempt = 0
 
     # Create our object
     a = Apprise()

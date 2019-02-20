@@ -23,7 +23,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import re
 import requests
 from json import dumps
 
@@ -44,14 +43,27 @@ class NotifyXBMC(NotifyBase):
     # The services URL
     service_url = 'http://kodi.tv/'
 
+    xbmc_protocol = 'xbmc'
+    xbmc_secure_protocol = 'xbmcs'
+    kodi_protocol = 'kodi'
+    kodi_secure_protocol = 'kodis'
+
     # The default protocols
-    protocol = ('xbmc', 'kodi')
+    protocol = (xbmc_protocol, kodi_protocol)
 
     # The default secure protocols
-    secure_protocol = ('xbmc', 'kodis')
+    secure_protocol = (xbmc_secure_protocol, kodi_secure_protocol)
 
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_kodi'
+
+    # Disable throttle rate for XBMC/KODI requests since they are normally
+    # local anyway
+    request_rate_per_sec = 0
+
+    # Limit results to just the first 2 line otherwise there is just to much
+    # content to display
+    body_max_line_count = 2
 
     # XBMC uses the http protocol with JSON requests
     xbmc_default_port = 8080
@@ -149,16 +161,10 @@ class NotifyXBMC(NotifyBase):
 
         return (self.headers, dumps(payload))
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform XBMC/KODI Notification
         """
-
-        # Limit results to just the first 2 line otherwise
-        # there is just to much content to display
-        body = re.split('[\r\n]+', body)
-        body[0] = body[0].strip('#').strip()
-        body = '\r\n'.join(body[0:2])
 
         if self.protocol == self.xbmc_remote_protocol:
             # XBMC v2.0
@@ -184,6 +190,10 @@ class NotifyXBMC(NotifyBase):
             url, self.verify_certificate,
         ))
         self.logger.debug('XBMC/KODI Payload: %s' % str(payload))
+
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+
         try:
             r = requests.post(
                 url,
@@ -223,6 +233,45 @@ class NotifyXBMC(NotifyBase):
             return False
 
         return True
+
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'overflow': self.overflow_mode,
+        }
+
+        # Determine Authentication
+        auth = ''
+        if self.user and self.password:
+            auth = '{user}:{password}@'.format(
+                user=self.quote(self.user, safe=''),
+                password=self.quote(self.password, safe=''),
+            )
+        elif self.user:
+            auth = '{user}@'.format(
+                user=self.quote(self.user, safe=''),
+            )
+
+        default_schema = self.xbmc_protocol if (
+            self.protocol <= self.xbmc_remote_protocol) else self.kodi_protocol
+        default_port = 443 if self.secure else self.xbmc_default_port
+        if self.secure:
+            # Append 's' to schema
+            default_schema + 's'
+
+        return '{schema}://{auth}{hostname}{port}/?{args}'.format(
+            schema=default_schema,
+            auth=auth,
+            hostname=self.host,
+            port='' if not self.port or self.port == default_port
+                 else ':{}'.format(self.port),
+            args=self.urlencode(args),
+        )
 
     @staticmethod
     def parse_url(url):

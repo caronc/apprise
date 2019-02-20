@@ -59,10 +59,11 @@ from json import dumps
 
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
+from ..common import NotifyType
 from ..common import NotifyImageSize
-from ..utils import compat_is_basestring
-from ..utils import parse_bool
 from ..common import NotifyFormat
+from ..utils import parse_bool
+from ..utils import parse_list
 
 TELEGRAM_IMAGE_XY = NotifyImageSize.XY_256
 
@@ -80,9 +81,6 @@ IS_CHAT_ID_RE = re.compile(
     r'^(@*(?P<idno>-?[0-9]{1,32})|(?P<name>[a-z_-][a-z0-9_-]+))$',
     re.IGNORECASE,
 )
-
-# Used to break path apart into list of chat identifiers
-CHAT_ID_LIST_DELIM = re.compile(r'[ \t\r\n,#\\/]+')
 
 
 class NotifyTelegram(NotifyBase):
@@ -134,16 +132,8 @@ class NotifyTelegram(NotifyBase):
         # Store our Bot Token
         self.bot_token = result.group('key')
 
-        if compat_is_basestring(chat_ids):
-            self.chat_ids = [x for x in filter(bool, CHAT_ID_LIST_DELIM.split(
-                chat_ids,
-            ))]
-
-        elif isinstance(chat_ids, (set, tuple, list)):
-            self.chat_ids = list(chat_ids)
-
-        else:
-            self.chat_ids = list()
+        # Parse our list
+        self.chat_ids = parse_list(chat_ids)
 
         if self.user:
             # Treat this as a channel too
@@ -153,7 +143,7 @@ class NotifyTelegram(NotifyBase):
             _id = self.detect_bot_owner()
             if _id:
                 # Store our id
-                self.chat_ids = [str(_id)]
+                self.chat_ids.append(str(_id))
 
         if len(self.chat_ids) == 0:
             self.logger.warning('No chat_id(s) were specified.')
@@ -336,7 +326,7 @@ class NotifyTelegram(NotifyBase):
 
         return 0
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Telegram Notification
         """
@@ -424,14 +414,14 @@ class NotifyTelegram(NotifyBase):
                 # ID
                 payload['chat_id'] = int(chat_id.group('idno'))
 
+            # Always call throttle before any remote server i/o is made;
+            # Telegram throttles to occur before sending the image so that
+            # content can arrive together.
+            self.throttle()
+
             if self.include_image is True:
                 # Send an image
-                if self.send_image(
-                        payload['chat_id'], notify_type) is not None:
-                    # We sent a post (whether we were successful or not)
-                    # we still hit the remote server... just throttle
-                    # before our next hit server query
-                    self.throttle()
+                self.send_image(payload['chat_id'], notify_type)
 
             self.logger.debug('Telegram POST URL: %s (cert_verify=%r)' % (
                 url, self.verify_certificate,
@@ -494,12 +484,27 @@ class NotifyTelegram(NotifyBase):
                 self.logger.debug('Socket Exception: %s' % str(e))
                 has_error = True
 
-            finally:
-                if len(chat_ids):
-                    # Prevent thrashing requests
-                    self.throttle()
-
         return not has_error
+
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'overflow': self.overflow_mode,
+        }
+
+        # No need to check the user token because the user automatically gets
+        # appended into the list of chat ids
+        return '{schema}://{bot_token}/{targets}/?{args}'.format(
+            schema=self.secure_protocol,
+            bot_token=self.quote(self.bot_token, safe=''),
+            targets='/'.join(
+                [self.quote('@{}'.format(x)) for x in self.chat_ids]),
+            args=self.urlencode(args))
 
     @staticmethod
     def parse_url(url):
@@ -512,17 +517,17 @@ class NotifyTelegram(NotifyBase):
         # tgram:// messages since the bot_token has a colon in it.
         # It invalidates an normal URL.
 
-        # This hack searches for this bogus URL and corrects it
-        # so we can properly load it further down. The other
-        # alternative is to ask users to actually change the colon
-        # into a slash (which will work too), but it's more likely
-        # to cause confusion... So this is the next best thing
+        # This hack searches for this bogus URL and corrects it so we can
+        # properly load it further down. The other alternative is to ask users
+        # to actually change the colon into a slash (which will work too), but
+        # it's more likely to cause confusion... So this is the next best thing
+        # we also check for %3A (incase the URL is encoded) as %3A == :
         try:
             tgram = re.match(
-                r'(?P<protocol>%s://)(bot)?(?P<prefix>([a-z0-9_-]+)'
-                r'(:[a-z0-9_-]+)?@)?(?P<btoken_a>[0-9]+):+'
-                r'(?P<remaining>.*)$' % NotifyTelegram.secure_protocol,
-                url, re.I)
+                r'(?P<protocol>{schema}://)(bot)?(?P<prefix>([a-z0-9_-]+)'
+                r'(:[a-z0-9_-]+)?@)?(?P<btoken_a>[0-9]+)(:|%3A)+'
+                r'(?P<remaining>.*)$'.format(
+                    schema=NotifyTelegram.secure_protocol), url, re.I)
 
         except (TypeError, AttributeError):
             # url is bad; force tgram to be None
@@ -534,14 +539,11 @@ class NotifyTelegram(NotifyBase):
 
         if tgram.group('prefix'):
             # Try again
-            results = NotifyBase.parse_url(
-                '%s%s%s/%s' % (
-                    tgram.group('protocol'),
-                    tgram.group('prefix'),
-                    tgram.group('btoken_a'),
-                    tgram.group('remaining'),
-                ),
-            )
+            results = NotifyBase.parse_url('%s%s%s/%s' % (
+                tgram.group('protocol'),
+                tgram.group('prefix'),
+                tgram.group('btoken_a'),
+                tgram.group('remaining')))
 
         else:
             # Try again
@@ -562,9 +564,8 @@ class NotifyTelegram(NotifyBase):
 
         bot_token = '%s:%s' % (bot_token_a, bot_token_b)
 
-        chat_ids = ','.join(
-            [x for x in filter(
-                bool, NotifyBase.split_path(results['fullpath']))][1:])
+        chat_ids = [x for x in filter(
+            bool, NotifyBase.split_path(results['fullpath']))][1:]
 
         # Store our bot token
         results['bot_token'] = bot_token

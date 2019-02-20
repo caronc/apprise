@@ -26,9 +26,10 @@
 import re
 import requests
 
-from ..utils import compat_is_basestring
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
+from ..common import NotifyType
+from ..utils import compat_is_basestring
 
 # Flag used as a placeholder to sending to all devices
 PUSHOVER_SEND_TO_ALL = 'ALL_DEVICES'
@@ -149,7 +150,7 @@ class NotifyPushover(NotifyBase):
                 'The user/group specified (%s) is invalid.' % self.user,
             )
 
-    def notify(self, title, body, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Pushover Notification
         """
@@ -189,6 +190,10 @@ class NotifyPushover(NotifyBase):
                 self.notify_url, self.verify_certificate,
             ))
             self.logger.debug('Pushover Payload: %s' % str(payload))
+
+            # Always call throttle before any remote server i/o is made
+            self.throttle()
+
             try:
                 r = requests.post(
                     self.notify_url,
@@ -231,11 +236,43 @@ class NotifyPushover(NotifyBase):
                 self.logger.debug('Socket Exception: %s' % str(e))
                 has_error = True
 
-            if len(devices):
-                # Prevent thrashing requests
-                self.throttle()
-
         return not has_error
+
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        _map = {
+            PushoverPriority.LOW: 'low',
+            PushoverPriority.MODERATE: 'moderate',
+            PushoverPriority.NORMAL: 'normal',
+            PushoverPriority.HIGH: 'high',
+            PushoverPriority.EMERGENCY: 'emergency',
+        }
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'overflow': self.overflow_mode,
+            'priority':
+                _map[PushoverPriority.NORMAL] if self.priority not in _map
+                else _map[self.priority],
+        }
+
+        devices = '/'.join([self.quote(x) for x in self.devices])
+        if devices == PUSHOVER_SEND_TO_ALL:
+            # keyword is reserved for internal usage only; it's safe to remove
+            # it from the devices list
+            devices = ''
+
+        return '{schema}://{auth}{token}/{devices}/?{args}'.format(
+            schema=self.secure_protocol,
+            auth='' if not self.user
+                 else '{user}@'.format(user=self.quote(self.user, safe='')),
+            token=self.quote(self.token, safe=''),
+            devices=devices,
+            args=self.urlencode(args))
 
     @staticmethod
     def parse_url(url):

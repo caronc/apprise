@@ -39,6 +39,7 @@ import requests
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyImageSize
+from ..common import NotifyType
 from ..utils import compat_is_basestring
 
 # Token required as part of the API request
@@ -78,7 +79,7 @@ class NotifyJoin(NotifyBase):
     service_url = 'https://joaoapps.com/join/'
 
     # The default protocol
-    protocol = 'join'
+    secure_protocol = 'join'
 
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_join'
@@ -89,6 +90,10 @@ class NotifyJoin(NotifyBase):
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_72
+
+    # Limit results to just the first 2 line otherwise there is just to much
+    # content to display
+    body_max_line_count = 2
 
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 1000
@@ -126,21 +131,10 @@ class NotifyJoin(NotifyBase):
             # Default to everyone
             self.devices.append('group.all')
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Join Notification
         """
-
-        try:
-            # Limit results to just the first 2 line otherwise
-            # there is just to much content to display
-            body = re.split('[\r\n]+', body)
-            body[0] = body[0].strip('#').strip()
-            body = '\r\n'.join(body[0:2])
-
-        except (AttributeError, TypeError):
-            # body was None or not of a type string
-            body = ''
 
         headers = {
             'User-Agent': self.app_id,
@@ -188,6 +182,9 @@ class NotifyJoin(NotifyBase):
             ))
             self.logger.debug('Join Payload: %s' % str(payload))
 
+            # Always call throttle before any remote server i/o is made
+            self.throttle()
+
             try:
                 r = requests.post(
                     url,
@@ -227,11 +224,24 @@ class NotifyJoin(NotifyBase):
                 self.logger.debug('Socket Exception: %s' % str(e))
                 return_status = False
 
-            if len(devices):
-                # Prevent thrashing requests
-                self.throttle()
-
         return return_status
+
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'overflow': self.overflow_mode,
+        }
+
+        return '{schema}://{apikey}/{devices}/?{args}'.format(
+            schema=self.secure_protocol,
+            apikey=self.quote(self.apikey, safe=''),
+            devices='/'.join([self.quote(x) for x in self.devices]),
+            args=self.urlencode(args))
 
     @staticmethod
     def parse_url(url):

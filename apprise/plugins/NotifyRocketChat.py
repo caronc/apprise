@@ -26,9 +26,11 @@
 import re
 import requests
 from json import loads
+from itertools import chain
 
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
+from ..common import NotifyType
 from ..utils import compat_is_basestring
 
 IS_CHANNEL = re.compile(r'^#(?P<name>[A-Za-z0-9]+)$')
@@ -66,8 +68,11 @@ class NotifyRocketChat(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_rocketchat'
 
-    # Defines the maximum allowable characters in the title
-    title_maxlen = 200
+    # The title is not used
+    title_maxlen = 0
+
+    # The maximum size of the message
+    body_maxlen = 200
 
     def __init__(self, recipients=None, **kwargs):
         """
@@ -106,6 +111,12 @@ class NotifyRocketChat(NotifyBase):
         elif not isinstance(recipients, (set, tuple, list)):
             recipients = []
 
+        if not (self.user and self.password):
+            # Username & Password is required for Rocket Chat to work
+            raise TypeError(
+                'No Rocket.Chat user/pass combo specified.'
+            )
+
         # Validate recipients and drop bad ones:
         for recipient in recipients:
             result = IS_CHANNEL.match(recipient)
@@ -133,9 +144,44 @@ class NotifyRocketChat(NotifyBase):
         # Used to track token headers upon authentication (if successful)
         self.headers = {}
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def url(self):
         """
-        wrapper to send_notification since we can alert more then one channel
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'overflow': self.overflow_mode,
+        }
+
+        # Determine Authentication
+        auth = '{user}:{password}@'.format(
+            user=self.quote(self.user, safe=''),
+            password=self.quote(self.password, safe=''),
+        )
+
+        default_port = 443 if self.secure else 80
+
+        return '{schema}://{auth}{hostname}{port}/{targets}/?{args}'.format(
+            schema=self.secure_protocol if self.secure else self.protocol,
+            auth=auth,
+            hostname=self.host,
+            port='' if self.port is None or self.port == default_port
+                 else ':{}'.format(self.port),
+            targets='/'.join(
+                [self.quote(x) for x in chain(
+                    # Channels are prefixed with a pound/hashtag symbol
+                    ['#{}'.format(x) for x in self.channels],
+                    # Rooms are as is
+                    self.rooms,
+                )]),
+            args=self.urlencode(args),
+        )
+
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
+        """
+        wrapper to _send since we can alert more then one channel
         """
 
         # Track whether we authenticated okay
@@ -143,8 +189,8 @@ class NotifyRocketChat(NotifyBase):
         if not self.login():
             return False
 
-        # Prepare our message
-        text = '*%s*\r\n%s' % (title.replace('*', '\\*'), body)
+        # Prepare our message using the body only
+        text = body
 
         # Initiaize our error tracking
         has_error = False
@@ -157,7 +203,7 @@ class NotifyRocketChat(NotifyBase):
             # Get Channel
             channel = channels.pop(0)
 
-            if not self.send_notification(
+            if not self._send(
                     {
                         'text': text,
                         'channel': channel,
@@ -166,16 +212,12 @@ class NotifyRocketChat(NotifyBase):
                 # toggle flag
                 has_error = True
 
-            if len(channels) + len(rooms) > 0:
-                # Prevent thrashing requests
-                self.throttle()
-
         # Send all our defined room id's
         while len(rooms):
             # Get Room
             room = rooms.pop(0)
 
-            if not self.send_notification(
+            if not self._send(
                     {
                         'text': text,
                         'roomId': room,
@@ -184,16 +226,12 @@ class NotifyRocketChat(NotifyBase):
                 # toggle flag
                 has_error = True
 
-            if len(rooms) > 0:
-                # Prevent thrashing requests
-                self.throttle()
-
         # logout
         self.logout()
 
         return not has_error
 
-    def send_notification(self, payload, notify_type, **kwargs):
+    def _send(self, payload, notify_type, **kwargs):
         """
         Perform Notify Rocket.Chat Notification
         """
@@ -202,6 +240,10 @@ class NotifyRocketChat(NotifyBase):
             self.api_url + 'chat.postMessage', self.verify_certificate,
         ))
         self.logger.debug('Rocket.Chat Payload: %s' % str(payload))
+
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+
         try:
             r = requests.post(
                 self.api_url + 'chat.postMessage',

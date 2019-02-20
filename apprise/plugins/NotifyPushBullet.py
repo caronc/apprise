@@ -30,7 +30,7 @@ from json import dumps
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
 from .NotifyBase import IS_EMAIL_RE
-
+from ..common import NotifyType
 from ..utils import compat_is_basestring
 
 # Flag used as a placeholder to sending to all devices
@@ -87,7 +87,7 @@ class NotifyPushBullet(NotifyBase):
         if len(self.recipients) == 0:
             self.recipients = (PUSHBULLET_SEND_TO_ALL, )
 
-    def notify(self, title, body, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform PushBullet Notification
         """
@@ -135,6 +135,10 @@ class NotifyPushBullet(NotifyBase):
                 self.notify_url, self.verify_certificate,
             ))
             self.logger.debug('PushBullet Payload: %s' % str(payload))
+
+            # Always call throttle before any remote server i/o is made
+            self.throttle()
+
             try:
                 r = requests.post(
                     self.notify_url,
@@ -176,11 +180,30 @@ class NotifyPushBullet(NotifyBase):
                 self.logger.debug('Socket Exception: %s' % str(e))
                 has_error = True
 
-            if len(recipients):
-                # Prevent thrashing requests
-                self.throttle()
-
         return not has_error
+
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'overflow': self.overflow_mode,
+        }
+
+        recipients = '/'.join([self.quote(x) for x in self.recipients])
+        if recipients == PUSHBULLET_SEND_TO_ALL:
+            # keyword is reserved for internal usage only; it's safe to remove
+            # it from the recipients list
+            recipients = ''
+
+        return '{schema}://{accesstoken}/{recipients}/?{args}'.format(
+            schema=self.secure_protocol,
+            accesstoken=self.quote(self.accesstoken, safe=''),
+            recipients=recipients,
+            args=self.urlencode(args))
 
     @staticmethod
     def parse_url(url):

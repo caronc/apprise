@@ -23,12 +23,13 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-from json import dumps
-import requests
 import re
-from time import time
+import requests
 import hmac
+from json import dumps
+from time import time
 from hashlib import sha1
+from itertools import chain
 try:
     from urlparse import urlparse
 
@@ -37,7 +38,7 @@ except ImportError:
 
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
-
+from ..common import NotifyType
 from ..common import NotifyImageSize
 from ..utils import compat_is_basestring
 
@@ -168,7 +169,7 @@ class NotifyBoxcar(NotifyBase):
                     '(%s) specified.' % recipient,
                 )
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Boxcar Notification
         """
@@ -229,6 +230,9 @@ class NotifyBoxcar(NotifyBase):
         ))
         self.logger.debug('Boxcar Payload: %s' % str(payload))
 
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+
         try:
             r = requests.post(
                 notify_url,
@@ -271,6 +275,27 @@ class NotifyBoxcar(NotifyBase):
             return False
 
         return True
+
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'overflow': self.overflow_mode,
+        }
+
+        return '{schema}://{access}/{secret}/{recipients}/?{args}'.format(
+            schema=self.secure_protocol,
+            access=self.quote(self.access),
+            secret=self.quote(self.secret),
+            recipients='/'.join([
+                self.quote(x) for x in chain(
+                    self.tags, self.device_tokens) if x != DEFAULT_TAG]),
+            args=self.urlencode(args),
+        )
 
     @staticmethod
     def parse_url(url):

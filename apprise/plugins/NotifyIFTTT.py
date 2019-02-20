@@ -34,16 +34,18 @@
 # URL. For example, it might look like this:
 #               https://maker.ifttt.com/use/a3nHB7gA9TfBQSqJAHklod
 #
-# In the above example a3nHB7gA9TfBQSqJAHklod becomes your {apikey}
+# In the above example a3nHB7gA9TfBQSqJAHklod becomes your {webhook_id}
 # You will need this to make this notification work correctly
 #
 # For each event you create you will assign it a name (this will be known as
 # the {event} when building your URL.
 import requests
-
 from json import dumps
+
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
+from ..common import NotifyType
+from ..utils import parse_list
 
 
 class NotifyIFTTT(NotifyBase):
@@ -59,7 +61,7 @@ class NotifyIFTTT(NotifyBase):
     service_url = 'https://ifttt.com/'
 
     # The default protocol
-    protocol = 'ifttt'
+    secure_protocol = 'ifttt'
 
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_ifttt'
@@ -87,37 +89,55 @@ class NotifyIFTTT(NotifyBase):
     ifttt_default_type_key = 'value3'
 
     # IFTTT uses the http protocol with JSON requests
-    notify_url = 'https://maker.ifttt.com/trigger/{event}/with/key/{apikey}'
+    notify_url = 'https://maker.ifttt.com/' \
+                 'trigger/{event}/with/key/{webhook_id}'
 
-    def __init__(self, apikey, event, event_args=None, **kwargs):
+    def __init__(self, webhook_id, events, add_tokens=None, del_tokens=None,
+                 **kwargs):
         """
         Initialize IFTTT Object
+
+        add_tokens can optionally be a dictionary of key/value pairs
+        that you want to include in the IFTTT post to the server.
+
+        del_tokens can optionally be a list/tuple/set of tokens
+        that you want to eliminate from the IFTTT post.  There isn't
+        much real functionality to this one unless you want to remove
+        reference to Value1, Value2, and/or Value3
 
         """
         super(NotifyIFTTT, self).__init__(**kwargs)
 
-        if not apikey:
-            raise TypeError('You must specify the Webhooks apikey.')
+        if not webhook_id:
+            raise TypeError('You must specify the Webhooks webhook_id.')
 
-        if not event:
-            raise TypeError('You must specify the Event you wish to trigger.')
+        # Store our Events we wish to trigger
+        self.events = parse_list(events)
+
+        if not self.events:
+            raise TypeError(
+                'You must specify at least one event you wish to trigger on.')
 
         # Store our APIKey
-        self.apikey = apikey
+        self.webhook_id = webhook_id
 
-        # Store our Event we wish to trigger
-        self.event = event
+        # Tokens to include in post
+        self.add_tokens = {}
+        if add_tokens:
+            self.add_tokens.update(add_tokens)
 
-        if isinstance(event_args, dict):
-            # Make a copy of the arguments so that they can't change
-            # outside of this plugin
-            self.event_args = event_args.copy()
+        # Tokens to remove
+        self.del_tokens = []
+        if del_tokens is not None:
+            if isinstance(del_tokens, (list, tuple, set)):
+                self.del_tokens = del_tokens
 
-        else:
-            # Force a dictionary
-            self.event_args = dict()
+            else:
+                raise TypeError(
+                    'del_token must be a list; {} was provided'.format(
+                        str(type(del_tokens))))
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform IFTTT Notification
         """
@@ -134,71 +154,105 @@ class NotifyIFTTT(NotifyBase):
             self.ifttt_default_type_key: notify_type,
         }
 
-        # Update our payload using any other event_args specified
-        payload.update(self.event_args)
+        # Add any new tokens expected (this can also potentially override
+        # any entries defined above)
+        payload.update(self.add_tokens)
 
-        # Eliminate empty fields; users wishing to cancel the use of the
-        # self.ifttt_default_ entries can preset these keys to being
-        # empty so that they get caught here and removed.
-        payload = {x: y for x, y in payload.items() if y}
+        # Eliminate fields flagged for removal
+        payload = {x: y for x, y in payload.items()
+                   if x not in self.del_tokens}
 
-        # URL to transmit content via
-        url = self.notify_url.format(
-            apikey=self.apikey,
-            event=self.event,
+        # Track our failures
+        error_count = 0
+
+        # Create a copy of our event lit
+        events = list(self.events)
+
+        while len(events):
+
+            # Retrive an entry off of our event list
+            event = events.pop(0)
+
+            # URL to transmit content via
+            url = self.notify_url.format(
+                webhook_id=self.webhook_id,
+                event=event,
+            )
+
+            self.logger.debug('IFTTT POST URL: %s (cert_verify=%r)' % (
+                url, self.verify_certificate,
+            ))
+            self.logger.debug('IFTTT Payload: %s' % str(payload))
+
+            # Always call throttle before any remote server i/o is made
+            self.throttle()
+
+            try:
+                r = requests.post(
+                    url,
+                    data=dumps(payload),
+                    headers=headers,
+                    verify=self.verify_certificate,
+                )
+                self.logger.debug(
+                    u"IFTTT HTTP response headers: %r" % r.headers)
+                self.logger.debug(
+                    u"IFTTT HTTP response body: %r" % r.content)
+
+                if r.status_code != requests.codes.ok:
+                    # We had a problem
+                    try:
+                        self.logger.warning(
+                            'Failed to send IFTTT:%s '
+                            'notification: %s (error=%s).' % (
+                                event,
+                                HTTP_ERROR_MAP[r.status_code],
+                                r.status_code))
+
+                    except KeyError:
+                        self.logger.warning(
+                            'Failed to send IFTTT:%s '
+                            'notification (error=%s).' % (
+                                event, r.status_code))
+
+                    # self.logger.debug('Response Details: %s' % r.content)
+                    error_count += 1
+
+                else:
+                    self.logger.info(
+                        'Sent IFTTT notification to Event %s.' % event)
+
+            except requests.RequestException as e:
+                self.logger.warning(
+                    'A Connection error occured sending IFTTT:%s ' % (
+                        event) + 'notification.'
+                )
+                self.logger.debug('Socket Exception: %s' % str(e))
+                error_count += 1
+
+        return (error_count == 0)
+
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'overflow': self.overflow_mode,
+        }
+
+        # Store any new key/value pairs added to our list
+        args.update({'+{}'.format(k): v for k, v in self.add_tokens})
+        args.update({'-{}'.format(k): '' for k in self.del_tokens})
+
+        return '{schema}://{webhook_id}@{events}/?{args}'.format(
+            schema=self.secure_protocol,
+            webhook_id=self.webhook_id,
+            events='/'.join([self.quote(x, safe='') for x in self.events]),
+            args=self.urlencode(args),
         )
-
-        self.logger.debug('IFTTT POST URL: %s (cert_verify=%r)' % (
-            url, self.verify_certificate,
-        ))
-        self.logger.debug('IFTTT Payload: %s' % str(payload))
-        try:
-            r = requests.post(
-                url,
-                data=dumps(payload),
-                headers=headers,
-                verify=self.verify_certificate,
-            )
-            self.logger.debug(
-                u"IFTTT HTTP response status: %r" % r.status_code)
-            self.logger.debug(
-                u"IFTTT HTTP response headers: %r" % r.headers)
-            self.logger.debug(
-                u"IFTTT HTTP response body: %r" % r.content)
-
-            if r.status_code != requests.codes.ok:
-                # We had a problem
-                try:
-                    self.logger.warning(
-                        'Failed to send IFTTT:%s '
-                        'notification: %s (error=%s).' % (
-                            self.event,
-                            HTTP_ERROR_MAP[r.status_code],
-                            r.status_code))
-
-                except KeyError:
-                    self.logger.warning(
-                        'Failed to send IFTTT:%s '
-                        'notification (error=%s).' % (
-                            self.event,
-                            r.status_code))
-
-                # self.logger.debug('Response Details: %s' % r.content)
-                return False
-
-            else:
-                self.logger.info(
-                    'Sent IFTTT notification to Event %s.' % self.event)
-
-        except requests.RequestException as e:
-            self.logger.warning(
-                'A Connection error occured sending IFTTT:%s ' % (
-                    self.event) + 'notification.'
-            )
-            self.logger.debug('Socket Exception: %s' % str(e))
-            return False
-
-        return True
 
     @staticmethod
     def parse_url(url):
@@ -214,22 +268,14 @@ class NotifyIFTTT(NotifyBase):
             return results
 
         # Our Event
-        results['event'] = results['host']
+        results['events'] = list()
+        results['events'].append(results['host'])
 
         # Our API Key
-        results['apikey'] = results['user']
+        results['webhook_id'] = results['user']
 
-        # Store ValueX entries based on each entry past the host
-        results['event_args'] = {
-            '{0}{1}'.format(NotifyIFTTT.ifttt_default_key_prefix, n + 1):
-            NotifyBase.unquote(x)
-            for n, x in enumerate(
-                NotifyBase.split_path(results['fullpath'])) if x}
-
-        # Allow users to set key=val parameters to specify more types
-        # of payload options
-        results['event_args'].update(
-            {k: NotifyBase.unquote(v)
-                for k, v in results['qsd'].items()})
+        # Now fetch the remaining tokens
+        results['events'].extend([x for x in filter(
+            bool, NotifyBase.split_path(results['fullpath']))][0:])
 
         return results

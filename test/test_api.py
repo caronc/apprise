@@ -71,14 +71,33 @@ def test_apprise():
 
     a = Apprise(servers=servers)
 
-    # 3 servers loaded
+    # 2 servers loaded
     assert(len(a) == 2)
+
+    # We can retrieve our URLs this way:
+    assert(len(a.urls()) == 2)
 
     # We can add another server
     assert(
         a.add('mmosts://mattermost.server.local/'
               '3ccdd113474722377935511fc85d3dd4') is True)
     assert(len(a) == 3)
+
+    # We can pop an object off of our stack by it's indexed value:
+    obj = a.pop(0)
+    assert(isinstance(obj, NotifyBase) is True)
+    assert(len(a) == 2)
+
+    # We can retrieve elements from our list too by reference:
+    assert(compat_is_basestring(a[0].url()) is True)
+
+    # We can iterate over our list too:
+    count = 0
+    for o in a:
+        assert(compat_is_basestring(o.url()) is True)
+        count += 1
+    # verify that we did indeed iterate over each element
+    assert(len(a) == count)
 
     # We can empty our set
     a.clear()

@@ -26,9 +26,11 @@
 import re
 import requests
 from json import dumps
+from itertools import chain
 
 from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
+from ..common import NotifyType
 from ..utils import compat_is_basestring
 
 # Used to detect and parse channels
@@ -127,7 +129,7 @@ class NotifyPushed(NotifyBase):
 
         return
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Pushed Notification
         """
@@ -152,7 +154,7 @@ class NotifyPushed(NotifyBase):
 
         if len(self.channels) + len(self.users) == 0:
             # Just notify the app
-            return self.send_notification(
+            return self._send(
                 payload=payload, notify_type=notify_type, **kwargs)
 
         # If our code reaches here, we want to target channels and users (by
@@ -170,15 +172,11 @@ class NotifyPushed(NotifyBase):
             # Get Channel
             _payload['target_alias'] = channels.pop(0)
 
-            if not self.send_notification(
+            if not self._send(
                     payload=_payload, notify_type=notify_type, **kwargs):
 
                 # toggle flag
                 has_error = True
-
-            if len(channels) + len(users) > 0:
-                # Prevent thrashing requests
-                self.throttle()
 
         # Copy our payload
         _payload = dict(payload)
@@ -188,23 +186,20 @@ class NotifyPushed(NotifyBase):
         while len(users):
             # Get User's Pushed ID
             _payload['pushed_id'] = users.pop(0)
-            if not self.send_notification(
+
+            if not self._send(
                     payload=_payload, notify_type=notify_type, **kwargs):
 
                 # toggle flag
                 has_error = True
 
-            if len(users) > 0:
-                # Prevent thrashing requests
-                self.throttle()
-
         return not has_error
 
-    def send_notification(self, payload, notify_type, **kwargs):
+    def _send(self, payload, notify_type, **kwargs):
         """
         A lower level call that directly pushes a payload to the Pushed
         Notification servers.  This should never be called directly; it is
-        referenced automatically through the notify() function.
+        referenced automatically through the send() function.
         """
 
         headers = {
@@ -216,6 +211,10 @@ class NotifyPushed(NotifyBase):
             self.notify_url, self.verify_certificate,
         ))
         self.logger.debug('Pushed Payload: %s' % str(payload))
+
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+
         try:
             r = requests.post(
                 self.notify_url,
@@ -255,6 +254,30 @@ class NotifyPushed(NotifyBase):
             return False
 
         return True
+
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'overflow': self.overflow_mode,
+        }
+
+        return '{schema}://{app_key}/{app_secret}/{targets}/?{args}'.format(
+            schema=self.secure_protocol,
+            app_key=self.quote(self.app_key, safe=''),
+            app_secret=self.quote(self.app_secret, safe=''),
+            targets='/'.join(
+                [self.quote(x) for x in chain(
+                    # Channels are prefixed with a pound/hashtag symbol
+                    ['#{}'.format(x) for x in self.channels],
+                    # Users are prefixed with an @ symbol
+                    ['@{}'.format(x) for x in self.users],
+                )]),
+            args=self.urlencode(args))
 
     @staticmethod
     def parse_url(url):

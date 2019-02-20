@@ -28,6 +28,7 @@ import sys
 import types
 
 import apprise
+from apprise.utils import compat_is_basestring
 
 try:
     # Python v3.4+
@@ -112,6 +113,9 @@ def test_gnome_plugin():
 
     # Check that it found our mocked environments
     assert(obj._enabled is True)
+
+    # Test url() call
+    assert(compat_is_basestring(obj.url()) is True)
 
     # test notifications
     assert(obj.notify(title='title', body='body',

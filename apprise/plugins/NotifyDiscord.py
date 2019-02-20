@@ -48,6 +48,7 @@ from .NotifyBase import NotifyBase
 from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyImageSize
 from ..common import NotifyFormat
+from ..common import NotifyType
 from ..utils import parse_bool
 
 
@@ -113,7 +114,7 @@ class NotifyDiscord(NotifyBase):
 
         return
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Discord Notification
         """
@@ -180,8 +181,8 @@ class NotifyDiscord(NotifyBase):
 
         else:
             # not markdown
-            payload['content'] = body if not title \
-                else "{}\r\n{}".format(title, body)
+            payload['content'] = \
+                body if not title else "{}\r\n{}".format(title, body)
 
         if self.avatar and image_url:
             payload['avatar_url'] = image_url
@@ -201,6 +202,10 @@ class NotifyDiscord(NotifyBase):
             notify_url, self.verify_certificate,
         ))
         self.logger.debug('Discord Payload: %s' % str(payload))
+
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+
         try:
             r = requests.post(
                 notify_url,
@@ -240,6 +245,28 @@ class NotifyDiscord(NotifyBase):
             return False
 
         return True
+
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'overflow': self.overflow_mode,
+            'tts': 'yes' if self.tts else 'no',
+            'avatar': 'yes' if self.avatar else 'no',
+            'footer': 'yes' if self.footer else 'no',
+            'thumbnail': 'yes' if self.thumbnail else 'no',
+        }
+
+        return '{schema}://{webhook_id}/{webhook_token}/?{args}'.format(
+            schema=self.secure_protocol,
+            webhook_id=self.quote(self.webhook_id),
+            webhook_token=self.quote(self.webhook_token),
+            args=self.urlencode(args),
+        )
 
     @staticmethod
     def parse_url(url):

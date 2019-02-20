@@ -26,6 +26,8 @@
 import re
 import logging
 from time import sleep
+from datetime import datetime
+
 try:
     # Python 2.7
     from urllib import unquote as _unquote
@@ -42,21 +44,17 @@ from ..utils import parse_url
 from ..utils import parse_bool
 from ..utils import parse_list
 from ..utils import is_hostname
+from ..common import NotifyType
 from ..common import NOTIFY_TYPES
 from ..common import NotifyFormat
 from ..common import NOTIFY_FORMATS
+from ..common import OverflowMode
+from ..common import OVERFLOW_MODES
 
 from ..AppriseAsset import AppriseAsset
 
 # use sax first because it's faster
 from xml.sax.saxutils import escape as sax_escape
-
-
-def _escape(text):
-    """
-    saxutil escape tool
-    """
-    return sax_escape(text, {"'": "&apos;", "\"": "&quot;"})
 
 
 HTTP_ERROR_MAP = {
@@ -113,20 +111,32 @@ class NotifyBase(object):
     setup_url = None
 
     # Most Servers do not like more then 1 request per 5 seconds, so 5.5 gives
-    # us a safe play range...
-    throttle_attempt = 5.5
+    # us a safe play range.
+    request_rate_per_sec = 5.5
 
     # Allows the user to specify the NotifyImageSize object
     image_size = None
 
     # The maximum allowable characters allowed in the body per message
-    body_maxlen = 32768
+    # We set it to what would virtually be an infinite value really
+    # 2^63 - 1 = 9223372036854775807
+    body_maxlen = 9223372036854775807
 
-    # Defines the maximum allowable characters in the title
+    # Defines the maximum allowable characters in the title; set this to zero
+    # if a title can't be used. Titles that are not used but are defined are
+    # automatically placed into the body
     title_maxlen = 250
+
+    # Set the maximum line count; if this is set to anything larger then zero
+    # the message (prior to it being sent) will be truncated to this number
+    # of lines. Setting this to zero disables this feature.
+    body_max_line_count = 0
 
     # Default Notify Format
     notify_format = NotifyFormat.TEXT
+
+    # Default Overflow Mode
+    overflow_mode = OverflowMode.UPSTREAM
 
     # Maintain a set of tags to associate with this specific notification
     tags = set()
@@ -162,7 +172,6 @@ class NotifyBase(object):
 
         self.user = kwargs.get('user')
         self.password = kwargs.get('password')
-        self.headers = kwargs.get('headers')
 
         if 'format' in kwargs:
             # Store the specified format if specified
@@ -177,25 +186,64 @@ class NotifyBase(object):
             # Provide override
             self.notify_format = notify_format
 
+        if 'overflow' in kwargs:
+            # Store the specified format if specified
+            overflow = kwargs.get('overflow', '')
+            if overflow.lower() not in OVERFLOW_MODES:
+                self.logger.error(
+                    'Invalid overflow method %s' % overflow,
+                )
+                raise TypeError(
+                    'Invalid overflow method %s' % overflow,
+                )
+            # Provide override
+            self.overflow_mode = overflow
+
         if 'tag' in kwargs:
             # We want to associate some tags with our notification service.
             # the code below gets the 'tag' argument if defined, otherwise
             # it just falls back to whatever was already defined globally
             self.tags = set(parse_list(kwargs.get('tag', self.tags)))
 
-    def throttle(self, throttle_time=None):
+        # Tracks the time any i/o was made to the remote server.  This value
+        # is automatically set and controlled through the throttle() call.
+        self._last_io_datetime = None
+
+    def throttle(self, last_io=None):
         """
         A common throttle control
         """
-        self.logger.debug('Throttling...')
 
-        throttle_time = throttle_time \
-            if throttle_time is not None else self.throttle_attempt
+        if last_io is not None:
+            # Assume specified last_io
+            self._last_io_datetime = last_io
 
-        # Perform throttle
-        if throttle_time > 0:
-            sleep(throttle_time)
+        # Get ourselves a reference time of 'now'
+        reference = datetime.now()
 
+        if self._last_io_datetime is None:
+            # Set time to 'now' and no need to throttle
+            self._last_io_datetime = reference
+            return
+
+        if self.request_rate_per_sec <= 0.0:
+            # We're done if there is no throttle limit set
+            return
+
+        # If we reach here, we need to do additional logic.
+        # If the difference between the reference time and 'now' is less than
+        # the defined request_rate_per_sec then we need to throttle for the
+        # remaining balance of this time.
+
+        elapsed = (reference - self._last_io_datetime).total_seconds()
+
+        if elapsed < self.request_rate_per_sec:
+            self.logger.debug('Throttling for {}s...'.format(
+                self.request_rate_per_sec - elapsed))
+            sleep(self.request_rate_per_sec - elapsed)
+
+        # Update our timestamp before we leave
+        self._last_io_datetime = reference
         return
 
     def image_url(self, notify_type, logo=False, extension=None):
@@ -260,6 +308,117 @@ class NotifyBase(object):
             color_type=color_type,
         )
 
+    def notify(self, body, title=None, notify_type=NotifyType.INFO,
+               overflow=None, **kwargs):
+        """
+        Performs notification
+
+        """
+
+        # Handle situations where the title is None
+        title = '' if not title else title
+
+        # Apply our overflow (if defined)
+        for chunk in self._apply_overflow(body=body, title=title,
+                                          overflow=overflow):
+            # Send notification
+            if not self.send(body=chunk['body'], title=chunk['title'],
+                             notify_type=notify_type):
+
+                # Toggle our return status flag
+                return False
+
+        return True
+
+    def _apply_overflow(self, body, title=None, overflow=None):
+        """
+        Takes the message body and title as input.  This function then
+        applies any defined overflow restrictions associated with the
+        notification service and may alter the message if/as required.
+
+        The function will always return a list object in the following
+        structure:
+            [
+                {
+                    title: 'the title goes here',
+                    body: 'the message body goes here',
+                },
+                {
+                    title: 'the title goes here',
+                    body: 'the message body goes here',
+                },
+
+            ]
+        """
+
+        response = list()
+
+        # tidy
+        title = '' if not title else title.strip()
+        body = '' if not body else body.rstrip()
+
+        if overflow is None:
+            # default
+            overflow = self.overflow_mode
+
+        if self.title_maxlen <= 0:
+            # Content is appended to body
+            body = '{}\r\n{}'.format(title, body)
+            title = ''
+
+        # Enforce the line count first always
+        if self.body_max_line_count > 0:
+            # Limit results to just the first 2 line otherwise
+            # there is just to much content to display
+            body = re.split(r'\r*\n', body)
+            body = '\r\n'.join(body[0:self.body_max_line_count])
+
+        if overflow == OverflowMode.UPSTREAM:
+            # Nothing more to do
+            response.append({'body': body, 'title': title})
+            return response
+
+        elif len(title) > self.title_maxlen:
+            # Truncate our Title
+            title = title[:self.title_maxlen]
+
+        if self.body_maxlen > 0 and len(body) <= self.body_maxlen:
+            response.append({'body': body, 'title': title})
+            return response
+
+        if overflow == OverflowMode.TRUNCATE:
+            # Truncate our body and return
+            response.append({
+                'body': body[:self.body_maxlen],
+                'title': title,
+            })
+            # For truncate mode, we're done now
+            return response
+
+        # If we reach here, then we are in SPLIT mode.
+        # For here, we want to split the message as many times as we have to
+        # in order to fit it within the designated limits.
+        response = [{
+            'body': body[i: i + self.body_maxlen],
+            'title': title} for i in range(0, len(body), self.body_maxlen)]
+
+        return response
+
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
+        """
+        Should preform the actual notification itself.
+
+        """
+        raise NotImplementedError("send() is implimented by the child class.")
+
+    def url(self):
+        """
+        Assembles the URL associated with the notification based on the
+        arguments provied.
+
+        """
+        raise NotImplementedError("url() is implimented by the child class.")
+
     def __contains__(self, tags):
         """
         Returns true if the tag specified is associated with this notification.
@@ -290,12 +449,21 @@ class NotifyBase(object):
         """
         Takes html text as input and escapes it so that it won't
         conflict with any xml/html wrapping characters.
+
+        Args:
+            html (str): The HTML code to escape
+            convert_new_lines (:obj:`bool`, optional): escape new lines (\n)
+            whitespace (:obj:`bool`, optional): escape whitespace
+
+        Returns:
+            str: The escaped html
         """
         if not html:
             # nothing more to do; return object as is
             return html
 
-        escaped = _escape(html)
+        # Escape HTML
+        escaped = sax_escape(html, {"'": "&apos;", "\"": "&quot;"})
 
         if whitespace:
             # Tidy up whitespace too
@@ -311,8 +479,25 @@ class NotifyBase(object):
     @staticmethod
     def unquote(content, encoding='utf-8', errors='replace'):
         """
-        common unquote function
+        Replace %xx escapes by their single-character equivalent. The optional
+        encoding and errors parameters specify how to decode percent-encoded
+        sequences.
 
+        Wrapper to Python's unquote while remaining compatible with both
+        Python 2 & 3 since the reference to this function changed between
+        versions.
+
+        Note: errors set to 'replace' means that invalid sequences are
+              replaced by a placeholder character.
+
+        Args:
+            content (str): The quoted URI string you wish to unquote
+            encoding (:obj:`str`, optional): encoding type
+            errors (:obj:`str`, errors): how to handle invalid character found
+                in encoded string (defined by encoding)
+
+        Returns:
+            str: The unquoted URI string
         """
         if not content:
             return ''
@@ -327,9 +512,25 @@ class NotifyBase(object):
 
     @staticmethod
     def quote(content, safe='/', encoding=None, errors=None):
-        """
-        common quote function
+        """ Replaces single character non-ascii characters and URI specific
+        ones by their %xx code.
 
+        Wrapper to Python's unquote while remaining compatible with both
+        Python 2 & 3 since the reference to this function changed between
+        versions.
+
+        Args:
+            content (str): The URI string you wish to quote
+            safe (str): non-ascii characters and URI specific ones that you
+                        do not wish to escape (if detected). Setting this
+                        string to an empty one causes everything to be
+                        escaped.
+            encoding (:obj:`str`, optional): encoding type
+            errors (:obj:`str`, errors): how to handle invalid character found
+                in encoded string (defined by encoding)
+
+        Returns:
+            str: The quoted URI string
         """
         if not content:
             return ''
@@ -344,26 +545,60 @@ class NotifyBase(object):
 
     @staticmethod
     def urlencode(query, doseq=False, safe='', encoding=None, errors=None):
-        """
-        common urlencode function
+        """Convert a mapping object or a sequence of two-element tuples
 
+        Wrapper to Python's unquote while remaining compatible with both
+        Python 2 & 3 since the reference to this function changed between
+        versions.
+
+        The resulting string is a series of key=value pairs separated by '&'
+        characters, where both key and value are quoted using the quote()
+        function.
+
+        Note: If the dictionary entry contains an entry that is set to None
+              it is not included in the final result set. If you want to
+              pass in an empty variable, set it to an empty string.
+
+        Args:
+            query (str): The dictionary to encode
+            doseq (:obj:`bool`, optional): Handle sequences
+            safe (:obj:`str`): non-ascii characters and URI specific ones that
+                you do not wish to escape (if detected). Setting this string
+                to an empty one causes everything to be escaped.
+            encoding (:obj:`str`, optional): encoding type
+            errors (:obj:`str`, errors): how to handle invalid character found
+                in encoded string (defined by encoding)
+
+        Returns:
+            str: The escaped parameters returned as a string
         """
+        # Tidy query by eliminating any records set to None
+        _query = {k: v for (k, v) in query.items() if v is not None}
         try:
             # Python v3.x
             return _urlencode(
-                query, doseq=doseq, safe=safe, encoding=encoding,
+                _query, doseq=doseq, safe=safe, encoding=encoding,
                 errors=errors)
 
         except TypeError:
             # Python v2.7
-            return _urlencode(query)
+            return _urlencode(_query)
 
     @staticmethod
     def split_path(path, unquote=True):
-        """
-        Splits a URL up into a list object.
+        """Splits a URL up into a list object.
 
+        Parses a specified URL and breaks it into a list.
+
+        Args:
+            path (str): The path to split up into a list.
+            unquote (:obj:`bool`, optional): call unquote on each element
+                 added to the returned list.
+
+        Returns:
+            list: A list containing all of the elements in the path
         """
+
         if unquote:
             return PATHSPLIT_LIST_DELIM.split(
                 NotifyBase.unquote(path).lstrip('/'))
@@ -371,26 +606,51 @@ class NotifyBase(object):
 
     @staticmethod
     def is_email(address):
-        """
-        Returns True if specified entry is an email address
+        """Determine if the specified entry is an email address
 
+        Args:
+            address (str): The string you want to check.
+
+        Returns:
+            bool: Returns True if the address specified is an email address
+                  and False if it isn't.
         """
+
         return IS_EMAIL_RE.match(address) is not None
 
     @staticmethod
     def is_hostname(hostname):
-        """
-        Returns True if specified entry is a hostname
+        """Determine if the specified entry is a hostname
 
+        Args:
+            hostname (str): The string you want to check.
+
+        Returns:
+            bool: Returns True if the hostname specified is in fact a hostame
+                  and False if it isn't.
         """
         return is_hostname(hostname)
 
     @staticmethod
     def parse_url(url, verify_host=True):
-        """
-        Parses the URL and returns it broken apart into a dictionary.
+        """Parses the URL and returns it broken apart into a dictionary.
 
+        This is very specific and customized for Apprise.
+
+
+        Args:
+            url (str): The URL you want to fully parse.
+            verify_host (:obj:`bool`, optional): a flag kept with the parsed
+                 URL which some child classes will later use to verify SSL
+                 keys (if SSL transactions take place).  Unless under very
+                 specific circumstances, it is strongly recomended that
+                 you leave this default value set to True.
+
+        Returns:
+            A dictionary is returned containing the URL fully parsed if
+            successful, otherwise None is returned.
         """
+
         results = parse_url(
             url, default_schema='unknown', verify_host=verify_host)
 
@@ -417,6 +677,15 @@ class NotifyBase(object):
                         results['format']))
                 del results['format']
 
+        # Allow overriding the default overflow
+        if 'overflow' in results['qsd']:
+            results['overflow'] = results['qsd'].get('overflow')
+            if results['overflow'] not in OVERFLOW_MODES:
+                NotifyBase.logger.warning(
+                    'Unsupported overflow specified {}'.format(
+                        results['overflow']))
+                del results['overflow']
+
         # Password overrides
         if 'pass' in results['qsd']:
             results['password'] = results['qsd']['pass']
@@ -425,6 +694,4 @@ class NotifyBase(object):
         if 'user' in results['qsd']:
             results['user'] = results['qsd']['user']
 
-        results['headers'] = {k[1:]: v for k, v in results['qsd'].items()
-                              if re.match(r'^-.', k)}
         return results

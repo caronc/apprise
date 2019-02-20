@@ -26,10 +26,9 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
-import re
-
 from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
+from ..common import NotifyType
 
 # Default our global support flag
 NOTIFY_GNOME_SUPPORT_ENABLED = False
@@ -86,6 +85,18 @@ class NotifyGnome(NotifyBase):
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_128
 
+    # Disable throttle rate for Gnome requests since they are normally
+    # local anyway
+    request_rate_per_sec = 0
+
+    # Limit results to just the first 10 line otherwise there is just to much
+    # content to display
+    body_max_line_count = 10
+
+    # A title can not be used for SMS Messages.  Setting this to zero will
+    # cause any title (if defined) to get placed into the message body.
+    title_maxlen = 0
+
     # This entry is a bit hacky, but it allows us to unit-test this library
     # in an environment that simply doesn't have the gnome packages
     # available to us.  It also allows us to handle situations where the
@@ -109,7 +120,7 @@ class NotifyGnome(NotifyBase):
         else:
             self.urgency = urgency
 
-    def notify(self, title, body, notify_type, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Gnome Notification
         """
@@ -118,15 +129,6 @@ class NotifyGnome(NotifyBase):
             self.logger.warning(
                 "Gnome Notifications are not supported by this system.")
             return False
-
-        # Limit results to just the first 10 line otherwise
-        # there is just to much content to display
-        body = re.split('[\r\n]+', body)
-        if title:
-            # Place title on first line if it exists
-            body.insert(0, title)
-
-        body = '\r\n'.join(body[0:10])
 
         try:
             # App initialization
@@ -140,6 +142,9 @@ class NotifyGnome(NotifyBase):
 
             # Assign urgency
             notification.set_urgency(self.urgency)
+
+            # Always call throttle before any remote server i/o is made
+            self.throttle()
 
             try:
                 # Use Pixbuf to create the proper image type
@@ -157,12 +162,19 @@ class NotifyGnome(NotifyBase):
             notification.show()
             self.logger.info('Sent Gnome notification.')
 
-        except Exception as e:
+        except Exception:
             self.logger.warning('Failed to send Gnome notification.')
             self.logger.exception('Gnome Exception')
             return False
 
         return True
+
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        return '{schema}://'.format(schema=self.protocol)
 
     @staticmethod
     def parse_url(url):

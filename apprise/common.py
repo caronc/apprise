@@ -77,3 +77,31 @@ NOTIFY_FORMATS = (
     NotifyFormat.HTML,
     NotifyFormat.MARKDOWN,
 )
+
+
+class OverflowMode(object):
+    """
+    A list of pre-defined modes of how to handle the text when it exceeds the
+    defined maximum message size.
+    """
+
+    # Send the data as is; untouched.  Let the upstream server decide how the
+    # content is handled.  Some upstream services might gracefully handle this
+    # with expected intentions; others might not.
+    UPSTREAM = 'upstream'
+
+    # Always truncate the text when it exceeds the maximum message size and
+    # send it anyway
+    TRUNCATE = 'truncate'
+
+    # Split the message into multiple smaller messages that fit within the
+    # limits of what is expected.  The smaller messages are sent
+    SPLIT = 'split'
+
+
+# Define our modes so we can verify if we need to
+OVERFLOW_MODES = (
+    OverflowMode.UPSTREAM,
+    OverflowMode.TRUNCATE,
+    OverflowMode.SPLIT,
+)
