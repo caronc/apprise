@@ -118,9 +118,7 @@ class NotifyBase(object):
     image_size = None
 
     # The maximum allowable characters allowed in the body per message
-    # We set it to what would virtually be an infinite value really
-    # 2^63 - 1 = 9223372036854775807
-    body_maxlen = 9223372036854775807
+    body_maxlen = 32768
 
     # Defines the maximum allowable characters in the title; set this to zero
     # if a title can't be used. Titles that are not used but are defined are
