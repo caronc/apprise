@@ -3279,7 +3279,7 @@ def test_notify_overflow_split():
 
         # Our body is only broken up; not lost
         _body = chunk.get('body')
-        assert body[offset: len(_body) + offset] == _body
+        assert body[offset: len(_body) + offset].rstrip() == _body
         offset += len(_body)
 
     #
