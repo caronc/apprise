@@ -158,8 +158,9 @@ class NotifyIFTTT(NotifyBase):
         # any entries defined above)
         payload.update(self.add_tokens)
 
-        # Eliminate fields flagged for removal
-        payload = {x: y for x, y in payload.items()
+        # Eliminate fields flagged for removal otherwise ensure all tokens are
+        # lowercase since that is what the IFTTT server expects from us.
+        payload = {x.lower(): y for x, y in payload.items()
                    if x not in self.del_tokens}
 
         # Track our failures
