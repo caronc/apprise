@@ -86,9 +86,12 @@ try:
         from gi.repository import GdkPixbuf
         NOTIFY_DBUS_IMAGE_SUPPORT = True
 
-    except ImportError:
+    except (ImportError, ValueError):
         # No problem; this will get caught in outer try/catch
-        raise
+
+        # A ValueError will get thrown upon calling gi.require_version() if
+        # GDK/GTK isn't installed on the system but gi is.
+        pass
 
 except ImportError:
     # No problem; we just simply can't support this plugin; we could
