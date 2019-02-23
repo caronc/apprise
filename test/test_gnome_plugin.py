@@ -77,7 +77,7 @@ def test_gnome_plugin():
     gi.repository.Notify.init.return_value = True
     gi.repository.Notify.Notification = mock_notify
 
-    # Emulate require_version function1k:
+    # Emulate require_version function:
     gi.require_version = mock.Mock(
         name=gi_name + '.require_version')
 
