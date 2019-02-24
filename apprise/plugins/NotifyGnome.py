@@ -47,10 +47,13 @@ try:
     # We're good to go!
     NOTIFY_GNOME_SUPPORT_ENABLED = True
 
-except ImportError:
+except (ImportError, ValueError):
     # No problem; we just simply can't support this plugin; we could
     # be in microsoft windows, or we just don't have the python-gobject
     # library available to us (or maybe one we don't support)?
+
+    # Alternativey A ValueError will get thrown upon calling
+    # gi.require_version() if the requested Notify namespace isn't available
     pass
 
 
