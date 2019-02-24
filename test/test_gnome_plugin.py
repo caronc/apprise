@@ -153,3 +153,31 @@ def test_gnome_plugin():
 
     # Test the setting of a the urgency
     apprise.plugins.NotifyGnome(urgency=0)
+
+    # Verify this all works in the event a ValueError is also thronw
+    # out of the call to gi.require_version()
+
+    # Emulate require_version function:
+    gi.require_version.side_effect = ValueError()
+
+    # The following libraries need to be reloaded to prevent
+    #  TypeError: super(type, obj): obj must be an instance or subtype of type
+    #  This is better explained in this StackOverflow post:
+    #     https://stackoverflow.com/questions/31363311/\
+    #       any-way-to-manually-fix-operation-of-\
+    #          super-after-ipython-reload-avoiding-ty
+    #
+    reload(sys.modules['apprise.plugins.NotifyGnome'])
+    reload(sys.modules['apprise.plugins'])
+    reload(sys.modules['apprise.Apprise'])
+    reload(sys.modules['apprise'])
+
+    # Create our instance
+    obj = apprise.Apprise.instantiate('gnome://', suppress_exceptions=False)
+    assert(isinstance(obj, apprise.plugins.NotifyGnome) is True)
+    obj.duration = 0
+
+    # Our notifications can not work without our gi library having been
+    # loaded.
+    assert(obj.notify(title='title', body='body',
+           notify_type=apprise.NotifyType.INFO) is False)
