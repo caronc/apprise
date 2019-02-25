@@ -27,7 +27,6 @@ import requests
 from json import dumps
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyType
 from ..common import NotifyImageSize
 
@@ -204,17 +203,17 @@ class NotifyXBMC(NotifyBase):
             )
             if r.status_code != requests.codes.ok:
                 # We had a problem
-                try:
-                    self.logger.warning(
-                        'Failed to send XBMC/KODI notification:'
-                        '%s (error=%s).' % (
-                            HTTP_ERROR_MAP[r.status_code],
-                            r.status_code))
+                status_str = \
+                    NotifyBase.http_response_code_lookup(r.status_code)
 
-                except KeyError:
-                    self.logger.warning(
-                        'Failed to send XBMC/KODI notification '
-                        '(error=%s).' % r.status_code)
+                self.logger.warning(
+                    'Failed to send XBMC/KODI notification: '
+                    '{}{}error={}.'.format(
+                        status_str,
+                        ', ' if status_str else '',
+                        r.status_code))
+
+                self.logger.debug('Response Details:\r\n{}'.format(r.content))
 
                 # Return; we're done
                 return False

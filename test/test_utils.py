@@ -34,6 +34,10 @@ except ImportError:
 
 from apprise import utils
 
+# Disable logging for a cleaner testing output
+import logging
+logging.disable(logging.CRITICAL)
+
 
 def test_parse_qsd():
     "utils: parse_qsd() testing """
@@ -387,6 +391,18 @@ def test_is_hostname():
     assert utils.is_hostname('') is False
 
 
+def test_is_email():
+    """
+    API: is_email() function
+
+    """
+    # Valid Emails
+    assert utils.is_email('test@gmail.com') is True
+
+    # Invalid Emails
+    assert utils.is_email('invalid.com') is False
+
+
 def test_parse_list():
     "utils: parse_list() testing """
 
@@ -424,3 +440,79 @@ def test_parse_list():
         '.divx', '.wmv', '.iso', '.mkv', '.mov', '.mpg', '.avi', '.vob',
         '.xvid', '.mpeg', '.mp4',
     ]))
+
+
+def test_exclusive_match():
+    """utils: is_exclusive_match() testing
+    """
+
+    # No Logic always returns True
+    assert utils.is_exclusive_match(data=None, logic=None) is True
+    assert utils.is_exclusive_match(data=None, logic=set()) is True
+    assert utils.is_exclusive_match(data='', logic=set()) is True
+    assert utils.is_exclusive_match(data=u'', logic=set()) is True
+    assert utils.is_exclusive_match(data=u'check', logic=set()) is True
+    assert utils.is_exclusive_match(
+        data=['check', 'checkb'], logic=set()) is True
+
+    # String delimters are stripped out so that a list can be formed
+    # the below is just an empty token list
+    assert utils.is_exclusive_match(data=set(), logic=',;   ,') is True
+
+    # garbage logic is never an exclusive match
+    assert utils.is_exclusive_match(data=set(), logic=object()) is False
+    assert utils.is_exclusive_match(data=set(), logic=[object(), ]) is False
+
+    #
+    # Test with logic:
+    #
+    data = set(['abc'])
+
+    # def in data
+    assert utils.is_exclusive_match(
+        logic='def', data=data) is False
+    # def in data
+    assert utils.is_exclusive_match(
+        logic=['def', ], data=data) is False
+    # def in data
+    assert utils.is_exclusive_match(
+        logic=('def', ), data=data) is False
+    # def in data
+    assert utils.is_exclusive_match(
+        logic=set(['def', ]), data=data) is False
+    # abc in data
+    assert utils.is_exclusive_match(
+        logic=['abc', ], data=data) is True
+    # abc in data
+    assert utils.is_exclusive_match(
+        logic=('abc', ), data=data) is True
+    # abc in data
+    assert utils.is_exclusive_match(
+        logic=set(['abc', ]), data=data) is True
+    # abc or def in data
+    assert utils.is_exclusive_match(
+        logic='abc, def', data=data) is True
+
+    #
+    # Update our data set so we can do more advance checks
+    #
+    data = set(['abc', 'def', 'efg', 'xyz'])
+
+    # def and abc in data
+    assert utils.is_exclusive_match(
+        logic=[('abc', 'def')], data=data) is True
+
+    # cba and abc in data
+    assert utils.is_exclusive_match(
+        logic=[('cba', 'abc')], data=data) is False
+
+    # www or zzz or abc and xyz
+    assert utils.is_exclusive_match(
+        logic=['www', 'zzz', ('abc', 'xyz')], data=data) is True
+    # www or zzz or abc and xyz (strings are valid too)
+    assert utils.is_exclusive_match(
+        logic=['www', 'zzz', ('abc, xyz')], data=data) is True
+
+    # www or zzz or abc and jjj
+    assert utils.is_exclusive_match(
+        logic=['www', 'zzz', ('abc', 'jjj')], data=data) is False

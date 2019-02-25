@@ -24,24 +24,22 @@
 # THE SOFTWARE.
 
 import re
+import six
 import requests
 from json import loads
 from itertools import chain
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyType
-from ..utils import compat_is_basestring
 
 IS_CHANNEL = re.compile(r'^#(?P<name>[A-Za-z0-9]+)$')
 IS_ROOM_ID = re.compile(r'^(?P<name>[A-Za-z0-9]+)$')
 
 # Extend HTTP Error Messages
-RC_HTTP_ERROR_MAP = HTTP_ERROR_MAP.copy()
-RC_HTTP_ERROR_MAP.update({
+RC_HTTP_ERROR_MAP = {
     400: 'Channel/RoomId is wrong format, or missing from server.',
     401: 'Authentication tokens provided is invalid or missing.',
-})
+}
 
 # Used to break apart list of potential tags by their delimiter
 # into a usable list.
@@ -103,7 +101,7 @@ class NotifyRocketChat(NotifyBase):
         if recipients is None:
             recipients = []
 
-        elif compat_is_basestring(recipients):
+        elif isinstance(recipients, six.string_types):
             recipients = [x for x in filter(bool, LIST_DELIM.split(
                 recipients,
             ))]
@@ -253,24 +251,23 @@ class NotifyRocketChat(NotifyBase):
             )
             if r.status_code != requests.codes.ok:
                 # We had a problem
-                try:
-                    self.logger.warning(
-                        'Failed to send Rocket.Chat notification: '
-                        '%s (error=%s).' % (
-                            RC_HTTP_ERROR_MAP[r.status_code],
-                            r.status_code))
+                status_str = \
+                    NotifyBase.http_response_code_lookup(
+                        r.status_code, RC_HTTP_ERROR_MAP)
 
-                except KeyError:
-                    self.logger.warning(
-                        'Failed to send Rocket.Chat notification '
-                        '(error=%s).' % (
-                            r.status_code))
+                self.logger.warning(
+                    'Failed to send Rocket.Chat notification: '
+                    '{}{}error={}.'.format(
+                        status_str,
+                        ', ' if status_str else '',
+                        r.status_code))
+
+                self.logger.debug('Response Details:\r\n{}'.format(r.content))
 
                 # Return; we're done
                 return False
 
             else:
-                self.logger.debug('Rocket.Chat Server Response: %s.' % r.text)
                 self.logger.info('Sent Rocket.Chat notification.')
 
         except requests.RequestException as e:
@@ -302,28 +299,30 @@ class NotifyRocketChat(NotifyBase):
             )
             if r.status_code != requests.codes.ok:
                 # We had a problem
-                try:
-                    self.logger.warning(
-                        'Failed to authenticate with Rocket.Chat server: '
-                        '%s (error=%s).' % (
-                            RC_HTTP_ERROR_MAP[r.status_code],
-                            r.status_code))
+                status_str = \
+                    NotifyBase.http_response_code_lookup(
+                        r.status_code, RC_HTTP_ERROR_MAP)
 
-                except KeyError:
-                    self.logger.warning(
-                        'Failed to authenticate with Rocket.Chat server '
-                        '(error=%s).' % (
-                            r.status_code))
+                self.logger.warning(
+                    'Failed to authenticate {} with Rocket.Chat: '
+                    '{}{}error={}.'.format(
+                        self.user,
+                        status_str,
+                        ', ' if status_str else '',
+                        r.status_code))
+
+                self.logger.debug('Response Details:\r\n{}'.format(r.content))
 
                 # Return; we're done
                 return False
 
             else:
                 self.logger.debug('Rocket.Chat authentication successful')
-                response = loads(r.text)
+                response = loads(r.content)
                 if response.get('status') != "success":
                     self.logger.warning(
-                        'Could not authenticate with Rocket.Chat server.')
+                        'Could not authenticate {} with Rocket.Chat.'.format(
+                            self.user))
                     return False
 
                 # Set our headers for further communication
@@ -334,8 +333,8 @@ class NotifyRocketChat(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured authenticating to the '
-                'Rocket.Chat server.')
+                'A Connection error occured authenticating {} on '
+                'Rocket.Chat.'.format(self.user))
             self.logger.debug('Socket Exception: %s' % str(e))
             return False
 
@@ -353,18 +352,19 @@ class NotifyRocketChat(NotifyBase):
             )
             if r.status_code != requests.codes.ok:
                 # We had a problem
-                try:
-                    self.logger.warning(
-                        'Failed to log off Rocket.Chat server: '
-                        '%s (error=%s).' % (
-                            RC_HTTP_ERROR_MAP[r.status_code],
-                            r.status_code))
+                status_str = \
+                    NotifyBase.http_response_code_lookup(
+                        r.status_code, RC_HTTP_ERROR_MAP)
 
-                except KeyError:
-                    self.logger.warning(
-                        'Failed to log off Rocket.Chat server '
-                        '(error=%s).' % (
-                            r.status_code))
+                self.logger.warning(
+                    'Failed to logoff {} from Rocket.Chat: '
+                    '{}{}error={}.'.format(
+                        self.user,
+                        status_str,
+                        ', ' if status_str else '',
+                        r.status_code))
+
+                self.logger.debug('Response Details:\r\n{}'.format(r.content))
 
                 # Return; we're done
                 return False
@@ -372,7 +372,7 @@ class NotifyRocketChat(NotifyBase):
             else:
                 self.logger.debug(
                     'Rocket.Chat log off successful; response %s.' % (
-                        r.text))
+                        r.content))
 
         except requests.RequestException as e:
             self.logger.warning(

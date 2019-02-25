@@ -29,20 +29,15 @@ from json import dumps
 from time import time
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyType
 
 # Token required as part of the API request
 VALIDATE_TOKEN = re.compile(r'[A-Za-z0-9]{64}')
 
-# Default User
-MATRIX_DEFAULT_USER = 'apprise'
-
 # Extend HTTP Error Messages
-MATRIX_HTTP_ERROR_MAP = HTTP_ERROR_MAP.copy()
-MATRIX_HTTP_ERROR_MAP.update({
+MATRIX_HTTP_ERROR_MAP = {
     403: 'Unauthorized - Invalid Token.',
-})
+}
 
 
 class MatrixNotificationMode(object):
@@ -79,6 +74,9 @@ class NotifyMatrix(NotifyBase):
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 1000
 
+    # Default User
+    matrix_default_user = 'apprise'
+
     def __init__(self, token, mode=MatrixNotificationMode.MATRIX, **kwargs):
         """
         Initialize Matrix Object
@@ -112,7 +110,7 @@ class NotifyMatrix(NotifyBase):
 
         if not self.user:
             self.logger.warning(
-                'No user was specified; using %s.' % MATRIX_DEFAULT_USER)
+                'No user was specified; using %s.' % self.matrix_default_user)
 
         if mode not in MATRIX_NOTIFICATION_MODES:
             self.logger.warning('The mode specified (%s) is invalid.' % mode)
@@ -144,9 +142,6 @@ class NotifyMatrix(NotifyBase):
             'User-Agent': self.app_id,
             'Content-Type': 'application/json',
         }
-
-        # error tracking (used for function return)
-        notify_okay = True
 
         # Perform Formatting
         title = self._re_formatting_rules.sub(  # pragma: no branch
@@ -183,20 +178,21 @@ class NotifyMatrix(NotifyBase):
             )
             if r.status_code != requests.codes.ok:
                 # We had a problem
-                try:
-                    self.logger.warning(
-                        'Failed to send Matrix '
-                        'notification: %s (error=%s).' % (
-                            MATRIX_HTTP_ERROR_MAP[r.status_code],
-                            r.status_code))
+                status_str = \
+                    NotifyBase.http_response_code_lookup(
+                        r.status_code, MATRIX_HTTP_ERROR_MAP)
 
-                except KeyError:
-                    self.logger.warning(
-                        'Failed to send Matrix '
-                        'notification (error=%s).' % r.status_code)
+                self.logger.warning(
+                    'Failed to send Matrix notification: '
+                    '{}{}error={}.'.format(
+                        status_str,
+                        ', ' if status_str else '',
+                        r.status_code))
+
+                self.logger.debug('Response Details:\r\n{}'.format(r.content))
 
                 # Return; we're done
-                notify_okay = False
+                return False
 
             else:
                 self.logger.info('Sent Matrix notification.')
@@ -206,14 +202,15 @@ class NotifyMatrix(NotifyBase):
                 'A Connection error occured sending Matrix notification.'
             )
             self.logger.debug('Socket Exception: %s' % str(e))
-            notify_okay = False
+            # Return; we're done
+            return False
 
-        return notify_okay
+        return True
 
     def __slack_mode_payload(self, title, body, notify_type):
         # prepare JSON Object
         payload = {
-            'username': self.user if self.user else MATRIX_DEFAULT_USER,
+            'username': self.user if self.user else self.matrix_default_user,
             # Use Markdown language
             'mrkdwn': True,
             'attachments': [{
@@ -234,7 +231,8 @@ class NotifyMatrix(NotifyBase):
         msg = '<h4>%s</h4>%s<br/>' % (title, body)
 
         payload = {
-            'displayName': self.user if self.user else MATRIX_DEFAULT_USER,
+            'displayName':
+                self.user if self.user else self.matrix_default_user,
             'format': 'html',
             'text': msg,
         }

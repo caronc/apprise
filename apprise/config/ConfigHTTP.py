@@ -23,48 +23,53 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import re
 import six
 import requests
-from json import dumps
+from .ConfigBase import ConfigBase
+from ..common import ConfigFormat
 
-from .NotifyBase import NotifyBase
-from ..common import NotifyImageSize
-from ..common import NotifyType
+# Support YAML formats
+# text/yaml
+# text/x-yaml
+# application/yaml
+# application/x-yaml
+MIME_IS_YAML = re.compile('(text|application)/(x-)?yaml', re.I)
 
 
-class NotifyJSON(NotifyBase):
+class ConfigHTTP(ConfigBase):
     """
-    A wrapper for JSON Notifications
+    A wrapper for HTTP based configuration sources
     """
 
     # The default descriptive name associated with the Notification
-    service_name = 'JSON'
+    service_name = 'HTTP'
 
     # The default protocol
-    protocol = 'json'
+    protocol = 'http'
 
     # The default secure protocol
-    secure_protocol = 'jsons'
+    secure_protocol = 'https'
 
-    # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_Custom_JSON'
+    # The maximum number of seconds to wait for a connection to be established
+    # before out-right just giving up
+    connection_timeout_sec = 5.0
 
-    # Allows the user to specify the NotifyImageSize object
-    image_size = NotifyImageSize.XY_128
+    # If an HTTP error occurs, define the number of characters you still want
+    # to read back.  This is useful for debugging purposes, but nothing else.
+    # The idea behind enforcing this kind of restriction is to prevent abuse
+    # from queries to services that may be untrusted.
+    max_error_buffer_size = 2048
 
-    # Disable throttle rate for JSON requests since they are normally
-    # local anyway
-    request_rate_per_sec = 0
-
-    def __init__(self, headers, **kwargs):
+    def __init__(self, headers=None, **kwargs):
         """
-        Initialize JSON Object
+        Initialize HTTP Object
 
         headers can be a dictionary of key/value pairs that you want to
         additionally include as part of the server headers to post with
 
         """
-        super(NotifyJSON, self).__init__(**kwargs)
+        super(ConfigHTTP, self).__init__(**kwargs)
 
         if self.secure:
             self.schema = 'https'
@@ -90,9 +95,12 @@ class NotifyJSON(NotifyBase):
 
         # Define any arguments set
         args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
+            'encoding': self.encoding,
         }
+
+        if self.config_format:
+            # A format was enforced; make sure it's passed back with the url
+            args['format'] = self.config_format
 
         # Append our headers into our args
         args.update({'+{}'.format(k): v for k, v in self.headers.items()})
@@ -120,25 +128,14 @@ class NotifyJSON(NotifyBase):
             args=self.urlencode(args),
         )
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
+    def read(self, **kwargs):
         """
-        Perform JSON Notification
+        Perform retrieval of the configuration based on the specified request
         """
 
-        # prepare JSON Object
-        payload = {
-            # Version: Major.Minor,  Major is only updated if the entire
-            # schema is changed. If just adding new items (or removing
-            # old ones, only increment the Minor!
-            'version': '1.0',
-            'title': title,
-            'message': body,
-            'type': notify_type,
-        }
-
+        # prepare XML Object
         headers = {
             'User-Agent': self.app_id,
-            'Content-Type': 'application/json'
         }
 
         # Apply any/all header over-rides defined
@@ -154,52 +151,102 @@ class NotifyJSON(NotifyBase):
 
         url += self.fullpath
 
-        self.logger.debug('JSON POST URL: %s (cert_verify=%r)' % (
+        self.logger.debug('HTTP POST URL: %s (cert_verify=%r)' % (
             url, self.verify_certificate,
         ))
-        self.logger.debug('JSON Payload: %s' % str(payload))
+
+        # Prepare our response object
+        response = None
+
+        # Where our request object will temporarily live.
+        r = None
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
 
         try:
+            # Make our request
             r = requests.post(
                 url,
-                data=dumps(payload),
                 headers=headers,
                 auth=auth,
                 verify=self.verify_certificate,
+                timeout=self.connection_timeout_sec,
+                stream=True,
             )
-            if r.status_code != requests.codes.ok:
-                # We had a problem
-                status_str = \
-                    NotifyBase.http_response_code_lookup(r.status_code)
 
-                self.logger.warning(
-                    'Failed to send JSON notification: '
-                    '{}{}error={}.'.format(
+            if r.status_code != requests.codes.ok:
+                status_str = \
+                    ConfigBase.http_response_code_lookup(r.status_code)
+                self.logger.error(
+                    'Failed to get HTTP configuration: '
+                    '{}{} error={}.'.format(
                         status_str,
-                        ', ' if status_str else '',
+                        ',' if status_str else '',
                         r.status_code))
 
-                self.logger.debug('Response Details:\r\n{}'.format(r.content))
+                # Display payload for debug information only; Don't read any
+                # more than the first X bytes since we're potentially accessing
+                # content from untrusted servers.
+                if self.max_error_buffer_size > 0:
+                    self.logger.debug(
+                        'Response Details:\r\n{}'.format(
+                            r.content[0:self.max_error_buffer_size]))
 
-                # Return; we're done
-                return False
+                # Close out our connection if it exists to eliminate any
+                # potential inefficiencies with the Request connection pool as
+                # documented on their site when using the stream=True option.
+                r.close()
+
+                # Return None (signifying a failure)
+                return None
+
+            # Store our response
+            if self.max_buffer_size > 0 and \
+                    r.headers['Content-Length'] > self.max_buffer_size:
+
+                # Provide warning of data truncation
+                self.logger.error(
+                    'HTTP config response exceeds maximum buffer length '
+                    '({}KB);'.format(int(self.max_buffer_size / 1024)))
+
+                # Close out our connection if it exists to eliminate any
+                # potential inefficiencies with the Request connection pool as
+                # documented on their site when using the stream=True option.
+                r.close()
+
+                # Return None - buffer execeeded
+                return None
 
             else:
-                self.logger.info('Sent JSON notification.')
+                # Store our result
+                response = r.content
+
+                # Detect config format based on mime if the format isn't
+                # already enforced
+                if self.config_format is None \
+                    and MIME_IS_YAML.match(r.headers.get(
+                        'Content-Type', 'text/plain')) is not None:
+
+                    # YAML data detected based on header content
+                    self.default_config_format = ConfigFormat.YAML
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured sending JSON '
-                'notification to %s.' % self.host)
+                'A Connection error occured retrieving HTTP '
+                'configuration from %s.' % self.host)
             self.logger.debug('Socket Exception: %s' % str(e))
 
-            # Return; we're done
-            return False
+            # Return None (signifying a failure)
+            return None
 
-        return True
+        # Close out our connection if it exists to eliminate any potential
+        # inefficiencies with the Request connection pool as documented on
+        # their site when using the stream=True option.
+        r.close()
+
+        # Return our response object
+        return response
 
     @staticmethod
     def parse_url(url):
@@ -208,7 +255,7 @@ class NotifyJSON(NotifyBase):
         us to substantiate this object.
 
         """
-        results = NotifyBase.parse_url(url)
+        results = ConfigBase.parse_url(url)
 
         if not results:
             # We're done early as we couldn't load the results

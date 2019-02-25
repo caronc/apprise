@@ -45,7 +45,6 @@ import requests
 from json import dumps
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyImageSize
 from ..common import NotifyFormat
 from ..common import NotifyType
@@ -215,20 +214,19 @@ class NotifyDiscord(NotifyBase):
             )
             if r.status_code not in (
                     requests.codes.ok, requests.codes.no_content):
+
                 # We had a problem
-                try:
-                    self.logger.warning(
-                        'Failed to send Discord notification: '
-                        '%s (error=%s).' % (
-                            HTTP_ERROR_MAP[r.status_code],
-                            r.status_code))
+                status_str = \
+                    NotifyBase.http_response_code_lookup(r.status_code)
 
-                except KeyError:
-                    self.logger.warning(
-                        'Failed to send Discord notification '
-                        '(error=%s).' % r.status_code)
+                self.logger.warning(
+                    'Failed to send Discord notification: '
+                    '{}{}error={}.'.format(
+                        status_str,
+                        ', ' if status_str else '',
+                        r.status_code))
 
-                self.logger.debug('Response Details: %s' % r.raw.read())
+                self.logger.debug('Response Details:\r\n{}'.format(r.content))
 
                 # Return; we're done
                 return False

@@ -24,13 +24,12 @@
 # THE SOFTWARE.
 
 import re
+import six
 import requests
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyImageSize
 from ..common import NotifyType
-from ..utils import compat_is_basestring
 
 
 class NotifyXML(NotifyBase):
@@ -89,7 +88,7 @@ class NotifyXML(NotifyBase):
             self.schema = 'http'
 
         self.fullpath = kwargs.get('fullpath')
-        if not compat_is_basestring(self.fullpath):
+        if not isinstance(self.fullpath, six.string_types):
             self.fullpath = '/'
 
         self.headers = {}
@@ -190,17 +189,18 @@ class NotifyXML(NotifyBase):
                 verify=self.verify_certificate,
             )
             if r.status_code != requests.codes.ok:
-                try:
-                    self.logger.warning(
-                        'Failed to send XML notification: '
-                        '%s (error=%s).' % (
-                            HTTP_ERROR_MAP[r.status_code],
-                            r.status_code))
+                # We had a problem
+                status_str = \
+                    NotifyBase.http_response_code_lookup(r.status_code)
 
-                except KeyError:
-                    self.logger.warning(
-                        'Failed to send XML notification '
-                        '(error=%s).' % r.status_code)
+                self.logger.warning(
+                    'Failed to send XML notification: '
+                    '{}{}error={}.'.format(
+                        status_str,
+                        ', ' if status_str else '',
+                        r.status_code))
+
+                self.logger.debug('Response Details:\r\n{}'.format(r.content))
 
                 # Return; we're done
                 return False

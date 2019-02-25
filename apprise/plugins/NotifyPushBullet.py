@@ -24,14 +24,13 @@
 # THE SOFTWARE.
 
 import re
+import six
 import requests
 from json import dumps
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import HTTP_ERROR_MAP
-from .NotifyBase import IS_EMAIL_RE
+from ..utils import GET_EMAIL_RE
 from ..common import NotifyType
-from ..utils import compat_is_basestring
 
 # Flag used as a placeholder to sending to all devices
 PUSHBULLET_SEND_TO_ALL = 'ALL_DEVICES'
@@ -40,11 +39,10 @@ PUSHBULLET_SEND_TO_ALL = 'ALL_DEVICES'
 # into a usable list.
 RECIPIENTS_LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
 
-# Extend HTTP Error Messages
-PUSHBULLET_HTTP_ERROR_MAP = HTTP_ERROR_MAP.copy()
-PUSHBULLET_HTTP_ERROR_MAP.update({
+# Provide some known codes Pushbullet uses and what they translate to:
+PUSHBULLET_HTTP_ERROR_MAP = {
     401: 'Unauthorized - Invalid Token.',
-})
+}
 
 
 class NotifyPushBullet(NotifyBase):
@@ -74,7 +72,7 @@ class NotifyPushBullet(NotifyBase):
         super(NotifyPushBullet, self).__init__(**kwargs)
 
         self.accesstoken = accesstoken
-        if compat_is_basestring(recipients):
+        if isinstance(recipients, six.string_types):
             self.recipients = [x for x in filter(
                 bool, RECIPIENTS_LIST_DELIM.split(recipients))]
 
@@ -117,7 +115,7 @@ class NotifyPushBullet(NotifyBase):
                 # Send to all
                 pass
 
-            elif IS_EMAIL_RE.match(recipient):
+            elif GET_EMAIL_RE.match(recipient):
                 payload['email'] = recipient
                 self.logger.debug(
                     "Recipient '%s' is an email address" % recipient)
@@ -150,23 +148,24 @@ class NotifyPushBullet(NotifyBase):
 
                 if r.status_code != requests.codes.ok:
                     # We had a problem
-                    try:
-                        self.logger.warning(
-                            'Failed to send PushBullet notification to '
-                            '"%s": %s (error=%s).' % (
-                                recipient,
-                                PUSHBULLET_HTTP_ERROR_MAP[r.status_code],
-                                r.status_code))
+                    status_str = \
+                        NotifyBase.http_response_code_lookup(
+                            r.status_code, PUSHBULLET_HTTP_ERROR_MAP)
 
-                    except KeyError:
-                        self.logger.warning(
-                            'Failed to send PushBullet notification to '
-                            '"%s" (error=%s).' % (recipient, r.status_code))
+                    self.logger.warning(
+                        'Failed to send PushBullet notification to {}:'
+                        '{}{}error={}.'.format(
+                            recipient,
+                            status_str,
+                            ', ' if status_str else '',
+                            r.status_code))
 
-                    # self.logger.debug('Response Details: %s' % r.raw.read())
+                    self.logger.debug(
+                        'Response Details:\r\n{}'.format(r.content))
 
-                    # Return; we're done
+                    # Mark our failure
                     has_error = True
+                    continue
 
                 else:
                     self.logger.info(
@@ -178,7 +177,10 @@ class NotifyPushBullet(NotifyBase):
                     'notification to "%s".' % (recipient),
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))
+
+                # Mark our failure
                 has_error = True
+                continue
 
         return not has_error
 

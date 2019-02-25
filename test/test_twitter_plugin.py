@@ -28,6 +28,10 @@ from apprise import NotifyType
 from apprise import Apprise
 import mock
 
+# Disable logging for a cleaner testing output
+import logging
+logging.disable(logging.CRITICAL)
+
 
 TEST_URLS = (
     ##################################

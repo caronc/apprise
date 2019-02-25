@@ -27,7 +27,6 @@ import re
 import requests
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyType
 
 # Used to validate API Key
@@ -54,12 +53,11 @@ PROWL_PRIORITIES = (
     ProwlPriority.EMERGENCY,
 )
 
-# Extend HTTP Error Messages
-PROWL_HTTP_ERROR_MAP = HTTP_ERROR_MAP.copy()
-HTTP_ERROR_MAP.update({
+# Provide some known codes Prowl uses and what they translate to:
+PROWL_HTTP_ERROR_MAP = {
     406: 'IP address has exceeded API limit',
     409: 'Request not aproved.',
-})
+}
 
 
 class NotifyProwl(NotifyBase):
@@ -168,20 +166,18 @@ class NotifyProwl(NotifyBase):
             )
             if r.status_code != requests.codes.ok:
                 # We had a problem
-                try:
-                    self.logger.warning(
-                        'Failed to send Prowl notification: '
-                        '%s (error=%s).' % (
-                            PROWL_HTTP_ERROR_MAP[r.status_code],
-                            r.status_code))
+                status_str = \
+                    NotifyBase.http_response_code_lookup(
+                        r.status_code, PROWL_HTTP_ERROR_MAP)
 
-                except KeyError:
-                    self.logger.warning(
-                        'Failed to send Prowl notification '
-                        '(error=%s).' % (
-                            r.status_code))
+                self.logger.warning(
+                    'Failed to send Prowl notification:'
+                    '{}{}error={}.'.format(
+                        status_str,
+                        ', ' if status_str else '',
+                        r.status_code))
 
-                self.logger.debug('Response Details: %s' % r.raw.read())
+                self.logger.debug('Response Details:\r\n{}'.format(r.content))
 
                 # Return; we're done
                 return False

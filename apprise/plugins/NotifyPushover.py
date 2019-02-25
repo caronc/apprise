@@ -24,12 +24,11 @@
 # THE SOFTWARE.
 
 import re
+import six
 import requests
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyType
-from ..utils import compat_is_basestring
 
 # Flag used as a placeholder to sending to all devices
 PUSHOVER_SEND_TO_ALL = 'ALL_DEVICES'
@@ -65,10 +64,9 @@ PUSHOVER_PRIORITIES = (
 DEVICE_LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
 
 # Extend HTTP Error Messages
-PUSHOVER_HTTP_ERROR_MAP = HTTP_ERROR_MAP.copy()
-PUSHOVER_HTTP_ERROR_MAP.update({
+PUSHOVER_HTTP_ERROR_MAP = {
     401: 'Unauthorized - Invalid Token.',
-})
+}
 
 
 class NotifyPushover(NotifyBase):
@@ -117,7 +115,7 @@ class NotifyPushover(NotifyBase):
                 'The API Token specified (%s) is invalid.' % token,
             )
 
-        if compat_is_basestring(devices):
+        if isinstance(devices, six.string_types):
             self.devices = [x for x in filter(bool, DEVICE_LIST_DELIM.split(
                 devices,
             ))]
@@ -173,6 +171,8 @@ class NotifyPushover(NotifyBase):
                 self.logger.warning(
                     'The device specified (%s) is invalid.' % device,
                 )
+
+                # Mark our failure
                 has_error = True
                 continue
 
@@ -204,25 +204,24 @@ class NotifyPushover(NotifyBase):
                 )
                 if r.status_code != requests.codes.ok:
                     # We had a problem
-                    try:
-                        self.logger.warning(
-                            'Failed to send Pushover:%s '
-                            'notification: %s (error=%s).' % (
-                                device,
-                                PUSHOVER_HTTP_ERROR_MAP[r.status_code],
-                                r.status_code))
+                    status_str = \
+                        NotifyBase.http_response_code_lookup(
+                            r.status_code, PUSHOVER_HTTP_ERROR_MAP)
 
-                    except KeyError:
-                        self.logger.warning(
-                            'Failed to send Pushover:%s '
-                            'notification (error=%s).' % (
-                                device,
-                                r.status_code))
+                    self.logger.warning(
+                        'Failed to send Pushover notification to {}: '
+                        '{}{}error={}.'.format(
+                            device,
+                            status_str,
+                            ', ' if status_str else '',
+                            r.status_code))
 
-                    # self.logger.debug('Response Details: %s' % r.raw.read())
+                    self.logger.debug(
+                        'Response Details:\r\n{}'.format(r.content))
 
-                    # Return; we're done
+                    # Mark our failure
                     has_error = True
+                    continue
 
                 else:
                     self.logger.info(
@@ -234,7 +233,10 @@ class NotifyPushover(NotifyBase):
                         device) + 'notification.'
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))
+
+                # Mark our failure
                 has_error = True
+                continue
 
         return not has_error
 

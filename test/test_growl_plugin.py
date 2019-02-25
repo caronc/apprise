@@ -23,12 +23,15 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import mock
+import six
 from apprise import plugins
 from apprise import NotifyType
 from apprise import Apprise
-from apprise.utils import compat_is_basestring
 
-import mock
+# Disable logging for a cleaner testing output
+import logging
+logging.disable(logging.CRITICAL)
 
 
 TEST_URLS = (
@@ -222,7 +225,7 @@ def test_growl_plugin(mock_gntp):
 
             if isinstance(obj, plugins.NotifyBase.NotifyBase):
                 # We loaded okay; now lets make sure we can reverse this url
-                assert(compat_is_basestring(obj.url()) is True)
+                assert(isinstance(obj.url(), six.string_types) is True)
 
                 # Instantiate the exact same object again using the URL from
                 # the one that was already created properly

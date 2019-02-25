@@ -24,7 +24,7 @@
 # THE SOFTWARE.
 
 import re
-
+import six
 from os.path import expanduser
 
 try:
@@ -98,6 +98,18 @@ NOTIFY_CUSTOM_DEL_TOKENS = re.compile(r'^-(?P<key>.*)\s*')
 # Used for attempting to acquire the schema if the URL can't be parsed.
 GET_SCHEMA_RE = re.compile(r'\s*(?P<schema>[a-z0-9]{2,9})://.*$', re.I)
 
+# Regular expression based and expanded from:
+# http://www.regular-expressions.info/email.html
+GET_EMAIL_RE = re.compile(
+    r"((?P<label>[^+]+)\+)?"
+    r"(?P<userid>[a-z0-9$%=_~-]+"
+    r"(?:\.[a-z0-9$%+=_~-]+)"
+    r"*)@(?P<domain>(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+"
+    r"[a-z0-9](?:[a-z0-9-]*"
+    r"[a-z0-9]))?",
+    re.IGNORECASE,
+)
+
 
 def is_hostname(hostname):
     """
@@ -113,18 +125,18 @@ def is_hostname(hostname):
     return all(allowed.match(x) for x in hostname.split("."))
 
 
-def compat_is_basestring(content):
-    """
-    Python 3 support for checking if content is unicode and/or
-    of a string type
-    """
-    try:
-        # Python v2.x
-        return isinstance(content, basestring)
+def is_email(address):
+    """Determine if the specified entry is an email address
 
-    except NameError:
-        # Python v3.x
-        return isinstance(content, str)
+    Args:
+        address (str): The string you want to check.
+
+    Returns:
+        bool: Returns True if the address specified is an email address
+              and False if it isn't.
+    """
+
+    return GET_EMAIL_RE.match(address) is not None
 
 
 def tidy_path(path):
@@ -245,7 +257,7 @@ def parse_url(url, default_schema='http', verify_host=True):
      content could not be extracted.
     """
 
-    if not compat_is_basestring(url):
+    if not isinstance(url, six.string_types):
         # Simple error checking
         return None
 
@@ -391,10 +403,10 @@ def parse_url(url, default_schema='http', verify_host=True):
 
     # Re-assemble cleaned up version of the url
     result['url'] = '%s://' % result['schema']
-    if compat_is_basestring(result['user']):
+    if isinstance(result['user'], six.string_types):
         result['url'] += result['user']
 
-        if compat_is_basestring(result['password']):
+        if isinstance(result['password'], six.string_types):
             result['url'] += ':%s@' % result['password']
 
         else:
@@ -420,7 +432,7 @@ def parse_bool(arg, default=False):
     If the content could not be parsed, then the default is returned.
     """
 
-    if compat_is_basestring(arg):
+    if isinstance(arg, six.string_types):
         # no = no - False
         # of = short for off - False
         # 0  = int for False
@@ -473,7 +485,7 @@ def parse_list(*args):
 
     result = []
     for arg in args:
-        if compat_is_basestring(arg):
+        if isinstance(arg, six.string_types):
             result += re.split(STRING_DELIMITERS, arg)
 
         elif isinstance(arg, (set, list, tuple)):
@@ -494,3 +506,60 @@ def parse_list(*args):
     # a list, we need to change it into a list object to remain compatible with
     # both distribution types.
     return sorted([x for x in filter(bool, list(set(result)))])
+
+
+def is_exclusive_match(logic, data):
+    """
+
+    The data variable should always be a set of strings that the logic can be
+    compared against. It should be a set.  If it isn't already, then it will
+    be converted as such. These identify the tags themselves.
+
+    Our logic should be a list as well:
+      - top level entries are treated as an 'or'
+      - second level (or more) entries are treated as 'and'
+
+      examples:
+        logic="tagA, tagB"                = tagA or tagB
+        logic=['tagA', 'tagB']            = tagA or tagB
+        logic=[('tagA', 'tagC'), 'tagB']  = (tagA and tagC) or tagB
+        logic=[('tagB', 'tagC')]          = tagB and tagC
+    """
+
+    if logic is None:
+        # If there is no logic to apply then we're done early
+        return True
+
+    elif isinstance(logic, six.string_types):
+        # Update our logic to support our delimiters
+        logic = set(parse_list(logic))
+
+    if not isinstance(logic, (list, tuple, set)):
+        # garbage input
+        return False
+
+    # using the data detected; determine if we'll allow the
+    # notification to be sent or not
+    matched = (len(logic) == 0)
+
+    # Every entry here will be or'ed with the next
+    for entry in logic:
+        if not isinstance(entry, (six.string_types, list, tuple, set)):
+            # Garbage entry in our logic found
+            return False
+
+        # treat these entries as though all elements found
+        # must exist in the notification service
+        entries = set(parse_list(entry))
+
+        if len(entries.intersection(data)) == len(entries):
+            # our set contains all of the entries found
+            # in our notification data set
+            matched = True
+            break
+
+        # else: keep looking
+
+    # Return True if we matched against our logic (or simply none was
+    # specified).
+    return matched

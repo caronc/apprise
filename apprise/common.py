@@ -105,3 +105,26 @@ OVERFLOW_MODES = (
     OverflowMode.TRUNCATE,
     OverflowMode.SPLIT,
 )
+
+
+class ConfigFormat(object):
+    """
+    A list of pre-defined config formats that can be passed via the
+    apprise library.
+    """
+
+    # A text based configuration. This consists of a list of URLs delimited by
+    # a new line.  pound/hashtag (#) or semi-colon (;) can be used as comment
+    # characters.
+    TEXT = 'text'
+
+    # YAML files allow a more rich of an experience when settig up your
+    # apprise configuration files.
+    YAML = 'yaml'
+
+
+# Define our configuration formats mostly used for verification
+CONFIG_FORMATS = (
+    ConfigFormat.TEXT,
+    ConfigFormat.YAML,
+)

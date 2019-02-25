@@ -23,12 +23,12 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import six
 import mock
 import sys
 import types
 
 import apprise
-from apprise.utils import compat_is_basestring
 
 try:
     # Python v3.4+
@@ -40,6 +40,10 @@ except ImportError:
     except ImportError:
         # Python v2.7
         pass
+
+# Disable logging for a cleaner testing output
+import logging
+logging.disable(logging.CRITICAL)
 
 
 def test_gnome_plugin():
@@ -115,7 +119,7 @@ def test_gnome_plugin():
     assert(obj._enabled is True)
 
     # Test url() call
-    assert(compat_is_basestring(obj.url()) is True)
+    assert(isinstance(obj.url(), six.string_types) is True)
 
     # test notifications
     assert(obj.notify(title='title', body='body',

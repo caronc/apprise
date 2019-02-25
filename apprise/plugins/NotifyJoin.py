@@ -34,22 +34,20 @@
 #   https://play.google.com/store/apps/details?id=com.joaomgcd.join
 
 import re
+import six
 import requests
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyImageSize
 from ..common import NotifyType
-from ..utils import compat_is_basestring
 
 # Token required as part of the API request
 VALIDATE_APIKEY = re.compile(r'[A-Za-z0-9]{32}')
 
 # Extend HTTP Error Messages
-JOIN_HTTP_ERROR_MAP = HTTP_ERROR_MAP.copy()
-JOIN_HTTP_ERROR_MAP.update({
+JOIN_HTTP_ERROR_MAP = {
     401: 'Unauthorized - Invalid Token.',
-})
+}
 
 # Used to break path apart into list of devices
 DEVICE_LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
@@ -98,6 +96,9 @@ class NotifyJoin(NotifyBase):
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 1000
 
+    # The default group to use if none is specified
+    default_join_group = 'group.all'
+
     def __init__(self, apikey, devices, **kwargs):
         """
         Initialize Join Object
@@ -116,7 +117,7 @@ class NotifyJoin(NotifyBase):
         # The token associated with the account
         self.apikey = apikey.strip()
 
-        if compat_is_basestring(devices):
+        if isinstance(devices, six.string_types):
             self.devices = [x for x in filter(bool, DEVICE_LIST_DELIM.split(
                 devices,
             ))]
@@ -129,7 +130,7 @@ class NotifyJoin(NotifyBase):
 
         if len(self.devices) == 0:
             # Default to everyone
-            self.devices.append('group.all')
+            self.devices.append(self.default_join_group)
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
@@ -142,7 +143,7 @@ class NotifyJoin(NotifyBase):
         }
 
         # error tracking (used for function return)
-        return_status = True
+        has_error = False
 
         # Create a copy of the devices list
         devices = list(self.devices)
@@ -158,6 +159,8 @@ class NotifyJoin(NotifyBase):
                         device,
                     )
                 )
+                # Mark our failure
+                has_error = True
                 continue
 
             url_args = {
@@ -192,26 +195,27 @@ class NotifyJoin(NotifyBase):
                     headers=headers,
                     verify=self.verify_certificate,
                 )
+
                 if r.status_code != requests.codes.ok:
                     # We had a problem
-                    try:
-                        self.logger.warning(
-                            'Failed to send Join:%s '
-                            'notification: %s (error=%s).' % (
-                                device,
-                                JOIN_HTTP_ERROR_MAP[r.status_code],
-                                r.status_code))
+                    status_str = \
+                        NotifyBase.http_response_code_lookup(
+                            r.status_code, JOIN_HTTP_ERROR_MAP)
 
-                    except KeyError:
-                        self.logger.warning(
-                            'Failed to send Join:%s '
-                            'notification (error=%s).' % (
-                                device,
-                                r.status_code))
+                    self.logger.warning(
+                        'Failed to send Join notification to {}: '
+                        '{}{}error={}.'.format(
+                            device,
+                            status_str,
+                            ', ' if status_str else '',
+                            r.status_code))
 
-                    # self.logger.debug('Response Details: %s' % r.raw.read())
+                    self.logger.debug(
+                        'Response Details:\r\n{}'.format(r.content))
 
-                    return_status = False
+                    # Mark our failure
+                    has_error = True
+                    continue
 
                 else:
                     self.logger.info('Sent Join notification to %s.' % device)
@@ -222,9 +226,12 @@ class NotifyJoin(NotifyBase):
                     'notification.' % device
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))
-                return_status = False
 
-        return return_status
+                # Mark our failure
+                has_error = True
+                continue
+
+        return not has_error
 
     def url(self):
         """

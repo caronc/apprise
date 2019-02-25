@@ -43,7 +43,6 @@ import requests
 from json import dumps
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyType
 from ..utils import parse_list
 
@@ -163,8 +162,8 @@ class NotifyIFTTT(NotifyBase):
         payload = {x.lower(): y for x, y in payload.items()
                    if x not in self.del_tokens}
 
-        # Track our failures
-        error_count = 0
+        # error tracking (used for function return)
+        has_error = False
 
         # Create a copy of our event lit
         events = list(self.events)
@@ -202,26 +201,27 @@ class NotifyIFTTT(NotifyBase):
 
                 if r.status_code != requests.codes.ok:
                     # We had a problem
-                    try:
-                        self.logger.warning(
-                            'Failed to send IFTTT:%s '
-                            'notification: %s (error=%s).' % (
-                                event,
-                                HTTP_ERROR_MAP[r.status_code],
-                                r.status_code))
+                    status_str = \
+                        NotifyBase.http_response_code_lookup(r.status_code)
 
-                    except KeyError:
-                        self.logger.warning(
-                            'Failed to send IFTTT:%s '
-                            'notification (error=%s).' % (
-                                event, r.status_code))
+                    self.logger.warning(
+                        'Failed to send IFTTT notification to {}: '
+                        '{}{}error={}.'.format(
+                            event,
+                            status_str,
+                            ', ' if status_str else '',
+                            r.status_code))
 
-                    # self.logger.debug('Response Details: %s' % r.content)
-                    error_count += 1
+                    self.logger.debug(
+                        'Response Details:\r\n{}'.format(r.content))
+
+                    # Mark our failure
+                    has_error = True
+                    continue
 
                 else:
                     self.logger.info(
-                        'Sent IFTTT notification to Event %s.' % event)
+                        'Sent IFTTT notification to %s.' % event)
 
             except requests.RequestException as e:
                 self.logger.warning(
@@ -229,9 +229,12 @@ class NotifyIFTTT(NotifyBase):
                         event) + 'notification.'
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))
-                error_count += 1
 
-        return (error_count == 0)
+                # Mark our failure
+                has_error = True
+                continue
+
+        return not has_error
 
     def url(self):
         """

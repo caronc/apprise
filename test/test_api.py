@@ -24,22 +24,28 @@
 # THE SOFTWARE.
 
 from __future__ import print_function
+import six
+import pytest
+import requests
+import mock
 from os import chmod
 from os import getuid
 from os.path import dirname
+
 from apprise import Apprise
 from apprise import AppriseAsset
-from apprise.utils import compat_is_basestring
-from apprise.Apprise import SCHEMA_MAP
 from apprise import NotifyBase
 from apprise import NotifyType
 from apprise import NotifyFormat
 from apprise import NotifyImageSize
 from apprise import __version__
-from apprise.Apprise import __load_matrix
-import pytest
-import requests
-import mock
+
+from apprise.plugins import SCHEMA_MAP
+from apprise.plugins import __load_matrix
+
+# Disable logging for a cleaner testing output
+import logging
+logging.disable(logging.CRITICAL)
 
 
 def test_apprise():
@@ -89,12 +95,12 @@ def test_apprise():
     assert(len(a) == 2)
 
     # We can retrieve elements from our list too by reference:
-    assert(compat_is_basestring(a[0].url()) is True)
+    assert(isinstance(a[0].url(), six.string_types) is True)
 
     # We can iterate over our list too:
     count = 0
     for o in a:
-        assert(compat_is_basestring(o.url()) is True)
+        assert(isinstance(o.url(), six.string_types) is True)
         count += 1
     # verify that we did indeed iterate over each element
     assert(len(a) == count)
@@ -241,6 +247,10 @@ def test_apprise():
     # We an add already substatiated instances into our Apprise object
     a.add(plugin)
     assert(len(a) == 1)
+
+    # We can add entries as a list too (to add more then one)
+    a.add([plugin, plugin, plugin])
+    assert(len(a) == 4)
 
     # Reset our object again
     a.clear()
@@ -659,4 +669,4 @@ def test_apprise_details():
     # All plugins must have a name defined; the below generates
     # a list of entrys that do not have a string defined.
     assert(not len([x['service_name'] for x in details['schemas']
-                   if not compat_is_basestring(x['service_name'])]))
+                   if not isinstance(x['service_name'], six.string_types)]))

@@ -36,15 +36,14 @@
 #
 #
 import re
+import six
 import requests
 from json import dumps
 from time import time
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyImageSize
 from ..common import NotifyType
-from ..utils import compat_is_basestring
 
 # Token required as part of the API request
 #  /AAAAAAAAA/........./........................
@@ -62,10 +61,9 @@ VALIDATE_TOKEN_C = re.compile(r'[A-Za-z0-9]{24}')
 SLACK_DEFAULT_USER = 'apprise'
 
 # Extend HTTP Error Messages
-SLACK_HTTP_ERROR_MAP = HTTP_ERROR_MAP.copy()
-SLACK_HTTP_ERROR_MAP.update({
+SLACK_HTTP_ERROR_MAP = {
     401: 'Unauthorized - Invalid Token.',
-})
+}
 
 # Used to break path apart into list of channels
 CHANNEL_LIST_DELIM = re.compile(r'[ \t\r\n,#\\/]+')
@@ -143,7 +141,7 @@ class NotifySlack(NotifyBase):
             self.logger.warning(
                 'No user was specified; using %s.' % SLACK_DEFAULT_USER)
 
-        if compat_is_basestring(channels):
+        if isinstance(channels, six.string_types):
             self.channels = [x for x in filter(bool, CHANNEL_LIST_DELIM.split(
                 channels,
             ))]
@@ -186,7 +184,7 @@ class NotifySlack(NotifyBase):
         }
 
         # error tracking (used for function return)
-        notify_okay = True
+        has_error = False
 
         # Perform Formatting
         title = self._re_formatting_rules.sub(  # pragma: no branch
@@ -214,6 +212,8 @@ class NotifySlack(NotifyBase):
                         channel,
                     )
                 )
+                # Mark our failure
+                has_error = True
                 continue
 
             if len(channel) > 1 and channel[0] == '+':
@@ -263,28 +263,28 @@ class NotifySlack(NotifyBase):
                 )
                 if r.status_code != requests.codes.ok:
                     # We had a problem
-                    try:
-                        self.logger.warning(
-                            'Failed to send Slack:%s '
-                            'notification: %s (error=%s).' % (
-                                channel,
-                                SLACK_HTTP_ERROR_MAP[r.status_code],
-                                r.status_code))
+                    status_str = \
+                        NotifyBase.http_response_code_lookup(
+                            r.status_code, SLACK_HTTP_ERROR_MAP)
 
-                    except KeyError:
-                        self.logger.warning(
-                            'Failed to send Slack:%s '
-                            'notification (error=%s).' % (
-                                channel,
-                                r.status_code))
+                    self.logger.warning(
+                        'Failed to send Slack notification to {}: '
+                        '{}{}error={}.'.format(
+                            channel,
+                            status_str,
+                            ', ' if status_str else '',
+                            r.status_code))
 
-                    # self.logger.debug('Response Details: %s' % r.content)
+                    self.logger.debug(
+                        'Response Details:\r\n{}'.format(r.content))
 
-                    # Return; we're done
-                    notify_okay = False
+                    # Mark our failure
+                    has_error = True
+                    continue
 
                 else:
-                    self.logger.info('Sent Slack notification.')
+                    self.logger.info(
+                        'Sent Slack notification to {}.'.format(channel))
 
             except requests.RequestException as e:
                 self.logger.warning(
@@ -292,9 +292,12 @@ class NotifySlack(NotifyBase):
                         channel) + 'notification.'
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))
-                notify_okay = False
 
-        return notify_okay
+                # Mark our failure
+                has_error = True
+                continue
+
+        return not has_error
 
     def url(self):
         """

@@ -58,7 +58,6 @@ from json import loads
 from json import dumps
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyType
 from ..common import NotifyImageSize
 from ..common import NotifyFormat
@@ -120,14 +119,15 @@ class NotifyTelegram(NotifyBase):
 
         except AttributeError:
             # Token was None
-            self.logger.warning('No Bot Token was specified.')
-            raise TypeError('No Bot Token was specified.')
+            err = 'No Bot Token was specified.'
+            self.logger.warning(err)
+            raise TypeError(err)
 
         result = VALIDATE_BOT_TOKEN.match(self.bot_token)
         if not result:
-            raise TypeError(
-                'The Bot Token specified (%s) is invalid.' % bot_token,
-            )
+            err = 'The Bot Token specified (%s) is invalid.' % bot_token
+            self.logger.warning(err)
+            raise TypeError(err)
 
         # Store our Bot Token
         self.bot_token = result.group('key')
@@ -146,8 +146,9 @@ class NotifyTelegram(NotifyBase):
                 self.chat_ids.append(str(_id))
 
         if len(self.chat_ids) == 0:
-            self.logger.warning('No chat_id(s) were specified.')
-            raise TypeError('No chat_id(s) were specified.')
+            err = 'No chat_id(s) were specified.'
+            self.logger.warning(err)
+            raise TypeError(err)
 
         # Track whether or not we want to send an image with our notification
         # or not.
@@ -171,8 +172,7 @@ class NotifyTelegram(NotifyBase):
         if not path:
             # No image to send
             self.logger.debug(
-                'Telegram Image does not exist for %s' % (
-                    notify_type))
+                'Telegram Image does not exist for %s' % (notify_type))
             return None
 
         files = {'photo': (basename(path), open(path), 'rb')}
@@ -195,19 +195,18 @@ class NotifyTelegram(NotifyBase):
 
             if r.status_code != requests.codes.ok:
                 # We had a problem
-                try:
-                    self.logger.warning(
-                        'Failed to post Telegram Image: '
-                        '%s (error=%s).' % (
-                            HTTP_ERROR_MAP[r.status_code],
-                            r.status_code))
+                status_str = \
+                    NotifyBase.http_response_code_lookup(r.status_code)
 
-                except KeyError:
-                    self.logger.warning(
-                        'Failed to detect Telegram Image. (error=%s).' % (
-                            r.status_code))
+                self.logger.warning(
+                    'Failed to send Telegram Image: '
+                    '{}{}error={}.'.format(
+                        status_str,
+                        ', ' if status_str else '',
+                        r.status_code))
 
-                # self.logger.debug('Response Details: %s' % r.raw.read())
+                self.logger.debug('Response Details:\r\n{}'.format(r.content))
+
                 return False
 
         except requests.RequestException as e:
@@ -248,6 +247,8 @@ class NotifyTelegram(NotifyBase):
 
             if r.status_code != requests.codes.ok:
                 # We had a problem
+                status_str = \
+                    NotifyBase.http_response_code_lookup(r.status_code)
 
                 try:
                     # Try to get the error message if we can:
@@ -256,30 +257,26 @@ class NotifyTelegram(NotifyBase):
                 except Exception:
                     error_msg = None
 
-                try:
-                    if error_msg:
-                        self.logger.warning(
-                            'Failed to detect Telegram user: (%s) %s.' % (
-                                r.status_code, error_msg))
-
-                    else:
-                        self.logger.warning(
-                            'Failed to detect Telegram user: '
-                            '%s (error=%s).' % (
-                                HTTP_ERROR_MAP[r.status_code],
-                                r.status_code))
-
-                except KeyError:
+                if error_msg:
                     self.logger.warning(
-                        'Failed to detect Telegram user. (error=%s).' % (
+                        'Failed to detect the Telegram user: (%s) %s.' % (
+                            r.status_code, error_msg))
+
+                else:
+                    self.logger.warning(
+                        'Failed to detect the Telegram user: '
+                        '{}{}error={}.'.format(
+                            status_str,
+                            ', ' if status_str else '',
                             r.status_code))
 
-                # self.logger.debug('Response Details: %s' % r.raw.read())
+                self.logger.debug('Response Details:\r\n{}'.format(r.content))
+
                 return 0
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A connection error occured detecting Telegram User.')
+                'A connection error occured detecting the Telegram User.')
             self.logger.debug('Socket Exception: %s' % str(e))
             return 0
 
@@ -403,6 +400,8 @@ class NotifyTelegram(NotifyBase):
                         chat_id,
                     )
                 )
+
+                # Flag our error
                 has_error = True
                 continue
 
@@ -438,6 +437,8 @@ class NotifyTelegram(NotifyBase):
 
                 if r.status_code != requests.codes.ok:
                     # We had a problem
+                    status_str = \
+                        NotifyBase.http_response_code_lookup(r.status_code)
 
                     try:
                         # Try to get the error message if we can:
@@ -446,32 +447,19 @@ class NotifyTelegram(NotifyBase):
                     except Exception:
                         error_msg = None
 
-                    try:
-                        if error_msg:
-                            self.logger.warning(
-                                'Failed to send Telegram:%s '
-                                'notification: (%s) %s.' % (
-                                    payload['chat_id'],
-                                    r.status_code, error_msg))
+                    self.logger.warning(
+                        'Failed to send Telegram notification to {}: '
+                        '{}, error={}.'.format(
+                            payload['chat_id'],
+                            error_msg if error_msg else status_str,
+                            r.status_code))
 
-                        else:
-                            self.logger.warning(
-                                'Failed to send Telegram:%s '
-                                'notification: %s (error=%s).' % (
-                                    payload['chat_id'],
-                                    HTTP_ERROR_MAP[r.status_code],
-                                    r.status_code))
-
-                    except KeyError:
-                        self.logger.warning(
-                            'Failed to send Telegram:%s '
-                            'notification (error=%s).' % (
-                                payload['chat_id'], r.status_code))
-
-                    # self.logger.debug('Response Details: %s' % r.raw.read())
+                    self.logger.debug(
+                        'Response Details:\r\n{}'.format(r.content))
 
                     # Flag our error
                     has_error = True
+                    continue
 
                 else:
                     self.logger.info('Sent Telegram notification.')
@@ -482,7 +470,10 @@ class NotifyTelegram(NotifyBase):
                         payload['chat_id']) + 'notification.'
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))
+
+                # Flag our error
                 has_error = True
+                continue
 
         return not has_error
 

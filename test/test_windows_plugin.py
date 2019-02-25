@@ -25,11 +25,11 @@
 
 import mock
 import sys
+import six
 import types
 
 # Rebuild our Apprise environment
 import apprise
-from apprise.utils import compat_is_basestring
 
 try:
     # Python v3.4+
@@ -41,6 +41,10 @@ except ImportError:
     except ImportError:
         # Python v2.7
         pass
+
+# Disable logging for a cleaner testing output
+import logging
+logging.disable(logging.CRITICAL)
 
 
 def test_windows_plugin():
@@ -109,7 +113,7 @@ def test_windows_plugin():
     obj.duration = 0
 
     # Test URL functionality
-    assert(compat_is_basestring(obj.url()) is True)
+    assert(isinstance(obj.url(), six.string_types) is True)
 
     # Check that it found our mocked environments
     assert(obj._enabled is True)

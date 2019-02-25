@@ -22,7 +22,7 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
-
+import six
 from datetime import datetime
 from datetime import timedelta
 
@@ -30,7 +30,10 @@ from apprise.plugins.NotifyBase import NotifyBase
 from apprise import NotifyType
 from apprise import NotifyImageSize
 from timeit import default_timer
-from apprise.utils import compat_is_basestring
+
+# Disable logging for a cleaner testing output
+import logging
+logging.disable(logging.CRITICAL)
 
 
 def test_notify_base():
@@ -41,7 +44,7 @@ def test_notify_base():
 
     # invalid types throw exceptions
     try:
-        nb = NotifyBase(**{'format': 'invalid'})
+        NotifyBase(**{'format': 'invalid'})
         # We should never reach here as an exception should be thrown
         assert(False)
 
@@ -50,7 +53,7 @@ def test_notify_base():
 
     # invalid types throw exceptions
     try:
-        nb = NotifyBase(**{'overflow': 'invalid'})
+        NotifyBase(**{'overflow': 'invalid'})
         # We should never reach here as an exception should be thrown
         assert(False)
 
@@ -154,8 +157,9 @@ def test_notify_base():
 
     # Color handling
     assert nb.color(notify_type='invalid') is None
-    assert compat_is_basestring(
-        nb.color(notify_type=NotifyType.INFO, color_type=None))
+    assert isinstance(
+        nb.color(notify_type=NotifyType.INFO, color_type=None),
+        six.string_types)
     assert isinstance(
         nb.color(notify_type=NotifyType.INFO, color_type=int), int)
     assert isinstance(
@@ -191,13 +195,6 @@ def test_notify_base():
     assert NotifyBase.split_path(
         '/path/?name=Dr%20Disrespect', unquote=True) == \
         ['path', '?name=Dr', 'Disrespect']
-
-    # Test is_email
-    assert NotifyBase.is_email('test@gmail.com') is True
-    assert NotifyBase.is_email('invalid.com') is False
-
-    # Test is_hostname
-    assert NotifyBase.is_hostname('example.com') is True
 
     # Test quote
     assert NotifyBase.unquote('%20') == ' '

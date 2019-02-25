@@ -35,7 +35,6 @@ from json import dumps
 from json import loads
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import HTTP_ERROR_MAP
 from ..utils import parse_bool
 from ..common import NotifyType
 from .. import __version__ as VERSION
@@ -168,20 +167,19 @@ class NotifyEmby(NotifyBase):
             )
 
             if r.status_code != requests.codes.ok:
-                try:
-                    self.logger.warning(
-                        'Failed to authenticate user %s details: '
-                        '%s (error=%s).' % (
-                            self.user,
-                            HTTP_ERROR_MAP[r.status_code],
-                            r.status_code))
+                # We had a problem
+                status_str = \
+                    NotifyBase.http_response_code_lookup(r.status_code)
 
-                except KeyError:
-                    self.logger.warning(
-                        'Failed to authenticate user %s details: '
-                        '(error=%s).' % (self.user, r.status_code))
+                self.logger.warning(
+                    'Failed to authenticate Emby user {} details: '
+                    '{}{}error={}.'.format(
+                        self.user,
+                        status_str,
+                        ', ' if status_str else '',
+                        r.status_code))
 
-                self.logger.debug('Emby Response:\r\n%s' % r.text)
+                self.logger.debug('Response Details:\r\n{}'.format(r.content))
 
                 # Return; we're done
                 return False
@@ -329,20 +327,19 @@ class NotifyEmby(NotifyBase):
             )
 
             if r.status_code != requests.codes.ok:
-                try:
-                    self.logger.warning(
-                        'Failed to acquire session for user %s details: '
-                        '%s (error=%s).' % (
-                            self.user,
-                            HTTP_ERROR_MAP[r.status_code],
-                            r.status_code))
+                # We had a problem
+                status_str = \
+                    NotifyBase.http_response_code_lookup(r.status_code)
 
-                except KeyError:
-                    self.logger.warning(
-                        'Failed to acquire session for user %s details: '
-                        '(error=%s).' % (self.user, r.status_code))
+                self.logger.warning(
+                    'Failed to acquire Emby session for user {}: '
+                    '{}{}error={}.'.format(
+                        self.user,
+                        status_str,
+                        ', ' if status_str else '',
+                        r.status_code))
 
-                self.logger.debug('Emby Response:\r\n%s' % r.text)
+                self.logger.debug('Response Details:\r\n{}'.format(r.content))
 
                 # Return; we're done
                 return sessions
@@ -412,20 +409,20 @@ class NotifyEmby(NotifyBase):
                     # The below show up if we were 'just' logged out
                     requests.codes.ok,
                     requests.codes.no_content):
-                try:
-                    self.logger.warning(
-                        'Failed to logoff user %s details: '
-                        '%s (error=%s).' % (
-                            self.user,
-                            HTTP_ERROR_MAP[r.status_code],
-                            r.status_code))
 
-                except KeyError:
-                    self.logger.warning(
-                        'Failed to logoff user %s details: '
-                        '(error=%s).' % (self.user, r.status_code))
+                # We had a problem
+                status_str = \
+                    NotifyBase.http_response_code_lookup(r.status_code)
 
-                self.logger.debug('Emby Response:\r\n%s' % r.text)
+                self.logger.warning(
+                    'Failed to logoff Emby user {}: '
+                    '{}{}error={}.'.format(
+                        self.user,
+                        status_str,
+                        ', ' if status_str else '',
+                        r.status_code))
+
+                self.logger.debug('Response Details:\r\n{}'.format(r.content))
 
                 # Return; we're done
                 return False
@@ -509,17 +506,19 @@ class NotifyEmby(NotifyBase):
                 if r.status_code not in (
                         requests.codes.ok,
                         requests.codes.no_content):
-                    try:
-                        self.logger.warning(
-                            'Failed to send Emby notification: '
-                            '%s (error=%s).' % (
-                                HTTP_ERROR_MAP[r.status_code],
-                                r.status_code))
+                    # We had a problem
+                    status_str = \
+                        NotifyBase.http_response_code_lookup(r.status_code)
 
-                    except KeyError:
-                        self.logger.warning(
-                            'Failed to send Emby notification '
-                            '(error=%s).' % (r.status_code))
+                    self.logger.warning(
+                        'Failed to send Emby notification: '
+                        '{}{}error={}.'.format(
+                            status_str,
+                            ', ' if status_str else '',
+                            r.status_code))
+
+                    self.logger.debug(
+                        'Response Details:\r\n{}'.format(r.content))
 
                     # Mark our failure
                     has_error = True
