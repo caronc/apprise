@@ -398,9 +398,12 @@ def test_is_email():
     """
     # Valid Emails
     assert utils.is_email('test@gmail.com') is True
+    assert utils.is_email('tag+test@gmail.com') is True
 
     # Invalid Emails
     assert utils.is_email('invalid.com') is False
+    assert utils.is_email(object()) is False
+    assert utils.is_email(None) is False
 
 
 def test_parse_list():

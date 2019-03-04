@@ -136,7 +136,11 @@ def is_email(address):
               and False if it isn't.
     """
 
-    return GET_EMAIL_RE.match(address) is not None
+    try:
+        return GET_EMAIL_RE.match(address) is not None
+    except TypeError:
+        # invalid syntax
+        return False
 
 
 def tidy_path(path):

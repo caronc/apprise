@@ -23,9 +23,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import os
 import re
 import six
 import logging
+import yaml
 
 from .. import plugins
 from ..AppriseAsset import AppriseAsset
@@ -184,6 +186,18 @@ class ConfigBase(URLBase):
 
         Optionally associate an asset with the notification.
 
+        The file syntax is:
+
+            #
+            # pound/hashtag allow for line comments
+            #
+            # One or more tags can be idenified using comma's (,) to separate
+            # them.
+            <Tag(s)>=<URL>
+
+            # Or you can use this format (no tags associated)
+            <URL>
+
         """
         # For logging, track the line number
         line = 0
@@ -196,8 +210,14 @@ class ConfigBase(URLBase):
             r'(\s*(?P<tags>[^=]+)=|=)?\s*'
             r'(?P<url>[a-z0-9]{2,9}://.*))?$', re.I)
 
-        # split our content up to read line by line
-        content = re.split(r'\r*\n', content)
+        try:
+            # split our content up to read line by line
+            content = re.split(r'\r*\n', content)
+
+        except TypeError:
+            # content was not expected string type
+            logger.error('Invalid apprise text data specified')
+            return list()
 
         for entry in content:
             # Increment our line count
@@ -244,7 +264,7 @@ class ConfigBase(URLBase):
             # containing all of the information parsed from our URL
             results = plugins.SCHEMA_MAP[schema].parse_url(_url)
 
-            if not results:
+            if results is None:
                 # Failed to parse the server URL
                 logger.warning(
                     'Unparseable URL {} on line {}.'.format(url, line))
@@ -288,7 +308,234 @@ class ConfigBase(URLBase):
         """
         response = list()
 
-        # TODO
+        try:
+            # Load our data
+            result = yaml.load(content)
+
+        except (AttributeError, yaml.error.MarkedYAMLError) as e:
+            # Invalid content
+            logger.error('Invalid apprise yaml data specified.')
+            logger.debug('YAML Exception:{}{}'.format(os.linesep, e))
+            return list()
+
+        if not isinstance(result, dict):
+            # Invalid content
+            logger.error('Invalid apprise yaml structure specified')
+            return list()
+
+        # YAML Version
+        version = result.get('version', 1)
+        if version != 1:
+            # Invalid syntax
+            logger.error(
+                'Invalid apprise yaml version specified {}.'.format(version))
+            return list()
+
+        #
+        # global asset object
+        #
+        asset = asset if isinstance(asset, AppriseAsset) else AppriseAsset()
+        tokens = result.get('asset', None)
+        if tokens and isinstance(tokens, dict):
+            for k, v in tokens.items():
+
+                if k.startswith('_') or k.endswith('_'):
+                    # Entries are considered reserved if they start or end
+                    # with an underscore
+                    logger.warning('Ignored asset key "{}".'.format(k))
+                    continue
+
+                if not (hasattr(asset, k) and
+                        isinstance(getattr(asset, k), six.string_types)):
+                    # We can't set a function or non-string set value
+                    logger.warning('Invalid asset key "{}".'.format(k))
+                    continue
+
+                if v is None:
+                    # Convert to an empty string
+                    v = ''
+
+                if not isinstance(v, six.string_types):
+                    # we must set strings with a string
+                    logger.warning('Invalid asset value to "{}".'.format(k))
+                    continue
+
+                # Set our asset object with the new value
+                setattr(asset, k, v.strip())
+
+        #
+        # global tag root directive
+        #
+        global_tags = set()
+
+        tags = result.get('tag', None)
+        if tags and isinstance(tags, (list, tuple, six.string_types)):
+            # Store any preset tags
+            global_tags = set(parse_list(tags))
+
+        #
+        # urls root directive
+        #
+        urls = result.get('urls', None)
+        if not isinstance(urls, (list, tuple)):
+            # Unsupported
+            logger.error('Missing "urls" directive in apprise yaml.')
+            return list()
+
+        # Iterate over each URL
+        for no, url in enumerate(urls):
+
+            # Our results object is what we use to instantiate our object if
+            # we can. Reset it to None on each iteration
+            results = list()
+
+            if isinstance(url, six.string_types):
+                # We're just a simple URL string
+
+                # swap hash (#) tag values with their html version
+                _url = url.replace('/#', '/%23')
+
+                # Attempt to acquire the schema at the very least to allow our
+                # plugins to determine if they can make a better
+                # interpretation of a URL geared for them
+                schema = GET_SCHEMA_RE.match(_url)
+                if schema is None:
+                    logger.warning(
+                        'Unsupported schema in urls entry #{}'.format(no))
+                    continue
+
+                # Ensure our schema is always in lower case
+                schema = schema.group('schema').lower()
+
+                # Some basic validation
+                if schema not in plugins.SCHEMA_MAP:
+                    logger.warning(
+                        'Unsupported schema {} in urls entry #{}'.format(
+                            schema, no))
+                    continue
+
+                # Parse our url details of the server object as dictionary
+                # containing all of the information parsed from our URL
+                _results = plugins.SCHEMA_MAP[schema].parse_url(_url)
+                if _results is None:
+                    logger.warning(
+                        'Unparseable {} based url; entry #{}'.format(
+                            schema, no))
+                    continue
+
+                # add our results to our global set
+                results.append(_results)
+
+            elif isinstance(url, dict):
+                # We are a url string with additional unescaped options
+                if six.PY2:
+                    _url, tokens = next(url.iteritems())
+                else:  # six.PY3
+                    _url, tokens = next(iter(url.items()))
+
+                # swap hash (#) tag values with their html version
+                _url = _url.replace('/#', '/%23')
+
+                # Get our schema
+                schema = GET_SCHEMA_RE.match(_url)
+                if schema is None:
+                    logger.warning(
+                        'Unsupported schema in urls entry #{}'.format(no))
+                    continue
+
+                # Ensure our schema is always in lower case
+                schema = schema.group('schema').lower()
+
+                # Some basic validation
+                if schema not in plugins.SCHEMA_MAP:
+                    logger.warning(
+                        'Unsupported schema {} in urls entry #{}'.format(
+                            schema, no))
+                    continue
+
+                # Parse our url details of the server object as dictionary
+                # containing all of the information parsed from our URL
+                _results = plugins.SCHEMA_MAP[schema].parse_url(_url)
+                if _results is None:
+                    # Setup dictionary
+                    _results = {
+                        # Minimum requirements
+                        'schema': schema,
+                    }
+
+                if tokens is not None:
+                    # populate and/or override any results populated by
+                    # parse_url()
+                    for entries in tokens:
+                        # Copy ourselves a template of our parsed URL as a base
+                        # to work with
+                        r = _results.copy()
+
+                        # We are a url string with additional unescaped options
+                        if isinstance(entries, dict):
+                            if six.PY2:
+                                _url, tokens = next(url.iteritems())
+                            else:  # six.PY3
+                                _url, tokens = next(iter(url.items()))
+
+                            # Tags you just can't over-ride
+                            if 'schema' in entries:
+                                del entries['schema']
+
+                            # Extend our dictionary with our new entries
+                            r.update(entries)
+
+                            # add our results to our global set
+                            results.append(r)
+
+                else:
+                    # add our results to our global set
+                    results.append(_results)
+
+            else:
+                # Unsupported
+                logger.warning(
+                    'Unsupported apprise yaml entry #{}'.format(no))
+                continue
+
+            # Track our entries
+            entry = 0
+
+            while len(results):
+                # Increment our entry count
+                entry += 1
+
+                # Grab our first item
+                _results = results.pop(0)
+
+                # tag is a special keyword that is managed by apprise object.
+                # The below ensures our tags are set correctly
+                if 'tag' in _results:
+                    # Tidy our list up
+                    _results['tag'] = \
+                        set(parse_list(_results['tag'])) | global_tags
+
+                else:
+                    # Just use the global settings
+                    _results['tag'] = global_tags
+
+                # Prepare our Asset Object
+                _results['asset'] = asset
+
+                try:
+                    # Attempt to create an instance of our plugin using the
+                    # parsed URL information
+                    plugin = plugins.SCHEMA_MAP[_results['schema']](**_results)
+
+                except Exception:
+                    # the arguments are invalid or can not be used.
+                    logger.warning(
+                        'Could not load apprise yaml entry #{}, item #{}'
+                        .format(no, entry))
+                    continue
+
+                # if we reach here, we successfully loaded our data
+                response.append(plugin)
 
         return response
 

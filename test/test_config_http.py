@@ -94,17 +94,26 @@ def test_config_http(mock_post, mock_get):
     assert isinstance(ch.url(), six.string_types) is True
     assert isinstance(ch.read(), six.string_types) is True
 
+    # one entry added
+    assert len(ch) == 1
+
     results = ConfigHTTP.parse_url('http://localhost:8080/path/')
     assert isinstance(results, dict)
     ch = ConfigHTTP(**results)
     assert isinstance(ch.url(), six.string_types) is True
     assert isinstance(ch.read(), six.string_types) is True
 
+    # one entry added
+    assert len(ch) == 1
+
     results = ConfigHTTP.parse_url('http://user@localhost?format=text')
     assert isinstance(results, dict)
     ch = ConfigHTTP(**results)
     assert isinstance(ch.url(), six.string_types) is True
     assert isinstance(ch.read(), six.string_types) is True
+
+    # one entry added
+    assert len(ch) == 1
 
     results = ConfigHTTP.parse_url('https://localhost')
     assert isinstance(results, dict)
@@ -153,9 +162,40 @@ def test_config_http(mock_post, mock_get):
 
     for st in yaml_supported_types:
         dummy_request.headers['Content-Type'] = st
-        ch.default_config_format = ConfigFormat.TEXT
+        ch.default_config_format = None
         assert isinstance(ch.read(), six.string_types) is True
+        # Set to YAML
         assert ch.default_config_format == ConfigFormat.YAML
+
+    # Test TEXT detection
+    text_supported_types = ('text/plain', 'text/html')
+
+    for st in text_supported_types:
+        dummy_request.headers['Content-Type'] = st
+        ch.default_config_format = None
+        assert isinstance(ch.read(), six.string_types) is True
+        # Set to TEXT
+        assert ch.default_config_format == ConfigFormat.TEXT
+
+    # The type is never adjusted to mime types we don't understand
+    ukwn_supported_types = ('text/css', 'application/zip')
+
+    for st in ukwn_supported_types:
+        dummy_request.headers['Content-Type'] = st
+        ch.default_config_format = None
+        assert isinstance(ch.read(), six.string_types) is True
+        # Remains unchanged
+        assert ch.default_config_format is None
+
+    # When the entry is missing; we handle this too
+    del dummy_request.headers['Content-Type']
+    ch.default_config_format = None
+    assert isinstance(ch.read(), six.string_types) is True
+    # Remains unchanged
+    assert ch.default_config_format is None
+
+    # Restore our content type object for lower tests
+    dummy_request.headers['Content-Type'] = 'text/plain'
 
     ch.max_buffer_size = len(dummy_request.content) - 1
     assert ch.read() is None

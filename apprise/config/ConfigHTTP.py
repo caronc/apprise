@@ -36,6 +36,11 @@ from ..common import ConfigFormat
 # application/x-yaml
 MIME_IS_YAML = re.compile('(text|application)/(x-)?yaml', re.I)
 
+# Support TEXT formats
+# text/plain
+# text/html
+MIME_IS_TEXT = re.compile('text/(plain|html)', re.I)
+
 
 class ConfigHTTP(ConfigBase):
     """
@@ -224,12 +229,21 @@ class ConfigHTTP(ConfigBase):
 
                 # Detect config format based on mime if the format isn't
                 # already enforced
-                if self.config_format is None \
-                    and MIME_IS_YAML.match(r.headers.get(
-                        'Content-Type', 'text/plain')) is not None:
+                content_type = r.headers.get(
+                    'Content-Type', 'application/octet-stream')
+                if self.config_format is None and content_type:
+                    if MIME_IS_YAML.match(content_type) is not None:
 
-                    # YAML data detected based on header content
-                    self.default_config_format = ConfigFormat.YAML
+                        # YAML data detected based on header content
+                        self.default_config_format = ConfigFormat.YAML
+
+                    elif MIME_IS_TEXT.match(content_type) is not None:
+
+                        # TEXT data detected based on header content
+                        self.default_config_format = ConfigFormat.TEXT
+
+                    # else do nothing; fall back to whatever default is
+                    # already set.
 
         except requests.RequestException as e:
             self.logger.warning(
