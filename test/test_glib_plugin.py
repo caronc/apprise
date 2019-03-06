@@ -23,12 +23,12 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import six
 import pytest
 import mock
 import sys
 import types
 import apprise
-from apprise.utils import compat_is_basestring
 
 try:
     # Python v3.4+
@@ -40,6 +40,10 @@ except ImportError:
     except ImportError:
         # Python v2.7
         pass
+
+# Disable logging for a cleaner testing output
+import logging
+logging.disable(logging.CRITICAL)
 
 if 'dbus' not in sys.modules:
     # Environment doesn't allow for dbus
@@ -225,7 +229,7 @@ def test_dbus_plugin(mock_mainloop, mock_byte, mock_bytearray,
     obj.duration = 0
 
     # Test url() call
-    assert(compat_is_basestring(obj.url()) is True)
+    assert(isinstance(obj.url(), six.string_types) is True)
 
     # Our notification succeeds even though the gi library was not loaded
     assert(obj.notify(title='title', body='body',
@@ -255,7 +259,7 @@ def test_dbus_plugin(mock_mainloop, mock_byte, mock_bytearray,
     obj.duration = 0
 
     # Test url() call
-    assert(compat_is_basestring(obj.url()) is True)
+    assert(isinstance(obj.url(), six.string_types) is True)
 
     # Our notification succeeds even though the gi library was not loaded
     assert(obj.notify(title='title', body='body',
@@ -277,7 +281,7 @@ def test_dbus_plugin(mock_mainloop, mock_byte, mock_bytearray,
     obj.duration = 0
 
     # Test url() call
-    assert(compat_is_basestring(obj.url()) is True)
+    assert(isinstance(obj.url(), six.string_types) is True)
 
     # Our notification fail because the dbus library wasn't present
     assert(obj.notify(title='title', body='body',

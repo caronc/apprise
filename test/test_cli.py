@@ -27,26 +27,30 @@ from __future__ import print_function
 from apprise import cli
 from apprise import NotifyBase
 from click.testing import CliRunner
-from apprise.Apprise import SCHEMA_MAP
+from apprise.plugins import SCHEMA_MAP
+
+# Disable logging for a cleaner testing output
+import logging
+logging.disable(logging.CRITICAL)
 
 
-def test_apprise_cli():
+def test_apprise_cli(tmpdir):
     """
     API: Apprise() CLI
 
     """
 
     class GoodNotification(NotifyBase):
-        def __init__(self, **kwargs):
-            super(GoodNotification, self).__init__()
+        def __init__(self, *args, **kwargs):
+            super(GoodNotification, self).__init__(*args, **kwargs)
 
         def notify(self, **kwargs):
             # Pretend everything is okay
             return True
 
     class BadNotification(NotifyBase):
-        def __init__(self, **kwargs):
-            super(BadNotification, self).__init__()
+        def __init__(self, *args, **kwargs):
+            super(BadNotification, self).__init__(*args, **kwargs)
 
         def notify(self, **kwargs):
             # Pretend everything is okay
@@ -70,6 +74,10 @@ def test_apprise_cli():
     result = runner.invoke(cli.main, ['-vvv'])
     assert result.exit_code == 1
 
+    # Display version information and exit
+    result = runner.invoke(cli.main, ['-V'])
+    assert result.exit_code == 0
+
     result = runner.invoke(cli.main, [
         '-t', 'test title',
         '-b', 'test body',
@@ -89,3 +97,52 @@ def test_apprise_cli():
         'bad://localhost',
     ])
     assert result.exit_code == 1
+
+    # Write a simple text based configuration file
+    t = tmpdir.mkdir("apprise-obj").join("apprise")
+    buf = """
+    taga,tagb=good://localhost
+    tagc=good://nuxref.com
+    """
+    t.write(buf)
+
+    # This will read our configuration and send 2 notices to
+    # each of the above defined good:// entries
+    result = runner.invoke(cli.main, [
+        '-b', 'test config',
+        '--config', str(t),
+    ])
+    assert result.exit_code == 0
+
+    # This will send out 1 notification because our tag matches
+    # one of the entries above
+    # translation: has taga
+    result = runner.invoke(cli.main, [
+        '-b', 'has taga',
+        '--config', str(t),
+        '--tag', 'taga',
+    ])
+    assert result.exit_code == 0
+
+    # This will send out 0 notification because our tag requests that we meet
+    # at least 2 tags associated with the same notification service (which
+    # isn't the case above)
+    # translation: has taga AND tagd
+    result = runner.invoke(cli.main, [
+        '-b', 'has taga AND tagd',
+        '--config', str(t),
+        '--tag', 'taga,tagd',
+    ])
+    assert result.exit_code == 0
+
+    # This will send out 2 notifications because by specifying 2 tag
+    # entries, we 'or' them together:
+    # translation: has taga or tagb or tagd
+    result = runner.invoke(cli.main, [
+        '-b', 'has taga OR tagc OR tagd',
+        '--config', str(t),
+        '--tag', 'taga',
+        '--tag', 'tagc',
+        '--tag', 'tagd',
+    ])
+    assert result.exit_code == 0

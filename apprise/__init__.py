@@ -27,7 +27,7 @@ __title__ = 'apprise'
 __version__ = '0.7.3'
 __author__ = 'Chris Caron'
 __license__ = 'MIT'
-__copywrite__ = 'Copyright 2019 Chris Caron <lead2gold@gmail.com>'
+__copywrite__ = 'Copyright (C) 2019 Chris Caron <lead2gold@gmail.com>'
 __email__ = 'lead2gold@gmail.com'
 __status__ = 'Production'
 
@@ -39,10 +39,16 @@ from .common import NotifyFormat
 from .common import NOTIFY_FORMATS
 from .common import OverflowMode
 from .common import OVERFLOW_MODES
+from .common import ConfigFormat
+from .common import CONFIG_FORMATS
+
+from .URLBase import URLBase
 from .plugins.NotifyBase import NotifyBase
+from .config.ConfigBase import ConfigBase
 
 from .Apprise import Apprise
 from .AppriseAsset import AppriseAsset
+from .AppriseConfig import AppriseConfig
 
 # Set default logging handler to avoid "No handler found" warnings.
 import logging
@@ -51,9 +57,11 @@ logging.getLogger(__name__).addHandler(NullHandler())
 
 __all__ = [
     # Core
-    'Apprise', 'AppriseAsset', 'NotifyBase',
+    'Apprise', 'AppriseAsset', 'AppriseConfig', 'URLBase', 'NotifyBase',
+    'ConfigBase',
 
     # Reference
     'NotifyType', 'NotifyImageSize', 'NotifyFormat', 'OverflowMode',
     'NOTIFY_TYPES', 'NOTIFY_IMAGE_SIZES', 'NOTIFY_FORMATS', 'OVERFLOW_MODES',
+    'ConfigFormat', 'CONFIG_FORMATS',
 ]

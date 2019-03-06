@@ -24,6 +24,7 @@
 # THE SOFTWARE.
 
 import re
+import six
 import requests
 import hmac
 from json import dumps
@@ -37,10 +38,8 @@ except ImportError:
     from urllib.parse import urlparse
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyType
 from ..common import NotifyImageSize
-from ..utils import compat_is_basestring
 
 # Default to sending to all devices if nothing is specified
 DEFAULT_TAG = '@all'
@@ -148,7 +147,7 @@ class NotifyBoxcar(NotifyBase):
             self.tags.append(DEFAULT_TAG)
             recipients = []
 
-        elif compat_is_basestring(recipients):
+        elif isinstance(recipients, six.string_types):
             recipients = [x for x in filter(bool, TAGS_LIST_DELIM.split(
                 recipients,
             ))]
@@ -243,20 +242,18 @@ class NotifyBoxcar(NotifyBase):
 
             # Boxcar returns 201 (Created) when successful
             if r.status_code != requests.codes.created:
-                try:
-                    self.logger.warning(
-                        'Failed to send Boxcar notification: '
-                        '%s (error=%s).' % (
-                            HTTP_ERROR_MAP[r.status_code],
-                            r.status_code))
+                # We had a problem
+                status_str = \
+                    NotifyBase.http_response_code_lookup(r.status_code)
 
-                except KeyError:
-                    self.logger.warning(
-                        'Failed to send Boxcar notification '
-                        '(error=%s).' % (
-                            r.status_code))
+                self.logger.warning(
+                    'Failed to send Boxcar notification: '
+                    '{}{}error={}.'.format(
+                        status_str,
+                        ', ' if status_str else '',
+                        r.status_code))
 
-                # self.logger.debug('Response Details: %s' % r.raw.read())
+                self.logger.debug('Response Details:\r\n{}'.format(r.content))
 
                 # Return; we're done
                 return False

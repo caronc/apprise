@@ -32,6 +32,7 @@ from datetime import datetime
 from .NotifyBase import NotifyBase
 from ..common import NotifyFormat
 from ..common import NotifyType
+from ..utils import is_email
 
 
 class WebBaseLogin(object):
@@ -268,11 +269,11 @@ class NotifyEmail(NotifyBase):
         self.from_addr = kwargs.get('from', None)
         self.to_addr = kwargs.get('to', self.from_addr)
 
-        if not NotifyBase.is_email(self.from_addr):
+        if not is_email(self.from_addr):
             # Parse Source domain based on from_addr
             raise TypeError('Invalid ~From~ email format: %s' % self.from_addr)
 
-        if not NotifyBase.is_email(self.to_addr):
+        if not is_email(self.to_addr):
             raise TypeError('Invalid ~To~ email format: %s' % self.to_addr)
 
         # Now detect the SMTP Server
@@ -330,7 +331,7 @@ class NotifyEmail(NotifyBase):
                 login_type = WEBBASE_LOOKUP_TABLE[i][2]\
                     .get('login_type', [])
 
-                if NotifyBase.is_email(self.user) and \
+                if is_email(self.user) and \
                    WebBaseLogin.EMAIL not in login_type:
                     # Email specified but login type
                     # not supported; switch it to user id

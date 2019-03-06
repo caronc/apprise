@@ -24,70 +24,26 @@
 # THE SOFTWARE.
 
 import re
+import six
 import logging
 from markdown import markdown
+from itertools import chain
 
 from .common import NotifyType
 from .common import NotifyFormat
+from .utils import is_exclusive_match
 from .utils import parse_list
-from .utils import compat_is_basestring
 from .utils import GET_SCHEMA_RE
 
 from .AppriseAsset import AppriseAsset
+from .AppriseConfig import AppriseConfig
+from .config.ConfigBase import ConfigBase
+from .plugins.NotifyBase import NotifyBase
 
-from . import NotifyBase
 from . import plugins
 from . import __version__
 
 logger = logging.getLogger(__name__)
-
-# Build a list of supported plugins
-SCHEMA_MAP = {}
-
-
-# Load our Lookup Matrix
-def __load_matrix():
-    """
-    Dynamically load our schema map; this allows us to gracefully
-    skip over plugins we simply don't have the dependecies for.
-
-    """
-    # to add it's mapping to our hash table
-    for entry in dir(plugins):
-
-        # Get our plugin
-        plugin = getattr(plugins, entry)
-        if not hasattr(plugin, 'app_id'):  # pragma: no branch
-            # Filter out non-notification modules
-            continue
-
-        # Load protocol(s) if defined
-        proto = getattr(plugin, 'protocol', None)
-        if compat_is_basestring(proto):
-            if proto not in SCHEMA_MAP:
-                SCHEMA_MAP[proto] = plugin
-
-        elif isinstance(proto, (set, list, tuple)):
-            # Support iterables list types
-            for p in proto:
-                if p not in SCHEMA_MAP:
-                    SCHEMA_MAP[p] = plugin
-
-        # Load secure protocol(s) if defined
-        protos = getattr(plugin, 'secure_protocol', None)
-        if compat_is_basestring(protos):
-            if protos not in SCHEMA_MAP:
-                SCHEMA_MAP[protos] = plugin
-
-        if isinstance(protos, (set, list, tuple)):
-            # Support iterables list types
-            for p in protos:
-                if p not in SCHEMA_MAP:
-                    SCHEMA_MAP[p] = plugin
-
-
-# Dynamically build our module
-__load_matrix()
 
 
 class Apprise(object):
@@ -112,10 +68,8 @@ class Apprise(object):
         # directory images can be found in. It can also identify remote
         # URL paths that contain the images you want to present to the end
         # user. If no asset is specified, then the default one is used.
-        self.asset = asset
-        if asset is None:
-            # Load our default configuration
-            self.asset = AppriseAsset()
+        self.asset = \
+            asset if isinstance(asset, AppriseAsset) else AppriseAsset()
 
         if servers:
             self.add(servers)
@@ -128,48 +82,45 @@ class Apprise(object):
 
         """
         # swap hash (#) tag values with their html version
-        # This is useful for accepting channels (as arguments to pushbullet)
         _url = url.replace('/#', '/%23')
 
         # Attempt to acquire the schema at the very least to allow our plugins
         # to determine if they can make a better interpretation of a URL
-        # geared for them anyway.
+        # geared for them
         schema = GET_SCHEMA_RE.match(_url)
         if schema is None:
-            logger.error('%s is an unparseable server url.' % url)
+            logger.error('Unparseable schema:// found in URL {}.'.format(url))
             return None
 
-        # Update the schema
+        # Ensure our schema is always in lower case
         schema = schema.group('schema').lower()
 
         # Some basic validation
-        if schema not in SCHEMA_MAP:
-            logger.error(
-                '{0} is not a supported server type (url={1}).'.format(
-                    schema,
-                    _url,
-                )
-            )
+        if schema not in plugins.SCHEMA_MAP:
+            logger.error('Unsupported schema {}.'.format(schema))
             return None
 
-        # Parse our url details
-        # the server object is a dictionary containing all of the information
-        # parsed from our URL
-        results = SCHEMA_MAP[schema].parse_url(_url)
+        # Parse our url details of the server object as dictionary containing
+        # all of the information parsed from our URL
+        results = plugins.SCHEMA_MAP[schema].parse_url(_url)
 
-        if not results:
+        if results is None:
             # Failed to parse the server URL
-            logger.error('Could not parse URL: %s' % url)
+            logger.error('Unparseable URL {}.'.format(url))
             return None
 
         # Build a list of tags to associate with the newly added notifications
         results['tag'] = set(parse_list(tag))
 
+        # Prepare our Asset Object
+        results['asset'] = \
+            asset if isinstance(asset, AppriseAsset) else AppriseAsset()
+
         if suppress_exceptions:
             try:
                 # Attempt to create an instance of our plugin using the parsed
                 # URL information
-                plugin = SCHEMA_MAP[results['schema']](**results)
+                plugin = plugins.SCHEMA_MAP[results['schema']](**results)
 
             except Exception:
                 # the arguments are invalid or can not be used.
@@ -179,11 +130,7 @@ class Apprise(object):
         else:
             # Attempt to create an instance of our plugin using the parsed
             # URL information but don't wrap it in a try catch
-            plugin = SCHEMA_MAP[results['schema']](**results)
-
-        # Save our asset
-        if asset:
-            plugin.asset = asset
+            plugin = plugins.SCHEMA_MAP[results['schema']](**results)
 
         return plugin
 
@@ -202,23 +149,43 @@ class Apprise(object):
         # Initialize our return status
         return_status = True
 
-        if asset is None:
+        if isinstance(asset, AppriseAsset):
             # prepare default asset
             asset = self.asset
 
-        if isinstance(servers, NotifyBase):
+        if isinstance(servers, six.string_types):
+            # build our server list
+            servers = parse_list(servers)
+
+        elif isinstance(servers, (ConfigBase, NotifyBase, AppriseConfig)):
             # Go ahead and just add our plugin into our list
             self.servers.append(servers)
             return True
 
-        # build our server listings
-        servers = parse_list(servers)
+        elif not isinstance(servers, (tuple, set, list)):
+            logging.error(
+                "An invalid notification (type={}) was specified.".format(
+                    type(servers)))
+            return False
+
         for _server in servers:
+
+            if isinstance(_server, (ConfigBase, NotifyBase, AppriseConfig)):
+                # Go ahead and just add our plugin into our list
+                self.servers.append(_server)
+                continue
+
+            elif not isinstance(_server, six.string_types):
+                logging.error(
+                    "An invalid notification (type={}) was specified.".format(
+                        type(_server)))
+                return_status = False
+                continue
 
             # Instantiate ourselves an object, this function throws or
             # returns None if it fails
             instance = Apprise.instantiate(_server, asset=asset, tag=tag)
-            if not instance:
+            if not isinstance(instance, NotifyBase):
                 return_status = False
                 logging.error(
                     "Failed to load notification url: {}".format(_server),
@@ -254,7 +221,7 @@ class Apprise(object):
         """
 
         # Initialize our return result
-        status = len(self.servers) > 0
+        status = len(self) > 0
 
         if not (title or body):
             return False
@@ -273,115 +240,89 @@ class Apprise(object):
         #     tag=[('tagB', 'tagC')]          = tagB and tagC
 
         # Iterate over our loaded plugins
-        for server in self.servers:
+        for entry in self.servers:
 
-            if tag is not None:
+            if isinstance(entry, (ConfigBase, AppriseConfig)):
+                # load our servers
+                servers = entry.servers()
 
-                if isinstance(tag, (list, tuple, set)):
-                    # using the tags detected; determine if we'll allow the
-                    # notification to be sent or not
-                    matched = False
+            else:
+                servers = [entry, ]
 
-                    # Every entry here will be or'ed with the next
-                    for entry in tag:
-                        if isinstance(entry, (list, tuple, set)):
-
-                            # treat these entries as though all elements found
-                            # must exist in the notification service
-                            tags = set(parse_list(entry))
-
-                            if len(tags.intersection(
-                                   server.tags)) == len(tags):
-                                # our set contains all of the entries found
-                                # in our notification server object
-                                matched = True
-                                break
-
-                        elif entry in server:
-                            # our entr(ies) match what was found in our server
-                            # object.
-                            matched = True
-                            break
-
-                        # else: keep looking
-
-                    if not matched:
-                        # We did not meet any of our and'ed criteria
-                        continue
-
-                elif tag not in server:
-                    # one or more tags were defined and they didn't match the
-                    # entry in the current service; move along...
+            for server in servers:
+                # Apply our tag matching based on our defined logic
+                if tag is not None and not is_exclusive_match(
+                        logic=tag, data=server.tags):
                     continue
 
-                # else: our content was found inside the server, so we're good
+                # If our code reaches here, we either did not define a tag (it
+                # was set to None), or we did define a tag and the logic above
+                # determined we need to notify the service it's associated with
+                if server.notify_format not in conversion_map:
+                    if body_format == NotifyFormat.MARKDOWN and \
+                            server.notify_format == NotifyFormat.HTML:
 
-            # If our code reaches here, we either did not define a tag (it was
-            # set to None), or we did define a tag and the logic above
-            # determined we need to notify the service it's associated with
-            if server.notify_format not in conversion_map:
-                if body_format == NotifyFormat.MARKDOWN and \
-                        server.notify_format == NotifyFormat.HTML:
+                        # Apply Markdown
+                        conversion_map[server.notify_format] = markdown(body)
 
-                    # Apply Markdown
-                    conversion_map[server.notify_format] = markdown(body)
+                    elif body_format == NotifyFormat.TEXT and \
+                            server.notify_format == NotifyFormat.HTML:
 
-                elif body_format == NotifyFormat.TEXT and \
-                        server.notify_format == NotifyFormat.HTML:
+                        # Basic TEXT to HTML format map; supports keys only
+                        re_map = {
+                            # Support Ampersand
+                            r'&': '&amp;',
 
-                    # Basic TEXT to HTML format map; supports keys only
-                    re_map = {
-                        # Support Ampersand
-                        r'&': '&amp;',
+                            # Spaces to &nbsp; for formatting purposes since
+                            # multiple spaces are treated as one an this may
+                            # not be the callers intention
+                            r' ': '&nbsp;',
 
-                        # Spaces to &nbsp; for formatting purposes since
-                        # multiple spaces are treated as one an this may not
-                        # be the callers intention
-                        r' ': '&nbsp;',
+                            # Tab support
+                            r'\t': '&nbsp;&nbsp;&nbsp;',
 
-                        # Tab support
-                        r'\t': '&nbsp;&nbsp;&nbsp;',
+                            # Greater than and Less than Characters
+                            r'>': '&gt;',
+                            r'<': '&lt;',
+                        }
 
-                        # Greater than and Less than Characters
-                        r'>': '&gt;',
-                        r'<': '&lt;',
-                    }
+                        # Compile our map
+                        re_table = re.compile(
+                            r'(' + '|'.join(
+                                map(re.escape, re_map.keys())) + r')',
+                            re.IGNORECASE,
+                        )
 
-                    # Compile our map
-                    re_table = re.compile(
-                        r'(' + '|'.join(map(re.escape, re_map.keys())) + r')',
-                        re.IGNORECASE,
-                    )
+                        # Execute our map against our body in addition to
+                        # swapping out new lines and replacing them with <br/>
+                        conversion_map[server.notify_format] = \
+                            re.sub(r'\r*\n', '<br/>\r\n',
+                                   re_table.sub(
+                                       lambda x: re_map[x.group()], body))
 
-                    # Execute our map against our body in addition to swapping
-                    # out new lines and replacing them with <br/>
-                    conversion_map[server.notify_format] = \
-                        re.sub(r'\r*\n', '<br/>\r\n',
-                               re_table.sub(lambda x: re_map[x.group()], body))
+                    else:
+                        # Store entry directly
+                        conversion_map[server.notify_format] = body
 
-                else:
-                    # Store entry directly
-                    conversion_map[server.notify_format] = body
+                try:
+                    # Send notification
+                    if not server.notify(
+                            body=conversion_map[server.notify_format],
+                            title=title,
+                            notify_type=notify_type):
 
-            try:
-                # Send notification
-                if not server.notify(
-                        body=conversion_map[server.notify_format],
-                        title=title,
-                        notify_type=notify_type):
+                        # Toggle our return status flag
+                        status = False
 
-                    # Toggle our return status flag
+                except TypeError:
+                    # These our our internally thrown notifications
                     status = False
 
-            except TypeError:
-                # These our our internally thrown notifications
-                status = False
-
-            except Exception:
-                # A catch all so we don't have to abort early
-                # just because one of our plugins has a bug in it.
-                logging.exception("Notification Exception")
-                status = False
+                except Exception:
+                    # A catch all so we don't have to abort early
+                    # just because one of our plugins has a bug in it.
+                    logging.exception("Notification Exception")
+                    status = False
 
         return status
 
@@ -412,12 +353,12 @@ class Apprise(object):
 
             # Standard protocol(s) should be None or a tuple
             protocols = getattr(plugin, 'protocol', None)
-            if compat_is_basestring(protocols):
+            if isinstance(protocols, six.string_types):
                 protocols = (protocols, )
 
             # Secure protocol(s) should be None or a tuple
             secure_protocols = getattr(plugin, 'secure_protocol', None)
-            if compat_is_basestring(secure_protocols):
+            if isinstance(secure_protocols, six.string_types):
                 secure_protocols = (secure_protocols, )
 
             # Build our response object
@@ -439,27 +380,87 @@ class Apprise(object):
 
     def pop(self, index):
         """
-        Removes an indexed Notification Service from the stack and
-        returns it.
+        Removes an indexed Notification Service from the stack and returns it.
+
+        The thing is we can never pop AppriseConfig() entries, only what was
+        loaded within them. So pop needs to carefully iterate over our list
+        and only track actual entries.
         """
 
-        # Remove our entry
-        return self.servers.pop(index)
+        # Tracking variables
+        prev_offset = -1
+        offset = prev_offset
+
+        for idx, s in enumerate(self.servers):
+            if isinstance(s, (ConfigBase, AppriseConfig)):
+                servers = s.servers()
+                if len(servers) > 0:
+                    # Acquire a new maximum offset to work with
+                    offset = prev_offset + len(servers)
+
+                    if offset >= index:
+                        # we can pop an element from our config stack
+                        fn = s.pop if isinstance(s, ConfigBase) \
+                            else s.server_pop
+
+                        return fn(index if prev_offset == -1
+                                  else (index - prev_offset - 1))
+
+            else:
+                offset = prev_offset + 1
+                if offset == index:
+                    return self.servers.pop(idx)
+
+            # Update our old offset
+            prev_offset = offset
+
+        # If we reach here, then we indexed out of range
+        raise IndexError('list index out of range')
 
     def __getitem__(self, index):
         """
         Returns the indexed server entry of a loaded notification server
         """
-        return self.servers[index]
+        # Tracking variables
+        prev_offset = -1
+        offset = prev_offset
+
+        for idx, s in enumerate(self.servers):
+            if isinstance(s, (ConfigBase, AppriseConfig)):
+                # Get our list of servers associate with our config object
+                servers = s.servers()
+                if len(servers) > 0:
+                    # Acquire a new maximum offset to work with
+                    offset = prev_offset + len(servers)
+
+                    if offset >= index:
+                        return servers[index if prev_offset == -1
+                                       else (index - prev_offset - 1)]
+
+            else:
+                offset = prev_offset + 1
+                if offset == index:
+                    return self.servers[idx]
+
+            # Update our old offset
+            prev_offset = offset
+
+        # If we reach here, then we indexed out of range
+        raise IndexError('list index out of range')
 
     def __iter__(self):
         """
-        Returns an iterator to our server list
+        Returns an iterator to each of our servers loaded. This includes those
+        found inside configuration.
         """
-        return iter(self.servers)
+        return chain(*[[s] if not isinstance(s, (ConfigBase, AppriseConfig))
+                       else iter(s.servers()) for s in self.servers])
 
     def __len__(self):
         """
-        Returns the number of servers loaded
+        Returns the number of servers loaded; this includes those found within
+        loaded configuration. This funtion nnever actually counts the
+        Config entry themselves (if they exist), only what they contain.
         """
-        return len(self.servers)
+        return sum([1 if not isinstance(s, (ConfigBase, AppriseConfig))
+                    else len(s.servers()) for s in self.servers])

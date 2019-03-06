@@ -24,14 +24,13 @@
 # THE SOFTWARE.
 
 import re
+import six
 import requests
 from json import dumps
 from itertools import chain
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyType
-from ..utils import compat_is_basestring
 
 # Used to detect and parse channels
 IS_CHANNEL = re.compile(r'^#(?P<name>[A-Za-z0-9]+)$')
@@ -94,7 +93,7 @@ class NotifyPushed(NotifyBase):
         if recipients is None:
             recipients = []
 
-        elif compat_is_basestring(recipients):
+        elif isinstance(recipients, six.string_types):
             recipients = [x for x in filter(bool, LIST_DELIM.split(
                 recipients,
             ))]
@@ -225,19 +224,17 @@ class NotifyPushed(NotifyBase):
 
             if r.status_code != requests.codes.ok:
                 # We had a problem
-                try:
-                    self.logger.warning(
-                        'Failed to send Pushed notification: '
-                        '%s (error=%s).' % (
-                            HTTP_ERROR_MAP[r.status_code],
-                            r.status_code))
+                status_str = \
+                    NotifyBase.http_response_code_lookup(r.status_code)
 
-                except KeyError:
-                    self.logger.warning(
-                        'Failed to send Pushed notification '
-                        '(error=%s).' % r.status_code)
+                self.logger.warning(
+                    'Failed to send Pushed notification:'
+                    '{}{}error={}.'.format(
+                        status_str,
+                        ', ' if status_str else '',
+                        r.status_code))
 
-                self.logger.debug('Response Details: %s' % r.raw.read())
+                self.logger.debug('Response Details:\r\n{}'.format(r.content))
 
                 # Return; we're done
                 return False

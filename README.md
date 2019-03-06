@@ -48,7 +48,7 @@ The table below identifies the services this tool supports and some example serv
 | [PushBullet](https://github.com/caronc/apprise/wiki/Notify_pushbullet) | pbul://    | (TCP) 443    | pbul://accesstoken<br />pbul://accesstoken/#channel<br/>pbul://accesstoken/A_DEVICE_ID<br />pbul://accesstoken/email@address.com<br />pbul://accesstoken/#channel/#channel2/email@address.net/DEVICE
 | [Pushjet](https://github.com/caronc/apprise/wiki/Notify_pushjet) | pjet:// or pjets:// | (TCP) 80 or 443 | pjet://secret@hostname<br />pjet://secret@hostname:port<br />pjets://secret@hostname<br />pjets://secret@hostname:port
 | [Pushed](https://github.com/caronc/apprise/wiki/Notify_pushed) | pushed://    | (TCP) 443    | pushed://appkey/appsecret/<br/>pushed://appkey/appsecret/#ChannelAlias<br/>pushed://appkey/appsecret/#ChannelAlias1/#ChannelAlias2/#ChannelAliasN<br/>pushed://appkey/appsecret/@UserPushedID<br/>pushed://appkey/appsecret/@UserPushedID1/@UserPushedID2/@UserPushedIDN
-| [Pushover](https://github.com/caronc/apprise/wiki/Notify_pushover)  | pover://   | (TCP) 443   | pover://user@token<br />pover://user@token/DEVICE<br />pover://user@token/DEVICE1/DEVICE2/DEVICEN<br />_Note: you must specify both your user_id and token_
+| [Pushover](https://github.com/caronc/apprise/wiki/Notify_pushover)  | pover://   | (TCP) 443   | pover://user@token<br />pover://user@token/DEVICE<br />pover://user@token/DEVICE1/DEVICE2/DEVICEN<br />**Note**: you must specify both your user_id and token
 | [Rocket.Chat](https://github.com/caronc/apprise/wiki/Notify_rocketchat) | rocket:// or rockets://  | (TCP) 80 or 443   | rocket://user:password@hostname/RoomID/Channel<br />rockets://user:password@hostname:443/Channel1/Channel1/RoomID<br />rocket://user:password@hostname/Channel
 | [Ryver](https://github.com/caronc/apprise/wiki/Notify_ryver) | ryver://  | (TCP) 443   | ryver://Organization/Token<br />ryver://botname@Organization/Token
 | [Slack](https://github.com/caronc/apprise/wiki/Notify_slack) | slack://  | (TCP) 443   | slack://TokenA/TokenB/TokenC/Channel<br />slack://botname@TokenA/TokenB/TokenC/Channel<br />slack://user@TokenA/TokenB/TokenC/Channel1/Channel2/ChannelN
@@ -92,12 +92,36 @@ cat /proc/cpuinfo | apprise -t 'cpu info' \
       'mailto://myemail:mypass@gmail.com'
 ```
 
+### Configuration Files
+No one wants to put there credentials out for everyone to see on the command line.  No problem *apprise* also supports configuration files.  It can handle both a specific [YAML format](https://github.com/caronc/apprise/wiki/config_yaml) or a very simple [TEXT format](https://github.com/caronc/apprise/wiki/config_text). You can also pull these configuration files via an HTTP query too! More information concerning Apprise configuration can be found [here](https://github.com/caronc/apprise/wiki/config)
+```bash
+# By default now if no url or configuration is specified aprise will
+# peek for this data in:
+#  ~/.apprise
+#  ~/.apprise.yml
+#  ~/.config/apprise
+#  ~/.config/apprise.yml
+
+# If you loaded one of those files, your command line gets really easy:
+apprise -t 'my title' -b 'my notification body'
+
+# Know the location of the configuration source? No problem, just
+# specify it.
+apprise -t 'my title' -b 'my notification body' \
+	--config=/path/to/my/config.yml
+
+# Got lots of configuration locations? No problem, specify them all:
+apprise -t 'my title' -b 'my notification body' \
+	--config=/path/to/my/config.yml \
+	--config=https://localhost/my/apprise/config
+```
+
 ## Developers
 To send a notification from within your python application, just do the following:
 ```python
 import apprise
 
-# create an Apprise instance
+# Create an Apprise instance
 apobj = apprise.Apprise()
 
 # Add all of the notification services by their server url.
@@ -106,6 +130,37 @@ apobj.add('mailto://myemail:mypass@gmail.com')
 
 # A sample pushbullet notification
 apobj.add('pbul://o.gn5kj6nfhv736I7jC3cj3QLRiyhgl98b')
+
+# Then notify these services any time you desire. The below would
+# notify all of the services loaded into our Apprise object.
+apobj.notify(
+    body='what a great notification service!',
+    title='my notification title',
+)
+```
+
+### Configuration Files
+Developers need access to configuration files too. The good news is they're use just involves declaring another object that Apprise can ingest as easy as the notification urls.  You can mix and match config and notification entries too!
+```python
+import apprise
+
+# Create an Apprise instance
+apobj = apprise.Apprise()
+
+# Create an Config instance
+config = apprise.AppriseCofig()
+
+# Add a configuration source:
+config.add('/path/to/my/config.yml')
+
+# Add another...
+config.add('https://myserver:8080/path/to/config')
+
+# Make sure to add our config into our apprise object
+apobj.add(config)
+
+# You can mix and match; add an entry directly if you want too
+apobj.add('mailto://myemail:mypass@gmail.com')
 
 # Then notify these services any time you desire. The below would
 # notify all of the services loaded into our Apprise object.

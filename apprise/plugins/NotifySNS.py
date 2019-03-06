@@ -24,6 +24,7 @@
 # THE SOFTWARE.
 
 import re
+import six
 import hmac
 import requests
 from hashlib import sha256
@@ -33,9 +34,7 @@ from xml.etree import ElementTree
 from itertools import chain
 
 from .NotifyBase import NotifyBase
-from .NotifyBase import HTTP_ERROR_MAP
 from ..common import NotifyType
-from ..utils import compat_is_basestring
 
 # Some Phone Number Detection
 IS_PHONE_NO = re.compile(r'^\+?(?P<phone>[0-9\s)(+-]+)\s*$')
@@ -63,10 +62,9 @@ IS_REGION = re.compile(
     r'^\s*(?P<country>[a-z]{2})-(?P<area>[a-z]+)-(?P<no>[0-9]+)\s*$', re.I)
 
 # Extend HTTP Error Messages
-AWS_HTTP_ERROR_MAP = HTTP_ERROR_MAP.copy()
-AWS_HTTP_ERROR_MAP.update({
+AWS_HTTP_ERROR_MAP = {
     403: 'Unauthorized - Invalid Access/Secret Key Combination.',
-})
+}
 
 
 class NotifySNS(NotifyBase):
@@ -152,7 +150,7 @@ class NotifySNS(NotifyBase):
         if recipients is None:
             recipients = []
 
-        elif compat_is_basestring(recipients):
+        elif isinstance(recipients, six.string_types):
             recipients = [x for x in filter(bool, LIST_DELIM.split(
                 recipients,
             ))]
@@ -301,22 +299,21 @@ class NotifySNS(NotifyBase):
 
             if r.status_code != requests.codes.ok:
                 # We had a problem
-                try:
-                    self.logger.warning(
-                        'Failed to send AWS notification to '
-                        '"%s": %s (error=%s).' % (
-                            to,
-                            AWS_HTTP_ERROR_MAP[r.status_code],
-                            r.status_code))
+                status_str = \
+                    NotifyBase.http_response_code_lookup(
+                        r.status_code, AWS_HTTP_ERROR_MAP)
 
-                except KeyError:
-                    self.logger.warning(
-                        'Failed to send AWS notification to '
-                        '"%s" (error=%s).' % (to, r.status_code))
+                self.logger.warning(
+                    'Failed to send AWS notification to {}: '
+                    '{}{}error={}.'.format(
+                        to,
+                        status_str,
+                        ', ' if status_str else '',
+                        r.status_code))
 
-                    self.logger.debug('Response Details: %s' % r.text)
+                self.logger.debug('Response Details:\r\n{}'.format(r.content))
 
-                return (False, NotifySNS.aws_response_to_dict(r.text))
+                return (False, NotifySNS.aws_response_to_dict(r.content))
 
             else:
                 self.logger.info(
@@ -330,7 +327,7 @@ class NotifySNS(NotifyBase):
             self.logger.debug('Socket Exception: %s' % str(e))
             return (False, NotifySNS.aws_response_to_dict(None))
 
-        return (True, NotifySNS.aws_response_to_dict(r.text))
+        return (True, NotifySNS.aws_response_to_dict(r.content))
 
     def aws_prepare_request(self, payload, reference=None):
         """
