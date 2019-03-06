@@ -140,7 +140,7 @@ apobj.notify(
 ```
 
 ### Configuration Files
-Developers need access to configuration files too. The good news is they're use just involves declaring another object that Apprise can ingest as easy as the notification urls.  You can mix and match config and notification entries too!
+Developers need access to configuration files too. The good news is their use just involves declaring another object (called AppriseConfig) that Apprise can ingest too!  You can mix and match config and notification entries too!
 ```python
 import apprise
 
@@ -148,7 +148,7 @@ import apprise
 apobj = apprise.Apprise()
 
 # Create an Config instance
-config = apprise.AppriseCofig()
+config = apprise.AppriseConfig()
 
 # Add a configuration source:
 config.add('/path/to/my/config.yml')
@@ -160,13 +160,22 @@ config.add('https://myserver:8080/path/to/config')
 apobj.add(config)
 
 # You can mix and match; add an entry directly if you want too
-apobj.add('mailto://myemail:mypass@gmail.com')
+apobj.add('mailto://myemail:mypass@gmail.com', tag=admin)
 
 # Then notify these services any time you desire. The below would
-# notify all of the services loaded into our Apprise object.
+# notify all of the services loaded into our Apprise object; this includes
+# all items identified in the configuration files.
 apobj.notify(
     body='what a great notification service!',
     title='my notification title',
+)
+
+# If you're using tagging, then you can load all of your notifications
+# but only selectively call ones associated with one or more tags:
+apobj.notify(
+    body='send a notification to our admin group'
+    title='Attention Admins',
+    tag='admin',
 )
 ```
 
