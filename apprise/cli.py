@@ -27,6 +27,8 @@
 import click
 import logging
 import sys
+from os.path import isfile
+from os.path import expanduser
 
 from . import NotifyType
 from . import Apprise
@@ -116,13 +118,13 @@ def main(title, body, config, urls, notification_type, theme, tag, verbose,
     else:
         logger.setLevel(logging.ERROR)
 
-    if version:
-        print_version_msg()
-        sys.exit(0)
-
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     ch.setFormatter(formatter)
     logger.addHandler(ch)
+
+    if version:
+        print_version_msg()
+        sys.exit(0)
 
     # Prepare our asset
     asset = AppriseAsset(theme=theme)
@@ -133,7 +135,7 @@ def main(title, body, config, urls, notification_type, theme, tag, verbose,
     # Load our configuration if no URLs or specified configuration was
     # identified on the command line
     a.add(AppriseConfig(
-        paths=DEFAULT_SEARCH_PATHS
+        paths=[f for f in DEFAULT_SEARCH_PATHS if isfile(expanduser(f))]
         if not (config or urls) else config), asset=asset)
 
     # Load our inventory up

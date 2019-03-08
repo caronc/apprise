@@ -246,7 +246,7 @@ class ConfigHTTP(ConfigBase):
                     # already set.
 
         except requests.RequestException as e:
-            self.logger.warning(
+            self.logger.error(
                 'A Connection error occured retrieving HTTP '
                 'configuration from %s.' % self.host)
             self.logger.debug('Socket Exception: %s' % str(e))

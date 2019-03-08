@@ -96,7 +96,7 @@ class ConfigFile(ConfigBase):
         except OSError:
             # getsize() can throw this acception if the file is missing
             # and or simply isn't accessible
-            self.logger.debug(
+            self.logger.error(
                 'File is not accessible: {}'.format(path))
             return None
 
@@ -126,7 +126,7 @@ class ConfigFile(ConfigBase):
 
             # Could not open and/or read the file; this is not a problem since
             # we scan a lot of default paths.
-            self.logger.debug(
+            self.logger.error(
                 'File can not be opened for read: {}'.format(path))
             return None
 
@@ -138,7 +138,7 @@ class ConfigFile(ConfigBase):
             # YAML Filename Detected
             self.default_config_format = ConfigFormat.YAML
 
-        self.logger.debug('Read Config File: %s' % (path))
+        self.logger.debug('Succesfully read config file: %s' % (path))
 
         # Return our response object
         return response

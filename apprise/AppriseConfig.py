@@ -114,7 +114,7 @@ class AppriseConfig(object):
                 continue
 
             elif not isinstance(_config, six.string_types):
-                logging.error(
+                logging.warning(
                     "An invalid configuration (type={}) was specified.".format(
                         type(_config)))
                 return_status = False
@@ -125,9 +125,6 @@ class AppriseConfig(object):
             instance = AppriseConfig.instantiate(_config, asset=asset, tag=tag)
             if not isinstance(instance, ConfigBase):
                 return_status = False
-                logging.error(
-                    "Failed to load configuration url: {}".format(_config),
-                )
                 continue
 
             # Add our initialized plugin to our server listings
@@ -195,7 +192,7 @@ class AppriseConfig(object):
 
             # Some basic validation
             if schema not in config.SCHEMA_MAP:
-                logger.error('Unsupported schema {}.'.format(schema))
+                logger.debug('Unsupported schema {}.'.format(schema))
                 return None
 
         # Parse our url details of the server object as dictionary containing
@@ -204,7 +201,7 @@ class AppriseConfig(object):
 
         if not results:
             # Failed to parse the server URL
-            logger.error('Unparseable URL {}.'.format(url))
+            logger.debug('Unparseable URL {}.'.format(url))
             return None
 
         # Build a list of tags to associate with the newly added notifications
@@ -222,7 +219,7 @@ class AppriseConfig(object):
 
             except Exception:
                 # the arguments are invalid or can not be used.
-                logger.error('Could not load URL: %s' % url)
+                logger.debug('Could not load URL: %s' % url)
                 return None
 
         else:
