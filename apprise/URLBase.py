@@ -128,9 +128,13 @@ class URLBase(object):
         # is automatically set and controlled through the throttle() call.
         self._last_io_datetime = None
 
-    def throttle(self, last_io=None):
+    def throttle(self, last_io=None, wait=None):
         """
         A common throttle control
+
+        if a wait is specified, then it will force a sleep of the
+        specified time if it is larger then the calculated throttle
+        time.
         """
 
         if last_io is not None:
@@ -156,13 +160,17 @@ class URLBase(object):
 
         elapsed = (reference - self._last_io_datetime).total_seconds()
 
-        if elapsed < self.request_rate_per_sec:
+        if wait is not None:
+            self.logger.debug('Throttling for {}s...'.format(wait))
+            sleep(wait)
+
+        elif elapsed < self.request_rate_per_sec:
             self.logger.debug('Throttling for {}s...'.format(
                 self.request_rate_per_sec - elapsed))
             sleep(self.request_rate_per_sec - elapsed)
 
         # Update our timestamp before we leave
-        self._last_io_datetime = reference
+        self._last_io_datetime = datetime.now()
         return
 
     def url(self):

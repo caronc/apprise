@@ -150,6 +150,12 @@ def test_notify_base():
     # then other
     assert elapsed < 0.5
 
+    # Force a throttle time
+    start_time = default_timer()
+    nb.throttle(wait=0.5)
+    elapsed = default_timer() - start_time
+    assert elapsed > 0.5 and elapsed < 1.5
+
     # our NotifyBase wasn't initialized with an ImageSize so this will fail
     assert nb.image_url(notify_type=NotifyType.INFO) is None
     assert nb.image_path(notify_type=NotifyType.INFO) is None
