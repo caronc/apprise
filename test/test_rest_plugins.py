@@ -514,48 +514,24 @@ TEST_URLS = (
     ('matrixs://', {
         'instance': None,
     }),
-    # No token
     ('matrix://localhost', {
-        'instance': TypeError,
-    }),
-    ('matrix://user@localhost', {
-        'instance': TypeError,
-    }),
-    ('matrix://localhost/%s' % ('a' * 64), {
+        # treats it as a anonymous user to register
         'instance': plugins.NotifyMatrix,
+        # response is false because we have nothing to notify
+        'response': False,
     }),
-    # Name and token
-    ('matrix://user@localhost/%s' % ('a' * 64), {
-        'instance': plugins.NotifyMatrix,
-    }),
-    # port and token (secure)
-    ('matrixs://localhost:9000/%s' % ('a' * 64), {
-        'instance': plugins.NotifyMatrix,
-    }),
-    # Name, port, token and slack mode
-    ('matrix://user@localhost:9000/%s?mode=slack' % ('a' * 64), {
-        'instance': plugins.NotifyMatrix,
-    }),
-    # Name, port, token and matrix mode
-    ('matrix://user@localhost:9000/%s?mode=matrix' % ('a' * 64), {
-        'instance': plugins.NotifyMatrix,
-    }),
-    # Name, port, token and invalid mode
-    ('matrix://user@localhost:9000/%s?mode=foo' % ('a' * 64), {
-        'instance': TypeError,
-    }),
-    ('matrix://user@localhost:9000/%s?mode=slack' % ('a' * 64), {
+    ('matrix://user:pass@localhost/#room1/#room2/#room3', {
         'instance': plugins.NotifyMatrix,
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
-    ('matrix://user@localhost:9000/%s?mode=slack' % ('a' * 64), {
+    ('matrix://user:pass@localhost/#room1/#room2/!room1', {
         'instance': plugins.NotifyMatrix,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
-    ('matrix://user@localhost:9000/%s?mode=slack' % ('a' * 64), {
+    ('matrix://user:pass@localhost:1234/#room', {
         'instance': plugins.NotifyMatrix,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
