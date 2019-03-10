@@ -96,7 +96,7 @@ class NotifyGnome(NotifyBase):
     # content to display
     body_max_line_count = 10
 
-    # A title can not be used for SMS Messages.  Setting this to zero will
+    # A title can not be used for Gnome Messages.  Setting this to zero will
     # cause any title (if defined) to get placed into the message body.
     title_maxlen = 0
 

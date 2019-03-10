@@ -367,8 +367,10 @@ class NotifyTelegram(NotifyBase):
                 # Tabs become 3 spaces
                 title = re.sub('&emsp;?', '   ', title, re.I)
 
+                # HTML
+                title = NotifyBase.escape_html(title, whitespace=False)
+
             # HTML
-            title = NotifyBase.escape_html(title, whitespace=False)
             body = NotifyBase.escape_html(body, whitespace=False)
 
         # Assign the body

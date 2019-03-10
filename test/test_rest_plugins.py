@@ -3128,6 +3128,16 @@ def test_notify_overflow_truncate():
 
     # Verify that we break the title to a max length of our title_max
     # and that the body remains untouched
+
+    obj.notify_format = NotifyFormat.HTML
+    chunks = obj._apply_overflow(body=body, title=title)
+    assert len(chunks) == 1
+
+    obj.notify_format = NotifyFormat.MARKDOWN
+    chunks = obj._apply_overflow(body=body, title=title)
+    assert len(chunks) == 1
+
+    obj.notify_format = NotifyFormat.TEXT
     chunks = obj._apply_overflow(body=body, title=title)
     assert len(chunks) == 1
 

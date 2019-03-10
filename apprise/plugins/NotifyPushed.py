@@ -64,6 +64,10 @@ class NotifyPushed(NotifyBase):
     # Pushed uses the http protocol with JSON requests
     notify_url = 'https://api.pushed.co/1/push'
 
+    # A title can not be used for Pushed Messages.  Setting this to zero will
+    # cause any title (if defined) to get placed into the message body.
+    title_maxlen = 0
+
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 140
 

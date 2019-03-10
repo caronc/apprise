@@ -167,7 +167,7 @@ class NotifyRyver(NotifyBase):
 
         # prepare JSON Object
         payload = {
-            "body": body if not title else '**%s**\r\n%s' % (title, body),
+            "body": body if not title else '**{}**\r\n{}'.format(title, body),
             'createSource': {
                 "displayName": self.user,
                 "avatar": self.image_url(notify_type),

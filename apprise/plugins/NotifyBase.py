@@ -74,6 +74,13 @@ class NotifyBase(URLBase):
     # Default Overflow Mode
     overflow_mode = OverflowMode.UPSTREAM
 
+    # Default Title HTML Tagging
+    # When a title is specified for a notification service that doesn't accept
+    # titles, by default apprise tries to give a plesant view and convert the
+    # title so that it can be placed into the body. The default is to just
+    # use a <b> tag.  The below causes the <b>title</b> to get generated:
+    default_html_tag_id = 'b'
+
     def __init__(self, **kwargs):
         """
         Initialize some general configuration that will keep things consistent
@@ -224,9 +231,23 @@ class NotifyBase(URLBase):
             # default
             overflow = self.overflow_mode
 
-        if self.title_maxlen <= 0:
-            # Content is appended to body
-            body = '{}\r\n{}'.format(title, body)
+        if self.title_maxlen <= 0 and len(title) > 0:
+            if self.notify_format == NotifyFormat.MARKDOWN:
+                # Content is appended to body as markdown
+                body = '**{}**\r\n{}'.format(title, body)
+
+            elif self.notify_format == NotifyFormat.HTML:
+                # Content is appended to body as html
+                body = '<{open_tag}>{title}</{close_tag}>' \
+                    '<br />\r\n{body}'.format(
+                        open_tag=self.default_html_tag_id,
+                        title=self.escape_html(title),
+                        close_tag=self.default_html_tag_id,
+                        body=body)
+            else:
+                # Content is appended to body as text
+                body = '{}\r\n{}'.format(title, body)
+
             title = ''
 
         # Enforce the line count first always
