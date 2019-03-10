@@ -196,6 +196,11 @@ def test_notify_base():
         '/path/?name=Dr%20Disrespect', unquote=True) == \
         ['path', '?name=Dr', 'Disrespect']
 
+    # Give nothing, get nothing
+    assert NotifyBase.escape_html("") == ""
+    assert NotifyBase.escape_html(None) == ""
+    assert NotifyBase.escape_html(object()) == ""
+
     # Test quote
     assert NotifyBase.unquote('%20') == ' '
     assert NotifyBase.quote(' ') == '%20'

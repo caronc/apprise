@@ -24,6 +24,7 @@
 # THE SOFTWARE.
 
 import re
+import six
 import logging
 from time import sleep
 from datetime import datetime
@@ -199,9 +200,8 @@ class URLBase(object):
         Returns:
             str: The escaped html
         """
-        if not html:
-            # nothing more to do; return object as is
-            return html
+        if not isinstance(html, six.string_types) or not html:
+            return ''
 
         # Escape HTML
         escaped = sax_escape(html, {"'": "&apos;", "\"": "&quot;"})
