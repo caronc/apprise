@@ -74,6 +74,9 @@ def test_apprise_cli(tmpdir):
     result = runner.invoke(cli.main, ['-vvv'])
     assert result.exit_code == 1
 
+    result = runner.invoke(cli.main, ['-vvvv'])
+    assert result.exit_code == 1
+
     # Display version information and exit
     result = runner.invoke(cli.main, ['-V'])
     assert result.exit_code == 0

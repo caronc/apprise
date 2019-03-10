@@ -41,7 +41,7 @@ from . import __license__
 from . import __copywrite__
 
 # Logging
-logger = logging.getLogger('apprise.plugins.NotifyBase')
+logger = logging.getLogger('apprise')
 
 # Defines our click context settings adding -h to the additional options that
 # can be specified to get the help menu to come up
@@ -112,8 +112,11 @@ def main(title, body, config, urls, notification_type, theme, tag, verbose,
     if verbose > 2:
         logger.setLevel(logging.DEBUG)
 
-    elif verbose == 1:
+    elif verbose > 1:
         logger.setLevel(logging.INFO)
+
+    elif verbose > 0:
+        logger.setLevel(logging.WARNING)
 
     else:
         logger.setLevel(logging.ERROR)
