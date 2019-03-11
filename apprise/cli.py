@@ -35,6 +35,8 @@ from . import Apprise
 from . import AppriseAsset
 from . import AppriseConfig
 from .utils import parse_list
+from .common import NOTIFY_TYPES
+
 from . import __title__
 from . import __version__
 from . import __license__
@@ -79,29 +81,40 @@ def print_version_msg():
 
 
 @click.command(context_settings=CONTEXT_SETTINGS)
-@click.option('--title', '-t', default=None, type=str,
-              help='Specify the message title.')
 @click.option('--body', '-b', default=None, type=str,
-              help='Specify the message body.')
+              help='Specify the message body. If no body is specified then '
+              'content is read from <stdin>.')
+@click.option('--title', '-t', default=None, type=str,
+              help='Specify the message title. This field is complete '
+              'optional.')
 @click.option('--config', '-c', default=None, type=str, multiple=True,
+              metavar='CONFIG_URL',
               help='Specify one or more configuration locations.')
 @click.option('--notification-type', '-n', default=NotifyType.INFO, type=str,
-              metavar='TYPE', help='Specify the message type (default=info).')
-@click.option('--theme', '-T', default='default', type=str,
+              metavar='TYPE',
+              help='Specify the message type (default=info). Possible values'
+              ' are "{}", and "{}".'.format(
+                  '", "'.join(NOTIFY_TYPES[:-1]), NOTIFY_TYPES[-1]))
+@click.option('--theme', '-T', default='default', type=str, metavar='THEME',
               help='Specify the default theme.')
 @click.option('--tag', '-g', default=None, type=str, multiple=True,
-              help='Specify one or more tags to reference.')
+              metavar='TAG', help='Specify one or more tags to filter '
+              'which services to notify. Use multiple --tag (-g) entries to '
+              '"OR" the tags together and comma separated to "AND" them. '
+              'If no tags are specified then all services are notified.')
 @click.option('-v', '--verbose', count=True)
 @click.option('-V', '--version', is_flag=True,
               help='Display the apprise version and exit.')
 @click.argument('urls', nargs=-1,
                 metavar='SERVER_URL [SERVER_URL2 [SERVER_URL3]]',)
-def main(title, body, config, urls, notification_type, theme, tag, verbose,
+def main(body, title, config, urls, notification_type, theme, tag, verbose,
          version):
     """
     Send a notification to all of the specified servers identified by their
     URLs the content provided within the title, body and notification-type.
 
+    For a list of all of the supported services and information on how to
+    use them, check out at https://github.com/caronc/apprise
     """
     # Note: Click ignores the return values of functions it wraps, If you
     #       want to return a specific error code, you must call sys.exit()
