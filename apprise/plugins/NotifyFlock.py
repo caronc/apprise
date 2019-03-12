@@ -39,10 +39,8 @@ import re
 import six
 import requests
 from json import dumps
-from time import time
 
 from .NotifyBase import NotifyBase
-from ..common import NotifyImageSize
 from ..common import NotifyType
 
 # Token required as part of the API request
@@ -53,6 +51,7 @@ VALIDATE_TOKEN = re.compile(r'[A-Za-z0-9-]{24}')
 FLOCK_HTTP_ERROR_MAP = {
     401: 'Unauthorized - Invalid Token.',
 }
+
 
 class FlockContentType(object):
     """
@@ -67,6 +66,7 @@ FLOCK_CONTENT_TYPES = (
     FlockContentType.FLOCKML,
     FlockContentType.TEXT,
 )
+
 
 class NotifyFlock(NotifyBase):
     """
@@ -209,7 +209,6 @@ class NotifyFlock(NotifyBase):
         """
         Parses the URL and returns enough arguments that can allow
         us to substantiate this object.
-
         """
         results = NotifyBase.parse_url(url)
 
@@ -222,10 +221,11 @@ class NotifyFlock(NotifyBase):
         # The first token is stored in the hostname
         token = results['host']
 
-        if 'contenttype' in results['qsd'] and len(results['qsd']['contenttype']):
+        if 'contenttype' in results['qsd'] and\
+            len(results['qsd']['contenttype']):
             results['contenttype'] = results['qsd']\
                 .get('contenttype', FlockContentType.TEXT).lower()
 
         results['token'] = token
-        
+
         return results
