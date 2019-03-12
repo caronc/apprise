@@ -49,6 +49,7 @@ from .NotifyPushover import NotifyPushover
 from .NotifyRocketChat import NotifyRocketChat
 from .NotifyRyver import NotifyRyver
 from .NotifySlack import NotifySlack
+from .NotifyFlock import NotifyFlock
 from .NotifySNS import NotifySNS
 from .NotifyTelegram import NotifyTelegram
 from .NotifyTwitter.NotifyTwitter import NotifyTwitter
@@ -77,7 +78,7 @@ __all__ = [
     'NotifyPushed', 'NotifyPushBullet', 'NotifyPushjet',
     'NotifyPushover', 'NotifyRocketChat', 'NotifyRyver', 'NotifySlack',
     'NotifySNS', 'NotifyTwitter', 'NotifyTelegram', 'NotifyXBMC',
-    'NotifyXML', 'NotifyWindows',
+    'NotifyXML', 'NotifyWindows', 'NotifyFlock',
 
     # Reference
     'NotifyImageSize', 'NOTIFY_IMAGE_SIZES', 'NotifyType', 'NOTIFY_TYPES',
