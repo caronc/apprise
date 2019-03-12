@@ -135,7 +135,7 @@ class NotifyFlock(NotifyBase):
         )
 
         payload = {
-            self.contenttype: '%s - %s' % (self.contenttype, body)
+            self.contenttype: body
         }
 
         self.logger.debug('Flock POST URL: %s (cert_verify=%r)' % (
