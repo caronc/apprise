@@ -34,6 +34,7 @@ from .NotifyDiscord import NotifyDiscord
 from .NotifyEmail import NotifyEmail
 from .NotifyEmby import NotifyEmby
 from .NotifyFaast import NotifyFaast
+from .NotifyGotify import NotifyGotify
 from .NotifyGrowl.NotifyGrowl import NotifyGrowl
 from .NotifyGnome import NotifyGnome
 from .NotifyIFTTT import NotifyIFTTT
@@ -72,9 +73,9 @@ SCHEMA_MAP = {}
 __all__ = [
     # Notification Services
     'NotifyBoxcar', 'NotifyDBus', 'NotifyEmail', 'NotifyEmby', 'NotifyDiscord',
-    'NotifyFaast', 'NotifyGnome', 'NotifyGrowl', 'NotifyIFTTT', 'NotifyJoin',
-    'NotifyJSON', 'NotifyMatrix', 'NotifyMatterMost', 'NotifyProwl',
-    'NotifyPushed', 'NotifyPushBullet', 'NotifyPushjet',
+    'NotifyFaast', 'NotifyGnome', 'NotifyGotify', 'NotifyGrowl', 'NotifyIFTTT',
+    'NotifyJoin', 'NotifyJSON', 'NotifyMatrix', 'NotifyMatterMost',
+    'NotifyProwl', 'NotifyPushed', 'NotifyPushBullet', 'NotifyPushjet',
     'NotifyPushover', 'NotifyRocketChat', 'NotifyRyver', 'NotifySlack',
     'NotifySNS', 'NotifyTwitter', 'NotifyTelegram', 'NotifyXBMC',
     'NotifyXML', 'NotifyWindows',
