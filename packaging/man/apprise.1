@@ -1,0 +1,132 @@
+.\" generated with Ronn/v0.7.3
+.\" http://github.com/rtomayko/ronn/tree/0.7.3
+.
+.TH "APPRISE" "1" "March 2019" "" ""
+.
+.SH "NAME"
+\fBapprise\fR \- Push Notifications that work with just about every platform!
+.
+.SH "SYNOPSIS"
+\fBapprise\fR [\fIoptions\fR\.\.\.] \fIservice\-url\fR\.\.\.
+.
+.br
+.
+.SH "DESCRIPTION"
+\fBApprise\fR allows you to send a notification to \fIalmost all\fR of the most popular notification services available to us today such as: Discord, Telegram, Pushbullet, Slack, Twitter, etc\.
+.
+.IP "\(bu" 4
+One notification library to rule them all\.
+.
+.IP "\(bu" 4
+A common and intuitive notification syntax\.
+.
+.IP "\(bu" 4
+Supports the handling of images (to the notification services that will accept them)\.
+.
+.IP "" 0
+.
+.SH "OPTIONS"
+The Apprise options are as follows:
+.
+.TP
+\fB\-b\fR, \fB\-\-body=\fR\fITEXT\fR
+Specify the message body\. If no body is specified then content is read from \fIstdin\fR\.
+.
+.TP
+\fB\-t\fR, \fB\-\-title=\fR\fITEXT\fR
+Specify the message title\. This field is complete optional\.
+.
+.TP
+\fB\-c\fR, \fB\-\-config=\fR\fICONFIG\-URL\fR
+Specify one or more configuration locations\.
+.
+.TP
+\fB\-n\fR, \fB\-\-notification\-type=\fR\fITYPE\fR
+Specify the message type (default=info)\. Possible values are "info", "success", "failure", and "warning"\.
+.
+.TP
+\fB\-T\fR, \fB\-\-theme=\fRTHEME
+Specify the default theme\.
+.
+.TP
+\fB\-g\fR, \fB\-\-tag=\fRTAG
+Specify one or more tags to filter which services to notify\. Use multiple \fB\-\-tag\fR (\fB\-g\fR) entries to \fBOR\fR the tags together and comma separated to \fBAND\fR them\. If no tags are specified then all services are notified\.
+.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+The more of these you specify, the more verbose the output is\.
+.
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+Display the apprise version and exit\.
+.
+.TP
+\fB\-\-help\fR
+Show this message and exit\.
+.
+.SH "SERVICE URLS"
+There are to many service URL and combinations to list here\. It\'s best to visit the Apprise GitHub page \fIhttps://github\.com/caronc/apprise\fR and see what\'s available\.
+.
+.SH "EXAMPLES"
+Send a notification to as many servers as you want to specify as you can easily chain them together:
+.
+.IP "" 4
+.
+.nf
+
+$ apprise \-t \'my title\' \-b \'my notification body\' \e
+   \'mailto://myemail:mypass@gmail\.com\' \e
+   \'pbul://o\.gn5kj6nfhv736I7jC3cj3QLRiyhgl98b\'
+.
+.fi
+.
+.IP "" 0
+.
+.P
+If you don\'t specify a \fB\-\-body\fR (\fB\-b\fR) then stdin is used allowing you to use the tool as part of your every day administration:
+.
+.IP "" 4
+.
+.nf
+
+$ cat /proc/cpuinfo | apprise \-t \'cpu info\' \e
+    \'mailto://myemail:mypass@gmail\.com\'
+.
+.fi
+.
+.IP "" 0
+.
+.P
+Load in a configuration file which identifies all of your notification service URLs and notify them all:
+.
+.IP "" 4
+.
+.nf
+
+$ apprise \-t \'my title\' \-b \'my notification body\' \e
+   \-\-config=~/apprise\.yml
+.
+.fi
+.
+.IP "" 0
+.
+.P
+Load in a configuration file from a remote server that identifies all of your notification service URLs and only notify the ones tagged as \fIdevops\fR\.
+.
+.IP "" 4
+.
+.nf
+
+$ apprise \-t \'my title\' \-b \'my notification body\' \e
+   \-\-config=https://localhost/my/apprise/config \e
+   \-t devops
+.
+.fi
+.
+.IP "" 0
+.
+.SH "BUGS"
+\fBApprise\fR is written in Python with 100% test coverage; but it still makes it far from perfect since the notification services it talks to change all the time\. If you find any bugs, please make them known at: \fIhttps://github\.com/caronc/apprise/issues\fR
+.
+.SH "COPYRIGHT"
+Apprise is Copyright (C) 2019 Chris Caron \fIlead2gold@gmail\.com\fR

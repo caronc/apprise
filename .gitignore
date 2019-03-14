@@ -31,6 +31,9 @@ sdist/
 *.manifest
 *.spec
 
+# Allow RPM SPEC files despite pyInstaller ignore
+!packaging/redhat/*.spec
+
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt

@@ -1,0 +1,8 @@
+diff -Naur apprise-0.7.4/apprise/cli.py apprise-0.7.4-patched/apprise/cli.py
+--- apprise-0.7.4/apprise/cli.py	2019-03-10 10:52:36.000000000 -0400
++++ apprise-0.7.4-patched/apprise/cli.py	2019-03-13 19:20:31.284335462 -0400
+@@ -1,4 +1,3 @@
+-#!/usr/bin/env python
+ # -*- coding: utf-8 -*-
+ 
+ # Copyright (C) 2019 Chris Caron <lead2gold@gmail.com>
