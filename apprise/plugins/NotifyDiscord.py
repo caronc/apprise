@@ -131,9 +131,6 @@ class NotifyDiscord(NotifyBase):
             # If Text-To-Speech is set to True, then we do not want to wait
             # for the whole message before continuing. Otherwise, we wait
             'wait': self.tts is False,
-
-            # Our color associated with our notification
-            'color': self.color(notify_type, int)
         }
 
         # Acquire image_url
@@ -149,6 +146,9 @@ class NotifyDiscord(NotifyBase):
                 'title': title,
                 'type': 'rich',
                 'description': body,
+                
+                # Our color associated with our notification
+                'color': self.color(notify_type, int),
             }]
 
             # Break titles out so that we can sort them in embeds
