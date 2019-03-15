@@ -146,7 +146,7 @@ class NotifyDiscord(NotifyBase):
                 'title': title,
                 'type': 'rich',
                 'description': body,
-                
+
                 # Our color associated with our notification
                 'color': self.color(notify_type, int),
             }]
