@@ -309,8 +309,8 @@ class ConfigBase(URLBase):
         response = list()
 
         try:
-            # Load our data
-            result = yaml.load(content)
+            # Load our data (safely)
+            result = yaml.load(content, Loader=yaml.SafeLoader)
 
         except (AttributeError, yaml.error.MarkedYAMLError) as e:
             # Invalid content
