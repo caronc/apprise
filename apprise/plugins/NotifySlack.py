@@ -44,6 +44,7 @@ from time import time
 from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
 from ..common import NotifyType
+from ..common import NotifyFormat
 
 # Token required as part of the API request
 #  /AAAAAAAAA/........./........................
@@ -97,6 +98,8 @@ class NotifySlack(NotifyBase):
 
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 1000
+
+    notify_format = NotifyFormat.MARKDOWN
 
     def __init__(self, token_a, token_b, token_c, channels, **kwargs):
         """
@@ -233,7 +236,7 @@ class NotifySlack(NotifyBase):
                 'channel': _channel,
                 'username': self.user if self.user else SLACK_DEFAULT_USER,
                 # Use Markdown language
-                'mrkdwn': True,
+                'mrkdwn': (self.notify_format == NotifyFormat.MARKDOWN),
                 'attachments': [{
                     'title': title,
                     'text': body,
