@@ -583,6 +583,47 @@ TEST_URLS = (
         'test_requests_exceptions': True,
     }),
 
+    # Matrix supports webhooks too; the following tests this now:
+    ('matrix://user:token@localhost?webhook=matrix&format=text', {
+        # user and token correctly specified with webhook
+        'instance': plugins.NotifyMatrix,
+    }),
+    ('matrix://user:token@localhost?webhook=matrix&format=html', {
+        # user and token correctly specified with webhook
+        'instance': plugins.NotifyMatrix,
+    }),
+    ('matrix://user:token@localhost?webhook=slack&format=text', {
+        # user and token correctly specified with webhook
+        'instance': plugins.NotifyMatrix,
+    }),
+    ('matrixs://user:token@localhost?webhook=SLACK&format=markdown', {
+        # user and token specified; slack webhook still detected
+        # despite uppercase characters
+        'instance': plugins.NotifyMatrix,
+    }),
+    ('matrix://user:token@localhost?webhook=On', {
+        # invalid webhook specified (unexpected boolean)
+        'instance': TypeError,
+    }),
+    ('matrix://token@localhost/?webhook=Matrix', {
+        'instance': plugins.NotifyMatrix,
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('matrix://user:token@localhost/webhook=matrix', {
+        'instance': plugins.NotifyMatrix,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('matrix://token@localhost:8080/?webhook=slack', {
+        'instance': plugins.NotifyMatrix,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+
     ##################################
     # NotifyMatterMost
     ##################################
