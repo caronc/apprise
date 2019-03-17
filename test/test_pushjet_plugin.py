@@ -112,8 +112,11 @@ def test_plugin(mock_refresh, mock_send):
             obj = Apprise.instantiate(url, suppress_exceptions=False)
 
             if obj is None:
-                # We're done (assuming this is what we were expecting)
-                assert instance is None
+                if instance is not None:
+                    # We're done (assuming this is what we were expecting)
+                    print("{} didn't instantiate itself "
+                          "(we expected it to)".format(url))
+                    assert False
                 continue
 
             if instance is None:

@@ -270,6 +270,51 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifyGotify
+    ##################################
+    ('gotify://', {
+        'instance': None,
+    }),
+    # No token specified
+    ('gotify://hostname', {
+        'instance': TypeError,
+    }),
+    # Provide a hostname and token
+    ('gotify://hostname/%s' % ('t' * 16), {
+        'instance': plugins.NotifyGotify,
+    }),
+    # Provide a priority
+    ('gotify://hostname/%s?priority=high' % ('i' * 16), {
+        'instance': plugins.NotifyGotify,
+    }),
+    # Provide an invalid priority
+    ('gotify://hostname:8008/%s?priority=invalid' % ('i' * 16), {
+        'instance': plugins.NotifyGotify,
+    }),
+    # An invalid url
+    ('gotify://:@/', {
+        'instance': None,
+    }),
+    ('gotify://hostname/%s/' % ('t' * 16), {
+        'instance': plugins.NotifyGotify,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('gotifys://localhost/%s/' % ('t' * 16), {
+        'instance': plugins.NotifyGotify,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('gotify://localhost/%s/' % ('t' * 16), {
+        'instance': plugins.NotifyGotify,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifyIFTTT - If This Than That
     ##################################
     ('ifttt://', {
@@ -1565,8 +1610,11 @@ def test_rest_plugins(mock_post, mock_get):
                 url, asset=asset, suppress_exceptions=False)
 
             if obj is None:
-                # We're done (assuming this is what we were expecting)
-                assert instance is None
+                if instance is not None:
+                    # We're done (assuming this is what we were expecting)
+                    print("{} didn't instantiate itself "
+                          "(we expected it to)".format(url))
+                    assert False
                 continue
 
             if instance is None:

@@ -57,9 +57,9 @@ setup(
     long_description_content_type='text/markdown',
     url='https://github.com/caronc/apprise',
     keywords='Push Notifications Email AWS SNS Boxcar Discord Dbus Emby Faast '
-        'Gnome Growl IFTTT Join KODI Matrix Mattermost Prowl PushBullet '
-        'Pushjet Pushed Pushover Rocket.Chat Ryver Slack Telegram Twiiter '
-        'XBMC Microsoft Windows CLI API',
+        'Gnome Gotify Growl IFTTT Join KODI Matrix Mattermost Prowl'
+        'PushBullet Pushjet Pushed Pushover Rocket.Chat Ryver Slack Telegram '
+        'Twitter XBMC Microsoft Windows CLI API',
     author='Chris Caron',
     author_email='lead2gold@gmail.com',
     packages=find_packages(),

@@ -23,9 +23,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import sys
 import six
 from apprise.AppriseAsset import AppriseAsset
 from apprise.config.ConfigBase import ConfigBase
+from apprise.config import __load_matrix
 
 # Disable logging for a cleaner testing output
 import logging
@@ -47,7 +49,7 @@ def test_config_base():
     except TypeError:
         assert(True)
 
-    # Notify format types are not the same as ConfigBase ones
+    # Config format types are not the same as ConfigBase ones
     try:
         ConfigBase(**{'format': 'markdown'})
         # We should never reach here as an exception should be thrown
@@ -591,3 +593,68 @@ urls:
     assert len(result[5].tags) == 4
     assert 'customer' in result[5].tags
     assert 'chris' in result[5].tags
+
+
+def test_config_matrix_dynamic_importing(tmpdir):
+    """
+    API: Apprise() Config Matrix Importing
+
+    """
+
+    # Make our new path valid
+    suite = tmpdir.mkdir("apprise_config_test_suite")
+    suite.join("__init__.py").write('')
+
+    module_name = 'badconfig'
+
+    # Update our path to point to our new test suite
+    sys.path.insert(0, str(suite))
+
+    # Create a base area to work within
+    base = suite.mkdir(module_name)
+    base.join("__init__.py").write('')
+
+    # Test no app_id
+    base.join('ConfigBadFile1.py').write(
+        """
+class ConfigBadFile1(object):
+    pass""")
+
+    # No class of the same name
+    base.join('ConfigBadFile2.py').write(
+        """
+class BadClassName(object):
+    pass""")
+
+    # Exception thrown
+    base.join('ConfigBadFile3.py').write("""raise ImportError()""")
+
+    # Utilizes a schema:// already occupied (as string)
+    base.join('ConfigGoober.py').write(
+        """
+from apprise import ConfigBase
+class ConfigGoober(ConfigBase):
+    # This class tests the fact we have a new class name, but we're
+    # trying to over-ride items previously used
+
+    # The default simple (insecure) protocol (used by ConfigMail)
+    protocol = 'http'
+
+    # The default secure protocol (used by ConfigMail)
+    secure_protocol = 'https'""")
+
+    # Utilizes a schema:// already occupied (as tuple)
+    base.join('ConfigBugger.py').write("""
+from apprise import ConfigBase
+class ConfigBugger(ConfigBase):
+    # This class tests the fact we have a new class name, but we're
+    # trying to over-ride items previously used
+
+    # The default simple (insecure) protocol (used by ConfigMail), the other
+    # isn't
+    protocol = ('http', 'bugger-test' )
+
+    # The default secure protocol (used by ConfigMail), the other isn't
+    secure_protocol = ('https', 'bugger-tests')""")
+
+    __load_matrix(path=str(base), name=module_name)

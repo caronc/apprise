@@ -24,6 +24,7 @@
 # THE SOFTWARE.
 
 from __future__ import print_function
+import sys
 import six
 import pytest
 import requests
@@ -670,3 +671,68 @@ def test_apprise_details():
     # a list of entrys that do not have a string defined.
     assert(not len([x['service_name'] for x in details['schemas']
                    if not isinstance(x['service_name'], six.string_types)]))
+
+
+def test_notify_matrix_dynamic_importing(tmpdir):
+    """
+    API: Apprise() Notify Matrix Importing
+
+    """
+
+    # Make our new path valid
+    suite = tmpdir.mkdir("apprise_notify_test_suite")
+    suite.join("__init__.py").write('')
+
+    module_name = 'badnotify'
+
+    # Update our path to point to our new test suite
+    sys.path.insert(0, str(suite))
+
+    # Create a base area to work within
+    base = suite.mkdir(module_name)
+    base.join("__init__.py").write('')
+
+    # Test no app_id
+    base.join('NotifyBadFile1.py').write(
+        """
+class NotifyBadFile1(object):
+    pass""")
+
+    # No class of the same name
+    base.join('NotifyBadFile2.py').write(
+        """
+class BadClassName(object):
+    pass""")
+
+    # Exception thrown
+    base.join('NotifyBadFile3.py').write("""raise ImportError()""")
+
+    # Utilizes a schema:// already occupied (as string)
+    base.join('NotifyGoober.py').write(
+        """
+from apprise import NotifyBase
+class NotifyGoober(NotifyBase):
+    # This class tests the fact we have a new class name, but we're
+    # trying to over-ride items previously used
+
+    # The default simple (insecure) protocol (used by NotifyMail)
+    protocol = 'mailto'
+
+    # The default secure protocol (used by NotifyMail)
+    secure_protocol = 'mailtos'""")
+
+    # Utilizes a schema:// already occupied (as tuple)
+    base.join('NotifyBugger.py').write("""
+from apprise import NotifyBase
+class NotifyBugger(NotifyBase):
+    # This class tests the fact we have a new class name, but we're
+    # trying to over-ride items previously used
+
+    # The default simple (insecure) protocol (used by NotifyMail), the other
+    # isn't
+    protocol = ('mailto', 'bugger-test' )
+
+    # The default secure protocol (used by NotifyMail), the other isn't
+    secure_protocol = ('mailtos', 'bugger-tests')""")
+
+    __load_matrix(path=str(base), name=module_name)
