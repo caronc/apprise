@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2019 Hitesh Sondhi <hitesh@cropsly.com>
+# Copyright (C) 2019 Chris Caron <lead2gold@gmail.com>
 # All rights reserved.
 #
 # This code is licensed under the MIT License.
@@ -36,36 +36,31 @@
 #
 #
 import re
-import six
 import requests
 from json import dumps
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
+from ..common import NotifyFormat
+from ..common import NotifyImageSize
+from ..utils import parse_list
 
-# Token required as part of the API request
-# /134b8gh0-eba0-4fa9-ab9c-257ced0e8221
-VALIDATE_TOKEN = re.compile(r'[A-Za-z0-9-]{24}')
 
 # Extend HTTP Error Messages
 FLOCK_HTTP_ERROR_MAP = {
     401: 'Unauthorized - Invalid Token.',
 }
 
+# Default User
+FLOCK_DEFAULT_USER = 'apprise'
 
-class FlockContentType(object):
-    """
-    Flock supports to content types
-    """
-    FLOCKML = 'flockml'
-    TEXT = 'text'
+# Used to detect a channel/user
+IS_CHANNEL_RE = re.compile(r'^(#|g:)(?P<id>[A-Z0-9_]{12})$', re.I)
+IS_USER_RE = re.compile(r'^(@|u:)?(?P<id>[A-Z0-9_]{12})$', re.I)
 
-
-# Define the types in a list for validation purposes
-FLOCK_CONTENT_TYPES = (
-    FlockContentType.FLOCKML,
-    FlockContentType.TEXT,
-)
+# Token required as part of the API request
+# /134b8gh0-eba0-4fa9-ab9c-257ced0e8221
+IS_API_TOKEN = re.compile(r'^[a-z0-9-]{24}$', re.I)
 
 
 class NotifyFlock(NotifyBase):
@@ -88,33 +83,56 @@ class NotifyFlock(NotifyBase):
     # Flock uses the http protocol with JSON requests
     notify_url = 'https://api.flock.com/hooks/sendMessage'
 
-    def __init__(self, token, contenttype=FlockContentType.TEXT, **kwargs):
+    # API Wrapper
+    notify_api = 'https://api.flock.co/v1/chat.sendMessage'
+
+    # Allows the user to specify the NotifyImageSize object
+    image_size = NotifyImageSize.XY_72
+
+    def __init__(self, token, targets=None, **kwargs):
         """
         Initialize Flock Object
         """
         super(NotifyFlock, self).__init__(**kwargs)
 
-        if not VALIDATE_TOKEN.match(token.strip()):
-            self.logger.warning(
-                'The API Token specified (%s) is invalid.' % token,
-            )
-            raise TypeError(
-                'The API Token specified (%s) is invalid.' % token,
-            )
+        # Build ourselves a target list
+        self.targets = list()
 
-        # The token associated with the account
+        # Initialize our token object
         self.token = token.strip()
 
-        # Store our webhook type
-        self.contenttype = contenttype
+        if not IS_API_TOKEN.match(self.token):
+            msg = 'The Flock API Token specified ({}) is invalid.'.format(
+                self.token)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
-        if self.contenttype not in FLOCK_CONTENT_TYPES:
+        # Track any issues
+        has_error = False
+
+        # Tidy our targets
+        targets = parse_list(targets)
+
+        for target in targets:
+            result = IS_USER_RE.match(target)
+            if result:
+                self.targets.append('u:' + result.group('id'))
+                continue
+
+            result = IS_CHANNEL_RE.match(target)
+            if result:
+                self.targets.append('g:' + result.group('id'))
+                continue
+
+            has_error = True
             self.logger.warning(
-                'The content type specified (%s) is invalid.' % contenttype,
-            )
-            raise TypeError(
-                'The content type specified (%s) is invalid.' % contenttype,
-            )
+                'Ignoring invalid target ({}) specified.'.format(target))
+
+        if has_error and len(self.targets) == 0:
+            # We have a bot token and no target(s) to message
+            msg = 'No targets found with specified Flock Bot Token.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
@@ -129,18 +147,58 @@ class NotifyFlock(NotifyBase):
         # error tracking (used for function return)
         has_error = False
 
-        url = '%s/%s' % (
-            self.notify_url,
-            self.token
-        )
+        if self.notify_format == NotifyFormat.HTML:
+            body = '<flockml>{}</flockml>'.format(body)
+
+        else:
+            title = NotifyBase.escape_html(title, whitespace=False)
+            body = NotifyBase.escape_html(body, whitespace=False)
+
+            body = '<flockml>{}{}</flockml>'.format(
+                '' if not title else '<b>{}</b><br/>'.format(title), body)
 
         payload = {
-            self.contenttype: body
+            'token': self.token,
+            'flockml': body,
+            'sendAs': {
+                'name': FLOCK_DEFAULT_USER if not self.user else self.user,
+                'profileImage': self.image_url(notify_type),
+            }
         }
 
+        if len(self.targets):
+            # Create a copy of our targets
+            targets = list(self.targets)
+
+            while len(targets) > 0:
+                # Get our first item
+                target = targets.pop(0)
+
+                # Copy and update our payload
+                _payload = payload.copy()
+                _payload['to'] = target
+
+                if not self._post(self.notify_api, headers, _payload):
+                    has_error = True
+
+        else:
+            # Webhook
+            url = '{}/{}'.format(self.notify_url, self.token)
+            if not self._post(url, headers, payload):
+                has_error = True
+
+        return not has_error
+
+    def _post(self, url, headers, payload):
+        """
+        A wrapper to the requests object
+        """
+
+        # error tracking (used for function return)
+        has_error = False
+
         self.logger.debug('Flock POST URL: %s (cert_verify=%r)' % (
-            url, self.verify_certificate,
-        ))
+            url, self.verify_certificate))
         self.logger.debug('Flock Payload: %s' % str(payload))
 
         # Always call throttle before any remote server i/o is made
@@ -172,8 +230,7 @@ class NotifyFlock(NotifyBase):
                 has_error = True
 
             else:
-                self.logger.info(
-                    'Sent Flock notification.')
+                self.logger.info('Sent Flock notification.')
 
         except requests.RequestException as e:
             self.logger.warning(
@@ -194,13 +251,14 @@ class NotifyFlock(NotifyBase):
         args = {
             'format': self.notify_format,
             'overflow': self.overflow_mode,
-            'contenttype': self.contenttype
         }
 
-        return '{schema}://{token}/?{args}'\
+        return '{schema}://{token}/{targets}?{args}'\
             .format(
                 schema=self.secure_protocol,
                 token=self.quote(self.token, safe=''),
+                targets='/'.join(
+                    [self.quote(target, safe='') for target in self.targets]),
                 args=self.urlencode(args),
             )
 
@@ -218,14 +276,10 @@ class NotifyFlock(NotifyBase):
 
         # Apply our settings now
 
+        results['targets'] = [x for x in filter(
+            bool, NotifyBase.split_path(results['fullpath']))]
+
         # The first token is stored in the hostname
-        token = results['host']
-
-        if 'contenttype' in results['qsd'] and\
-            len(results['qsd']['contenttype']):
-            results['contenttype'] = results['qsd']\
-                .get('contenttype', FlockContentType.TEXT).lower()
-
-        results['token'] = token
+        results['token'] = results['host']
 
         return results

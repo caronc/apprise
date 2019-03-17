@@ -19,3 +19,6 @@ The contributors have been listed in alphabetical order:
 
 * Wim de With <wf@dewith.io>
   * Dec 2018 - Added Matrix Support
+
+* Hitesh Sondhi <hitesh@cropsly.com>
+  * Mar 2019 - Added Flock Support

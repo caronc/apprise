@@ -270,6 +270,94 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifyFlock
+    ##################################
+    # No token specified
+    ('flock://', {
+        'instance': None,
+    }),
+    # Provide a token
+    ('flock://%s' % ('t' * 24), {
+        'instance': plugins.NotifyFlock,
+    }),
+    # Provide markdown format
+    ('flock://%s?format=markdown' % ('i' * 24), {
+        'instance': plugins.NotifyFlock,
+    }),
+    # Provide text format
+    ('flock://%s?format=text' % ('i' * 24), {
+        'instance': plugins.NotifyFlock,
+    }),
+    # Bot API presumed if one or more targets are specified
+    # Provide markdown format
+    ('flock://%s/u:%s?format=markdown' % ('i' * 24, 'u' * 12), {
+        'instance': plugins.NotifyFlock,
+    }),
+    # Bot API presumed if one or more targets are specified
+    # Provide text format
+    ('flock://%s/u:%s?format=html' % ('i' * 24, 'u' * 12), {
+        'instance': plugins.NotifyFlock,
+    }),
+    # Bot API presumed if one or more targets are specified
+    # u: is optional
+    ('flock://%s/%s?format=text' % ('i' * 24, 'u' * 12), {
+        'instance': plugins.NotifyFlock,
+    }),
+    # Bot API presumed if one or more targets are specified
+    # Multi-entries
+    ('flock://%s/g:%s/u:%s?format=text' % ('i' * 24, 'g' * 12, 'u' * 12), {
+        'instance': plugins.NotifyFlock,
+    }),
+    # Bot API presumed if one or more targets are specified
+    # Multi-entries using @ for user and # for channel
+    ('flock://%s/#%s/@%s?format=text' % ('i' * 24, 'g' * 12, 'u' * 12), {
+        'instance': plugins.NotifyFlock,
+    }),
+    # Bot API presumed if one or more targets are specified
+    # has bad entry
+    ('flock://%s/g:%s/u:%s?format=text' % ('i' * 24, 'g' * 12, 'u' * 10), {
+        'instance': plugins.NotifyFlock,
+    }),
+    # Bot API presumed if one or more targets are specified
+    # has all bad entries
+    ('flock://%s/g:%s/u:%s?format=text' % ('i' * 24, 'g' * 14, 'u' * 10), {
+        'instance': TypeError,
+    }),
+    # Provide invalid token
+    ('flock://%s?format=text' % ('i' * 10), {
+        'instance': TypeError,
+    }),
+    # An invalid url
+    ('flock://:@/', {
+        'instance': None,
+    }),
+    # Error Testing
+    ('flock://%s/g:%s/u:%s?format=text' % ('i' * 24, 'g' * 12, 'u' * 10), {
+        'instance': plugins.NotifyFlock,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('flock://%s/' % ('t' * 24), {
+        'instance': plugins.NotifyFlock,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('flock://%s/' % ('t' * 24), {
+        'instance': plugins.NotifyFlock,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('flock://%s/' % ('t' * 24), {
+        'instance': plugins.NotifyFlock,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifyGotify
     ##################################
     ('gotify://', {
