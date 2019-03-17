@@ -373,9 +373,6 @@ class NotifyTelegram(NotifyBase):
             # HTML
             body = NotifyBase.escape_html(body, whitespace=False)
 
-        # Assign the body
-        payload['text'] = body
-
         if title and self.notify_format == NotifyFormat.TEXT:
             # Text HTML Formatting
             payload['text'] = '<b>%s</b>\r\n%s' % (
@@ -390,6 +387,10 @@ class NotifyTelegram(NotifyBase):
                 title,
                 body,
             )
+
+        else:
+            # Assign the body
+            payload['text'] = body
 
         # Create a copy of the chat_ids list
         chat_ids = list(self.chat_ids)
