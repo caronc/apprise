@@ -23,8 +23,121 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-from . import NotifyPushjet
+import re
+from . import pushjet
 
-__all__ = [
-    'NotifyPushjet',
-]
+from ..NotifyBase import NotifyBase
+from ...common import NotifyType
+
+PUBLIC_KEY_RE = re.compile(
+    r'^[a-z0-9]{4}-[a-z0-9]{6}-[a-z0-9]{12}-[a-z0-9]{5}-[a-z0-9]{9}$', re.I)
+
+SECRET_KEY_RE = re.compile(r'^[a-z0-9]{32}$', re.I)
+
+
+class NotifyPushjet(NotifyBase):
+    """
+    A wrapper for Pushjet Notifications
+    """
+
+    # The default descriptive name associated with the Notification
+    service_name = 'Pushjet'
+
+    # The default protocol
+    protocol = 'pjet'
+
+    # The default secure protocol
+    secure_protocol = 'pjets'
+
+    # A URL that takes you to the setup/help of the specific protocol
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_pushjet'
+
+    # Disable throttle rate for Pushjet requests since they are normally
+    # local anyway (the remote/online service is no more)
+    request_rate_per_sec = 0
+
+    def __init__(self, secret_key, **kwargs):
+        """
+        Initialize Pushjet Object
+        """
+        super(NotifyPushjet, self).__init__(**kwargs)
+
+        # store our key
+        self.secret_key = secret_key
+
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
+        """
+        Perform Pushjet Notification
+        """
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+
+        server = "https://" if self.secure else "http://"
+
+        server += self.host
+        if self.port:
+            server += ":" + str(self.port)
+
+        try:
+            api = pushjet.pushjet.Api(server)
+            service = api.Service(secret_key=self.secret_key)
+
+            service.send(body, title)
+            self.logger.info('Sent Pushjet notification.')
+
+        except (pushjet.errors.PushjetError, ValueError) as e:
+            self.logger.warning('Failed to send Pushjet notification.')
+            self.logger.debug('Pushjet Exception: %s' % str(e))
+            return False
+
+        return True
+
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'overflow': self.overflow_mode,
+        }
+
+        default_port = 443 if self.secure else 80
+
+        return '{schema}://{secret_key}@{hostname}{port}/?{args}'.format(
+            schema=self.secure_protocol if self.secure else self.protocol,
+            secret_key=self.quote(self.secret_key, safe=''),
+            hostname=self.host,
+            port='' if self.port is None or self.port == default_port
+                 else ':{}'.format(self.port),
+            args=self.urlencode(args),
+        )
+
+    @staticmethod
+    def parse_url(url):
+        """
+        Parses the URL and returns enough arguments that can allow
+        us to substantiate this object.
+
+        Syntax:
+           pjet://secret_key@hostname
+           pjet://secret_key@hostname:port
+           pjets://secret_key@hostname
+           pjets://secret_key@hostname:port
+
+        """
+        results = NotifyBase.parse_url(url)
+
+        if not results:
+            # We're done early as we couldn't load the results
+            return results
+
+        if not results.get('user'):
+            # a username is required
+            return None
+
+        # Store it as it's value
+        results['secret_key'] = results.get('user')
+
+        return results
