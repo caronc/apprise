@@ -32,14 +32,17 @@ import six
 import requests
 from json import dumps
 from json import loads
+from time import time
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
 from ..common import NotifyImageSize
+from ..common import NotifyFormat
 from ..utils import parse_bool
 
 # Define default path
 MATRIX_V2_API_PATH = '/_matrix/client/r0'
+MATRIX_V1_WEBHOOK_PATH = '/api/v1/matrix/hook'
 
 # Extend HTTP Error Messages
 MATRIX_HTTP_ERROR_MAP = {
@@ -61,6 +64,24 @@ IS_ROOM_ID = re.compile(
     r'^\s*(!|&#33;|%21)(?P<room>[a-z0-9-]+)((:|%3A)'
     r'(?P<home_server>[a-z0-9.-]+))?\s*$', re.I)
 
+# Default User
+SLACK_DEFAULT_USER = 'apprise'
+
+
+class MatrixWebhookMode(object):
+    # The default webhook mode is to just be set to Matrix
+    MATRIX = "matrix"
+
+    # Support the slack webhook plugin
+    SLACK = "slack"
+
+
+# webhook modes are placed ito this list for validation purposes
+MATRIX_WEBHOOK_MODES = (
+    MatrixWebhookMode.MATRIX,
+    MatrixWebhookMode.SLACK,
+)
+
 
 class NotifyMatrix(NotifyBase):
     """
@@ -78,12 +99,6 @@ class NotifyMatrix(NotifyBase):
 
     # The default secure protocol
     secure_protocol = 'matrixs'
-
-    # Define the default secure port to use
-    default_secure_port = 8448
-
-    # Define the default insecure port to use
-    default_insecure_port = 8008
 
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_matrix'
@@ -105,7 +120,7 @@ class NotifyMatrix(NotifyBase):
     # the server doesn't remind us how long we shoul wait for
     default_wait_ms = 1000
 
-    def __init__(self, rooms=None, thumbnail=True, **kwargs):
+    def __init__(self, rooms=None, webhook=None, thumbnail=True, **kwargs):
         """
         Initialize Matrix Object
         """
@@ -122,6 +137,13 @@ class NotifyMatrix(NotifyBase):
 
         else:
             self.rooms = []
+
+        self.webhook = None \
+            if not isinstance(webhook, six.string_types) else webhook.lower()
+        if self.webhook and self.webhook not in MATRIX_WEBHOOK_MODES:
+            msg = 'The webhook specified ({}) is invalid.'.format(webhook)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         # our home server gets populated after a login/registration
         self.home_server = None
@@ -142,6 +164,172 @@ class NotifyMatrix(NotifyBase):
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Matrix Notification
+        """
+
+        # Call the _send_ function applicable to whatever mode we're in
+        # - calls _send_webhook_notification if the webhook variable is set
+        # - calls _send_server_notification if the webhook variable is not set
+        return getattr(self, '_send_{}_notification'.format(
+            'webhook' if self.webhook else 'server'))(
+                body=body, title=title, notify_type=notify_type, **kwargs)
+
+    def _send_webhook_notification(self, body, title='',
+                                   notify_type=NotifyType.INFO, **kwargs):
+        """
+        Perform Matrix Notification as a webhook
+        """
+
+        headers = {
+            'User-Agent': self.app_id,
+            'Content-Type': 'application/json',
+        }
+
+        # Acquire our access token from our URL
+        access_token = self.password if self.password else self.user
+
+        default_port = 443 if self.secure else 80
+
+        # Prepare our URL
+        url = '{schema}://{hostname}:{port}/{token}{webhook_path}'.format(
+            schema='https' if self.secure else 'http',
+            hostname=self.host,
+            port='' if self.port is None
+            or self.port == default_port else self.port,
+            token=access_token,
+            webhook_path=MATRIX_V1_WEBHOOK_PATH,
+        )
+
+        # Retrieve our payload
+        payload = getattr(self, '_{}_webhook_payload'.format(self.webhook))(
+            body=body, title=title, notify_type=notify_type, **kwargs)
+
+        self.logger.debug('Matrix POST URL: %s (cert_verify=%r)' % (
+            url, self.verify_certificate,
+        ))
+        self.logger.debug('Matrix Payload: %s' % str(payload))
+
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+
+        try:
+            r = requests.post(
+                url,
+                data=dumps(payload),
+                headers=headers,
+                verify=self.verify_certificate,
+            )
+            if r.status_code != requests.codes.ok:
+                # We had a problem
+                status_str = \
+                    NotifyBase.http_response_code_lookup(
+                        r.status_code, MATRIX_HTTP_ERROR_MAP)
+
+                self.logger.warning(
+                    'Failed to send Matrix notification: '
+                    '{}{}error={}.'.format(
+                        status_str,
+                        ', ' if status_str else '',
+                        r.status_code))
+
+                self.logger.debug('Response Details:\r\n{}'.format(r.content))
+
+                # Return; we're done
+                return False
+
+            else:
+                self.logger.info('Sent Matrix notification.')
+
+        except requests.RequestException as e:
+            self.logger.warning(
+                'A Connection error occured sending Matrix notification.'
+            )
+            self.logger.debug('Socket Exception: %s' % str(e))
+            # Return; we're done
+            return False
+
+        return True
+
+    def _slack_webhook_payload(self, body, title='',
+                               notify_type=NotifyType.INFO, **kwargs):
+        """
+        Format the payload for a Slack based message
+
+        """
+
+        if not hasattr(self, '_re_slack_formatting_rules'):
+            # Prepare some one-time slack formating variables
+
+            self._re_slack_formatting_map = {
+                # New lines must become the string version
+                r'\r\*\n': '\\n',
+                # Escape other special characters
+                r'&': '&amp;',
+                r'<': '&lt;',
+                r'>': '&gt;',
+            }
+
+            # Iterate over above list and store content accordingly
+            self._re_slack_formatting_rules = re.compile(
+                r'(' + '|'.join(self._re_slack_formatting_map.keys()) + r')',
+                re.IGNORECASE,
+            )
+
+        # Perform Formatting
+        title = self._re_slack_formatting_rules.sub(  # pragma: no branch
+            lambda x: self._re_slack_formatting_map[x.group()], title,
+        )
+
+        body = self._re_slack_formatting_rules.sub(  # pragma: no branch
+            lambda x: self._re_slack_formatting_map[x.group()], body,
+        )
+
+        # prepare JSON Object
+        payload = {
+            'username': self.user if self.user else SLACK_DEFAULT_USER,
+            # Use Markdown language
+            'mrkdwn': (self.notify_format == NotifyFormat.MARKDOWN),
+            'attachments': [{
+                'title': title,
+                'text': body,
+                'color': self.color(notify_type),
+                'ts': time(),
+                'footer': self.app_id,
+            }],
+        }
+
+        return payload
+
+    def _matrix_webhook_payload(self, body, title='',
+                                notify_type=NotifyType.INFO, **kwargs):
+        """
+        Format the payload for a Matrix based message
+
+        """
+
+        payload = {
+            'displayName':
+                self.user if self.user else self.matrix_default_user,
+            'format': 'html',
+        }
+
+        if self.notify_format == NotifyFormat.HTML:
+            payload['text'] = '{}{}'.format('' if not title else title, body)
+
+        else:  # TEXT or MARKDOWN
+
+            # Ensure our content is escaped
+            title = NotifyBase.escape_html(title)
+            body = NotifyBase.escape_html(body)
+
+            payload['text'] = '{}{}'.format(
+                '' if not title else '<h4>{}</h4>'.format(title), body)
+
+        return payload
+
+    def _send_server_notification(self, body, title='',
+                                  notify_type=NotifyType.INFO, **kwargs):
+        """
+        Perform Direct Matrix Server Notification (no webhook)
         """
 
         if self.access_token is None:
@@ -573,14 +761,14 @@ class NotifyMatrix(NotifyBase):
         if self.access_token is not None:
             headers["Authorization"] = 'Bearer %s' % self.access_token
 
-        default_port = self.default_secure_port \
-            if self.secure else self.default_insecure_port
+        default_port = 443 if self.secure else 80
 
         url = \
             '{schema}://{hostname}:{port}{matrix_api}{path}'.format(
                 schema='https' if self.secure else 'http',
                 hostname=self.host,
-                port=default_port if self.port is None else self.port,
+                port='' if self.port is None
+                or self.port == default_port else self.port,
                 matrix_api=MATRIX_V2_API_PATH,
                 path=path)
 
@@ -691,6 +879,9 @@ class NotifyMatrix(NotifyBase):
             'overflow': self.overflow_mode,
         }
 
+        if self.webhook:
+            args['webhook'] = self.webhook
+
         # Determine Authentication method
         auth = ''
         if self.user and self.password:
@@ -704,15 +895,14 @@ class NotifyMatrix(NotifyBase):
                 user=self.quote(self.user, safe=''),
             )
 
-        default_port = self.default_secure_port \
-            if self.secure else self.default_insecure_port
+        default_port = 443 if self.secure else 80
 
         return '{schema}://{auth}{hostname}{port}/{rooms}?{args}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
             hostname=self.host,
-            port='' if self.port is None or self.port == default_port
-                 else ':{}'.format(self.port),
+            port='' if self.port is None
+            or self.port == default_port else ':{}'.format(self.port),
             rooms=self.quote('/'.join(self.rooms)),
             args=self.urlencode(args),
         )
@@ -738,5 +928,8 @@ class NotifyMatrix(NotifyBase):
         # Use Thumbnail
         results['thumbnail'] = \
             parse_bool(results['qsd'].get('thumbnail', False))
+
+        # Webhook
+        results['webhook'] = results['qsd'].get('webhook')
 
         return results
