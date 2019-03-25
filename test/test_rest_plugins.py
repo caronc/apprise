@@ -358,6 +358,66 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifyGitter
+    ##################################
+    ('gitter://', {
+        'instance': None,
+    }),
+    ('gitter://:@/', {
+        'instance': None,
+    }),
+    # Token specified but it's invalid
+    ('gitter://%s' % ('a' * 12), {
+        'instance': TypeError,
+    }),
+    # Token specified but no channel - still okay
+    ('gitter://%s' % ('a' * 40), {
+        'instance': plugins.NotifyGitter,
+        # our notify() will however return a False since it can't
+        # notify anything
+        'response': False,
+    }),
+    # Token + channel
+    ('gitter://%s/apprise' % ('a' * 40), {
+        'instance': plugins.NotifyGitter,
+        # don't include an image by default
+        'include_image': False,
+        # This actually fails because the first thing we do is generate a list
+        # of channel's that we are a part of, and test_rest_plugins() won't
+        # be able to fulfill this task.  Hence we'll get a list of no channels
+        # and having nothing to notify will give us a failed state:
+        'response': False,
+    }),
+    # include image in post
+    ('gitter://%s/apprise?image=Yes' % ('a' * 40), {
+        'instance': plugins.NotifyGitter,
+        'response': False,
+    }),
+    # Don't include image in post (this is the default anyway)
+    ('gitter://%s/apprise?image=No' % ('a' * 40), {
+        'instance': plugins.NotifyGitter,
+        'response': False,
+    }),
+    ('gitter://%s' % ('a' * 40), {
+        'instance': plugins.NotifyGitter,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('gitter://%s' % ('a' * 40), {
+        'instance': plugins.NotifyGitter,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('gitter://%s' % ('a' * 40), {
+        'instance': plugins.NotifyGitter,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifyGotify
     ##################################
     ('gotify://', {
