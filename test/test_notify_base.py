@@ -194,13 +194,54 @@ def test_notify_base():
         "<content>'\t \n</content>", convert_new_lines=True) == \
         '&lt;content&gt;&apos;&emsp;&nbsp;&lt;br/&gt;&lt;/content&gt;'
 
+    # Test invalid data
+    assert NotifyBase.split_path(None) == []
+    assert NotifyBase.split_path(object()) == []
+    assert NotifyBase.split_path(42) == []
+
     assert NotifyBase.split_path(
         '/path/?name=Dr%20Disrespect', unquote=False) == \
         ['path', '?name=Dr%20Disrespect']
 
     assert NotifyBase.split_path(
         '/path/?name=Dr%20Disrespect', unquote=True) == \
-        ['path', '?name=Dr', 'Disrespect']
+        ['path', '?name=Dr Disrespect']
+
+    # a slash found inside the path, if escaped properly will not be broken
+    # by split_path while additional concatinated slashes are ignored
+    # FYI: %2F = /
+    assert NotifyBase.split_path(
+        '/%2F///%2F%2F////%2F%2F%2F////', unquote=True) == \
+        ['/', '//', '///']
+
+    # Test invalid data
+    assert NotifyBase.parse_list(None) == []
+    assert NotifyBase.parse_list(42) == ['42', ]
+
+    result = NotifyBase.parse_list(
+        ',path,?name=Dr%20Disrespect', unquote=False)
+    assert isinstance(result, list) is True
+    assert len(result) == 2
+    assert 'path' in result
+    assert '?name=Dr%20Disrespect' in result
+
+    result = NotifyBase.parse_list(',path,?name=Dr%20Disrespect', unquote=True)
+    assert isinstance(result, list) is True
+    assert len(result) == 2
+    assert 'path' in result
+    assert '?name=Dr Disrespect' in result
+
+    # by parse_list while additional concatinated slashes are ignored
+    # FYI: %2F = /
+    # In this lit there are actually 4 entries, however parse_list
+    # eliminates duplicates in addition to unquoting content by default
+    result = NotifyBase.parse_list(
+        ',%2F,%2F%2F, , , ,%2F%2F%2F, %2F', unquote=True)
+    assert isinstance(result, list) is True
+    assert len(result) == 3
+    assert '/' in result
+    assert '//' in result
+    assert '///' in result
 
     # Give nothing, get nothing
     assert NotifyBase.escape_html("") == ""

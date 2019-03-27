@@ -24,11 +24,11 @@
 # THE SOFTWARE.
 
 import re
-import six
 import requests
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
+from ..utils import parse_list
 
 # Flag used as a placeholder to sending to all devices
 PUSHOVER_SEND_TO_ALL = 'ALL_DEVICES'
@@ -60,9 +60,6 @@ PUSHOVER_PRIORITIES = (
     PushoverPriority.EMERGENCY,
 )
 
-# Used to break path apart into list of devices
-DEVICE_LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
-
 # Extend HTTP Error Messages
 PUSHOVER_HTTP_ERROR_MAP = {
     401: 'Unauthorized - Invalid Token.',
@@ -92,7 +89,7 @@ class NotifyPushover(NotifyBase):
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 512
 
-    def __init__(self, token, devices=None, priority=None, **kwargs):
+    def __init__(self, token, targets=None, priority=None, **kwargs):
         """
         Initialize Pushover Object
         """
@@ -104,30 +101,18 @@ class NotifyPushover(NotifyBase):
 
         except AttributeError:
             # Token was None
-            self.logger.warning('No API Token was specified.')
-            raise TypeError('No API Token was specified.')
+            msg = 'No API Token was specified.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         if not VALIDATE_TOKEN.match(self.token):
-            self.logger.warning(
-                'The API Token specified (%s) is invalid.' % token,
-            )
-            raise TypeError(
-                'The API Token specified (%s) is invalid.' % token,
-            )
+            msg = 'The API Token specified (%s) is invalid.'.format(token)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
-        if isinstance(devices, six.string_types):
-            self.devices = [x for x in filter(bool, DEVICE_LIST_DELIM.split(
-                devices,
-            ))]
-
-        elif isinstance(devices, (set, tuple, list)):
-            self.devices = devices
-
-        else:
-            self.devices = list()
-
-        if len(self.devices) == 0:
-            self.devices = (PUSHOVER_SEND_TO_ALL, )
+        self.targets = parse_list(targets)
+        if len(self.targets) == 0:
+            self.targets = (PUSHOVER_SEND_TO_ALL, )
 
         # The Priority of the message
         if priority not in PUSHOVER_PRIORITIES:
@@ -137,16 +122,14 @@ class NotifyPushover(NotifyBase):
             self.priority = priority
 
         if not self.user:
-            self.logger.warning('No user was specified.')
-            raise TypeError('No user was specified.')
+            msg = 'No user was specified.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         if not VALIDATE_USERGROUP.match(self.user):
-            self.logger.warning(
-                'The user/group specified (%s) is invalid.' % self.user,
-            )
-            raise TypeError(
-                'The user/group specified (%s) is invalid.' % self.user,
-            )
+            msg = 'The user/group specified (%s) is invalid.' % self.user
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
@@ -163,7 +146,7 @@ class NotifyPushover(NotifyBase):
         has_error = False
 
         # Create a copy of the devices list
-        devices = list(self.devices)
+        devices = list(self.targets)
         while len(devices):
             device = devices.pop(0)
 
@@ -205,7 +188,7 @@ class NotifyPushover(NotifyBase):
                 if r.status_code != requests.codes.ok:
                     # We had a problem
                     status_str = \
-                        NotifyBase.http_response_code_lookup(
+                        NotifyPushover.http_response_code_lookup(
                             r.status_code, PUSHOVER_HTTP_ERROR_MAP)
 
                     self.logger.warning(
@@ -262,7 +245,10 @@ class NotifyPushover(NotifyBase):
                 else _map[self.priority],
         }
 
-        devices = '/'.join([self.quote(x) for x in self.devices])
+        # Escape our devices
+        devices = '/'.join([NotifyPushover.quote(x, safe='')
+                            for x in self.targets])
+
         if devices == PUSHOVER_SEND_TO_ALL:
             # keyword is reserved for internal usage only; it's safe to remove
             # it from the devices list
@@ -271,10 +257,11 @@ class NotifyPushover(NotifyBase):
         return '{schema}://{auth}{token}/{devices}/?{args}'.format(
             schema=self.secure_protocol,
             auth='' if not self.user
-                 else '{user}@'.format(user=self.quote(self.user, safe='')),
-            token=self.quote(self.token, safe=''),
+                 else '{user}@'.format(
+                     user=NotifyPushover.quote(self.user, safe='')),
+            token=NotifyPushover.quote(self.token, safe=''),
             devices=devices,
-            args=self.urlencode(args))
+            args=NotifyPushover.urlencode(args))
 
     @staticmethod
     def parse_url(url):
@@ -289,21 +276,14 @@ class NotifyPushover(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
-        # Apply our settings now
-        devices = NotifyBase.unquote(results['fullpath'])
-
+        # Set our priority
         if 'priority' in results['qsd'] and len(results['qsd']['priority']):
             _map = {
                 'l': PushoverPriority.LOW,
-                '-2': PushoverPriority.LOW,
                 'm': PushoverPriority.MODERATE,
-                '-1': PushoverPriority.MODERATE,
                 'n': PushoverPriority.NORMAL,
-                '0': PushoverPriority.NORMAL,
                 'h': PushoverPriority.HIGH,
-                '1': PushoverPriority.HIGH,
                 'e': PushoverPriority.EMERGENCY,
-                '2': PushoverPriority.EMERGENCY,
             }
             try:
                 results['priority'] = \
@@ -313,7 +293,15 @@ class NotifyPushover(NotifyBase):
                 # No priority was set
                 pass
 
-        results['token'] = results['host']
-        results['devices'] = devices
+        # Retrieve all of our targets
+        results['targets'] = NotifyPushover.split_path(results['fullpath'])
+
+        # The 'to' makes it easier to use yaml configuration
+        if 'to' in results['qsd'] and len(results['qsd']['to']):
+            results['targets'] += \
+                NotifyPushover.parse_list(results['qsd']['to'])
+
+        # Token
+        results['token'] = NotifyPushover.unquote(results['host'])
 
         return results

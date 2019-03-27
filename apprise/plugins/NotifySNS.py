@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import re
-import six
 import hmac
 import requests
 from hashlib import sha256
@@ -35,6 +34,7 @@ from itertools import chain
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
+from ..utils import parse_list
 
 # Some Phone Number Detection
 IS_PHONE_NO = re.compile(r'^\+?(?P<phone>[0-9\s)(+-]+)\s*$')
@@ -49,10 +49,6 @@ IS_PHONE_NO = re.compile(r'^\+?(?P<phone>[0-9\s)(+-]+)\s*$')
 # Allow a starting hashtag (#) specification to help eliminate possible
 # ambiguity between a topic that is comprised of all digits and a phone number
 IS_TOPIC = re.compile(r'^#?(?P<name>[A-Za-z0-9_-]+)\s*$')
-
-# Used to break apart list of potential tags by their delimiter
-# into a usable list.
-LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
 
 # Because our AWS Access Key Secret contains slashes, we actually use the
 # region as a delimiter. This is a bit hacky; but it's much easier than having
@@ -97,26 +93,26 @@ class NotifySNS(NotifyBase):
     title_maxlen = 0
 
     def __init__(self, access_key_id, secret_access_key, region_name,
-                 recipients=None, **kwargs):
+                 targets=None, **kwargs):
         """
         Initialize Notify AWS SNS Object
         """
         super(NotifySNS, self).__init__(**kwargs)
 
         if not access_key_id:
-            raise TypeError(
-                'An invalid AWS Access Key ID was specified.'
-            )
+            msg = 'An invalid AWS Access Key ID was specified.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         if not secret_access_key:
-            raise TypeError(
-                'An invalid AWS Secret Access Key was specified.'
-            )
+            msg = 'An invalid AWS Secret Access Key was specified.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         if not (region_name and IS_REGION.match(region_name)):
-            raise TypeError(
-                'An invalid AWS Region was specified.'
-            )
+            msg = 'An invalid AWS Region was specified.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         # Initialize topic list
         self.topics = list()
@@ -147,20 +143,12 @@ class NotifySNS(NotifyBase):
         self.aws_auth_algorithm = 'AWS4-HMAC-SHA256'
         self.aws_auth_request = 'aws4_request'
 
-        if recipients is None:
-            recipients = []
+        # Get our targets
+        targets = parse_list(targets)
 
-        elif isinstance(recipients, six.string_types):
-            recipients = [x for x in filter(bool, LIST_DELIM.split(
-                recipients,
-            ))]
-
-        elif not isinstance(recipients, (set, tuple, list)):
-            recipients = []
-
-        # Validate recipients and drop bad ones:
-        for recipient in recipients:
-            result = IS_PHONE_NO.match(recipient)
+        # Validate targets and drop bad ones:
+        for target in targets:
+            result = IS_PHONE_NO.match(target)
             if result:
                 # Further check our phone # for it's digit count
                 # if it's less than 10, then we can assume it's
@@ -169,7 +157,7 @@ class NotifySNS(NotifyBase):
                 if len(result) < 11 or len(result) > 14:
                     self.logger.warning(
                         'Dropped invalid phone # '
-                        '(%s) specified.' % recipient,
+                        '(%s) specified.' % target,
                     )
                     continue
 
@@ -177,7 +165,7 @@ class NotifySNS(NotifyBase):
                 self.phone.append('+{}'.format(result))
                 continue
 
-            result = IS_TOPIC.match(recipient)
+            result = IS_TOPIC.match(target)
             if result:
                 # store valid topic
                 self.topics.append(result.group('name'))
@@ -185,12 +173,12 @@ class NotifySNS(NotifyBase):
 
             self.logger.warning(
                 'Dropped invalid phone/topic '
-                '(%s) specified.' % recipient,
+                '(%s) specified.' % target,
             )
 
         if len(self.phone) == 0 and len(self.topics) == 0:
             self.logger.warning(
-                'There are no valid recipient identified to notify.')
+                'There are no valid target identified to notify.')
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
@@ -278,7 +266,7 @@ class NotifySNS(NotifyBase):
         self.throttle()
 
         # Convert our payload from a dict() into a urlencoded string
-        payload = self.urlencode(payload)
+        payload = NotifySNS.urlencode(payload)
 
         # Prepare our Notification URL
         # Prepare our AWS Headers based on our payload
@@ -300,7 +288,7 @@ class NotifySNS(NotifyBase):
             if r.status_code != requests.codes.ok:
                 # We had a problem
                 status_str = \
-                    NotifyBase.http_response_code_lookup(
+                    NotifySNS.http_response_code_lookup(
                         r.status_code, AWS_HTTP_ERROR_MAP)
 
                 self.logger.warning(
@@ -541,17 +529,18 @@ class NotifySNS(NotifyBase):
         return '{schema}://{key_id}/{key_secret}/{region}/{targets}/'\
             '?{args}'.format(
                 schema=self.secure_protocol,
-                key_id=self.quote(self.aws_access_key_id, safe=''),
-                key_secret=self.quote(self.aws_secret_access_key, safe=''),
-                region=self.quote(self.aws_region_name, safe=''),
+                key_id=NotifySNS.quote(self.aws_access_key_id, safe=''),
+                key_secret=NotifySNS.quote(
+                    self.aws_secret_access_key, safe=''),
+                region=NotifySNS.quote(self.aws_region_name, safe=''),
                 targets='/'.join(
-                    [self.quote(x) for x in chain(
+                    [NotifySNS.quote(x) for x in chain(
                         # Phone # are prefixed with a plus symbol
                         ['+{}'.format(x) for x in self.phone],
                         # Topics are prefixed with a pound/hashtag symbol
                         ['#{}'.format(x) for x in self.topics],
                     )]),
-                args=self.urlencode(args),
+                args=NotifySNS.urlencode(args),
             )
 
     @staticmethod
@@ -567,12 +556,8 @@ class NotifySNS(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
-        #
-        # Apply our settings now
-        #
-
         # The AWS Access Key ID is stored in the hostname
-        access_key_id = results['host']
+        access_key_id = NotifySNS.unquote(results['host'])
 
         # Our AWS Access Key Secret contains slashes in it which unfortunately
         # means it is of variable length after the hostname.  Since we require
@@ -586,9 +571,12 @@ class NotifySNS(NotifyBase):
         # accumulated data.
         secret_access_key_parts = list()
 
+        # Start with a list of entries to work with
+        entries = NotifySNS.split_path(results['fullpath'])
+
         # Section 1: Get Region and Access Secret
         index = 0
-        for i, entry in enumerate(NotifyBase.split_path(results['fullpath'])):
+        for i, entry in enumerate(entries):
 
             # Are we at the region yet?
             result = IS_REGION.match(entry)
@@ -615,9 +603,13 @@ class NotifySNS(NotifyBase):
             secret_access_key_parts.append(entry)
 
         # Section 2: Get our Recipients (basically all remaining entries)
-        results['recipients'] = [
-            NotifyBase.unquote(x) for x in filter(bool, NotifyBase.split_path(
-                results['fullpath']))][index:]
+        results['targets'] = entries[index:]
+
+        # Support the 'to' variable so that we can support rooms this way too
+        # The 'to' makes it easier to use yaml configuration
+        if 'to' in results['qsd'] and len(results['qsd']['to']):
+            results['targets'] += \
+                NotifySNS.parse_list(results['qsd']['to'])
 
         # Store our other detected data (if at all)
         results['region_name'] = region_name

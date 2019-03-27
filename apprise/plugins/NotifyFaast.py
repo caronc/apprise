@@ -27,6 +27,7 @@ import requests
 from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
 from ..common import NotifyType
+from ..utils import parse_bool
 
 
 class NotifyFaast(NotifyBase):
@@ -52,13 +53,17 @@ class NotifyFaast(NotifyBase):
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_72
 
-    def __init__(self, authtoken, **kwargs):
+    def __init__(self, authtoken, include_image=True, **kwargs):
         """
         Initialize Faast Object
         """
         super(NotifyFaast, self).__init__(**kwargs)
 
+        # Store the Authentication Token
         self.authtoken = authtoken
+
+        # Associate an image with our post
+        self.include_image = include_image
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
@@ -77,7 +82,10 @@ class NotifyFaast(NotifyBase):
             'message': body,
         }
 
-        image_url = self.image_url(notify_type)
+        # Acquire our image if we're configured to do so
+        image_url = None if not self.include_image \
+            else self.image_url(notify_type)
+
         if image_url:
             payload['icon_url'] = image_url
 
@@ -99,7 +107,7 @@ class NotifyFaast(NotifyBase):
             if r.status_code != requests.codes.ok:
                 # We had a problem
                 status_str = \
-                    NotifyBase.http_response_code_lookup(r.status_code)
+                    NotifyFaast.http_response_code_lookup(r.status_code)
 
                 self.logger.warning(
                     'Failed to send Faast notification:'
@@ -136,12 +144,13 @@ class NotifyFaast(NotifyBase):
         args = {
             'format': self.notify_format,
             'overflow': self.overflow_mode,
+            'image': 'yes' if self.include_image else 'no',
         }
 
         return '{schema}://{authtoken}/?{args}'.format(
             schema=self.protocol,
-            authtoken=self.quote(self.authtoken, safe=''),
-            args=self.urlencode(args),
+            authtoken=NotifyFaast.quote(self.authtoken, safe=''),
+            args=NotifyFaast.urlencode(args),
         )
 
     @staticmethod
@@ -157,9 +166,11 @@ class NotifyFaast(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
-        # Apply our settings now
-
         # Store our authtoken using the host
-        results['authtoken'] = results['host']
+        results['authtoken'] = NotifyFaast.unquote(results['host'])
+
+        # Include image with our post
+        results['include_image'] = \
+            parse_bool(results['qsd'].get('image', True))
 
         return results

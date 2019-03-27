@@ -26,6 +26,7 @@
 from . import tweepy
 from ..NotifyBase import NotifyBase
 from ...common import NotifyType
+from ...utils import parse_list
 
 
 class NotifyTwitter(NotifyBase):
@@ -54,7 +55,7 @@ class NotifyTwitter(NotifyBase):
     # Twitter does have titles when creating a message
     title_maxlen = 0
 
-    def __init__(self, ckey, csecret, akey, asecret, **kwargs):
+    def __init__(self, ckey, csecret, akey, asecret, targets=None, **kwargs):
         """
         Initialize Twitter Object
 
@@ -62,29 +63,32 @@ class NotifyTwitter(NotifyBase):
         super(NotifyTwitter, self).__init__(**kwargs)
 
         if not ckey:
-            raise TypeError(
-                'An invalid Consumer API Key was specified.'
-            )
+            msg = 'An invalid Consumer API Key was specified.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         if not csecret:
-            raise TypeError(
-                'An invalid Consumer Secret API Key was specified.'
-            )
+            msg = 'An invalid Consumer Secret API Key was specified.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         if not akey:
-            raise TypeError(
-                'An invalid Acess Token API Key was specified.'
-            )
+            msg = 'An invalid Access Token API Key was specified.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         if not asecret:
-            raise TypeError(
-                'An invalid Acess Token Secret API Key was specified.'
-            )
+            msg = 'An invalid Access Token Secret API Key was specified.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
-        if not self.user:
-            raise TypeError(
-                'No user was specified.'
-            )
+        # Identify our targets
+        self.targets = parse_list(targets)
+
+        if len(self.targets) == 0 and not self.user:
+            msg = 'No user(s) were specified.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         # Store our data
         self.ckey = ckey
@@ -113,28 +117,68 @@ class NotifyTwitter(NotifyBase):
             )
             return False
 
-        # Always call throttle before any remote server i/o is made to avoid
-        # thrashing the remote server and risk being blocked.
-        self.throttle()
+        # Get ourselves a list of targets
+        users = list(self.targets)
+        if not users:
+            # notify ourselves
+            users.append(self.user)
 
-        try:
-            # Get our API
-            api = tweepy.API(self.auth)
+        # Error Tracking
+        has_error = False
 
-            # Send our Direct Message
-            api.send_direct_message(self.user, text=body)
-            self.logger.info('Sent Twitter DM notification.')
+        while len(users) > 0:
+            # Get our user
+            user = users.pop(0)
 
-        except Exception as e:
-            self.logger.warning(
-                'A Connection error occured sending Twitter '
-                'direct message to %s.' % self.user)
-            self.logger.debug('Twitter Exception: %s' % str(e))
+            # Always call throttle before any remote server i/o is made to
+            # avoid thrashing the remote server and risk being blocked.
+            self.throttle()
 
-            # Return; we're done
-            return False
+            try:
+                # Get our API
+                api = tweepy.API(self.auth)
 
-        return True
+                # Send our Direct Message
+                api.send_direct_message(user, text=body)
+                self.logger.info(
+                    'Sent Twitter DM notification to {}.'.format(user))
+
+            except Exception as e:
+                self.logger.warning(
+                    'A Connection error occured sending Twitter '
+                    'direct message to %s.' % user)
+                self.logger.debug('Twitter Exception: %s' % str(e))
+
+                # Track our error
+                has_error = True
+
+        return not has_error
+
+    def url(self):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'overflow': self.overflow_mode,
+        }
+
+        if len(self.targets) > 0:
+            args['to'] = ','.join([NotifyTwitter.quote(x, safe='')
+                                   for x in self.targets])
+
+        return '{schema}://{auth}{ckey}/{csecret}/{akey}/{asecret}' \
+            '/?{args}'.format(
+                auth='' if not self.user else '{user}@'.format(
+                    user=NotifyTwitter.quote(self.user, safe='')),
+                schema=self.secure_protocol,
+                ckey=NotifyTwitter.quote(self.ckey, safe=''),
+                asecret=NotifyTwitter.quote(self.csecret, safe=''),
+                akey=NotifyTwitter.quote(self.akey, safe=''),
+                csecret=NotifyTwitter.quote(self.asecret, safe=''),
+                args=NotifyTwitter.urlencode(args))
 
     @staticmethod
     def parse_url(url):
@@ -152,13 +196,12 @@ class NotifyTwitter(NotifyBase):
         # Apply our settings now
 
         # The first token is stored in the hostname
-        consumer_key = results['host']
+        consumer_key = NotifyTwitter.unquote(results['host'])
 
         # Now fetch the remaining tokens
         try:
             consumer_secret, access_token_key, access_token_secret = \
-                [x for x in filter(bool, NotifyBase.split_path(
-                    results['fullpath']))][0:3]
+                NotifyTwitter.split_path(results['fullpath'])[0:3]
 
         except (ValueError, AttributeError, IndexError):
             # Force some bad values that will get caught
@@ -171,5 +214,9 @@ class NotifyTwitter(NotifyBase):
         results['csecret'] = consumer_secret
         results['akey'] = access_token_key
         results['asecret'] = access_token_secret
+
+        # Support the to= allowing one to identify more then one user to tweet
+        # too
+        results['targets'] = NotifyTwitter.parse_list(results['qsd'].get('to'))
 
         return results

@@ -78,7 +78,7 @@ class NotifyDiscord(NotifyBase):
     body_maxlen = 2000
 
     def __init__(self, webhook_id, webhook_token, tts=False, avatar=True,
-                 footer=False, thumbnail=True, **kwargs):
+                 footer=False, footer_logo=True, include_image=True, **kwargs):
         """
         Initialize Discord Object
 
@@ -86,14 +86,14 @@ class NotifyDiscord(NotifyBase):
         super(NotifyDiscord, self).__init__(**kwargs)
 
         if not webhook_id:
-            raise TypeError(
-                'An invalid Client ID was specified.'
-            )
+            msg = 'An invalid Client ID was specified.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         if not webhook_token:
-            raise TypeError(
-                'An invalid Webhook Token was specified.'
-            )
+            msg = 'An invalid Webhook Token was specified.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         # Store our data
         self.webhook_id = webhook_id
@@ -105,11 +105,14 @@ class NotifyDiscord(NotifyBase):
         # Over-ride Avatar Icon
         self.avatar = avatar
 
-        # Place a footer icon
+        # Place a footer
         self.footer = footer
 
+        # include a footer_logo in footer
+        self.footer_logo = footer_logo
+
         # Place a thumbnail image inline with the message body
-        self.thumbnail = thumbnail
+        self.include_image = include_image
 
         return
 
@@ -163,15 +166,18 @@ class NotifyDiscord(NotifyBase):
                 payload['embeds'][0]['fields'] = fields[1:]
 
             if self.footer:
+                # Acquire logo URL
                 logo_url = self.image_url(notify_type, logo=True)
+
+                # Set Footer text to our app description
                 payload['embeds'][0]['footer'] = {
                     'text': self.app_desc,
                 }
 
-                if logo_url:
+                if self.footer_logo and logo_url:
                     payload['embeds'][0]['footer']['icon_url'] = logo_url
 
-            if self.thumbnail and image_url:
+            if self.include_image and image_url:
                 payload['embeds'][0]['thumbnail'] = {
                     'url': image_url,
                     'height': 256,
@@ -256,14 +262,15 @@ class NotifyDiscord(NotifyBase):
             'tts': 'yes' if self.tts else 'no',
             'avatar': 'yes' if self.avatar else 'no',
             'footer': 'yes' if self.footer else 'no',
-            'thumbnail': 'yes' if self.thumbnail else 'no',
+            'footer_logo': 'yes' if self.footer_logo else 'no',
+            'image': 'yes' if self.include_image else 'no',
         }
 
         return '{schema}://{webhook_id}/{webhook_token}/?{args}'.format(
             schema=self.secure_protocol,
-            webhook_id=self.quote(self.webhook_id),
-            webhook_token=self.quote(self.webhook_token),
-            args=self.urlencode(args),
+            webhook_id=NotifyDiscord.quote(self.webhook_id, safe=''),
+            webhook_token=NotifyDiscord.quote(self.webhook_token, safe=''),
+            args=NotifyDiscord.urlencode(args),
         )
 
     @staticmethod
@@ -283,14 +290,14 @@ class NotifyDiscord(NotifyBase):
             return results
 
         # Store our webhook ID
-        webhook_id = results['host']
+        webhook_id = NotifyDiscord.unquote(results['host'])
 
         # Now fetch our tokens
         try:
-            webhook_token = [x for x in filter(bool, NotifyBase.split_path(
-                results['fullpath']))][0]
+            webhook_token = \
+                NotifyDiscord.split_path(results['fullpath'])[0]
 
-        except (ValueError, AttributeError, IndexError):
+        except IndexError:
             # Force some bad values that will get caught
             # in parsing later
             webhook_token = None
@@ -304,12 +311,27 @@ class NotifyDiscord(NotifyBase):
         # Use Footer
         results['footer'] = parse_bool(results['qsd'].get('footer', False))
 
+        # Use Footer Logo
+        results['footer_logo'] = \
+            parse_bool(results['qsd'].get('footer_logo', True))
+
         # Update Avatar Icon
         results['avatar'] = parse_bool(results['qsd'].get('avatar', True))
 
         # Use Thumbnail
-        results['thumbnail'] = \
-            parse_bool(results['qsd'].get('thumbnail', False))
+        if 'thumbnail' in results['qsd']:
+            # Deprication Notice issued for v0.7.5
+            NotifyDiscord.logger.warning(
+                'DEPRICATION NOTICE - The Discord URL contains the parameter '
+                '"thumbnail=" which will be depricated in an upcoming '
+                'release. Please use "image=" instead.'
+            )
+
+        # use image= for consistency with the other plugins but we also
+        # support thumbnail= for backwards compatibility.
+        results['include_image'] = \
+            parse_bool(results['qsd'].get(
+                'image', results['qsd'].get('thumbnail', False)))
 
         return results
 

@@ -32,12 +32,14 @@
 #  These are important <---^----------------------------------------^
 #
 import re
+import six
 import requests
 from json import dumps
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
 from ..common import NotifyType
+from ..utils import parse_bool
 
 # Token required as part of the API request
 VALIDATE_TOKEN = re.compile(r'[A-Za-z0-9]{15}')
@@ -46,18 +48,18 @@ VALIDATE_TOKEN = re.compile(r'[A-Za-z0-9]{15}')
 VALIDATE_ORG = re.compile(r'[A-Za-z0-9-]{3,32}')
 
 
-class RyverWebhookType(object):
+class RyverWebhookMode(object):
     """
-    Ryver supports to webhook types
+    Ryver supports to webhook modes
     """
     SLACK = 'slack'
     RYVER = 'ryver'
 
 
 # Define the types in a list for validation purposes
-RYVER_WEBHOOK_TYPES = (
-    RyverWebhookType.SLACK,
-    RyverWebhookType.RYVER,
+RYVER_WEBHOOK_MODES = (
+    RyverWebhookMode.SLACK,
+    RyverWebhookMode.RYVER,
 )
 
 
@@ -84,45 +86,53 @@ class NotifyRyver(NotifyBase):
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 1000
 
-    def __init__(self, organization, token, webhook=RyverWebhookType.RYVER,
-                 **kwargs):
+    def __init__(self, organization, token, mode=RyverWebhookMode.RYVER,
+                 include_image=True, **kwargs):
         """
         Initialize Ryver Object
         """
         super(NotifyRyver, self).__init__(**kwargs)
 
+        if not token:
+            msg = 'No Ryver token was specified.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
+        if not organization:
+            msg = 'No Ryver organization was specified.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
         if not VALIDATE_TOKEN.match(token.strip()):
-            self.logger.warning(
-                'The token specified (%s) is invalid.' % token,
-            )
-            raise TypeError(
-                'The token specified (%s) is invalid.' % token,
-            )
+            msg = 'The Ryver token specified ({}) is invalid.'\
+                .format(token)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         if not VALIDATE_ORG.match(organization.strip()):
-            self.logger.warning(
-                'The organization specified (%s) is invalid.' % organization,
-            )
-            raise TypeError(
-                'The organization specified (%s) is invalid.' % organization,
-            )
+            msg = 'The Ryver organization specified ({}) is invalid.'\
+                .format(organization)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
-        # Store our webhook type
-        self.webhook = webhook
+        # Store our webhook mode
+        self.mode = None \
+            if not isinstance(mode, six.string_types) else mode.lower()
 
-        if self.webhook not in RYVER_WEBHOOK_TYPES:
-            self.logger.warning(
-                'The webhook specified (%s) is invalid.' % webhook,
-            )
-            raise TypeError(
-                'The webhook specified (%s) is invalid.' % webhook,
-            )
+        if self.mode not in RYVER_WEBHOOK_MODES:
+            msg = 'The Ryver webhook mode specified ({}) is invalid.' \
+                .format(mode)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         # The organization associated with the account
         self.organization = organization.strip()
 
         # The token associated with the account
         self.token = token.strip()
+
+        # Place an image inline with the message body
+        self.include_image = include_image
 
         # Slack formatting requirements are defined here which Ryver supports:
         # https://api.slack.com/docs/message-formatting
@@ -151,7 +161,7 @@ class NotifyRyver(NotifyBase):
             'Content-Type': 'application/json',
         }
 
-        if self.webhook == RyverWebhookType.SLACK:
+        if self.mode == RyverWebhookMode.SLACK:
             # Perform Slack formatting
             title = self._re_formatting_rules.sub(  # pragma: no branch
                 lambda x: self._re_formatting_map[x.group()], title,
@@ -160,19 +170,26 @@ class NotifyRyver(NotifyBase):
                 lambda x: self._re_formatting_map[x.group()], body,
             )
 
-        url = 'https://%s.ryver.com/application/webhook/%s' % (
+        url = 'https://{}.ryver.com/application/webhook/{}'.format(
             self.organization,
             self.token,
         )
 
         # prepare JSON Object
         payload = {
-            "body": body if not title else '**{}**\r\n{}'.format(title, body),
+            'body': body if not title else '**{}**\r\n{}'.format(title, body),
             'createSource': {
-                "displayName": self.user,
-                "avatar": self.image_url(notify_type),
+                'displayName': self.user,
+                'avatar': None,
             },
         }
+
+        # Acquire our image url if configured to do so
+        image_url = None if not self.include_image else \
+            self.image_url(notify_type)
+
+        if image_url:
+            payload['createSource']['avatar'] = image_url
 
         self.logger.debug('Ryver POST URL: %s (cert_verify=%r)' % (
             url, self.verify_certificate,
@@ -229,22 +246,23 @@ class NotifyRyver(NotifyBase):
         args = {
             'format': self.notify_format,
             'overflow': self.overflow_mode,
-            'webhook': self.webhook,
+            'image': 'yes' if self.include_image else 'no',
+            'mode': self.mode,
         }
 
         # Determine if there is a botname present
         botname = ''
         if self.user:
             botname = '{botname}@'.format(
-                botname=self.quote(self.user, safe=''),
+                botname=NotifyRyver.quote(self.user, safe=''),
             )
 
         return '{schema}://{botname}{organization}/{token}/?{args}'.format(
             schema=self.secure_protocol,
             botname=botname,
-            organization=self.quote(self.organization, safe=''),
-            token=self.quote(self.token, safe=''),
-            args=self.urlencode(args),
+            organization=NotifyRyver.quote(self.organization, safe=''),
+            token=NotifyRyver.quote(self.token, safe=''),
+            args=NotifyRyver.urlencode(args),
         )
 
     @staticmethod
@@ -254,31 +272,41 @@ class NotifyRyver(NotifyBase):
         us to substantiate this object.
 
         """
+
         results = NotifyBase.parse_url(url)
 
         if not results:
             # We're done early as we couldn't load the results
             return results
 
-        # Apply our settings now
-
         # The first token is stored in the hostname
-        organization = results['host']
+        results['organization'] = NotifyRyver.unquote(results['host'])
 
         # Now fetch the remaining tokens
         try:
-            token = [x for x in filter(
-                bool, NotifyBase.split_path(results['fullpath']))][0]
+            results['token'] = \
+                NotifyRyver.split_path(results['fullpath'])[0]
 
-        except (ValueError, AttributeError, IndexError):
-            # We're done
-            return None
+        except IndexError:
+            # no token
+            results['token'] = None
 
-        if 'webhook' in results['qsd'] and len(results['qsd']['webhook']):
-            results['webhook'] = results['qsd']\
-                .get('webhook', RyverWebhookType.RYVER).lower()
+        if 'webhook' in results['qsd']:
+            # Deprication Notice issued for v0.7.5
+            NotifyRyver.logger.warning(
+                'DEPRICATION NOTICE - The Ryver URL contains the parameter '
+                '"webhook=" which will be depricated in an upcoming '
+                'release. Please use "mode=" instead.'
+            )
 
-        results['organization'] = organization
-        results['token'] = token
+        # use mode= for consistency with the other plugins but we also
+        # support webhook= for backwards compatibility.
+        results['mode'] = results['qsd'].get(
+            'mode', results['qsd'].get(
+                'webhook', RyverWebhookMode.RYVER))
+
+        # use image= for consistency with the other plugins
+        results['include_image'] = \
+            parse_bool(results['qsd'].get('image', True))
 
         return results

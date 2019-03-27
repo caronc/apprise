@@ -29,6 +29,7 @@ from __future__ import print_function
 from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
 from ..common import NotifyType
+from ..utils import parse_bool
 
 # Default our global support flag
 NOTIFY_GNOME_SUPPORT_ENABLED = False
@@ -109,7 +110,7 @@ class NotifyGnome(NotifyBase):
     # let me know! :)
     _enabled = NOTIFY_GNOME_SUPPORT_ENABLED
 
-    def __init__(self, urgency=None, **kwargs):
+    def __init__(self, urgency=None, include_image=True, **kwargs):
         """
         Initialize Gnome Object
         """
@@ -122,6 +123,10 @@ class NotifyGnome(NotifyBase):
 
         else:
             self.urgency = urgency
+
+        # Track whether or not we want to send an image with our notification
+        # or not.
+        self.include_image = include_image
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
@@ -138,7 +143,8 @@ class NotifyGnome(NotifyBase):
             Notify.init(self.app_id)
 
             # image path
-            icon_path = self.image_path(notify_type, extension='.ico')
+            icon_path = None if not self.include_image \
+                else self.image_path(notify_type, extension='.ico')
 
             # Build message body
             notification = Notify.Notification.new(body)
@@ -149,18 +155,19 @@ class NotifyGnome(NotifyBase):
             # Always call throttle before any remote server i/o is made
             self.throttle()
 
-            try:
-                # Use Pixbuf to create the proper image type
-                image = GdkPixbuf.Pixbuf.new_from_file(icon_path)
+            if icon_path:
+                try:
+                    # Use Pixbuf to create the proper image type
+                    image = GdkPixbuf.Pixbuf.new_from_file(icon_path)
 
-                # Associate our image to our notification
-                notification.set_icon_from_pixbuf(image)
-                notification.set_image_from_pixbuf(image)
+                    # Associate our image to our notification
+                    notification.set_icon_from_pixbuf(image)
+                    notification.set_image_from_pixbuf(image)
 
-            except Exception as e:
-                self.logger.warning(
-                    "Could not load Gnome notification icon ({}): {}"
-                    .format(icon_path, e))
+                except Exception as e:
+                    self.logger.warning(
+                        "Could not load Gnome notification icon ({}): {}"
+                        .format(icon_path, e))
 
             notification.show()
             self.logger.info('Sent Gnome notification.')
@@ -177,7 +184,25 @@ class NotifyGnome(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        return '{schema}://'.format(schema=self.protocol)
+        _map = {
+            GnomeUrgency.LOW: 'low',
+            GnomeUrgency.NORMAL: 'normal',
+            GnomeUrgency.HIGH: 'high',
+        }
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'overflow': self.overflow_mode,
+            'image': 'yes' if self.include_image else 'no',
+            'urgency': 'normal' if self.urgency not in _map
+                       else _map[self.urgency]
+        }
+
+        return '{schema}://_/?{args}'.format(
+            schema=self.protocol,
+            args=NotifyGnome.urlencode(args),
+        )
 
     @staticmethod
     def parse_url(url):
@@ -188,18 +213,43 @@ class NotifyGnome(NotifyBase):
 
         """
 
-        # return a very basic set of requirements
-        return {
-            'schema': NotifyGnome.protocol,
-            'user': None,
-            'password': None,
-            'port': None,
-            'host': 'localhost',
-            'fullpath': None,
-            'path': None,
-            'url': url,
-            'qsd': {},
-            # Set the urgency to None so that we fall back to the default
-            # value.
-            'urgency': None,
-        }
+        results = NotifyBase.parse_url(url)
+        if not results:
+            results = {
+                'schema': NotifyGnome.protocol,
+                'user': None,
+                'password': None,
+                'port': None,
+                'host': '_',
+                'fullpath': None,
+                'path': None,
+                'url': url,
+                'qsd': {},
+            }
+
+        # Include images with our message
+        results['include_image'] = \
+            parse_bool(results['qsd'].get('image', True))
+
+        # Gnome supports urgency, but we we also support the keyword priority
+        # so that it is consistent with some of the other plugins
+        urgency = results['qsd'].get('urgency', results['qsd'].get('priority'))
+        if urgency and len(urgency):
+            _map = {
+                '0': GnomeUrgency.LOW,
+                'l': GnomeUrgency.LOW,
+                'n': GnomeUrgency.NORMAL,
+                '1': GnomeUrgency.NORMAL,
+                'h': GnomeUrgency.HIGH,
+                '2': GnomeUrgency.HIGH,
+            }
+
+            try:
+                # Attempt to index/retrieve our urgency
+                results['urgency'] = _map[urgency[0].lower()]
+
+            except KeyError:
+                # No priority was set
+                pass
+
+        return results

@@ -45,6 +45,7 @@ from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
 from ..common import NotifyType
 from ..common import NotifyFormat
+from ..utils import parse_bool
 
 # Token required as part of the API request
 #  /AAAAAAAAA/........./........................
@@ -101,41 +102,51 @@ class NotifySlack(NotifyBase):
 
     notify_format = NotifyFormat.MARKDOWN
 
-    def __init__(self, token_a, token_b, token_c, channels, **kwargs):
+    def __init__(self, token_a, token_b, token_c, targets,
+                 include_image=True, **kwargs):
         """
         Initialize Slack Object
         """
         super(NotifySlack, self).__init__(**kwargs)
 
+        if not token_a:
+            msg = 'The first API token is not specified.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
+        if not token_b:
+            msg = 'The second API token is not specified.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
+        if not token_c:
+            msg = 'The third API token is not specified.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
         if not VALIDATE_TOKEN_A.match(token_a.strip()):
-            self.logger.warning(
-                'The first API Token specified (%s) is invalid.' % token_a,
-            )
-            raise TypeError(
-                'The first API Token specified (%s) is invalid.' % token_a,
-            )
+            msg = 'The first API token specified ({}) is invalid.'\
+                .format(token_a)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         # The token associated with the account
         self.token_a = token_a.strip()
 
         if not VALIDATE_TOKEN_B.match(token_b.strip()):
-            self.logger.warning(
-                'The second API Token specified (%s) is invalid.' % token_b,
-            )
-            raise TypeError(
-                'The second API Token specified (%s) is invalid.' % token_b,
-            )
+            msg = 'The second API token specified ({}) is invalid.'\
+                .format(token_b)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         # The token associated with the account
         self.token_b = token_b.strip()
 
         if not VALIDATE_TOKEN_C.match(token_c.strip()):
-            self.logger.warning(
-                'The third API Token specified (%s) is invalid.' % token_c,
-            )
-            raise TypeError(
-                'The third API Token specified (%s) is invalid.' % token_c,
-            )
+            msg = 'The third API token specified ({}) is invalid.'\
+                .format(token_c)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         # The token associated with the account
         self.token_c = token_c.strip()
@@ -144,20 +155,21 @@ class NotifySlack(NotifyBase):
             self.logger.warning(
                 'No user was specified; using %s.' % SLACK_DEFAULT_USER)
 
-        if isinstance(channels, six.string_types):
+        if isinstance(targets, six.string_types):
             self.channels = [x for x in filter(bool, CHANNEL_LIST_DELIM.split(
-                channels,
+                targets,
             ))]
 
-        elif isinstance(channels, (set, tuple, list)):
-            self.channels = channels
+        elif isinstance(targets, (set, tuple, list)):
+            self.channels = targets
 
         else:
             self.channels = list()
 
         if len(self.channels) == 0:
-            self.logger.warning('No channel(s) were specified.')
-            raise TypeError('No channel(s) were specified.')
+            msg = 'No channel(s) were specified.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         # Formatting requirements are defined here:
         # https://api.slack.com/docs/message-formatting
@@ -175,6 +187,9 @@ class NotifySlack(NotifyBase):
             r'(' + '|'.join(self._re_formatting_map.keys()) + r')',
             re.IGNORECASE,
         )
+
+        # Place a thumbnail image inline with the message body
+        self.include_image = include_image
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
@@ -202,8 +217,6 @@ class NotifySlack(NotifyBase):
             self.token_b,
             self.token_c,
         )
-
-        image_url = self.image_url(notify_type)
 
         # Create a copy of the channel list
         channels = list(self.channels)
@@ -247,6 +260,10 @@ class NotifySlack(NotifyBase):
                 }],
             }
 
+            # Acquire our to-be footer icon if configured to do so
+            image_url = None if not self.include_image \
+                else self.image_url(notify_type)
+
             if image_url:
                 payload['attachments'][0]['footer_icon'] = image_url
 
@@ -267,7 +284,7 @@ class NotifySlack(NotifyBase):
                 if r.status_code != requests.codes.ok:
                     # We had a problem
                     status_str = \
-                        NotifyBase.http_response_code_lookup(
+                        NotifySlack.http_response_code_lookup(
                             r.status_code, SLACK_HTTP_ERROR_MAP)
 
                     self.logger.warning(
@@ -311,25 +328,26 @@ class NotifySlack(NotifyBase):
         args = {
             'format': self.notify_format,
             'overflow': self.overflow_mode,
+            'image': 'yes' if self.include_image else 'no',
         }
 
         # Determine if there is a botname present
         botname = ''
         if self.user:
             botname = '{botname}@'.format(
-                botname=self.quote(self.user, safe=''),
+                botname=NotifySlack.quote(self.user, safe=''),
             )
 
         return '{schema}://{botname}{token_a}/{token_b}/{token_c}/{targets}/'\
             '?{args}'.format(
                 schema=self.secure_protocol,
                 botname=botname,
-                token_a=self.quote(self.token_a, safe=''),
-                token_b=self.quote(self.token_b, safe=''),
-                token_c=self.quote(self.token_c, safe=''),
+                token_a=NotifySlack.quote(self.token_a, safe=''),
+                token_b=NotifySlack.quote(self.token_b, safe=''),
+                token_c=NotifySlack.quote(self.token_c, safe=''),
                 targets='/'.join(
-                    [self.quote(x, safe='') for x in self.channels]),
-                args=self.urlencode(args),
+                    [NotifySlack.quote(x, safe='') for x in self.channels]),
+                args=NotifySlack.urlencode(args),
             )
 
     @staticmethod
@@ -345,26 +363,39 @@ class NotifySlack(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
-        # Apply our settings now
+        # Get unquoted entries
+        entries = NotifySlack.split_path(results['fullpath'])
 
         # The first token is stored in the hostname
-        token_a = results['host']
+        results['token_a'] = NotifySlack.unquote(results['host'])
 
         # Now fetch the remaining tokens
         try:
-            token_b, token_c = [x for x in filter(
-                bool, NotifyBase.split_path(results['fullpath']))][0:2]
+            results['token_b'] = entries.pop(0)
 
-        except (ValueError, AttributeError, IndexError):
+        except IndexError:
             # We're done
-            return None
+            results['token_b'] = None
 
-        channels = [x for x in filter(
-            bool, NotifyBase.split_path(results['fullpath']))][2:]
+        try:
+            results['token_c'] = entries.pop(0)
 
-        results['token_a'] = token_a
-        results['token_b'] = token_b
-        results['token_c'] = token_c
-        results['channels'] = channels
+        except IndexError:
+            # We're done
+            results['token_c'] = None
+
+        # assign remaining entries to the channels we wish to notify
+        results['targets'] = entries
+
+        # Support the 'to' variable so that we can support rooms this way too
+        # The 'to' makes it easier to use yaml configuration
+        if 'to' in results['qsd'] and len(results['qsd']['to']):
+            results['targets'] += [x for x in filter(
+                bool, CHANNEL_LIST_DELIM.split(
+                    NotifySlack.unquote(results['qsd']['to'])))]
+
+        # Get Image
+        results['include_image'] = \
+            parse_bool(results['qsd'].get('image', True))
 
         return results

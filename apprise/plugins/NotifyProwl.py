@@ -103,12 +103,9 @@ class NotifyProwl(NotifyBase):
             self.priority = priority
 
         if not VALIDATE_APIKEY.match(apikey):
-            self.logger.warning(
-                'The API key specified (%s) is invalid.' % apikey,
-            )
-            raise TypeError(
-                'The API key specified (%s) is invalid.' % apikey,
-            )
+            msg = 'The API key specified ({}) is invalid.'.format(apikey)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         # Store the API key
         self.apikey = apikey
@@ -116,13 +113,12 @@ class NotifyProwl(NotifyBase):
         # Store the provider key (if specified)
         if providerkey:
             if not VALIDATE_PROVIDERKEY.match(providerkey):
-                self.logger.warning(
-                    'The Provider key specified (%s) '
-                    'is invalid.' % providerkey)
+                msg = \
+                    'The Provider key specified ({}) is invalid.' \
+                    .format(providerkey)
 
-                raise TypeError(
-                    'The Provider key specified (%s) '
-                    'is invalid.' % providerkey)
+                self.logger.warning(msg)
+                raise TypeError(msg)
 
         # Store the Provider Key
         self.providerkey = providerkey
@@ -218,10 +214,10 @@ class NotifyProwl(NotifyBase):
 
         return '{schema}://{apikey}/{providerkey}/?{args}'.format(
             schema=self.secure_protocol,
-            apikey=self.quote(self.apikey, safe=''),
+            apikey=NotifyProwl.quote(self.apikey, safe=''),
             providerkey='' if not self.providerkey
-                        else self.quote(self.providerkey, safe=''),
-            args=self.urlencode(args),
+                        else NotifyProwl.quote(self.providerkey, safe=''),
+            args=NotifyProwl.urlencode(args),
         )
 
     @staticmethod
@@ -237,15 +233,16 @@ class NotifyProwl(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
-        # Apply our settings now
+        # Set the API Key
+        results['apikey'] = NotifyProwl.unquote(results['host'])
 
-        # optionally find the provider key
+        # Optionally try to find the provider key
         try:
-            providerkey = [x for x in filter(
-                bool, NotifyBase.split_path(results['fullpath']))][0]
+            results['providerkey'] = \
+                NotifyProwl.split_path(results['fullpath'])[0]
 
-        except (AttributeError, IndexError):
-            providerkey = None
+        except IndexError:
+            pass
 
         if 'priority' in results['qsd'] and len(results['qsd']['priority']):
             _map = {
@@ -262,8 +259,5 @@ class NotifyProwl(NotifyBase):
             except KeyError:
                 # No priority was set
                 pass
-
-        results['apikey'] = results['host']
-        results['providerkey'] = providerkey
 
         return results

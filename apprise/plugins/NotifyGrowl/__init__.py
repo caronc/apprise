@@ -28,6 +28,7 @@ from .gntp import errors
 from ..NotifyBase import NotifyBase
 from ...common import NotifyImageSize
 from ...common import NotifyType
+from ...utils import parse_bool
 
 
 # Priorities
@@ -86,7 +87,7 @@ class NotifyGrowl(NotifyBase):
     # Default Growl Port
     default_port = 23053
 
-    def __init__(self, priority=None, version=2, **kwargs):
+    def __init__(self, priority=None, version=2, include_image=True, **kwargs):
         """
         Initialize Growl Object
         """
@@ -129,28 +130,26 @@ class NotifyGrowl(NotifyBase):
             )
 
         except errors.NetworkError:
-            self.logger.warning(
-                'A network error occured sending Growl '
-                'notification to %s.' % self.host)
-            raise TypeError(
-                'A network error occured sending Growl '
-                'notification to %s.' % self.host)
+            msg = 'A network error occured sending Growl ' \
+                  'notification to {}.'.format(self.host)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         except errors.AuthError:
-            self.logger.warning(
-                'An authentication error occured sending Growl '
-                'notification to %s.' % self.host)
-            raise TypeError(
-                'An authentication error occured sending Growl '
-                'notification to %s.' % self.host)
+            msg = 'An authentication error occured sending Growl ' \
+                  'notification to {}.'.format(self.host)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         except errors.UnsupportedError:
-            self.logger.warning(
-                'An unsupported error occured sending Growl '
-                'notification to %s.' % self.host)
-            raise TypeError(
-                'An unsupported error occured sending Growl '
-                'notification to %s.' % self.host)
+            msg = 'An unsupported error occured sending Growl ' \
+                  'notification to {}.'.format(self.host)
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
+        # Track whether or not we want to send an image with our notification
+        # or not.
+        self.include_image = include_image
 
         return
 
@@ -162,11 +161,13 @@ class NotifyGrowl(NotifyBase):
         icon = None
         if self.version >= 2:
             # URL Based
-            icon = self.image_url(notify_type)
+            icon = None if not self.include_image \
+                else self.image_url(notify_type)
 
         else:
             # Raw
-            icon = self.image_raw(notify_type)
+            icon = None if not self.include_image \
+                else self.image_raw(notify_type)
 
         payload = {
             'noteType': GROWL_NOTIFICATION_TYPE,
@@ -232,6 +233,7 @@ class NotifyGrowl(NotifyBase):
         args = {
             'format': self.notify_format,
             'overflow': self.overflow_mode,
+            'image': 'yes' if self.include_image else 'no',
             'priority':
                 _map[GrowlPriority.NORMAL] if self.priority not in _map
                 else _map[self.priority],
@@ -239,18 +241,19 @@ class NotifyGrowl(NotifyBase):
         }
 
         auth = ''
-        if self.password:
+        if self.user:
+            # The growl password is stored in the user field
             auth = '{password}@'.format(
-                password=self.quote(self.user, safe=''),
+                password=NotifyGrowl.quote(self.user, safe=''),
             )
 
         return '{schema}://{auth}{hostname}{port}/?{args}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
-            hostname=self.host,
+            hostname=NotifyGrowl.quote(self.host, safe=''),
             port='' if self.port is None or self.port == self.default_port
                  else ':{}'.format(self.port),
-            args=self.urlencode(args),
+            args=NotifyGrowl.urlencode(args),
         )
 
     @staticmethod
@@ -272,11 +275,11 @@ class NotifyGrowl(NotifyBase):
             # Allow the user to specify the version of the protocol to use.
             try:
                 version = int(
-                    NotifyBase.unquote(
+                    NotifyGrowl.unquote(
                         results['qsd']['version']).strip().split('.')[0])
 
             except (AttributeError, IndexError, TypeError, ValueError):
-                NotifyBase.logger.warning(
+                NotifyGrowl.logger.warning(
                     'An invalid Growl version of "%s" was specified and will '
                     'be ignored.' % results['qsd']['version']
                 )
@@ -306,6 +309,11 @@ class NotifyGrowl(NotifyBase):
         if results.get('password', None) is None:
             results['password'] = results.get('user', None)
 
+        # Include images with our message
+        results['include_image'] = \
+            parse_bool(results['qsd'].get('image', True))
+
+        # Set our version
         if version:
             results['version'] = version
 

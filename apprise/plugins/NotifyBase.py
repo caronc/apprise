@@ -33,9 +33,6 @@ from ..common import NOTIFY_FORMATS
 from ..common import OverflowMode
 from ..common import OVERFLOW_MODES
 
-# HTML New Line Delimiter
-NOTIFY_NEWLINE = '\r\n'
-
 
 class NotifyBase(URLBase):
     """
@@ -94,12 +91,10 @@ class NotifyBase(URLBase):
             # Store the specified format if specified
             notify_format = kwargs.get('format', '')
             if notify_format.lower() not in NOTIFY_FORMATS:
-                self.logger.error(
-                    'Invalid notification format %s' % notify_format,
-                )
-                raise TypeError(
-                    'Invalid notification format %s' % notify_format,
-                )
+                msg = 'Invalid notification format %s'.format(notify_format)
+                self.logger.error(msg)
+                raise TypeError(msg)
+
             # Provide override
             self.notify_format = notify_format
 
@@ -107,12 +102,10 @@ class NotifyBase(URLBase):
             # Store the specified format if specified
             overflow = kwargs.get('overflow', '')
             if overflow.lower() not in OVERFLOW_MODES:
-                self.logger.error(
-                    'Invalid overflow method %s' % overflow,
-                )
-                raise TypeError(
-                    'Invalid overflow method %s' % overflow,
-                )
+                msg = 'Invalid overflow method {}'.format(overflow)
+                self.logger.error(msg)
+                raise TypeError(msg)
+
             # Provide override
             self.overflow_mode = overflow
 

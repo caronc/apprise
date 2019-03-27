@@ -25,15 +25,17 @@
 
 # To use this plugin, you need to first access https://dev.flock.com/webhooks
 # Specifically https://dev.flock.com/webhooks/incoming
-# to create a new incoming webhook for your account. You'll need to
+#
+# To create a new incoming webhook for your account. You'll need to
 # follow the wizard to pre-determine the channel(s) you want your
-# message to broadcast to, and when you're complete, you will
+# message to broadcast to. When you've completed this, you will
 # recieve a URL that looks something like this:
 # https://api.flock.com/hooks/sendMessage/134b8gh0-eba0-4fa9-ab9c-257ced0e8221
 #                                                             ^
 #                                                             |
 #  This is important <----------------------------------------^
 #
+#  It becomes your 'token' that you will pass into this class
 #
 import re
 import requests
@@ -44,6 +46,7 @@ from ..common import NotifyType
 from ..common import NotifyFormat
 from ..common import NotifyImageSize
 from ..utils import parse_list
+from ..utils import parse_bool
 
 
 # Extend HTTP Error Messages
@@ -89,7 +92,7 @@ class NotifyFlock(NotifyBase):
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_72
 
-    def __init__(self, token, targets=None, **kwargs):
+    def __init__(self, token, targets=None, include_image=True, **kwargs):
         """
         Initialize Flock Object
         """
@@ -134,6 +137,10 @@ class NotifyFlock(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
+        # Track whether or not we want to send an image with our notification
+        # or not.
+        self.include_image = include_image
+
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Flock Notification
@@ -151,8 +158,8 @@ class NotifyFlock(NotifyBase):
             body = '<flockml>{}</flockml>'.format(body)
 
         else:
-            title = NotifyBase.escape_html(title, whitespace=False)
-            body = NotifyBase.escape_html(body, whitespace=False)
+            title = NotifyFlock.escape_html(title, whitespace=False)
+            body = NotifyFlock.escape_html(body, whitespace=False)
 
             body = '<flockml>{}{}</flockml>'.format(
                 '' if not title else '<b>{}</b><br/>'.format(title), body)
@@ -162,7 +169,10 @@ class NotifyFlock(NotifyBase):
             'flockml': body,
             'sendAs': {
                 'name': FLOCK_DEFAULT_USER if not self.user else self.user,
-                'profileImage': self.image_url(notify_type),
+                # A Profile Image is only configured if we're configured to
+                # allow it
+                'profileImage': None if not self.include_image
+                else self.image_url(notify_type),
             }
         }
 
@@ -213,7 +223,7 @@ class NotifyFlock(NotifyBase):
             if r.status_code != requests.codes.ok:
                 # We had a problem
                 status_str = \
-                    NotifyBase.http_response_code_lookup(
+                    NotifyFlock.http_response_code_lookup(
                         r.status_code, FLOCK_HTTP_ERROR_MAP)
 
                 self.logger.warning(
@@ -251,15 +261,17 @@ class NotifyFlock(NotifyBase):
         args = {
             'format': self.notify_format,
             'overflow': self.overflow_mode,
+            'image': 'yes' if self.include_image else 'no',
         }
 
         return '{schema}://{token}/{targets}?{args}'\
             .format(
                 schema=self.secure_protocol,
-                token=self.quote(self.token, safe=''),
+                token=NotifyFlock.quote(self.token, safe=''),
                 targets='/'.join(
-                    [self.quote(target, safe='') for target in self.targets]),
-                args=self.urlencode(args),
+                    [NotifyFlock.quote(target, safe='')
+                     for target in self.targets]),
+                args=NotifyFlock.urlencode(args),
             )
 
     @staticmethod
@@ -274,12 +286,19 @@ class NotifyFlock(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
-        # Apply our settings now
+        # Get our entries; split_path() looks after unquoting content for us
+        # by default
+        results['targets'] = NotifyFlock.split_path(results['fullpath'])
 
-        results['targets'] = [x for x in filter(
-            bool, NotifyBase.split_path(results['fullpath']))]
+        # The 'to' makes it easier to use yaml configuration
+        if 'to' in results['qsd'] and len(results['qsd']['to']):
+            results['targets'] += NotifyFlock.parse_list(results['qsd']['to'])
 
         # The first token is stored in the hostname
-        results['token'] = results['host']
+        results['token'] = NotifyFlock.unquote(results['host'])
+
+        # Include images with our message
+        results['include_image'] = \
+            parse_bool(results['qsd'].get('image', True))
 
         return results

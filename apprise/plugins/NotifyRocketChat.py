@@ -24,13 +24,13 @@
 # THE SOFTWARE.
 
 import re
-import six
 import requests
 from json import loads
 from itertools import chain
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
+from ..utils import parse_list
 
 IS_CHANNEL = re.compile(r'^#(?P<name>[A-Za-z0-9]+)$')
 IS_ROOM_ID = re.compile(r'^(?P<name>[A-Za-z0-9]+)$')
@@ -72,17 +72,14 @@ class NotifyRocketChat(NotifyBase):
     # The maximum size of the message
     body_maxlen = 200
 
-    def __init__(self, recipients=None, **kwargs):
+    def __init__(self, targets=None, **kwargs):
         """
         Initialize Notify Rocket.Chat Object
         """
         super(NotifyRocketChat, self).__init__(**kwargs)
 
-        if self.secure:
-            self.schema = 'https'
-
-        else:
-            self.schema = 'http'
+        # Set our schema
+        self.schema = 'https' if self.secure else 'http'
 
         # Prepare our URL
         self.api_url = '%s://%s' % (self.schema, self.host)
@@ -98,17 +95,6 @@ class NotifyRocketChat(NotifyBase):
         # Initialize room list
         self.rooms = list()
 
-        if recipients is None:
-            recipients = []
-
-        elif isinstance(recipients, six.string_types):
-            recipients = [x for x in filter(bool, LIST_DELIM.split(
-                recipients,
-            ))]
-
-        elif not isinstance(recipients, (set, tuple, list)):
-            recipients = []
-
         if not (self.user and self.password):
             # Username & Password is required for Rocket Chat to work
             raise TypeError(
@@ -116,7 +102,7 @@ class NotifyRocketChat(NotifyBase):
             )
 
         # Validate recipients and drop bad ones:
-        for recipient in recipients:
+        for recipient in parse_list(targets):
             result = IS_CHANNEL.match(recipient)
             if result:
                 # store valid device
@@ -135,9 +121,9 @@ class NotifyRocketChat(NotifyBase):
             )
 
         if len(self.rooms) == 0 and len(self.channels) == 0:
-            raise TypeError(
-                'No Rocket.Chat room and/or channels specified to notify.'
-            )
+            msg = 'No Rocket.Chat room and/or channels specified to notify.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         # Used to track token headers upon authentication (if successful)
         self.headers = {}
@@ -155,8 +141,8 @@ class NotifyRocketChat(NotifyBase):
 
         # Determine Authentication
         auth = '{user}:{password}@'.format(
-            user=self.quote(self.user, safe=''),
-            password=self.quote(self.password, safe=''),
+            user=NotifyRocketChat.quote(self.user, safe=''),
+            password=NotifyRocketChat.quote(self.password, safe=''),
         )
 
         default_port = 443 if self.secure else 80
@@ -164,17 +150,17 @@ class NotifyRocketChat(NotifyBase):
         return '{schema}://{auth}{hostname}{port}/{targets}/?{args}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
-            hostname=self.host,
+            hostname=NotifyRocketChat.quote(self.host, safe=''),
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
             targets='/'.join(
-                [self.quote(x) for x in chain(
+                [NotifyRocketChat.quote(x, safe='') for x in chain(
                     # Channels are prefixed with a pound/hashtag symbol
                     ['#{}'.format(x) for x in self.channels],
                     # Rooms are as is
                     self.rooms,
                 )]),
-            args=self.urlencode(args),
+            args=NotifyRocketChat.urlencode(args),
         )
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
@@ -252,7 +238,7 @@ class NotifyRocketChat(NotifyBase):
             if r.status_code != requests.codes.ok:
                 # We had a problem
                 status_str = \
-                    NotifyBase.http_response_code_lookup(
+                    NotifyRocketChat.http_response_code_lookup(
                         r.status_code, RC_HTTP_ERROR_MAP)
 
                 self.logger.warning(
@@ -300,7 +286,7 @@ class NotifyRocketChat(NotifyBase):
             if r.status_code != requests.codes.ok:
                 # We had a problem
                 status_str = \
-                    NotifyBase.http_response_code_lookup(
+                    NotifyRocketChat.http_response_code_lookup(
                         r.status_code, RC_HTTP_ERROR_MAP)
 
                 self.logger.warning(
@@ -353,7 +339,7 @@ class NotifyRocketChat(NotifyBase):
             if r.status_code != requests.codes.ok:
                 # We had a problem
                 status_str = \
-                    NotifyBase.http_response_code_lookup(
+                    NotifyRocketChat.http_response_code_lookup(
                         r.status_code, RC_HTTP_ERROR_MAP)
 
                 self.logger.warning(
@@ -396,7 +382,12 @@ class NotifyRocketChat(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
-        # Apply our settings now
-        results['recipients'] = NotifyBase.unquote(results['fullpath'])
+        # Apply our targets
+        results['targets'] = NotifyRocketChat.split_path(results['fullpath'])
+
+        # The 'to' makes it easier to use yaml configuration
+        if 'to' in results['qsd'] and len(results['qsd']['to']):
+            results['targets'] += \
+                NotifyRocketChat.parse_list(results['qsd']['to'])
 
         return results

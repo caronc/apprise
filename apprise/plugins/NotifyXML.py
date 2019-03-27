@@ -81,12 +81,6 @@ class NotifyXML(NotifyBase):
     </soapenv:Body>
 </soapenv:Envelope>"""
 
-        if self.secure:
-            self.schema = 'https'
-
-        else:
-            self.schema = 'http'
-
         self.fullpath = kwargs.get('fullpath')
         if not isinstance(self.fullpath, six.string_types):
             self.fullpath = '/'
@@ -116,12 +110,12 @@ class NotifyXML(NotifyBase):
         auth = ''
         if self.user and self.password:
             auth = '{user}:{password}@'.format(
-                user=self.quote(self.user, safe=''),
-                password=self.quote(self.password, safe=''),
+                user=NotifyXML.quote(self.user, safe=''),
+                password=NotifyXML.quote(self.password, safe=''),
             )
         elif self.user:
             auth = '{user}@'.format(
-                user=self.quote(self.user, safe=''),
+                user=NotifyXML.quote(self.user, safe=''),
             )
 
         default_port = 443 if self.secure else 80
@@ -129,10 +123,10 @@ class NotifyXML(NotifyBase):
         return '{schema}://{auth}{hostname}{port}/?{args}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
-            hostname=self.host,
+            hostname=NotifyXML.quote(self.host, safe=''),
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
-            args=self.urlencode(args),
+            args=NotifyXML.urlencode(args),
         )
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
@@ -150,9 +144,10 @@ class NotifyXML(NotifyBase):
         headers.update(self.headers)
 
         re_map = {
-            '{MESSAGE_TYPE}': NotifyBase.quote(notify_type),
-            '{SUBJECT}': NotifyBase.quote(title),
-            '{MESSAGE}': NotifyBase.quote(body),
+            '{MESSAGE_TYPE}': NotifyXML.escape_html(
+                notify_type, whitespace=False),
+            '{SUBJECT}': NotifyXML.escape_html(title, whitespace=False),
+            '{MESSAGE}': NotifyXML.escape_html(body, whitespace=False),
         }
 
         # Iterate over above list and store content accordingly
@@ -165,7 +160,10 @@ class NotifyXML(NotifyBase):
         if self.user:
             auth = (self.user, self.password)
 
-        url = '%s://%s' % (self.schema, self.host)
+        # Set our schema
+        schema = 'https' if self.secure else 'http'
+
+        url = '%s://%s' % (schema, self.host)
         if isinstance(self.port, int):
             url += ':%d' % self.port
 
@@ -191,7 +189,7 @@ class NotifyXML(NotifyBase):
             if r.status_code != requests.codes.ok:
                 # We had a problem
                 status_str = \
-                    NotifyBase.http_response_code_lookup(r.status_code)
+                    NotifyXML.http_response_code_lookup(r.status_code)
 
                 self.logger.warning(
                     'Failed to send XML notification: '
@@ -236,5 +234,9 @@ class NotifyXML(NotifyBase):
         # to to our returned result set
         results['headers'] = results['qsd-']
         results['headers'].update(results['qsd+'])
+
+        # Tidy our header entries by unquoting them
+        results['headers'] = {NotifyXML.unquote(x): NotifyXML.unquote(y)
+                              for x, y in results['headers'].items()}
 
         return results

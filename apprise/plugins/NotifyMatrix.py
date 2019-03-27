@@ -39,6 +39,7 @@ from ..common import NotifyType
 from ..common import NotifyImageSize
 from ..common import NotifyFormat
 from ..utils import parse_bool
+from ..utils import parse_list
 
 # Define default path
 MATRIX_V2_API_PATH = '/_matrix/client/r0'
@@ -49,10 +50,6 @@ MATRIX_HTTP_ERROR_MAP = {
     403: 'Unauthorized - Invalid Token.',
     429: 'Rate limit imposed; wait 2s and try again',
 }
-
-# Used to break apart list of potential tags by their delimiter
-# into a usable list.
-LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
 
 # Matrix Room Syntax
 IS_ROOM_ALIAS = re.compile(
@@ -120,30 +117,15 @@ class NotifyMatrix(NotifyBase):
     # the server doesn't remind us how long we shoul wait for
     default_wait_ms = 1000
 
-    def __init__(self, rooms=None, webhook=None, thumbnail=True, **kwargs):
+    def __init__(self, targets=None, mode=None, include_image=True,
+                 **kwargs):
         """
         Initialize Matrix Object
         """
         super(NotifyMatrix, self).__init__(**kwargs)
 
         # Prepare a list of rooms to connect and notify
-        if isinstance(rooms, six.string_types):
-            self.rooms = [x for x in filter(bool, LIST_DELIM.split(
-                rooms,
-            ))]
-
-        elif isinstance(rooms, (set, tuple, list)):
-            self.rooms = rooms
-
-        else:
-            self.rooms = []
-
-        self.webhook = None \
-            if not isinstance(webhook, six.string_types) else webhook.lower()
-        if self.webhook and self.webhook not in MATRIX_WEBHOOK_MODES:
-            msg = 'The webhook specified ({}) is invalid.'.format(webhook)
-            self.logger.warning(msg)
-            raise TypeError(msg)
+        self.rooms = parse_list(targets)
 
         # our home server gets populated after a login/registration
         self.home_server = None
@@ -154,12 +136,20 @@ class NotifyMatrix(NotifyBase):
         # This gets initialized after a login/registration
         self.access_token = None
 
-        # Place a thumbnail image inline with the message body
-        self.thumbnail = thumbnail
+        # Place an image inline with the message body
+        self.include_image = include_image
 
         # maintain a lookup of room alias's we already paired with their id
         # to speed up future requests
         self._room_cache = {}
+
+        # Setup our mode
+        self.mode = None \
+            if not isinstance(mode, six.string_types) else mode.lower()
+        if self.mode and self.mode not in MATRIX_WEBHOOK_MODES:
+            msg = 'The mode specified ({}) is invalid.'.format(mode)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
@@ -167,10 +157,10 @@ class NotifyMatrix(NotifyBase):
         """
 
         # Call the _send_ function applicable to whatever mode we're in
-        # - calls _send_webhook_notification if the webhook variable is set
-        # - calls _send_server_notification if the webhook variable is not set
+        # - calls _send_webhook_notification if the mode variable is set
+        # - calls _send_server_notification if the mode variable is not set
         return getattr(self, '_send_{}_notification'.format(
-            'webhook' if self.webhook else 'server'))(
+            'webhook' if self.mode else 'server'))(
                 body=body, title=title, notify_type=notify_type, **kwargs)
 
     def _send_webhook_notification(self, body, title='',
@@ -200,7 +190,7 @@ class NotifyMatrix(NotifyBase):
         )
 
         # Retrieve our payload
-        payload = getattr(self, '_{}_webhook_payload'.format(self.webhook))(
+        payload = getattr(self, '_{}_webhook_payload'.format(self.mode))(
             body=body, title=title, notify_type=notify_type, **kwargs)
 
         self.logger.debug('Matrix POST URL: %s (cert_verify=%r)' % (
@@ -221,7 +211,7 @@ class NotifyMatrix(NotifyBase):
             if r.status_code != requests.codes.ok:
                 # We had a problem
                 status_str = \
-                    NotifyBase.http_response_code_lookup(
+                    NotifyMatrix.http_response_code_lookup(
                         r.status_code, MATRIX_HTTP_ERROR_MAP)
 
                 self.logger.warning(
@@ -318,8 +308,8 @@ class NotifyMatrix(NotifyBase):
         else:  # TEXT or MARKDOWN
 
             # Ensure our content is escaped
-            title = NotifyBase.escape_html(title)
-            body = NotifyBase.escape_html(body)
+            title = NotifyMatrix.escape_html(title)
+            body = NotifyMatrix.escape_html(body)
 
             payload['text'] = '{}{}'.format(
                 '' if not title else '<h4>{}</h4>'.format(title), body)
@@ -375,8 +365,11 @@ class NotifyMatrix(NotifyBase):
                 title='' if not title else '{}\r\n'.format(title),
                 body=body)
 
-            image_url = self.image_url(notify_type)
-            if self.thumbnail and image_url:
+            # Acquire our image url if we're configured to do so
+            image_url = None if not self.include_image else \
+                self.image_url(notify_type)
+
+            if image_url:
                 # Define our payload
                 image_payload = {
                     'msgtype': 'm.image',
@@ -385,7 +378,7 @@ class NotifyMatrix(NotifyBase):
                 }
                 # Build our path
                 path = '/rooms/{}/send/m.room.message'.format(
-                    NotifyBase.quote(room_id))
+                    NotifyMatrix.quote(room_id))
 
                 # Post our content
                 postokay, response = self._fetch(path, payload=image_payload)
@@ -402,7 +395,7 @@ class NotifyMatrix(NotifyBase):
 
             # Build our path
             path = '/rooms/{}/send/m.room.message'.format(
-                NotifyBase.quote(room_id))
+                NotifyMatrix.quote(room_id))
 
             # Post our content
             postokay, response = self._fetch(path, payload=payload)
@@ -446,7 +439,7 @@ class NotifyMatrix(NotifyBase):
         # Register
         postokay, response = \
             self._fetch('/register', payload=payload, params=params)
-        if not postokay:
+        if not (postokay and isinstance(response, dict)):
             # Failed to register
             return False
 
@@ -489,7 +482,7 @@ class NotifyMatrix(NotifyBase):
 
         # Build our URL
         postokay, response = self._fetch('/login', payload=payload)
-        if not postokay:
+        if not (postokay and isinstance(response, dict)):
             # Failed to login
             return False
 
@@ -581,7 +574,7 @@ class NotifyMatrix(NotifyBase):
             )
 
             # Build our URL
-            path = '/join/{}'.format(NotifyBase.quote(room_id))
+            path = '/join/{}'.format(NotifyMatrix.quote(room_id))
 
             # Make our query
             postokay, _ = self._fetch(path, payload=payload)
@@ -612,7 +605,7 @@ class NotifyMatrix(NotifyBase):
         # If we reach here, we need to join the channel
 
         # Build our URL
-        path = '/join/{}'.format(NotifyBase.quote(room))
+        path = '/join/{}'.format(NotifyMatrix.quote(room))
 
         # Attempt to join the channel
         postokay, response = self._fetch(path, payload=payload)
@@ -695,7 +688,7 @@ class NotifyMatrix(NotifyBase):
             return list()
 
         postokay, response = self._fetch(
-            '/joined_rooms', payload=None, fn=requests.get)
+            '/joined_rooms', payload=None, method='GET')
         if not postokay:
             # Failed to retrieve listings
             return list()
@@ -736,14 +729,14 @@ class NotifyMatrix(NotifyBase):
         # Make our request
         postokay, response = self._fetch(
             "/directory/room/{}".format(
-                self.quote(room)), payload=None, fn=requests.get)
+                NotifyMatrix.quote(room)), payload=None, method='GET')
 
         if postokay:
             return response.get("room_id")
 
         return None
 
-    def _fetch(self, path, payload=None, params=None, fn=requests.post):
+    def _fetch(self, path, payload=None, params=None, method='POST'):
         """
         Wrapper to request.post() to manage it's response better and make
         the send() function cleaner and easier to maintain.
@@ -775,6 +768,9 @@ class NotifyMatrix(NotifyBase):
         # Our response object
         response = {}
 
+        # fetch function
+        fn = requests.post if method == 'POST' else requests.get
+
         # Define how many attempts we'll make if we get caught in a throttle
         # event
         retries = self.default_retries if self.default_retries > 0 else 1
@@ -789,7 +785,7 @@ class NotifyMatrix(NotifyBase):
             self.logger.debug('Matrix Payload: %s' % str(payload))
 
             try:
-                r = requests.post(
+                r = fn(
                     url,
                     data=dumps(payload),
                     params=params,
@@ -826,7 +822,7 @@ class NotifyMatrix(NotifyBase):
                 elif r.status_code != requests.codes.ok:
                     # We had a problem
                     status_str = \
-                        NotifyBase.http_response_code_lookup(
+                        NotifyMatrix.http_response_code_lookup(
                             r.status_code, MATRIX_HTTP_ERROR_MAP)
 
                     self.logger.warning(
@@ -877,22 +873,23 @@ class NotifyMatrix(NotifyBase):
         args = {
             'format': self.notify_format,
             'overflow': self.overflow_mode,
+            'image': 'yes' if self.include_image else 'no',
         }
 
-        if self.webhook:
-            args['webhook'] = self.webhook
+        if self.mode:
+            args['mode'] = self.mode
 
-        # Determine Authentication method
+        # Determine Authentication
         auth = ''
         if self.user and self.password:
             auth = '{user}:{password}@'.format(
-                user=self.quote(self.user, safe=''),
-                password=self.quote(self.password, safe=''),
+                user=NotifyMatrix.quote(self.user, safe=''),
+                password=NotifyMatrix.quote(self.password, safe=''),
             )
 
         elif self.user:
             auth = '{user}@'.format(
-                user=self.quote(self.user, safe=''),
+                user=NotifyMatrix.quote(self.user, safe=''),
             )
 
         default_port = 443 if self.secure else 80
@@ -900,11 +897,11 @@ class NotifyMatrix(NotifyBase):
         return '{schema}://{auth}{hostname}{port}/{rooms}?{args}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
-            hostname=self.host,
+            hostname=NotifyMatrix.quote(self.host, safe=''),
             port='' if self.port is None
             or self.port == default_port else ':{}'.format(self.port),
-            rooms=self.quote('/'.join(self.rooms)),
-            args=self.urlencode(args),
+            rooms=NotifyMatrix.quote('/'.join(self.rooms)),
+            args=NotifyMatrix.urlencode(args),
         )
 
     @staticmethod
@@ -921,15 +918,40 @@ class NotifyMatrix(NotifyBase):
             return results
 
         # Get our rooms
-        results['rooms'] = [
-            NotifyBase.unquote(x) for x in filter(bool, NotifyBase.split_path(
-                results['fullpath']))][0:]
+        results['targets'] = NotifyMatrix.split_path(results['fullpath'])
 
-        # Use Thumbnail
-        results['thumbnail'] = \
-            parse_bool(results['qsd'].get('thumbnail', False))
+        # Support the 'to' variable so that we can support rooms this way too
+        # The 'to' makes it easier to use yaml configuration
+        if 'to' in results['qsd'] and len(results['qsd']['to']):
+            results['targets'] += NotifyMatrix.parse_list(results['qsd']['to'])
 
-        # Webhook
-        results['webhook'] = results['qsd'].get('webhook')
+        # Thumbnail (old way)
+        if 'thumbnail' in results['qsd']:
+            # Deprication Notice issued for v0.7.5
+            NotifyMatrix.logger.warning(
+                'DEPRICATION NOTICE - The Matrix URL contains the parameter '
+                '"thumbnail=" which will be depricated in an upcoming '
+                'release. Please use "image=" instead.'
+            )
+
+        # use image= for consistency with the other plugins but we also
+        # support thumbnail= for backwards compatibility.
+        results['include_image'] = \
+            parse_bool(results['qsd'].get(
+                'image', results['qsd'].get('thumbnail', False)))
+
+        # Webhook (old way)
+        if 'webhook' in results['qsd']:
+            # Deprication Notice issued for v0.7.5
+            NotifyMatrix.logger.warning(
+                'DEPRICATION NOTICE - The Matrix URL contains the parameter '
+                '"webhook=" which will be depricated in an upcoming '
+                'release. Please use "mode=" instead.'
+            )
+
+        # use mode= for consistency with the other plugins but we also
+        # support webhook= for backwards compatibility.
+        results['mode'] = results['qsd'].get(
+            'mode', results['qsd'].get('webhook'))
 
         return results

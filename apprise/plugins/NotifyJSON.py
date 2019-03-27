@@ -56,7 +56,7 @@ class NotifyJSON(NotifyBase):
     # local anyway
     request_rate_per_sec = 0
 
-    def __init__(self, headers, **kwargs):
+    def __init__(self, headers=None, **kwargs):
         """
         Initialize JSON Object
 
@@ -65,12 +65,6 @@ class NotifyJSON(NotifyBase):
 
         """
         super(NotifyJSON, self).__init__(**kwargs)
-
-        if self.secure:
-            self.schema = 'https'
-
-        else:
-            self.schema = 'http'
 
         self.fullpath = kwargs.get('fullpath')
         if not isinstance(self.fullpath, six.string_types):
@@ -101,12 +95,12 @@ class NotifyJSON(NotifyBase):
         auth = ''
         if self.user and self.password:
             auth = '{user}:{password}@'.format(
-                user=self.quote(self.user, safe=''),
-                password=self.quote(self.password, safe=''),
+                user=NotifyJSON.quote(self.user, safe=''),
+                password=NotifyJSON.quote(self.password, safe=''),
             )
         elif self.user:
             auth = '{user}@'.format(
-                user=self.quote(self.user, safe=''),
+                user=NotifyJSON.quote(self.user, safe=''),
             )
 
         default_port = 443 if self.secure else 80
@@ -114,10 +108,10 @@ class NotifyJSON(NotifyBase):
         return '{schema}://{auth}{hostname}{port}/?{args}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
-            hostname=self.host,
+            hostname=NotifyJSON.quote(self.host, safe=''),
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
-            args=self.urlencode(args),
+            args=NotifyJSON.urlencode(args),
         )
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
@@ -148,7 +142,10 @@ class NotifyJSON(NotifyBase):
         if self.user:
             auth = (self.user, self.password)
 
-        url = '%s://%s' % (self.schema, self.host)
+        # Set our schema
+        schema = 'https' if self.secure else 'http'
+
+        url = '%s://%s' % (schema, self.host)
         if isinstance(self.port, int):
             url += ':%d' % self.port
 
@@ -173,7 +170,7 @@ class NotifyJSON(NotifyBase):
             if r.status_code != requests.codes.ok:
                 # We had a problem
                 status_str = \
-                    NotifyBase.http_response_code_lookup(r.status_code)
+                    NotifyJSON.http_response_code_lookup(r.status_code)
 
                 self.logger.warning(
                     'Failed to send JSON notification: '
@@ -218,5 +215,9 @@ class NotifyJSON(NotifyBase):
         # to to our returned result set
         results['headers'] = results['qsd-']
         results['headers'].update(results['qsd+'])
+
+        # Tidy our header entries by unquoting them
+        results['headers'] = {NotifyJSON.unquote(x): NotifyJSON.unquote(y)
+                              for x, y in results['headers'].items()}
 
         return results

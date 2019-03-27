@@ -106,7 +106,7 @@ class URLBase(object):
         # Secure Mode
         self.secure = kwargs.get('secure', False)
 
-        self.host = kwargs.get('host', '')
+        self.host = URLBase.unquote(kwargs.get('host'))
         self.port = kwargs.get('port')
         if self.port:
             try:
@@ -116,13 +116,20 @@ class URLBase(object):
                 self.port = None
 
         self.user = kwargs.get('user')
+        if self.user:
+            # Always unquote user if it exists
+            self.user = URLBase.unquote(self.user)
+
         self.password = kwargs.get('password')
+        if self.password:
+            # Always unquote the pssword if it exists
+            self.password = URLBase.unquote(self.password)
 
         if 'tag' in kwargs:
             # We want to associate some tags with our notification service.
             # the code below gets the 'tag' argument if defined, otherwise
             # it just falls back to whatever was already defined globally
-            self.tags = set(parse_list(kwargs.get('tag', self.tags)))
+            self.tags = set(parse_list(kwargs.get('tag'), self.tags))
 
         # Tracks the time any i/o was made to the remote server.  This value
         # is automatically set and controlled through the throttle() call.
@@ -161,7 +168,7 @@ class URLBase(object):
         elapsed = (reference - self._last_io_datetime).total_seconds()
 
         if wait is not None:
-            self.logger.debug('Throttling for {}s...'.format(wait))
+            self.logger.debug('Throttling forced for {}s...'.format(wait))
             sleep(wait)
 
         elif elapsed < self.request_rate_per_sec:
@@ -348,10 +355,42 @@ class URLBase(object):
             list: A list containing all of the elements in the path
         """
 
+        try:
+            paths = PATHSPLIT_LIST_DELIM.split(path.lstrip('/'))
+            if unquote:
+                paths = \
+                    [URLBase.unquote(x) for x in filter(bool, paths)]
+
+        except AttributeError:
+            # path is not useable, we still want to gracefully return an
+            # empty list
+            paths = []
+
+        return paths
+
+    @staticmethod
+    def parse_list(content, unquote=True):
+        """A wrapper to utils.parse_list() with unquoting support
+
+        Parses a specified set of data and breaks it into a list.
+
+        Args:
+            content (str): The path to split up into a list. If a list is
+                 provided, then it's individual entries are processed.
+
+            unquote (:obj:`bool`, optional): call unquote on each element
+                 added to the returned list.
+
+        Returns:
+            list: A unique list containing all of the elements in the path
+        """
+
+        content = parse_list(content)
         if unquote:
-            return PATHSPLIT_LIST_DELIM.split(
-                URLBase.unquote(path).lstrip('/'))
-        return PATHSPLIT_LIST_DELIM.split(path.lstrip('/'))
+            content = \
+                [URLBase.unquote(x) for x in filter(bool, content)]
+
+        return content
 
     @property
     def app_id(self):

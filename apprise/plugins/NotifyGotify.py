@@ -103,7 +103,7 @@ class NotifyGotify(NotifyBase):
         # Our access token does not get created until we first
         # authenticate with our Gotify server. The same goes for the
         # user id below.
-        self.access_token = token
+        self.token = token
 
         return
 
@@ -121,12 +121,12 @@ class NotifyGotify(NotifyBase):
 
         # Define our parameteers
         params = {
-            'token': self.access_token,
+            'token': self.token,
         }
 
         # Prepare Gotify Object
         payload = {
-            'priority': 2,
+            'priority': self.priority,
             'title': title,
             'message': body,
         }
@@ -156,7 +156,7 @@ class NotifyGotify(NotifyBase):
             if r.status_code != requests.codes.ok:
                 # We had a problem
                 status_str = \
-                    NotifyBase.http_response_code_lookup(r.status_code)
+                    NotifyGotify.http_response_code_lookup(r.status_code)
 
                 self.logger.warning(
                     'Failed to send Gotify notification: '
@@ -201,11 +201,11 @@ class NotifyGotify(NotifyBase):
 
         return '{schema}://{hostname}{port}/{token}/?{args}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
-            hostname=self.host,
+            hostname=NotifyGotify.quote(self.host, safe=''),
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
-            token=self.access_token,
-            args=self.urlencode(args),
+            token=NotifyGotify.quote(self.token, safe=''),
+            args=NotifyGotify.urlencode(args),
         )
 
     @staticmethod
@@ -220,13 +220,17 @@ class NotifyGotify(NotifyBase):
             # We're done early
             return results
 
+        # Retrieve our escaped entries found on the fullpath
+        entries = NotifyBase.split_path(results['fullpath'])
+
         # optionally find the provider key
         try:
-            token = [x for x in filter(
-                bool, NotifyBase.split_path(results['fullpath']))][0]
+            # The first entry is our token
+            results['token'] = entries.pop(0)
 
-        except (AttributeError, IndexError):
-            token = None
+        except IndexError:
+            # No token was set
+            results['token'] = None
 
         if 'priority' in results['qsd'] and len(results['qsd']['priority']):
             _map = {
@@ -243,8 +247,5 @@ class NotifyGotify(NotifyBase):
             except KeyError:
                 # No priority was set
                 pass
-
-        # Set our token
-        results['token'] = token
 
         return results

@@ -31,6 +31,7 @@ from time import sleep
 from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
 from ..common import NotifyType
+from ..utils import parse_bool
 
 # Default our global support flag
 NOTIFY_WINDOWS_SUPPORT_ENABLED = False
@@ -75,6 +76,9 @@ class NotifyWindows(NotifyBase):
     # content to display
     body_max_line_count = 2
 
+    # The number of seconds to display the popup for
+    default_popup_duration_sec = 12
+
     # This entry is a bit hacky, but it allows us to unit-test this library
     # in an environment that simply doesn't have the windows packages
     # available to us.  It also allows us to handle situations where the
@@ -84,18 +88,23 @@ class NotifyWindows(NotifyBase):
     # let me know! :)
     _enabled = NOTIFY_WINDOWS_SUPPORT_ENABLED
 
-    def __init__(self, **kwargs):
+    def __init__(self, include_image=True, duration=None, **kwargs):
         """
         Initialize Windows Object
         """
 
+        super(NotifyWindows, self).__init__(**kwargs)
+
         # Number of seconds to display notification for
-        self.duration = 12
+        self.duration = self.default_popup_duration_sec \
+            if not (isinstance(duration, int) and duration > 0) else duration
 
         # Define our handler
         self.hwnd = None
 
-        super(NotifyWindows, self).__init__(**kwargs)
+        # Track whether or not we want to send an image with our notification
+        # or not.
+        self.include_image = include_image
 
     def _on_destroy(self, hwnd, msg, wparam, lparam):
         """
@@ -140,20 +149,26 @@ class NotifyWindows(NotifyBase):
                 self.hinst, None)
             win32gui.UpdateWindow(self.hwnd)
 
-            # image path
-            icon_path = self.image_path(notify_type, extension='.ico')
-            icon_flags = win32con.LR_LOADFROMFILE | win32con.LR_DEFAULTSIZE
+            # image path (if configured to acquire)
+            icon_path = None if not self.include_image \
+                else self.image_path(notify_type, extension='.ico')
 
-            try:
-                hicon = win32gui.LoadImage(
-                    self.hinst, icon_path, win32con.IMAGE_ICON, 0, 0,
-                    icon_flags)
+            if icon_path:
+                icon_flags = win32con.LR_LOADFROMFILE | win32con.LR_DEFAULTSIZE
 
-            except Exception as e:
-                self.logger.warning(
-                    "Could not load windows notification icon ({}): {}"
-                    .format(icon_path, e))
+                try:
+                    hicon = win32gui.LoadImage(
+                        self.hinst, icon_path, win32con.IMAGE_ICON, 0, 0,
+                        icon_flags)
 
+                except Exception as e:
+                    self.logger.warning(
+                        "Could not load windows notification icon ({}): {}"
+                        .format(icon_path, e))
+
+                    # disable icon
+                    hicon = win32gui.LoadIcon(0, win32con.IDI_APPLICATION)
+            else:
                 # disable icon
                 hicon = win32gui.LoadIcon(0, win32con.IDI_APPLICATION)
 
@@ -185,7 +200,18 @@ class NotifyWindows(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        return '{schema}://'.format(schema=self.protocol)
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'overflow': self.overflow_mode,
+            'image': 'yes' if self.include_image else 'no',
+            'duration': str(self.duration),
+        }
+
+        return '{schema}://_/?{args}'.format(
+            schema=self.protocol,
+            args=NotifyWindows.urlencode(args),
+        )
 
     @staticmethod
     def parse_url(url):
@@ -196,15 +222,31 @@ class NotifyWindows(NotifyBase):
 
         """
 
-        # return a very basic set of requirements
-        return {
-            'schema': NotifyWindows.protocol,
-            'user': None,
-            'password': None,
-            'port': None,
-            'host': 'localhost',
-            'fullpath': None,
-            'path': None,
-            'url': url,
-            'qsd': {},
-        }
+        results = NotifyBase.parse_url(url)
+        if not results:
+            results = {
+                'schema': NotifyWindows.protocol,
+                'user': None,
+                'password': None,
+                'port': None,
+                'host': '_',
+                'fullpath': None,
+                'path': None,
+                'url': url,
+                'qsd': {},
+            }
+
+        # Include images with our message
+        results['include_image'] = \
+            parse_bool(results['qsd'].get('image', True))
+
+        # Set duration
+        try:
+            results['duration'] = int(results['qsd'].get('duration'))
+
+        except (TypeError, ValueError):
+            # Not a valid integer; ignore entry
+            pass
+
+        # return results
+        return results

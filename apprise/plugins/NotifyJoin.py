@@ -34,12 +34,13 @@
 #   https://play.google.com/store/apps/details?id=com.joaomgcd.join
 
 import re
-import six
 import requests
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
 from ..common import NotifyType
+from ..utils import parse_list
+from ..utils import parse_bool
 
 # Token required as part of the API request
 VALIDATE_APIKEY = re.compile(r'[A-Za-z0-9]{32}')
@@ -48,9 +49,6 @@ VALIDATE_APIKEY = re.compile(r'[A-Za-z0-9]{32}')
 JOIN_HTTP_ERROR_MAP = {
     401: 'Unauthorized - Invalid Token.',
 }
-
-# Used to break path apart into list of devices
-DEVICE_LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
 
 # Used to detect a device
 IS_DEVICE_RE = re.compile(r'([A-Za-z0-9]{32})')
@@ -99,38 +97,31 @@ class NotifyJoin(NotifyBase):
     # The default group to use if none is specified
     default_join_group = 'group.all'
 
-    def __init__(self, apikey, devices, **kwargs):
+    def __init__(self, apikey, targets, include_image=True, **kwargs):
         """
         Initialize Join Object
         """
         super(NotifyJoin, self).__init__(**kwargs)
 
         if not VALIDATE_APIKEY.match(apikey.strip()):
-            self.logger.warning(
-                'The first API Token specified (%s) is invalid.' % apikey,
-            )
-
-            raise TypeError(
-                'The first API Token specified (%s) is invalid.' % apikey,
-            )
+            msg = 'The JOIN API Token specified ({}) is invalid.'\
+                .format(apikey)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         # The token associated with the account
         self.apikey = apikey.strip()
 
-        if isinstance(devices, six.string_types):
-            self.devices = [x for x in filter(bool, DEVICE_LIST_DELIM.split(
-                devices,
-            ))]
-
-        elif isinstance(devices, (set, tuple, list)):
-            self.devices = devices
-
-        else:
-            self.devices = list()
+        # Parse devices specified
+        self.devices = parse_list(targets)
 
         if len(self.devices) == 0:
             # Default to everyone
             self.devices.append(self.default_join_group)
+
+        # Track whether or not we want to send an image with our notification
+        # or not.
+        self.include_image = include_image
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
@@ -151,13 +142,12 @@ class NotifyJoin(NotifyBase):
             device = devices.pop(0)
             group_re = IS_GROUP_RE.match(device)
             if group_re:
-                device = 'group.%s' % group_re.group('name').lower()
+                device = 'group.{}'.format(group_re.group('name').lower())
 
             elif not IS_DEVICE_RE.match(device):
                 self.logger.warning(
-                    "The specified device/group '%s' is invalid; skipping." % (
-                        device,
-                    )
+                    'Skipping specified invalid device/group "{}"'
+                    .format(device)
                 )
                 # Mark our failure
                 has_error = True
@@ -170,7 +160,10 @@ class NotifyJoin(NotifyBase):
                 'text': body,
             }
 
-            image_url = self.image_url(notify_type)
+            # prepare our image for display if configured to do so
+            image_url = None if not self.include_image \
+                else self.image_url(notify_type)
+
             if image_url:
                 url_args['icon'] = image_url
 
@@ -178,7 +171,7 @@ class NotifyJoin(NotifyBase):
             payload = {}
 
             # Prepare the URL
-            url = '%s?%s' % (self.notify_url, NotifyBase.urlencode(url_args))
+            url = '%s?%s' % (self.notify_url, NotifyJoin.urlencode(url_args))
 
             self.logger.debug('Join POST URL: %s (cert_verify=%r)' % (
                 url, self.verify_certificate,
@@ -199,7 +192,7 @@ class NotifyJoin(NotifyBase):
                 if r.status_code != requests.codes.ok:
                     # We had a problem
                     status_str = \
-                        NotifyBase.http_response_code_lookup(
+                        NotifyJoin.http_response_code_lookup(
                             r.status_code, JOIN_HTTP_ERROR_MAP)
 
                     self.logger.warning(
@@ -242,13 +235,15 @@ class NotifyJoin(NotifyBase):
         args = {
             'format': self.notify_format,
             'overflow': self.overflow_mode,
+            'image': 'yes' if self.include_image else 'no',
         }
 
         return '{schema}://{apikey}/{devices}/?{args}'.format(
             schema=self.secure_protocol,
-            apikey=self.quote(self.apikey, safe=''),
-            devices='/'.join([self.quote(x) for x in self.devices]),
-            args=self.urlencode(args))
+            apikey=NotifyJoin.quote(self.apikey, safe=''),
+            devices='/'.join([NotifyJoin.quote(x, safe='')
+                              for x in self.devices]),
+            args=NotifyJoin.urlencode(args))
 
     @staticmethod
     def parse_url(url):
@@ -263,11 +258,30 @@ class NotifyJoin(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
-        # Apply our settings now
-        devices = ' '.join(
-            filter(bool, NotifyBase.split_path(results['fullpath'])))
+        # Our API Key is the hostname if no user is specified
+        results['apikey'] = \
+            results['user'] if results['user'] else results['host']
 
-        results['apikey'] = results['host']
-        results['devices'] = devices
+        # Unquote our API Key
+        results['apikey'] = NotifyJoin.unquote(results['apikey'])
+
+        # Our Devices
+        results['targets'] = list()
+        if results['user']:
+            # If a user was defined, then the hostname is actually a target
+            # too
+            results['targets'].append(NotifyJoin.unquote(results['host']))
+
+        # Now fetch the remaining tokens
+        results['targets'].extend(
+            NotifyJoin.split_path(results['fullpath']))
+
+        # The 'to' makes it easier to use yaml configuration
+        if 'to' in results['qsd'] and len(results['qsd']['to']):
+            results['targets'] += NotifyJoin.parse_list(results['qsd']['to'])
+
+        # Include images with our message
+        results['include_image'] = \
+            parse_bool(results['qsd'].get('image', True))
 
         return results

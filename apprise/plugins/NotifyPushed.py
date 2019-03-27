@@ -24,23 +24,19 @@
 # THE SOFTWARE.
 
 import re
-import six
 import requests
 from json import dumps
 from itertools import chain
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
+from ..utils import parse_list
 
 # Used to detect and parse channels
 IS_CHANNEL = re.compile(r'^#(?P<name>[A-Za-z0-9]+)$')
 
 # Used to detect and parse a users push id
 IS_USER_PUSHED_ID = re.compile(r'^@(?P<name>[A-Za-z0-9]+)$')
-
-# Used to break apart list of potential tags by their delimiter
-# into a usable list.
-LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
 
 
 class NotifyPushed(NotifyBase):
@@ -71,7 +67,7 @@ class NotifyPushed(NotifyBase):
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 140
 
-    def __init__(self, app_key, app_secret, recipients=None, **kwargs):
+    def __init__(self, app_key, app_secret, targets=None, **kwargs):
         """
         Initialize Pushed Object
 
@@ -79,14 +75,14 @@ class NotifyPushed(NotifyBase):
         super(NotifyPushed, self).__init__(**kwargs)
 
         if not app_key:
-            raise TypeError(
-                'An invalid Application Key was specified.'
-            )
+            msg = 'An invalid Application Key was specified.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         if not app_secret:
-            raise TypeError(
-                'An invalid Application Secret was specified.'
-            )
+            msg = 'An invalid Application Secret was specified.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         # Initialize channel list
         self.channels = list()
@@ -94,28 +90,15 @@ class NotifyPushed(NotifyBase):
         # Initialize user list
         self.users = list()
 
-        if recipients is None:
-            recipients = []
-
-        elif isinstance(recipients, six.string_types):
-            recipients = [x for x in filter(bool, LIST_DELIM.split(
-                recipients,
-            ))]
-
-        elif not isinstance(recipients, (set, tuple, list)):
-            raise TypeError(
-                'An invalid receipient list was specified.'
-            )
-
         # Validate recipients and drop bad ones:
-        for recipient in recipients:
-            result = IS_CHANNEL.match(recipient)
+        for target in parse_list(targets):
+            result = IS_CHANNEL.match(target)
             if result:
                 # store valid device
                 self.channels.append(result.group('name'))
                 continue
 
-            result = IS_USER_PUSHED_ID.match(recipient)
+            result = IS_USER_PUSHED_ID.match(target)
             if result:
                 # store valid room
                 self.users.append(result.group('name'))
@@ -123,7 +106,7 @@ class NotifyPushed(NotifyBase):
 
             self.logger.warning(
                 'Dropped invalid channel/userid '
-                '(%s) specified.' % recipient,
+                '(%s) specified.' % target,
             )
 
         # Store our data
@@ -229,7 +212,7 @@ class NotifyPushed(NotifyBase):
             if r.status_code != requests.codes.ok:
                 # We had a problem
                 status_str = \
-                    NotifyBase.http_response_code_lookup(r.status_code)
+                    NotifyPushed.http_response_code_lookup(r.status_code)
 
                 self.logger.warning(
                     'Failed to send Pushed notification:'
@@ -269,16 +252,16 @@ class NotifyPushed(NotifyBase):
 
         return '{schema}://{app_key}/{app_secret}/{targets}/?{args}'.format(
             schema=self.secure_protocol,
-            app_key=self.quote(self.app_key, safe=''),
-            app_secret=self.quote(self.app_secret, safe=''),
+            app_key=NotifyPushed.quote(self.app_key, safe=''),
+            app_secret=NotifyPushed.quote(self.app_secret, safe=''),
             targets='/'.join(
-                [self.quote(x) for x in chain(
+                [NotifyPushed.quote(x) for x in chain(
                     # Channels are prefixed with a pound/hashtag symbol
                     ['#{}'.format(x) for x in self.channels],
                     # Users are prefixed with an @ symbol
                     ['@{}'.format(x) for x in self.users],
                 )]),
-            args=self.urlencode(args))
+            args=NotifyPushed.urlencode(args))
 
     @staticmethod
     def parse_url(url):
@@ -296,30 +279,28 @@ class NotifyPushed(NotifyBase):
         # Apply our settings now
 
         # The first token is stored in the hostname
-        app_key = results['host']
+        app_key = NotifyPushed.unquote(results['host'])
 
-        # Initialize our recipients
-        recipients = None
-
+        entries = NotifyPushed.split_path(results['fullpath'])
         # Now fetch the remaining tokens
         try:
-            app_secret = \
-                [x for x in filter(bool, NotifyBase.split_path(
-                    results['fullpath']))][0]
+            app_secret = entries.pop(0)
 
-        except (ValueError, AttributeError, IndexError):
+        except IndexError:
             # Force some bad values that will get caught
             # in parsing later
             app_secret = None
             app_key = None
 
-        # Get our recipients
-        recipients = \
-            [x for x in filter(bool, NotifyBase.split_path(
-                results['fullpath']))][1:]
+        # Get our recipients (based on remaining entries)
+        results['targets'] = entries
+
+        # The 'to' makes it easier to use yaml configuration
+        if 'to' in results['qsd'] and len(results['qsd']['to']):
+            results['targets'] += \
+                NotifyPushed.parse_list(results['qsd']['to'])
 
         results['app_key'] = app_key
         results['app_secret'] = app_secret
-        results['recipients'] = recipients
 
         return results
