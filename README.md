@@ -85,8 +85,8 @@ pip install apprise
 ## Command Line
 A small command line tool is also provided with this package called *apprise*. If you know the server url's you wish to notify, you can simply provide them all on the command line and send your notifications that way:
 ```bash
-# Send a notification to as many servers as you want to specify
-# as you can easily chain them together:
+# Send a notification to as many servers as you want
+# as you can easily chain one after another:
 apprise -t 'my title' -b 'my notification body' \
    'mailto://myemail:mypass@gmail.com' \
    'pbul://o.gn5kj6nfhv736I7jC3cj3QLRiyhgl98b'
@@ -95,6 +95,10 @@ apprise -t 'my title' -b 'my notification body' \
 # you to use the tool as part of your every day administration:
 cat /proc/cpuinfo | apprise -t 'cpu info' \
       'mailto://myemail:mypass@gmail.com'
+
+# The title field is totally optional
+uptime | apprise \
+ 'discord:///4174216298/JHMHI8qBe7bk2ZwO5U711o3dV_js'
 ```
 
 ### Configuration Files
@@ -145,7 +149,7 @@ apobj.notify(
 ```
 
 ### Configuration Files
-Developers need access to configuration files too. The good news is their use just involves declaring another object (called AppriseConfig) that Apprise can ingest too!  You can mix and match config and notification entries too!
+Developers need access to configuration files too. The good news is their use just involves declaring another object (called *AppriseConfig*) that the *Apprise* object can ingest.  You can also freely mix and match config and notification entries as often as you wish!
 ```python
 import apprise
 
@@ -165,7 +169,8 @@ config.add('https://myserver:8080/path/to/config')
 apobj.add(config)
 
 # You can mix and match; add an entry directly if you want too
-apobj.add('mailto://myemail:mypass@gmail.com', tag=admin)
+# In this entry we associate the 'admin' tag with our notification
+apobj.add('mailto://myemail:mypass@gmail.com', tag='admin')
 
 # Then notify these services any time you desire. The below would
 # notify all of the services loaded into our Apprise object; this includes
@@ -176,12 +181,14 @@ apobj.notify(
 )
 
 # If you're using tagging, then you can load all of your notifications
-# but only selectively call ones associated with one or more tags:
+# but only selectively notify the ones associated with one or more 
+# matched tags:
 apobj.notify(
     body='send a notification to our admin group'
     title='Attention Admins',
+    # notify any services tagged with the 'admin' tag
     tag='admin',
 )
 ```
 
-If you're interested in reading more about this and methods on how to customize your own notifications, please check out the wiki at https://github.com/caronc/apprise/wiki/Development_API
+If you're interested in reading more about this and other methods on how to customize your own notifications, please check out the wiki at https://github.com/caronc/apprise/wiki/Development_API
