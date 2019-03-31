@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import re
-import six
 import ssl
 from os.path import isfile
 
@@ -99,7 +98,7 @@ class NotifyXMPP(NotifyBase):
     # let me know! :)
     _enabled = NOTIFY_XMPP_SUPPORT_ENABLED
 
-    def __init__(self, targets=None, jid=None, xep=None, to=None, **kwargs):
+    def __init__(self, targets=None, jid=None, xep=None, **kwargs):
         """
         Initialize XMPP Object
         """
@@ -176,17 +175,6 @@ class NotifyXMPP(NotifyBase):
 
         else:
             self.targets = list()
-
-        if isinstance(to, six.string_types):
-            # supporting to= makes yaml configuration easier since the user
-            # just has to identify each user one after another.  This is just
-            # an optional extension to also make the url easier to read if
-            # some wish to use it.
-
-            # the to is presumed to be the targets JID
-            self.targets.append(to)
-
-        return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
@@ -302,15 +290,16 @@ class NotifyXMPP(NotifyBase):
         }
 
         if self.jid:
-            args['jid'] = self.quote(self.jid, safe='')
+            args['jid'] = self.jid
 
         if self.xep:
-            args['xep'] = self.quote(
-                ','.join([str(xep) for xep in self.xep]), safe='')
+            # xep are integers, so we need to just iterate over a list and
+            # switch them to a string
+            args['xep'] = ','.join([str(xep) for xep in self.xep])
 
         # Target JID(s) can clash with our existing paths, so we just use comma
-        # and/or space as a delimiters
-        jids = self.quote(' '.join(self.targets), safe='')
+        # and/or space as a delimiters - %20 = space
+        jids = '%20'.join([NotifyXMPP.quote(x, safe='') for x in self.targets])
 
         default_port = self.default_secure_port \
             if self.secure else self.default_unsecure_port
@@ -318,19 +307,21 @@ class NotifyXMPP(NotifyBase):
         default_schema = self.secure_protocol if self.secure else self.protocol
 
         if self.user and self.password:
-            auth = '{}:{}'.format(self.user, self.password)
+            auth = '{}:{}'.format(
+                NotifyXMPP.quote(self.user, safe=''),
+                NotifyXMPP.quote(self.password, safe=''))
 
         else:
             auth = self.password if self.password else self.user
 
         return '{schema}://{auth}@{hostname}{port}/{jids}?{args}'.format(
-            auth=self.quote(auth, safe=''),
+            auth=auth,
             schema=default_schema,
-            hostname=self.host,
+            hostname=NotifyXMPP.quote(self.host, safe=''),
             port='' if not self.port or self.port == default_port
                  else ':{}'.format(self.port),
             jids=jids,
-            args=self.urlencode(args),
+            args=NotifyXMPP.urlencode(args),
         )
 
     @staticmethod
@@ -348,18 +339,20 @@ class NotifyXMPP(NotifyBase):
 
         # Get our targets; we ignore path slashes since they identify
         # our resources
-        results['targets'] = parse_list(results['fullpath'])
+        results['targets'] = NotifyXMPP.parse_list(results['fullpath'])
 
         # Over-ride the xep plugins
         if 'xep' in results['qsd'] and len(results['qsd']['xep']):
-            results['xep'] = parse_list(results['qsd']['xep'])
+            results['xep'] = \
+                NotifyXMPP.parse_list(results['qsd']['xep'])
 
         # Over-ride the default (and detected) jid
         if 'jid' in results['qsd'] and len(results['qsd']['jid']):
-            results['jid'] = results['qsd']['jid']
+            results['jid'] = NotifyXMPP.unquote(results['qsd']['jid'])
 
         # Over-ride the default (and detected) jid
         if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['to'] = results['qsd']['to']
+            results['targets'] += \
+                NotifyXMPP.parse_list(results['qsd']['to'])
 
         return results

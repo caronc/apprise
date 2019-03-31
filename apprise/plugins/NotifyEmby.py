@@ -96,9 +96,10 @@ class NotifyEmby(NotifyBase):
         self.modal = modal
 
         if not self.user:
-            # Token was None
-            self.logger.warning('No Username was specified.')
-            raise TypeError('No Username was specified.')
+            # User was not specified
+            msg = 'No Username was specified.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         return
 
@@ -169,7 +170,7 @@ class NotifyEmby(NotifyBase):
             if r.status_code != requests.codes.ok:
                 # We had a problem
                 status_str = \
-                    NotifyBase.http_response_code_lookup(r.status_code)
+                    NotifyEmby.http_response_code_lookup(r.status_code)
 
                 self.logger.warning(
                     'Failed to authenticate Emby user {} details: '
@@ -329,7 +330,7 @@ class NotifyEmby(NotifyBase):
             if r.status_code != requests.codes.ok:
                 # We had a problem
                 status_str = \
-                    NotifyBase.http_response_code_lookup(r.status_code)
+                    NotifyEmby.http_response_code_lookup(r.status_code)
 
                 self.logger.warning(
                     'Failed to acquire Emby session for user {}: '
@@ -412,7 +413,7 @@ class NotifyEmby(NotifyBase):
 
                 # We had a problem
                 status_str = \
-                    NotifyBase.http_response_code_lookup(r.status_code)
+                    NotifyEmby.http_response_code_lookup(r.status_code)
 
                 self.logger.warning(
                     'Failed to logoff Emby user {}: '
@@ -508,7 +509,7 @@ class NotifyEmby(NotifyBase):
                         requests.codes.no_content):
                     # We had a problem
                     status_str = \
-                        NotifyBase.http_response_code_lookup(r.status_code)
+                        NotifyEmby.http_response_code_lookup(r.status_code)
 
                     self.logger.warning(
                         'Failed to send Emby notification: '
@@ -555,21 +556,21 @@ class NotifyEmby(NotifyBase):
         auth = ''
         if self.user and self.password:
             auth = '{user}:{password}@'.format(
-                user=self.quote(self.user, safe=''),
-                password=self.quote(self.password, safe=''),
+                user=NotifyEmby.quote(self.user, safe=''),
+                password=NotifyEmby.quote(self.password, safe=''),
             )
         else:  # self.user is set
             auth = '{user}@'.format(
-                user=self.quote(self.user, safe=''),
+                user=NotifyEmby.quote(self.user, safe=''),
             )
 
         return '{schema}://{auth}{hostname}{port}/?{args}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
-            hostname=self.host,
+            hostname=NotifyEmby.quote(self.host, safe=''),
             port='' if self.port is None or self.port == self.emby_default_port
                  else ':{}'.format(self.port),
-            args=self.urlencode(args),
+            args=NotifyEmby.urlencode(args),
         )
 
     @property

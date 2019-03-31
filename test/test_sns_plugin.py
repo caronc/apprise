@@ -51,7 +51,7 @@ def test_object_initialization():
             access_key_id=None,
             secret_access_key=TEST_ACCESS_KEY_SECRET,
             region_name=TEST_REGION,
-            recipients='+1800555999',
+            targets='+1800555999',
         )
         # The entries above are invalid, our code should never reach here
         assert(False)
@@ -66,7 +66,7 @@ def test_object_initialization():
             access_key_id=TEST_ACCESS_KEY_ID,
             secret_access_key=None,
             region_name=TEST_REGION,
-            recipients='+1800555999',
+            targets='+1800555999',
         )
         # The entries above are invalid, our code should never reach here
         assert(False)
@@ -81,7 +81,7 @@ def test_object_initialization():
             access_key_id=TEST_ACCESS_KEY_ID,
             secret_access_key=TEST_ACCESS_KEY_SECRET,
             region_name=None,
-            recipients='+1800555999',
+            targets='+1800555999',
         )
         # The entries above are invalid, our code should never reach here
         assert(False)
@@ -96,7 +96,7 @@ def test_object_initialization():
             access_key_id=TEST_ACCESS_KEY_ID,
             secret_access_key=TEST_ACCESS_KEY_SECRET,
             region_name=TEST_REGION,
-            recipients=None,
+            targets=None,
         )
         # Still valid even without recipients
         assert(True)
@@ -111,7 +111,7 @@ def test_object_initialization():
             access_key_id=TEST_ACCESS_KEY_ID,
             secret_access_key=TEST_ACCESS_KEY_SECRET,
             region_name=TEST_REGION,
-            recipients=object(),
+            targets=object(),
         )
         # Still valid even without recipients
         assert(True)
@@ -127,7 +127,7 @@ def test_object_initialization():
             access_key_id=TEST_ACCESS_KEY_ID,
             secret_access_key=TEST_ACCESS_KEY_SECRET,
             region_name=TEST_REGION,
-            recipients='+1809',
+            targets='+1809',
         )
         # The recipient is invalid, but it's still okay; this Notification
         # still becomes pretty much useless at this point though
@@ -144,7 +144,7 @@ def test_object_initialization():
             access_key_id=TEST_ACCESS_KEY_ID,
             secret_access_key=TEST_ACCESS_KEY_SECRET,
             region_name=TEST_REGION,
-            recipients='#(invalid-topic-because-of-the-brackets)',
+            targets='#(invalid-topic-because-of-the-brackets)',
         )
         # The recipient is invalid, but it's still okay; this Notification
         # still becomes pretty much useless at this point though
@@ -169,7 +169,7 @@ def test_url_parsing():
     )
 
     # Confirm that there were no recipients found
-    assert(len(results['recipients']) == 0)
+    assert(len(results['targets']) == 0)
     assert('region_name' in results)
     assert(TEST_REGION == results['region_name'])
     assert('access_key_id' in results)
@@ -188,9 +188,9 @@ def test_url_parsing():
     )
 
     # Confirm that our recipients were found
-    assert(len(results['recipients']) == 2)
-    assert('+18001234567' in results['recipients'])
-    assert('MyTopic' in results['recipients'])
+    assert(len(results['targets']) == 2)
+    assert('+18001234567' in results['targets'])
+    assert('MyTopic' in results['targets'])
     assert('region_name' in results)
     assert(TEST_REGION == results['region_name'])
     assert('access_key_id' in results)

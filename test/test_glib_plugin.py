@@ -176,6 +176,87 @@ def test_dbus_plugin(mock_mainloop, mock_byte, mock_bytearray,
     assert(obj.notify(title='', body='body',
            notify_type=apprise.NotifyType.INFO) is True)
 
+    # Test our arguments through the instantiate call
+    obj = apprise.Apprise.instantiate(
+        'dbus://_/?image=True', suppress_exceptions=False)
+    assert(isinstance(obj, apprise.plugins.NotifyDBus) is True)
+    assert(isinstance(obj.url(), six.string_types) is True)
+    assert(obj.notify(title='title', body='body',
+           notify_type=apprise.NotifyType.INFO) is True)
+
+    obj = apprise.Apprise.instantiate(
+        'dbus://_/?image=False', suppress_exceptions=False)
+    assert(isinstance(obj, apprise.plugins.NotifyDBus) is True)
+    assert(isinstance(obj.url(), six.string_types) is True)
+    assert(obj.notify(title='title', body='body',
+           notify_type=apprise.NotifyType.INFO) is True)
+
+    # Test priority (alias to urgency) handling
+    obj = apprise.Apprise.instantiate(
+        'dbus://_/?priority=invalid', suppress_exceptions=False)
+    assert(isinstance(obj, apprise.plugins.NotifyDBus) is True)
+    assert(isinstance(obj.url(), six.string_types) is True)
+    assert(obj.notify(title='title', body='body',
+           notify_type=apprise.NotifyType.INFO) is True)
+
+    obj = apprise.Apprise.instantiate(
+        'dbus://_/?priority=high', suppress_exceptions=False)
+    assert(isinstance(obj, apprise.plugins.NotifyDBus) is True)
+    assert(isinstance(obj.url(), six.string_types) is True)
+    assert(obj.notify(title='title', body='body',
+           notify_type=apprise.NotifyType.INFO) is True)
+
+    obj = apprise.Apprise.instantiate(
+        'dbus://_/?priority=2', suppress_exceptions=False)
+    assert(isinstance(obj, apprise.plugins.NotifyDBus) is True)
+    assert(isinstance(obj.url(), six.string_types) is True)
+    assert(obj.notify(title='title', body='body',
+           notify_type=apprise.NotifyType.INFO) is True)
+
+    # Test urgency handling
+    obj = apprise.Apprise.instantiate(
+        'dbus://_/?urgency=invalid', suppress_exceptions=False)
+    assert(isinstance(obj, apprise.plugins.NotifyDBus) is True)
+    assert(isinstance(obj.url(), six.string_types) is True)
+    assert(obj.notify(title='title', body='body',
+           notify_type=apprise.NotifyType.INFO) is True)
+
+    obj = apprise.Apprise.instantiate(
+        'dbus://_/?urgency=high', suppress_exceptions=False)
+    assert(isinstance(obj, apprise.plugins.NotifyDBus) is True)
+    assert(isinstance(obj.url(), six.string_types) is True)
+    assert(obj.notify(title='title', body='body',
+           notify_type=apprise.NotifyType.INFO) is True)
+
+    obj = apprise.Apprise.instantiate(
+        'dbus://_/?urgency=2', suppress_exceptions=False)
+    assert(isinstance(obj, apprise.plugins.NotifyDBus) is True)
+    assert(isinstance(obj.url(), six.string_types) is True)
+    assert(obj.notify(title='title', body='body',
+           notify_type=apprise.NotifyType.INFO) is True)
+
+    obj = apprise.Apprise.instantiate(
+        'dbus://_/?urgency=', suppress_exceptions=False)
+    assert(isinstance(obj, apprise.plugins.NotifyDBus) is True)
+    assert(isinstance(obj.url(), six.string_types) is True)
+    assert(obj.notify(title='title', body='body',
+           notify_type=apprise.NotifyType.INFO) is True)
+
+    # Test x/y
+    obj = apprise.Apprise.instantiate(
+        'dbus://_/?x=5&y=5', suppress_exceptions=False)
+    assert(isinstance(obj, apprise.plugins.NotifyDBus) is True)
+    assert(isinstance(obj.url(), six.string_types) is True)
+    assert(obj.notify(title='title', body='body',
+           notify_type=apprise.NotifyType.INFO) is True)
+
+    obj = apprise.Apprise.instantiate(
+        'dbus://_/?x=invalid&y=invalid', suppress_exceptions=False)
+    assert(isinstance(obj, apprise.plugins.NotifyDBus) is True)
+    assert(isinstance(obj.url(), six.string_types) is True)
+    assert(obj.notify(title='title', body='body',
+           notify_type=apprise.NotifyType.INFO) is True)
+
     # If our underlining object throws for whatever reason, we will
     # gracefully fail
     mock_notify = mock.Mock()

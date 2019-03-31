@@ -125,6 +125,43 @@ def test_windows_plugin():
     assert(obj.notify(title='title', body='body',
            notify_type=apprise.NotifyType.INFO) is True)
 
+    obj = apprise.Apprise.instantiate(
+        'windows://_/?image=True', suppress_exceptions=False)
+    obj.duration = 0
+    assert(isinstance(obj.url(), six.string_types) is True)
+    assert(obj.notify(title='title', body='body',
+           notify_type=apprise.NotifyType.INFO) is True)
+
+    obj = apprise.Apprise.instantiate(
+        'windows://_/?image=False', suppress_exceptions=False)
+    obj.duration = 0
+    assert(isinstance(obj.url(), six.string_types) is True)
+    assert(obj.notify(title='title', body='body',
+           notify_type=apprise.NotifyType.INFO) is True)
+
+    obj = apprise.Apprise.instantiate(
+        'windows://_/?duration=1', suppress_exceptions=False)
+    assert(isinstance(obj.url(), six.string_types) is True)
+    assert(obj.notify(title='title', body='body',
+           notify_type=apprise.NotifyType.INFO) is True)
+    # loads okay
+    assert obj.duration == 1
+
+    obj = apprise.Apprise.instantiate(
+        'windows://_/?duration=invalid', suppress_exceptions=False)
+    # Falls back to default
+    assert obj.duration == obj.default_popup_duration_sec
+
+    obj = apprise.Apprise.instantiate(
+        'windows://_/?duration=-1', suppress_exceptions=False)
+    # Falls back to default
+    assert obj.duration == obj.default_popup_duration_sec
+
+    obj = apprise.Apprise.instantiate(
+        'windows://_/?duration=0', suppress_exceptions=False)
+    # Falls back to default
+    assert obj.duration == obj.default_popup_duration_sec
+
     # Test our loading of our icon exception; it will still allow the
     # notification to be sent
     win32gui.LoadImage.side_effect = AttributeError

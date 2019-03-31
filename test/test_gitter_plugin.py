@@ -101,6 +101,7 @@ def test_notify_gitter_plugin_general(mock_post, mock_get):
     obj = plugins.NotifyGitter(token=token, targets='apprise')
     assert isinstance(obj, plugins.NotifyGitter) is True
     assert isinstance(obj.url(), six.string_types) is True
+
     # apprise room was found
     assert obj.send(body="test") is True
 

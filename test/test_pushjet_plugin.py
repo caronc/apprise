@@ -45,9 +45,12 @@ TEST_URLS = (
     ('pjets://', {
         'instance': None,
     }),
+    ('pjet://:@/', {
+        'instance': None,
+    }),
     #  You must specify a username
     ('pjet://%s' % ('a' * 32), {
-        'instance': None,
+        'instance': TypeError,
     }),
     # Specify your own server
     ('pjet://%s@localhost' % ('a' * 32), {
@@ -56,9 +59,6 @@ TEST_URLS = (
     # Specify your own server with port
     ('pjets://%s@localhost:8080' % ('a' * 32), {
         'instance': plugins.NotifyPushjet,
-    }),
-    ('pjet://:@/', {
-        'instance': None,
     }),
     ('pjet://%s@localhost:8081' % ('a' * 32), {
         'instance': plugins.NotifyPushjet,

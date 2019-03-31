@@ -62,6 +62,12 @@ class NotifyPushjet(NotifyBase):
         """
         super(NotifyPushjet, self).__init__(**kwargs)
 
+        if not secret_key:
+            # You must provide a Pushjet key to work with
+            msg = 'You must specify a Pushjet Secret Key.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
         # store our key
         self.secret_key = secret_key
 
@@ -107,11 +113,11 @@ class NotifyPushjet(NotifyBase):
 
         return '{schema}://{secret_key}@{hostname}{port}/?{args}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
-            secret_key=self.quote(self.secret_key, safe=''),
-            hostname=self.host,
+            secret_key=NotifyPushjet.quote(self.secret_key, safe=''),
+            hostname=NotifyPushjet.quote(self.host, safe=''),
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
-            args=self.urlencode(args),
+            args=NotifyPushjet.urlencode(args),
         )
 
     @staticmethod
@@ -133,11 +139,8 @@ class NotifyPushjet(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
-        if not results.get('user'):
-            # a username is required
-            return None
-
         # Store it as it's value
-        results['secret_key'] = results.get('user')
+        results['secret_key'] = \
+            NotifyPushjet.unquote(results.get('user'))
 
         return results

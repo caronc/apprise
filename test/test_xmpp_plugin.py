@@ -26,7 +26,7 @@
 import six
 import mock
 import sys
-# import types
+import ssl
 
 import apprise
 
@@ -128,6 +128,39 @@ def test_xmpp_plugin(tmpdir):
 
     # Not possible because no password was specified
     assert obj is None
+
+    # SSL Flags
+    if hasattr(ssl, "PROTOCOL_TLS"):
+        # Test cases where PROTOCOL_TLS simply isn't available
+        ssl_temp_swap = ssl.PROTOCOL_TLS
+        del ssl.PROTOCOL_TLS
+
+        # Test our URL
+        url = 'xmpps://user:pass@example.com'
+        obj = apprise.Apprise.instantiate(url, suppress_exceptions=False)
+        # Test we loaded
+        assert isinstance(obj, apprise.plugins.NotifyXMPP) is True
+        assert obj.notify(
+            title='title', body='body',
+            notify_type=apprise.NotifyType.INFO) is True
+
+        # Restore the variable for remaining tests
+        setattr(ssl, 'PROTOCOL_TLS', ssl_temp_swap)
+
+    else:
+        # Handle case where it is not missing
+        setattr(ssl, 'PROTOCOL_TLS', ssl.PROTOCOL_TLSv1)
+        # Test our URL
+        url = 'xmpps://user:pass@example.com'
+        obj = apprise.Apprise.instantiate(url, suppress_exceptions=False)
+        # Test we loaded
+        assert isinstance(obj, apprise.plugins.NotifyXMPP) is True
+        assert obj.notify(
+            title='title', body='body',
+            notify_type=apprise.NotifyType.INFO) is True
+
+        # Restore settings as they were
+        del ssl.PROTOCOL_TLS
 
     # Try Different Variations of our URL
     for url in (

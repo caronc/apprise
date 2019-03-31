@@ -55,7 +55,7 @@ from ..utils import parse_bool
 # API Gitter URL
 GITTER_API_URL = 'https://api.gitter.im/v1'
 
-# Used to validate API Key
+# Used to validate your personal access token
 VALIDATE_TOKEN = re.compile(r'^[a-z0-9]{40}$', re.I)
 
 # Used to break path apart into list of targets
@@ -95,9 +95,11 @@ class NotifyGitter(NotifyBase):
 
     # For Tracking Purposes
     ratelimit_reset = datetime.utcnow()
+
     # Default to 1
     ratelimit_remaining = 1
 
+    # Default Notification Format
     notify_format = NotifyFormat.MARKDOWN
 
     def __init__(self, token, targets, include_image=True, **kwargs):
@@ -107,7 +109,7 @@ class NotifyGitter(NotifyBase):
         super(NotifyGitter, self).__init__(**kwargs)
 
         try:
-            # The token associated with the account
+            # The personal access token associated with the account
             self.token = token.strip()
 
         except AttributeError:
@@ -117,7 +119,8 @@ class NotifyGitter(NotifyBase):
             raise TypeError(msg)
 
         if not VALIDATE_TOKEN.match(self.token):
-            msg = 'The API Token specified ({}) is invalid.'.format(token)
+            msg = 'The Personal Access Token specified ({}) is invalid.' \
+                  .format(token)
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -140,10 +143,11 @@ class NotifyGitter(NotifyBase):
         # error tracking (used for function return)
         has_error = False
 
-        # Build mapping of room names to their channel id's
+        # Set up our image for display if configured to do so
+        image_url = None if not self.include_image \
+            else self.image_url(notify_type)
 
-        image_url = self.image_url(notify_type)
-        if self.include_image and image_url:
+        if image_url:
             body = '![alt]({})\n{}'.format(image_url, body)
 
         # Create a copy of the targets list
@@ -288,7 +292,7 @@ class NotifyGitter(NotifyBase):
             if r.status_code != requests.codes.ok:
                 # We had a problem
                 status_str = \
-                    NotifyBase.http_response_code_lookup(r.status_code)
+                    NotifyGitter.http_response_code_lookup(r.status_code)
 
                 self.logger.warning(
                     'Failed to send Gitter POST to {}: '
@@ -342,14 +346,15 @@ class NotifyGitter(NotifyBase):
         args = {
             'format': self.notify_format,
             'overflow': self.overflow_mode,
-            'image': self.include_image,
+            'image': 'yes' if self.include_image else 'no',
         }
 
         return '{schema}://{token}/{targets}/?{args}'.format(
             schema=self.secure_protocol,
-            token=self.quote(self.token, safe=''),
-            targets='/'.join(self.targets),
-            args=self.urlencode(args))
+            token=NotifyGitter.quote(self.token, safe=''),
+            targets='/'.join(
+                [NotifyGitter.quote(x, safe='') for x in self.targets]),
+            args=NotifyGitter.urlencode(args))
 
     @staticmethod
     def parse_url(url):
@@ -364,15 +369,16 @@ class NotifyGitter(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
-        results['token'] = results['host']
-        results['targets'] = \
-            [NotifyBase.unquote(x) for x in filter(bool, NotifyBase.split_path(
-                results['fullpath']))]
+        results['token'] = NotifyGitter.unquote(results['host'])
+
+        # Get our entries; split_path() looks after unquoting content for us
+        # by default
+        results['targets'] = NotifyGitter.split_path(results['fullpath'])
 
         # Support the 'to' variable so that we can support targets this way too
         # The 'to' makes it easier to use yaml configuration
         if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'] += parse_list(results['qsd']['to'])
+            results['targets'] += NotifyGitter.parse_list(results['qsd']['to'])
 
         # Include images with our message
         results['include_image'] = \

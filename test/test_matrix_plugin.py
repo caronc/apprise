@@ -61,25 +61,25 @@ def test_notify_matrix_plugin_general(mock_post, mock_get):
     mock_post.return_value = request
 
     # Variation Initializations
-    obj = plugins.NotifyMatrix(rooms='#abcd')
+    obj = plugins.NotifyMatrix(targets='#abcd')
     assert isinstance(obj, plugins.NotifyMatrix) is True
     assert isinstance(obj.url(), six.string_types) is True
     # Registration successful
     assert obj.send(body="test") is True
 
-    obj = plugins.NotifyMatrix(user='user', rooms='#abcd')
+    obj = plugins.NotifyMatrix(user='user', targets='#abcd')
     assert isinstance(obj, plugins.NotifyMatrix) is True
     assert isinstance(obj.url(), six.string_types) is True
     # Registration successful
     assert obj.send(body="test") is True
 
-    obj = plugins.NotifyMatrix(password='passwd', rooms='#abcd')
+    obj = plugins.NotifyMatrix(password='passwd', targets='#abcd')
     assert isinstance(obj, plugins.NotifyMatrix) is True
     assert isinstance(obj.url(), six.string_types) is True
     # A username gets automatically generated in these cases
     assert obj.send(body="test") is True
 
-    obj = plugins.NotifyMatrix(user='user', password='passwd', rooms='#abcd')
+    obj = plugins.NotifyMatrix(user='user', password='passwd', targets='#abcd')
     assert isinstance(obj.url(), six.string_types) is True
     assert isinstance(obj, plugins.NotifyMatrix) is True
     # Registration Successful
@@ -94,17 +94,17 @@ def test_notify_matrix_plugin_general(mock_post, mock_get):
     # Fails because we couldn't register because of 404 errors
     assert obj.send(body="test") is False
 
-    obj = plugins.NotifyMatrix(user='test', rooms='#abcd')
+    obj = plugins.NotifyMatrix(user='test', targets='#abcd')
     assert isinstance(obj, plugins.NotifyMatrix) is True
     # Fails because we still couldn't register
     assert obj.send(user='test', password='passwd', body="test") is False
 
-    obj = plugins.NotifyMatrix(user='test', password='passwd', rooms='#abcd')
+    obj = plugins.NotifyMatrix(user='test', password='passwd', targets='#abcd')
     assert isinstance(obj, plugins.NotifyMatrix) is True
     # Fails because we still couldn't register
     assert obj.send(body="test") is False
 
-    obj = plugins.NotifyMatrix(password='passwd', rooms='#abcd')
+    obj = plugins.NotifyMatrix(password='passwd', targets='#abcd')
     # Fails because we still couldn't register
     assert isinstance(obj, plugins.NotifyMatrix) is True
     assert obj.send(body="test") is False
@@ -132,7 +132,7 @@ def test_notify_matrix_plugin_general(mock_post, mock_get):
     request.content = dumps(response_obj)
     request.status_code = requests.codes.ok
 
-    obj = plugins.NotifyMatrix(rooms=None)
+    obj = plugins.NotifyMatrix(targets=None)
     assert isinstance(obj, plugins.NotifyMatrix) is True
 
     # Force a empty joined list response
@@ -191,7 +191,8 @@ def test_notify_matrix_plugin_fetch(mock_post, mock_get):
     mock_get.side_effect = fetch_failed
     mock_post.side_effect = fetch_failed
 
-    obj = plugins.NotifyMatrix(user='user', password='passwd', thumbnail=True)
+    obj = plugins.NotifyMatrix(
+        user='user', password='passwd', include_image=True)
     assert isinstance(obj, plugins.NotifyMatrix) is True
     # We would hve failed to send our image notification
     assert obj.send(user='test', password='passwd', body="test") is False
@@ -518,3 +519,23 @@ def test_notify_matrix_plugin_rooms(mock_post, mock_get):
     request.status_code = 403
     obj._room_cache = {}
     assert obj._room_id('#abc123:localhost') is None
+
+
+def test_notify_matrix_url_parsing():
+    """
+    API: NotifyMatrix() URL Testing
+
+    """
+    result = plugins.NotifyMatrix.parse_url(
+        'matrix://user:token@localhost?to=#room')
+    assert isinstance(result, dict) is True
+    assert len(result['targets']) == 1
+    assert '#room' in result['targets']
+
+    result = plugins.NotifyMatrix.parse_url(
+        'matrix://user:token@localhost?to=#room1,#room2,#room3')
+    assert isinstance(result, dict) is True
+    assert len(result['targets']) == 3
+    assert '#room1' in result['targets']
+    assert '#room2' in result['targets']
+    assert '#room3' in result['targets']

@@ -116,24 +116,80 @@ def test_gnome_plugin():
     obj.duration = 0
 
     # Check that it found our mocked environments
-    assert(obj._enabled is True)
+    assert obj._enabled is True
 
     # Test url() call
-    assert(isinstance(obj.url(), six.string_types) is True)
+    assert isinstance(obj.url(), six.string_types) is True
 
     # test notifications
-    assert(obj.notify(title='title', body='body',
-           notify_type=apprise.NotifyType.INFO) is True)
+    assert obj.notify(title='title', body='body',
+                      notify_type=apprise.NotifyType.INFO) is True
 
     # test notification without a title
-    assert(obj.notify(title='', body='body',
-           notify_type=apprise.NotifyType.INFO) is True)
+    assert obj.notify(title='', body='body',
+                      notify_type=apprise.NotifyType.INFO) is True
+
+    obj = apprise.Apprise.instantiate(
+        'gnome://_/?image=True', suppress_exceptions=False)
+    assert isinstance(obj, apprise.plugins.NotifyGnome) is True
+    assert obj.notify(title='title', body='body',
+                      notify_type=apprise.NotifyType.INFO) is True
+
+    obj = apprise.Apprise.instantiate(
+        'gnome://_/?image=False', suppress_exceptions=False)
+    assert isinstance(obj, apprise.plugins.NotifyGnome) is True
+    assert obj.notify(title='title', body='body',
+                      notify_type=apprise.NotifyType.INFO) is True
+
+    # Test Priority (alias of urgency)
+    obj = apprise.Apprise.instantiate(
+        'gnome://_/?priority=invalid', suppress_exceptions=False)
+    assert isinstance(obj, apprise.plugins.NotifyGnome) is True
+    assert obj.urgency == 1
+    assert obj.notify(title='title', body='body',
+                      notify_type=apprise.NotifyType.INFO) is True
+
+    obj = apprise.Apprise.instantiate(
+        'gnome://_/?priority=high', suppress_exceptions=False)
+    assert isinstance(obj, apprise.plugins.NotifyGnome) is True
+    assert obj.urgency == 2
+    assert obj.notify(title='title', body='body',
+                      notify_type=apprise.NotifyType.INFO) is True
+
+    obj = apprise.Apprise.instantiate(
+        'gnome://_/?priority=2', suppress_exceptions=False)
+    assert isinstance(obj, apprise.plugins.NotifyGnome) is True
+    assert obj.urgency == 2
+    assert obj.notify(title='title', body='body',
+                      notify_type=apprise.NotifyType.INFO) is True
+
+    # Test Urgeny
+    obj = apprise.Apprise.instantiate(
+        'gnome://_/?urgency=invalid', suppress_exceptions=False)
+    assert obj.urgency == 1
+    assert isinstance(obj, apprise.plugins.NotifyGnome) is True
+    assert obj.notify(title='title', body='body',
+                      notify_type=apprise.NotifyType.INFO) is True
+
+    obj = apprise.Apprise.instantiate(
+        'gnome://_/?urgency=high', suppress_exceptions=False)
+    assert obj.urgency == 2
+    assert isinstance(obj, apprise.plugins.NotifyGnome) is True
+    assert obj.notify(title='title', body='body',
+                      notify_type=apprise.NotifyType.INFO) is True
+
+    obj = apprise.Apprise.instantiate(
+        'gnome://_/?urgency=2', suppress_exceptions=False)
+    assert isinstance(obj, apprise.plugins.NotifyGnome) is True
+    assert obj.urgency == 2
+    assert obj.notify(title='title', body='body',
+                      notify_type=apprise.NotifyType.INFO) is True
 
     # Test our loading of our icon exception; it will still allow the
     # notification to be sent
     mock_pixbuf.new_from_file.side_effect = AttributeError()
-    assert(obj.notify(title='title', body='body',
-           notify_type=apprise.NotifyType.INFO) is True)
+    assert obj.notify(title='title', body='body',
+                      notify_type=apprise.NotifyType.INFO) is True
     # Undo our change
     mock_pixbuf.new_from_file.side_effect = None
 
@@ -142,8 +198,8 @@ def test_gnome_plugin():
         .Notification.new.return_value = None
     sys.modules['gi.repository.Notify']\
         .Notification.new.side_effect = AttributeError()
-    assert(obj.notify(title='title', body='body',
-           notify_type=apprise.NotifyType.INFO) is False)
+    assert obj.notify(title='title', body='body',
+                      notify_type=apprise.NotifyType.INFO) is False
 
     # Undo our change
     sys.modules['gi.repository.Notify']\
@@ -152,11 +208,11 @@ def test_gnome_plugin():
     # Toggle our testing for when we can't send notifications because the
     # package has been made unavailable to us
     obj._enabled = False
-    assert(obj.notify(title='title', body='body',
-           notify_type=apprise.NotifyType.INFO) is False)
+    assert obj.notify(title='title', body='body',
+                      notify_type=apprise.NotifyType.INFO) is False
 
-    # Test the setting of a the urgency
-    apprise.plugins.NotifyGnome(urgency=0)
+    # Test the setting of a the urgency (through priority keyword)
+    apprise.plugins.NotifyGnome(priority=0)
 
     # Verify this all works in the event a ValueError is also thronw
     # out of the call to gi.require_version()
@@ -178,10 +234,10 @@ def test_gnome_plugin():
 
     # Create our instance
     obj = apprise.Apprise.instantiate('gnome://', suppress_exceptions=False)
-    assert(isinstance(obj, apprise.plugins.NotifyGnome) is True)
+    assert isinstance(obj, apprise.plugins.NotifyGnome) is True
     obj.duration = 0
 
     # Our notifications can not work without our gi library having been
     # loaded.
-    assert(obj.notify(title='title', body='body',
-           notify_type=apprise.NotifyType.INFO) is False)
+    assert obj.notify(title='title', body='body',
+                      notify_type=apprise.NotifyType.INFO) is False

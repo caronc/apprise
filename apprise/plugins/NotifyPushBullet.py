@@ -23,21 +23,16 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import re
-import six
 import requests
 from json import dumps
 
 from .NotifyBase import NotifyBase
 from ..utils import GET_EMAIL_RE
 from ..common import NotifyType
+from ..utils import parse_list
 
 # Flag used as a placeholder to sending to all devices
 PUSHBULLET_SEND_TO_ALL = 'ALL_DEVICES'
-
-# Used to break apart list of potential recipients by their delimiter
-# into a usable list.
-RECIPIENTS_LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
 
 # Provide some known codes Pushbullet uses and what they translate to:
 PUSHBULLET_HTTP_ERROR_MAP = {
@@ -65,25 +60,17 @@ class NotifyPushBullet(NotifyBase):
     # PushBullet uses the http protocol with JSON requests
     notify_url = 'https://api.pushbullet.com/v2/pushes'
 
-    def __init__(self, accesstoken, recipients=None, **kwargs):
+    def __init__(self, accesstoken, targets=None, **kwargs):
         """
         Initialize PushBullet Object
         """
         super(NotifyPushBullet, self).__init__(**kwargs)
 
         self.accesstoken = accesstoken
-        if isinstance(recipients, six.string_types):
-            self.recipients = [x for x in filter(
-                bool, RECIPIENTS_LIST_DELIM.split(recipients))]
 
-        elif isinstance(recipients, (set, tuple, list)):
-            self.recipients = recipients
-
-        else:
-            self.recipients = list()
-
-        if len(self.recipients) == 0:
-            self.recipients = (PUSHBULLET_SEND_TO_ALL, )
+        self.targets = parse_list(targets)
+        if len(self.targets) == 0:
+            self.targets = (PUSHBULLET_SEND_TO_ALL, )
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
@@ -99,10 +86,10 @@ class NotifyPushBullet(NotifyBase):
         # error tracking (used for function return)
         has_error = False
 
-        # Create a copy of the recipients list
-        recipients = list(self.recipients)
-        while len(recipients):
-            recipient = recipients.pop(0)
+        # Create a copy of the targets list
+        targets = list(self.targets)
+        while len(targets):
+            recipient = targets.pop(0)
 
             # prepare JSON Object
             payload = {
@@ -149,7 +136,7 @@ class NotifyPushBullet(NotifyBase):
                 if r.status_code != requests.codes.ok:
                     # We had a problem
                     status_str = \
-                        NotifyBase.http_response_code_lookup(
+                        NotifyPushBullet.http_response_code_lookup(
                             r.status_code, PUSHBULLET_HTTP_ERROR_MAP)
 
                     self.logger.warning(
@@ -195,17 +182,17 @@ class NotifyPushBullet(NotifyBase):
             'overflow': self.overflow_mode,
         }
 
-        recipients = '/'.join([self.quote(x) for x in self.recipients])
-        if recipients == PUSHBULLET_SEND_TO_ALL:
+        targets = '/'.join([NotifyPushBullet.quote(x) for x in self.targets])
+        if targets == PUSHBULLET_SEND_TO_ALL:
             # keyword is reserved for internal usage only; it's safe to remove
             # it from the recipients list
-            recipients = ''
+            targets = ''
 
-        return '{schema}://{accesstoken}/{recipients}/?{args}'.format(
+        return '{schema}://{accesstoken}/{targets}/?{args}'.format(
             schema=self.secure_protocol,
-            accesstoken=self.quote(self.accesstoken, safe=''),
-            recipients=recipients,
-            args=self.urlencode(args))
+            accesstoken=NotifyPushBullet.quote(self.accesstoken, safe=''),
+            targets=targets,
+            args=NotifyPushBullet.urlencode(args))
 
     @staticmethod
     def parse_url(url):
@@ -220,10 +207,17 @@ class NotifyPushBullet(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
-        # Apply our settings now
-        recipients = NotifyBase.unquote(results['fullpath'])
+        # Fetch our targets
+        results['targets'] = \
+            NotifyPushBullet.split_path(results['fullpath'])
 
-        results['accesstoken'] = results['host']
-        results['recipients'] = recipients
+        # The 'to' makes it easier to use yaml configuration
+        if 'to' in results['qsd'] and len(results['qsd']['to']):
+            results['targets'] += \
+                NotifyPushBullet.parse_list(results['qsd']['to'])
+
+        # Setup the token; we store it in Access Token for global
+        # plugin consistency with naming conventions
+        results['accesstoken'] = NotifyPushBullet.unquote(results['host'])
 
         return results

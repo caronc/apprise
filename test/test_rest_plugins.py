@@ -64,9 +64,13 @@ TEST_URLS = (
     ('boxcar://', {
         'instance': None,
     }),
+    # A a bad url
+    ('boxcar://:@/', {
+        'instance': TypeError,
+    }),
     # No secret specified
     ('boxcar://%s' % ('a' * 64), {
-        'instance': None,
+        'instance': TypeError,
     }),
     # An invalid access and secret key specified
     ('boxcar://access.key/secret.key/', {
@@ -79,15 +83,19 @@ TEST_URLS = (
         'requests_response_code': requests.codes.created,
     }),
     # Test without image set
-    ('boxcar://%s/%s' % ('a' * 64, 'b' * 64), {
+    ('boxcar://%s/%s?image=True' % ('a' * 64, 'b' * 64), {
         'instance': plugins.NotifyBoxcar,
         'requests_response_code': requests.codes.created,
-        # don't include an image by default
+        # don't include an image in Asset by default
         'include_image': False,
+    }),
+    ('boxcar://%s/%s?image=False' % ('a' * 64, 'b' * 64), {
+        'instance': plugins.NotifyBoxcar,
+        'requests_response_code': requests.codes.created,
     }),
     # our access, secret and device are all 64 characters
     # which is what we're doing here
-    ('boxcar://%s/%s/@tag1/tag2///%s/' % (
+    ('boxcar://%s/%s/@tag1/tag2///%s/?to=tag3' % (
         'a' * 64, 'b' * 64, 'd' * 64), {
         'instance': plugins.NotifyBoxcar,
         'requests_response_code': requests.codes.created,
@@ -96,9 +104,6 @@ TEST_URLS = (
     ('boxcar://%s/%s/@%s' % ('a' * 64, 'b' * 64, 't' * 64), {
         'instance': plugins.NotifyBoxcar,
         'requests_response_code': requests.codes.created,
-    }),
-    ('boxcar://:@/', {
-        'instance': None,
     }),
     ('boxcar://%s/%s/' % ('a' * 64, 'b' * 64), {
         'instance': plugins.NotifyBoxcar,
@@ -139,19 +144,37 @@ TEST_URLS = (
         'instance': plugins.NotifyDiscord,
         'requests_response_code': requests.codes.no_content,
     }),
+
     # Enable other options
+
+    # DEPRICATED reference to Thumbnail
     ('discord://%s/%s?format=markdown&footer=Yes&thumbnail=Yes' % (
         'i' * 24, 't' * 64), {
             'instance': plugins.NotifyDiscord,
             'requests_response_code': requests.codes.no_content,
     }),
-    ('discord://%s/%s?format=markdown&footer=Yes&thumbnail=Yes' % (
+    ('discord://%s/%s?format=markdown&footer=Yes&thumbnail=No' % (
+        'i' * 24, 't' * 64), {
+            'instance': plugins.NotifyDiscord,
+            'requests_response_code': requests.codes.no_content,
+    }),
+
+    # thumbnail= is depricated and image= is the proper entry
+    ('discord://%s/%s?format=markdown&footer=Yes&image=Yes' % (
         'i' * 24, 't' * 64), {
             'instance': plugins.NotifyDiscord,
             'requests_response_code': requests.codes.no_content,
             # don't include an image by default
             'include_image': False,
     }),
+    ('discord://%s/%s?format=markdown&footer=Yes&image=No' % (
+        'i' * 24, 't' * 64), {
+            'instance': plugins.NotifyDiscord,
+            'requests_response_code': requests.codes.no_content,
+            # don't include an image by default
+            'include_image': True,
+    }),
+
     ('discord://%s/%s?format=markdown&avatar=No&footer=No' % (
         'i' * 24, 't' * 64), {
             'instance': plugins.NotifyDiscord,
@@ -278,6 +301,23 @@ TEST_URLS = (
     }),
     # Provide a token
     ('flock://%s' % ('t' * 24), {
+        'instance': plugins.NotifyFlock,
+    }),
+    # Image handling
+    ('flock://%s?image=True' % ('t' * 24), {
+        'instance': plugins.NotifyFlock,
+    }),
+    ('flock://%s?image=False' % ('t' * 24), {
+        'instance': plugins.NotifyFlock,
+    }),
+    ('flock://%s?image=True' % ('t' * 24), {
+        'instance': plugins.NotifyFlock,
+        # Run test when image is set to True, but one couldn't actually be
+        # loaded from the Asset Object.
+        'include_image': False,
+    }),
+    # Test to=
+    ('flock://%s?to=u:%s&format=markdown' % ('i' * 24, 'u' * 12), {
         'instance': plugins.NotifyFlock,
     }),
     # Provide markdown format
@@ -479,6 +519,10 @@ TEST_URLS = (
     ('ifttt://WebHookID@EventID/?+TemplateKey=TemplateVal', {
         'instance': plugins.NotifyIFTTT,
     }),
+    # Test to= in which case we set the host to the webhook id
+    ('ifttt://WebHookID?to=EventID,EventID2', {
+        'instance': plugins.NotifyIFTTT,
+    }),
     # Removing certain keys:
     ('ifttt://WebHookID@EventID/?-Value1=&-Value2', {
         'instance': plugins.NotifyIFTTT,
@@ -521,6 +565,18 @@ TEST_URLS = (
     ('join://%s' % ('a' * 24), {
         # Missing a channel
         'instance': TypeError,
+    }),
+    # APIKey + device (using to=)
+    ('join://%s?to=%s' % ('a' * 32, 'd' * 32), {
+        'instance': plugins.NotifyJoin,
+    }),
+    # APIKey + device
+    ('join://%s@%s?image=True' % ('a' * 32, 'd' * 32), {
+        'instance': plugins.NotifyJoin,
+    }),
+    # No image
+    ('join://%s@%s?image=False' % ('a' * 32, 'd' * 32), {
+        'instance': plugins.NotifyJoin,
     }),
     # APIKey + device
     ('join://%s/%s' % ('a' * 32, 'd' * 32), {
@@ -732,9 +788,24 @@ TEST_URLS = (
     }),
 
     # Matrix supports webhooks too; the following tests this now:
+    ('matrix://user:token@localhost?mode=matrix&format=text', {
+        # user and token correctly specified with webhook
+        'instance': plugins.NotifyMatrix,
+        'response': False,
+    }),
+    ('matrix://user:token@localhost?mode=matrix&format=html', {
+        # user and token correctly specified with webhook
+        'instance': plugins.NotifyMatrix,
+    }),
+    ('matrix://user:token@localhost?mode=slack&format=text', {
+        # user and token correctly specified with webhook
+        'instance': plugins.NotifyMatrix,
+    }),
+    # Legacy (depricated) webhook reference
     ('matrix://user:token@localhost?webhook=matrix&format=text', {
         # user and token correctly specified with webhook
         'instance': plugins.NotifyMatrix,
+        'response': False,
     }),
     ('matrix://user:token@localhost?webhook=matrix&format=html', {
         # user and token correctly specified with webhook
@@ -744,27 +815,45 @@ TEST_URLS = (
         # user and token correctly specified with webhook
         'instance': plugins.NotifyMatrix,
     }),
-    ('matrixs://user:token@localhost?webhook=SLACK&format=markdown', {
+    ('matrixs://user:token@localhost?mode=SLACK&format=markdown', {
         # user and token specified; slack webhook still detected
         # despite uppercase characters
         'instance': plugins.NotifyMatrix,
     }),
-    ('matrix://user:token@localhost?webhook=On', {
+    # Image Reference
+    ('matrixs://user:token@localhost?mode=slack&format=markdown&image=True', {
+        # user and token specified; image set to True
+        'instance': plugins.NotifyMatrix,
+    }),
+    ('matrixs://user:token@localhost?mode=slack&format=markdown&image=False', {
+        # user and token specified; image set to True
+        'instance': plugins.NotifyMatrix,
+    }),
+    # Legacy (Depricated) image reference
+    ('matrixs://user:token@localhost?mode=slack&thumbnail=False', {
+        # user and token specified; image set to True
+        'instance': plugins.NotifyMatrix,
+    }),
+    ('matrixs://user:token@localhost?mode=slack&thumbnail=True', {
+        # user and token specified; image set to True
+        'instance': plugins.NotifyMatrix,
+    }),
+    ('matrix://user:token@localhost?mode=On', {
         # invalid webhook specified (unexpected boolean)
         'instance': TypeError,
     }),
-    ('matrix://token@localhost/?webhook=Matrix', {
+    ('matrix://token@localhost/?mode=Matrix', {
         'instance': plugins.NotifyMatrix,
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
-    ('matrix://user:token@localhost/webhook=matrix', {
+    ('matrix://user:token@localhost/mode=matrix', {
         'instance': plugins.NotifyMatrix,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
-    ('matrix://token@localhost:8080/?webhook=slack', {
+    ('matrix://token@localhost:8080/?mode=slack', {
         'instance': plugins.NotifyMatrix,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
@@ -787,6 +876,20 @@ TEST_URLS = (
     ('mmost://user@localhost/3ccdd113474722377935511fc85d3dd4?channel=test', {
         'instance': plugins.NotifyMatterMost,
     }),
+    ('mmost://user@localhost/3ccdd113474722377935511fc85d3dd4?to=test', {
+        'instance': plugins.NotifyMatterMost,
+    }),
+    ('mmost://localhost/3ccdd113474722377935511fc85d3dd4'
+     '?to=test&image=True', {
+         'instance': plugins.NotifyMatterMost}),
+    ('mmost://localhost/3ccdd113474722377935511fc85d3dd4' \
+     '?to=test&image=False', {
+         'instance': plugins.NotifyMatterMost}),
+    ('mmost://localhost/3ccdd113474722377935511fc85d3dd4' \
+     '?to=test&image=True', {
+         'instance': plugins.NotifyMatterMost,
+         # don't include an image by default
+         'include_image': False}),
     ('mmost://localhost:8080/3ccdd113474722377935511fc85d3dd4', {
         'instance': plugins.NotifyMatterMost,
     }),
@@ -915,6 +1018,10 @@ TEST_URLS = (
     ('pbul://%s/#channel/' % ('a' * 32), {
         'instance': plugins.NotifyPushBullet,
     }),
+    # APIKey + channel (via to=
+    ('pbul://%s/?to=#channel' % ('a' * 32), {
+        'instance': plugins.NotifyPushBullet,
+    }),
     # APIKey + 2 channels
     ('pbul://%s/#channel1/#channel2' % ('a' * 32), {
         'instance': plugins.NotifyPushBullet,
@@ -997,6 +1104,10 @@ TEST_URLS = (
     }),
     # Application Key+Secret + channel
     ('pushed://%s/%s/#channel/' % ('a' * 32, 'a' * 64), {
+        'instance': plugins.NotifyPushed,
+    }),
+    # Application Key+Secret + channel (via to=)
+    ('pushed://%s/%s?to=channel' % ('a' * 32, 'a' * 64), {
         'instance': plugins.NotifyPushed,
     }),
     # Application Key+Secret + dropped entry
@@ -1100,6 +1211,10 @@ TEST_URLS = (
     ('pover://%s@%s/DEVICE' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
     }),
+    # APIKey + Valid User + 1 Device (via to=)
+    ('pover://%s@%s?to=DEVICE' % ('u' * 30, 'a' * 30), {
+        'instance': plugins.NotifyPushover,
+    }),
     # APIKey + Valid User + 2 Devices
     ('pover://%s@%s/DEVICE1/DEVICE2/' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
@@ -1182,6 +1297,18 @@ TEST_URLS = (
     }),
     # A room and port identifier
     ('rocket://user:pass@localhost:8080/room/', {
+        'instance': plugins.NotifyRocketChat,
+        # The response text is expected to be the following on a success
+        'requests_response_text': {
+            'status': 'success',
+            'data': {
+                'authToken': 'abcd',
+                'userId': 'user',
+            },
+        },
+    }),
+    # A channel (using the to=)
+    ('rockets://user:pass@localhost?to=#channel', {
         'instance': plugins.NotifyRocketChat,
         # The response text is expected to be the following on a success
         'requests_response_text': {
@@ -1286,10 +1413,11 @@ TEST_URLS = (
     }),
     ('ryver://apprise', {
         # Just org provided (no token)
-        'instance': None,
+        'instance': TypeError,
     }),
     ('ryver://abc,#/ckhrjW8w672m6HG', {
-        # Invalid org provided
+        # Invalid org provided (this isn't actually even a value url)
+        # because the hostname has ,# in it
         'instance': None,
     }),
     ('ryver://a/ckhrjW8w672m6HG', {
@@ -1304,9 +1432,26 @@ TEST_URLS = (
         # Invalid webhook provided
         'instance': TypeError,
     }),
+    ('ryver://apprise/ckhrjW8w672m6HG?mode=slack', {
+        # No username specified; this is still okay as we use whatever
+        # the user told the webhook to use; set our slack mode
+        'instance': plugins.NotifyRyver,
+    }),
+    ('ryver://apprise/ckhrjW8w672m6HG?mode=ryver', {
+        # No username specified; this is still okay as we use whatever
+        # the user told the webhook to use; set our ryver mode
+        'instance': plugins.NotifyRyver,
+    }),
+    # Legacy webhook mode setting:
+    # Legacy webhook mode setting:
     ('ryver://apprise/ckhrjW8w672m6HG?webhook=slack', {
         # No username specified; this is still okay as we use whatever
         # the user told the webhook to use; set our slack mode
+        'instance': plugins.NotifyRyver,
+    }),
+    ('ryver://apprise/ckhrjW8w672m6HG?webhook=ryver', {
+        # No username specified; this is still okay as we use whatever
+        # the user told the webhook to use; set our ryver mode
         'instance': plugins.NotifyRyver,
     }),
     ('ryver://caronc@apprise/ckhrjW8w672m6HG', {
@@ -1344,7 +1489,11 @@ TEST_URLS = (
     }),
     ('slack://T1JJ3T3L2', {
         # Just Token 1 provided
-        'instance': None,
+        'instance': TypeError,
+    }),
+    ('slack://T1JJ3T3L2/A1BRTD4JD/', {
+        # Just 2 tokens provided
+        'instance': TypeError,
     }),
     ('slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#hmm/#-invalid-', {
         # No username specified; this is still okay as we sub in
@@ -1361,11 +1510,15 @@ TEST_URLS = (
         # don't include an image by default
         'include_image': False,
     }),
-    ('slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/+id/%20/@id/', {
+    ('slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/+id/@id/', {
         # + encoded id,
         # @ userid
         'instance': plugins.NotifySlack,
     }),
+    ('slack://username@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/' \
+        '?to=#nuxref', {
+            'instance': plugins.NotifySlack,
+        }),
     ('slack://username@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#nuxref', {
         'instance': plugins.NotifySlack,
     }),
@@ -1433,6 +1586,11 @@ TEST_URLS = (
         # Missing a topic and/or phone No
         'instance': plugins.NotifySNS,
     }),
+    ('sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/us-east-1' \
+        '?to=12223334444', {
+            # Missing a topic and/or phone No
+            'instance': plugins.NotifySNS,
+        }),
     ('sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcevi7FQ/us-west-2/12223334444', {
         'instance': plugins.NotifySNS,
         # throw a bizzare code forcing us to fail to look it up
@@ -1464,6 +1622,10 @@ TEST_URLS = (
     }),
     # Simple Message with multiple chat names
     ('tgram://123456789:abcdefg_hijklmnop/id1/id2/', {
+        'instance': plugins.NotifyTelegram,
+    }),
+    # Simple Message with multiple chat names
+    ('tgram://123456789:abcdefg_hijklmnop/?to=id1,id2', {
         'instance': plugins.NotifyTelegram,
     }),
     # Simple Message with an invalid chat ID
@@ -1592,6 +1754,15 @@ TEST_URLS = (
         'instance': None,
     }),
     ('xbmc://localhost', {
+        'instance': plugins.NotifyXBMC,
+    }),
+    ('xbmc://localhost?duration=14', {
+        'instance': plugins.NotifyXBMC,
+    }),
+    ('xbmc://localhost?duration=invalid', {
+        'instance': plugins.NotifyXBMC,
+    }),
+    ('xbmc://localhost?duration=-1', {
         'instance': plugins.NotifyXBMC,
     }),
     ('xbmc://user:pass@localhost', {
@@ -1810,13 +1981,13 @@ def test_rest_plugins(mock_post, mock_get):
                 # Expected None but didn't get it
                 print('%s instantiated %s (but expected None)' % (
                     url, str(obj)))
-                assert(False)
+                assert False
 
-            assert(isinstance(obj, instance))
+            assert isinstance(obj, instance) is True
 
             if isinstance(obj, plugins.NotifyBase.NotifyBase):
                 # We loaded okay; now lets make sure we can reverse this url
-                assert(isinstance(obj.url(), six.string_types) is True)
+                assert isinstance(obj.url(), six.string_types) is True
 
                 # Instantiate the exact same object again using the URL from
                 # the one that was already created properly
@@ -1830,14 +2001,14 @@ def test_rest_plugins(mock_post, mock_get):
                     # assertion failure makes things easier to debug later on
                     print('TEST FAIL: {} regenerated as {}'.format(
                         url, obj.url()))
-                    assert(False)
+                    assert False
 
             if self:
                 # Iterate over our expected entries inside of our object
                 for key, val in self.items():
                     # Test that our object has the desired key
-                    assert(hasattr(key, obj))
-                    assert(getattr(key, obj) == val)
+                    assert hasattr(key, obj) is True
+                    assert getattr(key, obj) == val
 
             #
             # Stage 1: with title defined
@@ -1947,9 +2118,11 @@ def test_rest_plugins(mock_post, mock_get):
         except Exception as e:
             # Handle our exception
             if(instance is None):
+                print('%s %s' % (url, str(e)))
                 raise
 
             if not isinstance(e, instance):
+                print('%s %s' % (url, str(e)))
                 raise
 
 
@@ -1971,39 +2144,39 @@ def test_notify_boxcar_plugin(mock_post, mock_get):
     secret = '_' * 64
 
     # Initializes the plugin with recipients set to None
-    plugins.NotifyBoxcar(access=access, secret=secret, recipients=None)
+    plugins.NotifyBoxcar(access=access, secret=secret, targets=None)
 
     # Initializes the plugin with a valid access, but invalid access key
     try:
-        plugins.NotifyBoxcar(access=None, secret=secret, recipients=None)
-        assert(False)
+        plugins.NotifyBoxcar(access=None, secret=secret, targets=None)
+        assert False
 
     except TypeError:
         # We should throw an exception for knowingly having an invalid
-        assert(True)
+        assert True
 
     # Initializes the plugin with a valid access, but invalid secret key
     try:
-        plugins.NotifyBoxcar(access=access, secret='invalid', recipients=None)
-        assert(False)
+        plugins.NotifyBoxcar(access=access, secret='invalid', targets=None)
+        assert False
 
     except TypeError:
         # We should throw an exception for knowingly having an invalid key
-        assert(True)
+        assert True
 
     # Initializes the plugin with a valid access, but invalid secret
     try:
-        plugins.NotifyBoxcar(access=access, secret=None, recipients=None)
-        assert(False)
+        plugins.NotifyBoxcar(access=access, secret=None, targets=None)
+        assert False
 
     except TypeError:
         # We should throw an exception for knowingly having an invalid
-        assert(True)
+        assert True
 
     # Initializes the plugin with recipients list
     # the below also tests our the variation of recipient types
     plugins.NotifyBoxcar(
-        access=access, secret=secret, recipients=[device, tag])
+        access=access, secret=secret, targets=[device, tag])
 
     mock_get.return_value = requests.Request()
     mock_post.return_value = requests.Request()
@@ -2011,9 +2184,17 @@ def test_notify_boxcar_plugin(mock_post, mock_get):
     mock_get.return_value.status_code = requests.codes.created
 
     # Test notifications without a body or a title
-    p = plugins.NotifyBoxcar(access=access, secret=secret, recipients=None)
+    p = plugins.NotifyBoxcar(access=access, secret=secret, targets=None)
 
-    p.notify(body=None, title=None, notify_type=NotifyType.INFO) is True
+    assert p.notify(body=None, title=None, notify_type=NotifyType.INFO) is True
+
+    # Test comma, separate values
+    device = 'a' * 64
+
+    p = plugins.NotifyBoxcar(
+        access=access, secret=secret,
+        targets=','.join([device, device, device]))
+    assert len(p.device_tokens) == 3
 
 
 @mock.patch('requests.get')
@@ -2039,11 +2220,11 @@ def test_notify_discord_plugin(mock_post, mock_get):
     # Empty Channel list
     try:
         plugins.NotifyDiscord(webhook_id=None, webhook_token=webhook_token)
-        assert(False)
+        assert False
 
     except TypeError:
         # we'll thrown because no webhook_id was specified
-        assert(True)
+        assert True
 
     obj = plugins.NotifyDiscord(
         webhook_id=webhook_id,
@@ -2065,9 +2246,9 @@ def test_notify_discord_plugin(mock_post, mock_get):
         "#### Heading 5"
 
     results = obj.extract_markdown_sections(test_markdown)
-    assert(isinstance(results, list))
+    assert isinstance(results, list) is True
     # We should have 5 sections (since there are 5 headers identified above)
-    assert(len(results) == 5)
+    assert len(results) == 5
 
     # Use our test markdown string during a notification
     assert obj.notify(
@@ -2465,7 +2646,7 @@ def test_notify_ifttt_plugin(mock_post, mock_get):
     plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
 
     # Initialize some generic (but valid) tokens
-    webhook_id = 'webhookid'
+    webhook_id = 'webhook_id'
     events = ['event1', 'event2']
 
     # Prepare Mock
@@ -2477,16 +2658,25 @@ def test_notify_ifttt_plugin(mock_post, mock_get):
     mock_post.return_value.content = '{}'
 
     try:
+        obj = plugins.NotifyIFTTT(webhook_id=None, events=None)
+        # No webhook_id specified
+        assert False
+
+    except TypeError:
+        # Exception should be thrown about the fact webhook_id was specified
+        assert True
+
+    try:
         obj = plugins.NotifyIFTTT(webhook_id=webhook_id, events=None)
-        # No token specified
-        assert(False)
+        # No events specified
+        assert False
 
     except TypeError:
         # Exception should be thrown about the fact no token was specified
-        assert(True)
+        assert True
 
     obj = plugins.NotifyIFTTT(webhook_id=webhook_id, events=events)
-    assert(isinstance(obj, plugins.NotifyIFTTT))
+    assert isinstance(obj, plugins.NotifyIFTTT) is True
 
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO) is True
@@ -2496,7 +2686,7 @@ def test_notify_ifttt_plugin(mock_post, mock_get):
         webhook_id=webhook_id, events=events,
         add_tokens={'Test': 'ValueA', 'Test2': 'ValueB'})
 
-    assert(isinstance(obj, plugins.NotifyIFTTT))
+    assert isinstance(obj, plugins.NotifyIFTTT) is True
 
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO) is True
@@ -2515,7 +2705,7 @@ def test_notify_ifttt_plugin(mock_post, mock_get):
         # an exception.
         assert True
 
-    assert(isinstance(obj, plugins.NotifyIFTTT))
+    assert isinstance(obj, plugins.NotifyIFTTT) is True
 
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO) is True
@@ -2531,7 +2721,7 @@ def test_notify_ifttt_plugin(mock_post, mock_get):
             plugins.NotifyIFTTT.ifttt_default_body_key,
             plugins.NotifyIFTTT.ifttt_default_type_key))
 
-    assert(isinstance(obj, plugins.NotifyIFTTT))
+    assert isinstance(obj, plugins.NotifyIFTTT) is True
 
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO) is True
@@ -2553,13 +2743,13 @@ def test_notify_join_plugin(mock_post, mock_get):
     apikey = 'a' * 32
 
     # Initializes the plugin with devices set to a string
-    plugins.NotifyJoin(apikey=apikey, devices=group)
+    plugins.NotifyJoin(apikey=apikey, targets=group)
 
     # Initializes the plugin with devices set to None
-    plugins.NotifyJoin(apikey=apikey, devices=None)
+    plugins.NotifyJoin(apikey=apikey, targets=None)
 
     # Initializes the plugin with devices set to a set
-    p = plugins.NotifyJoin(apikey=apikey, devices=[group, device])
+    p = plugins.NotifyJoin(apikey=apikey, targets=[group, device])
 
     # Prepare our mock responses
     req = requests.Request()
@@ -2571,6 +2761,45 @@ def test_notify_join_plugin(mock_post, mock_get):
     # Test notifications without a body or a title; nothing to send
     # so we return False
     p.notify(body=None, title=None, notify_type=NotifyType.INFO) is False
+
+
+def test_notify_pover_plugin():
+    """
+    API: NotifyPushover() Extra Checks
+
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
+
+    # No token
+    try:
+        plugins.NotifyPushover(token=None)
+        assert False
+
+    except TypeError:
+        # we'll thrown because we provided no token
+        assert True
+
+
+def test_notify_ryver_plugin():
+    """
+    API: NotifyRyver() Extra Checks
+
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
+
+    # must be 15 characters long
+    token = 'a' * 15
+
+    # No organization
+    try:
+        plugins.NotifyRyver(organization=None, token=token)
+        assert False
+
+    except TypeError:
+        # we'll thrown because an empty list of channels was provided
+        assert True
 
 
 @mock.patch('requests.get')
@@ -2592,8 +2821,8 @@ def test_notify_slack_plugin(mock_post, mock_get):
     channels = 'chan1,#chan2,+id,@user,,,'
 
     obj = plugins.NotifySlack(
-        token_a=token_a, token_b=token_b, token_c=token_c, channels=channels)
-    assert(len(obj.channels) == 4)
+        token_a=token_a, token_b=token_b, token_c=token_c, targets=channels)
+    assert len(obj.channels) == 4
 
     # Prepare Mock
     mock_get.return_value = requests.Request()
@@ -2605,16 +2834,27 @@ def test_notify_slack_plugin(mock_post, mock_get):
     try:
         plugins.NotifySlack(
             token_a=token_a, token_b=token_b, token_c=token_c,
-            channels=None)
-        assert(False)
+            targets=None)
+        assert False
 
     except TypeError:
         # we'll thrown because an empty list of channels was provided
-        assert(True)
+        assert True
+
+    # Missing first Token
+    try:
+        plugins.NotifySlack(
+            token_a=None, token_b=token_b, token_c=token_c,
+            targets=channels)
+        assert False
+
+    except TypeError:
+        # we'll thrown because an empty list of channels was provided
+        assert True
 
     # Test include_image
     obj = plugins.NotifySlack(
-        token_a=token_a, token_b=token_b, token_c=token_c, channels=channels,
+        token_a=token_a, token_b=token_b, token_c=token_c, targets=channels,
         include_image=True)
 
     # This call includes an image with it's payload:
@@ -2645,26 +2885,26 @@ def test_notify_pushbullet_plugin(mock_post, mock_get):
     mock_get.return_value.status_code = requests.codes.ok
 
     obj = plugins.NotifyPushBullet(
-        accesstoken=accesstoken, recipients=recipients)
-    assert(isinstance(obj, plugins.NotifyPushBullet))
-    assert(len(obj.recipients) == 4)
+        accesstoken=accesstoken, targets=recipients)
+    assert isinstance(obj, plugins.NotifyPushBullet) is True
+    assert len(obj.targets) == 4
 
     obj = plugins.NotifyPushBullet(accesstoken=accesstoken)
-    assert(isinstance(obj, plugins.NotifyPushBullet))
+    assert isinstance(obj, plugins.NotifyPushBullet) is True
     # Default is to send to all devices, so there will be a
     # recipient here
-    assert(len(obj.recipients) == 1)
+    assert len(obj.targets) == 1
 
-    obj = plugins.NotifyPushBullet(accesstoken=accesstoken, recipients=set())
-    assert(isinstance(obj, plugins.NotifyPushBullet))
+    obj = plugins.NotifyPushBullet(accesstoken=accesstoken, targets=set())
+    assert isinstance(obj, plugins.NotifyPushBullet) is True
     # Default is to send to all devices, so there will be a
     # recipient here
-    assert(len(obj.recipients) == 1)
+    assert len(obj.targets) == 1
 
     # Support the handling of an empty and invalid URL strings
-    assert(plugins.NotifyPushBullet.parse_url(None) is None)
-    assert(plugins.NotifyPushBullet.parse_url('') is None)
-    assert(plugins.NotifyPushBullet.parse_url(42) is None)
+    assert plugins.NotifyPushBullet.parse_url(None) is None
+    assert plugins.NotifyPushBullet.parse_url('') is None
+    assert plugins.NotifyPushBullet.parse_url(42) is None
 
 
 @mock.patch('requests.get')
@@ -2696,12 +2936,12 @@ def test_notify_pushed_plugin(mock_post, mock_get):
             app_secret=None,
             recipients=None,
         )
-        assert(False)
+        assert False
 
     except TypeError:
         # No application Secret was specified; it's a good thing if
         # this exception was thrown
-        assert(True)
+        assert True
 
     try:
         obj = plugins.NotifyPushed(
@@ -2711,47 +2951,20 @@ def test_notify_pushed_plugin(mock_post, mock_get):
         )
         # recipients list set to (None) is perfectly fine; in this
         # case it will notify the App
-        assert(True)
+        assert True
 
     except TypeError:
         # Exception should never be thrown!
-        assert(False)
-
-    try:
-        obj = plugins.NotifyPushed(
-            app_key=app_key,
-            app_secret=app_secret,
-            recipients=object(),
-        )
-        # invalid recipients list (object)
-        assert(False)
-
-    except TypeError:
-        # Exception should be thrown about the fact no recipients were
-        # specified
-        assert(True)
-
-    try:
-        obj = plugins.NotifyPushed(
-            app_key=app_key,
-            app_secret=app_secret,
-            recipients=set(),
-        )
-        # Any empty set is acceptable
-        assert(True)
-
-    except TypeError:
-        # Exception should never be thrown
-        assert(False)
+        assert False
 
     obj = plugins.NotifyPushed(
         app_key=app_key,
         app_secret=app_secret,
-        recipients=recipients,
+        targets=recipients,
     )
-    assert(isinstance(obj, plugins.NotifyPushed))
-    assert(len(obj.channels) == 2)
-    assert(len(obj.users) == 2)
+    assert isinstance(obj, plugins.NotifyPushed) is True
+    assert len(obj.channels) == 2
+    assert len(obj.users) == 2
 
     # Support the handling of an empty and invalid URL strings
     assert plugins.NotifyPushed.parse_url(None) is None
@@ -2789,42 +3002,42 @@ def test_notify_pushover_plugin(mock_post, mock_get):
     mock_get.return_value.status_code = requests.codes.ok
 
     try:
-        obj = plugins.NotifyPushover(user=user, token=None)
+        obj = plugins.NotifyPushover(user=user, webhook_id=None)
         # No token specified
-        assert(False)
+        assert False
 
     except TypeError:
         # Exception should be thrown about the fact no token was specified
-        assert(True)
+        assert True
 
-    obj = plugins.NotifyPushover(user=user, token=token, devices=devices)
-    assert(isinstance(obj, plugins.NotifyPushover))
-    assert(len(obj.devices) == 3)
+    obj = plugins.NotifyPushover(user=user, token=token, targets=devices)
+    assert isinstance(obj, plugins.NotifyPushover) is True
+    assert len(obj.targets) == 3
 
     # This call fails because there is 1 invalid device
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO) is False
 
     obj = plugins.NotifyPushover(user=user, token=token)
-    assert(isinstance(obj, plugins.NotifyPushover))
+    assert isinstance(obj, plugins.NotifyPushover) is True
     # Default is to send to all devices, so there will be a
     # device defined here
-    assert(len(obj.devices) == 1)
+    assert len(obj.targets) == 1
 
     # This call succeeds because all of the devices are valid
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO) is True
 
-    obj = plugins.NotifyPushover(user=user, token=token, devices=set())
-    assert(isinstance(obj, plugins.NotifyPushover))
+    obj = plugins.NotifyPushover(user=user, token=token, targets=set())
+    assert isinstance(obj, plugins.NotifyPushover) is True
     # Default is to send to all devices, so there will be a
     # device defined here
-    assert(len(obj.devices) == 1)
+    assert len(obj.targets) == 1
 
     # Support the handling of an empty and invalid URL strings
-    assert(plugins.NotifyPushover.parse_url(None) is None)
-    assert(plugins.NotifyPushover.parse_url('') is None)
-    assert(plugins.NotifyPushover.parse_url(42) is None)
+    assert plugins.NotifyPushover.parse_url(None) is None
+    assert plugins.NotifyPushover.parse_url('') is None
+    assert plugins.NotifyPushover.parse_url(42) is None
 
 
 @mock.patch('requests.get')
@@ -2852,44 +3065,11 @@ def test_notify_rocketchat_plugin(mock_post, mock_get):
     mock_post.return_value.content = ''
     mock_get.return_value.content = ''
 
-    try:
-        obj = plugins.NotifyRocketChat(
-            user=user, password=password, recipients=None)
-        # invalid recipients list (None)
-        assert(False)
-
-    except TypeError:
-        # Exception should be thrown about the fact no recipients were
-        # specified
-        assert(True)
-
-    try:
-        obj = plugins.NotifyRocketChat(
-            user=user, password=password, recipients=object())
-        # invalid recipients list (object)
-        assert(False)
-
-    except TypeError:
-        # Exception should be thrown about the fact no recipients were
-        # specified
-        assert(True)
-
-    try:
-        obj = plugins.NotifyRocketChat(
-            user=user, password=password, recipients=set())
-        # invalid recipient list/set (no entries)
-        assert(False)
-
-    except TypeError:
-        # Exception should be thrown about the fact no recipients were
-        # specified
-        assert(True)
-
     obj = plugins.NotifyRocketChat(
-        user=user, password=password, recipients=recipients)
-    assert(isinstance(obj, plugins.NotifyRocketChat))
-    assert(len(obj.channels) == 2)
-    assert(len(obj.rooms) == 2)
+        user=user, password=password, targets=recipients)
+    assert isinstance(obj, plugins.NotifyRocketChat) is True
+    assert len(obj.channels) == 2
+    assert len(obj.rooms) == 2
 
     #
     # Logout
@@ -2980,57 +3160,39 @@ def test_notify_telegram_plugin(mock_post, mock_get):
     mock_post.return_value.content = '{}'
 
     try:
-        obj = plugins.NotifyTelegram(bot_token=None, chat_ids=chat_ids)
+        obj = plugins.NotifyTelegram(bot_token=None, targets=chat_ids)
         # invalid bot token (None)
-        assert(False)
+        assert False
 
     except TypeError:
         # Exception should be thrown about the fact no token was specified
-        assert(True)
+        assert True
 
     try:
         obj = plugins.NotifyTelegram(
-            bot_token=invalid_bot_token, chat_ids=chat_ids)
+            bot_token=invalid_bot_token, targets=chat_ids)
         # invalid bot token
-        assert(False)
+        assert False
 
     except TypeError:
         # Exception should be thrown about the fact an invalid token was
         # specified
-        assert(True)
+        assert True
 
-    try:
-        obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids=None)
-        # No chat_ids specified
-        assert(False)
-
-    except TypeError:
-        # Exception should be thrown about the fact no token was specified
-        assert(True)
-
-    try:
-        obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids=set())
-        # No chat_ids specified
-        assert(False)
-
-    except TypeError:
-        # Exception should be thrown about the fact no token was specified
-        assert(True)
-
-    obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids=chat_ids)
-    assert(isinstance(obj, plugins.NotifyTelegram))
-    assert(len(obj.chat_ids) == 2)
+    obj = plugins.NotifyTelegram(bot_token=bot_token, targets=chat_ids)
+    assert isinstance(obj, plugins.NotifyTelegram) is True
+    assert len(obj.targets) == 2
 
     # test url call
-    assert(isinstance(obj.url(), six.string_types))
+    assert isinstance(obj.url(), six.string_types) is True
     # Test that we can load the string we generate back:
     obj = plugins.NotifyTelegram(**plugins.NotifyTelegram.parse_url(obj.url()))
-    assert(isinstance(obj, plugins.NotifyTelegram))
+    assert isinstance(obj, plugins.NotifyTelegram) is True
 
     # Support the handling of an empty and invalid URL strings
-    assert(plugins.NotifyTelegram.parse_url(None) is None)
-    assert(plugins.NotifyTelegram.parse_url('') is None)
-    assert(plugins.NotifyTelegram.parse_url(42) is None)
+    assert plugins.NotifyTelegram.parse_url(None) is None
+    assert plugins.NotifyTelegram.parse_url('') is None
+    assert plugins.NotifyTelegram.parse_url(42) is None
 
     # Prepare Mock to fail
     response = mock.Mock()
@@ -3044,7 +3206,7 @@ def test_notify_telegram_plugin(mock_post, mock_get):
     mock_post.return_value = response
 
     # No image asset
-    nimg_obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids=chat_ids)
+    nimg_obj = plugins.NotifyTelegram(bot_token=bot_token, targets=chat_ids)
     nimg_obj.asset = AppriseAsset(image_path_mask=False, image_url_mask=False)
 
     # Test that our default settings over-ride base settings since they are
@@ -3065,8 +3227,8 @@ def test_notify_telegram_plugin(mock_post, mock_get):
         body='body', title='title', notify_type=NotifyType.INFO) is False
 
     # This tests erroneous messages involving a single chat id
-    obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids='l2g')
-    nimg_obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids='l2g')
+    obj = plugins.NotifyTelegram(bot_token=bot_token, targets='l2g')
+    nimg_obj = plugins.NotifyTelegram(bot_token=bot_token, targets='l2g')
     nimg_obj.asset = AppriseAsset(image_path_mask=False, image_url_mask=False)
 
     assert obj.notify(
@@ -3111,9 +3273,9 @@ def test_notify_telegram_plugin(mock_post, mock_get):
     })
     mock_post.return_value.status_code = requests.codes.ok
 
-    obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids=None)
-    assert(len(obj.chat_ids) == 1)
-    assert(obj.chat_ids[0] == '532389719')
+    obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+    assert len(obj.targets) == 1
+    assert obj.targets[0] == '532389719'
 
     # Do the test again, but without the expected (parsed response)
     mock_post.return_value.content = dumps({
@@ -3125,50 +3287,54 @@ def test_notify_telegram_plugin(mock_post, mock_get):
         ],
     })
     try:
-        obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids=None)
+        obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
         # No chat_ids specified
-        assert(False)
+        assert False
 
     except TypeError:
         # Exception should be thrown about the fact no token was specified
-        assert(True)
+        assert True
+
+    # Detect the bot with a bad response
+    mock_post.return_value.content = dumps({})
+    obj.detect_bot_owner()
 
     # Test our bot detection with a internal server error
     mock_post.return_value.status_code = requests.codes.internal_server_error
     try:
-        obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids=None)
+        obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
         # No chat_ids specified
-        assert(False)
+        assert False
 
     except TypeError:
         # Exception should be thrown about the fact no token was specified
-        assert(True)
+        assert True
 
     # Test our bot detection with an unmappable html error
     mock_post.return_value.status_code = 999
     try:
-        obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids=None)
+        obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
         # No chat_ids specified
-        assert(False)
+        assert False
 
     except TypeError:
         # Exception should be thrown about the fact no token was specified
-        assert(True)
+        assert True
 
     # Do it again but this time provide a failure message
     mock_post.return_value.content = dumps({'description': 'Failure Message'})
     try:
-        obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids=None)
+        obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
         # No chat_ids specified
-        assert(False)
+        assert False
 
     except TypeError:
         # Exception should be thrown about the fact no token was specified
-        assert(True)
+        assert True
 
     # Do it again but this time provide a failure message and perform a
     # notification without a bot detection by providing at least 1 chat id
-    obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids=['@abcd'])
+    obj = plugins.NotifyTelegram(bot_token=bot_token, targets=['@abcd'])
     assert nimg_obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO) is False
 
@@ -3176,13 +3342,13 @@ def test_notify_telegram_plugin(mock_post, mock_get):
     for _exception in REQUEST_EXCEPTIONS:
         mock_post.side_effect = _exception
         try:
-            obj = plugins.NotifyTelegram(bot_token=bot_token, chat_ids=None)
+            obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
             # No chat_ids specified
-            assert(False)
+            assert False
 
         except TypeError:
             # Exception should be thrown about the fact no token was specified
-            assert(True)
+            assert True
 
 
 def test_notify_overflow_truncate():

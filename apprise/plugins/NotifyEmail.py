@@ -450,13 +450,13 @@ class NotifyEmail(NotifyBase):
         auth = ''
         if self.user and self.password:
             auth = '{user}:{password}@'.format(
-                user=self.quote(user, safe=''),
-                password=self.quote(self.password, safe=''),
+                user=NotifyEmail.quote(user, safe=''),
+                password=NotifyEmail.quote(self.password, safe=''),
             )
         else:
             # user url
             auth = '{user}@'.format(
-                user=self.quote(user, safe=''),
+                user=NotifyEmail.quote(user, safe=''),
             )
 
         # Default Port setup
@@ -466,10 +466,10 @@ class NotifyEmail(NotifyBase):
         return '{schema}://{auth}{hostname}{port}/?{args}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
-            hostname=self.host,
+            hostname=NotifyEmail.quote(self.host, safe=''),
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
-            args=self.urlencode(args),
+            args=NotifyEmail.urlencode(args),
         )
 
     @staticmethod
@@ -485,21 +485,28 @@ class NotifyEmail(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
-        # Apply our settings now
-
+        # The To: address is pre-determined if to= is not otherwise
+        # specified.
         to_addr = ''
+
+        # The From address is a must; either through the use of templates
+        # from= entry and/or merging the user and hostname together, this
+        # must be calculated or parse_url will fail.  The to_addr will
+        # become the from_addr if it can't be calculated
         from_addr = ''
+
+        # The server we connect to to send our mail to
         smtp_host = ''
 
         # Attempt to detect 'from' email address
         if 'from' in results['qsd'] and len(results['qsd']['from']):
-            from_addr = NotifyBase.unquote(results['qsd']['from'])
+            from_addr = NotifyEmail.unquote(results['qsd']['from'])
 
         else:
             # get 'To' email address
             from_addr = '%s@%s' % (
                 re.split(
-                    r'[\s@]+', NotifyBase.unquote(results['user']))[0],
+                    r'[\s@]+', NotifyEmail.unquote(results['user']))[0],
                 results.get('host', '')
             )
             # Lets be clever and attempt to make the from
@@ -511,7 +518,7 @@ class NotifyEmail(NotifyBase):
 
         # Attempt to detect 'to' email address
         if 'to' in results['qsd'] and len(results['qsd']['to']):
-            to_addr = NotifyBase.unquote(results['qsd']['to']).strip()
+            to_addr = NotifyEmail.unquote(results['qsd']['to']).strip()
 
         if not to_addr:
             # Send to ourselves if not otherwise specified to do so
@@ -519,7 +526,7 @@ class NotifyEmail(NotifyBase):
 
         if 'name' in results['qsd'] and len(results['qsd']['name']):
             # Extract from name to associate with from address
-            results['name'] = NotifyBase.unquote(results['qsd']['name'])
+            results['name'] = NotifyEmail.unquote(results['qsd']['name'])
 
         if 'timeout' in results['qsd'] and len(results['qsd']['timeout']):
             # Extract the timeout to associate with smtp server
@@ -528,7 +535,7 @@ class NotifyEmail(NotifyBase):
         # Store SMTP Host if specified
         if 'smtp' in results['qsd'] and len(results['qsd']['smtp']):
             # Extract the smtp server
-            smtp_host = NotifyBase.unquote(results['qsd']['smtp'])
+            smtp_host = NotifyEmail.unquote(results['qsd']['smtp'])
 
         if 'mode' in results['qsd'] and len(results['qsd']['mode']):
             # Extract the secure mode to over-ride the default

@@ -30,6 +30,7 @@ from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
 from ..common import NotifyType
 from ..utils import GET_SCHEMA_RE
+from ..utils import parse_bool
 
 # Default our global support flag
 NOTIFY_DBUS_SUPPORT_ENABLED = False
@@ -170,7 +171,8 @@ class NotifyDBus(NotifyBase):
     # let me know! :)
     _enabled = NOTIFY_DBUS_SUPPORT_ENABLED
 
-    def __init__(self, urgency=None, x_axis=None, y_axis=None, **kwargs):
+    def __init__(self, urgency=None, x_axis=None, y_axis=None,
+                 include_image=True, **kwargs):
         """
         Initialize DBus Object
         """
@@ -184,13 +186,10 @@ class NotifyDBus(NotifyBase):
         self.schema = kwargs.get('schema', 'dbus')
 
         if self.schema not in MAINLOOP_MAP:
-            # Unsupported Schema
-            self.logger.warning(
-                'The schema specified ({}) is not supported.'
-                .format(self.schema))
-            raise TypeError(
-                'The schema specified ({}) is not supported.'
-                .format(self.schema))
+            msg = 'The schema specified ({}) is not supported.' \
+                .format(self.schema)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         # The urgency of the message
         if urgency not in DBUS_URGENCIES:
@@ -200,8 +199,12 @@ class NotifyDBus(NotifyBase):
             self.urgency = urgency
 
         # Our x/y axis settings
-        self.x_axis = x_axis
-        self.y_axis = y_axis
+        self.x_axis = x_axis if isinstance(x_axis, int) else None
+        self.y_axis = y_axis if isinstance(y_axis, int) else None
+
+        # Track whether or not we want to send an image with our notification
+        # or not.
+        self.include_image = include_image
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
@@ -229,7 +232,8 @@ class NotifyDBus(NotifyBase):
         )
 
         # image path
-        icon_path = self.image_path(notify_type, extension='.ico')
+        icon_path = None if not self.include_image \
+            else self.image_path(notify_type, extension='.ico')
 
         # Our meta payload
         meta_payload = {
@@ -241,7 +245,7 @@ class NotifyDBus(NotifyBase):
             meta_payload['x'] = self.x_axis
             meta_payload['y'] = self.y_axis
 
-        if NOTIFY_DBUS_IMAGE_SUPPORT is True:
+        if NOTIFY_DBUS_IMAGE_SUPPORT and icon_path:
             try:
                 # Use Pixbuf to create the proper image type
                 image = GdkPixbuf.Pixbuf.new_from_file(icon_path)
@@ -299,7 +303,33 @@ class NotifyDBus(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        return '{schema}://'.format(schema=self.schema)
+        _map = {
+            DBusUrgency.LOW: 'low',
+            DBusUrgency.NORMAL: 'normal',
+            DBusUrgency.HIGH: 'high',
+        }
+
+        # Define any arguments set
+        args = {
+            'format': self.notify_format,
+            'overflow': self.overflow_mode,
+            'image': 'yes' if self.include_image else 'no',
+            'urgency': 'normal' if self.urgency not in _map
+                       else _map[self.urgency]
+        }
+
+        # x in (x,y) screen coordinates
+        if self.x_axis:
+            args['x'] = str(self.x_axis)
+
+        # y in (x,y) screen coordinates
+        if self.y_axis:
+            args['y'] = str(self.y_axis)
+
+        return '{schema}://_/?{args}'.format(
+            schema=self.protocol,
+            args=NotifyDBus.urlencode(args),
+        )
 
     @staticmethod
     def parse_url(url):
@@ -314,23 +344,58 @@ class NotifyDBus(NotifyBase):
             # Content is simply not parseable
             return None
 
-        # return a very basic set of requirements
-        return {
-            'schema': schema.group('schema').lower(),
-            'user': None,
-            'password': None,
-            'port': None,
-            'host': 'localhost',
-            'fullpath': None,
-            'path': None,
-            'url': url,
-            'qsd': {},
-            # screen lat/lon (in pixels) where x=0 and y=0 if you want to put
-            # the notification in the top left hand side. Accept defaults if
-            # set to None
-            'x_axis': None,
-            'y_axis': None,
-            # Set the urgency to None so that we fall back to the default
-            # value.
-            'urgency': None,
-        }
+        results = NotifyBase.parse_url(url)
+        if not results:
+            results = {
+                'schema': schema.group('schema').lower(),
+                'user': None,
+                'password': None,
+                'port': None,
+                'host': '_',
+                'fullpath': None,
+                'path': None,
+                'url': url,
+                'qsd': {},
+            }
+
+        # Include images with our message
+        results['include_image'] = \
+            parse_bool(results['qsd'].get('image', True))
+
+        # DBus supports urgency, but we we also support the keyword priority
+        # so that it is consistent with some of the other plugins
+        urgency = results['qsd'].get('urgency', results['qsd'].get('priority'))
+        if urgency and len(urgency):
+            _map = {
+                '0': DBusUrgency.LOW,
+                'l': DBusUrgency.LOW,
+                'n': DBusUrgency.NORMAL,
+                '1': DBusUrgency.NORMAL,
+                'h': DBusUrgency.HIGH,
+                '2': DBusUrgency.HIGH,
+            }
+
+            try:
+                # Attempt to index/retrieve our urgency
+                results['urgency'] = _map[urgency[0].lower()]
+
+            except KeyError:
+                # No priority was set
+                pass
+
+        # handle x,y coordinates
+        try:
+            results['x_axis'] = int(results['qsd'].get('x'))
+
+        except (TypeError, ValueError):
+            # No x was set
+            pass
+
+        try:
+            results['y_axis'] = int(results['qsd'].get('y'))
+
+        except (TypeError, ValueError):
+            # No y was set
+            pass
+
+        return results

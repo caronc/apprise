@@ -108,14 +108,17 @@ class NotifyIFTTT(NotifyBase):
         super(NotifyIFTTT, self).__init__(**kwargs)
 
         if not webhook_id:
-            raise TypeError('You must specify the Webhooks webhook_id.')
+            msg = 'You must specify the Webhooks webhook_id.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         # Store our Events we wish to trigger
         self.events = parse_list(events)
 
         if not self.events:
-            raise TypeError(
-                'You must specify at least one event you wish to trigger on.')
+            msg = 'You must specify at least one event you wish to trigger on.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         # Store our APIKey
         self.webhook_id = webhook_id
@@ -132,9 +135,10 @@ class NotifyIFTTT(NotifyBase):
                 self.del_tokens = del_tokens
 
             else:
-                raise TypeError(
-                    'del_token must be a list; {} was provided'.format(
-                        str(type(del_tokens))))
+                msg = 'del_token must be a list; {} was provided'.format(
+                    str(type(del_tokens)))
+                self.logger.warning(msg)
+                raise TypeError(msg)
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
@@ -202,7 +206,7 @@ class NotifyIFTTT(NotifyBase):
                 if r.status_code != requests.codes.ok:
                     # We had a problem
                     status_str = \
-                        NotifyBase.http_response_code_lookup(r.status_code)
+                        NotifyIFTTT.http_response_code_lookup(r.status_code)
 
                     self.logger.warning(
                         'Failed to send IFTTT notification to {}: '
@@ -253,9 +257,10 @@ class NotifyIFTTT(NotifyBase):
 
         return '{schema}://{webhook_id}@{events}/?{args}'.format(
             schema=self.secure_protocol,
-            webhook_id=self.webhook_id,
-            events='/'.join([self.quote(x, safe='') for x in self.events]),
-            args=self.urlencode(args),
+            webhook_id=NotifyIFTTT.quote(self.webhook_id, safe=''),
+            events='/'.join([NotifyIFTTT.quote(x, safe='')
+                             for x in self.events]),
+            args=NotifyIFTTT.urlencode(args),
         )
 
     @staticmethod
@@ -271,15 +276,26 @@ class NotifyIFTTT(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
+        # Our API Key is the hostname if no user is specified
+        results['webhook_id'] = \
+            results['user'] if results['user'] else results['host']
+
+        # Unquote our API Key
+        results['webhook_id'] = NotifyIFTTT.unquote(results['webhook_id'])
+
         # Our Event
         results['events'] = list()
-        results['events'].append(results['host'])
-
-        # Our API Key
-        results['webhook_id'] = results['user']
+        if results['user']:
+            # If a user was defined, then the hostname is actually a event
+            # too
+            results['events'].append(NotifyIFTTT.unquote(results['host']))
 
         # Now fetch the remaining tokens
-        results['events'].extend([x for x in filter(
-            bool, NotifyBase.split_path(results['fullpath']))][0:])
+        results['events'].extend(NotifyIFTTT.split_path(results['fullpath']))
+
+        # The 'to' makes it easier to use yaml configuration
+        if 'to' in results['qsd'] and len(results['qsd']['to']):
+            results['events'] += \
+                NotifyIFTTT.parse_list(results['qsd']['to'])
 
         return results

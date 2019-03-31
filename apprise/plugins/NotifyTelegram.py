@@ -107,7 +107,7 @@ class NotifyTelegram(NotifyBase):
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 4096
 
-    def __init__(self, bot_token, chat_ids, detect_bot_owner=True,
+    def __init__(self, bot_token, targets, detect_bot_owner=True,
                  include_image=True, **kwargs):
         """
         Initialize Telegram Object
@@ -133,19 +133,19 @@ class NotifyTelegram(NotifyBase):
         self.bot_token = result.group('key')
 
         # Parse our list
-        self.chat_ids = parse_list(chat_ids)
+        self.targets = parse_list(targets)
 
         if self.user:
             # Treat this as a channel too
-            self.chat_ids.append(self.user)
+            self.targets.append(self.user)
 
-        if len(self.chat_ids) == 0 and detect_bot_owner:
+        if len(self.targets) == 0 and detect_bot_owner:
             _id = self.detect_bot_owner()
             if _id:
                 # Store our id
-                self.chat_ids.append(str(_id))
+                self.targets.append(str(_id))
 
-        if len(self.chat_ids) == 0:
+        if len(self.targets) == 0:
             err = 'No chat_id(s) were specified.'
             self.logger.warning(err)
             raise TypeError(err)
@@ -168,14 +168,25 @@ class NotifyTelegram(NotifyBase):
             'sendPhoto'
         )
 
+        # Acquire our image path if configured to do so; we don't bother
+        # checking to see if selfinclude_image is set here because the
+        # send_image() function itself (this function) checks this flag
+        # already
         path = self.image_path(notify_type)
+
         if not path:
             # No image to send
             self.logger.debug(
                 'Telegram Image does not exist for %s' % (notify_type))
-            return None
 
-        files = {'photo': (basename(path), open(path), 'rb')}
+            # No need to fail; we may have been configured this way through
+            # the apprise.AssetObject()
+            return True
+
+        # Configure file payload (for upload)
+        files = {
+            'photo': (basename(path), open(path), 'rb'),
+        }
 
         payload = {
             'chat_id': chat_id,
@@ -196,7 +207,7 @@ class NotifyTelegram(NotifyBase):
             if r.status_code != requests.codes.ok:
                 # We had a problem
                 status_str = \
-                    NotifyBase.http_response_code_lookup(r.status_code)
+                    NotifyTelegram.http_response_code_lookup(r.status_code)
 
                 self.logger.warning(
                     'Failed to send Telegram Image: '
@@ -248,7 +259,7 @@ class NotifyTelegram(NotifyBase):
             if r.status_code != requests.codes.ok:
                 # We had a problem
                 status_str = \
-                    NotifyBase.http_response_code_lookup(r.status_code)
+                    NotifyTelegram.http_response_code_lookup(r.status_code)
 
                 try:
                     # Try to get the error message if we can:
@@ -368,10 +379,10 @@ class NotifyTelegram(NotifyBase):
                 title = re.sub('&emsp;?', '   ', title, re.I)
 
                 # HTML
-                title = NotifyBase.escape_html(title, whitespace=False)
+                title = NotifyTelegram.escape_html(title, whitespace=False)
 
             # HTML
-            body = NotifyBase.escape_html(body, whitespace=False)
+            body = NotifyTelegram.escape_html(body, whitespace=False)
 
         if title and self.notify_format == NotifyFormat.TEXT:
             # Text HTML Formatting
@@ -393,9 +404,9 @@ class NotifyTelegram(NotifyBase):
             payload['text'] = body
 
         # Create a copy of the chat_ids list
-        chat_ids = list(self.chat_ids)
-        while len(chat_ids):
-            chat_id = chat_ids.pop(0)
+        targets = list(self.targets)
+        while len(targets):
+            chat_id = targets.pop(0)
             chat_id = IS_CHAT_ID_RE.match(chat_id)
             if not chat_id:
                 self.logger.warning(
@@ -441,7 +452,7 @@ class NotifyTelegram(NotifyBase):
                 if r.status_code != requests.codes.ok:
                     # We had a problem
                     status_str = \
-                        NotifyBase.http_response_code_lookup(r.status_code)
+                        NotifyTelegram.http_response_code_lookup(r.status_code)
 
                     try:
                         # Try to get the error message if we can:
@@ -489,16 +500,17 @@ class NotifyTelegram(NotifyBase):
         args = {
             'format': self.notify_format,
             'overflow': self.overflow_mode,
+            'image': self.include_image,
         }
 
         # No need to check the user token because the user automatically gets
         # appended into the list of chat ids
         return '{schema}://{bot_token}/{targets}/?{args}'.format(
             schema=self.secure_protocol,
-            bot_token=self.quote(self.bot_token, safe=''),
+            bot_token=NotifyTelegram.quote(self.bot_token, safe=''),
             targets='/'.join(
-                [self.quote('@{}'.format(x)) for x in self.chat_ids]),
-            args=self.urlencode(args))
+                [NotifyTelegram.quote('@{}'.format(x)) for x in self.targets]),
+            args=NotifyTelegram.urlencode(args))
 
     @staticmethod
     def parse_url(url):
@@ -507,9 +519,9 @@ class NotifyTelegram(NotifyBase):
         us to substantiate this object.
 
         """
-        # This is a dirty hack; but it's the only work around to
-        # tgram:// messages since the bot_token has a colon in it.
-        # It invalidates an normal URL.
+        # This is a dirty hack; but it's the only work around to tgram://
+        # messages since the bot_token has a colon in it. It invalidates a
+        # normal URL.
 
         # This hack searches for this bogus URL and corrects it so we can
         # properly load it further down. The other alternative is to ask users
@@ -550,22 +562,27 @@ class NotifyTelegram(NotifyBase):
             )
 
         # The first token is stored in the hostname
-        bot_token_a = results['host']
+        bot_token_a = NotifyTelegram.unquote(results['host'])
+
+        # Get a nice unquoted list of path entries
+        entries = NotifyTelegram.split_path(results['fullpath'])
 
         # Now fetch the remaining tokens
-        bot_token_b = [x for x in filter(
-            bool, NotifyBase.split_path(results['fullpath']))][0]
+        bot_token_b = entries.pop(0)
 
         bot_token = '%s:%s' % (bot_token_a, bot_token_b)
 
-        chat_ids = [x for x in filter(
-            bool, NotifyBase.split_path(results['fullpath']))][1:]
+        # Store our chat ids (as these are the remaining entries)
+        results['targets'] = entries
+
+        # Support the 'to' variable so that we can support rooms this way too
+        # The 'to' makes it easier to use yaml configuration
+        if 'to' in results['qsd'] and len(results['qsd']['to']):
+            results['targets'] += \
+                NotifyTelegram.parse_list(results['qsd']['to'])
 
         # Store our bot token
         results['bot_token'] = bot_token
-
-        # Store our chat ids
-        results['chat_ids'] = chat_ids
 
         # Include images with our message
         results['include_image'] = \
