@@ -30,6 +30,7 @@ from .NotifyBase import NotifyBase
 from ..utils import GET_EMAIL_RE
 from ..common import NotifyType
 from ..utils import parse_list
+from ..AppriseLocale import gettext_lazy as _
 
 # Flag used as a placeholder to sending to all devices
 PUSHBULLET_SEND_TO_ALL = 'ALL_DEVICES'
@@ -59,6 +60,49 @@ class NotifyPushBullet(NotifyBase):
 
     # PushBullet uses the http protocol with JSON requests
     notify_url = 'https://api.pushbullet.com/v2/pushes'
+
+    # Define object templates
+    templates = (
+        '{schema}://{accesstoken}',
+        '{schema}://{accesstoken}/{targets}',
+    )
+
+    # Define our template tokens
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'accesstoken': {
+            'name': _('Access Token'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+        },
+        'target_device': {
+            'name': _('Target Device'),
+            'type': 'string',
+            'map_to': 'targets',
+        },
+        'target_channel': {
+            'name': _('Target Channel'),
+            'type': 'string',
+            'prefix': '#',
+            'map_to': 'targets',
+        },
+        'target_email': {
+            'name': _('Target Email'),
+            'type': 'string',
+            'map_to': 'targets',
+        },
+        'targets': {
+            'name': _('Targets'),
+            'type': 'list:string',
+        },
+    })
+
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'to': {
+            'alias_of': 'targets',
+        },
+    })
 
     def __init__(self, accesstoken, targets=None, **kwargs):
         """

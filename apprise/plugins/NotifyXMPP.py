@@ -30,6 +30,7 @@ from os.path import isfile
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
 from ..utils import parse_list
+from ..AppriseLocale import gettext_lazy as _
 
 # xep string parser
 XEP_PARSE_RE = re.compile('^[^1-9]*(?P<xep>[1-9][0-9]{0,3})$')
@@ -97,6 +98,71 @@ class NotifyXMPP(NotifyBase):
     # outside of what is defined in test/test_xmpp_plugin.py, please
     # let me know! :)
     _enabled = NOTIFY_XMPP_SUPPORT_ENABLED
+
+    # Define object templates
+    templates = (
+        '{schema}://{host}',
+        '{schema}://{password}@{host}',
+        '{schema}://{password}@{host}:{port}',
+        '{schema}://{user}:{password}@{host}',
+        '{schema}://{user}:{password}@{host}:{port}',
+        '{schema}://{host}/{targets}',
+        '{schema}://{password}@{host}/{targets}',
+        '{schema}://{password}@{host}:{port}/{targets}',
+        '{schema}://{user}:{password}@{host}/{targets}',
+        '{schema}://{user}:{password}@{host}:{port}/{targets}',
+    )
+
+    # Define our tokens
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'host': {
+            'name': _('Hostname'),
+            'type': 'string',
+            'required': True,
+        },
+        'port': {
+            'name': _('Port'),
+            'type': 'int',
+            'min': 1,
+            'max': 65535,
+        },
+        'user': {
+            'name': _('Username'),
+            'type': 'string',
+        },
+        'password': {
+            'name': _('Password'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+        },
+        'target_jid': {
+            'name': _('Target JID'),
+            'type': 'string',
+            'map_to': 'targets',
+        },
+        'targets': {
+            'name': _('Targets'),
+            'type': 'list:string',
+        },
+    })
+
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'to': {
+            'alias_of': 'targets',
+        },
+        'xep': {
+            'name': _('XEP'),
+            'type': 'list:string',
+            'prefix': 'xep-',
+            'regex': (r'[1-9][0-9]{0,3}', 'i'),
+        },
+        'jid': {
+            'name': _('Source JID'),
+            'type': 'string',
+        },
+    })
 
     def __init__(self, targets=None, jid=None, xep=None, **kwargs):
         """

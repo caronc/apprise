@@ -47,6 +47,7 @@ from json import loads
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
 from ..utils import parse_list
+from ..AppriseLocale import gettext_lazy as _
 
 
 # Used to validate your personal access apikey
@@ -92,6 +93,70 @@ class NotifyTwilio(NotifyBase):
     # A title can not be used for SMS Messages.  Setting this to zero will
     # cause any title (if defined) to get placed into the message body.
     title_maxlen = 0
+
+    # Define object templates
+    templates = (
+        '{schema}://{account_sid}:{auth_token}@{from_phone}',
+        '{schema}://{account_sid}:{auth_token}@{from_phone}/{targets}',
+    )
+
+    # Define our template tokens
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'account_sid': {
+            'name': _('Account SID'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+            'regex': (r'AC[a-f0-9]{32}', 'i'),
+        },
+        'auth_token': {
+            'name': _('Auth Token'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+            'regex': (r'[a-f0-9]{32}', 'i'),
+        },
+        'from_phone': {
+            'name': _('From Phone No'),
+            'type': 'string',
+            'required': True,
+            'regex': (r'\+?[0-9\s)(+-]+', 'i'),
+            'map_to': 'source',
+        },
+        'target_phone': {
+            'name': _('Target Phone No'),
+            'type': 'string',
+            'prefix': '+',
+            'regex': (r'[0-9\s)(+-]+', 'i'),
+            'map_to': 'targets',
+        },
+        'short_code': {
+            'name': _('Target Short Code'),
+            'type': 'string',
+            'regex': (r'[0-9]{5,6}', 'i'),
+            'map_to': 'targets',
+        },
+        'targets': {
+            'name': _('Targets'),
+            'type': 'list:string',
+        },
+    })
+
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'to': {
+            'alias_of': 'targets',
+        },
+        'from': {
+            'alias_of': 'from_phone',
+        },
+        'sid': {
+            'alias_of': 'account_sid',
+        },
+        'token': {
+            'alias_of': 'auth_token',
+        },
+    })
 
     def __init__(self, account_sid, auth_token, source, targets=None,
                  **kwargs):

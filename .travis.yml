@@ -25,6 +25,7 @@ matrix:
       env: TOXENV=pypy3
 
 install:
+  - pip install babel
   - pip install .
   - pip install codecov
   - pip install -r dev-requirements.txt

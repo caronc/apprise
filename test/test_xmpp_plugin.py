@@ -108,7 +108,7 @@ def test_xmpp_plugin(tmpdir):
         .CA_CERTIFICATE_FILE_LOCATIONS = []
 
     # Disable Throttling to speed testing
-    apprise.plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
+    apprise.plugins.NotifyBase.request_rate_per_sec = 0
 
     # Create our instance
     obj = apprise.Apprise.instantiate('xmpp://', suppress_exceptions=False)

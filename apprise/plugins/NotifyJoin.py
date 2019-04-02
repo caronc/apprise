@@ -41,9 +41,10 @@ from ..common import NotifyImageSize
 from ..common import NotifyType
 from ..utils import parse_list
 from ..utils import parse_bool
+from ..AppriseLocale import gettext_lazy as _
 
 # Token required as part of the API request
-VALIDATE_APIKEY = re.compile(r'[A-Za-z0-9]{32}')
+VALIDATE_APIKEY = re.compile(r'[a-z0-9]{32}', re.I)
 
 # Extend HTTP Error Messages
 JOIN_HTTP_ERROR_MAP = {
@@ -51,7 +52,7 @@ JOIN_HTTP_ERROR_MAP = {
 }
 
 # Used to detect a device
-IS_DEVICE_RE = re.compile(r'([A-Za-z0-9]{32})')
+IS_DEVICE_RE = re.compile(r'([a-z0-9]{32})', re.I)
 
 # Used to detect a device
 IS_GROUP_RE = re.compile(
@@ -96,6 +97,53 @@ class NotifyJoin(NotifyBase):
 
     # The default group to use if none is specified
     default_join_group = 'group.all'
+
+    # Define object templates
+    templates = (
+        '{schema}://{apikey}/{targets}',
+    )
+
+    # Define our template tokens
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'apikey': {
+            'name': _('API Key'),
+            'type': 'string',
+            'regex': (r'[a-z0-9]{32}', 'i'),
+            'private': True,
+            'required': True,
+        },
+        'device': {
+            'name': _('Device ID'),
+            'type': 'string',
+            'regex': (r'[a-z0-9]{32}', 'i'),
+            'map_to': 'targets',
+        },
+        'group': {
+            'name': _('Group'),
+            'type': 'choice:string',
+            'values': (
+                'all', 'android', 'chrome', 'windows10', 'phone', 'tablet',
+                'pc'),
+            'map_to': 'targets',
+        },
+        'targets': {
+            'name': _('Targets'),
+            'type': 'list:string',
+            'required': True,
+        },
+    })
+
+    template_args = dict(NotifyBase.template_args, **{
+        'image': {
+            'name': _('Include Image'),
+            'type': 'bool',
+            'default': False,
+            'map_to': 'include_image',
+        },
+        'to': {
+            'alias_of': 'targets',
+        },
+    })
 
     def __init__(self, apikey, targets, include_image=True, **kwargs):
         """

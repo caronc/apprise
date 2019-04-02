@@ -24,6 +24,7 @@
 # THE SOFTWARE.
 
 import re
+import six
 import smtplib
 from email.mime.text import MIMEText
 from socket import error as SocketError
@@ -33,6 +34,8 @@ from .NotifyBase import NotifyBase
 from ..common import NotifyFormat
 from ..common import NotifyType
 from ..utils import is_email
+from ..utils import parse_list
+from ..AppriseLocale import gettext_lazy as _
 
 
 class WebBaseLogin(object):
@@ -242,9 +245,86 @@ class NotifyEmail(NotifyBase):
     # Default SMTP Timeout (in seconds)
     connect_timeout = 15
 
-    def __init__(self, **kwargs):
+    # Define object templates
+    templates = (
+        '{schema}://{user}:{password}@{host}',
+        '{schema}://{user}:{password}@{host}:{port}',
+        '{schema}://{user}:{password}@{host}/{targets}',
+        '{schema}://{user}:{password}@{host}:{port}/{targets}',
+    )
+
+    # Define our template tokens
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'user': {
+            'name': _('User Name'),
+            'type': 'string',
+            'required': True,
+        },
+        'password': {
+            'name': _('Password'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+        },
+        'host': {
+            'name': _('Domain'),
+            'type': 'string',
+            'required': True,
+        },
+        'port': {
+            'name': _('Port'),
+            'type': 'int',
+            'min': 1,
+            'max': 65535,
+        },
+        'targets': {
+            'name': _('Target Emails'),
+            'type': 'list:string',
+        },
+    })
+
+    template_args = dict(NotifyBase.template_args, **{
+        'to': {
+            'name': _('To Email'),
+            'type': 'string',
+            'map_to': 'targets',
+        },
+        'from': {
+            'name': _('From Email'),
+            'type': 'string',
+            'map_to': 'from_addr',
+        },
+        'name': {
+            'name': _('From Name'),
+            'type': 'string',
+            'map_to': 'from_name',
+        },
+        'smtp_host': {
+            'name': _('SMTP Server'),
+            'type': 'string',
+        },
+        'mode': {
+            'name': _('Secure Mode'),
+            'type': 'choice:string',
+            'values': SECURE_MODES,
+            'default': SecureMailMode.STARTTLS,
+            'map_to': 'secure_mode',
+        },
+        'timeout': {
+            'name': _('Server Timeout'),
+            'type': 'int',
+            'default': 15,
+            'min': 5,
+        },
+    })
+
+    def __init__(self, timeout=15, smtp_host=None, from_name=None,
+                 from_addr=None, secure_mode=None, targets=None, **kwargs):
         """
         Initialize Email Object
+
+        The smtp_host and secure_mode can be automatically detected depending
+        on how the URL was built
         """
         super(NotifyEmail, self).__init__(**kwargs)
 
@@ -258,33 +338,49 @@ class NotifyEmail(NotifyBase):
 
         # Email SMTP Server Timeout
         try:
-            self.timeout = int(kwargs.get('timeout', self.connect_timeout))
+            self.timeout = int(timeout)
 
         except (ValueError, TypeError):
             self.timeout = self.connect_timeout
 
+        # Acquire targets
+        self.targets = parse_list(targets)
+
         # Now we want to construct the To and From email
         # addresses from the URL provided
-        self.from_name = kwargs.get('name', None)
-        self.from_addr = kwargs.get('from', None)
-        self.to_addr = kwargs.get('to', self.from_addr)
+        self.from_name = from_name
+        self.from_addr = from_addr
+
+        if not self.from_addr:
+            # detect our email address
+            self.from_addr = '{}@{}'.format(
+                re.split(r'[\s@]+', self.user)[0],
+                self.host,
+            )
 
         if not is_email(self.from_addr):
             # Parse Source domain based on from_addr
-            raise TypeError('Invalid ~From~ email format: %s' % self.from_addr)
+            msg = 'Invalid ~From~ email specified: {}'.format(self.from_addr)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
-        if not is_email(self.to_addr):
-            raise TypeError('Invalid ~To~ email format: %s' % self.to_addr)
+        # If our target email list is empty we want to add ourselves to it
+        if len(self.targets) == 0:
+            self.targets.append(self.from_addr)
 
         # Now detect the SMTP Server
-        self.smtp_host = kwargs.get('smtp_host', '')
+        self.smtp_host = \
+            smtp_host if isinstance(smtp_host, six.string_types) else ''
 
         # Now detect secure mode
-        self.secure_mode = kwargs.get('secure_mode', self.default_secure_mode)
-
+        self.secure_mode = self.default_secure_mode \
+            if not isinstance(secure_mode, six.string_types) \
+            else secure_mode.lower()
         if self.secure_mode not in SECURE_MODES:
-            raise TypeError(
-                'Invalid secure mode specified: %s.' % self.secure_mode)
+            msg = 'The secure mode specified ({}) is invalid.'\
+                  .format(secure_mode)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         # Apply any defaults based on certain known configurations
         self.NotifyEmailDefaults()
@@ -305,7 +401,7 @@ class NotifyEmail(NotifyBase):
 
         for i in range(len(EMAIL_TEMPLATES)):  # pragma: no branch
             self.logger.debug('Scanning %s against %s' % (
-                self.to_addr, EMAIL_TEMPLATES[i][0]
+                self.from_addr, EMAIL_TEMPLATES[i][0]
             ))
             match = EMAIL_TEMPLATES[i][1].match(self.from_addr)
             if match:
@@ -345,7 +441,7 @@ class NotifyEmail(NotifyBase):
                     elif WebBaseLogin.USERID not in login_type:
                         # user specified but login type
                         # not supported; switch it to email
-                        self.user = '%s@%s' % (self.user, self.host)
+                        self.user = '{}@{}'.format(self.user, self.host)
 
                 break
 
@@ -358,77 +454,94 @@ class NotifyEmail(NotifyBase):
         if not from_name:
             from_name = self.app_desc
 
-        self.logger.debug('Email From: %s <%s>' % (
-            self.from_addr, from_name))
-        self.logger.debug('Email To: %s' % (self.to_addr))
-        self.logger.debug('Login ID: %s' % (self.user))
-        self.logger.debug('Delivery: %s:%d' % (self.smtp_host, self.port))
+        # error tracking (used for function return)
+        has_error = False
 
-        # Prepare Email Message
-        if self.notify_format == NotifyFormat.HTML:
-            email = MIMEText(body, 'html')
+        # Create a copy of the targets list
+        emails = list(self.targets)
+        while len(emails):
+            # Get our email to notify
+            to_addr = emails.pop(0)
 
-        else:
-            email = MIMEText(body, 'plain')
+            if not is_email(to_addr):
+                self.logger.warning(
+                    'Invalid ~To~ email specified: {}'.format(to_addr))
+                has_error = True
+                continue
 
-        email['Subject'] = title
-        email['From'] = '%s <%s>' % (from_name, self.from_addr)
-        email['To'] = self.to_addr
-        email['Date'] = datetime.utcnow()\
-                                .strftime("%a, %d %b %Y %H:%M:%S +0000")
-        email['X-Application'] = self.app_id
+            self.logger.debug(
+                'Email From: {} <{}>'.format(from_name, self.from_addr))
+            self.logger.debug('Email To: {}'.format(to_addr))
+            self.logger.debug('Login ID: {}'.format(self.user))
+            self.logger.debug(
+                'Delivery: {}:{}'.format(self.smtp_host, self.port))
 
-        # bind the socket variable to the current namespace
-        socket = None
+            # Prepare Email Message
+            if self.notify_format == NotifyFormat.HTML:
+                email = MIMEText(body, 'html')
 
-        # Always call throttle before any remote server i/o is made
-        self.throttle()
+            else:
+                email = MIMEText(body, 'plain')
 
-        try:
-            self.logger.debug('Connecting to remote SMTP server...')
-            socket_func = smtplib.SMTP
-            if self.secure and self.secure_mode == SecureMailMode.SSL:
-                self.logger.debug('Securing connection with SSL...')
-                socket_func = smtplib.SMTP_SSL
+            email['Subject'] = title
+            email['From'] = '{} <{}>'.format(from_name, self.from_addr)
+            email['To'] = to_addr
+            email['Date'] = \
+                datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S +0000")
+            email['X-Application'] = self.app_id
 
-            socket = socket_func(
-                self.smtp_host,
-                self.port,
-                None,
-                timeout=self.timeout,
-            )
+            # bind the socket variable to the current namespace
+            socket = None
 
-            if self.secure and self.secure_mode == SecureMailMode.STARTTLS:
-                # Handle Secure Connections
-                self.logger.debug('Securing connection with STARTTLS...')
-                socket.starttls()
+            # Always call throttle before any remote server i/o is made
+            self.throttle()
 
-            if self.user and self.password:
-                # Apply Login credetials
-                self.logger.debug('Applying user credentials...')
-                socket.login(self.user, self.password)
+            try:
+                self.logger.debug('Connecting to remote SMTP server...')
+                socket_func = smtplib.SMTP
+                if self.secure and self.secure_mode == SecureMailMode.SSL:
+                    self.logger.debug('Securing connection with SSL...')
+                    socket_func = smtplib.SMTP_SSL
 
-            # Send the email
-            socket.sendmail(self.from_addr, self.to_addr, email.as_string())
+                socket = socket_func(
+                    self.smtp_host,
+                    self.port,
+                    None,
+                    timeout=self.timeout,
+                )
 
-            self.logger.info('Sent Email notification to "%s".' % (
-                self.to_addr,
-            ))
+                if self.secure and self.secure_mode == SecureMailMode.STARTTLS:
+                    # Handle Secure Connections
+                    self.logger.debug('Securing connection with STARTTLS...')
+                    socket.starttls()
 
-        except (SocketError, smtplib.SMTPException, RuntimeError) as e:
-            self.logger.warning(
-                'A Connection error occured sending Email '
-                'notification to %s.' % self.smtp_host)
-            self.logger.debug('Socket Exception: %s' % str(e))
-            # Return; we're done
-            return False
+                if self.user and self.password:
+                    # Apply Login credetials
+                    self.logger.debug('Applying user credentials...')
+                    socket.login(self.user, self.password)
 
-        finally:
-            # Gracefully terminate the connection with the server
-            if socket is not None:  # pragma: no branch
-                socket.quit()
+                # Send the email
+                socket.sendmail(
+                    self.from_addr, to_addr, email.as_string())
 
-        return True
+                self.logger.info(
+                    'Sent Email notification to "{}".'.format(to_addr))
+
+            except (SocketError, smtplib.SMTPException, RuntimeError) as e:
+                self.logger.warning(
+                    'A Connection error occured sending Email '
+                    'notification to {}.'.format(self.smtp_host))
+                self.logger.debug('Socket Exception: %s' % str(e))
+
+                # Mark our failure
+                has_error = True
+
+            finally:
+                # Gracefully terminate the connection with the server
+                if socket is not None:  # pragma: no branch
+                    socket.quit()
+
+        return not has_error
 
     def url(self):
         """
@@ -439,7 +552,6 @@ class NotifyEmail(NotifyBase):
         args = {
             'format': self.notify_format,
             'overflow': self.overflow_mode,
-            'to': self.to_addr,
             'from': self.from_addr,
             'name': self.from_name,
             'mode': self.secure_mode,
@@ -469,12 +581,19 @@ class NotifyEmail(NotifyBase):
         default_port = \
             self.default_secure_port if self.secure else self.default_port
 
-        return '{schema}://{auth}{hostname}{port}/?{args}'.format(
+        # a simple boolean check as to whether we display our target emails
+        # or not
+        has_targets = \
+            not (len(self.targets) == 1 and self.targets[0] == self.from_addr)
+
+        return '{schema}://{auth}{hostname}{port}/{targets}?{args}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
             hostname=NotifyEmail.quote(self.host, safe=''),
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
+            targets='' if has_targets else '/'.join(
+                [NotifyEmail.quote(x, safe='') for x in self.targets]),
             args=NotifyEmail.urlencode(args),
         )
 
@@ -491,48 +610,30 @@ class NotifyEmail(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
-        # The To: address is pre-determined if to= is not otherwise
-        # specified.
-        to_addr = ''
-
         # The From address is a must; either through the use of templates
         # from= entry and/or merging the user and hostname together, this
-        # must be calculated or parse_url will fail.  The to_addr will
-        # become the from_addr if it can't be calculated
+        # must be calculated or parse_url will fail.
         from_addr = ''
 
         # The server we connect to to send our mail to
         smtp_host = ''
 
+        # Get our potential email targets; if none our found we'll just
+        # add one to ourselves
+        results['targets'] = NotifyEmail.split_path(results['fullpath'])
+
         # Attempt to detect 'from' email address
         if 'from' in results['qsd'] and len(results['qsd']['from']):
             from_addr = NotifyEmail.unquote(results['qsd']['from'])
 
-        else:
-            # get 'To' email address
-            from_addr = '%s@%s' % (
-                re.split(
-                    r'[\s@]+', NotifyEmail.unquote(results['user']))[0],
-                results.get('host', '')
-            )
-            # Lets be clever and attempt to make the from
-            # address an email based on the to address
-            from_addr = '%s@%s' % (
-                re.split(r'[\s@]+', from_addr)[0],
-                re.split(r'[\s@]+', from_addr)[-1],
-            )
-
         # Attempt to detect 'to' email address
         if 'to' in results['qsd'] and len(results['qsd']['to']):
-            to_addr = NotifyEmail.unquote(results['qsd']['to']).strip()
-
-        if not to_addr:
-            # Send to ourselves if not otherwise specified to do so
-            to_addr = from_addr
+            results['targets'] += \
+                NotifyEmail.parse_list(results['qsd']['to'])
 
         if 'name' in results['qsd'] and len(results['qsd']['name']):
             # Extract from name to associate with from address
-            results['name'] = NotifyEmail.unquote(results['qsd']['name'])
+            results['from_name'] = NotifyEmail.unquote(results['qsd']['name'])
 
         if 'timeout' in results['qsd'] and len(results['qsd']['timeout']):
             # Extract the timeout to associate with smtp server
@@ -547,8 +648,7 @@ class NotifyEmail(NotifyBase):
             # Extract the secure mode to over-ride the default
             results['secure_mode'] = results['qsd']['mode'].lower()
 
-        results['to'] = to_addr
-        results['from'] = from_addr
+        results['from_addr'] = from_addr
         results['smtp_host'] = smtp_host
 
         return results

@@ -45,6 +45,7 @@ from json import dumps
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
 from ..utils import parse_list
+from ..AppriseLocale import gettext_lazy as _
 
 
 class NotifyIFTTT(NotifyBase):
@@ -91,6 +92,45 @@ class NotifyIFTTT(NotifyBase):
     notify_url = 'https://maker.ifttt.com/' \
                  'trigger/{event}/with/key/{webhook_id}'
 
+    # Define object templates
+    templates = (
+        '{schema}://{webhook_id}/{events}',
+    )
+
+    # Define our template tokens
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'webhook_id': {
+            'name': _('Webhook ID'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+        },
+        'events': {
+            'name': _('Events'),
+            'type': 'list:string',
+            'required': True,
+        },
+    })
+
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'to': {
+            'alias_of': 'events',
+        },
+    })
+
+    # Define our token control
+    template_kwargs = {
+        'add_tokens': {
+            'name': _('Add Tokens'),
+            'prefix': '+',
+        },
+        'del_tokens': {
+            'name': _('Remove Tokens'),
+            'prefix': '-',
+        },
+    }
+
     def __init__(self, webhook_id, events, add_tokens=None, del_tokens=None,
                  **kwargs):
         """
@@ -133,6 +173,10 @@ class NotifyIFTTT(NotifyBase):
         if del_tokens is not None:
             if isinstance(del_tokens, (list, tuple, set)):
                 self.del_tokens = del_tokens
+
+            elif isinstance(del_tokens, dict):
+                # Convert the dictionary into a list
+                self.del_tokens = set(del_tokens.keys())
 
             else:
                 msg = 'del_token must be a list; {} was provided'.format(

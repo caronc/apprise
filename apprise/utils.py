@@ -25,6 +25,8 @@
 
 import re
 import six
+import contextlib
+import os
 from os.path import expanduser
 
 try:
@@ -589,3 +591,29 @@ def is_exclusive_match(logic, data):
     # Return True if we matched against our logic (or simply none was
     # specified).
     return matched
+
+
+@contextlib.contextmanager
+def environ(*remove, **update):
+    """
+    Temporarily updates the ``os.environ`` dictionary in-place.
+
+    The ``os.environ`` dictionary is updated in-place so that the modification
+    is sure to work in all situations.
+
+    :param remove: Environment variable(s) to remove.
+    :param update: Dictionary of environment variables and values to
+                   add/update.
+    """
+
+    # Create a backup of our environment for restoration purposes
+    env_orig = os.environ.copy()
+
+    try:
+        os.environ.update(update)
+        [os.environ.pop(k, None) for k in remove]
+        yield
+
+    finally:
+        # Restore our snapshot
+        os.environ = env_orig.copy()

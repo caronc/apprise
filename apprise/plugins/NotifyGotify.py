@@ -37,6 +37,7 @@ from json import dumps
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
+from ..AppriseLocale import gettext_lazy as _
 
 
 # Priorities
@@ -75,6 +76,43 @@ class NotifyGotify(NotifyBase):
 
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_gotify'
+
+    # Define object templates
+    templates = (
+        '{schema}://{host}/{token}',
+        '{schema}://{host}:{port}/{token}',
+    )
+
+    # Define our template tokens
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'token': {
+            'name': _('Token'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+        },
+        'host': {
+            'name': _('Hostname'),
+            'type': 'string',
+            'required': True,
+        },
+        'port': {
+            'name': _('Port'),
+            'type': 'int',
+            'min': 1,
+            'max': 65535,
+        },
+    })
+
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'priority': {
+            'name': _('Priority'),
+            'type': 'choice:int',
+            'values': GOTIFY_PRIORITIES,
+            'default': GotifyPriority.NORMAL,
+        },
+    })
 
     def __init__(self, token, priority=None, **kwargs):
         """

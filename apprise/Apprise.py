@@ -28,7 +28,6 @@ import os
 import six
 from markdown import markdown
 from itertools import chain
-
 from .common import NotifyType
 from .common import NotifyFormat
 from .utils import is_exclusive_match
@@ -39,6 +38,7 @@ from .logger import logger
 
 from .AppriseAsset import AppriseAsset
 from .AppriseConfig import AppriseConfig
+from .AppriseLocale import AppriseLocale
 from .config.ConfigBase import ConfigBase
 from .plugins.NotifyBase import NotifyBase
 
@@ -74,47 +74,95 @@ class Apprise(object):
         if servers:
             self.add(servers)
 
+        # Initialize our locale object
+        self.locale = AppriseLocale()
+
     @staticmethod
     def instantiate(url, asset=None, tag=None, suppress_exceptions=True):
         """
         Returns the instance of a instantiated plugin based on the provided
         Server URL.  If the url fails to be parsed, then None is returned.
 
+        The specified url can be either a string (the URL itself) or a
+        dictionary containing all of the components needed to istantiate
+        the notification service.  If identifying a dictionary, at the bare
+        minimum, one must specify the schema.
+
+        An example of a url dictionary object might look like:
+          {
+            schema: 'mailto',
+            host: 'google.com',
+            user: 'myuser',
+            password: 'mypassword',
+          }
+
+        Alternatively the string is much easier to specify:
+          mailto://user:mypassword@google.com
+
+        The dictionary works well for people who are calling details() to
+        extract the components they need to build the URL manually.
         """
-        # swap hash (#) tag values with their html version
-        _url = url.replace('/#', '/%23')
 
-        # Attempt to acquire the schema at the very least to allow our plugins
-        # to determine if they can make a better interpretation of a URL
-        # geared for them
-        schema = GET_SCHEMA_RE.match(_url)
-        if schema is None:
-            logger.error('Unparseable schema:// found in URL {}.'.format(url))
-            return None
+        # Initialize our result set
+        results = None
 
-        # Ensure our schema is always in lower case
-        schema = schema.group('schema').lower()
+        if isinstance(url, six.string_types):
+            # swap hash (#) tag values with their html version
+            _url = url.replace('/#', '/%23')
 
-        # Some basic validation
-        if schema not in plugins.SCHEMA_MAP:
-            logger.error('Unsupported schema {}.'.format(schema))
-            return None
+            # Attempt to acquire the schema at the very least to allow our
+            # plugins to determine if they can make a better interpretation of
+            # a URL geared for them
+            schema = GET_SCHEMA_RE.match(_url)
+            if schema is None:
+                logger.error(
+                    'Unparseable schema:// found in URL {}.'.format(url))
+                return None
 
-        # Parse our url details of the server object as dictionary containing
-        # all of the information parsed from our URL
-        results = plugins.SCHEMA_MAP[schema].parse_url(_url)
+            # Ensure our schema is always in lower case
+            schema = schema.group('schema').lower()
 
-        if results is None:
-            # Failed to parse the server URL
-            logger.error('Unparseable URL {}.'.format(url))
+            # Some basic validation
+            if schema not in plugins.SCHEMA_MAP:
+                logger.error('Unsupported schema {}.'.format(schema))
+                return None
+
+            # Parse our url details of the server object as dictionary
+            # containing all of the information parsed from our URL
+            results = plugins.SCHEMA_MAP[schema].parse_url(_url)
+
+            if results is None:
+                # Failed to parse the server URL
+                logger.error('Unparseable URL {}.'.format(url))
+                return None
+
+            logger.trace('URL {} unpacked as:{}{}'.format(
+                url, os.linesep, os.linesep.join(
+                    ['{}="{}"'.format(k, v) for k, v in results.items()])))
+
+        elif isinstance(url, dict):
+            # We already have our result set
+            results = url
+
+            if results.get('schema') not in plugins.SCHEMA_MAP:
+                # schema is a mandatory dictionary item as it is the only way
+                # we can index into our loaded plugins
+                logger.error('Dictionary does not include a "schema" entry.')
+                logger.trace('Invalid dictionary unpacked as:{}{}'.format(
+                    os.linesep, os.linesep.join(
+                        ['{}="{}"'.format(k, v) for k, v in results.items()])))
+                return None
+
+            logger.trace('Dictionary unpacked as:{}{}'.format(
+                os.linesep, os.linesep.join(
+                    ['{}="{}"'.format(k, v) for k, v in results.items()])))
+
+        else:
+            logger.error('Invalid URL specified: {}'.format(url))
             return None
 
         # Build a list of tags to associate with the newly added notifications
         results['tag'] = set(parse_list(tag))
-
-        logger.trace('URL {} unpacked as:{}{}'.format(
-            url, os.linesep, os.linesep.join(
-                ['{}="{}"'.format(k, v) for k, v in results.items()])))
 
         # Prepare our Asset Object
         results['asset'] = \
@@ -166,6 +214,10 @@ class Apprise(object):
             if len(servers) == 0:
                 return False
 
+        elif isinstance(servers, dict):
+            # no problem, we support kwargs, convert it to a list
+            servers = [servers]
+
         elif isinstance(servers, (ConfigBase, NotifyBase, AppriseConfig)):
             # Go ahead and just add our plugin into our list
             self.servers.append(servers)
@@ -184,7 +236,7 @@ class Apprise(object):
                 self.servers.append(_server)
                 continue
 
-            elif not isinstance(_server, six.string_types):
+            elif not isinstance(_server, (six.string_types, dict)):
                 logger.error(
                     "An invalid notification (type={}) was specified.".format(
                         type(_server)))
@@ -195,10 +247,9 @@ class Apprise(object):
             # returns None if it fails
             instance = Apprise.instantiate(_server, asset=asset, tag=tag)
             if not isinstance(instance, NotifyBase):
+                # No logging is requird as instantiate() handles failure
+                # and/or success reasons for us
                 return_status = False
-                logger.error(
-                    "Failed to load notification url: {}".format(_server),
-                )
                 continue
 
             # Add our initialized plugin to our server listings
@@ -335,7 +386,7 @@ class Apprise(object):
 
         return status
 
-    def details(self):
+    def details(self, lang=None):
         """
         Returns the details associated with the Apprise object
 
@@ -352,13 +403,7 @@ class Apprise(object):
         }
 
         # to add it's mapping to our hash table
-        for entry in sorted(dir(plugins)):
-
-            # Get our plugin
-            plugin = getattr(plugins, entry)
-            if not hasattr(plugin, 'app_id'):  # pragma: no branch
-                # Filter out non-notification modules
-                continue
+        for plugin in set(plugins.SCHEMA_MAP.values()):
 
             # Standard protocol(s) should be None or a tuple
             protocols = getattr(plugin, 'protocol', None)
@@ -370,6 +415,14 @@ class Apprise(object):
             if isinstance(secure_protocols, six.string_types):
                 secure_protocols = (secure_protocols, )
 
+            if not lang:
+                # Simply return our results
+                details = plugins.details(plugin)
+            else:
+                # Emulate the specified language when returning our results
+                with self.locale.lang_at(lang):
+                    details = plugins.details(plugin)
+
             # Build our response object
             response['schemas'].append({
                 'service_name': getattr(plugin, 'service_name', None),
@@ -377,6 +430,7 @@ class Apprise(object):
                 'setup_url': getattr(plugin, 'setup_url', None),
                 'protocols': protocols,
                 'secure_protocols': secure_protocols,
+                'details': details,
             })
 
         return response

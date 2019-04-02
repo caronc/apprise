@@ -38,6 +38,7 @@ from .NotifyBase import NotifyBase
 from ..utils import parse_bool
 from ..common import NotifyType
 from .. import __version__ as VERSION
+from ..AppriseLocale import gettext_lazy as _
 
 
 class NotifyEmby(NotifyBase):
@@ -71,6 +72,46 @@ class NotifyEmby(NotifyBase):
     # The Emby message timeout; basically it is how long should our message be
     # displayed for.  The value is in milli-seconds
     emby_message_timeout_ms = 60000
+
+    # Define object templates
+    templates = (
+        '{schema}://{host}',
+        '{schema}://{host}:{port}',
+        '{schema}://{user}:{password}@{host}',
+        '{schema}://{user}:{password}@{host}:{port}',
+    )
+
+    # Define our template tokens
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'host': {
+            'name': _('Hostname'),
+            'type': 'string',
+            'required': True,
+        },
+        'port': {
+            'name': _('Port'),
+            'type': 'int',
+            'min': 1,
+            'max': 65535,
+        },
+        'user': {
+            'name': _('Username'),
+            'type': 'string',
+        },
+        'password': {
+            'name': _('Password'),
+            'type': 'string',
+            'private': True,
+        },
+    })
+
+    template_args = dict(NotifyBase.template_args, **{
+        'modal': {
+            'name': _('Modal'),
+            'type': 'bool',
+            'default': False,
+        },
+    })
 
     def __init__(self, modal=False, **kwargs):
         """

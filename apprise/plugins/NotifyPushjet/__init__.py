@@ -28,6 +28,7 @@ from . import pushjet
 
 from ..NotifyBase import NotifyBase
 from ...common import NotifyType
+from ...AppriseLocale import gettext_lazy as _
 
 PUBLIC_KEY_RE = re.compile(
     r'^[a-z0-9]{4}-[a-z0-9]{6}-[a-z0-9]{12}-[a-z0-9]{5}-[a-z0-9]{9}$', re.I)
@@ -55,6 +56,33 @@ class NotifyPushjet(NotifyBase):
     # Disable throttle rate for Pushjet requests since they are normally
     # local anyway (the remote/online service is no more)
     request_rate_per_sec = 0
+
+    # Define object templates
+    templates = (
+        '{schema}://{secret_key}@{host}',
+        '{schema}://{secret_key}@{host}:{port}',
+    )
+
+    # Define our tokens
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'host': {
+            'name': _('Hostname'),
+            'type': 'string',
+            'required': True,
+        },
+        'port': {
+            'name': _('Port'),
+            'type': 'int',
+            'min': 1,
+            'max': 65535,
+        },
+        'secret_key': {
+            'name': _('Secret Key'),
+            'type': 'string',
+            'required': True,
+            'private': True,
+        },
+    })
 
     def __init__(self, secret_key, **kwargs):
         """

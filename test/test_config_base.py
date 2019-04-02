@@ -358,14 +358,9 @@ urls:
     - tag: my-custom-tag, my-other-tag
 
   # How to stack multiple entries:
-  - mailto://:
-    - user: jeff
-      pass: 123abc
-      from: jeff@yahoo.ca
-
-    - user: jack
-      pass: pass123
-      from: jack@hotmail.com
+  - mailto://user:123abc@yahoo.ca:
+    - to: test@examle.com
+    - to: test2@examle.com
 
       # This is an illegal entry; the schema can not be changed
       schema: json

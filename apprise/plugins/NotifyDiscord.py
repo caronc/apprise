@@ -49,6 +49,7 @@ from ..common import NotifyImageSize
 from ..common import NotifyFormat
 from ..common import NotifyType
 from ..utils import parse_bool
+from ..AppriseLocale import gettext_lazy as _
 
 
 class NotifyDiscord(NotifyBase):
@@ -77,8 +78,66 @@ class NotifyDiscord(NotifyBase):
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 2000
 
+    # Define object templates
+    templates = (
+        '{schema}://{webhook_id}/{webhook_token}',
+        '{schema}://{botname}@{webhook_id}/{webhook_token}',
+    )
+
+    # Define our template tokens
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'botname': {
+            'name': _('Bot Name'),
+            'type': 'string',
+            'map_to': 'user',
+        },
+        'webhook_id': {
+            'name': _('Webhook ID'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+        },
+        'webhook_token': {
+            'name': _('Webhook Token'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+        },
+    })
+
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'tts': {
+            'name': _('Text To Speech'),
+            'type': 'bool',
+            'default': False,
+        },
+        'avatar': {
+            'name': _('Avatar Image'),
+            'type': 'bool',
+            'default': True,
+        },
+        'footer': {
+            'name': _('Display Footer'),
+            'type': 'bool',
+            'default': False,
+        },
+        'footer_logo': {
+            'name': _('Footer Logo'),
+            'type': 'bool',
+            'default': True,
+        },
+        'image': {
+            'name': _('Include Image'),
+            'type': 'bool',
+            'default': False,
+            'map_to': 'include_image',
+        },
+    })
+
     def __init__(self, webhook_id, webhook_token, tts=False, avatar=True,
-                 footer=False, footer_logo=True, include_image=True, **kwargs):
+                 footer=False, footer_logo=True, include_image=False,
+                 **kwargs):
         """
         Initialize Discord Object
 

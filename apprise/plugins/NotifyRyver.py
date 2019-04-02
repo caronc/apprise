@@ -40,6 +40,7 @@ from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
 from ..common import NotifyType
 from ..utils import parse_bool
+from ..AppriseLocale import gettext_lazy as _
 
 # Token required as part of the API request
 VALIDATE_TOKEN = re.compile(r'[A-Za-z0-9]{15}')
@@ -85,6 +86,47 @@ class NotifyRyver(NotifyBase):
 
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 1000
+
+    # Define object templates
+    templates = (
+        '{schema}://{organization}/{token}',
+        '{schema}://{user}@{organization}/{token}',
+    )
+
+    # Define our template tokens
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'organization': {
+            'name': _('Organization'),
+            'type': 'string',
+            'required': True,
+        },
+        'token': {
+            'name': _('Token'),
+            'type': 'string',
+            'required': True,
+            'private': True,
+        },
+        'user': {
+            'name': _('Bot Name'),
+            'type': 'string',
+        },
+    })
+
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'mode': {
+            'name': _('Webhook Mode'),
+            'type': 'choice:string',
+            'values': RYVER_WEBHOOK_MODES,
+            'default': RyverWebhookMode.RYVER,
+        },
+        'image': {
+            'name': _('Include Image'),
+            'type': 'bool',
+            'default': True,
+            'map_to': 'include_image',
+        },
+    })
 
     def __init__(self, organization, token, mode=RyverWebhookMode.RYVER,
                  include_image=True, **kwargs):

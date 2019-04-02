@@ -30,6 +30,7 @@ from .NotifyBase import NotifyBase
 from ..common import NotifyType
 from ..common import NotifyImageSize
 from ..utils import parse_bool
+from ..AppriseLocale import gettext_lazy as _
 
 
 class NotifyXBMC(NotifyBase):
@@ -79,6 +80,54 @@ class NotifyXBMC(NotifyBase):
 
     # KODI default protocol version (v6)
     kodi_remote_protocol = 6
+
+    # Define object templates
+    templates = (
+        '{schema}://{host}',
+        '{schema}://{host}:{port}',
+        '{schema}://{user}:{password}@{host}',
+        '{schema}://{user}:{password}@{host}:{port}',
+    )
+
+    # Define our tokens
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'host': {
+            'name': _('Hostname'),
+            'type': 'string',
+            'required': True,
+        },
+        'port': {
+            'name': _('Port'),
+            'type': 'int',
+            'min': 1,
+            'max': 65535,
+        },
+        'user': {
+            'name': _('Username'),
+            'type': 'string',
+        },
+        'password': {
+            'name': _('Password'),
+            'type': 'string',
+            'private': True,
+        },
+    })
+
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'duration': {
+            'name': _('Duration'),
+            'type': 'int',
+            'min': 1,
+            'default': 12,
+        },
+        'image': {
+            'name': _('Include Image'),
+            'type': 'bool',
+            'default': True,
+            'map_to': 'include_image',
+        },
+    })
 
     def __init__(self, include_image=True, duration=None, **kwargs):
         """

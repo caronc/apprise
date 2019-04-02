@@ -47,6 +47,7 @@ from ..common import NotifyFormat
 from ..common import NotifyImageSize
 from ..utils import parse_list
 from ..utils import parse_bool
+from ..AppriseLocale import gettext_lazy as _
 
 
 # Extend HTTP Error Messages
@@ -91,6 +92,60 @@ class NotifyFlock(NotifyBase):
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_72
+
+    # Define object templates
+    templates = (
+        '{schema}://{token}',
+        '{schema}://{user}@{token}',
+        '{schema}://{user}@{token}/{targets}',
+        '{schema}://{token}/{targets}',
+    )
+
+    # Define our template tokens
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'token': {
+            'name': _('Access Key'),
+            'type': 'string',
+            'regex': (r'[a-z0-9-]{24}', 'i'),
+            'private': True,
+            'required': True,
+        },
+        'user': {
+            'name': _('Bot Name'),
+            'type': 'string',
+        },
+        'to_user': {
+            'name': _('To User ID'),
+            'type': 'string',
+            'prefix': '@',
+            'regex': (r'[A-Z0-9_]{12}', 'i'),
+            'map_to': 'targets',
+        },
+        'to_channel': {
+            'name': _('To Channel ID'),
+            'type': 'string',
+            'prefix': '#',
+            'regex': (r'[A-Z0-9_]{12}', 'i'),
+            'map_to': 'targets',
+        },
+        'targets': {
+            'name': _('Targets'),
+            'type': 'list:string',
+        },
+    })
+
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'image': {
+            'name': _('Include Image'),
+            'type': 'bool',
+            'default': True,
+            'map_to': 'include_image',
+        },
+        'to': {
+            'alias_of': 'targets',
+        },
+    })
 
     def __init__(self, token, targets=None, include_image=True, **kwargs):
         """

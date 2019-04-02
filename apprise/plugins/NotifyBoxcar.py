@@ -41,6 +41,7 @@ from .NotifyBase import NotifyBase
 from ..utils import parse_bool
 from ..common import NotifyType
 from ..common import NotifyImageSize
+from ..AppriseLocale import gettext_lazy as _
 
 # Default to sending to all devices if nothing is specified
 DEFAULT_TAG = '@all'
@@ -91,6 +92,62 @@ class NotifyBoxcar(NotifyBase):
 
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 10000
+
+    # Define object templates
+    templates = (
+        '{schema}://{access_key}/{secret_key}/',
+        '{schema}://{access_key}/{secret_key}/{targets}',
+    )
+
+    # Define our template tokens
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'access_key': {
+            'name': _('Access Key'),
+            'type': 'string',
+            'regex': (r'[A-Z0-9_-]{64}', 'i'),
+            'private': True,
+            'required': True,
+            'map_to': 'access',
+        },
+        'secret_key': {
+            'name': _('Secret Key'),
+            'type': 'string',
+            'regex': (r'[A-Z0-9_-]{64}', 'i'),
+            'private': True,
+            'required': True,
+            'map_to': 'secret',
+        },
+        'target_tag': {
+            'name': _('Target Tag ID'),
+            'type': 'string',
+            'prefix': '@',
+            'regex': (r'[A-Z0-9]{1,63}', 'i'),
+            'map_to': 'targets',
+        },
+        'target_device': {
+            'name': _('Target Device ID'),
+            'type': 'string',
+            'regex': (r'[A-Z0-9]{64}', 'i'),
+            'map_to': 'targets',
+        },
+        'targets': {
+            'name': _('Targets'),
+            'type': 'list:string',
+        },
+    })
+
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'image': {
+            'name': _('Include Image'),
+            'type': 'bool',
+            'default': True,
+            'map_to': 'include_image',
+        },
+        'to': {
+            'alias_of': 'targets',
+        },
+    })
 
     def __init__(self, access, secret, targets=None, include_image=True,
                  **kwargs):

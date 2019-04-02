@@ -43,7 +43,7 @@ def test_notify_gitter_plugin_general(mock_post, mock_get):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
+    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Generate a valid token (40 characters)
     token = 'a' * 40

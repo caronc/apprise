@@ -27,6 +27,7 @@ from . import tweepy
 from ..NotifyBase import NotifyBase
 from ...common import NotifyType
 from ...utils import parse_list
+from ...AppriseLocale import gettext_lazy as _
 
 
 class NotifyTwitter(NotifyBase):
@@ -54,6 +55,54 @@ class NotifyTwitter(NotifyBase):
 
     # Twitter does have titles when creating a message
     title_maxlen = 0
+
+    templates = (
+        '{schema}://{user}@{ckey}{csecret}/{akey}/{asecret}',
+    )
+
+    # Define our template tokens
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'ckey': {
+            'name': _('Consumer Key'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+        },
+        'csecret': {
+            'name': _('Consumer Secret'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+        },
+        'akey': {
+            'name': _('Access Key'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+        },
+        'asecret': {
+            'name': _('Access Secret'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+        },
+        'user': {
+            'name': _('User'),
+            'type': 'string',
+            'map_to': 'targets',
+        },
+        'targets': {
+            'name': _('Targets'),
+            'type': 'list:string',
+        },
+    })
+
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'to': {
+            'alias_of': 'targets',
+        },
+    })
 
     def __init__(self, ckey, csecret, akey, asecret, targets=None, **kwargs):
         """

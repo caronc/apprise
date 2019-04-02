@@ -30,6 +30,7 @@ import requests
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
 from ..utils import parse_list
+from ..AppriseLocale import gettext_lazy as _
 
 # Flag used as a placeholder to sending to all devices
 PUSHOVER_SEND_TO_ALL = 'ALL_DEVICES'
@@ -38,7 +39,7 @@ PUSHOVER_SEND_TO_ALL = 'ALL_DEVICES'
 VALIDATE_TOKEN = re.compile(r'^[a-z0-9]{30}$', re.I)
 
 # Used to detect a User and/or Group
-VALIDATE_USERGROUP = re.compile(r'^[a-z0-9]{30}$', re.I)
+VALIDATE_USER_KEY = re.compile(r'^[a-z0-9]{30}$', re.I)
 
 # Used to detect a User and/or Group
 VALIDATE_DEVICE = re.compile(r'^[a-z0-9_]{1,25}$', re.I)
@@ -144,6 +145,60 @@ class NotifyPushover(NotifyBase):
     # Default Pushover sound
     default_pushover_sound = PushoverSound.PUSHOVER
 
+    # Define object templates
+    templates = (
+        '{schema}://{user_key}@{token}',
+        '{schema}://{user_key}@{token}/{targets}',
+    )
+
+    # Define our template tokens
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'user_key': {
+            'name': _('User Key'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+            'regex': (r'[a-z0-9]{30}', 'i'),
+            'map_to': 'user',
+        },
+        'token': {
+            'name': _('Access Token'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+            'regex': (r'[a-z0-9]{30}', 'i'),
+        },
+        'target_device': {
+            'name': _('Target Device'),
+            'type': 'string',
+            'regex': (r'[a-z0-9_]{1,25}', 'i'),
+            'map_to': 'targets',
+        },
+        'targets': {
+            'name': _('Targets'),
+            'type': 'list:string',
+        },
+    })
+
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'priority': {
+            'name': _('Priority'),
+            'type': 'choice:int',
+            'values': PUSHOVER_PRIORITIES,
+            'default': PushoverPriority.NORMAL,
+        },
+        'sound': {
+            'name': _('Sound'),
+            'type': 'string',
+            'regex': (r'[a-z]{1,12}', 'i'),
+            'default': PushoverSound.PUSHOVER,
+        },
+        'to': {
+            'alias_of': 'targets',
+        },
+    })
+
     def __init__(self, token, targets=None, priority=None, sound=None,
                  **kwargs):
         """
@@ -186,12 +241,12 @@ class NotifyPushover(NotifyBase):
             self.priority = priority
 
         if not self.user:
-            msg = 'No user was specified.'
+            msg = 'No user key was specified.'
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        if not VALIDATE_USERGROUP.match(self.user):
-            msg = 'The user/group specified (%s) is invalid.' % self.user
+        if not VALIDATE_USER_KEY.match(self.user):
+            msg = 'The user key specified (%s) is invalid.' % self.user
             self.logger.warning(msg)
             raise TypeError(msg)
 

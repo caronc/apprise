@@ -63,6 +63,7 @@ from ..common import NotifyImageSize
 from ..common import NotifyFormat
 from ..utils import parse_bool
 from ..utils import parse_list
+from ..AppriseLocale import gettext_lazy as _
 
 TELEGRAM_IMAGE_XY = NotifyImageSize.XY_256
 
@@ -107,8 +108,55 @@ class NotifyTelegram(NotifyBase):
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 4096
 
-    def __init__(self, bot_token, targets, detect_bot_owner=True,
-                 include_image=True, **kwargs):
+    # Define object templates
+    templates = (
+        '{schema}://{bot_token}',
+        '{schema}://{bot_token}/{targets}',
+    )
+
+    # Define our template tokens
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'bot_token': {
+            'name': _('Bot Token'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+            'regex': (r'(bot)?[0-9]+:[a-z0-9_-]+', 'i'),
+        },
+        'target_user': {
+            'name': _('Target Chat ID'),
+            'type': 'string',
+            'map_to': 'targets',
+            'map_to': 'targets',
+            'regex': (r'((-?[0-9]{1,32})|([a-z_-][a-z0-9_-]+))', 'i'),
+        },
+        'targets': {
+            'name': _('Targets'),
+            'type': 'list:string',
+        },
+    })
+
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'image': {
+            'name': _('Include Image'),
+            'type': 'bool',
+            'default': False,
+            'map_to': 'include_image',
+        },
+        'detect': {
+            'name': _('Detect Bot Owner'),
+            'type': 'bool',
+            'default': True,
+            'map_to': 'detect_owner',
+        },
+        'to': {
+            'alias_of': 'targets',
+        },
+    })
+
+    def __init__(self, bot_token, targets, detect_owner=True,
+                 include_image=False, **kwargs):
         """
         Initialize Telegram Object
         """
@@ -135,11 +183,13 @@ class NotifyTelegram(NotifyBase):
         # Parse our list
         self.targets = parse_list(targets)
 
+        self.detect_owner = detect_owner
+
         if self.user:
             # Treat this as a channel too
             self.targets.append(self.user)
 
-        if len(self.targets) == 0 and detect_bot_owner:
+        if len(self.targets) == 0 and self.detect_owner:
             _id = self.detect_bot_owner()
             if _id:
                 # Store our id
@@ -502,6 +552,7 @@ class NotifyTelegram(NotifyBase):
             'overflow': self.overflow_mode,
             'image': self.include_image,
             'verify': 'yes' if self.verify_certificate else 'no',
+            'detect': 'yes' if self.detect_owner else 'no',
         }
 
         # No need to check the user token because the user automatically gets
@@ -588,5 +639,9 @@ class NotifyTelegram(NotifyBase):
         # Include images with our message
         results['include_image'] = \
             parse_bool(results['qsd'].get('image', False))
+
+        # Include images with our message
+        results['detect_owner'] = \
+            parse_bool(results['qsd'].get('detect', True))
 
         return results

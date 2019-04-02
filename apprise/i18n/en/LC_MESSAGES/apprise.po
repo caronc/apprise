@@ -1,0 +1,293 @@
+# English translations for apprise.
+# Copyright (C) 2019 Chris Caron
+# This file is distributed under the same license as the apprise project.
+# Chris Caron <lead2gold@gmail.com>, 2019.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: apprise 0.7.6\n"
+"Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
+"POT-Creation-Date: 2019-05-28 16:56-0400\n"
+"PO-Revision-Date: 2019-05-24 20:00-0400\n"
+"Last-Translator: Chris Caron <lead2gold@gmail.com>\n"
+"Language: en\n"
+"Language-Team: en <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1)\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.6.0\n"
+
+msgid "API Key"
+msgstr ""
+
+msgid "Access Key"
+msgstr ""
+
+msgid "Access Key ID"
+msgstr ""
+
+msgid "Access Secret"
+msgstr ""
+
+msgid "Access Token"
+msgstr ""
+
+msgid "Account SID"
+msgstr ""
+
+msgid "Add Tokens"
+msgstr ""
+
+msgid "Application Key"
+msgstr ""
+
+msgid "Application Secret"
+msgstr ""
+
+msgid "Auth Token"
+msgstr ""
+
+msgid "Authorization Token"
+msgstr ""
+
+msgid "Avatar Image"
+msgstr ""
+
+msgid "Bot Name"
+msgstr ""
+
+msgid "Bot Token"
+msgstr ""
+
+msgid "Channels"
+msgstr ""
+
+msgid "Consumer Key"
+msgstr ""
+
+msgid "Consumer Secret"
+msgstr ""
+
+msgid "Detect Bot Owner"
+msgstr ""
+
+msgid "Device ID"
+msgstr ""
+
+msgid "Display Footer"
+msgstr ""
+
+msgid "Domain"
+msgstr ""
+
+msgid "Duration"
+msgstr ""
+
+msgid "Events"
+msgstr ""
+
+msgid "Footer Logo"
+msgstr ""
+
+msgid "From Email"
+msgstr ""
+
+msgid "From Name"
+msgstr ""
+
+msgid "From Phone No"
+msgstr ""
+
+msgid "Group"
+msgstr ""
+
+msgid "HTTP Header"
+msgstr ""
+
+msgid "Hostname"
+msgstr ""
+
+msgid "Include Image"
+msgstr ""
+
+msgid "Modal"
+msgstr ""
+
+msgid "Notify Format"
+msgstr ""
+
+msgid "Organization"
+msgstr ""
+
+msgid "Overflow Mode"
+msgstr ""
+
+msgid "Password"
+msgstr ""
+
+msgid "Port"
+msgstr ""
+
+msgid "Priority"
+msgstr ""
+
+msgid "Provider Key"
+msgstr ""
+
+msgid "Region"
+msgstr ""
+
+msgid "Region Name"
+msgstr ""
+
+msgid "Remove Tokens"
+msgstr ""
+
+msgid "Rooms"
+msgstr ""
+
+msgid "SMTP Server"
+msgstr ""
+
+msgid "Schema"
+msgstr ""
+
+msgid "Secret Access Key"
+msgstr ""
+
+msgid "Secret Key"
+msgstr ""
+
+msgid "Secure Mode"
+msgstr ""
+
+msgid "Server Timeout"
+msgstr ""
+
+msgid "Sound"
+msgstr ""
+
+msgid "Source JID"
+msgstr ""
+
+msgid "Target Channel"
+msgstr ""
+
+msgid "Target Chat ID"
+msgstr ""
+
+msgid "Target Device"
+msgstr ""
+
+msgid "Target Device ID"
+msgstr ""
+
+msgid "Target Email"
+msgstr ""
+
+msgid "Target Emails"
+msgstr ""
+
+msgid "Target Encoded ID"
+msgstr ""
+
+msgid "Target JID"
+msgstr ""
+
+msgid "Target Phone No"
+msgstr ""
+
+msgid "Target Room Alias"
+msgstr ""
+
+msgid "Target Room ID"
+msgstr ""
+
+msgid "Target Short Code"
+msgstr ""
+
+msgid "Target Tag ID"
+msgstr ""
+
+msgid "Target Topic"
+msgstr ""
+
+msgid "Target User"
+msgstr ""
+
+msgid "Targets"
+msgstr ""
+
+msgid "Text To Speech"
+msgstr ""
+
+msgid "To Channel ID"
+msgstr ""
+
+msgid "To Email"
+msgstr ""
+
+msgid "To User ID"
+msgstr ""
+
+msgid "Token"
+msgstr ""
+
+msgid "Token A"
+msgstr ""
+
+msgid "Token B"
+msgstr ""
+
+msgid "Token C"
+msgstr ""
+
+msgid "Urgency"
+msgstr ""
+
+msgid "Use Avatar"
+msgstr ""
+
+msgid "User"
+msgstr ""
+
+msgid "User Key"
+msgstr ""
+
+msgid "User Name"
+msgstr ""
+
+msgid "Username"
+msgstr ""
+
+msgid "Verify SSL"
+msgstr ""
+
+msgid "Version"
+msgstr ""
+
+msgid "Webhook"
+msgstr ""
+
+msgid "Webhook ID"
+msgstr ""
+
+msgid "Webhook Mode"
+msgstr ""
+
+msgid "Webhook Token"
+msgstr ""
+
+msgid "X-Axis"
+msgstr ""
+
+msgid "XEP"
+msgstr ""
+
+msgid "Y-Axis"
+msgstr ""
+
+#~ msgid "Access Key Secret"
+#~ msgstr ""
+

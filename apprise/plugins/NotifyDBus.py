@@ -31,6 +31,7 @@ from ..common import NotifyImageSize
 from ..common import NotifyType
 from ..utils import GET_SCHEMA_RE
 from ..utils import parse_bool
+from ..AppriseLocale import gettext_lazy as _
 
 # Default our global support flag
 NOTIFY_DBUS_SUPPORT_ENABLED = False
@@ -170,6 +171,39 @@ class NotifyDBus(NotifyBase):
     # outside of what is defined in test/test_glib_plugin.py, please
     # let me know! :)
     _enabled = NOTIFY_DBUS_SUPPORT_ENABLED
+
+    # Define object templates
+    templates = (
+        '{schema}://_/',
+    )
+
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'urgency': {
+            'name': _('Urgency'),
+            'type': 'choice:int',
+            'values': DBUS_URGENCIES,
+            'default': DBusUrgency.NORMAL,
+        },
+        'x': {
+            'name': _('X-Axis'),
+            'type': 'int',
+            'min': 0,
+            'map_to': 'x_axis',
+        },
+        'y': {
+            'name': _('Y-Axis'),
+            'type': 'int',
+            'min': 0,
+            'map_to': 'y_axis',
+        },
+        'image': {
+            'name': _('Include Image'),
+            'type': 'bool',
+            'default': True,
+            'map_to': 'include_image',
+        },
+    })
 
     def __init__(self, urgency=None, x_axis=None, y_axis=None,
                  include_image=True, **kwargs):

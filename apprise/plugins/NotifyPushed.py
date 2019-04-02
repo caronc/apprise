@@ -31,6 +31,7 @@ from itertools import chain
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
 from ..utils import parse_list
+from ..AppriseLocale import gettext_lazy as _
 
 # Used to detect and parse channels
 IS_CHANNEL = re.compile(r'^#(?P<name>[A-Za-z0-9]+)$')
@@ -66,6 +67,51 @@ class NotifyPushed(NotifyBase):
 
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 140
+
+    # Define object templates
+    templates = (
+        '{schema}://{app_key}/{app_secret}',
+        '{schema}://{app_key}/{app_secret}@{targets}',
+    )
+
+    # Define our template tokens
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'app_key': {
+            'name': _('Application Key'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+        },
+        'app_secret': {
+            'name': _('Application Secret'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+        },
+        'target_user': {
+            'name': _('Target User'),
+            'prefix': '@',
+            'type': 'string',
+            'map_to': 'targets',
+        },
+        'target_channel': {
+            'name': _('Target Channel'),
+            'type': 'string',
+            'prefix': '#',
+            'map_to': 'targets',
+        },
+        'targets': {
+            'name': _('Targets'),
+            'type': 'list:string',
+        },
+    })
+
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'to': {
+            'alias_of': 'targets',
+        },
+    })
 
     def __init__(self, app_key, app_secret, targets=None, **kwargs):
         """

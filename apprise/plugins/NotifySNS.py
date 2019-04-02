@@ -35,6 +35,7 @@ from itertools import chain
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
 from ..utils import parse_list
+from ..AppriseLocale import gettext_lazy as _
 
 # Some Phone Number Detection
 IS_PHONE_NO = re.compile(r'^\+?(?P<phone>[0-9\s)(+-]+)\s*$')
@@ -91,6 +92,58 @@ class NotifySNS(NotifyBase):
     # A title can not be used for SMS Messages.  Setting this to zero will
     # cause any title (if defined) to get placed into the message body.
     title_maxlen = 0
+
+    # Define object templates
+    templates = (
+        '{schema}://{access_key_id}/{secret_access_key}{region}/{targets}',
+    )
+
+    # Define our template tokens
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'access_key_id': {
+            'name': _('Access Key ID'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+        },
+        'secret_access_key': {
+            'name': _('Secret Access Key'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+        },
+        'region': {
+            'name': _('Region'),
+            'type': 'string',
+            'required': True,
+            'regex': (r'[a-z]{2}-[a-z]+-[0-9]+', 'i'),
+            'map_to': 'region_name',
+        },
+        'target_phone_no': {
+            'name': _('Target Phone No'),
+            'type': 'string',
+            'map_to': 'targets',
+            'regex': (r'[0-9\s)(+-]+', 'i')
+        },
+        'target_topic': {
+            'name': _('Target Topic'),
+            'type': 'string',
+            'map_to': 'targets',
+            'prefix': '#',
+            'regex': (r'[A-Za-z0-9_-]+', 'i'),
+        },
+        'targets': {
+            'name': _('Targets'),
+            'type': 'list:string',
+        },
+    })
+
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'to': {
+            'alias_of': 'targets',
+        },
+    })
 
     def __init__(self, access_key_id, secret_access_key, region_name,
                  targets=None, **kwargs):

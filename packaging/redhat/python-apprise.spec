@@ -95,8 +95,10 @@ Requires: python-six
 Requires: python-markdown
 %if 0%{?rhel} && 0%{?rhel} <= 7
 BuildRequires: python-yaml
+BuildRequires: python-babel
 %else
 Requires: python2-yaml
+Requires: python2-babel
 %endif # using rhel7
 
 %if %{with tests}
@@ -141,6 +143,7 @@ BuildRequires: python%{python3_pkgversion}-six
 BuildRequires: python%{python3_pkgversion}-click >= 5.0
 BuildRequires: python%{python3_pkgversion}-markdown
 BuildRequires: python%{python3_pkgversion}-yaml
+BuildRequires: python%{python3_pkgversion}-babel
 Requires: python%{python3_pkgversion}-decorator
 Requires: python%{python3_pkgversion}-requests
 Requires: python%{python3_pkgversion}-requests-oauthlib
@@ -167,9 +170,11 @@ BuildRequires: python%{python3_pkgversion}-pytest-runner
 
 %build
 %if 0%{?with_python2}
+%{__python2} setup.py compile_catalog
 %py2_build
 %endif # with_python2
 %if 0%{?with_python3}
+%{__python3} setup.py compile_catalog
 %py3_build
 %endif # with_python3
 
