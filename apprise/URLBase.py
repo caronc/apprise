@@ -122,7 +122,7 @@ class URLBase(object):
 
         self.password = kwargs.get('password')
         if self.password:
-            # Always unquote the pssword if it exists
+            # Always unquote the password if it exists
             self.password = URLBase.unquote(self.password)
 
         if 'tag' in kwargs:

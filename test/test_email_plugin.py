@@ -397,3 +397,34 @@ def test_smtplib_send_okay(mock_smtplib):
 
     assert(obj.notify(
         body='body', title='test', notify_type=NotifyType.INFO) is True)
+
+
+def test_email_url_escaping():
+    """
+    API: Test that user/passwords are properly escaped from URL
+
+    """
+    # quote(' %20')
+    passwd = '%20%2520'
+
+    # Basically we want to check that ' ' equates to %20 and % equates to %25
+    # So the above translates to ' %20' (a space in front of %20).  We want
+    # to verify the handling of the password escaping and when it happens.
+    # a very bad response would be '  ' (double space)
+    obj = plugins.NotifyEmail.parse_url(
+        'mailto://user:{}@gmail.com?format=text'.format(passwd))
+
+    assert isinstance(obj, dict) is True
+    assert 'password' in obj
+
+    # Escaping doesn't happen at this stage because we want to leave this to
+    # the plugins discretion
+    assert obj.get('password') == '%20%2520'
+
+    obj = Apprise.instantiate(
+        'mailto://user:{}@gmail.com?format=text'.format(passwd),
+        suppress_exceptions=False)
+    assert isinstance(obj, plugins.NotifyEmail) is True
+
+    # The password is escapped 'once' at this point
+    assert obj.password == ' %20'
