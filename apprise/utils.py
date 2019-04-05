@@ -39,9 +39,6 @@ except ImportError:
     from urllib.parse import quote
     from urllib.parse import urlparse
 
-import logging
-logger = logging.getLogger(__name__)
-
 # URL Indexing Table for returns via parse_url()
 VALID_URL_RE = re.compile(
     r'^[\s]*(?P<schema>[^:\s]+):[/\\]*(?P<path>[^?]+)'

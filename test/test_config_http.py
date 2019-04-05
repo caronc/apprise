@@ -68,6 +68,10 @@ def test_config_http(mock_post, mock_get):
             # Pretend everything is okay
             return True
 
+        def url(self):
+            # Support url() function
+            return ''
+
     # Store our good notification in our schema map
     SCHEMA_MAP['good'] = GoodNotification
 

@@ -27,7 +27,7 @@ __all__ = [
 	'GrowlNotifier',
 ]
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('gntp')
 
 
 class GrowlNotifier(object):

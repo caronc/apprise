@@ -48,6 +48,10 @@ def test_apprise_cli(tmpdir):
             # Pretend everything is okay
             return True
 
+        def url(self):
+            # Support url()
+            return ''
+
     class BadNotification(NotifyBase):
         def __init__(self, *args, **kwargs):
             super(BadNotification, self).__init__(*args, **kwargs)
@@ -55,6 +59,10 @@ def test_apprise_cli(tmpdir):
         def notify(self, **kwargs):
             # Pretend everything is okay
             return False
+
+        def url(self):
+            # Support url()
+            return ''
 
     # Set up our notification types
     SCHEMA_MAP['good'] = GoodNotification

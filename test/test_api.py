@@ -143,10 +143,18 @@ def test_apprise():
             # We fail whenever we're initialized
             raise TypeError()
 
+        def url(self):
+            # Support URL
+            return ''
+
     class GoodNotification(NotifyBase):
         def __init__(self, **kwargs):
             super(GoodNotification, self).__init__(
                 notify_format=NotifyFormat.HTML, **kwargs)
+
+        def url(self):
+            # Support URL
+            return ''
 
         def notify(self, **kwargs):
             # Pretend everything is okay
@@ -190,16 +198,28 @@ def test_apprise():
             # Pretend everything is okay
             raise TypeError()
 
+        def url(self):
+            # Support URL
+            return ''
+
     class RuntimeNotification(NotifyBase):
         def notify(self, **kwargs):
             # Pretend everything is okay
             raise RuntimeError()
+
+        def url(self):
+            # Support URL
+            return ''
 
     class FailNotification(NotifyBase):
 
         def notify(self, **kwargs):
             # Pretend everything is okay
             return False
+
+        def url(self):
+            # Support URL
+            return ''
 
     # Store our bad notification in our schema map
     SCHEMA_MAP['throw'] = ThrowNotification
@@ -224,6 +244,11 @@ def test_apprise():
         def __init__(self, **kwargs):
             # Pretend everything is okay
             raise TypeError()
+
+        def url(self):
+            # Support URL
+            return ''
+
     SCHEMA_MAP['throw'] = ThrowInstantiateNotification
 
     # Reset our object
@@ -394,6 +419,10 @@ def test_apprise_notify_formats(tmpdir):
             # Pretend everything is okay
             return True
 
+        def url(self):
+            # Support URL
+            return ''
+
     class HtmlNotification(NotifyBase):
 
         # set our default notification format
@@ -406,6 +435,10 @@ def test_apprise_notify_formats(tmpdir):
             # Pretend everything is okay
             return True
 
+        def url(self):
+            # Support URL
+            return ''
+
     class MarkDownNotification(NotifyBase):
 
         # set our default notification format
@@ -417,6 +450,10 @@ def test_apprise_notify_formats(tmpdir):
         def notify(self, **kwargs):
             # Pretend everything is okay
             return True
+
+        def url(self):
+            # Support URL
+            return ''
 
     # Store our notifications into our schema map
     SCHEMA_MAP['text'] = TextNotification

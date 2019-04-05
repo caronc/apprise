@@ -24,8 +24,8 @@
 # THE SOFTWARE.
 
 import re
+import os
 import six
-import logging
 from markdown import markdown
 from itertools import chain
 
@@ -34,6 +34,7 @@ from .common import NotifyFormat
 from .utils import is_exclusive_match
 from .utils import parse_list
 from .utils import GET_SCHEMA_RE
+from .logger import logger
 
 from .AppriseAsset import AppriseAsset
 from .AppriseConfig import AppriseConfig
@@ -42,8 +43,6 @@ from .plugins.NotifyBase import NotifyBase
 
 from . import plugins
 from . import __version__
-
-logger = logging.getLogger(__name__)
 
 
 class Apprise(object):
@@ -112,6 +111,10 @@ class Apprise(object):
         # Build a list of tags to associate with the newly added notifications
         results['tag'] = set(parse_list(tag))
 
+        logger.trace('URL {} unpacked as:{}{}'.format(
+            url, os.linesep, os.linesep.join(
+                ['{}="{}"'.format(k, v) for k, v in results.items()])))
+
         # Prepare our Asset Object
         results['asset'] = \
             asset if isinstance(asset, AppriseAsset) else AppriseAsset()
@@ -121,6 +124,9 @@ class Apprise(object):
                 # Attempt to create an instance of our plugin using the parsed
                 # URL information
                 plugin = plugins.SCHEMA_MAP[results['schema']](**results)
+
+                # Create log entry of loaded URL
+                logger.debug('Loaded URL: {}'.format(plugin.url()))
 
             except Exception:
                 # the arguments are invalid or can not be used.
@@ -163,7 +169,7 @@ class Apprise(object):
             return True
 
         elif not isinstance(servers, (tuple, set, list)):
-            logging.error(
+            logger.error(
                 "An invalid notification (type={}) was specified.".format(
                     type(servers)))
             return False
@@ -176,7 +182,7 @@ class Apprise(object):
                 continue
 
             elif not isinstance(_server, six.string_types):
-                logging.error(
+                logger.error(
                     "An invalid notification (type={}) was specified.".format(
                         type(_server)))
                 return_status = False
@@ -187,7 +193,7 @@ class Apprise(object):
             instance = Apprise.instantiate(_server, asset=asset, tag=tag)
             if not isinstance(instance, NotifyBase):
                 return_status = False
-                logging.error(
+                logger.error(
                     "Failed to load notification url: {}".format(_server),
                 )
                 continue
@@ -321,7 +327,7 @@ class Apprise(object):
                 except Exception:
                     # A catch all so we don't have to abort early
                     # just because one of our plugins has a bug in it.
-                    logging.exception("Notification Exception")
+                    logger.exception("Notification Exception")
                     status = False
 
         return status

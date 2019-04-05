@@ -293,9 +293,9 @@ class NotifyRyver(NotifyBase):
 
         if 'webhook' in results['qsd']:
             # Deprication Notice issued for v0.7.5
-            NotifyRyver.logger.warning(
-                'DEPRICATION NOTICE - The Ryver URL contains the parameter '
-                '"webhook=" which will be depricated in an upcoming '
+            NotifyRyver.logger.deprecate(
+                'The Ryver URL contains the parameter '
+                '"webhook=" which will be deprecated in an upcoming '
                 'release. Please use "mode=" instead.'
             )
 

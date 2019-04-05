@@ -35,14 +35,12 @@ from . import AppriseAsset
 from . import AppriseConfig
 from .utils import parse_list
 from .common import NOTIFY_TYPES
+from .logger import logger
 
 from . import __title__
 from . import __version__
 from . import __license__
 from . import __copywrite__
-
-# Logging
-logger = logging.getLogger('apprise')
 
 # Defines our click context settings adding -h to the additional options that
 # can be specified to get the help menu to come up
@@ -121,18 +119,28 @@ def main(body, title, config, urls, notification_type, theme, tag, verbose,
 
     # Logging
     ch = logging.StreamHandler(sys.stdout)
-    if verbose > 2:
+    if verbose > 3:
+        # -vvvv: Most Verbose Debug Logging
+        logger.setLevel(logging.TRACE)
+
+    elif verbose > 2:
+        # -vvv: Debug Logging
         logger.setLevel(logging.DEBUG)
 
     elif verbose > 1:
+        # -vv: INFO Messages
         logger.setLevel(logging.INFO)
 
     elif verbose > 0:
+        # -v: WARNING Messages
         logger.setLevel(logging.WARNING)
 
     else:
+        # No verbosity means we display ERRORS only AND any deprecation
+        # warnings
         logger.setLevel(logging.ERROR)
 
+    # Format our logger
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     ch.setFormatter(formatter)
     logger.addHandler(ch)

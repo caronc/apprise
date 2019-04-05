@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import six
-import logging
 
 from . import config
 from . import ConfigBase
@@ -34,8 +33,7 @@ from .AppriseAsset import AppriseAsset
 from .utils import GET_SCHEMA_RE
 from .utils import parse_list
 from .utils import is_exclusive_match
-
-logger = logging.getLogger(__name__)
+from .logger import logger
 
 
 class AppriseConfig(object):
@@ -100,7 +98,7 @@ class AppriseConfig(object):
             configs = (configs, )
 
         elif not isinstance(configs, (tuple, set, list)):
-            logging.error(
+            logger.error(
                 'An invalid configuration path (type={}) was '
                 'specified.'.format(type(configs)))
             return False
@@ -114,7 +112,7 @@ class AppriseConfig(object):
                 continue
 
             elif not isinstance(_config, six.string_types):
-                logging.warning(
+                logger.warning(
                     "An invalid configuration (type={}) was specified.".format(
                         type(_config)))
                 return_status = False

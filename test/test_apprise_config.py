@@ -234,6 +234,10 @@ def test_apprise_multi_config_entries(tmpdir):
             # Pretend everything is okay
             return True
 
+        def url(self):
+            # support url()
+            return ''
+
     # Store our good notification in our schema map
     NOTIFY_SCHEMA_MAP['good'] = GoodNotification
 
@@ -356,6 +360,10 @@ def test_apprise_config_with_apprise_obj(tmpdir):
         def notify(self, **kwargs):
             # Pretend everything is okay
             return True
+
+        def url(self):
+            # support url()
+            return ''
 
     # Store our good notification in our schema map
     NOTIFY_SCHEMA_MAP['good'] = GoodNotification
