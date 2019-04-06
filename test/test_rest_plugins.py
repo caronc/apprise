@@ -1819,6 +1819,45 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifyWebexTeams
+    ##################################
+    ('wxteams://', {
+        'instance': None,
+    }),
+    ('wxteams://:@/', {
+        # We don't have strict host checking on for wxteams, so this URL
+        # actually becomes parseable and :@ becomes a hostname.
+        # The below errors because a second token wasn't found
+        'instance': TypeError,
+    }),
+    ('wxteams://{}'.format('a' * 40), {
+        # Just half of one token 1 provided
+        'instance': TypeError,
+    }),
+    ('wxteams://{}'.format('a' * 80), {
+        # token provided - we're good
+        'instance': plugins.NotifyWebexTeams,
+    }),
+    ('wxteams://{}'.format('a' * 80), {
+        'instance': plugins.NotifyWebexTeams,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('wxteams://{}'.format('a' * 80), {
+        'instance': plugins.NotifyWebexTeams,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('wxteams://{}'.format('a' * 80), {
+        'instance': plugins.NotifyWebexTeams,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifyKODI
     ##################################
     ('xbmc://', {
