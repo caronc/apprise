@@ -928,9 +928,9 @@ class NotifyMatrix(NotifyBase):
         # Thumbnail (old way)
         if 'thumbnail' in results['qsd']:
             # Deprication Notice issued for v0.7.5
-            NotifyMatrix.logger.warning(
-                'DEPRICATION NOTICE - The Matrix URL contains the parameter '
-                '"thumbnail=" which will be depricated in an upcoming '
+            NotifyMatrix.logger.deprecate(
+                'The Matrix URL contains the parameter '
+                '"thumbnail=" which will be deprecated in an upcoming '
                 'release. Please use "image=" instead.'
             )
 
@@ -943,9 +943,9 @@ class NotifyMatrix(NotifyBase):
         # Webhook (old way)
         if 'webhook' in results['qsd']:
             # Deprication Notice issued for v0.7.5
-            NotifyMatrix.logger.warning(
-                'DEPRICATION NOTICE - The Matrix URL contains the parameter '
-                '"webhook=" which will be depricated in an upcoming '
+            NotifyMatrix.logger.deprecate(
+                'The Matrix URL contains the parameter '
+                '"webhook=" which will be deprecated in an upcoming '
                 'release. Please use "mode=" instead.'
             )
 

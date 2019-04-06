@@ -138,8 +138,6 @@ class ConfigFile(ConfigBase):
             # YAML Filename Detected
             self.default_config_format = ConfigFormat.YAML
 
-        self.logger.debug('Succesfully read config file: %s' % (path))
-
         # Return our response object
         return response
 

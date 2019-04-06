@@ -321,9 +321,9 @@ class NotifyDiscord(NotifyBase):
         # Use Thumbnail
         if 'thumbnail' in results['qsd']:
             # Deprication Notice issued for v0.7.5
-            NotifyDiscord.logger.warning(
-                'DEPRICATION NOTICE - The Discord URL contains the parameter '
-                '"thumbnail=" which will be depricated in an upcoming '
+            NotifyDiscord.logger.deprecate(
+                'The Discord URL contains the parameter '
+                '"thumbnail=" which will be deprecated in an upcoming '
                 'release. Please use "image=" instead.'
             )
 

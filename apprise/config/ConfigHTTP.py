@@ -76,11 +76,7 @@ class ConfigHTTP(ConfigBase):
         """
         super(ConfigHTTP, self).__init__(**kwargs)
 
-        if self.secure:
-            self.schema = 'https'
-
-        else:
-            self.schema = 'http'
+        self.schema = 'https' if self.secure else 'http'
 
         self.fullpath = kwargs.get('fullpath')
         if not isinstance(self.fullpath, six.string_types):
@@ -241,9 +237,6 @@ class ConfigHTTP(ConfigBase):
 
                         # TEXT data detected based on header content
                         self.default_config_format = ConfigFormat.TEXT
-
-                    # else do nothing; fall back to whatever default is
-                    # already set.
 
         except requests.RequestException as e:
             self.logger.error(

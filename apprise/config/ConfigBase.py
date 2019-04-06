@@ -26,7 +26,6 @@
 import os
 import re
 import six
-import logging
 import yaml
 
 from .. import plugins
@@ -36,8 +35,6 @@ from ..common import ConfigFormat
 from ..common import CONFIG_FORMATS
 from ..utils import GET_SCHEMA_RE
 from ..utils import parse_list
-
-logger = logging.getLogger(__name__)
 
 
 class ConfigBase(URLBase):
@@ -60,9 +57,6 @@ class ConfigBase(URLBase):
     # reason we should be reading in more. This is more of a safe guard then
     # anything else. 128KB (131072B)
     max_buffer_size = 131072
-
-    # Logging
-    logger = logging.getLogger(__name__)
 
     def __init__(self, **kwargs):
         """
@@ -127,6 +121,13 @@ class ConfigBase(URLBase):
 
         # Execute our config parse function which always returns a list
         self._cached_servers.extend(fn(content=content, asset=asset))
+
+        if len(self._cached_servers):
+            self.logger.info('Loaded {} entries from {}'.format(
+                len(self._cached_servers), self.url()))
+        else:
+            self.logger.warning('Failed to load configuration from {}'.format(
+                self.url()))
 
         return self._cached_servers
 
@@ -216,7 +217,7 @@ class ConfigBase(URLBase):
 
         except TypeError:
             # content was not expected string type
-            logger.error('Invalid apprise text data specified')
+            ConfigBase.logger.error('Invalid apprise text data specified')
             return list()
 
         for entry in content:
@@ -226,7 +227,7 @@ class ConfigBase(URLBase):
             result = valid_line_re.match(entry)
             if not result:
                 # Invalid syntax
-                logger.error(
+                ConfigBase.logger.error(
                     'Invalid apprise text format found '
                     '{} on line {}.'.format(entry, line))
 
@@ -255,7 +256,7 @@ class ConfigBase(URLBase):
 
             # Some basic validation
             if schema not in plugins.SCHEMA_MAP:
-                logger.warning(
+                ConfigBase.logger.warning(
                     'Unsupported schema {} on line {}.'.format(
                         schema, line))
                 continue
@@ -266,13 +267,18 @@ class ConfigBase(URLBase):
 
             if results is None:
                 # Failed to parse the server URL
-                logger.warning(
+                ConfigBase.logger.warning(
                     'Unparseable URL {} on line {}.'.format(url, line))
                 continue
 
             # Build a list of tags to associate with the newly added
             # notifications if any were set
             results['tag'] = set(parse_list(result.group('tags')))
+
+            ConfigBase.logger.trace(
+                'URL {} unpacked as:{}{}'.format(
+                    url, os.linesep, os.linesep.join(
+                        ['{}="{}"'.format(k, v) for k, v in results.items()])))
 
             # Prepare our Asset Object
             results['asset'] = \
@@ -283,9 +289,12 @@ class ConfigBase(URLBase):
                 # parsed URL information
                 plugin = plugins.SCHEMA_MAP[results['schema']](**results)
 
+                # Create log entry of loaded URL
+                ConfigBase.logger.debug('Loaded URL: {}'.format(plugin.url()))
+
             except Exception:
                 # the arguments are invalid or can not be used.
-                logger.warning(
+                ConfigBase.logger.warning(
                     'Could not load URL {} on line {}.'.format(
                         url, line))
                 continue
@@ -314,20 +323,22 @@ class ConfigBase(URLBase):
 
         except (AttributeError, yaml.error.MarkedYAMLError) as e:
             # Invalid content
-            logger.error('Invalid apprise yaml data specified.')
-            logger.debug('YAML Exception:{}{}'.format(os.linesep, e))
+            ConfigBase.logger.error(
+                'Invalid apprise yaml data specified.')
+            ConfigBase.logger.debug(
+                'YAML Exception:{}{}'.format(os.linesep, e))
             return list()
 
         if not isinstance(result, dict):
             # Invalid content
-            logger.error('Invalid apprise yaml structure specified')
+            ConfigBase.logger.error('Invalid apprise yaml structure specified')
             return list()
 
         # YAML Version
         version = result.get('version', 1)
         if version != 1:
             # Invalid syntax
-            logger.error(
+            ConfigBase.logger.error(
                 'Invalid apprise yaml version specified {}.'.format(version))
             return list()
 
@@ -342,13 +353,15 @@ class ConfigBase(URLBase):
                 if k.startswith('_') or k.endswith('_'):
                     # Entries are considered reserved if they start or end
                     # with an underscore
-                    logger.warning('Ignored asset key "{}".'.format(k))
+                    ConfigBase.logger.warning(
+                        'Ignored asset key "{}".'.format(k))
                     continue
 
                 if not (hasattr(asset, k) and
                         isinstance(getattr(asset, k), six.string_types)):
                     # We can't set a function or non-string set value
-                    logger.warning('Invalid asset key "{}".'.format(k))
+                    ConfigBase.logger.warning(
+                        'Invalid asset key "{}".'.format(k))
                     continue
 
                 if v is None:
@@ -357,7 +370,8 @@ class ConfigBase(URLBase):
 
                 if not isinstance(v, six.string_types):
                     # we must set strings with a string
-                    logger.warning('Invalid asset value to "{}".'.format(k))
+                    ConfigBase.logger.warning(
+                        'Invalid asset value to "{}".'.format(k))
                     continue
 
                 # Set our asset object with the new value
@@ -379,7 +393,8 @@ class ConfigBase(URLBase):
         urls = result.get('urls', None)
         if not isinstance(urls, (list, tuple)):
             # Unsupported
-            logger.error('Missing "urls" directive in apprise yaml.')
+            ConfigBase.logger.error(
+                'Missing "urls" directive in apprise yaml.')
             return list()
 
         # Iterate over each URL
@@ -400,7 +415,7 @@ class ConfigBase(URLBase):
                 # interpretation of a URL geared for them
                 schema = GET_SCHEMA_RE.match(_url)
                 if schema is None:
-                    logger.warning(
+                    ConfigBase.logger.warning(
                         'Unsupported schema in urls entry #{}'.format(no))
                     continue
 
@@ -409,7 +424,7 @@ class ConfigBase(URLBase):
 
                 # Some basic validation
                 if schema not in plugins.SCHEMA_MAP:
-                    logger.warning(
+                    ConfigBase.logger.warning(
                         'Unsupported schema {} in urls entry #{}'.format(
                             schema, no))
                     continue
@@ -418,7 +433,7 @@ class ConfigBase(URLBase):
                 # containing all of the information parsed from our URL
                 _results = plugins.SCHEMA_MAP[schema].parse_url(_url)
                 if _results is None:
-                    logger.warning(
+                    ConfigBase.logger.warning(
                         'Unparseable {} based url; entry #{}'.format(
                             schema, no))
                     continue
@@ -439,7 +454,7 @@ class ConfigBase(URLBase):
                 # Get our schema
                 schema = GET_SCHEMA_RE.match(_url)
                 if schema is None:
-                    logger.warning(
+                    ConfigBase.logger.warning(
                         'Unsupported schema in urls entry #{}'.format(no))
                     continue
 
@@ -448,7 +463,7 @@ class ConfigBase(URLBase):
 
                 # Some basic validation
                 if schema not in plugins.SCHEMA_MAP:
-                    logger.warning(
+                    ConfigBase.logger.warning(
                         'Unsupported schema {} in urls entry #{}'.format(
                             schema, no))
                     continue
@@ -494,7 +509,7 @@ class ConfigBase(URLBase):
 
             else:
                 # Unsupported
-                logger.warning(
+                ConfigBase.logger.warning(
                     'Unsupported apprise yaml entry #{}'.format(no))
                 continue
 
@@ -519,6 +534,12 @@ class ConfigBase(URLBase):
                     # Just use the global settings
                     _results['tag'] = global_tags
 
+                ConfigBase.logger.trace(
+                    'URL no.{} {} unpacked as:{}{}'
+                    .format(os.linesep, no, url, os.linesep.join(
+                        ['{}="{}"'.format(k, a)
+                         for k, a in _results.items()])))
+
                 # Prepare our Asset Object
                 _results['asset'] = asset
 
@@ -527,9 +548,13 @@ class ConfigBase(URLBase):
                     # parsed URL information
                     plugin = plugins.SCHEMA_MAP[_results['schema']](**_results)
 
+                    # Create log entry of loaded URL
+                    ConfigBase.logger.debug(
+                        'Loaded URL: {}'.format(plugin.url()))
+
                 except Exception:
                     # the arguments are invalid or can not be used.
-                    logger.warning(
+                    ConfigBase.logger.warning(
                         'Could not load apprise yaml entry #{}, item #{}'
                         .format(no, entry))
                     continue
