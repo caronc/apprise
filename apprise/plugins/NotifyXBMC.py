@@ -258,6 +258,7 @@ class NotifyXBMC(NotifyBase):
             'overflow': self.overflow_mode,
             'image': 'yes' if self.include_image else 'no',
             'duration': str(self.duration),
+            'verify': 'yes' if self.verify_certificate else 'no',
         }
 
         # Determine Authentication

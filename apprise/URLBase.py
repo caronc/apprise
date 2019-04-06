@@ -435,7 +435,7 @@ class URLBase(object):
         results['secure'] = (results['schema'][-1] == 's')
 
         # Support SSL Certificate 'verify' keyword. Default to being enabled
-        results['verify'] = verify_host
+        results['verify'] = True
 
         if 'verify' in results['qsd']:
             results['verify'] = parse_bool(

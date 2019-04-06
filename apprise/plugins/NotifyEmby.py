@@ -550,6 +550,7 @@ class NotifyEmby(NotifyBase):
             'format': self.notify_format,
             'overflow': self.overflow_mode,
             'modal': 'yes' if self.modal else 'no',
+            'verify': 'yes' if self.verify_certificate else 'no',
         }
 
         # Determine Authentication

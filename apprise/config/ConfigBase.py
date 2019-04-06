@@ -292,11 +292,12 @@ class ConfigBase(URLBase):
                 # Create log entry of loaded URL
                 ConfigBase.logger.debug('Loaded URL: {}'.format(plugin.url()))
 
-            except Exception:
+            except Exception as e:
                 # the arguments are invalid or can not be used.
                 ConfigBase.logger.warning(
                     'Could not load URL {} on line {}.'.format(
                         url, line))
+                ConfigBase.logger.debug('Loading Exception: %s' % str(e))
                 continue
 
             # if we reach here, we successfully loaded our data

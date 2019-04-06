@@ -180,6 +180,7 @@ class NotifyPushBullet(NotifyBase):
         args = {
             'format': self.notify_format,
             'overflow': self.overflow_mode,
+            'verify': 'yes' if self.verify_certificate else 'no',
         }
 
         targets = '/'.join([NotifyPushBullet.quote(x) for x in self.targets])

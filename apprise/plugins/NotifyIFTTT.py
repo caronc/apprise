@@ -249,6 +249,7 @@ class NotifyIFTTT(NotifyBase):
         args = {
             'format': self.notify_format,
             'overflow': self.overflow_mode,
+            'verify': 'yes' if self.verify_certificate else 'no',
         }
 
         # Store any new key/value pairs added to our list

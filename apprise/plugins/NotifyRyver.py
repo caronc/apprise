@@ -248,6 +248,7 @@ class NotifyRyver(NotifyBase):
             'overflow': self.overflow_mode,
             'image': 'yes' if self.include_image else 'no',
             'mode': self.mode,
+            'verify': 'yes' if self.verify_certificate else 'no',
         }
 
         # Determine if there is a botname present

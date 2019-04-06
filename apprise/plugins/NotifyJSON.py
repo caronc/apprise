@@ -86,6 +86,7 @@ class NotifyJSON(NotifyBase):
         args = {
             'format': self.notify_format,
             'overflow': self.overflow_mode,
+            'verify': 'yes' if self.verify_certificate else 'no',
         }
 
         # Append our headers into our args

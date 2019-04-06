@@ -264,6 +264,7 @@ class NotifyDiscord(NotifyBase):
             'footer': 'yes' if self.footer else 'no',
             'footer_logo': 'yes' if self.footer_logo else 'no',
             'image': 'yes' if self.include_image else 'no',
+            'verify': 'yes' if self.verify_certificate else 'no',
         }
 
         return '{schema}://{webhook_id}/{webhook_token}/?{args}'.format(

@@ -287,6 +287,7 @@ class NotifyXMPP(NotifyBase):
         args = {
             'format': self.notify_format,
             'overflow': self.overflow_mode,
+            'verify': 'yes' if self.verify_certificate else 'no',
         }
 
         if self.jid:

@@ -238,6 +238,7 @@ class NotifyGrowl(NotifyBase):
                 _map[GrowlPriority.NORMAL] if self.priority not in _map
                 else _map[self.priority],
             'version': self.version,
+            'verify': 'yes' if self.verify_certificate else 'no',
         }
 
         auth = ''

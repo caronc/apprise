@@ -315,7 +315,8 @@ class NotifyDBus(NotifyBase):
             'overflow': self.overflow_mode,
             'image': 'yes' if self.include_image else 'no',
             'urgency': 'normal' if self.urgency not in _map
-                       else _map[self.urgency]
+                       else _map[self.urgency],
+            'verify': 'yes' if self.verify_certificate else 'no',
         }
 
         # x in (x,y) screen coordinates

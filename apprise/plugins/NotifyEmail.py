@@ -441,6 +441,7 @@ class NotifyEmail(NotifyBase):
             'smtp': self.smtp_host,
             'timeout': self.timeout,
             'user': self.user,
+            'verify': 'yes' if self.verify_certificate else 'no',
         }
 
         # pull email suffix from username (if present)

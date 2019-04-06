@@ -501,6 +501,7 @@ class NotifyTelegram(NotifyBase):
             'format': self.notify_format,
             'overflow': self.overflow_mode,
             'image': self.include_image,
+            'verify': 'yes' if self.verify_certificate else 'no',
         }
 
         # No need to check the user token because the user automatically gets

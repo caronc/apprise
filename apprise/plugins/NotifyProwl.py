@@ -209,7 +209,8 @@ class NotifyProwl(NotifyBase):
             'format': self.notify_format,
             'overflow': self.overflow_mode,
             'priority': 'normal' if self.priority not in _map
-                        else _map[self.priority]
+                        else _map[self.priority],
+            'verify': 'yes' if self.verify_certificate else 'no',
         }
 
         return '{schema}://{apikey}/{providerkey}/?{args}'.format(

@@ -243,6 +243,7 @@ class NotifyPushover(NotifyBase):
             'priority':
                 _map[PushoverPriority.NORMAL] if self.priority not in _map
                 else _map[self.priority],
+            'verify': 'yes' if self.verify_certificate else 'no',
         }
 
         # Escape our devices

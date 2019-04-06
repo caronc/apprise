@@ -262,6 +262,7 @@ class NotifyFlock(NotifyBase):
             'format': self.notify_format,
             'overflow': self.overflow_mode,
             'image': 'yes' if self.include_image else 'no',
+            'verify': 'yes' if self.verify_certificate else 'no',
         }
 
         return '{schema}://{token}/{targets}?{args}'\

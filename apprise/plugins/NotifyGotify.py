@@ -195,6 +195,7 @@ class NotifyGotify(NotifyBase):
             'format': self.notify_format,
             'overflow': self.overflow_mode,
             'priority': self.priority,
+            'verify': 'yes' if self.verify_certificate else 'no',
         }
 
         default_port = 443 if self.secure else 80

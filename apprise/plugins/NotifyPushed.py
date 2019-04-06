@@ -248,6 +248,7 @@ class NotifyPushed(NotifyBase):
         args = {
             'format': self.notify_format,
             'overflow': self.overflow_mode,
+            'verify': 'yes' if self.verify_certificate else 'no',
         }
 
         return '{schema}://{app_key}/{app_secret}/{targets}/?{args}'.format(
