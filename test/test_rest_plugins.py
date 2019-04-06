@@ -43,6 +43,9 @@ from apprise.common import OverflowMode
 import logging
 logging.disable(logging.CRITICAL)
 
+# a test UUID we can use
+UUID4 = '8b799edf-6f98-4d3a-9be7-2862fb4e5752'
+
 # Some exception handling we'll use
 REQUEST_EXCEPTIONS = (
     requests.ConnectionError(
@@ -932,6 +935,74 @@ TEST_URLS = (
         'test_requests_exceptions': True,
     }),
 
+    ##################################
+    # NotifyMSTeams
+    ##################################
+    ('msteams://', {
+        'instance': None,
+    }),
+    ('msteams://:@/', {
+        # We don't have strict host checking on for msteams, so this URL
+        # actually becomes parseable and :@ becomes a hostname.
+        # The below errors because a second token wasn't found
+        'instance': TypeError,
+    }),
+    ('msteams://{}'.format(UUID4), {
+        # Just half of one token 1 provided
+        'instance': TypeError,
+    }),
+    ('msteams://{}@{}/'.format(UUID4, UUID4), {
+        # Just 1 tokens provided
+        'instance': TypeError,
+    }),
+    ('msteams://{}@{}/{}'.format(UUID4, UUID4, 'a' * 32), {
+        # Just 2 tokens provided
+        'instance': TypeError,
+    }),
+    ('msteams://{}@{}/{}/{}?ta'.format(UUID4, UUID4, 'a' * 20, UUID4), {
+        # All tokens provided - invalid token 2
+        'instance': TypeError,
+    }),
+    ('msteams://{}@{}/{}/{}?tb'.format(UUID4, UUID4, 'a' * 32, 'abcd'), {
+        # All tokens provided - invalid token 3
+        'instance': TypeError,
+    }),
+    ('msteams://{}@{}/{}/{}?tb'.format('garbage', UUID4, 'a' * 32, 'abcd'), {
+        # All tokens provided - invalid token 1
+        'instance': TypeError,
+    }),
+    ('msteams://{}@{}/{}/{}?t1'.format(UUID4, UUID4, 'a' * 32, UUID4), {
+        # All tokens provided - we're good
+        'instance': plugins.NotifyMSTeams,
+    }),
+    ('msteams://{}@{}/{}/{}?t2'.format(UUID4, UUID4, 'a' * 32, UUID4), {
+        # All tokens provided - we're good
+        'instance': plugins.NotifyMSTeams,
+        # don't include an image by default
+        'include_image': False,
+    }),
+    ('msteams://{}@{}/{}/{}?image=No'.format(UUID4, UUID4, 'a' * 32, UUID4), {
+        # All tokens provided - we're good  no image
+        'instance': plugins.NotifyMSTeams,
+    }),
+    ('msteams://{}@{}/{}/{}?tx'.format(UUID4, UUID4, 'a' * 32, UUID4), {
+        'instance': plugins.NotifyMSTeams,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('msteams://{}@{}/{}/{}?ty'.format(UUID4, UUID4, 'a' * 32, UUID4), {
+        'instance': plugins.NotifyMSTeams,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('msteams://{}@{}/{}/{}?tz'.format(UUID4, UUID4, 'a' * 32, UUID4), {
+        'instance': plugins.NotifyMSTeams,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
 
     ##################################
     # NotifyProwl
