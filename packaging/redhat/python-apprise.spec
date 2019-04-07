@@ -40,24 +40,9 @@
 %global with_python3 0
 %endif # using rhel7
 
-Name:           python-apprise
-Version:        0.7.5
-Release:        1%{?dist}
-Summary:        A simple wrapper to many popular notification services used today
-License:        MIT
-URL:            https://github.com/caronc/apprise
-Source0:        %{url}/archive/v%{version}/apprise-%{version}.tar.gz
-# A simple man page to help with rpmlint. Future versions of apprise would not
-# require this entry as it will be part of the distribution going forward.
-# this man page was added as part of the Fedora review process
-Source1:        apprise.1
-# this patch allows version of requests that ships with RHEL v7 to
-# correctly handle test coverage.  It also removes reference to a
-# extra check not supported in py.test in EPEL7 builds
-Patch0:         apprise-rhel7-support.patch
-BuildArch:      noarch
+%global pypi_name apprise
 
-%description
+%global common_description %{expand: \
 Apprise is a Python package for simplifying access to all of the different
 notification services that are out there. Apprise opens the door and makes
 it easy to access:
@@ -66,12 +51,27 @@ Boxcar, Discord, E-Mail, Emby, Faast, Flock, Gitter, Gotify, Growl, IFTTT,
 Join, KODI, MatterMost, Matrix, Microsoft Windows Notifications,
 Microsoft Teams, Notify My Android, Prowl, Pushalot, PushBullet, Pushjet,
 Pushover, Rocket.Chat, Slack, Super Toasty, Stride, Telegram, Twitter, XBMC,
-XMPP, Webex Teams
+XMPP, Webex Teams}
+
+Name:           python-%{pypi_name}
+Version:        0.7.5
+Release:        1%{?dist}
+Summary:        A simple wrapper to many popular notification services used today
+License:        MIT
+URL:            https://github.com/caronc/%{pypi_name}
+Source0:        %{url}/archive/v%{version}/%{pypi_name}-%{version}.tar.gz
+# this patch allows version of requests that ships with RHEL v7 to
+# correctly handle test coverage.  It also removes reference to a
+# extra check not supported in py.test in EPEL7 builds
+Patch0:         %{pypi_name}-rhel7-support.patch
+BuildArch:      noarch
+
+%description %{common_description}
 
 %if 0%{?with_python2}
-%package -n python2-apprise
+%package -n python2-%{pypi_name}
 Summary: A simple wrapper to many popular notification services used today
-%{?python_provide:%python_provide python2-apprise}
+%{?python_provide:%python_provide python2-%{pypi_name}}
 
 BuildRequires: python2-devel
 BuildRequires: python-decorator
@@ -106,40 +106,31 @@ BuildRequires: python2-pytest
 
 %endif # with_tests
 
-%description -n python2-apprise
-Apprise is a Python package for simplifying access to all of the different
-notification services that are out there. Apprise opens the door and makes
-it easy to access:
-
-Boxcar, Discord, E-Mail, Emby, Faast, Flock, Gitter, Gotify, Growl, IFTTT,
-Join, KODI, MatterMost, Matrix, Microsoft Windows Notifications,
-Microsoft Teams, Notify My Android, Prowl, Pushalot, PushBullet, Pushjet,
-Pushover, Rocket.Chat, Slack, Super Toasty, Stride, Telegram, Twitter, XBMC,
-XMPP, Webex Teams
+%description -n python2-%{pypi_name} %{common_description}
 %endif # with_python2
 
-%package -n apprise
+%package -n %{pypi_name}
 Summary: Apprise CLI Tool
 
 %if 0%{?with_python3}
 Requires: python%{python3_pkgversion}-click >= 5.0
-Requires: python%{python3_pkgversion}-apprise = %{version}-%{release}
+Requires: python%{python3_pkgversion}-%{pypi_name} = %{version}-%{release}
 %endif # with_python3
 
 %if 0%{?with_python2}
 Requires: python2-click >= 5.0
-Requires: python2-apprise = %{version}-%{release}
+Requires: python2-%{pypi_name} = %{version}-%{release}
 %endif # with_python2
 
-%description -n apprise
+%description -n %{pypi_name}
 An accompanied CLI tool that can be used as part of Apprise
 to issue notifications from the command line to you favorite
 services.
 
 %if 0%{?with_python3}
-%package -n python%{python3_pkgversion}-apprise
+%package -n python%{python3_pkgversion}-%{pypi_name}
 Summary: A simple wrapper to many popular notification services used today
-%{?python_provide:%python_provide python%{python3_pkgversion}-apprise}
+%{?python_provide:%python_provide python%{python3_pkgversion}-%{pypi_name}}
 
 BuildRequires: python%{python3_pkgversion}-devel
 BuildRequires: python%{python3_pkgversion}-decorator
@@ -164,18 +155,11 @@ BuildRequires: python%{python3_pkgversion}-pytest
 BuildRequires: python%{python3_pkgversion}-pytest-runner
 %endif # with_tests
 
-%description -n python%{python3_pkgversion}-apprise
-Apprise is a Python package for simplifying access to all of the different
-notification services that are out there. Apprise opens the door and makes
-it easy to access:
-
-Boxcar, Discord, E-Mail, Emby, Faast, Growl, IFTTT, Join, KODI, MatterMost,
-Matrix, Notify My Android, Prowl, Pushalot, PushBullet, Pushjet, Pushover,
-Rocket.Chat, Slack, Super Toasty, Stride, Telegram, Twitter, XBMC
+%description -n python%{python3_pkgversion}-%{pypi_name} %{common_description}
 %endif # with_python3
 
 %prep
-%setup -q -n apprise-%{version}
+%setup -q -n %{pypi_name}-%{version}
 %if 0%{?rhel} && 0%{?rhel} <= 7
 # rhel7 older package work-arounds
 %patch0 -p1
@@ -197,14 +181,8 @@ Rocket.Chat, Slack, Super Toasty, Stride, Telegram, Twitter, XBMC
 %py3_install
 %endif # with_python3
 
-# Install man page
-# Future versions will look like this:
-# install -p -D -T -m 0644 packages/man/apprise.1 \
-#   %{buildroot}%{_mandir}/man1/apprise.1
-#
-# For now:
-install -p -D -T -m 0644 %{SOURCE1} \
-   %{buildroot}%{_mandir}/man1/apprise.1
+install -p -D -T -m 0644 packaging/man/%{pypi_name}.1 \
+	%{buildroot}%{_mandir}/man1/%{pypi_name}.1
 
 %if %{with tests}
 %check
@@ -217,33 +195,33 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 %endif # with_tests
 
 %if 0%{?with_python2}
-%files -n python2-apprise
+%files -n python2-%{pypi_name}
 %license LICENSE
 %doc README.md
-%{python2_sitelib}/apprise
-%exclude %{python2_sitelib}/apprise/cli.*
+%{python2_sitelib}/%{pypi_name}
+%exclude %{python2_sitelib}/%{pypi_name}/cli.*
 %{python2_sitelib}/*.egg-info
 %endif # with_python2
 
 %if 0%{?with_python3}
-%files -n python%{python3_pkgversion}-apprise
+%files -n python%{python3_pkgversion}-%{pypi_name}
 %license LICENSE
 %doc README.md
-%{python3_sitelib}/apprise
-%exclude %{python3_sitelib}/apprise/cli.*
+%{python3_sitelib}/%{pypi_name}
+%exclude %{python3_sitelib}/%{pypi_name}/cli.*
 %{python3_sitelib}/*.egg-info
 %endif # with_python3
 
-%files -n apprise
-%{_bindir}/apprise
-%{_mandir}/man1/apprise.1*
+%files -n %{pypi_name}
+%{_bindir}/%{pypi_name}
+%{_mandir}/man1/%{pypi_name}.1*
 
 %if 0%{?with_python3}
-%{python3_sitelib}/apprise/cli.*
+%{python3_sitelib}/%{pypi_name}/cli.*
 %endif # with_python3
 
 %if 0%{?with_python2}
-%{python2_sitelib}/apprise/cli.*
+%{python2_sitelib}/%{pypi_name}/cli.*
 %endif # with_python2
 
 %changelog
@@ -253,7 +231,7 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 * Sun Mar 10 2019 Chris Caron <lead2gold@gmail.com> - 0.7.4-1
 - Updated to v0.7.4
 - Fedora review process added a man page, spec restructuring and 2 patch files
-  to accomodate some valid points brought forth. These have already been pused
+  to accomodate some valid points brought forth. These have already been pushed
   upstream and will be removed on the next version.
 
 * Fri Feb 22 2019 Chris Caron <lead2gold@gmail.com> - 0.7.3-1
