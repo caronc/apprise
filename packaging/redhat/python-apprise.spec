@@ -41,7 +41,7 @@
 %endif # using rhel7
 
 Name:           python-apprise
-Version:        0.7.4
+Version:        0.7.5
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        MIT
@@ -55,12 +55,6 @@ Source1:        apprise.1
 # correctly handle test coverage.  It also removes reference to a
 # extra check not supported in py.test in EPEL7 builds
 Patch0:         apprise-rhel7-support.patch
-# This patch was discovered during a public review made on this package
-# with the fedora packaging team.  Rather then spin a new release, this
-# patch will allow the cli she-bang details to be set correctly; they should
-# hae never been hardcoded in the first place.  This will be removed in
-# the next release
-Patch1:         apprise-remove-shebang-on-cli.patch
 BuildArch:      noarch
 
 %description
@@ -68,9 +62,11 @@ Apprise is a Python package for simplifying access to all of the different
 notification services that are out there. Apprise opens the door and makes
 it easy to access:
 
-Boxcar, Discord, E-Mail, Emby, Faast, Growl, IFTTT, Join, KODI, MatterMost,
-Matrix, Notify My Android, Prowl, Pushalot, PushBullet, Pushjet, Pushover,
-Rocket.Chat, Slack, Super Toasty, Stride, Telegram, Twitter, XBMC
+Boxcar, Discord, E-Mail, Emby, Faast, Flock, Gitter, Gotify, Growl, IFTTT,
+Join, KODI, MatterMost, Matrix, Microsoft Windows Notifications,
+Microsoft Teams, Notify My Android, Prowl, Pushalot, PushBullet, Pushjet,
+Pushover, Rocket.Chat, Slack, Super Toasty, Stride, Telegram, Twitter, XBMC,
+XMPP, Webex Teams
 
 %if 0%{?with_python2}
 %package -n python2-apprise
@@ -115,9 +111,11 @@ Apprise is a Python package for simplifying access to all of the different
 notification services that are out there. Apprise opens the door and makes
 it easy to access:
 
-Boxcar, Discord, E-Mail, Emby, Faast, Growl, IFTTT, Join, KODI, MatterMost,
-Matrix, Notify My Android, Prowl, Pushalot, PushBullet, Pushjet, Pushover,
-Rocket.Chat, Slack, Super Toasty, Stride, Telegram, Twitter, XBMC
+Boxcar, Discord, E-Mail, Emby, Faast, Flock, Gitter, Gotify, Growl, IFTTT,
+Join, KODI, MatterMost, Matrix, Microsoft Windows Notifications,
+Microsoft Teams, Notify My Android, Prowl, Pushalot, PushBullet, Pushjet,
+Pushover, Rocket.Chat, Slack, Super Toasty, Stride, Telegram, Twitter, XBMC,
+XMPP, Webex Teams
 %endif # with_python2
 
 %package -n apprise
@@ -182,8 +180,6 @@ Rocket.Chat, Slack, Super Toasty, Stride, Telegram, Twitter, XBMC
 # rhel7 older package work-arounds
 %patch0 -p1
 %endif # using rhel7
-# Remove shebang
-%patch1 -p1
 
 %build
 %if 0%{?with_python2}
@@ -251,6 +247,9 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 %endif # with_python2
 
 %changelog
+* Sun Apr  7 2019 Chris Caron <lead2gold@gmail.com> - 0.7.5-1
+- Updated to v0.7.5
+
 * Sun Mar 10 2019 Chris Caron <lead2gold@gmail.com> - 0.7.4-1
 - Updated to v0.7.4
 - Fedora review process added a man page, spec restructuring and 2 patch files
