@@ -417,7 +417,7 @@ class ConfigBase(URLBase):
                 schema = GET_SCHEMA_RE.match(_url)
                 if schema is None:
                     ConfigBase.logger.warning(
-                        'Unsupported schema in urls entry #{}'.format(no))
+                        'Unsupported schema in urls entry #{}'.format(no + 1))
                     continue
 
                 # Ensure our schema is always in lower case
@@ -427,7 +427,7 @@ class ConfigBase(URLBase):
                 if schema not in plugins.SCHEMA_MAP:
                     ConfigBase.logger.warning(
                         'Unsupported schema {} in urls entry #{}'.format(
-                            schema, no))
+                            schema, no + 1))
                     continue
 
                 # Parse our url details of the server object as dictionary
@@ -436,7 +436,7 @@ class ConfigBase(URLBase):
                 if _results is None:
                     ConfigBase.logger.warning(
                         'Unparseable {} based url; entry #{}'.format(
-                            schema, no))
+                            schema, no + 1))
                     continue
 
                 # add our results to our global set
@@ -456,7 +456,7 @@ class ConfigBase(URLBase):
                 schema = GET_SCHEMA_RE.match(_url)
                 if schema is None:
                     ConfigBase.logger.warning(
-                        'Unsupported schema in urls entry #{}'.format(no))
+                        'Unsupported schema in urls entry #{}'.format(no + 1))
                     continue
 
                 # Ensure our schema is always in lower case
@@ -466,7 +466,7 @@ class ConfigBase(URLBase):
                 if schema not in plugins.SCHEMA_MAP:
                     ConfigBase.logger.warning(
                         'Unsupported schema {} in urls entry #{}'.format(
-                            schema, no))
+                            schema, no + 1))
                     continue
 
                 # Parse our url details of the server object as dictionary
@@ -511,7 +511,7 @@ class ConfigBase(URLBase):
             else:
                 # Unsupported
                 ConfigBase.logger.warning(
-                    'Unsupported apprise yaml entry #{}'.format(no))
+                    'Unsupported apprise yaml entry #{}'.format(no + 1))
                 continue
 
             # Track our entries
@@ -536,8 +536,8 @@ class ConfigBase(URLBase):
                     _results['tag'] = global_tags
 
                 ConfigBase.logger.trace(
-                    'URL no.{} {} unpacked as:{}{}'
-                    .format(os.linesep, no, url, os.linesep.join(
+                    'URL #{}: {} unpacked as:{}{}'
+                    .format(no + 1, url, os.linesep, os.linesep.join(
                         ['{}="{}"'.format(k, a)
                          for k, a in _results.items()])))
 
@@ -557,7 +557,7 @@ class ConfigBase(URLBase):
                     # the arguments are invalid or can not be used.
                     ConfigBase.logger.warning(
                         'Could not load apprise yaml entry #{}, item #{}'
-                        .format(no, entry))
+                        .format(no + 1, entry))
                     continue
 
                 # if we reach here, we successfully loaded our data
