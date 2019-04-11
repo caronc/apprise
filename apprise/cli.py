@@ -48,10 +48,10 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 # Define our default configuration we use if nothing is otherwise specified
 DEFAULT_SEARCH_PATHS = (
-    'file://~/.apprise',
-    'file://~/.apprise.yml',
-    'file://~/.config/apprise',
-    'file://~/.config/apprise.yml',
+    '~/.apprise',
+    '~/.apprise.yml',
+    '~/.config/apprise',
+    '~/.config/apprise.yml',
 )
 
 

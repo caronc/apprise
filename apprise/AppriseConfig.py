@@ -118,6 +118,8 @@ class AppriseConfig(object):
                 return_status = False
                 continue
 
+            logger.debug("Loading configuration: {}".format(_config))
+
             # Instantiate ourselves an object, this function throws or
             # returns None if it fails
             instance = AppriseConfig.instantiate(_config, asset=asset, tag=tag)
@@ -190,7 +192,7 @@ class AppriseConfig(object):
 
             # Some basic validation
             if schema not in config.SCHEMA_MAP:
-                logger.debug('Unsupported schema {}.'.format(schema))
+                logger.warning('Unsupported schema {}.'.format(schema))
                 return None
 
         # Parse our url details of the server object as dictionary containing
@@ -199,7 +201,7 @@ class AppriseConfig(object):
 
         if not results:
             # Failed to parse the server URL
-            logger.debug('Unparseable URL {}.'.format(url))
+            logger.warning('Unparseable URL {}.'.format(url))
             return None
 
         # Build a list of tags to associate with the newly added notifications
@@ -217,7 +219,7 @@ class AppriseConfig(object):
 
             except Exception:
                 # the arguments are invalid or can not be used.
-                logger.debug('Could not load URL: %s' % url)
+                logger.warning('Could not load URL: %s' % url)
                 return None
 
         else:

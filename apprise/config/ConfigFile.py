@@ -26,6 +26,7 @@
 import re
 import io
 import os
+from os.path import expanduser
 from .ConfigBase import ConfigBase
 from ..common import ConfigFormat
 
@@ -149,7 +150,7 @@ class ConfigFile(ConfigBase):
 
         """
 
-        results = ConfigBase.parse_url(url)
+        results = ConfigBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early; it's not a good URL
             return results
@@ -158,5 +159,5 @@ class ConfigFile(ConfigBase):
         if not match:
             return None
 
-        results['path'] = match.group('path')
+        results['path'] = expanduser(ConfigFile.unquote(match.group('path')))
         return results
