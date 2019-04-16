@@ -54,7 +54,7 @@ Pushover, Rocket.Chat, Slack, Super Toasty, Stride, Telegram, Twitter, XBMC,
 XMPP, Webex Teams}
 
 Name:           python-%{pypi_name}
-Version:        0.7.5
+Version:        0.7.6
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        MIT
@@ -225,6 +225,9 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 %endif # with_python2
 
 %changelog
+* Tue Apr 16 2019 Chris Caron <lead2gold@gmail.com> - 0.7.6-1
+- Updated to v0.7.6
+
 * Sun Apr  7 2019 Chris Caron <lead2gold@gmail.com> - 0.7.5-1
 - Updated to v0.7.5
 
