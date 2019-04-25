@@ -56,8 +56,8 @@ setup(
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     url='https://github.com/caronc/apprise',
-    keywords='Push Notifications Email AWS SNS Boxcar Discord Dbus Emby '
-        'Faast Flock Gitter Gnome Gotify Growl IFTTT Join KODI Matrix '
+    keywords='Push Notifications Alerts Email AWS SNS Boxcar Discord Dbus '
+        'Emby Faast Flock Gitter Gnome Gotify Growl IFTTT Join KODI Matrix '
         'Mattermost Matrix Prowl PushBullet Pushjet Pushed Pushover '
         'Rocket.Chat Ryver Slack Stride Telegram Twitter XBMC Microsoft '
         'Windows Webex CLI API',
@@ -82,6 +82,8 @@ setup(
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
         'License :: OSI Approved :: MIT License',
+        'Topic :: Software Development :: Libraries :: Python Modules',
+        'Topic :: Software Development :: Libraries :: Application Frameworks',
     ),
     entry_points={'console_scripts': console_scripts},
     python_requires='>=2.7',
