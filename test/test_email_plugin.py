@@ -315,7 +315,7 @@ def test_webbase_lookup(mock_smtp, mock_smtpssl):
     """
 
     # Insert a test email at the head of our table
-    NotifyEmailBase.WEBBASE_LOOKUP_TABLE = (
+    NotifyEmailBase.EMAIL_TEMPLATES = (
         (
             # Testing URL
             'Testing Lookup',
@@ -327,7 +327,7 @@ def test_webbase_lookup(mock_smtp, mock_smtpssl):
                 'login_type': (NotifyEmailBase.WebBaseLogin.USERID, )
             },
         ),
-    ) + NotifyEmailBase.WEBBASE_LOOKUP_TABLE
+    ) + NotifyEmailBase.EMAIL_TEMPLATES
 
     obj = Apprise.instantiate(
         'mailto://user:pass@l2g.com', suppress_exceptions=True)
@@ -340,6 +340,12 @@ def test_webbase_lookup(mock_smtp, mock_smtpssl):
     assert obj.secure is True
     assert obj.port == 123
     assert obj.smtp_host == 'smtp.l2g.com'
+
+    # We get the same results if an email is identified as the username
+    # because the USERID variable forces that we can't use an email
+    obj = Apprise.instantiate(
+        'mailto://_:pass@l2g.com?user=user@test.com', suppress_exceptions=True)
+    assert obj.user == 'user'
 
 
 @mock.patch('smtplib.SMTP')
@@ -426,5 +432,85 @@ def test_email_url_escaping():
         suppress_exceptions=False)
     assert isinstance(obj, plugins.NotifyEmail) is True
 
-    # The password is escapped 'once' at this point
-    assert obj.password == ' %20'
+
+def test_email_url_variations():
+    """
+    API: Test email variations to ensure parsing is correct
+
+    """
+    # Test variations of username required to be an email address
+    # user@example.com
+    obj = Apprise.instantiate(
+        'mailto://{user}:{passwd}@example.com'.format(
+            user='apprise%40example21.ca',
+            passwd='abcd123'),
+        suppress_exceptions=False)
+    assert isinstance(obj, plugins.NotifyEmail) is True
+
+    assert obj.password == 'abcd123'
+    assert obj.user == 'apprise@example21.ca'
+
+    # test username specified in the url body (as an argument)
+    # this always over-rides the entry at the front of the url
+    obj = Apprise.instantiate(
+        'mailto://_:{passwd}@example.com?user={user}'.format(
+            user='apprise%40example21.ca',
+            passwd='abcd123'),
+        suppress_exceptions=False)
+    assert isinstance(obj, plugins.NotifyEmail) is True
+
+    assert obj.password == 'abcd123'
+    assert obj.user == 'apprise@example21.ca'
+
+    # test user and password specified in the url body (as an argument)
+    # this always over-rides the entries at the front of the url
+    obj = Apprise.instantiate(
+        'mailto://_:_@example.com?user={user}&pass={passwd}'.format(
+            user='apprise%40example21.ca',
+            passwd='abcd123'),
+        suppress_exceptions=False)
+    assert isinstance(obj, plugins.NotifyEmail) is True
+
+    assert obj.password == 'abcd123'
+    assert obj.user == 'apprise@example21.ca'
+    assert obj.to_addr == 'apprise@example.com'
+    assert obj.to_addr == obj.from_addr
+
+    # test user and password specified in the url body (as an argument)
+    # this always over-rides the entries at the front of the url
+    # this is similar to the previous test except we're only specifying
+    # this information in the kwargs
+    obj = Apprise.instantiate(
+        'mailto://example.com?user={user}&pass={passwd}'.format(
+            user='apprise%40example21.ca',
+            passwd='abcd123'),
+        suppress_exceptions=False)
+    assert isinstance(obj, plugins.NotifyEmail) is True
+
+    assert obj.password == 'abcd123'
+    assert obj.user == 'apprise@example21.ca'
+    assert obj.to_addr == 'apprise@example.com'
+    assert obj.to_addr == obj.from_addr
+    assert obj.smtp_host == 'example.com'
+
+    # test a complicated example
+    obj = Apprise.instantiate(
+        'mailtos://{user}:{passwd}@{host}:{port}'
+        '?smtp={smtp_host}&format=text&from={this}&to={that}'.format(
+            user='apprise%40example21.ca',
+            passwd='abcd123',
+            host='example.com',
+            port=1234,
+            this='from@example.jp',
+            that='to@example.jp',
+            smtp_host='smtp.example.edu'),
+        suppress_exceptions=False)
+    assert isinstance(obj, plugins.NotifyEmail) is True
+
+    assert obj.password == 'abcd123'
+    assert obj.user == 'apprise@example21.ca'
+    assert obj.host == 'example.com'
+    assert obj.port == 1234
+    assert obj.smtp_host == 'smtp.example.edu'
+    assert obj.to_addr == 'to@example.jp'
+    assert obj.from_addr == 'from@example.jp'

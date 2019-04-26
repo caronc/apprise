@@ -62,7 +62,7 @@ SECURE_MODES = (
 # To attempt to make this script stupid proof, if we detect an email address
 # that is part of the this table, we can pre-use a lot more defaults if they
 # aren't otherwise specified on the users input.
-WEBBASE_LOOKUP_TABLE = (
+EMAIL_TEMPLATES = (
     # Google GMail
     (
         'Google Mail',
@@ -303,44 +303,49 @@ class NotifyEmail(NotifyBase):
             # over-riding any smarts to be applied
             return
 
-        for i in range(len(WEBBASE_LOOKUP_TABLE)):  # pragma: no branch
+        for i in range(len(EMAIL_TEMPLATES)):  # pragma: no branch
             self.logger.debug('Scanning %s against %s' % (
-                self.to_addr, WEBBASE_LOOKUP_TABLE[i][0]
+                self.to_addr, EMAIL_TEMPLATES[i][0]
             ))
-            match = WEBBASE_LOOKUP_TABLE[i][1].match(self.from_addr)
+            match = EMAIL_TEMPLATES[i][1].match(self.from_addr)
             if match:
                 self.logger.info(
                     'Applying %s Defaults' %
-                    WEBBASE_LOOKUP_TABLE[i][0],
+                    EMAIL_TEMPLATES[i][0],
                 )
-                self.port = WEBBASE_LOOKUP_TABLE[i][2]\
+                self.port = EMAIL_TEMPLATES[i][2]\
                     .get('port', self.port)
-                self.secure = WEBBASE_LOOKUP_TABLE[i][2]\
+                self.secure = EMAIL_TEMPLATES[i][2]\
                     .get('secure', self.secure)
-                self.secure_mode = WEBBASE_LOOKUP_TABLE[i][2]\
+                self.secure_mode = EMAIL_TEMPLATES[i][2]\
                     .get('secure_mode', self.secure_mode)
-                self.smtp_host = WEBBASE_LOOKUP_TABLE[i][2]\
+                self.smtp_host = EMAIL_TEMPLATES[i][2]\
                     .get('smtp_host', self.smtp_host)
 
                 if self.smtp_host is None:
-                    # Detect Server if possible
-                    self.smtp_host = re.split(r'[\s@]+', self.from_addr)[-1]
+                    # default to our host
+                    self.smtp_host = self.host
 
-                # Adjust email login based on the defined
-                # usertype
-                login_type = WEBBASE_LOOKUP_TABLE[i][2]\
+                # Adjust email login based on the defined usertype. If no entry
+                # was specified, then we default to having them all set (which
+                # basically implies that there are no restrictions and use use
+                # whatever was specified)
+                login_type = EMAIL_TEMPLATES[i][2]\
                     .get('login_type', [])
 
-                if is_email(self.user) and \
-                   WebBaseLogin.EMAIL not in login_type:
-                    # Email specified but login type
-                    # not supported; switch it to user id
-                    self.user = match.group('id')
+                if login_type:
+                    # only apply additional logic to our user if a login_type
+                    # was specified.
+                    if is_email(self.user) and \
+                       WebBaseLogin.EMAIL not in login_type:
+                        # Email specified but login type
+                        # not supported; switch it to user id
+                        self.user = match.group('id')
 
-                elif WebBaseLogin.USERID not in login_type:
-                    # user specified but login type
-                    # not supported; switch it to email
-                    self.user = '%s@%s' % (self.user, self.host)
+                    elif WebBaseLogin.USERID not in login_type:
+                        # user specified but login type
+                        # not supported; switch it to email
+                        self.user = '%s@%s' % (self.user, self.host)
 
                 break
 
