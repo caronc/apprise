@@ -48,7 +48,7 @@ notification services that are out there. Apprise opens the door and makes
 it easy to access:
 
 Boxcar, Discord, E-Mail, Emby, Faast, Flock, Gitter, Gotify, Growl, IFTTT,
-Join, KODI, MatterMost, Matrix, Microsoft Windows Notifications,
+Join, KODI, Mailgun, MatterMost, Matrix, Microsoft Windows Notifications,
 Microsoft Teams, Notify My Android, Prowl, Pushalot, PushBullet, Pushjet,
 Pushover, Rocket.Chat, Slack, Super Toasty, Stride, Telegram, Twitter, XBMC,
 XMPP, Webex Teams}
