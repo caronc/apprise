@@ -432,6 +432,9 @@ def test_email_url_escaping():
         suppress_exceptions=False)
     assert isinstance(obj, plugins.NotifyEmail) is True
 
+    # The password is escapped 'once' at this point
+    assert obj.password == ' %20'
+
 
 def test_email_url_variations():
     """
