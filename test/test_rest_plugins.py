@@ -758,6 +758,83 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifyMailgun
+    ##################################
+    ('mailgun://', {
+        'instance': None,
+    }),
+    ('mailgun://:@/', {
+        'instance': None,
+    }),
+    # No Token specified
+    ('mailgun://user@host', {
+        'instance': TypeError,
+    }),
+    # Token specified but it's invalid
+    ('mailgun://user@host/{}'.format('a' * 12), {
+        'instance': TypeError,
+    }),
+    # Token is valid, but no user name specified
+    ('mailgun://host/{}-{}-{}'.format('a' * 32, 'b' * 8, 'c' * 8), {
+        'instance': TypeError,
+    }),
+    # Invalid from email address
+    ('mailgun://!@host/{}-{}-{}'.format('a' * 32, 'b' * 8, 'c' * 8), {
+        'instance': TypeError,
+    }),
+    # No To email address, but everything else is valid
+    ('mailgun://user@host/{}-{}-{}'.format('a' * 32, 'b' * 8, 'c' * 8), {
+        'instance': plugins.NotifyMailgun,
+    }),
+    # valid url with region specified (case insensitve)
+    ('mailgun://user@host/{}-{}-{}?region=uS'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+            'instance': plugins.NotifyMailgun,
+    }),
+    # valid url with region specified (case insensitve)
+    ('mailgun://user@host/{}-{}-{}?region=EU'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+            'instance': plugins.NotifyMailgun,
+    }),
+    # invalid url with region specified (case insensitve)
+    ('mailgun://user@host/{}-{}-{}?region=invalid'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+            'instance': TypeError,
+    }),
+    # One To Email address
+    ('mailgun://user@host/{}-{}-{}/test@example.com'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+            'instance': plugins.NotifyMailgun,
+    }),
+    ('mailgun://user@host/{}-{}-{}?to=test@example.com'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+            'instance': plugins.NotifyMailgun,
+    }),
+    # One To Email address, a from name specified too
+    ('mailgun://user@host/{}-{}-{}/test@example.com?name="Frodo"'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+            'instance': plugins.NotifyMailgun,
+    }),
+    ('mailgun://user@host/{}-{}-{}'.format('a' * 32, 'b' * 8, 'c' * 8), {
+        'instance': plugins.NotifyMailgun,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('mailgun://user@host/{}-{}-{}'.format('a' * 32, 'b' * 8, 'c' * 8), {
+        'instance': plugins.NotifyMailgun,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('mailgun://user@host/{}-{}-{}'.format('a' * 32, 'b' * 8, 'c' * 8), {
+        'instance': plugins.NotifyMailgun,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifyMatrix
     ##################################
     ('matrix://', {
