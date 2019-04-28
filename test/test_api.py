@@ -318,6 +318,9 @@ def test_apprise_tagging(mock_post, mock_get):
     # Create our object
     a = Apprise()
 
+    # An invalid addition can't add the tag
+    assert(a.add('averyinvalidschema://localhost', tag='uhoh') is False)
+
     # Add entry and assign it to a tag called 'awesome'
     assert(a.add('json://localhost/path1/', tag='awesome') is True)
 
