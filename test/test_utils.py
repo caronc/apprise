@@ -24,6 +24,7 @@
 # THE SOFTWARE.
 
 from __future__ import print_function
+import re
 try:
     # Python 2.7
     from urllib import unquote
@@ -406,8 +407,104 @@ def test_is_email():
     assert utils.is_email(None) is False
 
 
+def test_split_urls():
+    """utils: split_urls() testing """
+    # A simple single array entry (As str)
+    results = utils.split_urls('')
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    # just delimeters
+    results = utils.split_urls(',  ,, , ,,, ')
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    results = utils.split_urls(',')
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    results = utils.split_urls(None)
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    results = utils.split_urls(42)
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    results = utils.split_urls('this is not a parseable url at all')
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    # Now test valid URLs
+    results = utils.split_urls('windows://')
+    assert isinstance(results, list)
+    assert len(results) == 1
+    assert 'windows://' in results
+
+    results = utils.split_urls('windows:// gnome://')
+    assert isinstance(results, list)
+    assert len(results) == 2
+    assert 'windows://' in results
+    assert 'gnome://' in results
+
+    # Commas and spaces found inside URLs are ignored
+    urls = [
+        'mailgun://noreply@sandbox.mailgun.org/apikey/?to=test@example.com,'
+        'test2@example.com,, abcd@example.com',
+        'mailgun://noreply@sandbox.another.mailgun.org/apikey/'
+        '?to=hello@example.com,,hmmm@example.com,, abcd@example.com, ,',
+        'windows://',
+    ]
+
+    # Since comma's and whitespace are the delimiters; they won't be
+    # present at the end of the URL; so we just need to write a special
+    # rstrip() as a regular exression to handle whitespace (\s) and comma
+    # delimiter
+    rstrip_re = re.compile(r'[\s,]+$')
+
+    # Since a comma acts as a delimiter, we run a risk of a problem where the
+    # comma exists as part of the URL and is therefore lost if it was found
+    # at the end of it.
+
+    results = utils.split_urls(', '.join(urls))
+    assert isinstance(results, list)
+    assert len(results) == len(urls)
+    for url in urls:
+        assert rstrip_re.sub('', url) in results
+
+    # However if a comma is found at the end of a single url without a new
+    # match to hit, it is saved and not lost
+
+    # The comma at the end of the password will not be lost if we're
+    # dealing with a single entry:
+    url = 'http://hostname?password=,abcd,'
+    results = utils.split_urls(url)
+    assert isinstance(results, list)
+    assert len(results) == 1
+    assert url in results
+
+    # however if we have multiple entries, commas and spaces between
+    # URLs will be lost, however the last URL will not lose the comma
+    urls = [
+        'schema1://hostname?password=,abcd,',
+        'schema2://hostname?password=,abcd,',
+    ]
+    results = utils.split_urls(', '.join(urls))
+    assert isinstance(results, list)
+    assert len(results) == len(urls)
+
+    # No match because the comma is gone in the results entry
+    # schema1://hostname?password=,abcd
+    assert urls[0] not in results
+    assert urls[0][:-1] in results
+
+    # However we wouldn't have lost the comma in the second one:
+    # schema2://hostname?password=,abcd,
+    assert urls[1] in results
+
+
 def test_parse_list():
-    "utils: parse_list() testing """
+    """utils: parse_list() testing """
 
     # A simple single array entry (As str)
     results = utils.parse_list(

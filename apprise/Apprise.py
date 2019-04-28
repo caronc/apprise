@@ -33,6 +33,7 @@ from .common import NotifyType
 from .common import NotifyFormat
 from .utils import is_exclusive_match
 from .utils import parse_list
+from .utils import split_urls
 from .utils import GET_SCHEMA_RE
 from .logger import logger
 
@@ -161,7 +162,9 @@ class Apprise(object):
 
         if isinstance(servers, six.string_types):
             # build our server list
-            servers = parse_list(servers)
+            servers = split_urls(servers)
+            if len(servers) == 0:
+                return False
 
         elif isinstance(servers, (ConfigBase, NotifyBase, AppriseConfig)):
             # Go ahead and just add our plugin into our list

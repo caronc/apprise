@@ -107,6 +107,10 @@ GET_EMAIL_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Regular expression used to destinguish between multiple URLs
+URL_DETECTION_RE = re.compile(
+    r'([a-z0-9]+?:\/\/.*?)[\s,]*(?=$|[a-z0-9]+?:\/\/)', re.I)
+
 
 def is_hostname(hostname):
     """
@@ -461,6 +465,28 @@ def parse_bool(arg, default=False):
 
     # Handle other types
     return bool(arg)
+
+
+def split_urls(urls):
+    """
+    Takes a string containing URLs separated by comma's and/or spaces and
+    returns a list.
+    """
+
+    try:
+        results = URL_DETECTION_RE.findall(urls)
+
+    except TypeError:
+        results = []
+
+    if len(results) > 0 and results[len(results) - 1][-1] != urls[-1]:
+        # we always want to save the end of url URL if we can; This handles
+        # cases where there is actually a comma (,) at the end of a single URL
+        # that would have otherwise got lost when our regex passed over it.
+        results[len(results) - 1] += \
+            re.match(r'.*?([\s,]+)?$', urls).group(1).rstrip()
+
+    return results
 
 
 def parse_list(*args):
