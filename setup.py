@@ -59,8 +59,8 @@ setup(
     keywords='Push Notifications Alerts Email AWS SNS Boxcar Discord Dbus '
         'Emby Faast Flock Gitter Gnome Gotify Growl IFTTT Join KODI Mailgun '
         'Matrix Mattermost Prowl PushBullet Pushjet Pushed Pushover '
-        'Rocket.Chat Ryver Slack Stride Telegram Twitter XBMC Microsoft '
-        'Windows Webex CLI API',
+        'Rocket.Chat Ryver Slack Stride Telegram Twilio Twitter XBMC '
+        'Microsoft MSTeams Windows Webex CLI API',
     author='Chris Caron',
     author_email='lead2gold@gmail.com',
     packages=find_packages(),
