@@ -178,7 +178,7 @@ class NotifySNS(NotifyBase):
 
         if len(self.phone) == 0 and len(self.topics) == 0:
             self.logger.warning(
-                'There are no valid target identified to notify.')
+                'There are no valid target(s) identified to notify.')
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
