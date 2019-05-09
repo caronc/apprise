@@ -333,7 +333,6 @@ def parse_url(url, default_schema='http', verify_host=True):
 
     # Parse results
     result['host'] = parsed[1].strip()
-
     if not result['host']:
         # Nothing more we can do without a hostname
         return None
@@ -365,7 +364,7 @@ def parse_url(url, default_schema='http', verify_host=True):
                 result['query'] = None
     try:
         (result['user'], result['host']) = \
-            re.split(r'[\s@]+', result['host'])[:2]
+            re.split(r'[@]+', result['host'])[:2]
 
     except ValueError:
         # no problem then, host only exists
@@ -375,7 +374,7 @@ def parse_url(url, default_schema='http', verify_host=True):
     if result['user'] is not None:
         try:
             (result['user'], result['password']) = \
-                re.split(r'[:\s]+', result['user'])[:2]
+                re.split(r'[:]+', result['user'])[:2]
 
         except ValueError:
             # no problem then, user only exists
@@ -384,7 +383,7 @@ def parse_url(url, default_schema='http', verify_host=True):
 
     try:
         (result['host'], result['port']) = \
-            re.split(r'[\s:]+', result['host'])[:2]
+            re.split(r'[:]+', result['host'])[:2]
 
     except ValueError:
         # no problem then, user only exists

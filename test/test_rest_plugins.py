@@ -1896,6 +1896,87 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifyTwilio
+    ##################################
+    ('twilio://', {
+        # No token specified
+        'instance': None,
+    }),
+    ('twilio://:@/', {
+        # invalid Auth token
+        'instance': TypeError,
+    }),
+    ('twilio://AC{}@12345678'.format('a' * 32), {
+        # Just sid provided
+        'instance': TypeError,
+    }),
+    ('twilio://AC{}:{}@_'.format('a' * 32, 'b' * 32), {
+        # sid and token provided but invalid from
+        'instance': TypeError,
+    }),
+    ('twilio://AC{}:{}@{}'.format('a' * 23, 'b' * 32, '1' * 11), {
+        # sid invalid and token
+        'instance': TypeError,
+    }),
+    ('twilio://AC{}:{}@{}'.format('a' * 32, 'b' * 23, '2' * 11), {
+        # sid and invalid token
+        'instance': TypeError,
+    }),
+    ('twilio://AC{}:{}@{}'.format('a' * 32, 'b' * 32, '3' * 5), {
+        # using short-code (5 characters) without a target
+        'instance': TypeError,
+    }),
+    ('twilio://AC{}:{}@{}'.format('a' * 32, 'b' * 32, '3' * 9), {
+        # sid and token provided and from but invalid from no
+        'instance': TypeError,
+    }),
+    ('twilio://AC{}:{}@{}/123/{}/abcd/'.format(
+        'a' * 32, 'b' * 32, '3' * 11, '9' * 15), {
+        # valid everything but target numbers
+        'instance': plugins.NotifyTwilio,
+    }),
+    ('twilio://AC{}:{}@12345/{}'.format('a' * 32, 'b' * 32, '4' * 11), {
+        # using short-code (5 characters)
+        'instance': plugins.NotifyTwilio,
+    }),
+    ('twilio://AC{}:{}@123456/{}'.format('a' * 32, 'b' * 32, '4' * 11), {
+        # using short-code (6 characters)
+        'instance': plugins.NotifyTwilio,
+    }),
+    ('twilio://AC{}:{}@{}'.format('a' * 32, 'b' * 32, '5' * 11), {
+        # using phone no with no target - we text ourselves in
+        # this case
+        'instance': plugins.NotifyTwilio,
+    }),
+    ('twilio://_?sid=AC{}&token={}&from={}'.format(
+        'a' * 32, 'b' * 32, '5' * 11), {
+        # use get args to acomplish the same thing
+        'instance': plugins.NotifyTwilio,
+    }),
+    ('twilio://_?sid=AC{}&token={}&source={}'.format(
+        'a' * 32, 'b' * 32, '5' * 11), {
+        # use get args to acomplish the same thing (use source instead of from)
+        'instance': plugins.NotifyTwilio,
+    }),
+    ('twilio://_?sid=AC{}&token={}&from={}&to={}'.format(
+        'a' * 32, 'b' * 32, '5' * 11, '7' * 13), {
+        # use to=
+        'instance': plugins.NotifyTwilio,
+    }),
+    ('twilio://AC{}:{}@{}'.format('a' * 32, 'b' * 32, '6' * 11), {
+        'instance': plugins.NotifyTwilio,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('twilio://AC{}:{}@{}'.format('a' * 32, 'b' * 32, '6' * 11), {
+        'instance': plugins.NotifyTwilio,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifyWebexTeams
     ##################################
     ('wxteams://', {
@@ -2160,7 +2241,7 @@ def test_rest_plugins(mock_post, mock_get):
                 if instance is not None:
                     # We're done (assuming this is what we were expecting)
                     print("{} didn't instantiate itself "
-                          "(we expected it to)".format(url))
+                          "(we expected it to be a {})".format(url, instance))
                     assert False
                 continue
 
@@ -2680,6 +2761,65 @@ def test_notify_emby_plugin_sessions(mock_post, mock_get, mock_logout,
     sessions = obj.sessions()
     assert isinstance(sessions, dict) is True
     assert len(sessions) == 0
+
+
+@mock.patch('requests.post')
+def test_notify_twilio_plugin(mock_post):
+    """
+    API: NotifyTwilio() Extra Checks
+
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
+
+    # Prepare our response
+    response = requests.Request()
+    response.status_code = requests.codes.ok
+
+    # Prepare Mock
+    mock_post.return_value = response
+
+    # Initialize some generic (but valid) tokens
+    account_sid = 'AC{}'.format('b' * 32)
+    auth_token = '{}'.format('b' * 32)
+    source = '+1 (555) 123-3456'
+
+    try:
+        plugins.NotifyTwilio(
+            account_sid=None, auth_token=auth_token, source=source)
+        # No account_sid specified
+        assert False
+
+    except TypeError:
+        # Exception should be thrown about the fact account_sid was not
+        # specified
+        assert True
+
+    try:
+        plugins.NotifyTwilio(
+            account_sid=account_sid, auth_token=None, source=source)
+        # No account_sid specified
+        assert False
+
+    except TypeError:
+        # Exception should be thrown about the fact account_sid was not
+        # specified
+        assert True
+
+    # a error response
+    response.status_code = 400
+    response.content = dumps({
+        'code': 21211,
+        'message': "The 'To' number +1234567 is not a valid phone number.",
+    })
+    mock_post.return_value = response
+
+    # Initialize our object
+    obj = plugins.NotifyTwilio(
+        account_sid=account_sid, auth_token=auth_token, source=source)
+
+    # We will fail with the above error code
+    assert obj.notify('title', 'body', 'info') is False
 
 
 @mock.patch('apprise.plugins.NotifyEmby.login')
