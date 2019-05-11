@@ -1671,8 +1671,8 @@ TEST_URLS = (
         'instance': plugins.NotifySlack,
     }),
     ('slack://username@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ', {
-        # Missing a channel
-        'instance': TypeError,
+        # Missing a channel, falls back to webhook channel bindings
+        'instance': plugins.NotifySlack,
     }),
     ('slack://username@INVALID/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#cool', {
         # invalid 1st Token
@@ -3156,17 +3156,6 @@ def test_notify_slack_plugin(mock_post, mock_get):
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.ok
     mock_get.return_value.status_code = requests.codes.ok
-
-    # Empty Channel list
-    try:
-        plugins.NotifySlack(
-            token_a=token_a, token_b=token_b, token_c=token_c,
-            targets=None)
-        assert False
-
-    except TypeError:
-        # we'll thrown because an empty list of channels was provided
-        assert True
 
     # Missing first Token
     try:
