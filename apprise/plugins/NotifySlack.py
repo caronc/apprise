@@ -36,7 +36,6 @@
 #
 #
 import re
-import six
 import requests
 from json import dumps
 from time import time
@@ -46,6 +45,7 @@ from ..common import NotifyImageSize
 from ..common import NotifyType
 from ..common import NotifyFormat
 from ..utils import parse_bool
+from ..utils import parse_list
 
 # Token required as part of the API request
 #  /AAAAAAAAA/........./........................
@@ -155,21 +155,13 @@ class NotifySlack(NotifyBase):
             self.logger.warning(
                 'No user was specified; using %s.' % SLACK_DEFAULT_USER)
 
-        if isinstance(targets, six.string_types):
-            self.channels = [x for x in filter(bool, CHANNEL_LIST_DELIM.split(
-                targets,
-            ))]
-
-        elif isinstance(targets, (set, tuple, list)):
-            self.channels = targets
-
-        else:
-            self.channels = list()
-
+        # Build list of channels
+        self.channels = parse_list(targets)
         if len(self.channels) == 0:
-            msg = 'No channel(s) were specified.'
-            self.logger.warning(msg)
-            raise TypeError(msg)
+            # No problem; the webhook is smart enough to just notify the
+            # channel it was created for; adding 'None' is just used as
+            # a flag lower to not set the channels
+            self.channels.append(None)
 
         # Formatting requirements are defined here:
         # https://api.slack.com/docs/message-formatting
@@ -218,47 +210,48 @@ class NotifySlack(NotifyBase):
             self.token_c,
         )
 
+        # prepare JSON Object
+        payload = {
+            'username': self.user if self.user else SLACK_DEFAULT_USER,
+            # Use Markdown language
+            'mrkdwn': (self.notify_format == NotifyFormat.MARKDOWN),
+            'attachments': [{
+                'title': title,
+                'text': body,
+                'color': self.color(notify_type),
+                # Time
+                'ts': time(),
+                'footer': self.app_id,
+            }],
+        }
+
         # Create a copy of the channel list
         channels = list(self.channels)
         while len(channels):
             channel = channels.pop(0)
-            if not IS_CHANNEL_RE.match(channel):
-                self.logger.warning(
-                    "The specified channel '%s' is invalid; skipping." % (
-                        channel,
-                    )
-                )
-                # Mark our failure
-                has_error = True
-                continue
 
-            if len(channel) > 1 and channel[0] == '+':
-                # Treat as encoded id if prefixed with a +
-                _channel = channel[1:]
+            if channel is not None:
+                # Channel over-ride was specified
+                if not IS_CHANNEL_RE.match(channel):
+                    self.logger.warning(
+                        "The specified target {} is invalid;"
+                        "skipping.".format(channel))
 
-            elif len(channel) > 1 and channel[0] == '@':
-                # Treat @ value 'as is'
-                _channel = channel
+                    # Mark our failure
+                    has_error = True
+                    continue
 
-            else:
-                # Prefix with channel hash tag
-                _channel = '#%s' % channel
+                if len(channel) > 1 and channel[0] == '+':
+                    # Treat as encoded id if prefixed with a +
+                    payload['channel'] = channel[1:]
 
-            # prepare JSON Object
-            payload = {
-                'channel': _channel,
-                'username': self.user if self.user else SLACK_DEFAULT_USER,
-                # Use Markdown language
-                'mrkdwn': (self.notify_format == NotifyFormat.MARKDOWN),
-                'attachments': [{
-                    'title': title,
-                    'text': body,
-                    'color': self.color(notify_type),
-                    # Time
-                    'ts': time(),
-                    'footer': self.app_id,
-                }],
-            }
+                elif len(channel) > 1 and channel[0] == '@':
+                    # Treat @ value 'as is'
+                    payload['channel'] = channel
+
+                else:
+                    # Prefix with channel hash tag
+                    payload['channel'] = '#%s' % channel
 
             # Acquire our to-be footer icon if configured to do so
             image_url = None if not self.include_image \
@@ -288,9 +281,10 @@ class NotifySlack(NotifyBase):
                             r.status_code, SLACK_HTTP_ERROR_MAP)
 
                     self.logger.warning(
-                        'Failed to send Slack notification to {}: '
+                        'Failed to send Slack notification{}: '
                         '{}{}error={}.'.format(
-                            channel,
+                            ' to {}'.format(channel)
+                            if channel is not None else '',
                             status_str,
                             ', ' if status_str else '',
                             r.status_code))
@@ -304,13 +298,16 @@ class NotifySlack(NotifyBase):
 
                 else:
                     self.logger.info(
-                        'Sent Slack notification to {}.'.format(channel))
+                        'Sent Slack notification{}.'.format(
+                            ' to {}'.format(channel)
+                            if channel is not None else ''))
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occured sending Slack:%s ' % (
-                        channel) + 'notification.'
-                )
+                    'A Connection error occured sending Slack '
+                    'notification{}.'.format(
+                        ' to {}'.format(channel)
+                        if channel is not None else ''))
                 self.logger.debug('Socket Exception: %s' % str(e))
 
                 # Mark our failure
