@@ -24,15 +24,21 @@
 # THE SOFTWARE.
 
 import re
+import six
 import requests
 from json import loads
+from json import dumps
 from itertools import chain
 
 from .NotifyBase import NotifyBase
+from ..common import NotifyImageSize
+from ..common import NotifyFormat
 from ..common import NotifyType
 from ..utils import parse_list
+from ..utils import parse_bool
 
-IS_CHANNEL = re.compile(r'^#(?P<name>[A-Za-z0-9]+)$')
+IS_CHANNEL = re.compile(r'^#(?P<name>[A-Za-z0-9_-]+)$')
+IS_USER = re.compile(r'^@(?P<name>[A-Za-z0-9._-]+)$')
 IS_ROOM_ID = re.compile(r'^(?P<name>[A-Za-z0-9]+)$')
 
 # Extend HTTP Error Messages
@@ -44,6 +50,24 @@ RC_HTTP_ERROR_MAP = {
 # Used to break apart list of potential tags by their delimiter
 # into a usable list.
 LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
+
+
+class RocketChatAuthMode(object):
+    """
+    The Chat Authentication mode is detected
+    """
+    # providing a webhook
+    WEBHOOK = "webhook"
+
+    # Providing a username and password (default)
+    BASIC = "basic"
+
+
+# Define our authentication modes
+ROCKETCHAT_AUTH_MODES = (
+    RocketChatAuthMode.WEBHOOK,
+    RocketChatAuthMode.BASIC,
+)
 
 
 class NotifyRocketChat(NotifyBase):
@@ -66,13 +90,21 @@ class NotifyRocketChat(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_rocketchat'
 
+    # Allows the user to specify the NotifyImageSize object; this is supported
+    # through the webhook
+    image_size = NotifyImageSize.XY_128
+
     # The title is not used
     title_maxlen = 0
 
     # The maximum size of the message
-    body_maxlen = 200
+    body_maxlen = 1000
 
-    def __init__(self, targets=None, **kwargs):
+    # Default to markdown
+    notify_format = NotifyFormat.MARKDOWN
+
+    def __init__(self, webhook=None, targets=None, mode=None,
+                 include_avatar=True, **kwargs):
         """
         Initialize Notify Rocket.Chat Object
         """
@@ -87,19 +119,55 @@ class NotifyRocketChat(NotifyBase):
         if isinstance(self.port, int):
             self.api_url += ':%d' % self.port
 
-        self.api_url += '/api/v1/'
-
         # Initialize channels list
         self.channels = list()
 
         # Initialize room list
         self.rooms = list()
 
-        if not (self.user and self.password):
+        # Initialize user list (webhook only)
+        self.users = list()
+
+        # Assign our webhook (if defined)
+        self.webhook = webhook
+
+        # Place an avatar image to associate with our content
+        self.include_avatar = include_avatar
+
+        # Used to track token headers upon authentication (if successful)
+        # This is only used if not on webhook mode
+        self.headers = {}
+
+        # Authentication mode
+        self.mode = None \
+            if not isinstance(mode, six.string_types) \
+            else mode.lower()
+
+        if self.mode and self.mode not in ROCKETCHAT_AUTH_MODES:
+            msg = 'The authentication mode specified ({}) is invalid.'.format(
+                mode)
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
+        # Detect our mode if it wasn't specified
+        if not self.mode:
+            if self.webhook is not None:
+                # Just a username was specified, we treat this as a webhook
+                self.mode = RocketChatAuthMode.WEBHOOK
+            else:
+                self.mode = RocketChatAuthMode.BASIC
+
+        if self.mode == RocketChatAuthMode.BASIC \
+                and not (self.user and self.password):
             # Username & Password is required for Rocket Chat to work
-            raise TypeError(
-                'No Rocket.Chat user/pass combo specified.'
-            )
+            msg = 'No Rocket.Chat user/pass combo was specified.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
+        elif self.mode == RocketChatAuthMode.WEBHOOK and not self.webhook:
+            msg = 'No Rocket.Chat Incoming Webhook was specified.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         # Validate recipients and drop bad ones:
         for recipient in parse_list(targets):
@@ -115,18 +183,24 @@ class NotifyRocketChat(NotifyBase):
                 self.rooms.append(result.group('name'))
                 continue
 
+            result = IS_USER.match(recipient)
+            if result:
+                # store valid room
+                self.users.append(result.group('name'))
+                continue
+
             self.logger.warning(
-                'Dropped invalid channel/room '
-                '(%s) specified.' % recipient,
+                'Dropped invalid channel/room/user '
+                '({}) specified.'.format(recipient),
             )
 
-        if len(self.rooms) == 0 and len(self.channels) == 0:
+        if self.mode == RocketChatAuthMode.BASIC and \
+                len(self.rooms) == 0 and len(self.channels) == 0:
             msg = 'No Rocket.Chat room and/or channels specified to notify.'
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # Used to track token headers upon authentication (if successful)
-        self.headers = {}
+        return
 
     def url(self):
         """
@@ -138,13 +212,22 @@ class NotifyRocketChat(NotifyBase):
             'format': self.notify_format,
             'overflow': self.overflow_mode,
             'verify': 'yes' if self.verify_certificate else 'no',
+            'avatar': 'yes' if self.include_avatar else 'no',
+            'mode': self.mode,
         }
 
         # Determine Authentication
-        auth = '{user}:{password}@'.format(
-            user=NotifyRocketChat.quote(self.user, safe=''),
-            password=NotifyRocketChat.quote(self.password, safe=''),
-        )
+        if self.mode == RocketChatAuthMode.BASIC:
+            auth = '{user}:{password}@'.format(
+                user=NotifyRocketChat.quote(self.user, safe=''),
+                password=NotifyRocketChat.quote(self.password, safe=''),
+            )
+        else:
+            auth = '{user}{webhook}@'.format(
+                user='{}:'.format(NotifyRocketChat.quote(self.user, safe=''))
+                if self.user else '',
+                webhook=NotifyRocketChat.quote(self.webhook, safe=''),
+            )
 
         default_port = 443 if self.secure else 80
 
@@ -160,6 +243,8 @@ class NotifyRocketChat(NotifyBase):
                     ['#{}'.format(x) for x in self.channels],
                     # Rooms are as is
                     self.rooms,
+                    # Users
+                    ['@{}'.format(x) for x in self.users],
                 )]),
             args=NotifyRocketChat.urlencode(args),
         )
@@ -169,44 +254,103 @@ class NotifyRocketChat(NotifyBase):
         wrapper to _send since we can alert more then one channel
         """
 
+        # Call the _send_ function applicable to whatever mode we're in
+        # - calls _send_webhook_notification if the mode variable is set
+        # - calls _send_basic_notification if the mode variable is not set
+        return getattr(self, '_send_{}_notification'.format(self.mode))(
+            body=body, title=title, notify_type=notify_type, **kwargs)
+
+    def _send_webhook_notification(self, body, title='',
+                                   notify_type=NotifyType.INFO, **kwargs):
+        """
+        Sends a webhook notification
+        """
+
+        # Our payload object
+        payload = self._payload(body, title, notify_type)
+
+        # Assemble our webhook URL
+        path = 'hooks/{}'.format(self.webhook)
+
+        # Build our list of channels/rooms/users (if any identified)
+        targets = ['@{}'.format(u) for u in self.users]
+        targets.extend(['#{}'.format(c) for c in self.channels])
+        targets.extend(['{}'.format(r) for r in self.rooms])
+
+        if len(targets) == 0:
+            # We can take an early exit
+            return self._send(
+                payload, notify_type=notify_type, path=path, **kwargs)
+
+        # Otherwise we want to iterate over each of the targets
+
+        # Initiaize our error tracking
+        has_error = False
+
+        headers = {
+            'User-Agent': self.app_id,
+            'Content-Type': 'application/json',
+        }
+
+        while len(targets):
+            # Retrieve our target
+            target = targets.pop(0)
+
+            # Assign our channel/room/user
+            payload['channel'] = target
+
+            if not self._send(
+                    dumps(payload), notify_type=notify_type, path=path,
+                    headers=headers, **kwargs):
+
+                # toggle flag
+                has_error = True
+
+        return not has_error
+
+    def _send_basic_notification(self, body, title='',
+                                 notify_type=NotifyType.INFO, **kwargs):
+        """
+        Authenticates with the server using a user/pass combo for
+        notifications.
+        """
         # Track whether we authenticated okay
 
         if not self.login():
             return False
 
-        # Prepare our message using the body only
-        text = body
+        # prepare JSON Object
+        payload = self._payload(body, title, notify_type)
 
         # Initiaize our error tracking
         has_error = False
 
-        # Create a copy of our rooms and channels to notify against
+        # Create a copy of our channels to notify against
         channels = list(self.channels)
-        rooms = list(self.rooms)
-
+        _payload = payload.copy()
         while len(channels) > 0:
             # Get Channel
             channel = channels.pop(0)
+            _payload['channel'] = channel
 
             if not self._send(
-                    {
-                        'text': text,
-                        'channel': channel,
-                    }, notify_type=notify_type, **kwargs):
+                    _payload, notify_type=notify_type, headers=self.headers,
+                    **kwargs):
 
                 # toggle flag
                 has_error = True
 
-        # Send all our defined room id's
+        # Create a copy of our room id's to notify against
+        rooms = list(self.rooms)
+        _payload = payload.copy()
         while len(rooms):
             # Get Room
             room = rooms.pop(0)
+            _payload['roomId'] = room
 
             if not self._send(
-                    {
-                        'text': text,
-                        'roomId': room,
-                    }, notify_type=notify_type, **kwargs):
+                    payload, notify_type=notify_type, headers=self.headers,
+                    **kwargs):
 
                 # toggle flag
                 has_error = True
@@ -216,14 +360,32 @@ class NotifyRocketChat(NotifyBase):
 
         return not has_error
 
-    def _send(self, payload, notify_type, **kwargs):
+    def _payload(self, body, title='', notify_type=NotifyType.INFO):
+        """
+        Prepares a payload object
+        """
+        # prepare JSON Object
+        payload = {
+            "text": body,
+        }
+
+        # apply our images if they're set to be displayed
+        image_url = self.image_url(notify_type)
+        if self.include_avatar:
+            payload['avatar'] = image_url
+
+        return payload
+
+    def _send(self, payload, notify_type, path='api/v1/chat.postMessage',
+              headers=None, **kwargs):
         """
         Perform Notify Rocket.Chat Notification
         """
 
+        api_url = '{}/{}'.format(self.api_url, path)
+
         self.logger.debug('Rocket.Chat POST URL: %s (cert_verify=%r)' % (
-            self.api_url + 'chat.postMessage', self.verify_certificate,
-        ))
+            api_url, self.verify_certificate))
         self.logger.debug('Rocket.Chat Payload: %s' % str(payload))
 
         # Always call throttle before any remote server i/o is made
@@ -231,9 +393,9 @@ class NotifyRocketChat(NotifyBase):
 
         try:
             r = requests.post(
-                self.api_url + 'chat.postMessage',
+                api_url,
                 data=payload,
-                headers=self.headers,
+                headers=headers,
                 verify=self.verify_certificate,
             )
             if r.status_code != requests.codes.ok:
@@ -243,8 +405,9 @@ class NotifyRocketChat(NotifyBase):
                         r.status_code, RC_HTTP_ERROR_MAP)
 
                 self.logger.warning(
-                    'Failed to send Rocket.Chat notification: '
+                    'Failed to send Rocket.Chat {}:notification: '
                     '{}{}error={}.'.format(
+                        self.mode,
                         status_str,
                         ', ' if status_str else '',
                         r.status_code))
@@ -255,12 +418,13 @@ class NotifyRocketChat(NotifyBase):
                 return False
 
             else:
-                self.logger.info('Sent Rocket.Chat notification.')
+                self.logger.info(
+                    'Sent Rocket.Chat {}:notification.'.format(self.mode))
 
         except requests.RequestException as e:
             self.logger.warning(
                 'A Connection error occured sending Rocket.Chat '
-                'notification.')
+                '{}:notification.'.format(self.mode))
             self.logger.debug('Socket Exception: %s' % str(e))
 
             # Return; we're done
@@ -273,14 +437,17 @@ class NotifyRocketChat(NotifyBase):
         login to our server
 
         """
+
         payload = {
             'username': self.user,
             'password': self.password,
         }
 
+        api_url = '{}/{}'.format(self.api_url, 'api/v1/login')
+
         try:
             r = requests.post(
-                self.api_url + 'login',
+                api_url,
                 data=payload,
                 verify=self.verify_certificate,
             )
@@ -331,9 +498,12 @@ class NotifyRocketChat(NotifyBase):
         """
         logout of our server
         """
+
+        api_url = '{}/{}'.format(self.api_url, 'api/v1/logout')
+
         try:
             r = requests.post(
-                self.api_url + 'logout',
+                api_url,
                 headers=self.headers,
                 verify=self.verify_certificate,
             )
@@ -377,18 +547,69 @@ class NotifyRocketChat(NotifyBase):
         us to substantiate this object.
 
         """
+
+        try:
+            # Attempt to detect the webhook (if specified in the URL)
+            # If no webhook is specified, then we just pass along as if nothing
+            # happened. However if we do find a webhook, we want to rebuild our
+            # URL without it since it conflicts with standard URLs. Support
+            # %2F since that is a forward slash escaped
+
+            # rocket://webhook@host
+            # rocket://user:webhook@host
+            match = re.match(
+                r'^\s*(?P<schema>[^:]+://)((?P<user>[^:]+):)?'
+                r'(?P<webhook>[a-z0-9]+(/|%2F)'
+                r'[a-z0-9]+)\@(?P<url>.+)$', url, re.I)
+
+        except TypeError:
+            # Not a string
+            return None
+
+        if match:
+            # Re-assemble our URL without the webhook
+            url = '{schema}{user}{url}'.format(
+                schema=match.group('schema'),
+                user='{}@'.format(match.group('user'))
+                if match.group('user') else '',
+                url=match.group('url'),
+            )
+
         results = NotifyBase.parse_url(url)
 
         if not results:
             # We're done early as we couldn't load the results
             return results
 
+        if match:
+            # store our webhook
+            results['webhook'] = \
+                NotifyRocketChat.unquote(match.group('webhook'))
+
+            # Take on the password too in the event we're in basic mode
+            # We do not unquote() as this is done at a later state
+            results['password'] = match.group('webhook')
+
         # Apply our targets
         results['targets'] = NotifyRocketChat.split_path(results['fullpath'])
+
+        # The user may have forced the mode
+        if 'mode' in results['qsd'] and len(results['qsd']['mode']):
+            results['mode'] = \
+                NotifyRocketChat.unquote(results['qsd']['mode'])
+
+        # avatar icon
+        results['include_avatar'] = \
+            parse_bool(results['qsd'].get('avatar', True))
 
         # The 'to' makes it easier to use yaml configuration
         if 'to' in results['qsd'] and len(results['qsd']['to']):
             results['targets'] += \
                 NotifyRocketChat.parse_list(results['qsd']['to'])
+
+        # The 'webhook' over-ride (if specified)
+        if 'webhook' in results['qsd'] and len(results['qsd']['webhook']):
+            results['webhook'] = \
+                NotifyRocketChat.unquote(results['qsd']['webhook'])
 
         return results
