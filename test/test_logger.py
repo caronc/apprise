@@ -55,3 +55,6 @@ def test_apprise_logger():
 
     # Verbose Debugging will activate
     URLBase.logger.trace('test')
+
+    # Disable Logging
+    logging.disable(logging.CRITICAL)
