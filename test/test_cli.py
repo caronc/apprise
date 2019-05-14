@@ -24,10 +24,22 @@
 # THE SOFTWARE.
 
 from __future__ import print_function
+import mock
 from apprise import cli
 from apprise import NotifyBase
 from click.testing import CliRunner
 from apprise.plugins import SCHEMA_MAP
+
+try:
+    # Python v3.4+
+    from importlib import reload
+except ImportError:
+    try:
+        # Python v3.0-v3.3
+        from imp import reload
+    except ImportError:
+        # Python v2.7
+        pass
 
 # Disable logging for a cleaner testing output
 import logging
@@ -157,3 +169,16 @@ def test_apprise_cli(tmpdir):
         '--tag', 'tagd',
     ])
     assert result.exit_code == 0
+
+
+@mock.patch('platform.system')
+def test_apprise_cli_windows_env(mock_system):
+    """
+    API: Apprise() CLI Windows Environment
+
+    """
+    # Force a windows environment
+    mock_system.return_value = 'Windows'
+
+    # Reload our module
+    reload(cli)

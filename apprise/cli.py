@@ -25,9 +25,11 @@
 
 import click
 import logging
+import platform
 import sys
 from os.path import isfile
 from os.path import expanduser
+from os.path import expandvars
 
 from . import NotifyType
 from . import Apprise
@@ -53,6 +55,16 @@ DEFAULT_SEARCH_PATHS = (
     '~/.config/apprise',
     '~/.config/apprise.yml',
 )
+
+# Detect Windows
+if platform.system() == 'Windows':
+    # Default Search Path for Windows Users
+    DEFAULT_SEARCH_PATHS = (
+        expandvars('%APPDATA%/Apprise/apprise'),
+        expandvars('%APPDATA%/Apprise/apprise.yml'),
+        expandvars('%LOCALAPPDATA%/Apprise/apprise'),
+        expandvars('%LOCALAPPDATA%/Apprise/apprise.yml'),
+    )
 
 
 def print_help_msg(command):
