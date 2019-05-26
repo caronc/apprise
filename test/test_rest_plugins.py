@@ -1349,6 +1349,10 @@ TEST_URLS = (
     ('pover://%s@%s' % ('u' * 30, 'a' * 24), {
         'instance': TypeError,
     }),
+    # APIKey + invalid sound setting
+    ('pover://%s@%s?sound=invalid' % ('u' * 30, 'a' * 30), {
+        'instance': TypeError,
+    }),
     # APIKey + Valid User
     ('pover://%s@%s' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
