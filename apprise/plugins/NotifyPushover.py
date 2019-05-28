@@ -24,6 +24,7 @@
 # THE SOFTWARE.
 
 import re
+import six
 import requests
 
 from .NotifyBase import NotifyBase
@@ -51,6 +52,57 @@ class PushoverPriority(object):
     HIGH = 1
     EMERGENCY = 2
 
+
+# Sounds
+class PushoverSound(object):
+    PUSHOVER = 'pushover'
+    BIKE = 'bike'
+    BUGLE = 'bugle'
+    CASHREGISTER = 'cashregister'
+    CLASSICAL = 'classical'
+    COSMIC = 'cosmic'
+    FALLING = 'falling'
+    GAMELAN = 'gamelan'
+    INCOMING = 'incoming'
+    INTERMISSION = 'intermission'
+    MAGIC = 'magic'
+    MECHANICAL = 'mechanical'
+    PIANOBAR = 'pianobar'
+    SIREN = 'siren'
+    SPACEALARM = 'spacealarm'
+    TUGBOAT = 'tugboat'
+    ALIEN = 'alien'
+    CLIMB = 'climb'
+    PERSISTENT = 'persistent'
+    ECHO = 'echo'
+    UPDOWN = 'updown'
+    NONE = 'none'
+
+
+PUSHOVER_SOUNDS = (
+    PushoverSound.PUSHOVER,
+    PushoverSound.BIKE,
+    PushoverSound.BUGLE,
+    PushoverSound.CASHREGISTER,
+    PushoverSound.CLASSICAL,
+    PushoverSound.COSMIC,
+    PushoverSound.FALLING,
+    PushoverSound.GAMELAN,
+    PushoverSound.INCOMING,
+    PushoverSound.INTERMISSION,
+    PushoverSound.MAGIC,
+    PushoverSound.MECHANICAL,
+    PushoverSound.PIANOBAR,
+    PushoverSound.SIREN,
+    PushoverSound.SPACEALARM,
+    PushoverSound.TUGBOAT,
+    PushoverSound.ALIEN,
+    PushoverSound.CLIMB,
+    PushoverSound.PERSISTENT,
+    PushoverSound.ECHO,
+    PushoverSound.UPDOWN,
+    PushoverSound.NONE,
+)
 
 PUSHOVER_PRIORITIES = (
     PushoverPriority.LOW,
@@ -89,7 +141,11 @@ class NotifyPushover(NotifyBase):
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 512
 
-    def __init__(self, token, targets=None, priority=None, **kwargs):
+    # Default Pushover sound
+    default_pushover_sound = PushoverSound.PUSHOVER
+
+    def __init__(self, token, targets=None, priority=None, sound=None,
+                 **kwargs):
         """
         Initialize Pushover Object
         """
@@ -113,6 +169,14 @@ class NotifyPushover(NotifyBase):
         self.targets = parse_list(targets)
         if len(self.targets) == 0:
             self.targets = (PUSHOVER_SEND_TO_ALL, )
+
+        # Setup our sound
+        self.sound = NotifyPushover.default_pushover_sound \
+            if not isinstance(sound, six.string_types) else sound.lower()
+        if self.sound and self.sound not in PUSHOVER_SOUNDS:
+            msg = 'The sound specified ({}) is invalid.'.format(sound)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         # The Priority of the message
         if priority not in PUSHOVER_PRIORITIES:
@@ -167,6 +231,7 @@ class NotifyPushover(NotifyBase):
                 'title': title,
                 'message': body,
                 'device': device,
+                'sound': self.sound,
             }
 
             self.logger.debug('Pushover POST URL: %s (cert_verify=%r)' % (
@@ -296,6 +361,11 @@ class NotifyPushover(NotifyBase):
 
         # Retrieve all of our targets
         results['targets'] = NotifyPushover.split_path(results['fullpath'])
+
+        # Get the sound
+        if 'sound' in results['qsd'] and len(results['qsd']['sound']):
+            results['sound'] = \
+                NotifyPushover.unquote(results['qsd']['sound'])
 
         # The 'to' makes it easier to use yaml configuration
         if 'to' in results['qsd'] and len(results['qsd']['to']):
