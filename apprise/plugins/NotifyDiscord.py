@@ -396,6 +396,29 @@ class NotifyDiscord(NotifyBase):
         return results
 
     @staticmethod
+    def parse_native_url(url):
+        """
+        Support https://discordapp.com/api/webhooks/WEBHOOK_ID/WEBHOOK_TOKEN
+        """
+
+        result = re.match(
+            r'^https?://discordapp\.com/api/webhooks/'
+            r'(?P<webhook_id>[0-9]+)/'
+            r'(?P<webhook_token>[A-Z0-9_-]+)/?'
+            r'(?P<args>\?[.+])?$', url, re.I)
+
+        if result:
+            return NotifyDiscord.parse_url(
+                '{schema}://{webhook_id}/{webhook_token}/{args}'.format(
+                    schema=NotifyDiscord.secure_protocol,
+                    webhook_id=result.group('webhook_id'),
+                    webhook_token=result.group('webhook_token'),
+                    args='' if not result.group('args')
+                    else result.group('args')))
+
+        return None
+
+    @staticmethod
     def extract_markdown_sections(markdown):
         """
         Takes a string in a markdown type format and extracts

@@ -472,3 +472,28 @@ class NotifySlack(NotifyBase):
             parse_bool(results['qsd'].get('image', True))
 
         return results
+
+    @staticmethod
+    def parse_native_url(url):
+        """
+        Support https://hooks.slack.com/services/TOKEN_A/TOKEN_B/TOKEN_C
+        """
+
+        result = re.match(
+            r'^https?://hooks\.slack\.com/services/'
+            r'(?P<token_a>[A-Z0-9]{9})/'
+            r'(?P<token_b>[A-Z0-9]{9})/'
+            r'(?P<token_c>[A-Z0-9]{24})/?'
+            r'(?P<args>\?[.+])?$', url, re.I)
+
+        if result:
+            return NotifySlack.parse_url(
+                '{schema}://{token_a}/{token_b}/{token_c}/{args}'.format(
+                    schema=NotifySlack.secure_protocol,
+                    token_a=result.group('token_a'),
+                    token_b=result.group('token_b'),
+                    token_c=result.group('token_c'),
+                    args='' if not result.group('args')
+                    else result.group('args')))
+
+        return None

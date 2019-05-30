@@ -73,7 +73,7 @@ __all__ = [
 
 # we mirror our base purely for the ability to reset everything; this
 # is generally only used in testing and should not be used by developers
-__MODULE_MAP = {}
+MODULE_MAP = {}
 
 
 # Load our Lookup Matrix
@@ -117,12 +117,12 @@ def __load_matrix(path=abspath(dirname(__file__)), name='apprise.plugins'):
             # Filter out non-notification modules
             continue
 
-        elif plugin_name in __MODULE_MAP:
+        elif plugin_name in MODULE_MAP:
             # we're already handling this object
             continue
 
         # Add our plugin name to our module map
-        __MODULE_MAP[plugin_name] = {
+        MODULE_MAP[plugin_name] = {
             'plugin': plugin,
             'module': module,
         }
@@ -171,7 +171,7 @@ def __reset_matrix():
     SCHEMA_MAP.clear()
 
     # Iterate over our module map so we can clear out our __all__ and globals
-    for plugin_name in __MODULE_MAP.keys():
+    for plugin_name in MODULE_MAP.keys():
         # Clear out globals
         del globals()[plugin_name]
 
@@ -179,7 +179,7 @@ def __reset_matrix():
         __all__.remove(plugin_name)
 
     # Clear out our module map
-    __MODULE_MAP.clear()
+    MODULE_MAP.clear()
 
 
 # Dynamically build our schema base

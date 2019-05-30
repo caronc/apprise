@@ -43,10 +43,10 @@ from ..utils import parse_bool
 from ..AppriseLocale import gettext_lazy as _
 
 # Token required as part of the API request
-VALIDATE_TOKEN = re.compile(r'[A-Za-z0-9]{15}')
+VALIDATE_TOKEN = re.compile(r'[A-Z0-9]{15}', re.I)
 
 # Organization required as part of the API request
-VALIDATE_ORG = re.compile(r'[A-Za-z0-9-]{3,32}')
+VALIDATE_ORG = re.compile(r'[A-Z0-9_-]{3,32}', re.I)
 
 
 class RyverWebhookMode(object):
@@ -353,3 +353,25 @@ class NotifyRyver(NotifyBase):
             parse_bool(results['qsd'].get('image', True))
 
         return results
+
+    @staticmethod
+    def parse_native_url(url):
+        """
+        Support https://RYVER_ORG.ryver.com/application/webhook/TOKEN
+        """
+
+        result = re.match(
+            r'^https?://(?P<org>[A-Z0-9_-]+)\.ryver\.com/application/webhook/'
+            r'(?P<webhook_token>[A-Z0-9]+)/?'
+            r'(?P<args>\?[.+])?$', url, re.I)
+
+        if result:
+            return NotifyRyver.parse_url(
+                '{schema}://{org}/{webhook_token}/{args}'.format(
+                    schema=NotifyRyver.secure_protocol,
+                    org=result.group('org'),
+                    webhook_token=result.group('webhook_token'),
+                    args='' if not result.group('args')
+                    else result.group('args')))
+
+        return None

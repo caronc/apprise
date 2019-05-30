@@ -245,3 +245,24 @@ class NotifyWebexTeams(NotifyBase):
         results['token'] = NotifyWebexTeams.unquote(results['host'])
 
         return results
+
+    @staticmethod
+    def parse_native_url(url):
+        """
+        Support https://api.ciscospark.com/v1/webhooks/incoming/WEBHOOK_TOKEN
+        """
+
+        result = re.match(
+            r'^https?://api\.ciscospark\.com/v[1-9][0-9]*/webhooks/incoming/'
+            r'(?P<webhook_token>[A-Z0-9_-]+)/?'
+            r'(?P<args>\?[.+])?$', url, re.I)
+
+        if result:
+            return NotifyWebexTeams.parse_url(
+                '{schema}://{webhook_token}/{args}'.format(
+                    schema=NotifyWebexTeams.secure_protocol,
+                    webhook_token=result.group('webhook_token'),
+                    args='' if not result.group('args')
+                    else result.group('args')))
+
+        return None
