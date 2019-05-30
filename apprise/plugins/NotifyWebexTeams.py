@@ -63,6 +63,7 @@ from json import dumps
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
 from ..common import NotifyFormat
+from ..AppriseLocale import gettext_lazy as _
 
 # Token required as part of the API request
 VALIDATE_TOKEN = re.compile(r'[a-z0-9]{80}', re.I)
@@ -105,6 +106,22 @@ class NotifyWebexTeams(NotifyBase):
 
     # Default to markdown; fall back to text
     notify_format = NotifyFormat.MARKDOWN
+
+    # Define object templates
+    templates = (
+        '{schema}://{token}',
+    )
+
+    # Define our template tokens
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'token': {
+            'name': _('Token'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+            'regex': (r'[a-z0-9]{80}', 'i'),
+        },
+    })
 
     def __init__(self, token, **kwargs):
         """

@@ -46,6 +46,7 @@ from ..common import NotifyType
 from ..common import NotifyFormat
 from ..utils import parse_bool
 from ..utils import parse_list
+from ..AppriseLocale import gettext_lazy as _
 
 # Token required as part of the API request
 #  /AAAAAAAAA/........./........................
@@ -71,7 +72,7 @@ SLACK_HTTP_ERROR_MAP = {
 CHANNEL_LIST_DELIM = re.compile(r'[ \t\r\n,#\\/]+')
 
 # Used to detect a channel
-IS_CHANNEL_RE = re.compile(r'[+#@]?([A-Z0-9_]{1,32})', re.I)
+IS_VALID_TARGET_RE = re.compile(r'[+#@]?([A-Z0-9_]{1,32})', re.I)
 
 
 class NotifySlack(NotifyBase):
@@ -100,7 +101,81 @@ class NotifySlack(NotifyBase):
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 1000
 
+    # Default Notification Format
     notify_format = NotifyFormat.MARKDOWN
+
+    # Define object templates
+    templates = (
+        '{schema}://{token_a}/{token_b}{token_c}',
+        '{schema}://{botname}@{token_a}/{token_b}{token_c}',
+        '{schema}://{token_a}/{token_b}{token_c}/{targets}',
+        '{schema}://{botname}@{token_a}/{token_b}{token_c}/{targets}',
+    )
+
+    # Define our template tokens
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'botname': {
+            'name': _('Bot Name'),
+            'type': 'string',
+            'map_to': 'user',
+        },
+        'token_a': {
+            'name': _('Token A'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+            'regex': (r'[A-Z0-9]{9}', 'i'),
+        },
+        'token_b': {
+            'name': _('Token B'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+            'regex': (r'[A-Z0-9]{9}', 'i'),
+        },
+        'token_c': {
+            'name': _('Token C'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+            'regex': (r'[A-Za-z0-9]{24}', 'i'),
+        },
+        'target_encoded_id': {
+            'name': _('Target Encoded ID'),
+            'type': 'string',
+            'prefix': '+',
+            'map_to': 'targets',
+        },
+        'target_user': {
+            'name': _('Target User'),
+            'type': 'string',
+            'prefix': '@',
+            'map_to': 'targets',
+        },
+        'target_channels': {
+            'name': _('Target Channel'),
+            'type': 'string',
+            'prefix': '#',
+            'map_to': 'targets',
+        },
+        'targets': {
+            'name': _('Targets'),
+            'type': 'list:string',
+        },
+    })
+
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'image': {
+            'name': _('Include Image'),
+            'type': 'bool',
+            'default': True,
+            'map_to': 'include_image',
+        },
+        'to': {
+            'alias_of': 'targets',
+        },
+    })
 
     def __init__(self, token_a, token_b, token_c, targets,
                  include_image=True, **kwargs):
@@ -232,7 +307,7 @@ class NotifySlack(NotifyBase):
 
             if channel is not None:
                 # Channel over-ride was specified
-                if not IS_CHANNEL_RE.match(channel):
+                if not IS_VALID_TARGET_RE.match(channel):
                     self.logger.warning(
                         "The specified target {} is invalid;"
                         "skipping.".format(channel))

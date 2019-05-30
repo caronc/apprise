@@ -86,6 +86,9 @@ class URLBase(object):
     # Maintain a set of tags to associate with this specific notification
     tags = set()
 
+    # Secure sites should be verified against a Certificate Authority
+    verify_certificate = True
+
     # Logging
     logger = logging.getLogger(__name__)
 

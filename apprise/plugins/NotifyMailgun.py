@@ -58,7 +58,7 @@ from .NotifyBase import NotifyBase
 from ..common import NotifyType
 from ..utils import parse_list
 from ..utils import is_email
-
+from ..AppriseLocale import gettext_lazy as _
 
 # Used to validate your personal access apikey
 VALIDATE_API_KEY = re.compile(r'^[a-z0-9]{32}-[a-z0-9]{8}-[a-z0-9]{8}$', re.I)
@@ -116,6 +116,56 @@ class NotifyMailgun(NotifyBase):
 
     # The default region to use if one isn't otherwise specified
     mailgun_default_region = MailgunRegion.US
+
+    # Define object templates
+    templates = (
+        '{schema}://{user}@{host}:{apikey}/',
+        '{schema}://{user}@{host}:{apikey}/{targets}',
+    )
+
+    # Define our template tokens
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'user': {
+            'name': _('User Name'),
+            'type': 'string',
+            'required': True,
+        },
+        'host': {
+            'name': _('Domain'),
+            'type': 'string',
+            'required': True,
+        },
+        'apikey': {
+            'name': _('API Key'),
+            'type': 'string',
+            'regex': (r'[a-z0-9]{32}-[a-z0-9]{8}-[a-z0-9]{8}', 'i'),
+            'private': True,
+            'required': True,
+        },
+        'targets': {
+            'name': _('Target Emails'),
+            'type': 'list:string',
+        },
+    })
+
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'name': {
+            'name': _('From Name'),
+            'type': 'string',
+            'map_to': 'from_name',
+        },
+        'region': {
+            'name': _('Region Name'),
+            'type': 'choice:string',
+            'values': MAILGUN_REGIONS,
+            'default': MailgunRegion.US,
+            'map_to': 'region_name',
+        },
+        'to': {
+            'alias_of': 'targets',
+        },
+    })
 
     def __init__(self, apikey, targets, from_name=None, region_name=None,
                  **kwargs):

@@ -32,13 +32,14 @@ from ..common import NotifyImageSize
 from ..common import NotifyType
 from ..utils import parse_bool
 from ..utils import parse_list
+from ..AppriseLocale import gettext_lazy as _
 
 # Some Reference Locations:
 # - https://docs.mattermost.com/developer/webhooks-incoming.html
 # - https://docs.mattermost.com/administration/config-settings.html
 
 # Used to validate Authorization Token
-VALIDATE_AUTHTOKEN = re.compile(r'[A-Za-z0-9]{24,32}')
+VALIDATE_AUTHTOKEN = re.compile(r'[a-z0-9]{24,32}', re.I)
 
 
 class NotifyMatterMost(NotifyBase):
@@ -73,7 +74,59 @@ class NotifyMatterMost(NotifyBase):
     # Mattermost does not have a title
     title_maxlen = 0
 
-    def __init__(self, authtoken, channels=None, include_image=True,
+    # Define object templates
+    templates = (
+        '{schema}://{host}/{authtoken}',
+        '{schema}://{host}/{authtoken}:{port}',
+        '{schema}://{botname}@{host}/{authtoken}',
+        '{schema}://{botname}@{host}/{authtoken}:{port}',
+    )
+
+    # Define our template tokens
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'host': {
+            'name': _('Hostname'),
+            'type': 'string',
+            'required': True,
+        },
+        'authtoken': {
+            'name': _('Access Key'),
+            'type': 'string',
+            'regex': (r'[a-z0-9]{24,32}', 'i'),
+            'private': True,
+            'required': True,
+        },
+        'botname': {
+            'name': _('Bot Name'),
+            'type': 'string',
+            'map_to': 'user',
+        },
+        'port': {
+            'name': _('Port'),
+            'type': 'int',
+            'min': 1,
+            'max': 65535,
+        },
+    })
+
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'channels': {
+            'name': _('Channels'),
+            'type': 'list:string',
+        },
+        'image': {
+            'name': _('Include Image'),
+            'type': 'bool',
+            'default': True,
+            'map_to': 'include_image',
+        },
+        'to': {
+            'alias_of': 'channels',
+        },
+    })
+
+    def __init__(self, authtoken, channels=None, include_image=False,
                  **kwargs):
         """
         Initialize MatterMost Object
@@ -86,7 +139,7 @@ class NotifyMatterMost(NotifyBase):
         else:
             self.schema = 'http'
 
-        # Our API Key
+        # Our Authorization Token
         self.authtoken = authtoken
 
         # Validate authtoken

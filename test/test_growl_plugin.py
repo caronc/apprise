@@ -223,7 +223,7 @@ def test_growl_plugin(mock_gntp):
 
             assert(isinstance(obj, instance) is True)
 
-            if isinstance(obj, plugins.NotifyBase.NotifyBase):
+            if isinstance(obj, plugins.NotifyBase):
                 # We loaded okay; now lets make sure we can reverse this url
                 assert(isinstance(obj.url(), six.string_types) is True)
 
@@ -233,7 +233,7 @@ def test_growl_plugin(mock_gntp):
 
                 # Our object should be the same instance as what we had
                 # originally expected above.
-                if not isinstance(obj_cmp, plugins.NotifyBase.NotifyBase):
+                if not isinstance(obj_cmp, plugins.NotifyBase):
                     # Assert messages are hard to trace back with the way
                     # these tests work. Just printing before throwing our
                     # assertion failure makes things easier to debug later on

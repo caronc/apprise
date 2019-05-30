@@ -28,6 +28,7 @@ from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
 from ..common import NotifyType
 from ..utils import parse_bool
+from ..AppriseLocale import gettext_lazy as _
 
 
 class NotifyFaast(NotifyBase):
@@ -52,6 +53,31 @@ class NotifyFaast(NotifyBase):
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_72
+
+    # Define object templates
+    templates = (
+        '{schema}://{authtoken}',
+    )
+
+    # Define our template tokens
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'authtoken': {
+            'name': _('Authorization Token'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+        },
+    })
+
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'image': {
+            'name': _('Include Image'),
+            'type': 'bool',
+            'default': True,
+            'map_to': 'include_image',
+        },
+    })
 
     def __init__(self, authtoken, include_image=True, **kwargs):
         """

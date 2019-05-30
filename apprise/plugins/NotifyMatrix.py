@@ -40,6 +40,7 @@ from ..common import NotifyImageSize
 from ..common import NotifyFormat
 from ..utils import parse_bool
 from ..utils import parse_list
+from ..AppriseLocale import gettext_lazy as _
 
 # Define default path
 MATRIX_V2_API_PATH = '/_matrix/client/r0'
@@ -66,6 +67,9 @@ SLACK_DEFAULT_USER = 'apprise'
 
 
 class MatrixWebhookMode(object):
+    # Webhook Mode is disabled
+    DISABLED = "off"
+
     # The default webhook mode is to just be set to Matrix
     MATRIX = "matrix"
 
@@ -75,6 +79,7 @@ class MatrixWebhookMode(object):
 
 # webhook modes are placed ito this list for validation purposes
 MATRIX_WEBHOOK_MODES = (
+    MatrixWebhookMode.DISABLED,
     MatrixWebhookMode.MATRIX,
     MatrixWebhookMode.SLACK,
 )
@@ -117,7 +122,86 @@ class NotifyMatrix(NotifyBase):
     # the server doesn't remind us how long we shoul wait for
     default_wait_ms = 1000
 
-    def __init__(self, targets=None, mode=None, include_image=True,
+    # Define object templates
+    templates = (
+        '{schema}://{user}:{password}@{host}/{targets}',
+        '{schema}://{user}:{password}@{host}:{port}/{targets}',
+        '{schema}://{token}:{password}@{host}/{targets}',
+        '{schema}://{token}:{password}@{host}:{port}/{targets}',
+        '{schema}://{user}:{token}:{password}@{host}/{targets}',
+        '{schema}://{user}:{token}:{password}@{host}:{port}/{targets}',
+    )
+
+    # Define our template tokens
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'host': {
+            'name': _('Hostname'),
+            'type': 'string',
+            'required': True,
+        },
+        'port': {
+            'name': _('Port'),
+            'type': 'int',
+            'min': 1,
+            'max': 65535,
+        },
+        'user': {
+            'name': _('Username'),
+            'type': 'string',
+        },
+        'password': {
+            'name': _('Password'),
+            'type': 'string',
+            'private': True,
+        },
+        'token': {
+            'name': _('Access Token'),
+            'map_to': 'password',
+        },
+        'target_user': {
+            'name': _('Target User'),
+            'type': 'string',
+            'prefix': '@',
+            'map_to': 'targets',
+        },
+        'target_room_id': {
+            'name': _('Target Room ID'),
+            'type': 'string',
+            'prefix': '!',
+            'map_to': 'targets',
+        },
+        'target_room_alias': {
+            'name': _('Target Room Alias'),
+            'type': 'string',
+            'prefix': '!',
+            'map_to': 'targets',
+        },
+        'targets': {
+            'name': _('Targets'),
+            'type': 'list:string',
+        },
+    })
+
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'image': {
+            'name': _('Include Image'),
+            'type': 'bool',
+            'default': False,
+            'map_to': 'include_image',
+        },
+        'mode': {
+            'name': _('Webhook Mode'),
+            'type': 'choice:string',
+            'values': MATRIX_WEBHOOK_MODES,
+            'default': MatrixWebhookMode.DISABLED,
+        },
+        'to': {
+            'alias_of': 'targets',
+        },
+    })
+
+    def __init__(self, targets=None, mode=None, include_image=False,
                  **kwargs):
         """
         Initialize Matrix Object
@@ -144,7 +228,7 @@ class NotifyMatrix(NotifyBase):
         self._room_cache = {}
 
         # Setup our mode
-        self.mode = None \
+        self.mode = MatrixWebhookMode.DISABLED \
             if not isinstance(mode, six.string_types) else mode.lower()
         if self.mode and self.mode not in MATRIX_WEBHOOK_MODES:
             msg = 'The mode specified ({}) is invalid.'.format(mode)
@@ -160,7 +244,8 @@ class NotifyMatrix(NotifyBase):
         # - calls _send_webhook_notification if the mode variable is set
         # - calls _send_server_notification if the mode variable is not set
         return getattr(self, '_send_{}_notification'.format(
-            'webhook' if self.mode else 'server'))(
+            'webhook' if self.mode != MatrixWebhookMode.DISABLED
+            else 'server'))(
                 body=body, title=title, notify_type=notify_type, **kwargs)
 
     def _send_webhook_notification(self, body, title='',
@@ -875,10 +960,8 @@ class NotifyMatrix(NotifyBase):
             'overflow': self.overflow_mode,
             'image': 'yes' if self.include_image else 'no',
             'verify': 'yes' if self.verify_certificate else 'no',
+            'mode': self.mode,
         }
-
-        if self.mode:
-            args['mode'] = self.mode
 
         # Determine Authentication
         auth = ''

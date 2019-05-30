@@ -28,6 +28,7 @@ import requests
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
+from ..AppriseLocale import gettext_lazy as _
 
 # Used to validate API Key
 VALIDATE_APIKEY = re.compile(r'[A-Za-z0-9]{40}')
@@ -89,6 +90,37 @@ class NotifyProwl(NotifyBase):
 
     # Defines the maximum allowable characters in the title
     title_maxlen = 1024
+
+    # Define object templates
+    templates = (
+        '{schema}://{apikey}',
+        '{schema}://{apikey}/{providerkey}',
+    )
+
+    # Define our template tokens
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'apikey': {
+            'name': _('API Key'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+        },
+        'providerkey': {
+            'name': _('Provider Key'),
+            'type': 'string',
+            'private': True,
+        },
+    })
+
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'priority': {
+            'name': _('Priority'),
+            'type': 'choice:int',
+            'values': PROWL_PRIORITIES,
+            'default': ProwlPriority.NORMAL,
+        },
+    })
 
     def __init__(self, apikey, providerkey=None, priority=None, **kwargs):
         """

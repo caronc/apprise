@@ -36,6 +36,7 @@ from ..common import NotifyFormat
 from ..common import NotifyType
 from ..utils import parse_list
 from ..utils import parse_bool
+from ..AppriseLocale import gettext_lazy as _
 
 IS_CHANNEL = re.compile(r'^#(?P<name>[A-Za-z0-9_-]+)$')
 IS_USER = re.compile(r'^@(?P<name>[A-Za-z0-9._-]+)$')
@@ -103,8 +104,84 @@ class NotifyRocketChat(NotifyBase):
     # Default to markdown
     notify_format = NotifyFormat.MARKDOWN
 
-    def __init__(self, webhook=None, targets=None, mode=None,
-                 include_avatar=True, **kwargs):
+    # Define object templates
+    templates = (
+        '{schema}://{user}:{password}@{host}:{port}/{targets}',
+        '{schema}://{user}:{password}@{host}/{targets}',
+        '{schema}://{webhook}@{host}',
+        '{schema}://{webhook}@{host}:{port}',
+        '{schema}://{webhook}@{host}/{targets}',
+        '{schema}://{webhook}@{host}:{port}/{targets}',
+    )
+
+    # Define our template arguments
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'host': {
+            'name': _('Hostname'),
+            'type': 'string',
+            'required': True,
+        },
+        'port': {
+            'name': _('Port'),
+            'type': 'int',
+            'min': 1,
+            'max': 65535,
+        },
+        'user': {
+            'name': _('Username'),
+            'type': 'string',
+        },
+        'password': {
+            'name': _('Password'),
+            'type': 'string',
+            'private': True,
+        },
+        'webhook': {
+            'name': _('Webhook'),
+            'type': 'string',
+        },
+        'target_channel': {
+            'name': _('Target Channel'),
+            'type': 'string',
+            'prefix': '#',
+            'map_to': 'targets',
+        },
+        'target_user': {
+            'name': _('Target User'),
+            'type': 'string',
+            'prefix': '@',
+            'map_to': 'targets',
+        },
+        'target_room': {
+            'name': _('Target Room ID'),
+            'type': 'string',
+            'map_to': 'targets',
+        },
+        'targets': {
+            'name': _('Targets'),
+            'type': 'list:string',
+        },
+    })
+
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'mode': {
+            'name': _('Webhook Mode'),
+            'type': 'choice:string',
+            'values': ROCKETCHAT_AUTH_MODES,
+        },
+        'avatar': {
+            'name': _('Use Avatar'),
+            'type': 'bool',
+            'default': True,
+        },
+        'to': {
+            'alias_of': 'targets',
+        },
+    })
+
+    def __init__(self, webhook=None, targets=None, mode=None, avatar=True,
+                 **kwargs):
         """
         Initialize Notify Rocket.Chat Object
         """
@@ -132,7 +209,7 @@ class NotifyRocketChat(NotifyBase):
         self.webhook = webhook
 
         # Place an avatar image to associate with our content
-        self.include_avatar = include_avatar
+        self.avatar = avatar
 
         # Used to track token headers upon authentication (if successful)
         # This is only used if not on webhook mode
@@ -212,7 +289,7 @@ class NotifyRocketChat(NotifyBase):
             'format': self.notify_format,
             'overflow': self.overflow_mode,
             'verify': 'yes' if self.verify_certificate else 'no',
-            'avatar': 'yes' if self.include_avatar else 'no',
+            'avatar': 'yes' if self.avatar else 'no',
             'mode': self.mode,
         }
 
@@ -371,7 +448,7 @@ class NotifyRocketChat(NotifyBase):
 
         # apply our images if they're set to be displayed
         image_url = self.image_url(notify_type)
-        if self.include_avatar:
+        if self.avatar:
             payload['avatar'] = image_url
 
         return payload
@@ -599,7 +676,7 @@ class NotifyRocketChat(NotifyBase):
                 NotifyRocketChat.unquote(results['qsd']['mode'])
 
         # avatar icon
-        results['include_avatar'] = \
+        results['avatar'] = \
             parse_bool(results['qsd'].get('avatar', True))
 
         # The 'to' makes it easier to use yaml configuration

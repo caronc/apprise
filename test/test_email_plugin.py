@@ -90,6 +90,9 @@ TEST_URLS = (
     ('mailtos://user:pass@nuxref.com:567?to=l2g@nuxref.com', {
         'instance': plugins.NotifyEmail,
     }),
+    ('mailtos://user:pass@nuxref.com:567/l2g@nuxref.com', {
+        'instance': plugins.NotifyEmail,
+    }),
     (
         'mailtos://user:pass@example.com?smtp=smtp.example.com&timeout=5'
         '&name=l2g&from=noreply@example.com', {
@@ -126,9 +129,11 @@ TEST_URLS = (
     ('mailtos://nuxref.com?user=&pass=.', {
         'instance': TypeError,
     }),
-    # Invalid To Address
+    # Invalid To Address is accepted, but we won't be able to properly email
+    # using the notify() call
     ('mailtos://user:pass@nuxref.com?to=@', {
-        'instance': TypeError,
+        'instance': plugins.NotifyEmail,
+        'response': False,
     }),
     # Valid URL, but can't structure a proper email
     ('mailtos://nuxref.com?user=%20!&pass=.', {
@@ -171,7 +176,7 @@ def test_email_plugin(mock_smtp, mock_smtpssl):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
+    plugins.NotifyBase.request_rate_per_sec = 0
 
     # iterate over our dictionary and test it out
     for (url, meta) in TEST_URLS:
@@ -234,7 +239,7 @@ def test_email_plugin(mock_smtp, mock_smtpssl):
 
             assert(isinstance(obj, instance))
 
-            if isinstance(obj, plugins.NotifyBase.NotifyBase):
+            if isinstance(obj, plugins.NotifyBase):
                 # We loaded okay; now lets make sure we can reverse this url
                 assert(isinstance(obj.url(), six.string_types) is True)
 
@@ -244,7 +249,7 @@ def test_email_plugin(mock_smtp, mock_smtpssl):
 
                 # Our object should be the same instance as what we had
                 # originally expected above.
-                if not isinstance(obj_cmp, plugins.NotifyBase.NotifyBase):
+                if not isinstance(obj_cmp, plugins.NotifyBase):
                     # Assert messages are hard to trace back with the way
                     # these tests work. Just printing before throwing our
                     # assertion failure makes things easier to debug later on
@@ -333,7 +338,8 @@ def test_webbase_lookup(mock_smtp, mock_smtpssl):
         'mailto://user:pass@l2g.com', suppress_exceptions=True)
 
     assert(isinstance(obj, plugins.NotifyEmail))
-    assert obj.to_addr == 'user@l2g.com'
+    assert len(obj.targets) == 1
+    assert 'user@l2g.com' in obj.targets
     assert obj.from_addr == 'user@l2g.com'
     assert obj.password == 'pass'
     assert obj.user == 'user'
@@ -355,7 +361,7 @@ def test_smtplib_init_fail(mock_smtplib):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
+    plugins.NotifyBase.request_rate_per_sec = 0
 
     obj = Apprise.instantiate(
         'mailto://user:pass@gmail.com', suppress_exceptions=False)
@@ -380,7 +386,7 @@ def test_smtplib_send_okay(mock_smtplib):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
+    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Defaults to HTML
     obj = Apprise.instantiate(
@@ -476,8 +482,9 @@ def test_email_url_variations():
 
     assert obj.password == 'abcd123'
     assert obj.user == 'apprise@example21.ca'
-    assert obj.to_addr == 'apprise@example.com'
-    assert obj.to_addr == obj.from_addr
+    assert len(obj.targets) == 1
+    assert 'apprise@example.com' in obj.targets
+    assert obj.targets[0] == obj.from_addr
 
     # test user and password specified in the url body (as an argument)
     # this always over-rides the entries at the front of the url
@@ -492,8 +499,9 @@ def test_email_url_variations():
 
     assert obj.password == 'abcd123'
     assert obj.user == 'apprise@example21.ca'
-    assert obj.to_addr == 'apprise@example.com'
-    assert obj.to_addr == obj.from_addr
+    assert len(obj.targets) == 1
+    assert 'apprise@example.com' in obj.targets
+    assert obj.targets[0] == obj.from_addr
     assert obj.smtp_host == 'example.com'
 
     # test a complicated example
@@ -515,5 +523,21 @@ def test_email_url_variations():
     assert obj.host == 'example.com'
     assert obj.port == 1234
     assert obj.smtp_host == 'smtp.example.edu'
-    assert obj.to_addr == 'to@example.jp'
+    assert len(obj.targets) == 1
+    assert 'to@example.jp' in obj.targets
     assert obj.from_addr == 'from@example.jp'
+
+
+def test_email_dict_variations():
+    """
+    API: Test email dictionary variations to ensure parsing is correct
+
+    """
+    # Test variations of username required to be an email address
+    # user@example.com
+    obj = Apprise.instantiate({
+        'schema': 'mailto',
+        'user': 'apprise@example.com',
+        'password': 'abd123',
+        'host': 'example.com'}, suppress_exceptions=False)
+    assert isinstance(obj, plugins.NotifyEmail) is True

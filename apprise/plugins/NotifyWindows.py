@@ -32,6 +32,7 @@ from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
 from ..common import NotifyType
 from ..utils import parse_bool
+from ..AppriseLocale import gettext_lazy as _
 
 # Default our global support flag
 NOTIFY_WINDOWS_SUPPORT_ENABLED = False
@@ -87,6 +88,27 @@ class NotifyWindows(NotifyBase):
     # outside of what is defined in test/test_windows_plugin.py, please
     # let me know! :)
     _enabled = NOTIFY_WINDOWS_SUPPORT_ENABLED
+
+    # Define object templates
+    templates = (
+        '{schema}://_/',
+    )
+
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'duration': {
+            'name': _('Duration'),
+            'type': 'int',
+            'min': 1,
+            'default': 12,
+        },
+        'image': {
+            'name': _('Include Image'),
+            'type': 'bool',
+            'default': True,
+            'map_to': 'include_image',
+        },
+    })
 
     def __init__(self, include_image=True, duration=None, **kwargs):
         """

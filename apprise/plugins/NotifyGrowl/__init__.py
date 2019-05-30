@@ -29,6 +29,7 @@ from ..NotifyBase import NotifyBase
 from ...common import NotifyImageSize
 from ...common import NotifyType
 from ...utils import parse_bool
+from ...AppriseLocale import gettext_lazy as _
 
 
 # Priorities
@@ -86,6 +87,51 @@ class NotifyGrowl(NotifyBase):
 
     # Default Growl Port
     default_port = 23053
+
+    # Define object templates
+    templates = (
+        '{schema}://{apikey}',
+        '{schema}://{apikey}/{providerkey}',
+    )
+
+    # Define our template tokens
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'apikey': {
+            'name': _('API Key'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+            'map_to': 'host',
+        },
+        'providerkey': {
+            'name': _('Provider Key'),
+            'type': 'string',
+            'private': True,
+            'map_to': 'fullpath',
+        },
+    })
+
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'priority': {
+            'name': _('Priority'),
+            'type': 'choice:int',
+            'values': GROWL_PRIORITIES,
+            'default': GrowlPriority.NORMAL,
+        },
+        'version': {
+            'name': _('Version'),
+            'type': 'choice:int',
+            'values': (1, 2),
+            'default': 2,
+        },
+        'image': {
+            'name': _('Include Image'),
+            'type': 'bool',
+            'default': True,
+            'map_to': 'include_image',
+        },
+    })
 
     def __init__(self, priority=None, version=2, include_image=True, **kwargs):
         """

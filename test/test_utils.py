@@ -25,6 +25,7 @@
 
 from __future__ import print_function
 import re
+import os
 try:
     # Python 2.7
     from urllib import unquote
@@ -616,3 +617,90 @@ def test_exclusive_match():
     # www or zzz or abc and jjj
     assert utils.is_exclusive_match(
         logic=['www', 'zzz', ('abc', 'jjj')], data=data) is False
+
+
+def test_environ_temporary_change():
+    """utils: environ() testing
+    """
+
+    e_key1 = 'APPRISE_TEMP1'
+    e_key2 = 'APPRISE_TEMP2'
+    e_key3 = 'APPRISE_TEMP3'
+
+    e_val1 = 'ABCD'
+    e_val2 = 'DEFG'
+    e_val3 = 'HIJK'
+
+    os.environ[e_key1] = e_val1
+    os.environ[e_key2] = e_val2
+    os.environ[e_key3] = e_val3
+
+    # Ensure our environment variable stuck
+    assert e_key1 in os.environ
+    assert e_val1 in os.environ[e_key1]
+    assert e_key2 in os.environ
+    assert e_val2 in os.environ[e_key2]
+    assert e_key3 in os.environ
+    assert e_val3 in os.environ[e_key3]
+
+    with utils.environ(e_key1, e_key3):
+        # Eliminates Environment Variable 1 and 3
+        assert e_key1 not in os.environ
+        assert e_key2 in os.environ
+        assert e_val2 in os.environ[e_key2]
+        assert e_key3 not in os.environ
+
+    # after with is over, environment is restored to normal
+    assert e_key1 in os.environ
+    assert e_val1 in os.environ[e_key1]
+    assert e_key2 in os.environ
+    assert e_val2 in os.environ[e_key2]
+    assert e_key3 in os.environ
+    assert e_val3 in os.environ[e_key3]
+
+    d_key = 'APPRISE_NOT_SET'
+    n_key = 'APPRISE_NEW_KEY'
+    n_val = 'NEW_VAL'
+
+    # Verify that our temporary variables (defined above) are not pre-existing
+    # environemnt variables as we'll be setting them below
+    assert n_key not in os.environ
+    assert d_key not in os.environ
+
+    # makes it easier to pass in the arguments
+    updates = {
+        e_key1: e_val3,
+        e_key2: e_val1,
+        n_key: n_val,
+    }
+    with utils.environ(d_key, e_key3, **updates):
+        # Attempt to eliminate an undefined key (silently ignored)
+        # Eliminates Environment Variable 3
+        # Environment Variable 1 takes on the value of Env 3
+        # Environment Variable 2 takes on the value of Env 1
+        # Set a brand new variable that previously didn't exist
+        assert e_key1 in os.environ
+        assert e_val3 in os.environ[e_key1]
+        assert e_key2 in os.environ
+        assert e_val1 in os.environ[e_key2]
+        assert e_key3 not in os.environ
+
+        # Can't delete a variable that doesn't exist; so we're in the same
+        # state here.
+        assert d_key not in os.environ
+
+        # Our temporary variables will be found now
+        assert n_key in os.environ
+        assert n_val in os.environ[n_key]
+
+    # after with is over, environment is restored to normal
+    assert e_key1 in os.environ
+    assert e_val1 in os.environ[e_key1]
+    assert e_key2 in os.environ
+    assert e_val2 in os.environ[e_key2]
+    assert e_key3 in os.environ
+    assert e_val3 in os.environ[e_key3]
+
+    # Even our temporary variables are now missing
+    assert n_key not in os.environ
+    assert d_key not in os.environ

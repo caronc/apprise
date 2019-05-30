@@ -30,6 +30,7 @@ from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
 from ..common import NotifyType
 from ..utils import parse_bool
+from ..AppriseLocale import gettext_lazy as _
 
 # Default our global support flag
 NOTIFY_GNOME_SUPPORT_ENABLED = False
@@ -109,6 +110,27 @@ class NotifyGnome(NotifyBase):
     # outside of what is defined in test/test_gnome_plugin.py, please
     # let me know! :)
     _enabled = NOTIFY_GNOME_SUPPORT_ENABLED
+
+    # Define object templates
+    templates = (
+        '{schema}://_/',
+    )
+
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'urgency': {
+            'name': _('Urgency'),
+            'type': 'choice:int',
+            'values': GNOME_URGENCIES,
+            'default': GnomeUrgency.NORMAL,
+        },
+        'image': {
+            'name': _('Include Image'),
+            'type': 'bool',
+            'default': True,
+            'map_to': 'include_image',
+        },
+    })
 
     def __init__(self, urgency=None, include_image=True, **kwargs):
         """

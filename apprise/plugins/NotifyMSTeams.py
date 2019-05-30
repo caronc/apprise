@@ -69,6 +69,7 @@ from ..common import NotifyImageSize
 from ..common import NotifyType
 from ..common import NotifyFormat
 from ..utils import parse_bool
+from ..AppriseLocale import gettext_lazy as _
 
 # Used to prepare our UUID regex matching
 UUID4_RE = \
@@ -114,7 +115,48 @@ class NotifyMSTeams(NotifyBase):
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 1000
 
+    # Default Notification Format
     notify_format = NotifyFormat.MARKDOWN
+
+    # Define object templates
+    templates = (
+        '{schema}://{token_a}/{token_b}{token_c}',
+    )
+
+    # Define our template tokens
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'token_a': {
+            'name': _('Token A'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+            'regex': (r'{}@{}'.format(UUID4_RE, UUID4_RE), 'i'),
+        },
+        'token_b': {
+            'name': _('Token B'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+            'regex': (r'[a-z0-9]{32}', 'i'),
+        },
+        'token_c': {
+            'name': _('Token C'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+            'regex': (UUID4_RE, 'i'),
+        },
+    })
+
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'image': {
+            'name': _('Include Image'),
+            'type': 'bool',
+            'default': False,
+            'map_to': 'include_image',
+        },
+    })
 
     def __init__(self, token_a, token_b, token_c, include_image=True,
                  **kwargs):

@@ -85,7 +85,7 @@ def test_plugin(mock_oauth, mock_api):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
+    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Define how many characters exist per line
     row = 80
@@ -140,7 +140,7 @@ def test_plugin(mock_oauth, mock_api):
 
             assert isinstance(obj, instance) is True
 
-            if isinstance(obj, plugins.NotifyBase.NotifyBase):
+            if isinstance(obj, plugins.NotifyBase):
                 # We loaded okay; now lets make sure we can reverse this url
                 assert isinstance(obj.url(), six.string_types) is True
 
@@ -150,7 +150,7 @@ def test_plugin(mock_oauth, mock_api):
 
                 # Our object should be the same instance as what we had
                 # originally expected above.
-                if not isinstance(obj_cmp, plugins.NotifyBase.NotifyBase):
+                if not isinstance(obj_cmp, plugins.NotifyBase):
                     # Assert messages are hard to trace back with the way
                     # these tests work. Just printing before throwing our
                     # assertion failure makes things easier to debug later on

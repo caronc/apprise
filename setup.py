@@ -33,6 +33,7 @@ except ImportError:
     from distutils.core import setup
 
 from setuptools import find_packages
+from babel.messages import frontend as babel
 
 install_options = os.environ.get("APPRISE_INSTALL", "").split(",")
 install_requires = open('requirements.txt').readlines()
@@ -55,6 +56,12 @@ setup(
     license='MIT',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
+    cmdclass={
+        'compile_catalog': babel.compile_catalog,
+        'extract_messages': babel.extract_messages,
+        'init_catalog': babel.init_catalog,
+        'update_catalog': babel.update_catalog,
+    },
     url='https://github.com/caronc/apprise',
     keywords='Push Notifications Alerts Email AWS SNS Boxcar Discord Dbus '
         'Emby Faast Flock Gitter Gnome Gotify Growl IFTTT Join KODI Mailgun '
@@ -69,6 +76,8 @@ setup(
             'assets/NotifyXML-1.0.xsd',
             'assets/themes/default/*.png',
             'assets/themes/default/*.ico',
+            'i18n/*.py',
+            'i18n/*/LC_MESSAGES/*.mo',
         ],
     },
     install_requires=install_requires,
@@ -87,6 +96,6 @@ setup(
     ),
     entry_points={'console_scripts': console_scripts},
     python_requires='>=2.7',
-    setup_requires=['pytest-runner', ],
+    setup_requires=['pytest-runner', 'babel', ],
     tests_require=open('dev-requirements.txt').readlines(),
 )

@@ -24,6 +24,7 @@
 # THE SOFTWARE.
 
 from __future__ import print_function
+import re
 import sys
 import six
 import pytest
@@ -43,6 +44,9 @@ from apprise import __version__
 
 from apprise.plugins import SCHEMA_MAP
 from apprise.plugins import __load_matrix
+from apprise.plugins import __reset_matrix
+from apprise.utils import parse_list
+import inspect
 
 # Disable logging for a cleaner testing output
 import logging
@@ -255,6 +259,10 @@ def test_apprise():
     a.clear()
     assert(len(a) == 0)
 
+    # Instantiate a bad object
+    plugin = a.instantiate(object, tag="bad_object")
+    assert plugin is None
+
     # Instantiate a good object
     plugin = a.instantiate('good://localhost', tag="good")
     assert(isinstance(plugin, NotifyBase))
@@ -292,6 +300,57 @@ def test_apprise():
         'throw://localhost', suppress_exceptions=True) is None)
     assert(len(a) == 0)
 
+    #
+    # We rince and repeat the same tests as above, however we do them
+    # using the dict version
+    #
+
+    # Reset our object
+    a.clear()
+    assert(len(a) == 0)
+
+    # Instantiate a good object
+    plugin = a.instantiate({
+        'schema': 'good',
+        'host': 'localhost'}, tag="good")
+    assert(isinstance(plugin, NotifyBase))
+
+    # Test simple tagging inside of the object
+    assert("good" in plugin)
+    assert("bad" not in plugin)
+
+    # the in (__contains__ override) is based on or'ed content; so although
+    # 'bad' isn't tagged as being in the plugin, 'good' is, so the return
+    # value of this is True
+    assert(["bad", "good"] in plugin)
+    assert(set(["bad", "good"]) in plugin)
+    assert(("bad", "good") in plugin)
+
+    # We an add already substatiated instances into our Apprise object
+    a.add(plugin)
+    assert(len(a) == 1)
+
+    # We can add entries as a list too (to add more then one)
+    a.add([plugin, plugin, plugin])
+    assert(len(a) == 4)
+
+    # Reset our object again
+    a.clear()
+    try:
+        a.instantiate({
+            'schema': 'throw',
+            'host': 'localhost'}, suppress_exceptions=False)
+        assert(False)
+
+    except TypeError:
+        assert(True)
+    assert(len(a) == 0)
+
+    assert(a.instantiate({
+        'schema': 'throw',
+        'host': 'localhost'}, suppress_exceptions=True) is None)
+    assert(len(a) == 0)
+
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
@@ -320,9 +379,16 @@ def test_apprise_tagging(mock_post, mock_get):
 
     # An invalid addition can't add the tag
     assert(a.add('averyinvalidschema://localhost', tag='uhoh') is False)
+    assert(a.add({
+        'schema': 'averyinvalidschema',
+        'host': 'localhost'}, tag='uhoh') is False)
 
     # Add entry and assign it to a tag called 'awesome'
     assert(a.add('json://localhost/path1/', tag='awesome') is True)
+    assert(a.add({
+        'schema': 'json',
+        'host': 'localhost',
+        'fullpath': '/path1/'}, tag='awesome') is True)
 
     # Add another notification and assign it to a tag called 'awesome'
     # and another tag called 'local'
@@ -674,16 +740,149 @@ def test_apprise_details():
     API: Apprise() Details
 
     """
+    # Reset our matrix
+    __reset_matrix()
 
-    # Caling load matix a second time which is an internal function causes it
-    # to skip over content already loaded into our matrix and thefore accesses
-    # other if/else parts of the code that aren't otherwise called
+    # This is a made up class that is just used to verify
+    class TestDetailNotification(NotifyBase):
+        """
+        This class is used to test various configurations supported
+        """
+
+        # Minimum requirements for a plugin to produce details
+        service_name = 'Detail Testing'
+
+        # The default simple (insecure) protocol (used by NotifyMail)
+        protocol = 'details'
+
+        # Set test_bool flag
+        always_true = True
+        always_false = False
+
+        # Define object templates
+        templates = (
+            '{schema}://{host}',
+            '{schema}://{host}:{port}',
+            '{schema}://{user}@{host}:{port}',
+            '{schema}://{user}:{pass}@{host}:{port}',
+        )
+
+        # Define our tokens; these are the minimum tokens required required to
+        # be passed into this function (as arguments). The syntax appends any
+        # previously defined in the base package and builds onto them
+        template_tokens = dict(NotifyBase.template_tokens, **{
+            'notype': {
+                # Nothing defined is still valid
+            },
+            'regex_test01': {
+                'name': _('RegexTest'),
+                'type': 'string',
+                'regex': r'[A-Z0-9]',
+            },
+            'regex_test02': {
+                'name': _('RegexTest'),
+                # Support regex options too
+                'regex': (r'[A-Z0-9]', 'i'),
+            },
+            'regex_test03': {
+                'name': _('RegexTest'),
+                # Support regex option without a second option
+                'regex': (r'[A-Z0-9]'),
+            },
+            'regex_test04': {
+                # this entry would just end up getting removed
+                'regex': None,
+            },
+            # List without delimiters (causes defaults to kick in)
+            'mylistA': {
+                'name': 'fruit',
+                'type': 'list:string',
+            },
+            # A list with a delimiter list
+            'mylistB': {
+                'name': 'softdrinks',
+                'type': 'list:string',
+                'delim': ['|', '-'],
+            },
+        })
+
+        template_args = dict(NotifyBase.template_args, **{
+            # Test _exist_if logic
+            'test_exists_if_01': {
+                'name': 'Always False',
+                'type': 'bool',
+                # Provide a default
+                'default': False,
+                # Base the existance of this key/value entry on the lookup
+                # of this class value at runtime. Hence:
+                #     if not NotifyObject.always_false
+                #         del this_entry
+                #
+                '_exists_if': 'always_false',
+            },
+            # Test _exist_if logic
+            'test_exists_if_02': {
+                'name': 'Always True',
+                'type': 'bool',
+                # Provide a default
+                'default': False,
+                # Base the existance of this key/value entry on the lookup
+                # of this class value at runtime. Hence:
+                #     if not NotifyObject.always_true
+                #         del this_entry
+                #
+                '_exists_if': 'always_true',
+            },
+        })
+
+        def url(self):
+            # Support URL
+            return ''
+
+        def notify(self, **kwargs):
+            # Pretend everything is okay (so we don't break other tests)
+            return True
+
+    # Store our good detail notification in our schema map
+    SCHEMA_MAP['details'] = TestDetailNotification
+
+    # Create our Apprise instance
+    a = Apprise()
+
+    # Dictionary response
+    assert isinstance(a.details(), dict)
+
+    # Reset our matrix
+    __reset_matrix()
+    __load_matrix()
+
+
+def test_apprise_details_plugin_verification():
+    """
+    API: Apprise() Details Plugin Verification
+
+    """
+
+    # Reset our matrix
+    __reset_matrix()
     __load_matrix()
 
     a = Apprise()
 
     # Details object
     details = a.details()
+
+    # Dictionary response
+    assert isinstance(details, dict)
+
+    # Details object with language defined:
+    details = a.details(lang='en')
+
+    # Dictionary response
+    assert isinstance(details, dict)
+
+    # Details object with unsupported language:
+    details = a.details(lang='xx')
 
     # Dictionary response
     assert isinstance(details, dict)
@@ -707,10 +906,240 @@ def test_apprise_details():
     assert 'image_url_mask' in details['asset']
     assert 'image_url_logo' in details['asset']
 
-    # All plugins must have a name defined; the below generates
-    # a list of entrys that do not have a string defined.
-    assert(not len([x['service_name'] for x in details['schemas']
-                   if not isinstance(x['service_name'], six.string_types)]))
+    # Valid Type Regular Expression Checker
+    # Case Sensitive and MUST match the following:
+    is_valid_type_re = re.compile(
+        r'((choice|list):)?(string|bool|int|float)')
+
+    # match tokens found in templates so we can cross reference them back
+    # to see if they have a matching argument
+    template_token_re = re.compile(r'{([^}]+)}[^{]*?(?=$|{)')
+
+    # Define acceptable map_to arguments that can be tied in with the
+    # kwargs function definitions.
+    valid_kwargs = set([
+        # URL prepared kwargs
+        'user', 'password', 'port', 'host', 'schema', 'fullpath',
+        # URLBase and NotifyBase args:
+        'verify', 'format', 'overflow',
+    ])
+
+    # Valid Schema Entries:
+    valid_schema_keys = (
+        'name', 'private', 'required', 'type', 'values', 'min', 'max',
+        'regex', 'default', 'list', 'delim', 'prefix', 'map_to', 'alias_of',
+    )
+    for entry in details['schemas']:
+
+        # Track the map_to entries (if specified); We need to make sure that
+        # these properly map back
+        map_to_entries = set()
+
+        # Track the alias_of entries
+        map_to_aliases = set()
+
+        # A Service Name MUST be defined
+        assert 'service_name' in entry
+        assert isinstance(entry['service_name'], six.string_types)
+
+        # Acquire our protocols
+        protocols = parse_list(
+            entry['protocols'], entry['secure_protocols'])
+
+        # At least one schema/protocol MUST be defined
+        assert len(protocols) > 0
+
+        # our details
+        assert 'details' in entry
+        assert isinstance(entry['details'], dict)
+
+        # All schema details should include args
+        for section in ['kwargs', 'args', 'tokens']:
+            assert section in entry['details']
+            assert isinstance(entry['details'][section], dict)
+
+            for key, arg in entry['details'][section].items():
+                # Validate keys (case-sensitive)
+                assert len([k for k in arg.keys()
+                            if k not in valid_schema_keys]) == 0
+
+                # Test our argument
+                assert isinstance(arg, dict)
+
+                if 'alias_of' not in arg:
+                    # Minimum requirement of an argument
+                    assert 'name' in arg
+                    assert isinstance(arg['name'], six.string_types)
+
+                    assert 'type' in arg
+                    assert isinstance(arg['type'], six.string_types)
+                    assert is_valid_type_re.match(arg['type']) is not None
+
+                    if 'min' in arg:
+                        assert arg['type'].endswith('float') \
+                            or arg['type'].endswith('int')
+                        assert isinstance(arg['min'], (int, float))
+
+                        if 'max' in arg:
+                            # If a min and max was specified, at least check
+                            # to confirm the min is less then the max
+                            assert arg['min'] < arg['max']
+
+                    if 'max' in arg:
+                        assert arg['type'].endswith('float') \
+                            or arg['type'].endswith('int')
+                        assert isinstance(arg['max'], (int, float))
+
+                    if 'private' in arg:
+                        assert isinstance(arg['private'], bool)
+
+                    if 'required' in arg:
+                        assert isinstance(arg['required'], bool)
+
+                    if 'prefix' in arg:
+                        assert isinstance(arg['prefix'], six.string_types)
+                        if section == 'kwargs':
+                            # The only acceptable prefix types for kwargs
+                            assert arg['prefix'] in ('+', '-')
+
+                    else:
+                        # kwargs requires that the 'prefix' is defined
+                        assert section != 'kwargs'
+
+                    if 'map_to' in arg:
+                        # must be a string
+                        assert isinstance(arg['map_to'], six.string_types)
+                        # Track our map_to object
+                        map_to_entries.add(arg['map_to'])
+
+                    else:
+                        map_to_entries.add(key)
+
+                    # Some verification
+                    if arg['type'].startswith('choice'):
+
+                        # choice:bool is redundant and should be swapped to
+                        # just bool
+                        assert not arg['type'].endswith('bool')
+
+                        # Choices require that a values list is provided
+                        assert 'values' in arg
+                        assert isinstance(arg['values'], (list, tuple))
+                        assert len(arg['values']) > 0
+
+                        # Test default
+                        if 'default' in arg:
+                            # if a default is provided on a choice object,
+                            # it better be in the list of values
+                            assert arg['default'] in arg['values']
+
+                    if arg['type'].startswith('bool'):
+                        # Boolean choices are less restrictive but require a
+                        # default value
+                        assert 'default' in arg
+                        assert isinstance(arg['default'], bool)
+
+                    if 'regex' in arg:
+                        # Regex must ALWAYS be in the format (regex, option)
+                        assert isinstance(arg['regex'], (tuple, list))
+                        assert len(arg['regex']) == 2
+                        assert isinstance(arg['regex'][0], six.string_types)
+                        assert arg['regex'][1] is None or isinstance(
+                            arg['regex'][1], six.string_types)
+
+                        # Compile the regular expression to verify that it is
+                        # valid
+                        try:
+                            re.compile(arg['regex'][0])
+                        except:
+                            assert '{} is an invalid regex'\
+                                .format(arg['regex'][0])
+
+                        # Regex should never start and/or end with ^/$; leave
+                        # that up to the user making use of the regex instead
+                        assert re.match(r'^[()\s]*\^', arg['regex'][0]) is None
+                        assert re.match(r'[()\s$]*\$', arg['regex'][0]) is None
+
+                    if arg['type'].startswith('list'):
+                        # Delimiters MUST be defined
+                        assert 'delim' in arg
+                        assert isinstance(arg['delim'], (list, tuple))
+                        assert len(arg['delim']) > 0
+
+                else:  # alias_of is in the object
+                    # must be a string
+                    assert isinstance(arg['alias_of'], six.string_types)
+                    # Track our alias_of object
+                    map_to_aliases.add(arg['alias_of'])
+                    # We should never map to ourselves
+                    assert arg['alias_of'] != key
+                    # 2 entries (name, and alias_of only!)
+                    assert len(entry['details'][section][key]) == 1
+
+        # inspect our object
+        spec = inspect.getargspec(SCHEMA_MAP[protocols[0]].__init__)
+
+        function_args = \
+            (set(parse_list(spec.keywords)) - set(['kwargs'])) \
+            | (set(spec.args) - set(['self'])) | valid_kwargs
+
+        # Iterate over our map_to_entries and make sure that everything
+        # maps to a function argument
+        for arg in map_to_entries:
+            if arg not in function_args:
+                # This print statement just makes the error easier to
+                # troubleshoot
+                print('{}:// template/arg/func reference missing error.'
+                      .format(protocols[0]))
+            assert arg in function_args
+
+        # Iterate over all of the function arguments and make sure that
+        # it maps back to a key
+        function_args -= valid_kwargs
+        for arg in function_args:
+            if arg not in map_to_entries:
+                # This print statement just makes the error easier to
+                # troubleshoot
+                print('{}:// template/func/arg reference missing error.'
+                      .format(protocols[0]))
+            assert arg in map_to_entries
+
+        # Iterate over our map_to_aliases and make sure they were defined in
+        # either the as a token or arg
+        for arg in map_to_aliases:
+            assert arg in set(entry['details']['args'].keys()) \
+                | set(entry['details']['tokens'].keys())
+
+        # Template verification
+        assert 'templates' in entry['details']
+        assert isinstance(entry['details']['templates'], (set, tuple, list))
+
+        # Iterate over our templates and parse our arguments
+        for template in entry['details']['templates']:
+            # Ensure we've properly opened and closed all of our tokens
+            assert template.count('{') == template.count('}')
+
+            expected_tokens = template.count('}')
+            args = template_token_re.findall(template)
+            assert expected_tokens == len(args)
+
+            # Build a cross reference set of our current defined objects
+            defined_tokens = set()
+            for key, arg in entry['details']['tokens'].items():
+                defined_tokens.add(key)
+                if 'alias_of' in arg:
+                    defined_tokens.add(arg['alias_of'])
+
+            # We want to make sure all of our defined tokens have been
+            # accounted for in at least one defined template
+            for arg in args:
+                assert arg in set(entry['details']['args'].keys()) \
+                    | set(entry['details']['tokens'].keys())
+
+                # The reverse of the above; make sure that each entry defined
+                # in the template_tokens is accounted for in at least one of
+                # the defined templates
+                assert arg in defined_tokens
 
 
 def test_notify_matrix_dynamic_importing(tmpdir):

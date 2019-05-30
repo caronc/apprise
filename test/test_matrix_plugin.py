@@ -43,7 +43,7 @@ def test_notify_matrix_plugin_general(mock_post, mock_get):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
+    plugins.NotifyBase.request_rate_per_sec = 0
 
     response_obj = {
         'room_id': '!abc123:localhost',
@@ -158,7 +158,7 @@ def test_notify_matrix_plugin_fetch(mock_post, mock_get):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
+    plugins.NotifyBase.request_rate_per_sec = 0
 
     response_obj = {
         'room_id': '!abc123:localhost',
@@ -205,7 +205,7 @@ def test_notify_matrix_plugin_fetch(mock_post, mock_get):
     assert obj.send(user='test', password='passwd', body="test") is False
 
     # Disable Throttling to speed testing
-    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
+    plugins.NotifyBase.request_rate_per_sec = 0
 
     response_obj = {
         # Registration
@@ -227,7 +227,7 @@ def test_notify_matrix_plugin_fetch(mock_post, mock_get):
     mock_post.return_value = request
     mock_get.return_value = request
 
-    obj = plugins.NotifyMatrix()
+    obj = plugins.NotifyMatrix(include_image=True)
     assert isinstance(obj, plugins.NotifyMatrix) is True
     assert obj.access_token is None
     assert obj._register() is True
@@ -264,7 +264,7 @@ def test_notify_matrix_plugin_auth(mock_post, mock_get):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
+    plugins.NotifyBase.request_rate_per_sec = 0
 
     response_obj = {
         # Registration
@@ -360,7 +360,7 @@ def test_notify_matrix_plugin_rooms(mock_post, mock_get):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyBase.NotifyBase.request_rate_per_sec = 0
+    plugins.NotifyBase.request_rate_per_sec = 0
 
     response_obj = {
         # Registration
@@ -539,3 +539,87 @@ def test_notify_matrix_url_parsing():
     assert '#room1' in result['targets']
     assert '#room2' in result['targets']
     assert '#room3' in result['targets']
+
+
+@mock.patch('requests.get')
+@mock.patch('requests.post')
+def test_notify_matrix_plugin_image_errors(mock_post, mock_get):
+    """
+    API: NotifyMatrix() Image Error Handling
+
+    """
+
+    def mock_function_handing(url, data, **kwargs):
+        """
+        dummy function for handling image posts (as a failure)
+        """
+        response_obj = {
+            'room_id': '!abc123:localhost',
+            'room_alias': '#abc123:localhost',
+            'joined_rooms': ['!abc123:localhost', '!def456:localhost'],
+            'access_token': 'abcd1234',
+            'home_server': 'localhost',
+        }
+
+        request = mock.Mock()
+        request.content = dumps(response_obj)
+        request.status_code = requests.codes.ok
+
+        if 'm.image' in data:
+            # Fail for images
+            request.status_code = 400
+
+        return request
+
+    # Prepare Mock
+    mock_get.side_effect = mock_function_handing
+    mock_post.side_effect = mock_function_handing
+
+    obj = plugins.NotifyMatrix(include_image=True)
+    assert isinstance(obj, plugins.NotifyMatrix) is True
+    assert obj.access_token is None
+
+    # Notification was successful, however we could not post image and since
+    # we had post errors (of any kind) we still report a failure.
+    assert obj.notify('test', 'test') is False
+
+    obj = plugins.NotifyMatrix(include_image=False)
+    assert isinstance(obj, plugins.NotifyMatrix) is True
+    assert obj.access_token is None
+
+    # We didn't post an image (which was set to fail) and therefore our
+    # post was okay
+    assert obj.notify('test', 'test') is True
+
+    def mock_function_handing(url, data, **kwargs):
+        """
+        dummy function for handling image posts (successfully)
+        """
+        response_obj = {
+            'room_id': '!abc123:localhost',
+            'room_alias': '#abc123:localhost',
+            'joined_rooms': ['!abc123:localhost', '!def456:localhost'],
+            'access_token': 'abcd1234',
+            'home_server': 'localhost',
+        }
+
+        request = mock.Mock()
+        request.content = dumps(response_obj)
+        request.status_code = requests.codes.ok
+
+        return request
+
+    # Prepare Mock
+    mock_get.side_effect = mock_function_handing
+    mock_post.side_effect = mock_function_handing
+    obj = plugins.NotifyMatrix(include_image=True)
+    assert isinstance(obj, plugins.NotifyMatrix) is True
+    assert obj.access_token is None
+
+    assert obj.notify('test', 'test') is True
+
+    obj = plugins.NotifyMatrix(include_image=False)
+    assert isinstance(obj, plugins.NotifyMatrix) is True
+    assert obj.access_token is None
+
+    assert obj.notify('test', 'test') is True
