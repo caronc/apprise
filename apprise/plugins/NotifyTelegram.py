@@ -45,7 +45,7 @@
 #    api key that the BotFather gave you.
 #
 #  For example, a url might look like this:
-#    https://api.telegram.org/bot123456789:alphanumeri_characters/getMe
+#    https://api.telegram.org/bot123456789:alphanumeric_characters/getMe
 #
 # Development API Reference::
 #  - https://core.telegram.org/bots/api

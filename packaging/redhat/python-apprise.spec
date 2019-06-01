@@ -54,7 +54,7 @@ Pushover, Rocket.Chat, Slack, Super Toasty, Stride, Telegram, Twilio, Twitter,
 XBMC, XMPP, Webex Teams}
 
 Name:           python-%{pypi_name}
-Version:        0.7.6
+Version:        0.7.7
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        MIT
@@ -82,8 +82,10 @@ BuildRequires: python-six
 BuildRequires: python2-click >= 5.0
 BuildRequires: python-markdown
 %if 0%{?rhel} && 0%{?rhel} <= 7
+BuildRequires: python-babel
 BuildRequires: python-yaml
 %else
+BuildRequires: python2-babel
 BuildRequires: python2-yaml
 %endif # using rhel7
 
@@ -94,11 +96,9 @@ Requires: python2-oauthlib
 Requires: python-six
 Requires: python-markdown
 %if 0%{?rhel} && 0%{?rhel} <= 7
-BuildRequires: python-yaml
-BuildRequires: python-babel
+Requires: python-yaml
 %else
 Requires: python2-yaml
-Requires: python2-babel
 %endif # using rhel7
 
 %if %{with tests}
@@ -170,11 +170,9 @@ BuildRequires: python%{python3_pkgversion}-pytest-runner
 
 %build
 %if 0%{?with_python2}
-%{__python2} setup.py compile_catalog
 %py2_build
 %endif # with_python2
 %if 0%{?with_python3}
-%{__python3} setup.py compile_catalog
 %py3_build
 %endif # with_python3
 
@@ -230,6 +228,9 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 %endif # with_python2
 
 %changelog
+* Fri May 31 2019 Chris Caron <lead2gold@gmail.com> - 0.7.7-1
+- Updated to v0.7.7
+
 * Tue Apr 16 2019 Chris Caron <lead2gold@gmail.com> - 0.7.6-1
 - Updated to v0.7.6
 
