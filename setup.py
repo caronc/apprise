@@ -33,7 +33,18 @@ except ImportError:
     from distutils.core import setup
 
 from setuptools import find_packages
-from babel.messages import frontend as babel
+
+cmdclass = {}
+try:
+    from babel.messages import frontend as babel
+    cmdclass = {
+        'compile_catalog': babel.compile_catalog,
+        'extract_messages': babel.extract_messages,
+        'init_catalog': babel.init_catalog,
+        'update_catalog': babel.update_catalog,
+    }
+except ImportError:
+    pass
 
 install_options = os.environ.get("APPRISE_INSTALL", "").split(",")
 install_requires = open('requirements.txt').readlines()
@@ -56,12 +67,7 @@ setup(
     license='MIT',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
-    cmdclass={
-        'compile_catalog': babel.compile_catalog,
-        'extract_messages': babel.extract_messages,
-        'init_catalog': babel.init_catalog,
-        'update_catalog': babel.update_catalog,
-    },
+    cmdclass=cmdclass,
     url='https://github.com/caronc/apprise',
     keywords='Push Notifications Alerts Email AWS SNS Boxcar Discord Dbus '
         'Emby Faast Flock Gitter Gnome Gotify Growl IFTTT Join KODI Mailgun '
