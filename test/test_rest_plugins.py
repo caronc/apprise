@@ -177,7 +177,12 @@ TEST_URLS = (
             # don't include an image by default
             'include_image': True,
     }),
-
+    ('https://discordapp.com/api/webhooks/{}/{}'.format(
+        '0' * 10, 'B' * 40), {
+            # Native URL Support, take the discord URL and still build from it
+            'instance': plugins.NotifyDiscord,
+            'requests_response_code': requests.codes.no_content,
+    }),
     ('discord://%s/%s?format=markdown&avatar=No&footer=No' % (
         'i' * 24, 't' * 64), {
             'instance': plugins.NotifyDiscord,
@@ -329,6 +334,10 @@ TEST_URLS = (
     }),
     # Provide text format
     ('flock://%s?format=text' % ('i' * 24), {
+        'instance': plugins.NotifyFlock,
+    }),
+    # Native URL Support, take the slack URL and still build from it
+    ('https://api.flock.com/hooks/sendMessage/{}/'.format('i' * 24), {
         'instance': plugins.NotifyFlock,
     }),
     # Bot API presumed if one or more targets are specified
@@ -532,6 +541,14 @@ TEST_URLS = (
     }),
     # A nicely formed ifttt url with 2 events defined:
     ('ifttt://WebHookID@EventID/EventID2/', {
+        'instance': plugins.NotifyIFTTT,
+    }),
+    # Support native URL references
+    ('https://maker.ifttt.com/use/WebHookID/', {
+        # No EventID specified
+        'instance': TypeError,
+    }),
+    ('https://maker.ifttt.com/use/WebHookID/EventID/', {
         'instance': plugins.NotifyIFTTT,
     }),
     # Test website connection failures
@@ -1052,6 +1069,12 @@ TEST_URLS = (
         # All tokens provided - we're good
         'instance': plugins.NotifyMSTeams,
     }),
+    # Support native URLs
+    ('https://outlook.office.com/webhook/{}@{}/IncomingWebhook/{}/{}'
+     .format(UUID4, UUID4, 'a' * 32, UUID4), {
+         # All tokens provided - we're good
+         'instance': plugins.NotifyMSTeams}),
+
     ('msteams://{}@{}/{}/{}?t2'.format(UUID4, UUID4, 'a' * 32, UUID4), {
         # All tokens provided - we're good
         'instance': plugins.NotifyMSTeams,
@@ -1647,6 +1670,10 @@ TEST_URLS = (
         # the user told the webhook to use; set our ryver mode
         'instance': plugins.NotifyRyver,
     }),
+    # Support Native URLs
+    ('https://apprise.ryver.com/application/webhook/ckhrjW8w672m6HG', {
+        'instance': plugins.NotifyRyver,
+    }),
     ('ryver://caronc@apprise/ckhrjW8w672m6HG', {
         'instance': plugins.NotifyRyver,
         # don't include an image by default
@@ -1717,6 +1744,11 @@ TEST_URLS = (
     }),
     ('slack://username@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ', {
         # Missing a channel, falls back to webhook channel bindings
+        'instance': plugins.NotifySlack,
+    }),
+    # Native URL Support, take the slack URL and still build from it
+    ('https://hooks.slack.com/services/{}/{}/{}'.format(
+        'A' * 9, 'B' * 9, 'c' * 24), {
         'instance': plugins.NotifySlack,
     }),
     ('slack://username@INVALID/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#cool', {
@@ -2038,6 +2070,11 @@ TEST_URLS = (
         'instance': TypeError,
     }),
     ('wxteams://{}'.format('a' * 80), {
+        # token provided - we're good
+        'instance': plugins.NotifyWebexTeams,
+    }),
+    # Support Native URLs
+    ('https://api.ciscospark.com/v1/webhooks/incoming/{}'.format('a' * 80), {
         # token provided - we're good
         'instance': plugins.NotifyWebexTeams,
     }),

@@ -74,7 +74,6 @@ from ..AppriseLocale import gettext_lazy as _
 # Used to prepare our UUID regex matching
 UUID4_RE = \
     r'[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
-#    r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 
 # Token required as part of the API request
 #  /AAAAAAAAA@AAAAAAAAA/........./.........
@@ -364,3 +363,33 @@ class NotifyMSTeams(NotifyBase):
             parse_bool(results['qsd'].get('image', True))
 
         return results
+
+    @staticmethod
+    def parse_native_url(url):
+        """
+        Support:
+            https://outlook.office.com/webhook/ABCD/IncomingWebhook/DEFG/HIJK
+        """
+
+        # We don't need to do incredibly details token matching as the purpose
+        # of this is just to detect that were dealing with an msteams url
+        # token parsing will occur once we initialize the function
+        result = re.match(
+            r'^https?://outlook\.office\.com/webhook/'
+            r'(?P<token_a>[A-Z0-9-]+@[A-Z0-9-]+)/'
+            r'IncomingWebhook/'
+            r'(?P<token_b>[A-Z0-9]+)/'
+            r'(?P<token_c>[A-Z0-9-]+)/?'
+            r'(?P<args>\?[.+])?$', url, re.I)
+
+        if result:
+            return NotifyMSTeams.parse_url(
+                '{schema}://{token_a}/{token_b}/{token_c}/{args}'.format(
+                    schema=NotifyMSTeams.secure_protocol,
+                    token_a=result.group('token_a'),
+                    token_b=result.group('token_b'),
+                    token_c=result.group('token_c'),
+                    args='' if not result.group('args')
+                    else result.group('args')))
+
+        return None

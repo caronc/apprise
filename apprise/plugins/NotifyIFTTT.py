@@ -39,6 +39,7 @@
 #
 # For each event you create you will assign it a name (this will be known as
 # the {event} when building your URL.
+import re
 import requests
 from json import dumps
 
@@ -344,3 +345,27 @@ class NotifyIFTTT(NotifyBase):
                 NotifyIFTTT.parse_list(results['qsd']['to'])
 
         return results
+
+    @staticmethod
+    def parse_native_url(url):
+        """
+        Support https://maker.ifttt.com/use/WEBHOOK_ID/EVENT_ID
+        """
+
+        result = re.match(
+            r'^https?://maker\.ifttt\.com/use/'
+            r'(?P<webhook_id>[A-Z0-9_-]+)'
+            r'/?(?P<events>([A-Z0-9_-]+/?)+)?'
+            r'/?(?P<args>\?[.+])?$', url, re.I)
+
+        if result:
+            return NotifyIFTTT.parse_url(
+                '{schema}://{webhook_id}{events}{args}'.format(
+                    schema=NotifyIFTTT.secure_protocol,
+                    webhook_id=result.group('webhook_id'),
+                    events='' if not result.group('events')
+                    else '@{}'.format(result.group('events')),
+                    args='' if not result.group('args')
+                    else result.group('args')))
+
+        return None

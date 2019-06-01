@@ -124,12 +124,20 @@ class Apprise(object):
 
             # Some basic validation
             if schema not in plugins.SCHEMA_MAP:
-                logger.error('Unsupported schema {}.'.format(schema))
-                return None
+                # Give the user the benefit of the doubt that the user may be
+                # using one of the URLs provided to them by their notification
+                # service. Before we fail for good, just scan all the plugins
+                # that support he native_url() parse function
+                results = \
+                    next((r['plugin'].parse_native_url(_url)
+                          for r in plugins.MODULE_MAP.values()
+                          if r['plugin'].parse_native_url(_url) is not None),
+                         None)
 
-            # Parse our url details of the server object as dictionary
-            # containing all of the information parsed from our URL
-            results = plugins.SCHEMA_MAP[schema].parse_url(_url)
+            else:
+                # Parse our url details of the server object as dictionary
+                # containing all of the information parsed from our URL
+                results = plugins.SCHEMA_MAP[schema].parse_url(_url)
 
             if results is None:
                 # Failed to parse the server URL

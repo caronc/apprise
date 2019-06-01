@@ -402,3 +402,21 @@ class NotifyBase(URLBase):
                 del results['overflow']
 
         return results
+
+    @staticmethod
+    def parse_native_url(url):
+        """
+        This is a base class that can be optionally over-ridden by child
+        classes who can build their Apprise URL based on the one provided
+        by the notification service they choose to use.
+
+        The intent of this is to make Apprise a little more userfriendly
+        to people who aren't familiar with constructing URLs and wish to
+        use the ones that were just provied by their notification serivice
+        that they're using.
+
+        This function will return None if the passed in URL can't be matched
+        as belonging to the notification service. Otherwise this function
+        should return the same set of results that parse_url() does.
+        """
+        return None

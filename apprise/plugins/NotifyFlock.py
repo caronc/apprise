@@ -358,3 +358,24 @@ class NotifyFlock(NotifyBase):
             parse_bool(results['qsd'].get('image', True))
 
         return results
+
+    @staticmethod
+    def parse_native_url(url):
+        """
+        Support https://api.flock.com/hooks/sendMessage/TOKEN
+        """
+
+        result = re.match(
+            r'^https?://api\.flock\.com/hooks/sendMessage/'
+            r'(?P<token>[a-z0-9-]{24})/?'
+            r'(?P<args>\?[.+])?$', url, re.I)
+
+        if result:
+            return NotifyFlock.parse_url(
+                '{schema}://{token}/{args}'.format(
+                    schema=NotifyFlock.secure_protocol,
+                    token=result.group('token'),
+                    args='' if not result.group('args')
+                    else result.group('args')))
+
+        return None
