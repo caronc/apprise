@@ -24,6 +24,7 @@
 # THE SOFTWARE.
 
 import re
+import six
 import requests
 from json import dumps
 
@@ -79,7 +80,11 @@ class NotifyMatterMost(NotifyBase):
         '{schema}://{host}/{authtoken}',
         '{schema}://{host}/{authtoken}:{port}',
         '{schema}://{botname}@{host}/{authtoken}',
-        '{schema}://{botname}@{host}/{authtoken}:{port}',
+        '{schema}://{botname}@{host}:{port}/{authtoken}',
+        '{schema}://{host}/{fullpath}/{authtoken}',
+        '{schema}://{host}/{fullpath}{authtoken}:{port}',
+        '{schema}://{botname}@{host}/{fullpath}/{authtoken}',
+        '{schema}://{botname}@{host}:{port}/{fullpath}/{authtoken}',
     )
 
     # Define our template tokens
@@ -95,6 +100,10 @@ class NotifyMatterMost(NotifyBase):
             'regex': (r'[a-z0-9]{24,32}', 'i'),
             'private': True,
             'required': True,
+        },
+        'fullpath': {
+            'name': _('Path'),
+            'type': 'string',
         },
         'botname': {
             'name': _('Bot Name'),
@@ -126,8 +135,8 @@ class NotifyMatterMost(NotifyBase):
         },
     })
 
-    def __init__(self, authtoken, channels=None, include_image=False,
-                 **kwargs):
+    def __init__(self, authtoken, fullpath=None, channels=None,
+                 include_image=False, **kwargs):
         """
         Initialize MatterMost Object
         """
@@ -138,6 +147,10 @@ class NotifyMatterMost(NotifyBase):
 
         else:
             self.schema = 'http'
+
+        # our full path
+        self.fullpath = '' if not isinstance(
+            fullpath, six.string_types) else fullpath.strip()
 
         # Our Authorization Token
         self.authtoken = authtoken
@@ -204,8 +217,9 @@ class NotifyMatterMost(NotifyBase):
             if channel:
                 payload['channel'] = channel
 
-            url = '%s://%s:%d' % (self.schema, self.host, self.port)
-            url += '/hooks/%s' % self.authtoken
+            url = '{}://{}:{}{}/hooks/{}'.format(
+                self.schema, self.host, self.port, self.fullpath,
+                self.authtoken)
 
             self.logger.debug('MatterMost POST URL: %s (cert_verify=%r)' % (
                 url, self.verify_certificate,
@@ -288,14 +302,17 @@ class NotifyMatterMost(NotifyBase):
         default_port = 443 if self.secure else self.default_port
         default_schema = self.secure_protocol if self.secure else self.protocol
 
-        return '{schema}://{hostname}{port}/{authtoken}/?{args}'.format(
-            schema=default_schema,
-            hostname=NotifyMatterMost.quote(self.host, safe=''),
-            port='' if not self.port or self.port == default_port
-                 else ':{}'.format(self.port),
-            authtoken=NotifyMatterMost.quote(self.authtoken, safe=''),
-            args=NotifyMatterMost.urlencode(args),
-        )
+        return \
+            '{schema}://{hostname}{port}{fullpath}{authtoken}/?{args}'.format(
+                schema=default_schema,
+                hostname=NotifyMatterMost.quote(self.host, safe=''),
+                port='' if not self.port or self.port == default_port
+                     else ':{}'.format(self.port),
+                fullpath='/' if not self.fullpath else '{}/'.format(
+                    NotifyMatterMost.quote(self.fullpath, safe='/')),
+                authtoken=NotifyMatterMost.quote(self.authtoken, safe=''),
+                args=NotifyMatterMost.urlencode(args),
+            )
 
     @staticmethod
     def parse_url(url):
@@ -310,14 +327,16 @@ class NotifyMatterMost(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
-        try:
-            # Apply our settings now
-            results['authtoken'] = \
-                NotifyMatterMost.split_path(results['fullpath'])[0]
+        # Acquire our tokens; the last one will always be our authtoken
+        # all entries before it will be our path
+        tokens = NotifyMatterMost.split_path(results['fullpath'])
 
-        except IndexError:
-            # There was no Authorization Token specified
-            results['authtoken'] = None
+        # Apply our settings now
+        results['authtoken'] = None if not tokens else tokens.pop()
+
+        # Store our path
+        results['fullpath'] = '' if not tokens \
+            else '/{}'.format('/'.join(tokens))
 
         # Define our optional list of channels to notify
         results['channels'] = list()

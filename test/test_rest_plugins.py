@@ -999,6 +999,13 @@ TEST_URLS = (
     ('mmosts://localhost/3ccdd113474722377935511fc85d3dd4', {
         'instance': plugins.NotifyMatterMost,
     }),
+    # Test our paths
+    ('mmosts://localhost/a/path/3ccdd113474722377935511fc85d3dd4', {
+        'instance': plugins.NotifyMatterMost,
+    }),
+    ('mmosts://localhost/////3ccdd113474722377935511fc85d3dd4///', {
+        'instance': plugins.NotifyMatterMost,
+    }),
     ('mmosts://localhost', {
         # Thrown because there was no webhook id specified
         'instance': TypeError,
