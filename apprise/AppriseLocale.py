@@ -192,16 +192,24 @@ class AppriseLocale(object):
 
             if hasattr(ctypes, 'windll'):
                 windll = ctypes.windll.kernel32
-                lang = locale.windows_locale[
-                    windll.GetUserDefaultUILanguage()]
-            else:
                 try:
-                    # Detect language
-                    lang = locale.getdefaultlocale()[0]
+                    lang = locale.windows_locale[
+                        windll.GetUserDefaultUILanguage()]
 
-                except TypeError:
-                    # None is returned if the default can't be determined
-                    # we're done in this case
-                    return None
+                    # Our detected windows language
+                    return lang[0:2].lower()
 
-        return lang[0:2].lower()
+                except (TypeError, KeyError):
+                    # Fallback to posix detection
+                    pass
+
+            try:
+                # Detect language
+                lang = locale.getdefaultlocale()[0]
+
+            except TypeError:
+                # None is returned if the default can't be determined
+                # we're done in this case
+                return None
+
+        return None if not lang else lang[0:2].lower()
