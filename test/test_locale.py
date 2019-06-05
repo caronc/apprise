@@ -27,6 +27,7 @@ import mock
 import ctypes
 
 from apprise import AppriseLocale
+from apprise.utils import environ
 
 try:
     # Python v3.4+
@@ -133,8 +134,7 @@ def test_gettext_installs(mock_gettext_trans):
         pass
 
 
-@mock.patch('locale.getdefaultlocale')
-def test_detect_language(mock_getlocale):
+def test_detect_language_windows_users():
     """
     API: Apprise() Detect language
 
@@ -147,14 +147,40 @@ def test_detect_language(mock_getlocale):
         setattr(ctypes, 'windll', windll)
 
     # The below accesses the windows fallback code
-    assert AppriseLocale.AppriseLocale.detect_language() == 'en'
+    with environ('LANG', 'LANGUAGE', 'LC_ALL', 'LC_CTYPE', LANG="en_CA"):
+        assert AppriseLocale.AppriseLocale.detect_language() == 'en'
 
     assert AppriseLocale.AppriseLocale\
         .detect_language(detect_fallback=False) is None
 
+    # 0 = IndexError
+    windll.kernel32.GetUserDefaultUILanguage.return_value = 0
+    setattr(ctypes, 'windll', windll)
+    with environ('LANG', 'LC_ALL', 'LC_CTYPE', LANGUAGE="en_CA"):
+        assert AppriseLocale.AppriseLocale.detect_language() == 'en'
+
+    # The below accesses the windows fallback code and fail
+    # then it will resort to the environment variables
+    with environ('LANG', 'LANGUAGE', 'LC_ALL', 'LC_CTYPE'):
+        # Language can't be detected
+        assert AppriseLocale.AppriseLocale.detect_language() is None
+
+    with environ('LANGUAGE', 'LC_ALL', 'LC_CTYPE', LANG="fr_CA"):
+        # Detect french language
+        assert AppriseLocale.AppriseLocale.detect_language() == 'fr'
+
+    # Tidy
+    delattr(ctypes, 'windll')
+
+
+@mock.patch('locale.getdefaultlocale')
+def test_detect_language_defaultlocale(mock_getlocale):
+    """
+    API: Apprise() Default locale detection
+
+    """
     # Handle case where getdefaultlocale() can't be detected
     mock_getlocale.return_value = None
-    delattr(ctypes, 'windll')
     assert AppriseLocale.AppriseLocale.detect_language() is None
 
     # if detect_language and windows env fail us, then we don't
