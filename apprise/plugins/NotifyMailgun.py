@@ -61,7 +61,7 @@ from ..utils import is_email
 from ..AppriseLocale import gettext_lazy as _
 
 # Used to validate your personal access apikey
-VALIDATE_API_KEY = re.compile(r'^[a-z0-9]{32}-[a-z0-9]{8}-[a-z0-9]{8}$', re.I)
+# VALIDATE_API_KEY = re.compile(r'^[a-z0-9]{32}-[a-z0-9]{8}-[a-z0-9]{8}$', re.I)
 
 # Provide some known codes Mailgun uses and what they translate to:
 # Based on https://documentation.mailgun.com/en/latest/api-intro.html#errors
@@ -184,11 +184,11 @@ class NotifyMailgun(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        if not VALIDATE_API_KEY.match(self.apikey):
-            msg = 'The API Key specified ({}) is invalid.' \
-                  .format(apikey)
-            self.logger.warning(msg)
-            raise TypeError(msg)
+#        if not VALIDATE_API_KEY.match(self.apikey):
+#            msg = 'The API Key specified ({}) is invalid.' \
+#                  .format(apikey)
+#            self.logger.warning(msg)
+#            raise TypeError(msg)
 
         # Validate our username
         if not self.user:
