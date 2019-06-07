@@ -1071,8 +1071,6 @@ def test_apprise_details_plugin_verification():
                     assert isinstance(arg['alias_of'], six.string_types)
                     # Track our alias_of object
                     map_to_aliases.add(arg['alias_of'])
-                    # We should never map to ourselves
-                    assert arg['alias_of'] != key
                     # 2 entries (name, and alias_of only!)
                     assert len(entry['details'][section][key]) == 1
 
