@@ -787,10 +787,6 @@ TEST_URLS = (
     ('mailgun://user@host', {
         'instance': TypeError,
     }),
-    # Token specified but it's invalid
-    ('mailgun://user@host/{}'.format('a' * 12), {
-        'instance': TypeError,
-    }),
     # Token is valid, but no user name specified
     ('mailgun://host/{}-{}-{}'.format('a' * 32, 'b' * 8, 'c' * 8), {
         'instance': TypeError,
