@@ -134,7 +134,6 @@ class NotifyMailgun(NotifyBase):
         'apikey': {
             'name': _('API Key'),
             'type': 'string',
-            'regex': (r'[a-z0-9]{32}-[a-z0-9]{8}-[a-z0-9]{8}', 'i'),
             'private': True,
             'required': True,
         },
