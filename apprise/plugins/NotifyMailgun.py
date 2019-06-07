@@ -51,7 +51,6 @@
 #  the email will be transmitted from.  If no email address is specified
 #  then it will also become the 'to' address as well.
 #
-import re
 import requests
 
 from .NotifyBase import NotifyBase
@@ -59,9 +58,6 @@ from ..common import NotifyType
 from ..utils import parse_list
 from ..utils import is_email
 from ..AppriseLocale import gettext_lazy as _
-
-# Used to validate your personal access apikey
-VALIDATE_API_KEY = re.compile(r'^[a-z0-9]{32}-[a-z0-9]{8}-[a-z0-9]{8}$', re.I)
 
 # Provide some known codes Mailgun uses and what they translate to:
 # Based on https://documentation.mailgun.com/en/latest/api-intro.html#errors
@@ -138,7 +134,6 @@ class NotifyMailgun(NotifyBase):
         'apikey': {
             'name': _('API Key'),
             'type': 'string',
-            'regex': (r'[a-z0-9]{32}-[a-z0-9]{8}-[a-z0-9]{8}', 'i'),
             'private': True,
             'required': True,
         },
@@ -181,12 +176,6 @@ class NotifyMailgun(NotifyBase):
         except AttributeError:
             # Token was None
             msg = 'No API Key was specified.'
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        if not VALIDATE_API_KEY.match(self.apikey):
-            msg = 'The API Key specified ({}) is invalid.' \
-                  .format(apikey)
             self.logger.warning(msg)
             raise TypeError(msg)
 
