@@ -2057,6 +2057,79 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifyNexmo
+    ##################################
+    ('nexmo://', {
+        # No secret and or key specified
+        'instance': None,
+    }),
+    ('nexmo://:@/', {
+        # invalid Auth key
+        'instance': TypeError,
+    }),
+    ('nexmo://{}@12345678'.format('a' * 8), {
+        # Just a key provided
+        'instance': TypeError,
+    }),
+    ('nexmo://{}:{}@_'.format('a' * 8, 'b' * 16), {
+        # key and secret provided but invalid from
+        'instance': TypeError,
+    }),
+    ('nexmo://{}:{}@{}'.format('a' * 23, 'b' * 16, '1' * 11), {
+        # key invalid and secret
+        'instance': TypeError,
+    }),
+    ('nexmo://{}:{}@{}'.format('a' * 8, 'b' * 2, '2' * 11), {
+        # key and invalid secret
+        'instance': TypeError,
+    }),
+    ('nexmo://{}:{}@{}'.format('a' * 8, 'b' * 16, '3' * 9), {
+        # key and secret provided and from but invalid from no
+        'instance': TypeError,
+    }),
+    ('nexmo://{}:{}@{}/?ttl=0'.format('a' * 8, 'b' * 16, '3' * 11), {
+        # Invalid ttl defined
+        'instance': TypeError,
+    }),
+    ('nexmo://{}:{}@{}/123/{}/abcd/'.format(
+        'a' * 8, 'b' * 16, '3' * 11, '9' * 15), {
+        # valid everything but target numbers
+        'instance': plugins.NotifyNexmo,
+    }),
+    ('nexmo://{}:{}@{}'.format('a' * 8, 'b' * 16, '5' * 11), {
+        # using phone no with no target - we text ourselves in
+        # this case
+        'instance': plugins.NotifyNexmo,
+    }),
+    ('nexmo://_?key={}&secret={}&from={}'.format(
+        'a' * 8, 'b' * 16, '5' * 11), {
+        # use get args to acomplish the same thing
+        'instance': plugins.NotifyNexmo,
+    }),
+    ('nexmo://_?key={}&secret={}&source={}'.format(
+        'a' * 8, 'b' * 16, '5' * 11), {
+        # use get args to acomplish the same thing (use source instead of from)
+        'instance': plugins.NotifyNexmo,
+    }),
+    ('nexmo://_?key={}&secret={}&from={}&to={}'.format(
+        'a' * 8, 'b' * 16, '5' * 11, '7' * 13), {
+        # use to=
+        'instance': plugins.NotifyNexmo,
+    }),
+    ('nexmo://{}:{}@{}'.format('a' * 8, 'b' * 16, '6' * 11), {
+        'instance': plugins.NotifyNexmo,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('nexmo://{}:{}@{}'.format('a' * 8, 'b' * 16, '6' * 11), {
+        'instance': plugins.NotifyNexmo,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifyWebexTeams
     ##################################
     ('wxteams://', {
@@ -2901,6 +2974,65 @@ def test_notify_twilio_plugin(mock_post):
     # Initialize our object
     obj = plugins.NotifyTwilio(
         account_sid=account_sid, auth_token=auth_token, source=source)
+
+    # We will fail with the above error code
+    assert obj.notify('title', 'body', 'info') is False
+
+
+@mock.patch('requests.post')
+def test_notify_nexmo_plugin(mock_post):
+    """
+    API: NotifyNexmo() Extra Checks
+
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.request_rate_per_sec = 0
+
+    # Prepare our response
+    response = requests.Request()
+    response.status_code = requests.codes.ok
+
+    # Prepare Mock
+    mock_post.return_value = response
+
+    # Initialize some generic (but valid) tokens
+    apikey = '{}'.format('b' * 8)
+    secret = '{}'.format('b' * 16)
+    source = '+1 (555) 123-3456'
+
+    try:
+        plugins.NotifyNexmo(
+            apikey=None, secret=secret, source=source)
+        # No apikey specified
+        assert False
+
+    except TypeError:
+        # Exception should be thrown about the fact apikey was not
+        # specified
+        assert True
+
+    try:
+        plugins.NotifyNexmo(
+            apikey=apikey, secret=None, source=source)
+        # No secret specified
+        assert False
+
+    except TypeError:
+        # Exception should be thrown about the fact apikey was not
+        # specified
+        assert True
+
+    # a error response
+    response.status_code = 400
+    response.content = dumps({
+        'code': 21211,
+        'message': "The 'To' number +1234567 is not a valid phone number.",
+    })
+    mock_post.return_value = response
+
+    # Initialize our object
+    obj = plugins.NotifyNexmo(
+        apikey=apikey, secret=secret, source=source)
 
     # We will fail with the above error code
     assert obj.notify('title', 'body', 'info') is False
