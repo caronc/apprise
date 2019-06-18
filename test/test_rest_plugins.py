@@ -1426,7 +1426,8 @@ TEST_URLS = (
         'instance': TypeError,
     }),
     # APIKey + emergency priority setting with retry and expire
-    ('pover://%s@%s?priority=emergency&retry=30&expire=300' % ('u' * 30, 'a' * 30), {
+    ('pover://%s@%s?priority=emergency&retry=30&expire=300'
+     % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
     }),
     # APIKey + priority setting (empty)

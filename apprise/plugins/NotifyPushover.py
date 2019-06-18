@@ -209,7 +209,8 @@ class NotifyPushover(NotifyBase):
         },
     })
 
-    def __init__(self, token, targets=None, priority=None, sound=None, retry=None, expire=None,
+    def __init__(self, token, targets=None, priority=None, sound=None,
+                 retry=None, expire=None,
                  **kwargs):
         """
         Initialize Pushover Object
@@ -253,7 +254,7 @@ class NotifyPushover(NotifyBase):
         # The following are for emergency alerts
         if self.priority == PushoverPriority.EMERGENCY:
             if retry is None or expire is None:
-                msg = 'Emergency pushes require expire and retry to be specified.'
+                msg = 'Emergency requires expire and retry to be specified.'
                 self.logger.warning(msg)
                 raise TypeError(msg)
             if retry < 30:
@@ -261,7 +262,7 @@ class NotifyPushover(NotifyBase):
                 self.logger.warning(msg)
                 raise TypeError(msg)
             if expire < 0 or expire > 10800:
-                msg = 'Expire has a maximum value of at most 10800 seconds (3 hours).'
+                msg = 'Expire has a max value of at most 10800 seconds.'
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
@@ -396,7 +397,8 @@ class NotifyPushover(NotifyBase):
                 else _map[self.priority],
             'verify': 'yes' if self.verify_certificate else 'no',
         }
-        # Only add expire and retry for emergency messages, pushover ignores for all other priorities
+        # Only add expire and retry for emergency messages,
+        # pushover ignores for all other priorities
         if self.priority == PushoverPriority.EMERGENCY:
             args.update({'expire': self.expire, 'retry': self.retry})
 
