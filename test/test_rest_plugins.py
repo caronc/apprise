@@ -1379,6 +1379,10 @@ TEST_URLS = (
     ('pover://%s@%s?sound=invalid' % ('u' * 30, 'a' * 30), {
         'instance': TypeError,
     }),
+    # APIKey + valid alternate sound picked
+    ('pover://%s@%s?sound=spacealarm' % ('u' * 30, 'a' * 30), {
+        'instance': plugins.NotifyPushover,
+    }),
     # APIKey + Valid User
     ('pover://%s@%s' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
@@ -1415,6 +1419,14 @@ TEST_URLS = (
     }),
     # APIKey + invalid priority setting
     ('pover://%s@%s?priority=invalid' % ('u' * 30, 'a' * 30), {
+        'instance': plugins.NotifyPushover,
+    }),
+    # APIKey + emergency(2) priority setting
+    ('pover://%s@%s?priority=emergency' % ('u' * 30, 'a' * 30), {
+        'instance': TypeError,
+    }),
+    # APIKey + emergency priority setting with retry and expire
+    ('pover://%s@%s?priority=emergency&retry=30&expire=300' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
     }),
     # APIKey + priority setting (empty)
