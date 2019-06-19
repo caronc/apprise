@@ -198,11 +198,14 @@ class NotifyPushover(NotifyBase):
             'name': _('Retry'),
             'type': 'int',
             'min': 30,
+            'default': 900,  # 15 minutes
         },
         'expire': {
             'name': _('Expire'),
             'type': 'int',
+            'min': 0,
             'max': 10800,
+            'default': 3600,  # 1 hour
         },
         'to': {
             'alias_of': 'targets',
@@ -253,21 +256,31 @@ class NotifyPushover(NotifyBase):
 
         # The following are for emergency alerts
         if self.priority == PushoverPriority.EMERGENCY:
-            if retry is None or expire is None:
-                msg = 'Emergency requires expire and retry to be specified.'
-                self.logger.warning(msg)
-                raise TypeError(msg)
-            if retry < 30:
+
+            # How often to resend notification, in seconds
+            self.retry = NotifyPushover.template_args['retry']['default']
+            try:
+                self.retry = int(retry)
+            except (ValueError, TypeError):
+                # Do nothing
+                pass
+
+            # How often to resend notification, in seconds
+            self.expire = NotifyPushover.template_args['expire']['default']
+            try:
+                self.expire = int(expire)
+            except (ValueError, TypeError):
+                # Do nothing
+                pass
+
+            if self.retry < 30:
                 msg = 'Retry must be at least 30.'
                 self.logger.warning(msg)
                 raise TypeError(msg)
-            if expire < 0 or expire > 10800:
+            if self.expire < 0 or self.expire > 10800:
                 msg = 'Expire has a max value of at most 10800 seconds.'
                 self.logger.warning(msg)
                 raise TypeError(msg)
-
-            self.retry = retry
-            self.expire = expire
 
         if not self.user:
             msg = 'No user key was specified.'
@@ -460,9 +473,9 @@ class NotifyPushover(NotifyBase):
 
         # Get expire and retry
         if 'expire' in results['qsd'] and len(results['qsd']['expire']):
-            results['expire'] = int(results['qsd']['expire'])
+            results['expire'] = results['qsd']['expire']
         if 'retry' in results['qsd'] and len(results['qsd']['retry']):
-            results['retry'] = int(results['qsd']['retry'])
+            results['retry'] = results['qsd']['retry']
 
         # The 'to' makes it easier to use yaml configuration
         if 'to' in results['qsd'] and len(results['qsd']['to']):
