@@ -1379,6 +1379,10 @@ TEST_URLS = (
     ('pover://%s@%s?sound=invalid' % ('u' * 30, 'a' * 30), {
         'instance': TypeError,
     }),
+    # APIKey + valid alternate sound picked
+    ('pover://%s@%s?sound=spacealarm' % ('u' * 30, 'a' * 30), {
+        'instance': plugins.NotifyPushover,
+    }),
     # APIKey + Valid User
     ('pover://%s@%s' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
@@ -1416,6 +1420,43 @@ TEST_URLS = (
     # APIKey + invalid priority setting
     ('pover://%s@%s?priority=invalid' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
+    }),
+    # APIKey + emergency(2) priority setting
+    ('pover://%s@%s?priority=emergency' % ('u' * 30, 'a' * 30), {
+        'instance': plugins.NotifyPushover,
+    }),
+    # APIKey + emergency priority setting with retry and expire
+    ('pover://%s@%s?priority=emergency&%s&%s' % ('u' * 30,
+                                                 'a' * 30,
+                                                 'retry=30',
+                                                 'expire=300'), {
+        'instance': plugins.NotifyPushover,
+    }),
+    # APIKey + emergency priority setting with text retry
+    ('pover://%s@%s?priority=emergency&%s&%s' % ('u' * 30,
+                                                 'a' * 30,
+                                                 'retry=invalid',
+                                                 'expire=300'), {
+        'instance': plugins.NotifyPushover,
+    }),
+    # APIKey + emergency priority setting with text expire
+    ('pover://%s@%s?priority=emergency&%s&%s' % ('u' * 30,
+                                                 'a' * 30,
+                                                 'retry=30',
+                                                 'expire=invalid'), {
+        'instance': plugins.NotifyPushover,
+    }),
+    # APIKey + emergency priority setting with invalid expire
+    ('pover://%s@%s?priority=emergency&%s' % ('u' * 30,
+                                              'a' * 30,
+                                              'expire=100000'), {
+        'instance': TypeError,
+    }),
+    # APIKey + emergency priority setting with invalid retry
+    ('pover://%s@%s?priority=emergency&%s' % ('u' * 30,
+                                              'a' * 30,
+                                              'retry=15'), {
+        'instance': TypeError,
     }),
     # APIKey + priority setting (empty)
     ('pover://%s@%s?priority=' % ('u' * 30, 'a' * 30), {

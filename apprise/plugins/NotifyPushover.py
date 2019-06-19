@@ -194,12 +194,26 @@ class NotifyPushover(NotifyBase):
             'regex': (r'[a-z]{1,12}', 'i'),
             'default': PushoverSound.PUSHOVER,
         },
+        'retry': {
+            'name': _('Retry'),
+            'type': 'int',
+            'min': 30,
+            'default': 900,  # 15 minutes
+        },
+        'expire': {
+            'name': _('Expire'),
+            'type': 'int',
+            'min': 0,
+            'max': 10800,
+            'default': 3600,  # 1 hour
+        },
         'to': {
             'alias_of': 'targets',
         },
     })
 
     def __init__(self, token, targets=None, priority=None, sound=None,
+                 retry=None, expire=None,
                  **kwargs):
         """
         Initialize Pushover Object
@@ -239,6 +253,34 @@ class NotifyPushover(NotifyBase):
 
         else:
             self.priority = priority
+
+        # The following are for emergency alerts
+        if self.priority == PushoverPriority.EMERGENCY:
+
+            # How often to resend notification, in seconds
+            self.retry = NotifyPushover.template_args['retry']['default']
+            try:
+                self.retry = int(retry)
+            except (ValueError, TypeError):
+                # Do nothing
+                pass
+
+            # How often to resend notification, in seconds
+            self.expire = NotifyPushover.template_args['expire']['default']
+            try:
+                self.expire = int(expire)
+            except (ValueError, TypeError):
+                # Do nothing
+                pass
+
+            if self.retry < 30:
+                msg = 'Retry must be at least 30.'
+                self.logger.warning(msg)
+                raise TypeError(msg)
+            if self.expire < 0 or self.expire > 10800:
+                msg = 'Expire has a max value of at most 10800 seconds.'
+                self.logger.warning(msg)
+                raise TypeError(msg)
 
         if not self.user:
             msg = 'No user key was specified.'
@@ -288,6 +330,9 @@ class NotifyPushover(NotifyBase):
                 'device': device,
                 'sound': self.sound,
             }
+
+            if self.priority == PushoverPriority.EMERGENCY:
+                payload.update({'retry': self.retry, 'expire': self.expire})
 
             self.logger.debug('Pushover POST URL: %s (cert_verify=%r)' % (
                 self.notify_url, self.verify_certificate,
@@ -365,6 +410,10 @@ class NotifyPushover(NotifyBase):
                 else _map[self.priority],
             'verify': 'yes' if self.verify_certificate else 'no',
         }
+        # Only add expire and retry for emergency messages,
+        # pushover ignores for all other priorities
+        if self.priority == PushoverPriority.EMERGENCY:
+            args.update({'expire': self.expire, 'retry': self.retry})
 
         # Escape our devices
         devices = '/'.join([NotifyPushover.quote(x, safe='')
@@ -421,6 +470,12 @@ class NotifyPushover(NotifyBase):
         if 'sound' in results['qsd'] and len(results['qsd']['sound']):
             results['sound'] = \
                 NotifyPushover.unquote(results['qsd']['sound'])
+
+        # Get expire and retry
+        if 'expire' in results['qsd'] and len(results['qsd']['expire']):
+            results['expire'] = results['qsd']['expire']
+        if 'retry' in results['qsd'] and len(results['qsd']['retry']):
+            results['retry'] = results['qsd']['retry']
 
         # The 'to' makes it easier to use yaml configuration
         if 'to' in results['qsd'] and len(results['qsd']['to']):
