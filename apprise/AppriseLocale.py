@@ -30,6 +30,7 @@ import contextlib
 from os.path import join
 from os.path import dirname
 from os.path import abspath
+from .logger import logger
 
 # Define our translation domain
 DOMAIN = 'apprise'
@@ -206,6 +207,16 @@ class AppriseLocale(object):
             try:
                 # Detect language
                 lang = locale.getdefaultlocale()[0]
+
+            except ValueError as e:
+                # This occurs when an invalid locale was parsed from the
+                # environment variable. While we still return None in this
+                # case, we want to better notify the end user of this. Users
+                # receiving this error should check their environment
+                # variables.
+                logger.warning(
+                    'Language detection failure / {}'.format(str(e)))
+                return None
 
             except TypeError:
                 # None is returned if the default can't be determined

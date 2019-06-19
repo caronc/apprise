@@ -23,6 +23,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import os
 import mock
 import ctypes
 
@@ -168,6 +169,16 @@ def test_detect_language_windows_users():
     with environ('LANGUAGE', 'LC_ALL', 'LC_CTYPE', LANG="fr_CA"):
         # Detect french language
         assert AppriseLocale.AppriseLocale.detect_language() == 'fr'
+
+    # The following unsets all enviroment vaiables and sets LC_CTYPE
+    # This was causing Python 2.7 to internally parse UTF-8 as an invalid
+    # locale and throw an uncaught ValueError
+    with environ(*list(os.environ.keys()), LC_CTYPE="UTF-8"):
+        assert AppriseLocale.AppriseLocale.detect_language() is None
+
+    # Test with absolutely no environment variables what-so-ever
+    with environ(*list(os.environ.keys())):
+        assert AppriseLocale.AppriseLocale.detect_language() is None
 
     # Tidy
     delattr(ctypes, 'windll')
