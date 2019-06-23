@@ -2338,6 +2338,76 @@ TEST_URLS = (
     ('xml://localhost:8080/path?-HeaderKey=HeaderValue', {
         'instance': plugins.NotifyXML,
     }),
+
+    ##################################
+    # NotifyZulip
+    ##################################
+    ('zulip://', {
+        'instance': None,
+    }),
+    ('zulip://:@/', {
+        'instance': None,
+    }),
+    ('zulip://apprise', {
+        # Just org provided (no token or botname)
+        'instance': TypeError,
+    }),
+    ('zulip://botname@apprise', {
+        # Just org and botname provided (no token)
+        'instance': TypeError,
+    }),
+    # invalid token
+    ('zulip://botname@apprise/{}'.format('a' * 24), {
+        'instance': TypeError,
+    }),
+    # invalid botname
+    ('zulip://....@apprise/{}'.format('a' * 32), {
+        'instance': TypeError,
+    }),
+    # Valid everything - no target so default is used
+    ('zulip://botname@apprise/{}'.format('a' * 32), {
+        'instance': plugins.NotifyZulip,
+    }),
+    # Valid everything - organization as hostname
+    ('zulip://botname@apprise.zulipchat.com/{}'.format('a' * 32), {
+        'instance': plugins.NotifyZulip,
+    }),
+    # Valid everything - 2 channels specified
+    ('zulip://botname@apprise/{}/channel1/channel2'.format('a' * 32), {
+        'instance': plugins.NotifyZulip,
+    }),
+    # Valid everything - 2 channels specified (using to=)
+    ('zulip://botname@apprise/{}/?to=channel1/channel2'.format('a' * 32), {
+        'instance': plugins.NotifyZulip,
+    }),
+    # Valid everything - 2 emails specified
+    ('zulip://botname@apprise/{}/user@example.com/user2@example.com'.format(
+        'a' * 32), {
+        'instance': plugins.NotifyZulip,
+    }),
+    ('zulip://botname@apprise/{}'.format('a' * 32), {
+        'instance': plugins.NotifyZulip,
+        # don't include an image by default
+        'include_image': False,
+    }),
+    ('zulip://botname@apprise/{}'.format('a' * 32), {
+        'instance': plugins.NotifyZulip,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('zulip://botname@apprise/{}'.format('a' * 32), {
+        'instance': plugins.NotifyZulip,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('zulip://botname@apprise/{}'.format('a' * 32), {
+        'instance': plugins.NotifyZulip,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
 )
 
 
@@ -3392,6 +3462,28 @@ def test_notify_ryver_plugin():
     # No organization
     try:
         plugins.NotifyRyver(organization=None, token=token)
+        assert False
+
+    except TypeError:
+        # we'll thrown because an empty list of channels was provided
+        assert True
+
+
+def test_notify_zulip_plugin():
+    """
+    API: NotifyZulip() Extra Checks
+
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.request_rate_per_sec = 0
+
+    # must be 32 characters long
+    token = 'a' * 32
+
+    # Invalid organization
+    try:
+        plugins.NotifyZulip(
+            botname='test', organization='#', token=token)
         assert False
 
     except TypeError:
