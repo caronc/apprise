@@ -128,6 +128,78 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifyD7Networks
+    ##################################
+    ('d7sms://', {
+        # No token specified
+        'instance': None,
+    }),
+    ('d7sms://:@/', {
+        # invalid user/pass
+        'instance': TypeError,
+    }),
+    ('d7sms://user:pass@{}/{}/{}'.format('1' * 10, '2' * 15, 'a' * 13), {
+        # invalid target numbers
+        'instance': TypeError,
+    }),
+    ('d7sms://user:pass@{}?batch=yes'.format('3' * 14), {
+        # valid number
+        'instance': plugins.NotifyD7Networks,
+    }),
+    ('d7sms://user:pass@{}?batch=yes'.format('7' * 14), {
+        # valid number
+        'instance': plugins.NotifyD7Networks,
+        # Test what happens if a batch send fails to return a messageCount
+        'requests_response_text': {
+            'data': {
+                'messageCount': 0,
+            },
+        },
+        # Expected notify() response
+        'notify_response': False,
+    }),
+    ('d7sms://user:pass@{}?batch=yes&to={}'.format('3' * 14, '6' * 14), {
+        # valid number
+        'instance': plugins.NotifyD7Networks,
+    }),
+    ('d7sms://user:pass@{}?batch=yes&from=apprise'.format('3' * 14), {
+        # valid number, utilizing the optional from= variable
+        'instance': plugins.NotifyD7Networks,
+    }),
+    ('d7sms://user:pass@{}?batch=yes&source=apprise'.format('3' * 14), {
+        # valid number, utilizing the optional source= variable (same as from)
+        'instance': plugins.NotifyD7Networks,
+    }),
+    ('d7sms://user:pass@{}?priority=invalid'.format('3' * 14), {
+        # valid number; invalid priority
+        'instance': plugins.NotifyD7Networks,
+    }),
+    ('d7sms://user:pass@{}?priority=3'.format('3' * 14), {
+        # valid number; adjusted priority
+        'instance': plugins.NotifyD7Networks,
+    }),
+    ('d7sms://user:pass@{}?priority=high'.format('3' * 14), {
+        # valid number; adjusted priority (string supported)
+        'instance': plugins.NotifyD7Networks,
+    }),
+    ('d7sms://user:pass@{}?batch=no'.format('3' * 14), {
+        # valid number - no batch
+        'instance': plugins.NotifyD7Networks,
+    }),
+    ('d7sms://user:pass@{}'.format('3' * 14), {
+        'instance': plugins.NotifyD7Networks,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('d7sms://user:pass@{}'.format('3' * 14), {
+        'instance': plugins.NotifyD7Networks,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifyDiscord
     ##################################
     ('discord://', {
@@ -2446,6 +2518,9 @@ def test_rest_plugins(mock_post, mock_get):
         # Our expected Query response (True, False, or exception type)
         response = meta.get('response', True)
 
+        # Our expected Notify response (True or False)
+        notify_response = meta.get('notify_response', response)
+
         # Allow us to force the server response code to be something other then
         # the defaults
         requests_response_code = meta.get(
@@ -2558,22 +2633,22 @@ def test_rest_plugins(mock_post, mock_get):
                     # check that we're as expected
                     assert obj.notify(
                         body=body, title=title,
-                        notify_type=notify_type) == response
+                        notify_type=notify_type) == notify_response
 
                     # check that this doesn't change using different overflow
                     # methods
                     assert obj.notify(
                         body=body, title=title,
                         notify_type=notify_type,
-                        overflow=OverflowMode.UPSTREAM) == response
+                        overflow=OverflowMode.UPSTREAM) == notify_response
                     assert obj.notify(
                         body=body, title=title,
                         notify_type=notify_type,
-                        overflow=OverflowMode.TRUNCATE) == response
+                        overflow=OverflowMode.TRUNCATE) == notify_response
                     assert obj.notify(
                         body=body, title=title,
                         notify_type=notify_type,
-                        overflow=OverflowMode.SPLIT) == response
+                        overflow=OverflowMode.SPLIT) == notify_response
 
                 else:
                     # Disable throttling
@@ -2616,8 +2691,8 @@ def test_rest_plugins(mock_post, mock_get):
             try:
                 if test_requests_exceptions is False:
                     # check that we're as expected
-                    assert obj.notify(
-                        body='body', notify_type=notify_type) == response
+                    assert obj.notify(body='body', notify_type=notify_type) \
+                        == notify_response
 
                 else:
                     for _exception in REQUEST_EXCEPTIONS:
