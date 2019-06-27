@@ -60,9 +60,6 @@ VALIDATE_TOKEN_B = re.compile(r'[A-Z0-9]{9}')
 #  /........./........./CCCCCCCCCCCCCCCCCCCCCCCC
 VALIDATE_TOKEN_C = re.compile(r'[A-Za-z0-9]{24}')
 
-# Default User
-SLACK_DEFAULT_USER = 'apprise'
-
 # Extend HTTP Error Messages
 SLACK_HTTP_ERROR_MAP = {
     401: 'Unauthorized - Invalid Token.',
@@ -228,7 +225,7 @@ class NotifySlack(NotifyBase):
 
         if not self.user:
             self.logger.warning(
-                'No user was specified; using %s.' % SLACK_DEFAULT_USER)
+                'No user was specified; using "%s".' % self.app_id)
 
         # Build list of channels
         self.channels = parse_list(targets)
@@ -287,7 +284,7 @@ class NotifySlack(NotifyBase):
 
         # prepare JSON Object
         payload = {
-            'username': self.user if self.user else SLACK_DEFAULT_USER,
+            'username': self.user if self.user else self.app_id,
             # Use Markdown language
             'mrkdwn': (self.notify_format == NotifyFormat.MARKDOWN),
             'attachments': [{

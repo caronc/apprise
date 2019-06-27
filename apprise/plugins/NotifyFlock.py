@@ -55,9 +55,6 @@ FLOCK_HTTP_ERROR_MAP = {
     401: 'Unauthorized - Invalid Token.',
 }
 
-# Default User
-FLOCK_DEFAULT_USER = 'apprise'
-
 # Used to detect a channel/user
 IS_CHANNEL_RE = re.compile(r'^(#|g:)(?P<id>[A-Z0-9_]{12})$', re.I)
 IS_USER_RE = re.compile(r'^(@|u:)?(?P<id>[A-Z0-9_]{12})$', re.I)
@@ -223,7 +220,7 @@ class NotifyFlock(NotifyBase):
             'token': self.token,
             'flockml': body,
             'sendAs': {
-                'name': FLOCK_DEFAULT_USER if not self.user else self.user,
+                'name': self.app_id if not self.user else self.user,
                 # A Profile Image is only configured if we're configured to
                 # allow it
                 'profileImage': None if not self.include_image

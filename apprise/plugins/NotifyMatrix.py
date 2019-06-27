@@ -62,9 +62,6 @@ IS_ROOM_ID = re.compile(
     r'^\s*(!|&#33;|%21)(?P<room>[a-z0-9-]+)((:|%3A)'
     r'(?P<home_server>[a-z0-9.-]+))?\s*$', re.I)
 
-# Default User
-SLACK_DEFAULT_USER = 'apprise'
-
 
 class MatrixWebhookMode(object):
     # Webhook Mode is disabled
@@ -360,7 +357,7 @@ class NotifyMatrix(NotifyBase):
 
         # prepare JSON Object
         payload = {
-            'username': self.user if self.user else SLACK_DEFAULT_USER,
+            'username': self.user if self.user else self.app_id,
             # Use Markdown language
             'mrkdwn': (self.notify_format == NotifyFormat.MARKDOWN),
             'attachments': [{
