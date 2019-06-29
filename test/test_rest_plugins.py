@@ -2170,6 +2170,152 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifyTwitter
+    ##################################
+    ('twitter://', {
+        'instance': None,
+    }),
+    ('twitter://:@/', {
+        'instance': TypeError,
+    }),
+    ('twitter://consumer_key', {
+        # Missing Keys
+        'instance': TypeError,
+    }),
+    ('twitter://consumer_key/consumer_secret/', {
+        # Missing Keys
+        'instance': TypeError,
+    }),
+    ('twitter://consumer_key/consumer_secret/access_token/', {
+        # Missing Access Secret
+        'instance': TypeError,
+    }),
+    ('twitter://consumer_key/consumer_secret/access_token/access_secret', {
+        # No user mean's we message ourselves
+        'instance': plugins.NotifyTwitter,
+        # Expected notify() response False (because we won't be able
+        # to detect our user)
+        'notify_response': False,
+    }),
+    ('twitter://consumer_key/consumer_secret/access_token/access_secret'
+        '?cache=no', {
+            # No user mean's we message ourselves
+            'instance': plugins.NotifyTwitter,
+            # However we'll be okay if we return a proper response
+            'requests_response_text': {
+                'id': 12345,
+                'screen_name': 'test'
+            },
+        }),
+    ('twitter://consumer_key/consumer_secret/access_token/access_secret', {
+        # No user mean's we message ourselves
+        'instance': plugins.NotifyTwitter,
+        # However we'll be okay if we return a proper response
+        'requests_response_text': {
+            'id': 12345,
+            'screen_name': 'test'
+        },
+    }),
+    # A duplicate of the entry above, this will cause cache to be referenced
+    ('twitter://consumer_key/consumer_secret/access_token/access_secret', {
+        # No user mean's we message ourselves
+        'instance': plugins.NotifyTwitter,
+        # However we'll be okay if we return a proper response
+        'requests_response_text': {
+            'id': 12345,
+            'screen_name': 'test'
+        },
+    }),
+    # handle cases where the screen_name is missing from the response causing
+    # an exception during parsing
+    ('twitter://consumer_key/consumer_secret2/access_token/access_secret', {
+        # No user mean's we message ourselves
+        'instance': plugins.NotifyTwitter,
+        # However we'll be okay if we return a proper response
+        'requests_response_text': {
+            'id': 12345,
+        },
+        # due to a mangled response_text we'll fail
+        'notify_response': False,
+    }),
+    ('twitter://user@consumer_key/csecret2/access_token/access_secret/-/%/', {
+        # One Invalid User
+        'instance': plugins.NotifyTwitter,
+        # Expected notify() response False (because we won't be able
+        # to detect our user)
+        'notify_response': False,
+    }),
+    ('twitter://user@consumer_key/csecret/access_token/access_secret'
+        '?cache=No', {
+            # No Cache
+            'instance': plugins.NotifyTwitter,
+            'requests_response_text': [{
+                'id': 12345,
+                'screen_name': 'user'
+            }],
+        }),
+    ('twitter://user@consumer_key/csecret/access_token/access_secret', {
+        # We're good!
+        'instance': plugins.NotifyTwitter,
+        'requests_response_text': [{
+            'id': 12345,
+            'screen_name': 'user'
+        }],
+    }),
+    # A duplicate of the entry above, this will cause cache to be referenced
+    # for this reason, we don't even need to return a valid response
+    ('twitter://user@consumer_key/csecret/access_token/access_secret', {
+        # We're identifying the same user we already sent to
+        'instance': plugins.NotifyTwitter,
+    }),
+    ('twitter://ckey/csecret/access_token/access_secret?mode=tweet', {
+        # A Public Tweet
+        'instance': plugins.NotifyTwitter,
+    }),
+    ('tweet://consumer_key/consumer_secret/access_token/access_secret', {
+        # tweet:// is to be depricated; but we will support for purposes of
+        # generating a warning to the user; the above matches an above
+        # twitter:// reference so that it can use what was cached
+        'instance': plugins.NotifyTwitter,
+    }),
+    ('twitter://user@ckey/csecret/access_token/access_secret?mode=invalid', {
+        # An invalid mode
+        'instance': TypeError,
+    }),
+    ('twitter://usera@consumer_key/consumer_secret/access_token/'
+        'access_secret/user/?to=userb', {
+            # We're good!
+            'instance': plugins.NotifyTwitter,
+            'requests_response_text': [{
+                'id': 12345,
+                'screen_name': 'usera'
+            }, {
+                'id': 12346,
+                'screen_name': 'userb'
+            }, {
+                # A garbage entry we can test exception handling on
+                'id': 123,
+            }],
+        }),
+    ('twitter://ckey/csecret/access_token/access_secret', {
+        'instance': plugins.NotifyTwitter,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('twitter://ckey/csecret/access_token/access_secret', {
+        'instance': plugins.NotifyTwitter,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+    ('twitter://ckey/csecret/access_token/access_secret?mode=tweet', {
+        'instance': plugins.NotifyTwitter,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+    ##################################
     # NotifyNexmo
     ##################################
     ('nexmo://', {
