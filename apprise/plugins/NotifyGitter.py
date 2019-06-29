@@ -261,7 +261,7 @@ class NotifyGitter(NotifyBase):
 
     def _fetch(self, url, payload=None, method='GET'):
         """
-        Wrapper to POST
+        Wrapper to request object
 
         """
 
@@ -305,11 +305,7 @@ class NotifyGitter(NotifyBase):
                 # period.
                 wait = (self.ratelimit_reset - now).total_seconds() + 0.5
 
-        # Always call throttle before any remote server i/o is made; for AWS
-        # time plays a huge factor in the headers being sent with the payload.
-        # So for AWS (SNS) requests we must throttle before they're generated
-        # and not directly before the i/o call like other notification
-        # services do.
+        # Always call throttle before any remote server i/o is made
         self.throttle(wait=wait)
 
         # fetch function
@@ -328,8 +324,9 @@ class NotifyGitter(NotifyBase):
                     NotifyGitter.http_response_code_lookup(r.status_code)
 
                 self.logger.warning(
-                    'Failed to send Gitter POST to {}: '
+                    'Failed to send Gitter {} to {}: '
                     '{}error={}.'.format(
+                        method,
                         url,
                         ', ' if status_str else '',
                         r.status_code))
@@ -361,8 +358,8 @@ class NotifyGitter(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'Exception received when sending Gitter POST to {}: '.
-                format(url))
+                'Exception received when sending Gitter {} to {}: '.
+                format(method, url))
             self.logger.debug('Socket Exception: %s' % str(e))
 
             # Mark our failure
