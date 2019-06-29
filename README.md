@@ -122,6 +122,12 @@ No one wants to put there credentials out for everyone to see on the command lin
 #  ~/.config/apprise
 #  ~/.config/apprise.yml
 
+# Windows users can store their default configuration files here:
+#  %APPDATA%/Apprise/apprise
+#  %APPDATA%/Apprise/apprise.yml
+#  %LOCALAPPDATA%/Apprise/apprise
+#  %LOCALAPPDATA%/Apprise/apprise.yml
+
 # If you loaded one of those files, your command line gets really easy:
 apprise -t 'my title' -b 'my notification body'
 
