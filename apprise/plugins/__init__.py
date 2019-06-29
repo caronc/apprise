@@ -37,7 +37,6 @@ from . import NotifyEmail as NotifyEmailBase
 # Required until re-factored into base code
 from .NotifyPushjet import pushjet
 from .NotifyGrowl import gntp
-from .NotifyTwitter import tweepy
 
 # NotifyBase object is passed in as a module not class
 from . import NotifyBase
@@ -66,9 +65,6 @@ __all__ = [
 
     # pushjet (used for NotifyPushjet Testing)
     'pushjet',
-
-    # tweepy (used for NotifyTwitter Testing)
-    'tweepy',
 ]
 
 # we mirror our base purely for the ability to reset everything; this
