@@ -65,7 +65,8 @@ TEST_URLS = (
     # NotifyBoxcar
     ##################################
     ('boxcar://', {
-        'instance': None,
+        # invalid secret key
+        'instance': TypeError,
     }),
     # A a bad url
     ('boxcar://:@/', {
@@ -131,8 +132,8 @@ TEST_URLS = (
     # NotifyD7Networks
     ##################################
     ('d7sms://', {
-        # No token specified
-        'instance': None,
+        # No target numbers
+        'instance': TypeError,
     }),
     ('d7sms://:@/', {
         # invalid user/pass
@@ -1108,7 +1109,8 @@ TEST_URLS = (
     # NotifyMSTeams
     ##################################
     ('msteams://', {
-        'instance': None,
+        # First API Token not specified
+        'instance': TypeError,
     }),
     ('msteams://:@/', {
         # We don't have strict host checking on for msteams, so this URL
@@ -2092,8 +2094,8 @@ TEST_URLS = (
     # NotifyTwilio
     ##################################
     ('twilio://', {
-        # No token specified
-        'instance': None,
+        # No Account SID specified
+        'instance': TypeError,
     }),
     ('twilio://:@/', {
         # invalid Auth token
@@ -2173,7 +2175,8 @@ TEST_URLS = (
     # NotifyTwitter
     ##################################
     ('twitter://', {
-        'instance': None,
+        # Missing Consumer API Key
+        'instance': TypeError,
     }),
     ('twitter://:@/', {
         'instance': TypeError,
@@ -2319,8 +2322,8 @@ TEST_URLS = (
     # NotifyNexmo
     ##################################
     ('nexmo://', {
-        # No secret and or key specified
-        'instance': None,
+        # No API Key specified
+        'instance': TypeError,
     }),
     ('nexmo://:@/', {
         # invalid Auth key
@@ -2392,7 +2395,8 @@ TEST_URLS = (
     # NotifyWebexTeams
     ##################################
     ('wxteams://', {
-        'instance': None,
+        # Teams Token missing
+        'instance': TypeError,
     }),
     ('wxteams://:@/', {
         # We don't have strict host checking on for wxteams, so this URL
@@ -2747,6 +2751,11 @@ def test_rest_plugins(mock_post, mock_get):
                 # We loaded okay; now lets make sure we can reverse this url
                 assert isinstance(obj.url(), six.string_types) is True
 
+                # Some Simple Invalid Instance Testing
+                assert instance.parse_url(None) is None
+                assert instance.parse_url(object) is None
+                assert instance.parse_url(42) is None
+
                 # Instantiate the exact same object again using the URL from
                 # the one that was already created properly
                 obj_cmp = Apprise.instantiate(obj.url())
@@ -2760,6 +2769,9 @@ def test_rest_plugins(mock_post, mock_get):
                     print('TEST FAIL: {} regenerated as {}'.format(
                         url, obj.url()))
                     assert False
+
+                # Tidy our object
+                del obj_cmp
 
             if self:
                 # Iterate over our expected entries inside of our object
@@ -2866,6 +2878,10 @@ def test_rest_plugins(mock_post, mock_get):
                 # Check that we were expecting this exception to happen
                 if not isinstance(e, response):
                     raise
+
+            # Tidy our object and allow any possible defined deconstructors to
+            # be executed.
+            del obj
 
         except AssertionError:
             # Don't mess with these entries
@@ -3430,7 +3446,21 @@ def test_notify_emby_plugin_logout(mock_post, mock_get, mock_login):
 
     # Disable the port completely
     obj.port = None
+
+    # Perform logout
     obj.logout()
+
+    # Calling logout on an object already logged out
+    obj.logout()
+
+    # Test Python v3.5 LookupError Bug: https://bugs.python.org/issue29288
+    mock_post.side_effect = LookupError()
+    mock_get.side_effect = LookupError()
+    obj.access_token = 'abc'
+    obj.user_id = '123'
+
+    # Tidy object
+    del obj
 
 
 @mock.patch('apprise.plugins.NotifyEmby.sessions')
@@ -3508,6 +3538,9 @@ def test_notify_emby_plugin_notify(mock_post, mock_get, mock_logout,
     # succeed
     mock_sessions.return_value = {}
     assert obj.notify('title', 'body', 'info') is True
+
+    # Tidy our object
+    del obj
 
 
 @mock.patch('requests.get')
@@ -3800,11 +3833,6 @@ def test_notify_pushbullet_plugin(mock_post, mock_get):
     # recipient here
     assert len(obj.targets) == 1
 
-    # Support the handling of an empty and invalid URL strings
-    assert plugins.NotifyPushBullet.parse_url(None) is None
-    assert plugins.NotifyPushBullet.parse_url('') is None
-    assert plugins.NotifyPushBullet.parse_url(42) is None
-
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
@@ -3864,11 +3892,6 @@ def test_notify_pushed_plugin(mock_post, mock_get):
     assert isinstance(obj, plugins.NotifyPushed) is True
     assert len(obj.channels) == 2
     assert len(obj.users) == 2
-
-    # Support the handling of an empty and invalid URL strings
-    assert plugins.NotifyPushed.parse_url(None) is None
-    assert plugins.NotifyPushed.parse_url('') is None
-    assert plugins.NotifyPushed.parse_url(42) is None
 
     # Prepare Mock to fail
     mock_post.return_value.status_code = requests.codes.internal_server_error
@@ -3933,11 +3956,6 @@ def test_notify_pushover_plugin(mock_post, mock_get):
     # device defined here
     assert len(obj.targets) == 1
 
-    # Support the handling of an empty and invalid URL strings
-    assert plugins.NotifyPushover.parse_url(None) is None
-    assert plugins.NotifyPushover.parse_url('') is None
-    assert plugins.NotifyPushover.parse_url(42) is None
-
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
@@ -3985,11 +4003,6 @@ def test_notify_rocketchat_plugin(mock_post, mock_get):
     # Logout
     #
     assert obj.logout() is True
-
-    # Support the handling of an empty and invalid URL strings
-    assert plugins.NotifyRocketChat.parse_url(None) is None
-    assert plugins.NotifyRocketChat.parse_url('') is None
-    assert plugins.NotifyRocketChat.parse_url(42) is None
 
     # Prepare Mock to fail
     mock_post.return_value.status_code = requests.codes.internal_server_error
@@ -4089,20 +4102,27 @@ def test_notify_telegram_plugin(mock_post, mock_get):
         # specified
         assert True
 
-    obj = plugins.NotifyTelegram(bot_token=bot_token, targets=chat_ids)
+    obj = plugins.NotifyTelegram(
+        bot_token=bot_token, targets=chat_ids, include_image=True)
     assert isinstance(obj, plugins.NotifyTelegram) is True
     assert len(obj.targets) == 2
+
+    # Test Image Sending Exceptions
+    mock_get.side_effect = IOError()
+    mock_post.side_effect = IOError()
+    obj.send_image(obj.targets[0], NotifyType.INFO)
+
+    # Restore their entries
+    mock_get.side_effect = None
+    mock_post.side_effect = None
+    mock_get.return_value.content = '{}'
+    mock_post.return_value.content = '{}'
 
     # test url call
     assert isinstance(obj.url(), six.string_types) is True
     # Test that we can load the string we generate back:
     obj = plugins.NotifyTelegram(**plugins.NotifyTelegram.parse_url(obj.url()))
     assert isinstance(obj, plugins.NotifyTelegram) is True
-
-    # Support the handling of an empty and invalid URL strings
-    assert plugins.NotifyTelegram.parse_url(None) is None
-    assert plugins.NotifyTelegram.parse_url('') is None
-    assert plugins.NotifyTelegram.parse_url(42) is None
 
     # Prepare Mock to fail
     response = mock.Mock()

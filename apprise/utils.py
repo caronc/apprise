@@ -42,12 +42,16 @@ except ImportError:
     from urllib.parse import urlparse
 
 # URL Indexing Table for returns via parse_url()
+# The below accepts and scans for:
+#  - schema://
+#  - schema://path
+#  - schema://path?kwargs
+#
 VALID_URL_RE = re.compile(
-    r'^[\s]*(?P<schema>[^:\s]+):[/\\]*(?P<path>[^?]+)'
-    r'(\?(?P<kwargs>.+))?[\s]*$',
+    r'^[\s]*((?P<schema>[^:\s]+):[/\\]+)?((?P<path>[^?]+)'
+    r'(\?(?P<kwargs>.+))?)?[\s]*$',
 )
-VALID_HOST_RE = re.compile(r'^[\s]*(?P<path>[^?\s]+)(\?(?P<kwargs>.+))?')
-VALID_QUERY_RE = re.compile(r'^(?P<path>.*[/\\])(?P<query>[^/\\]*)$')
+VALID_QUERY_RE = re.compile(r'^(?P<path>.*[/\\])(?P<query>[^/\\]+)?$')
 
 # delimiters used to separate values when content is passed in by string.
 # This is useful when turning a string into a list
@@ -251,6 +255,7 @@ def parse_url(url, default_schema='http', verify_host=True):
         <schema>://<host>:<port>/<path>
         <schema>://<host>/<path>
         <schema>://<host>
+        <host>
 
      Argument parsing is also supported:
         <schema>://<user>@<host>:<port>/<path>?key1=val&key2=val2
@@ -277,7 +282,7 @@ def parse_url(url, default_schema='http', verify_host=True):
         # The port (if specified)
         'port': None,
         # The hostname
-        'host': None,
+        'host': '',
         # The full path (query + path)
         'fullpath': None,
         # The path
@@ -304,41 +309,30 @@ def parse_url(url, default_schema='http', verify_host=True):
     qsdata = ''
     match = VALID_URL_RE.search(url)
     if match:
-        # Extract basic results
-        result['schema'] = match.group('schema').lower().strip()
-        host = match.group('path').strip()
-        try:
-            qsdata = match.group('kwargs').strip()
-        except AttributeError:
-            # No qsdata
-            pass
+        # Extract basic results (with schema present)
+        result['schema'] = match.group('schema').lower().strip() \
+            if match.group('schema') else default_schema
+        host = match.group('path').strip() \
+            if match.group('path') else ''
+        qsdata = match.group('kwargs').strip() \
+            if match.group('kwargs') else None
 
     else:
-        match = VALID_HOST_RE.search(url)
-        if not match:
-            return None
-        result['schema'] = default_schema
-        host = match.group('path').strip()
-        try:
-            qsdata = match.group('kwargs').strip()
-        except AttributeError:
-            # No qsdata
-            pass
+        # Could not extract basic content from the URL
+        return None
 
     # Parse Query Arugments ?val=key&key=val
     # while ensuring that all keys are lowercase
     if qsdata:
         result.update(parse_qsd(qsdata))
 
-    # Now do a proper extraction of data
+    # Now do a proper extraction of data; http:// is just substitued in place
+    # to allow urlparse() to function as expected, we'll swap this back to the
+    # expected schema after.
     parsed = urlparse('http://%s' % host)
 
     # Parse results
     result['host'] = parsed[1].strip()
-    if not result['host']:
-        # Nothing more we can do without a hostname
-        return None
-
     result['fullpath'] = quote(unquote(tidy_path(parsed[2].strip())))
 
     try:
@@ -359,11 +353,10 @@ def parse_url(url, default_schema='http', verify_host=True):
     else:
         # Using full path, extract query from path
         match = VALID_QUERY_RE.search(result['fullpath'])
-        if match:
-            result['path'] = match.group('path')
-            result['query'] = match.group('query')
-            if not result['query']:
-                result['query'] = None
+        result['path'] = match.group('path')
+        result['query'] = match.group('query')
+        if not result['query']:
+            result['query'] = None
     try:
         (result['user'], result['host']) = \
             re.split(r'[@]+', result['host'])[:2]

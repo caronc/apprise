@@ -1074,12 +1074,21 @@ def test_apprise_details_plugin_verification():
                     # 2 entries (name, and alias_of only!)
                     assert len(entry['details'][section][key]) == 1
 
-        # inspect our object
-        spec = inspect.getargspec(SCHEMA_MAP[protocols[0]].__init__)
+        if six.PY2:
+            # inspect our object
+            # getargspec() is depricated in Python v3
+            spec = inspect.getargspec(SCHEMA_MAP[protocols[0]].__init__)
 
-        function_args = \
-            (set(parse_list(spec.keywords)) - set(['kwargs'])) \
-            | (set(spec.args) - set(['self'])) | valid_kwargs
+            function_args = \
+                (set(parse_list(spec.keywords)) - set(['kwargs'])) \
+                | (set(spec.args) - set(['self'])) | valid_kwargs
+        else:
+            # Python v3+ uses getfullargspec()
+            spec = inspect.getfullargspec(SCHEMA_MAP[protocols[0]].__init__)
+
+            function_args = \
+                (set(parse_list(spec.varkw)) - set(['kwargs'])) \
+                | (set(spec.args) - set(['self'])) | valid_kwargs
 
         # Iterate over our map_to_entries and make sure that everything
         # maps to a function argument

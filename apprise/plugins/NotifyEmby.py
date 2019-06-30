@@ -669,4 +669,21 @@ class NotifyEmby(NotifyBase):
         """
         Deconstructor
         """
-        self.logout()
+        try:
+            self.logout()
+
+        except LookupError:
+            # Python v3.5 call to requests can sometimes throw the exception
+            #   "/usr/lib64/python3.7/socket.py", line 748, in getaddrinfo
+            #   LookupError: unknown encoding: idna
+            #
+            # This occurs every time when running unit-tests against Apprise:
+            # LANG=C.UTF-8 PYTHONPATH=$(pwd) py.test-3.7
+            #
+            # There has been an open issue on this since Jan 2017.
+            #   - https://bugs.python.org/issue29288
+            #
+            # A ~similar~ issue can be identified here in the requests
+            # ticket system as unresolved and has provided work-arounds
+            #   - https://github.com/kennethreitz/requests/issues/3578
+            pass
