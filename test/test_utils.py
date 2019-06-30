@@ -333,6 +333,103 @@ def test_parse_url():
     assert(result['qsd-'] == {})
     assert(result['qsd+'] == {})
 
+    # Test some illegal strings
+    result = utils.parse_url(object, verify_host=False)
+    assert result is None
+    result = utils.parse_url(None, verify_host=False)
+    assert result is None
+
+    # Just a schema; invalid host
+    result = utils.parse_url('test://')
+    assert result is None
+
+    # Do it again without host validation
+    result = utils.parse_url('test://', verify_host=False)
+    assert(result['schema'] == 'test')
+    # It's worth noting that the hostname is an empty string and is NEVER set
+    # to None if it wasn't specified.
+    assert result['host'] == ''
+    assert result['port'] is None
+    assert result['user'] is None
+    assert result['password'] is None
+    assert result['fullpath'] is None
+    assert result['path'] is None
+    assert result['query'] is None
+    assert result['url'] == 'test://'
+    assert result['qsd'] == {}
+    assert result['qsd-'] == {}
+    assert result['qsd+'] == {}
+
+    result = utils.parse_url('testhostname')
+    assert result['schema'] == 'http'
+    assert result['host'] == 'testhostname'
+    assert result['port'] is None
+    assert result['user'] is None
+    assert result['password'] is None
+    assert result['fullpath'] is None
+    assert result['path'] is None
+    assert result['query'] is None
+    # The default_schema kicks in here
+    assert result['url'] == 'http://testhostname'
+    assert result['qsd'] == {}
+    assert result['qsd-'] == {}
+
+    result = utils.parse_url('example.com', default_schema='unknown')
+    assert result['schema'] == 'unknown'
+    assert result['host'] == 'example.com'
+    assert result['port'] is None
+    assert result['user'] is None
+    assert result['password'] is None
+    assert result['fullpath'] is None
+    assert result['path'] is None
+    assert result['query'] is None
+    # The default_schema kicks in here
+    assert result['url'] == 'unknown://example.com'
+    assert result['qsd'] == {}
+    assert result['qsd-'] == {}
+
+    # An empty string without a hostame is still valid if verify_host is set
+    result = utils.parse_url('', verify_host=False)
+    assert result['schema'] == 'http'
+    assert result['host'] == ''
+    assert result['port'] is None
+    assert result['user'] is None
+    assert result['password'] is None
+    assert result['fullpath'] is None
+    assert result['path'] is None
+    assert result['query'] is None
+    # The default_schema kicks in here
+    assert result['url'] == 'http://'
+    assert result['qsd'] == {}
+    assert result['qsd-'] == {}
+
+    # A messed up URL
+    result = utils.parse_url('test://:@/', verify_host=False)
+    assert result['schema'] == 'test'
+    assert result['host'] == ''
+    assert result['port'] is None
+    assert result['user'] == ''
+    assert result['password'] == ''
+    assert result['fullpath'] == '/'
+    assert result['path'] == '/'
+    assert result['query'] is None
+    assert result['url'] == 'test://:@/'
+    assert result['qsd'] == {}
+    assert result['qsd-'] == {}
+
+    result = utils.parse_url('crazy://:@//_/@^&/jack.json', verify_host=False)
+    assert result['schema'] == 'crazy'
+    assert result['host'] == ''
+    assert result['port'] is None
+    assert result['user'] == ''
+    assert result['password'] == ''
+    assert(unquote(result['fullpath']) == '/_/@^&/jack.json')
+    assert(unquote(result['path']) == '/_/@^&/')
+    assert result['query'] == 'jack.json'
+    assert(unquote(result['url']) == 'crazy://:@/_/@^&/jack.json')
+    assert result['qsd'] == {}
+    assert result['qsd-'] == {}
+
 
 def test_parse_bool():
     "utils: parse_bool() testing """

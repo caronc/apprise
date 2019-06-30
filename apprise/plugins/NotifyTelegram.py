@@ -52,8 +52,6 @@
 import requests
 import re
 
-from os.path import basename
-
 from json import loads
 from json import dumps
 
@@ -227,56 +225,70 @@ class NotifyTelegram(NotifyBase):
         if not path:
             # No image to send
             self.logger.debug(
-                'Telegram Image does not exist for %s' % (notify_type))
+                'Telegram image does not exist for %s' % (notify_type))
 
             # No need to fail; we may have been configured this way through
             # the apprise.AssetObject()
             return True
 
-        # Configure file payload (for upload)
-        files = {
-            'photo': (basename(path), open(path), 'rb'),
-        }
-
-        payload = {
-            'chat_id': chat_id,
-        }
-
-        self.logger.debug(
-            'Telegram Image POST URL: %s (cert_verify=%r)' % (
-                url, self.verify_certificate))
-
         try:
-            r = requests.post(
-                url,
-                files=files,
-                data=payload,
-                verify=self.verify_certificate,
-            )
+            with open(path, 'rb') as f:
+                # Configure file payload (for upload)
+                files = {
+                    'photo': f,
+                }
 
-            if r.status_code != requests.codes.ok:
-                # We had a problem
-                status_str = \
-                    NotifyTelegram.http_response_code_lookup(r.status_code)
+                payload = {
+                    'chat_id': chat_id,
+                }
 
-                self.logger.warning(
-                    'Failed to send Telegram Image: '
-                    '{}{}error={}.'.format(
-                        status_str,
-                        ', ' if status_str else '',
-                        r.status_code))
+                self.logger.debug(
+                    'Telegram image POST URL: %s (cert_verify=%r)' % (
+                        url, self.verify_certificate))
 
-                self.logger.debug('Response Details:\r\n{}'.format(r.content))
+                try:
+                    r = requests.post(
+                        url,
+                        files=files,
+                        data=payload,
+                        verify=self.verify_certificate,
+                    )
 
-                return False
+                    if r.status_code != requests.codes.ok:
+                        # We had a problem
+                        status_str = NotifyTelegram\
+                            .http_response_code_lookup(r.status_code)
 
-        except requests.RequestException as e:
-            self.logger.warning(
-                'A connection error occured posting Telegram Image.')
-            self.logger.debug('Socket Exception: %s' % str(e))
-            return False
+                        self.logger.warning(
+                            'Failed to send Telegram image: '
+                            '{}{}error={}.'.format(
+                                status_str,
+                                ', ' if status_str else '',
+                                r.status_code))
 
-        return True
+                        self.logger.debug(
+                            'Response Details:\r\n{}'.format(r.content))
+
+                        return False
+
+                except requests.RequestException as e:
+                    self.logger.warning(
+                        'A connection error occured posting Telegram image.')
+                    self.logger.debug('Socket Exception: %s' % str(e))
+                    return False
+
+            return True
+
+        except (IOError, OSError):
+            # IOError is present for backwards compatibility with Python
+            # versions older then 3.3.  >= 3.3 throw OSError now.
+
+            # Could not open and/or read the file; this is not a problem since
+            # we scan a lot of default paths.
+            self.logger.error(
+                'File can not be opened for read: {}'.format(path))
+
+        return False
 
     def detect_bot_owner(self):
         """
