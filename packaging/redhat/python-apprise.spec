@@ -77,7 +77,6 @@ BuildRequires: python2-devel
 BuildRequires: python-decorator
 BuildRequires: python-requests
 BuildRequires: python2-requests-oauthlib
-BuildRequires: python2-oauthlib
 BuildRequires: python-six
 BuildRequires: python2-click >= 5.0
 BuildRequires: python-markdown
@@ -92,7 +91,6 @@ BuildRequires: python2-yaml
 Requires: python-decorator
 Requires: python-requests
 Requires: python2-requests-oauthlib
-Requires: python2-oauthlib
 Requires: python-six
 Requires: python-markdown
 %if 0%{?rhel} && 0%{?rhel} <= 7
