@@ -212,7 +212,7 @@ class Apprise(object):
         # Initialize our return status
         return_status = True
 
-        if isinstance(asset, AppriseAsset):
+        if asset is None:
             # prepare default asset
             asset = self.asset
 
