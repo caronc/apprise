@@ -6,7 +6,7 @@
 To inform or tell (someone). To make one aware of something.
 <hr/>
 
-*Apprise* allows you to send a notification to *almost* all of the most popular *notification* services available to us today such as: Telegram, Pushbullet, Slack, Twitter, etc.
+*Apprise* allows you to send a notification to *almost* all of the most popular *notification* services available to us today such as: Telegram, Discord, Slack, Twitter, etc.
 
 * One notification library to rule them all.
 * A common and intuitive notification syntax.
