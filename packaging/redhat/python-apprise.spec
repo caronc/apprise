@@ -51,7 +51,7 @@ Boxcar, Discord, E-Mail, Emby, Faast, Flock, Gitter, Gotify, Growl, IFTTT,
 Join, KODI, Mailgun, MatterMost, Matrix, Microsoft Windows Notifications,
 Microsoft Teams, Nexmo, Notify MyAndroid, Prowl, Pushalot, PushBullet, Pushjet,
 Pushover, Rocket.Chat, Slack, Super Toasty, Stride, Telegram, Twilio, Twitter,
-XBMC, XMPP, Webex Teams}
+Twist, XBMC, XMPP, Webex Teams}
 
 Name:           python-%{pypi_name}
 Version:        0.7.8
