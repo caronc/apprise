@@ -2172,6 +2172,59 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifyTwist
+    ##################################
+    ('twist://', {
+        # Missing Email and Login
+        'instance': None,
+    }),
+    ('twist://:@/', {
+        'instance': None,
+    }),
+    ('twist://user@example.com/', {
+        # No password
+        'instance': None,
+    }),
+    ('twist://user@example.com/password', {
+        # Password acceptable as first entry in path
+        'instance': plugins.NotifyTwist,
+        # Expected notify() response is False because internally we would
+        # have failed to login
+        'notify_response': False,
+    }),
+    ('twist://password:user1@example.com', {
+        # password:login acceptable
+        'instance': plugins.NotifyTwist,
+        # Expected notify() response is False because internally we would
+        # have failed to login
+        'notify_response': False,
+    }),
+    ('twist://password:user2@example.com', {
+        # password:login acceptable
+        'instance': plugins.NotifyTwist,
+        # Expected notify() response is False because internally we would
+        # have logged in, but we would have failed to look up the #General
+        # channel and workspace.
+        'requests_response_text': {
+            # Login expected response
+            'id': 1234,
+            'default_workspace': 9876,
+        },
+        'notify_response': False,
+    }),
+    ('twist://password:user2@example.com', {
+        'instance': plugins.NotifyTwist,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('twist://password:user2@example.com', {
+        'instance': plugins.NotifyTwist,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+    ##################################
     # NotifyTwitter
     ##################################
     ('twitter://', {

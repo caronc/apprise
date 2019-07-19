@@ -104,10 +104,10 @@ GET_SCHEMA_RE = re.compile(r'\s*(?P<schema>[a-z0-9]{2,9})://.*$', re.I)
 # Regular expression based and expanded from:
 # http://www.regular-expressions.info/email.html
 GET_EMAIL_RE = re.compile(
-    r"((?P<label>[^+]+)\+)?"
+    r"(?P<fulluser>((?P<label>[^+]+)\+)?"
     r"(?P<userid>[a-z0-9$%=_~-]+"
     r"(?:\.[a-z0-9$%+=_~-]+)"
-    r"*)@(?P<domain>(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+"
+    r"*))@(?P<domain>(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+"
     r"[a-z0-9](?:[a-z0-9-]*"
     r"[a-z0-9]))?",
     re.IGNORECASE,
