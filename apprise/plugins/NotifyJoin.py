@@ -88,10 +88,6 @@ class NotifyJoin(NotifyBase):
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_72
 
-    # Limit results to just the first 2 line otherwise there is just to much
-    # content to display
-    body_max_line_count = 2
-
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 1000
 
