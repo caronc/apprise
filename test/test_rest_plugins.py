@@ -1335,6 +1335,43 @@ TEST_URLS = (
         'test_requests_exceptions': True,
     }),
 
+    ##################################
+    # NotifyTechulusPush
+    ##################################
+    ('push://', {
+        # Missing APIKey
+        'instance': TypeError,
+    }),
+    # Invalid APIKey
+    ('push://%s' % ('+' * 24), {
+        'instance': TypeError,
+    }),
+    # APIkey
+    ('push://%s' % UUID4, {
+        'instance': plugins.NotifyTechulusPush,
+    }),
+    # APIKey + bad url
+    ('push://:@/', {
+        'instance': TypeError,
+    }),
+    ('push://%s' % UUID4, {
+        'instance': plugins.NotifyTechulusPush,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('push://%s' % UUID4, {
+        'instance': plugins.NotifyTechulusPush,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('push://%s' % UUID4, {
+        'instance': plugins.NotifyTechulusPush,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
 
     ##################################
     # NotifyPushed
