@@ -1,14 +1,14 @@
 ---
-name: New Notification Request
+name: 💡 New Notification Request
 about: Suggest a new notification service that you'd like to see Apprise support
 title: ''
-labels: ''
+labels: 'enhancement'
 assignees: ''
 
 ---
 
 :loudspeaker: **What is the name of the service?**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+<!--  Name of Service  -->
 
 :link: **Provide some details about the service that can help with it's development.**
 - Homepage: <!-- e.g https://discordapp.com/ -->

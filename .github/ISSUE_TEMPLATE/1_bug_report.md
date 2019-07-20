@@ -1,8 +1,8 @@
 ---
-name: Bug report
-about: Create a report to help us improve
+name: 🐛 Bug Report
+about: Report any errors and probems
 title: ''
-labels: ''
+labels: 'bug'
 assignees: ''
 
 ---
@@ -19,7 +19,7 @@ assignees: ''
 
 :computer: **Your System Details:**
  - OS: [e.g. RedHat v8.0]
- - Python Version: [e.g. v2.7]
+ - Python Version: [e.g. Python v2.7]
 
 :crystal_ball: **Additional context**
 Add any other context about the problem here.
