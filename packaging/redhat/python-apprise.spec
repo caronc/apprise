@@ -226,6 +226,9 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 %endif # with_python2
 
 %changelog
+* Fri Jul 19 2019 Chris Caron <lead2gold@gmail.com> - 0.7.9-1
+- Updated to v0.7.9
+
 * Thu Jun  6 2019 Chris Caron <lead2gold@gmail.com> - 0.7.8-1
 - Updated to v0.7.8
 
