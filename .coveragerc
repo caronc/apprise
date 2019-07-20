@@ -1,5 +1,5 @@
 [run]
-omit=*/gntp/*,*/tweepy/*,*/pushjet/*
+omit=*/gntp/*,*/pushjet/*
 disable_warnings = no-data-collected
 branch = True
 source =
