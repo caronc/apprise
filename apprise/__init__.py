@@ -24,7 +24,7 @@
 # THE SOFTWARE.
 
 __title__ = 'apprise'
-__version__ = '0.7.8'
+__version__ = '0.7.9'
 __author__ = 'Chris Caron'
 __license__ = 'MIT'
 __copywrite__ = 'Copyright (C) 2019 Chris Caron <lead2gold@gmail.com>'

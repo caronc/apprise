@@ -6,9 +6,9 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: apprise 0.7.8\n"
+"Project-Id-Version: apprise 0.7.9\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2019-06-06 12:49-0400\n"
+"POT-Creation-Date: 2019-07-19 22:54-0400\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,6 +18,9 @@ msgstr ""
 "Generated-By: Babel 2.7.0\n"
 
 msgid "API Key"
+msgstr ""
+
+msgid "API Secret"
 msgstr ""
 
 msgid "Access Key"
@@ -53,10 +56,16 @@ msgstr ""
 msgid "Avatar Image"
 msgstr ""
 
+msgid "Batch Mode"
+msgstr ""
+
 msgid "Bot Name"
 msgstr ""
 
 msgid "Bot Token"
+msgstr ""
+
+msgid "Cache Results"
 msgstr ""
 
 msgid "Channels"
@@ -83,7 +92,13 @@ msgstr ""
 msgid "Duration"
 msgstr ""
 
+msgid "Email"
+msgstr ""
+
 msgid "Events"
+msgstr ""
+
+msgid "Expire"
 msgstr ""
 
 msgid "Footer Logo"
@@ -110,6 +125,9 @@ msgstr ""
 msgid "Include Image"
 msgstr ""
 
+msgid "Message Mode"
+msgstr ""
+
 msgid "Modal"
 msgstr ""
 
@@ -117,6 +135,9 @@ msgid "Notify Format"
 msgstr ""
 
 msgid "Organization"
+msgstr ""
+
+msgid "Originating Address"
 msgstr ""
 
 msgid "Overflow Mode"
@@ -144,6 +165,9 @@ msgid "Region Name"
 msgstr ""
 
 msgid "Remove Tokens"
+msgstr ""
+
+msgid "Retry"
 msgstr ""
 
 msgid "Rooms"
@@ -174,6 +198,9 @@ msgid "Source JID"
 msgstr ""
 
 msgid "Target Channel"
+msgstr ""
+
+msgid "Target Channel ID"
 msgstr ""
 
 msgid "Target Chat ID"
@@ -251,9 +278,6 @@ msgstr ""
 msgid "Use Avatar"
 msgstr ""
 
-msgid "User"
-msgstr ""
-
 msgid "User Key"
 msgstr ""
 
@@ -288,5 +312,8 @@ msgid "XEP"
 msgstr ""
 
 msgid "Y-Axis"
+msgstr ""
+
+msgid "ttl"
 msgstr ""
 
