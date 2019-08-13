@@ -195,6 +195,23 @@ EMAIL_TEMPLATES = (
         },
     ),
 
+    # SendGrid (Email Server)
+    # You must specify an authenticated sender address in the from= settings
+    # and a valid email in the to= to deliver your emails to
+    (
+        'SendGrid',
+        re.compile(
+            r'^((?P<label>[^+]+)\+)?(?P<id>[^@]+)@'
+            r'(?P<domain>(\.smtp)?sendgrid\.(com|net))$', re.I),
+        {
+            'port': 465,
+            'smtp_host': 'smtp.sendgrid.net',
+            'secure': True,
+            'secure_mode': SecureMailMode.SSL,
+            'login_type': (WebBaseLogin.USERID, )
+        },
+    ),
+
     # Catch All
     (
         'Custom',
@@ -399,11 +416,17 @@ class NotifyEmail(NotifyBase):
             # over-riding any smarts to be applied
             return
 
+        # detect our email address using our user/host combo
+        from_addr = '{}@{}'.format(
+            re.split(r'[\s@]+', self.user)[0],
+            self.host,
+        )
+
         for i in range(len(EMAIL_TEMPLATES)):  # pragma: no branch
-            self.logger.debug('Scanning %s against %s' % (
-                self.from_addr, EMAIL_TEMPLATES[i][0]
+            self.logger.trace('Scanning %s against %s' % (
+                from_addr, EMAIL_TEMPLATES[i][0]
             ))
-            match = EMAIL_TEMPLATES[i][1].match(self.from_addr)
+            match = EMAIL_TEMPLATES[i][1].match(from_addr)
             if match:
                 self.logger.info(
                     'Applying %s Defaults' %

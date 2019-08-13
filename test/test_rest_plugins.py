@@ -1854,6 +1854,80 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifySendGrid
+    ##################################
+    ('sendgrid://', {
+        'instance': None,
+    }),
+    ('sendgrid://:@/', {
+        'instance': None,
+    }),
+    ('sendgrid://abcd', {
+        # Just an broken email (no api key or email)
+        'instance': None,
+    }),
+    ('sendgrid://abcd@host', {
+        # Just an Email specified, no API Key
+        'instance': None,
+    }),
+    ('sendgrid://invalid-api-key+*-d:user@example.com', {
+        # An invalid API Key
+        'instance': TypeError,
+    }),
+    ('sendgrid://abcd:user@example.com', {
+        # No To/Target Address(es) specified; so we sub in the same From
+        # address
+        'instance': plugins.NotifySendGrid,
+    }),
+    ('sendgrid://abcd:user@example.com/newuser@example.com', {
+        # A good email
+        'instance': plugins.NotifySendGrid,
+    }),
+    ('sendgrid://abcd:user@example.com/newuser@example.com'
+     '?bcc=l2g@nuxref.com', {
+         # A good email with Blind Carbon Copy
+         'instance': plugins.NotifySendGrid,
+     }),
+    ('sendgrid://abcd:user@example.com/newuser@example.com'
+     '?cc=l2g@nuxref.com', {
+         # A good email with Carbon Copy
+         'instance': plugins.NotifySendGrid,
+     }),
+    ('sendgrid://abcd:user@example.com/newuser@example.com'
+     '?to=l2g@nuxref.com', {
+         # A good email with Carbon Copy
+         'instance': plugins.NotifySendGrid,
+     }),
+    ('sendgrid://abcd:user@example.com/newuser@example.com'
+     '?template={}'.format(UUID4), {
+         # A good email with a template + no substitutions
+         'instance': plugins.NotifySendGrid,
+     }),
+    ('sendgrid://abcd:user@example.com/newuser@example.com'
+     '?template={}&+sub=value&+sub2=value2'.format(UUID4), {
+         # A good email with a template + substitutions
+         'instance': plugins.NotifySendGrid,
+     }),
+    ('sendgrid://abcd:user@example.ca/newuser@example.ca', {
+        'instance': plugins.NotifySendGrid,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('sendgrid://abcd:user@example.uk/newuser@example.uk', {
+        'instance': plugins.NotifySendGrid,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('sendgrid://abcd:user@example.au/newuser@example.au', {
+        'instance': plugins.NotifySendGrid,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifySlack
     ##################################
     ('slack://', {
@@ -3833,6 +3907,56 @@ def test_notify_zulip_plugin():
     except TypeError:
         # we'll thrown because an empty list of channels was provided
         assert True
+
+
+@mock.patch('requests.get')
+@mock.patch('requests.post')
+def test_notify_sendgrid_plugin(mock_post, mock_get):
+    """
+    API: NotifySendGrid() Extra Checks
+
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.request_rate_per_sec = 0
+
+    try:
+        # no apikey
+        plugins.NotifySendGrid(
+            apikey=None, from_email='user@example.com')
+        # We shouldn't get here; we should thrown an exception instead
+        assert False
+
+    except TypeError:
+        assert True
+
+    try:
+        plugins.NotifySendGrid(
+            apikey='abcd', from_email='!invalid')
+        # We shouldn't get here; we should thrown an exception instead
+        assert False
+
+    except TypeError:
+        assert True
+
+    try:
+        # no email
+        plugins.NotifySendGrid(apikey='abcd', from_email=None)
+        # We shouldn't get here; we should thrown an exception instead
+        assert False
+
+    except TypeError:
+        assert True
+
+    # Invalid To email address
+    plugins.NotifySendGrid(
+        apikey='abcd', from_email='user@example.com', targets="!invalid")
+
+    # Test invalid bcc/cc entries mixed with good ones
+    assert isinstance(plugins.NotifySendGrid(
+        apikey='abcd',
+        from_email='l2g@example.com',
+        bcc=('abc@def.com', '!invalid'),
+        cc=('abc@test.org', '!invalid')), plugins.NotifySendGrid)
 
 
 @mock.patch('requests.get')
