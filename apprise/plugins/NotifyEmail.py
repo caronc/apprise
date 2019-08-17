@@ -592,7 +592,7 @@ class NotifyEmail(NotifyBase):
             hostname=NotifyEmail.quote(self.host, safe=''),
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
-            targets='' if has_targets else '/'.join(
+            targets='' if not has_targets else '/'.join(
                 [NotifyEmail.quote(x, safe='') for x in self.targets]),
             args=NotifyEmail.urlencode(args),
         )
