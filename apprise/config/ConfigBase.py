@@ -236,7 +236,7 @@ class ConfigBase(URLBase):
                 # otherwise.
                 return list()
 
-            if result.group('comment') or not result.group('line'):
+            if not result.group('url'):
                 # Comment/empty line; do nothing
                 continue
 

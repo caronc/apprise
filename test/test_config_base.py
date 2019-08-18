@@ -176,6 +176,18 @@ def test_config_base_config_parse_text():
     assert isinstance(result, list)
     assert len(result) == 0
 
+    # Test case where a comment is on it's own line with nothing else
+    result = ConfigBase.config_parse_text("#")
+    # We expect to parse 0 entries from the above
+    assert isinstance(result, list)
+    assert len(result) == 0
+
+    # Test case of empty file
+    result = ConfigBase.config_parse_text("")
+    # We expect to parse 0 entries from the above
+    assert isinstance(result, list)
+    assert len(result) == 0
+
 
 def test_config_base_config_parse_yaml():
     """
