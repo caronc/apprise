@@ -2482,6 +2482,85 @@ TEST_URLS = (
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
     }),
+
+    ##################################
+    # NotifyMSG91
+    ##################################
+    ('msg91://', {
+        # No hostname/authkey specified
+        'instance': None,
+    }),
+    ('msg91://-', {
+        # Invalid AuthKey
+        'instance': None,
+    }),
+    ('msg91://{}'.format('a' * 23), {
+        # valid everything but target numbers
+        'instance': plugins.NotifyMSG91,
+        # Expected notify() response False because we have no numbers to
+        # notify
+        'notify_response': False,
+    }),
+    ('msg91://{}/123'.format('a' * 23), {
+        # invalid phone number
+        'instance': plugins.NotifyMSG91,
+        # Expected notify() response False because we have no numbers to
+        # notify
+        'notify_response': False,
+    }),
+    ('msg91://{}/abcd'.format('a' * 23), {
+        # invalid phone number
+        'instance': plugins.NotifyMSG91,
+        # Expected notify() response False because we have no numbers to
+        # notify
+        'notify_response': False,
+    }),
+    ('msg91://{}/15551232000/?country=invalid'.format('a' * 23), {
+        # invalid country
+        'instance': TypeError,
+    }),
+    ('msg91://{}/15551232000/?country=99'.format('a' * 23), {
+        # invalid country
+        'instance': TypeError,
+    }),
+    ('msg91://{}/15551232000/?route=invalid'.format('a' * 23), {
+        # invalid route
+        'instance': TypeError,
+    }),
+    ('msg91://{}/15551232000/?route=99'.format('a' * 23), {
+        # invalid route
+        'instance': TypeError,
+    }),
+    ('msg91://{}/15551232000'.format('a' * 23), {
+        # a valid message
+        'instance': plugins.NotifyMSG91,
+    }),
+    ('msg91://{}/?to=15551232000'.format('a' * 23), {
+        # a valid message
+        'instance': plugins.NotifyMSG91,
+    }),
+    ('msg91://{}/15551232000?country=91&route=1'.format('a' * 23), {
+        # using phone no with no target - we text ourselves in
+        # this case
+        'instance': plugins.NotifyMSG91,
+    }),
+    ('msg91://{}/15551232000'.format('a' * 23), {
+        # use get args to acomplish the same thing
+        'instance': plugins.NotifyMSG91,
+    }),
+    ('msg91://{}/15551232000'.format('a' * 23), {
+        'instance': plugins.NotifyMSG91,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('msg91://{}/15551232000'.format('a' * 23), {
+        'instance': plugins.NotifyMSG91,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
     ##################################
     # NotifyNexmo
     ##################################
@@ -3548,6 +3627,47 @@ def test_notify_nexmo_plugin(mock_post):
 
     # We will fail with the above error code
     assert obj.notify('title', 'body', 'info') is False
+
+
+@mock.patch('requests.post')
+def test_notify_msg91_plugin(mock_post):
+    """
+    API: NotifyMSG91() Extra Checks
+
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.request_rate_per_sec = 0
+
+    # Prepare our response
+    response = requests.Request()
+    response.status_code = requests.codes.ok
+
+    # Prepare Mock
+    mock_post.return_value = response
+
+    # Initialize some generic (but valid) tokens
+    # authkey = '{}'.format('a' * 24)
+    target = '+1 (555) 123-3456'
+
+    try:
+        # No authkey specified
+        plugins.NotifyMSG91(authkey=None, targets=target)
+        assert False
+
+    except TypeError:
+        # Exception should be thrown about the fact authkey was not
+        # specified
+        assert True
+
+    try:
+        # invalid authkey
+        plugins.NotifyMSG91(authkey='!#$%', targets=target)
+        assert False
+
+    except TypeError:
+        # Exception should be thrown about the fact authkey was not
+        # specified
+        assert True
 
 
 @mock.patch('apprise.plugins.NotifyEmby.login')
