@@ -35,6 +35,7 @@ from ..common import NotifyFormat
 from ..common import NotifyType
 from ..utils import is_email
 from ..utils import parse_list
+from ..utils import GET_EMAIL_RE
 from ..AppriseLocale import gettext_lazy as _
 
 
@@ -320,6 +321,14 @@ class NotifyEmail(NotifyBase):
             'name': _('SMTP Server'),
             'type': 'string',
         },
+        'cc': {
+            'name': _('Carbon Copy'),
+            'type': 'list:string',
+        },
+        'bcc': {
+            'name': _('Blind Carbon Copy'),
+            'type': 'list:string',
+        },
         'mode': {
             'name': _('Secure Mode'),
             'type': 'choice:string',
@@ -336,7 +345,8 @@ class NotifyEmail(NotifyBase):
     })
 
     def __init__(self, timeout=15, smtp_host=None, from_name=None,
-                 from_addr=None, secure_mode=None, targets=None, **kwargs):
+                 from_addr=None, secure_mode=None, targets=None, cc=None,
+                 bcc=None, **kwargs):
         """
         Initialize Email Object
 
@@ -362,6 +372,12 @@ class NotifyEmail(NotifyBase):
 
         # Acquire targets
         self.targets = parse_list(targets)
+
+        # Acquire Carbon Copies
+        self.cc = set()
+
+        # Acquire Blind Carbon Copies
+        self.bcc = set()
 
         # Now we want to construct the To and From email
         # addresses from the URL provided
@@ -398,6 +414,30 @@ class NotifyEmail(NotifyBase):
                   .format(secure_mode)
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        # Validate recipients (cc:) and drop bad ones:
+        for recipient in parse_list(cc):
+
+            if GET_EMAIL_RE.match(recipient):
+                self.cc.add(recipient)
+                continue
+
+            self.logger.warning(
+                'Dropped invalid Carbon Copy email '
+                '({}) specified.'.format(recipient),
+            )
+
+        # Validate recipients (bcc:) and drop bad ones:
+        for recipient in parse_list(bcc):
+
+            if GET_EMAIL_RE.match(recipient):
+                self.bcc.add(recipient)
+                continue
+
+            self.logger.warning(
+                'Dropped invalid Blind Carbon Copy email '
+                '({}) specified.'.format(recipient),
+            )
 
         # Apply any defaults based on certain known configurations
         self.NotifyEmailDefaults()
@@ -492,9 +532,18 @@ class NotifyEmail(NotifyBase):
                 has_error = True
                 continue
 
+            # Strip target out of cc list if in To or Bcc
+            cc = (self.cc - self.bcc - set([to_addr]))
+            # Strip target out of bcc list if in To
+            bcc = (self.bcc - set([to_addr]))
+
             self.logger.debug(
                 'Email From: {} <{}>'.format(from_name, self.from_addr))
             self.logger.debug('Email To: {}'.format(to_addr))
+            if len(cc):
+                self.logger.debug('Email Cc: {}'.format(', '.join(cc)))
+            if len(bcc):
+                self.logger.debug('Email Bcc: {}'.format(', '.join(bcc)))
             self.logger.debug('Login ID: {}'.format(self.user))
             self.logger.debug(
                 'Delivery: {}:{}'.format(self.smtp_host, self.port))
@@ -509,6 +558,7 @@ class NotifyEmail(NotifyBase):
             email['Subject'] = title
             email['From'] = '{} <{}>'.format(from_name, self.from_addr)
             email['To'] = to_addr
+            email['Cc'] = ','.join(cc)
             email['Date'] = \
                 datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S +0000")
             email['X-Application'] = self.app_id
@@ -545,7 +595,9 @@ class NotifyEmail(NotifyBase):
 
                 # Send the email
                 socket.sendmail(
-                    self.from_addr, to_addr, email.as_string())
+                    self.from_addr,
+                    [to_addr] + list(cc) + list(bcc),
+                    email.as_string())
 
                 self.logger.info(
                     'Sent Email notification to "{}".'.format(to_addr))
@@ -583,6 +635,14 @@ class NotifyEmail(NotifyBase):
             'user': self.user,
             'verify': 'yes' if self.verify_certificate else 'no',
         }
+
+        if len(self.cc) > 0:
+            # Handle our Carbon Copy Addresses
+            args['cc'] = ','.join(self.cc)
+
+        if len(self.bcc) > 0:
+            # Handle our Blind Carbon Copy Addresses
+            args['bcc'] = ','.join(self.bcc)
 
         # pull email suffix from username (if present)
         user = self.user.split('@')[0]
@@ -670,6 +730,16 @@ class NotifyEmail(NotifyBase):
         if 'mode' in results['qsd'] and len(results['qsd']['mode']):
             # Extract the secure mode to over-ride the default
             results['secure_mode'] = results['qsd']['mode'].lower()
+
+        # Handle Carbon Copy Addresses
+        if 'cc' in results['qsd'] and len(results['qsd']['cc']):
+            results['cc'] = \
+                NotifyEmail.parse_list(results['qsd']['cc'])
+
+        # Handle Blind Carbon Copy Addresses
+        if 'bcc' in results['qsd'] and len(results['qsd']['bcc']):
+            results['bcc'] = \
+                NotifyEmail.parse_list(results['qsd']['bcc'])
 
         results['from_addr'] = from_addr
         results['smtp_host'] = smtp_host

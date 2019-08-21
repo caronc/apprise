@@ -79,6 +79,9 @@ TEST_URLS = (
     ('mailto://user:pass@fastmail.com', {
         'instance': plugins.NotifyEmail,
     }),
+    ('mailto://user:pass@sendgrid.com', {
+        'instance': plugins.NotifyEmail,
+    }),
 
     # Custom Emails
     ('mailtos://user:pass@nuxref.com:567', {
@@ -114,6 +117,34 @@ TEST_URLS = (
     (
         'mailto://user:pass@example.com:2525?user=l2g@example.com'
         '&pass=l2g@apprise!is!Awesome&format=text', {
+            'instance': plugins.NotifyEmail,
+        },
+    ),
+    (
+        # Test Carbon Copy
+        'mailtos://user:pass@example.com?smtp=smtp.example.com'
+        '&name=l2g&cc=noreply@example.com,test@example.com', {
+            'instance': plugins.NotifyEmail,
+        },
+    ),
+    (
+        # Test Blind Carbon Copy
+        'mailtos://user:pass@example.com?smtp=smtp.example.com'
+        '&name=l2g&bcc=noreply@example.com,test@example.com', {
+            'instance': plugins.NotifyEmail,
+        },
+    ),
+    (
+        # Test Carbon Copy with bad email
+        'mailtos://user:pass@example.com?smtp=smtp.example.com'
+        '&name=l2g&cc=noreply@example.com,@', {
+            'instance': plugins.NotifyEmail,
+        },
+    ),
+    (
+        # Test Blind Carbon Copy with bad email
+        'mailtos://user:pass@example.com?smtp=smtp.example.com'
+        '&name=l2g&bcc=noreply@example.com,@', {
             'instance': plugins.NotifyEmail,
         },
     ),
