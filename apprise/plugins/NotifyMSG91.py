@@ -118,7 +118,7 @@ class NotifyMSG91(NotifyBase):
             'name': _('Authentication Key'),
             'type': 'string',
             'required': True,
-            'regex': (r'AC[a-z0-9]+', 'i'),
+            'regex': (r'[a-z0-9]+', 'i'),
         },
         'target_phone': {
             'name': _('Target Phone No'),
@@ -149,7 +149,7 @@ class NotifyMSG91(NotifyBase):
             'default': MSG91Route.TRANSACTIONAL,
         },
         'country': {
-            'name': _('Route'),
+            'name': _('Country'),
             'type': 'choice:int',
             'values': MSG91_COUNTRIES,
         },
