@@ -2562,6 +2562,54 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifyMessageBird
+    ##################################
+    ('msgbird://', {
+        # No hostname/apikey specified
+        'instance': None,
+    }),
+    ('msgbird://{}/15551232000'.format('a' * 10), {
+        # invalid apikey
+        'instance': TypeError,
+    }),
+    ('msgbird://{}/123'.format('a' * 25), {
+        # invalid phone number
+        'instance': TypeError,
+    }),
+    ('msgbird://{}/abc'.format('a' * 25), {
+        # invalid phone number
+        'instance': TypeError,
+    }),
+    ('msgbird://{}/15551232000'.format('a' * 25), {
+        # target phone number becomes who we text too; all is good
+        'instance': plugins.NotifyMessageBird,
+    }),
+    ('msgbird://{}/15551232000/abcd'.format('a' * 25), {
+        # invalid target phone number; we fall back to texting ourselves
+        'instance': plugins.NotifyMessageBird,
+    }),
+    ('msgbird://{}/15551232000/123'.format('a' * 25), {
+        # invalid target phone number; we fall back to texting ourselves
+        'instance': plugins.NotifyMessageBird,
+    }),
+    ('msgbird://{}/?from=15551233000&to=15551232000'.format('a' * 25), {
+        # reference to to= and frome=
+        'instance': plugins.NotifyMessageBird,
+    }),
+    ('msgbird://{}/15551232000'.format('a' * 25), {
+        'instance': plugins.NotifyMessageBird,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('msgbird://{}/15551232000'.format('a' * 25), {
+        'instance': plugins.NotifyMessageBird,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifyNexmo
     ##################################
     ('nexmo://', {
@@ -3662,6 +3710,37 @@ def test_notify_msg91_plugin(mock_post):
     try:
         # invalid authkey
         plugins.NotifyMSG91(authkey='!#$%', targets=target)
+        assert False
+
+    except TypeError:
+        # Exception should be thrown about the fact authkey was not
+        # specified
+        assert True
+
+
+@mock.patch('requests.post')
+def test_notify_messagebird_plugin(mock_post):
+    """
+    API: NotifyMessageBird() Extra Checks
+
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.request_rate_per_sec = 0
+
+    # Prepare our response
+    response = requests.Request()
+    response.status_code = requests.codes.ok
+
+    # Prepare Mock
+    mock_post.return_value = response
+
+    # Initialize some generic (but valid) tokens
+    # authkey = '{}'.format('a' * 24)
+    source = '+1 (555) 123-3456'
+
+    try:
+        # No authkey specified
+        plugins.NotifyMessageBird(apikey=None, source=source)
         assert False
 
     except TypeError:
