@@ -69,12 +69,12 @@ setup(
     long_description_content_type='text/markdown',
     cmdclass=cmdclass,
     url='https://github.com/caronc/apprise',
-    keywords='Push Notifications Alerts Email AWS SNS Boxcar Discord Dbus '
-        'Emby Faast Flock Gitter Gnome Gotify Growl IFTTT Join KODI Mailgun '
-        'Matrix Mattermost MessageBird MSG91 Nexmo Prowl PushBullet Pushjet '
-        'Pushed Pushover Rocket.Chat Ryver SendGrid Slack Stride '
-        'Techulus Push Telegram Twilio Twist Twitter XBMC Microsoft MSTeams '
-        'Windows Webex CLI API',
+    keywords='Push Notifications Alerts Email AWS SNS Boxcar ClickSend '
+        'Discord Dbus Emby Faast Flock Gitter Gnome Gotify Growl IFTTT Join '
+        'KODI Mailgun Matrix Mattermost MessageBird MSG91 Nexmo Prowl '
+        'PushBullet Pushjet Pushed Pushover Rocket.Chat Ryver SendGrid Slack '
+        'Stride Techulus Push Telegram Twilio Twist Twitter XBMC Microsoft '
+        'MSTeams Windows Webex CLI API',
     author='Chris Caron',
     author_email='lead2gold@gmail.com',
     packages=find_packages(),
