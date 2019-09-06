@@ -59,7 +59,7 @@ class NotifyMessageBird(NotifyBase):
     secure_protocol = 'msgbird'
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_msgbird'
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_messagebird'
 
     # MessageBird uses the http protocol with JSON requests
     notify_url = 'https://rest.messagebird.com/messages'
@@ -89,6 +89,7 @@ class NotifyMessageBird(NotifyBase):
             'name': _('Source Phone No'),
             'type': 'string',
             'prefix': '+',
+            'required': True,
             'regex': (r'[0-9\s)(+-]+', 'i'),
         },
         'target_phone': {

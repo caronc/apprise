@@ -3628,7 +3628,7 @@ def test_notify_twilio_plugin(mock_post):
         assert False
 
     except TypeError:
-        # Exception should be thrown about the fact account_sid was not
+        # Exception should be thrown about the fact the account_sid was not
         # specified
         assert True
 
@@ -3639,7 +3639,7 @@ def test_notify_twilio_plugin(mock_post):
         assert False
 
     except TypeError:
-        # Exception should be thrown about the fact account_sid was not
+        # Exception should be thrown about the fact the auth_token was not
         # specified
         assert True
 
@@ -3687,7 +3687,7 @@ def test_notify_nexmo_plugin(mock_post):
         assert False
 
     except TypeError:
-        # Exception should be thrown about the fact apikey was not
+        # Exception should be thrown about the fact the apikey was not
         # specified
         assert True
 
@@ -3698,7 +3698,7 @@ def test_notify_nexmo_plugin(mock_post):
         assert False
 
     except TypeError:
-        # Exception should be thrown about the fact apikey was not
+        # Exception should be thrown about the fact the secret was not
         # specified
         assert True
 
@@ -3744,7 +3744,7 @@ def test_notify_msg91_plugin(mock_post):
         assert False
 
     except TypeError:
-        # Exception should be thrown about the fact authkey was not
+        # Exception should be thrown about the fact the authkey was not
         # specified
         assert True
 
@@ -3754,8 +3754,8 @@ def test_notify_msg91_plugin(mock_post):
         assert False
 
     except TypeError:
-        # Exception should be thrown about the fact authkey was not
-        # specified
+        # Exception should be thrown about the fact the authkey was
+        # invalid
         assert True
 
 
@@ -3975,7 +3975,8 @@ def test_notify_ifttt_plugin(mock_post, mock_get):
         assert False
 
     except TypeError:
-        # Exception should be thrown about the fact webhook_id was specified
+        # Exception should be thrown about the fact the webhook_id was
+        # specified
         assert True
 
     try:
@@ -3984,7 +3985,7 @@ def test_notify_ifttt_plugin(mock_post, mock_get):
         assert False
 
     except TypeError:
-        # Exception should be thrown about the fact no token was specified
+        # Exception should be thrown about the fact no events were specified
         assert True
 
     obj = plugins.NotifyIFTTT(webhook_id=webhook_id, events=events)
@@ -4542,7 +4543,7 @@ def test_notify_telegram_plugin(mock_post, mock_get):
         assert False
 
     except TypeError:
-        # Exception should be thrown about the fact no token was specified
+        # Exception should be thrown about the fact no bot token was specified
         assert True
 
     try:
@@ -4552,7 +4553,7 @@ def test_notify_telegram_plugin(mock_post, mock_get):
         assert False
 
     except TypeError:
-        # Exception should be thrown about the fact an invalid token was
+        # Exception should be thrown about the fact an invalid bot token was
         # specified
         assert True
 
@@ -4676,7 +4677,7 @@ def test_notify_telegram_plugin(mock_post, mock_get):
         assert False
 
     except TypeError:
-        # Exception should be thrown about the fact no token was specified
+        # Exception should be thrown about the fact no bot token was specified
         assert True
 
     # Detect the bot with a bad response
@@ -4691,7 +4692,7 @@ def test_notify_telegram_plugin(mock_post, mock_get):
         assert False
 
     except TypeError:
-        # Exception should be thrown about the fact no token was specified
+        # Exception should be thrown over internal server error caused
         assert True
 
     # Test our bot detection with an unmappable html error
@@ -4702,7 +4703,7 @@ def test_notify_telegram_plugin(mock_post, mock_get):
         assert False
 
     except TypeError:
-        # Exception should be thrown about the fact no token was specified
+        # Exception should be thrown over invali internal error no
         assert True
 
     # Do it again but this time provide a failure message
@@ -4713,7 +4714,7 @@ def test_notify_telegram_plugin(mock_post, mock_get):
         assert False
 
     except TypeError:
-        # Exception should be thrown about the fact no token was specified
+        # Exception should be thrown about the fact no bot token was specified
         assert True
 
     # Do it again but this time provide a failure message and perform a
@@ -4731,7 +4732,8 @@ def test_notify_telegram_plugin(mock_post, mock_get):
             assert False
 
         except TypeError:
-            # Exception should be thrown about the fact no token was specified
+            # Exception should be thrown about the fact no bot token was
+            # specified
             assert True
 
 
