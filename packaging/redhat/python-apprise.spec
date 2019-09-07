@@ -75,7 +75,6 @@ Summary: A simple wrapper to many popular notification services used today
 %{?python_provide:%python_provide python2-%{pypi_name}}
 
 BuildRequires: python2-devel
-BuildRequires: python-decorator
 BuildRequires: python-requests
 BuildRequires: python2-requests-oauthlib
 BuildRequires: python-six
@@ -89,7 +88,6 @@ BuildRequires: python2-babel
 BuildRequires: python2-yaml
 %endif # using rhel7
 
-Requires: python-decorator
 Requires: python-requests
 Requires: python2-requests-oauthlib
 Requires: python-six
@@ -134,7 +132,6 @@ Summary: A simple wrapper to many popular notification services used today
 %{?python_provide:%python_provide python%{python3_pkgversion}-%{pypi_name}}
 
 BuildRequires: python%{python3_pkgversion}-devel
-BuildRequires: python%{python3_pkgversion}-decorator
 BuildRequires: python%{python3_pkgversion}-requests
 BuildRequires: python%{python3_pkgversion}-requests-oauthlib
 BuildRequires: python%{python3_pkgversion}-oauthlib
@@ -143,7 +140,6 @@ BuildRequires: python%{python3_pkgversion}-click >= 5.0
 BuildRequires: python%{python3_pkgversion}-markdown
 BuildRequires: python%{python3_pkgversion}-yaml
 BuildRequires: python%{python3_pkgversion}-babel
-Requires: python%{python3_pkgversion}-decorator
 Requires: python%{python3_pkgversion}-requests
 Requires: python%{python3_pkgversion}-requests-oauthlib
 Requires: python%{python3_pkgversion}-oauthlib

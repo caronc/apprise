@@ -1510,6 +1510,67 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifyPushjet
+    ##################################
+    ('pjet://', {
+        'instance': None,
+    }),
+    ('pjets://', {
+        'instance': None,
+    }),
+    ('pjet://:@/', {
+        'instance': None,
+    }),
+    #  You must specify a secret key
+    ('pjet://%s' % ('a' * 32), {
+        'instance': TypeError,
+    }),
+    # Legacy method of logging in (soon to be depricated)
+    ('pjet://%s@localhost' % ('a' * 32), {
+        'instance': plugins.NotifyPushjet,
+    }),
+    # The proper way to log in
+    ('pjet://user:pass@localhost/%s' % ('a' * 32), {
+        'instance': plugins.NotifyPushjet,
+    }),
+    # The proper way to log in
+    ('pjets://localhost/%s' % ('a' * 32), {
+        'instance': plugins.NotifyPushjet,
+    }),
+    # Specify your own server with login (secret= MUST be provided)
+    ('pjet://user:pass@localhost?secret=%s' % ('a' * 32), {
+        'instance': plugins.NotifyPushjet,
+    }),
+    # Specify your own server with login (no secret = fail normally)
+    # however this will work since we're providing depricated support
+    # at this time so the 'user' get's picked up as being the secret_key
+    ('pjet://user:pass@localhost', {
+        'instance': plugins.NotifyPushjet,
+    }),
+    # Specify your own server with port
+    ('pjets://localhost:8080/%s' % ('a' * 32), {
+        'instance': plugins.NotifyPushjet,
+    }),
+    ('pjets://localhost:8080/%s' % ('a' * 32), {
+        'instance': plugins.NotifyPushjet,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('pjets://localhost:4343/%s' % ('a' * 32), {
+        'instance': plugins.NotifyPushjet,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('pjet://localhost:8081/%s' % ('a' * 32), {
+        'instance': plugins.NotifyPushjet,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifyPushover
     ##################################
     ('pover://', {

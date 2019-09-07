@@ -1,4 +1,3 @@
-decorator
 requests
 requests-oauthlib
 six
