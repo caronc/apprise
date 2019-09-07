@@ -33,9 +33,6 @@ from os.path import abspath
 
 # Used for testing
 from . import NotifyEmail as NotifyEmailBase
-
-# Required until re-factored into base code
-from .NotifyPushjet import pushjet
 from .NotifyGrowl import gntp
 
 # NotifyBase object is passed in as a module not class
@@ -62,9 +59,6 @@ __all__ = [
 
     # gntp (used for NotifyGrowl Testing)
     'gntp',
-
-    # pushjet (used for NotifyPushjet Testing)
-    'pushjet',
 ]
 
 # we mirror our base purely for the ability to reset everything; this
