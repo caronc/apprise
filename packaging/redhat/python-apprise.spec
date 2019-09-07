@@ -137,7 +137,6 @@ BuildRequires: python%{python3_pkgversion}-devel
 BuildRequires: python%{python3_pkgversion}-decorator
 BuildRequires: python%{python3_pkgversion}-requests
 BuildRequires: python%{python3_pkgversion}-requests-oauthlib
-BuildRequires: python%{python3_pkgversion}-oauthlib
 BuildRequires: python%{python3_pkgversion}-six
 BuildRequires: python%{python3_pkgversion}-click >= 5.0
 BuildRequires: python%{python3_pkgversion}-markdown
@@ -146,7 +145,6 @@ BuildRequires: python%{python3_pkgversion}-babel
 Requires: python%{python3_pkgversion}-decorator
 Requires: python%{python3_pkgversion}-requests
 Requires: python%{python3_pkgversion}-requests-oauthlib
-Requires: python%{python3_pkgversion}-oauthlib
 Requires: python%{python3_pkgversion}-six
 Requires: python%{python3_pkgversion}-markdown
 Requires: python%{python3_pkgversion}-yaml
