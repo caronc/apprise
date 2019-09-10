@@ -3473,6 +3473,37 @@ def test_notify_discord_plugin(mock_post, mock_get):
     assert isinstance(results, list) is True
     # We should have 5 sections (since there are 5 headers identified above)
     assert len(results) == 5
+    assert results[0]['name'] == 'Heading one'
+    assert results[0]['value'] == '```md\nbody body\n```'
+    assert results[1]['name'] == 'Heading 2'
+    assert results[1]['value'] == \
+        '```md\nTest\n\nmore content\neven more content\n```'
+    assert results[2]['name'] == 'Heading 3'
+    assert results[2]['value'] == \
+        '```md\nnormal content\n```'
+    assert results[3]['name'] == 'heading 4'
+    assert results[3]['value'] == '```md\n\n```'
+    assert results[4]['name'] == 'Heading 5'
+    assert results[4]['value'] == '```md\n\n```'
+
+    # Test our markdown
+    obj = Apprise.instantiate(
+        'discord://{}/{}/?format=markdown'.format(webhook_id, webhook_token))
+    assert isinstance(obj, plugins.NotifyDiscord)
+    assert obj.notify(
+        body=test_markdown, title='title', notify_type=NotifyType.INFO) is True
+
+    # Empty String
+    results = obj.extract_markdown_sections("")
+    assert isinstance(results, list) is True
+    assert len(results) == 0
+
+    # String without Heading
+    test_markdown = "Just a string without any header entries.\n" + \
+        "A second line"
+    results = obj.extract_markdown_sections(test_markdown)
+    assert isinstance(results, list) is True
+    assert len(results) == 0
 
     # Use our test markdown string during a notification
     assert obj.notify(

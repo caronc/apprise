@@ -427,8 +427,8 @@ class NotifyDiscord(NotifyBase):
 
         """
         regex = re.compile(
-            r'^\s*#+\s*(?P<name>[^#\n]+)([ \r\t\v#])?'
-            r'(?P<value>([^ \r\t\v#].+?)(\n(?!\s#))|\s*$)', flags=re.S | re.M)
+            r'\s*#[# \t\v]*(?P<name>[^\n]+)(\n|\s*$)'
+            r'\s*((?P<value>[^#].+?)(?=\s*$|[\r\n]+\s*#))?', flags=re.S)
 
         common = regex.finditer(markdown)
         fields = list()
@@ -436,8 +436,9 @@ class NotifyDiscord(NotifyBase):
             d = el.groupdict()
 
             fields.append({
-                'name': d.get('name', '').strip(),
-                'value': '```md\n' + d.get('value', '').strip() + '\n```'
+                'name': d.get('name', '').strip('# \r\n\t\v'),
+                'value': '```md\n' +
+                (d.get('value').strip() if d.get('value') else '') + '\n```'
             })
 
         return fields
