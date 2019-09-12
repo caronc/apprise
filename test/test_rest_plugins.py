@@ -889,6 +889,55 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifyKumulos
+    ##################################
+    ('kumulos://', {
+        # No API or Server Key specified
+        'instance': None,
+    }),
+    ('kumulos://:@/', {
+        # No API or Server Key specified
+        # We don't have strict host checking on for kumulos, so this URL
+        # actually becomes parseable and :@ becomes a hostname.
+        # The below errors because a second token wasn't found
+        'instance': None,
+    }),
+    ('kumulos://invalid-api-key', {
+        # Invalid API Key
+        'instance': TypeError,
+    }),
+    ('kumulos://{}'.format(UUID4), {
+        # Server Key not specified
+        'instance': TypeError,
+    }),
+    ('kumulos://{}/{}/'.format(UUID4, 'a' * 26), {
+        # Invalid Server Key
+        'instance': TypeError,
+    }),
+    ('kumulos://{}/{}/'.format(UUID4, 'w' * 36), {
+        # Everything is okay
+        'instance': plugins.NotifyKumulos,
+    }),
+    ('kumulos://{}/{}/'.format(UUID4, 'x' * 36), {
+        'instance': plugins.NotifyKumulos,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('kumulos://{}/{}/'.format(UUID4, 'y' * 36), {
+        'instance': plugins.NotifyKumulos,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('kumulos://{}/{}/'.format(UUID4, 'z' * 36), {
+        'instance': plugins.NotifyKumulos,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifyMailgun
     ##################################
     ('mailgun://', {
@@ -4201,6 +4250,24 @@ def test_notify_ifttt_plugin(mock_post, mock_get):
             plugins.NotifyIFTTT.ifttt_default_type_key: None})
 
     assert isinstance(obj, plugins.NotifyIFTTT) is True
+
+
+def test_notify_kumulos_plugin():
+    """
+    API: NotifyKumulos() Extra Checks
+
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.request_rate_per_sec = 0
+
+    # Invalid API Key
+    try:
+        plugins.NotifyKumulos(None, None)
+        assert False
+
+    except TypeError:
+        # we'll thrown because an empty list of channels was provided
+        assert True
 
 
 @mock.patch('requests.get')

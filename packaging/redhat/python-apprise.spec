@@ -48,11 +48,11 @@ notification services that are out there. Apprise opens the door and makes
 it easy to access:
 
 Boxcar, ClickSend, Discord, E-Mail, Emby, Faast, Flock, Gitter, Gotify, Growl,
-IFTTT, Join, KODI, Mailgun, MatterMost, Matrix, Microsoft Windows Notifications,
-Microsoft Teams, MessageBird, MSG91, Nexmo, Notify MyAndroid, Prowl, Pushalot,
-PushBullet, Pushjet, Pushover, Rocket.Chat, SendGrid, SimplePush, Slack,
-Super Toasty, Stride, Techulus Push, Telegram, Twilio, Twitter, Twist, XBMC,
-XMPP, Webex Teams}
+IFTTT, Join, KODI, Kumulos, Mailgun, MatterMost, Matrix, Microsoft Windows
+Notifications, Microsoft Teams, MessageBird, MSG91, Nexmo, Notify MyAndroid,
+Prowl, Pushalot, PushBullet, Pushjet, Pushover, Rocket.Chat, SendGrid,
+SimplePush, Slack, Super Toasty, Stride, Techulus Push, Telegram, Twilio,
+Twitter, Twist, XBMC, XMPP, Webex Teams}
 
 Name:           python-%{pypi_name}
 Version:        0.7.9
