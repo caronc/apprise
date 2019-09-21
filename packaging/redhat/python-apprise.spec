@@ -55,7 +55,7 @@ SimplePush, Slack, Super Toasty, Stride, Techulus Push, Telegram, Twilio,
 Twitter, Twist, XBMC, XMPP, Webex Teams}
 
 Name:           python-%{pypi_name}
-Version:        0.7.9
+Version:        0.8.0
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        MIT
@@ -221,6 +221,9 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 %endif # with_python2
 
 %changelog
+* Fri Sep 20 2019 Chris Caron <lead2gold@gmail.com> - 0.8.0-1
+- Updated to v0.8.0
+
 * Fri Jul 19 2019 Chris Caron <lead2gold@gmail.com> - 0.7.9-1
 - Updated to v0.7.9
 

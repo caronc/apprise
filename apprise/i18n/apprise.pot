@@ -6,9 +6,9 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: apprise 0.7.9\n"
+"Project-Id-Version: apprise 0.8.0\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2019-07-19 22:54-0400\n"
+"POT-Creation-Date: 2019-09-20 21:05-0400\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -50,6 +50,9 @@ msgstr ""
 msgid "Auth Token"
 msgstr ""
 
+msgid "Authentication Key"
+msgstr ""
+
 msgid "Authorization Token"
 msgstr ""
 
@@ -57,6 +60,9 @@ msgid "Avatar Image"
 msgstr ""
 
 msgid "Batch Mode"
+msgstr ""
+
+msgid "Blind Carbon Copy"
 msgstr ""
 
 msgid "Bot Name"
@@ -68,6 +74,9 @@ msgstr ""
 msgid "Cache Results"
 msgstr ""
 
+msgid "Carbon Copy"
+msgstr ""
+
 msgid "Channels"
 msgstr ""
 
@@ -75,6 +84,9 @@ msgid "Consumer Key"
 msgstr ""
 
 msgid "Consumer Secret"
+msgstr ""
+
+msgid "Country"
 msgstr ""
 
 msgid "Detect Bot Owner"
@@ -93,6 +105,15 @@ msgid "Duration"
 msgstr ""
 
 msgid "Email"
+msgstr ""
+
+msgid "Encrypted Password"
+msgstr ""
+
+msgid "Encrypted Salt"
+msgstr ""
+
+msgid "Event"
 msgstr ""
 
 msgid "Events"
@@ -173,6 +194,9 @@ msgstr ""
 msgid "Rooms"
 msgstr ""
 
+msgid "Route"
+msgstr ""
+
 msgid "SMTP Server"
 msgstr ""
 
@@ -188,13 +212,25 @@ msgstr ""
 msgid "Secure Mode"
 msgstr ""
 
+msgid "Sender ID"
+msgstr ""
+
+msgid "Server Key"
+msgstr ""
+
 msgid "Server Timeout"
 msgstr ""
 
 msgid "Sound"
 msgstr ""
 
+msgid "Source Email"
+msgstr ""
+
 msgid "Source JID"
+msgstr ""
+
+msgid "Source Phone No"
 msgstr ""
 
 msgid "Target Channel"
@@ -246,6 +282,12 @@ msgid "Target User"
 msgstr ""
 
 msgid "Targets"
+msgstr ""
+
+msgid "Template"
+msgstr ""
+
+msgid "Template Data"
 msgstr ""
 
 msgid "Text To Speech"
