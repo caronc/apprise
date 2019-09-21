@@ -2807,6 +2807,12 @@ TEST_URLS = (
     }),
     ('msgbird://{}/15551232000'.format('a' * 25), {
         'instance': plugins.NotifyMessageBird,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('msgbird://{}/15551232000'.format('a' * 25), {
+        'instance': plugins.NotifyMessageBird,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
