@@ -87,7 +87,7 @@ class NotifyClickSend(NotifyBase):
     title_maxlen = 0
 
     # The maximum SMS batch size accepted by the ClickSend API
-    sms_batch_size = 1000
+    default_batch_size = 1000
 
     # Define object templates
     templates = (
@@ -197,18 +197,15 @@ class NotifyClickSend(NotifyBase):
             'messages': []
         }
 
-        # Create a copy of the target list
-        targets = list(self.targets)
-
         # Send in batches if identified to do so
-        sms_batch_size = 1 if not self.batch else self.sms_batch_size
+        default_batch_size = 1 if not self.batch else self.default_batch_size
 
-        for index in range(0, len(targets), sms_batch_size):
+        for index in range(0, len(self.targets), default_batch_size):
             payload['messages'] = [{
                 'source': 'php',
                 'body': body,
                 'to': '+{}'.format(to),
-            } for to in targets[index:index + sms_batch_size]]
+            } for to in self.targets[index:index + default_batch_size]]
 
             self.logger.debug('ClickSend POST URL: %s (cert_verify=%r)' % (
                 self.notify_url, self.verify_certificate,
@@ -234,8 +231,8 @@ class NotifyClickSend(NotifyBase):
                         'Failed to send {} ClickSend notification{}: '
                         '{}{}error={}.'.format(
                             len(payload['messages']),
-                            ' to {}'.format(targets[index])
-                            if sms_batch_size == 1 else '(s)',
+                            ' to {}'.format(self.targets[index])
+                            if default_batch_size == 1 else '(s)',
                             status_str,
                             ', ' if status_str else '',
                             r.status_code))
@@ -252,8 +249,8 @@ class NotifyClickSend(NotifyBase):
                         'Sent {} ClickSend notification{}.'
                         .format(
                             len(payload['messages']),
-                            ' to {}'.format(targets[index])
-                            if sms_batch_size == 1 else '(s)',
+                            ' to {}'.format(self.targets[index])
+                            if default_batch_size == 1 else '(s)',
                         ))
 
             except requests.RequestException as e:
