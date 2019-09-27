@@ -644,14 +644,17 @@ def test_exclusive_match():
     """utils: is_exclusive_match() testing
     """
 
-    # No Logic always returns True
+    # No Logic always returns True if there is also no data
     assert utils.is_exclusive_match(data=None, logic=None) is True
     assert utils.is_exclusive_match(data=None, logic=set()) is True
     assert utils.is_exclusive_match(data='', logic=set()) is True
     assert utils.is_exclusive_match(data=u'', logic=set()) is True
-    assert utils.is_exclusive_match(data=u'check', logic=set()) is True
+
+    # however, once data is introduced, True is no longer returned
+    # if no logic has been specified
+    assert utils.is_exclusive_match(data=u'check', logic=set()) is False
     assert utils.is_exclusive_match(
-        data=['check', 'checkb'], logic=set()) is True
+        data=['check', 'checkb'], logic=set()) is False
 
     # String delimters are stripped out so that a list can be formed
     # the below is just an empty token list
@@ -696,6 +699,10 @@ def test_exclusive_match():
     #
     data = set(['abc', 'def', 'efg', 'xyz'])
 
+    # match_all matches everything
+    assert utils.is_exclusive_match(logic='all', data=data) is True
+    assert utils.is_exclusive_match(logic=['all'], data=data) is True
+
     # def and abc in data
     assert utils.is_exclusive_match(
         logic=[('abc', 'def')], data=data) is True
@@ -714,6 +721,18 @@ def test_exclusive_match():
     # www or zzz or abc and jjj
     assert utils.is_exclusive_match(
         logic=['www', 'zzz', ('abc', 'jjj')], data=data) is False
+
+    #
+    # Empty data set
+    #
+    data = set()
+    assert utils.is_exclusive_match(logic=['www'], data=data) is False
+    assert utils.is_exclusive_match(logic='all', data=data) is True
+
+    # Change default value from 'all' to 'match_me'. Logic matches
+    # so we pass
+    assert utils.is_exclusive_match(
+        logic='match_me', data=data, match_all='match_me') is True
 
 
 def test_environ_temporary_change():

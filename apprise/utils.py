@@ -529,7 +529,7 @@ def parse_list(*args):
     return sorted([x for x in filter(bool, list(set(result)))])
 
 
-def is_exclusive_match(logic, data):
+def is_exclusive_match(logic, data, match_all='all'):
     """
 
     The data variable should always be a set of strings that the logic can be
@@ -547,21 +547,22 @@ def is_exclusive_match(logic, data):
         logic=[('tagB', 'tagC')]          = tagB and tagC
     """
 
-    if logic is None:
-        # If there is no logic to apply then we're done early
-        return True
-
-    elif isinstance(logic, six.string_types):
+    if isinstance(logic, six.string_types):
         # Update our logic to support our delimiters
         logic = set(parse_list(logic))
+
+    if not logic:
+        # If there is no logic to apply then we're done early; we only match
+        # if there is also no data to match against
+        return not data
 
     if not isinstance(logic, (list, tuple, set)):
         # garbage input
         return False
 
-    # using the data detected; determine if we'll allow the
-    # notification to be sent or not
-    matched = (len(logic) == 0)
+    # Track what we match against; but by default we do not match
+    # against anything
+    matched = False
 
     # Every entry here will be or'ed with the next
     for entry in logic:
@@ -573,7 +574,7 @@ def is_exclusive_match(logic, data):
         # must exist in the notification service
         entries = set(parse_list(entry))
 
-        if len(entries.intersection(data)) == len(entries):
+        if len(entries.intersection(data.union({match_all}))) == len(entries):
             # our set contains all of the entries found
             # in our notification data set
             matched = True

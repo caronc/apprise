@@ -68,7 +68,7 @@ def test_apprise_cli(tmpdir):
             super(BadNotification, self).__init__(*args, **kwargs)
 
         def notify(self, **kwargs):
-            # Pretend everything is okay
+            # Force a notification failure
             return False
 
         def url(self):
@@ -120,6 +120,16 @@ def test_apprise_cli(tmpdir):
     ])
     assert result.exit_code == 1
 
+    # Testing with the --dry-run flag reveals a successful response since we
+    # don't actually execute the bad:// notification; we only display it
+    result = runner.invoke(cli.main, [
+        '-t', 'test title',
+        '-b', 'test body',
+        'bad://localhost',
+        '--dry-run',
+    ])
+    assert result.exit_code == 0
+
     # Write a simple text based configuration file
     t = tmpdir.mkdir("apprise-obj").join("apprise")
     buf = """
@@ -128,13 +138,14 @@ def test_apprise_cli(tmpdir):
     """
     t.write(buf)
 
-    # This will read our configuration and send 2 notices to
-    # each of the above defined good:// entries
+    # This will read our configuration and not send any notices at all
+    # because we assigned tags to all of our urls and didn't identify
+    # a specific match below.
     result = runner.invoke(cli.main, [
         '-b', 'test config',
         '--config', str(t),
     ])
-    assert result.exit_code == 0
+    assert result.exit_code == 2
 
     # This will send out 1 notification because our tag matches
     # one of the entries above
@@ -143,17 +154,6 @@ def test_apprise_cli(tmpdir):
         '-b', 'has taga',
         '--config', str(t),
         '--tag', 'taga',
-    ])
-    assert result.exit_code == 0
-
-    # This will send out 0 notification because our tag requests that we meet
-    # at least 2 tags associated with the same notification service (which
-    # isn't the case above)
-    # translation: has taga AND tagd
-    result = runner.invoke(cli.main, [
-        '-b', 'has taga AND tagd',
-        '--config', str(t),
-        '--tag', 'taga,tagd',
     ])
     assert result.exit_code == 0
 
@@ -166,6 +166,66 @@ def test_apprise_cli(tmpdir):
         '--tag', 'taga',
         '--tag', 'tagc',
         '--tag', 'tagd',
+    ])
+    assert result.exit_code == 0
+
+    # Write a simple text based configuration file
+    t = tmpdir.mkdir("apprise-obj2").join("apprise-test2")
+    buf = """
+    good://localhost/1
+    good://localhost/2
+    good://localhost/3
+    good://localhost/4
+    good://localhost/5
+    myTag=good://localhost/6
+    """
+    t.write(buf)
+
+    # This will read our configuration and send a notification to
+    # the first 5 entries in the list, but not the one that has
+    # the tag associated with it
+    result = runner.invoke(cli.main, [
+        '-b', 'test config',
+        '--config', str(t),
+    ])
+    assert result.exit_code == 0
+
+    # This will fail because nothing matches mytag. It's case sensitive
+    # and we would only actually match against myTag
+    result = runner.invoke(cli.main, [
+        '-b', 'has taga',
+        '--config', str(t),
+        '--tag', 'mytag',
+    ])
+    assert result.exit_code == 2
+
+    # Same command as the one identified above except we set the --dry-run
+    # flag. This causes our list of matched results to be printed only.
+    # However, since we don't match anything; we still fail with a return code
+    # of 2.
+    result = runner.invoke(cli.main, [
+        '-b', 'has taga',
+        '--config', str(t),
+        '--tag', 'mytag',
+        '--dry-run'
+    ])
+    assert result.exit_code == 2
+
+    # Here is a case where we get what was expected
+    result = runner.invoke(cli.main, [
+        '-b', 'has taga',
+        '--config', str(t),
+        '--tag', 'myTag',
+    ])
+    assert result.exit_code == 0
+
+    # Testing with the --dry-run flag reveals the same positive results
+    # because there was at least one match
+    result = runner.invoke(cli.main, [
+        '-b', 'has taga',
+        '--config', str(t),
+        '--tag', 'myTag',
+        '--dry-run',
     ])
     assert result.exit_code == 0
 

@@ -111,13 +111,17 @@ def print_version_msg():
               'which services to notify. Use multiple --tag (-g) entries to '
               '"OR" the tags together and comma separated to "AND" them. '
               'If no tags are specified then all services are notified.')
-@click.option('-v', '--verbose', count=True)
-@click.option('-V', '--version', is_flag=True,
+@click.option('--dry-run', '-d', is_flag=True,
+              help='Perform a trial run but only prints the notification '
+              'services to-be triggered to the screen instead of actually '
+              'performing the action.')
+@click.option('--verbose', '-v', count=True)
+@click.option('--version', '-V', is_flag=True,
               help='Display the apprise version and exit.')
 @click.argument('urls', nargs=-1,
                 metavar='SERVER_URL [SERVER_URL2 [SERVER_URL3]]',)
-def main(body, title, config, urls, notification_type, theme, tag, verbose,
-         version):
+def main(body, title, config, urls, notification_type, theme, tag, dry_run,
+         verbose, version):
     """
     Send a notification to all of the specified servers identified by their
     URLs the content provided within the title, body and notification-type.
@@ -185,6 +189,7 @@ def main(body, title, config, urls, notification_type, theme, tag, verbose,
         sys.exit(1)
 
     if body is None:
+        logger.trace('Reading from stdin')
         # if no body was specified, then read from STDIN
         body = click.get_text_stream('stdin').read()
 
@@ -192,8 +197,40 @@ def main(body, title, config, urls, notification_type, theme, tag, verbose,
     # we or each of of the --tag and sets specified.
     tags = None if not tag else [parse_list(t) for t in tag]
 
-    # now print it out
-    if a.notify(
-            body=body, title=title, notify_type=notification_type, tag=tags):
-        sys.exit(0)
-    sys.exit(1)
+    if not dry_run:
+        # now print it out
+        result = a.notify(
+            body=body, title=title, notify_type=notification_type, tag=tags)
+    else:
+        click.secho("Apprise Matched Notifications", bold=True)
+        # Number of rows to assume in the terminal.  In future, maybe this can
+        # be detected and made dynamic
+        rows = 75
+
+        # Initialize our URL response;  This is populated within the for/loop
+        # below; but plays a factor at the end when we need to determine if
+        # we iterated at least once in the loop.
+        url = None
+
+        for idx, server in enumerate(a.find(tag=tags)):
+            url = server.url()
+            click.echo("{: 3d}. {}".format(
+                idx + 1,
+                url if len(url) <= rows else '{}...'.format(url[:rows - 3])))
+
+        # Initialize a default response of nothing matched, otherwise
+        # if we matched at least one entry, we can return True
+        result = None if url is None else True
+
+    if result is None:
+        # There were no notifications set.  This is a result of just having
+        # empty configuration files and/or being to restrictive when filtering
+        # by specific tag(s)
+        sys.exit(2)
+
+    elif result is False:
+        # At least 1 notification service failed to send
+        sys.exit(1)
+
+    # else:  We're good!
+    sys.exit(0)

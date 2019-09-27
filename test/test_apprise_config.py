@@ -307,6 +307,8 @@ def test_apprise_config_tagging(tmpdir):
     assert len(ac.servers(tag='a,b')) == 3
     # Now filter: a and b
     assert len(ac.servers(tag=[('a', 'b')])) == 1
+    # all matches everything
+    assert len(ac.servers(tag='all')) == 3
 
 
 def test_apprise_instantiate():
