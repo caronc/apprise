@@ -1,5 +1,5 @@
 ---
-name: 💡 New Notification Request
+name: 📣 New Notification Request
 about: Suggest a new notification service that you'd like to see Apprise support
 title: ''
 labels: 'enhancement'

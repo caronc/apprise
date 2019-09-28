@@ -1,6 +1,6 @@
 ---
 name: 🐛 Bug Report
-about: Report any errors and probems
+about: Report any errors and problems
 title: ''
 labels: 'bug'
 assignees: ''
