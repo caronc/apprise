@@ -23,6 +23,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 from __future__ import print_function
+import re
 import mock
 from apprise import cli
 from apprise import NotifyBase
@@ -61,7 +62,7 @@ def test_apprise_cli(tmpdir):
 
         def url(self):
             # Support url()
-            return ''
+            return 'good://'
 
     class BadNotification(NotifyBase):
         def __init__(self, *args, **kwargs):
@@ -73,7 +74,7 @@ def test_apprise_cli(tmpdir):
 
         def url(self):
             # Support url()
-            return ''
+            return 'bad://'
 
     # Set up our notification types
     SCHEMA_MAP['good'] = GoodNotification
@@ -189,6 +190,21 @@ def test_apprise_cli(tmpdir):
         '--config', str(t),
     ])
     assert result.exit_code == 0
+
+    # As a way of ensuring we match the first 5 entries, we can run a
+    # --dry-run against the same result set above and verify the output
+    result = runner.invoke(cli.main, [
+        '-b', 'test config',
+        '--config', str(t),
+        '--dry-run',
+    ])
+    assert result.exit_code == 0
+    lines = re.split(r'[\r\n]', result.output.strip())
+    # 5 lines of all good:// entries matched + header
+    assert len(lines) == 6
+    # Verify we match against the remaining good:// entries
+    for i in range(1, 6):
+        assert lines[i].endswith('good://')
 
     # This will fail because nothing matches mytag. It's case sensitive
     # and we would only actually match against myTag
