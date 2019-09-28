@@ -519,6 +519,20 @@ class Apprise(object):
         # If we reach here, then we indexed out of range
         raise IndexError('list index out of range')
 
+    def __bool__(self):
+        """
+        Allows the Apprise object to be wrapped in an Python 3.x based 'if
+        statement'.  True is returned if at least one service has been loaded.
+        """
+        return len(self) > 0
+
+    def __nonzero__(self):
+        """
+        Allows the Apprise object to be wrapped in an Python 2.x based 'if
+        statement'.  True is returned if at least one service has been loaded.
+        """
+        return len(self) > 0
+
     def __iter__(self):
         """
         Returns an iterator to each of our servers loaded. This includes those
