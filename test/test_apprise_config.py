@@ -55,6 +55,10 @@ def test_apprise_config(tmpdir):
     # There are no servers loaded
     assert len(ac) == 0
 
+    # Object can be directly checked as a boolean; response is False
+    # when there are no entries loaded
+    assert not ac
+
     # lets try anyway
     assert len(ac.servers()) == 0
 
@@ -82,6 +86,10 @@ def test_apprise_config(tmpdir):
 
     # One configuration file should have been found
     assert len(ac) == 1
+
+    # Object can be directly checked as a boolean; response is True
+    # when there is at least one entry
+    assert ac
 
     # We should be able to read our 3 servers from that
     assert len(ac.servers()) == 3

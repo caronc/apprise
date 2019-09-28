@@ -68,6 +68,10 @@ def test_apprise():
     # no items
     assert(len(a) == 0)
 
+    # Apprise object can also be directly tested with 'if' keyword
+    # No entries results in a False response
+    assert(not a)
+
     # Create an Asset object
     asset = AppriseAsset(theme='default')
 
@@ -84,6 +88,10 @@ def test_apprise():
 
     # 2 servers loaded
     assert(len(a) == 2)
+
+    # Apprise object can also be directly tested with 'if' keyword
+    # At least one entry results in a True response
+    assert(a)
 
     # We can retrieve our URLs this way:
     assert(len(a.urls()) == 2)
