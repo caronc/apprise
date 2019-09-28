@@ -568,7 +568,7 @@ class NotifySNS(NotifyBase):
 
         return response
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -583,8 +583,12 @@ class NotifySNS(NotifyBase):
         return '{schema}://{key_id}/{key_secret}/{region}/{targets}/'\
             '?{args}'.format(
                 schema=self.secure_protocol,
-                key_id=NotifySNS.quote(self.aws_access_key_id, safe=''),
-                key_secret=NotifySNS.quote(
+                key_id='{}...{}'.format(
+                    self.aws_access_key_id[0:1], self.aws_access_key_id[-1:])
+                if privacy else NotifySNS.quote(
+                    self.aws_access_key_id, safe=''),
+                key_secret='****'
+                if privacy else NotifySNS.quote(
                     self.aws_secret_access_key, safe=''),
                 region=NotifySNS.quote(self.aws_region_name, safe=''),
                 targets='/'.join(

@@ -285,7 +285,7 @@ class NotifyPushed(NotifyBase):
 
         return True
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -299,8 +299,10 @@ class NotifyPushed(NotifyBase):
 
         return '{schema}://{app_key}/{app_secret}/{targets}/?{args}'.format(
             schema=self.secure_protocol,
-            app_key=NotifyPushed.quote(self.app_key, safe=''),
-            app_secret=NotifyPushed.quote(self.app_secret, safe=''),
+            app_key='{}...{}'.format(self.app_key[0:1], self.app_key[-1:])
+            if privacy else NotifyPushed.quote(self.app_key, safe=''),
+            app_secret='****'
+            if privacy else NotifyPushed.quote(self.app_secret, safe=''),
             targets='/'.join(
                 [NotifyPushed.quote(x) for x in chain(
                     # Channels are prefixed with a pound/hashtag symbol

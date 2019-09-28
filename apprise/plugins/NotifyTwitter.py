@@ -558,7 +558,7 @@ class NotifyTwitter(NotifyBase):
         """
         return 10000 if self.mode == TwitterMessageMode.DM else 280
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -578,10 +578,14 @@ class NotifyTwitter(NotifyBase):
         return '{schema}://{ckey}/{csecret}/{akey}/{asecret}' \
             '/{targets}/?{args}'.format(
                 schema=self.secure_protocol[0],
-                ckey=NotifyTwitter.quote(self.ckey, safe=''),
-                asecret=NotifyTwitter.quote(self.csecret, safe=''),
-                akey=NotifyTwitter.quote(self.akey, safe=''),
-                csecret=NotifyTwitter.quote(self.asecret, safe=''),
+                ckey='{}...{}'.format(self.ckey[0:1], self.ckey[-1:])
+                if privacy else NotifyTwitter.quote(self.ckey, safe=''),
+                asecret='****'
+                if privacy else NotifyTwitter.quote(self.csecret, safe=''),
+                akey='{}...{}'.format(self.akey[0:1], self.akey[-1:])
+                if privacy else NotifyTwitter.quote(self.akey, safe=''),
+                csecret='****'
+                if privacy else NotifyTwitter.quote(self.asecret, safe=''),
                 targets='/'.join(
                     [NotifyTwitter.quote('@{}'.format(target), safe='')
                      for target in self.targets]),

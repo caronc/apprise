@@ -581,7 +581,7 @@ class NotifyEmby(NotifyBase):
 
         return not has_error
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -599,7 +599,8 @@ class NotifyEmby(NotifyBase):
         if self.user and self.password:
             auth = '{user}:{password}@'.format(
                 user=NotifyEmby.quote(self.user, safe=''),
-                password=NotifyEmby.quote(self.password, safe=''),
+                password='****'
+                if privacy else NotifyEmby.quote(self.password, safe=''),
             )
         else:  # self.user is set
             auth = '{user}@'.format(

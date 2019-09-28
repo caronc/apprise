@@ -280,7 +280,7 @@ class NotifyMatterMost(NotifyBase):
         # Return our overall status
         return not has_error
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -302,15 +302,27 @@ class NotifyMatterMost(NotifyBase):
         default_port = 443 if self.secure else self.default_port
         default_schema = self.secure_protocol if self.secure else self.protocol
 
+        # Determine if there is a botname present
+        botname = ''
+        if self.user:
+            botname = '{botname}@'.format(
+                botname=NotifyMatterMost.quote(self.user, safe=''),
+            )
+
         return \
-            '{schema}://{hostname}{port}{fullpath}{authtoken}/?{args}'.format(
+            '{schema}://{botname}{hostname}{port}{fullpath}{authtoken}' \
+            '/?{args}'.format(
                 schema=default_schema,
+                botname=botname,
                 hostname=NotifyMatterMost.quote(self.host, safe=''),
                 port='' if not self.port or self.port == default_port
                      else ':{}'.format(self.port),
                 fullpath='/' if not self.fullpath else '{}/'.format(
                     NotifyMatterMost.quote(self.fullpath, safe='/')),
-                authtoken=NotifyMatterMost.quote(self.authtoken, safe=''),
+                authtoken='{}...{}'.format(
+                    self.authtoken[0:1], self.authtoken[-1:])
+                if privacy else NotifyMatterMost.quote(
+                    self.authtoken, safe=''),
                 args=NotifyMatterMost.urlencode(args),
             )
 

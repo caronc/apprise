@@ -618,7 +618,7 @@ class NotifyEmail(NotifyBase):
 
         return not has_error
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -652,7 +652,8 @@ class NotifyEmail(NotifyBase):
         if self.user and self.password:
             auth = '{user}:{password}@'.format(
                 user=NotifyEmail.quote(user, safe=''),
-                password=NotifyEmail.quote(self.password, safe=''),
+                password='****'
+                if privacy else NotifyEmail.quote(self.password, safe=''),
             )
         else:
             # user url

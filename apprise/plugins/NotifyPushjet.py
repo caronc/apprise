@@ -115,7 +115,7 @@ class NotifyPushjet(NotifyBase):
         # store our key
         self.secret_key = secret_key
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -124,7 +124,7 @@ class NotifyPushjet(NotifyBase):
         args = {
             'format': self.notify_format,
             'overflow': self.overflow_mode,
-            'secret': self.secret_key,
+            'secret': '****' if privacy else self.secret_key,
             'verify': 'yes' if self.verify_certificate else 'no',
         }
 
@@ -135,7 +135,8 @@ class NotifyPushjet(NotifyBase):
         if self.user and self.password:
             auth = '{user}:{password}@'.format(
                 user=NotifyPushjet.quote(self.user, safe=''),
-                password=NotifyPushjet.quote(self.password, safe=''),
+                password='****'
+                if privacy else NotifyPushjet.quote(self.password, safe=''),
             )
 
         return '{schema}://{auth}{hostname}{port}/?{args}'.format(

@@ -279,7 +279,7 @@ class NotifyRocketChat(NotifyBase):
 
         return
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -297,13 +297,15 @@ class NotifyRocketChat(NotifyBase):
         if self.mode == RocketChatAuthMode.BASIC:
             auth = '{user}:{password}@'.format(
                 user=NotifyRocketChat.quote(self.user, safe=''),
-                password=NotifyRocketChat.quote(self.password, safe=''),
+                password='****'
+                if privacy else NotifyRocketChat.quote(self.password, safe=''),
             )
         else:
             auth = '{user}{webhook}@'.format(
                 user='{}:'.format(NotifyRocketChat.quote(self.user, safe=''))
                 if self.user else '',
-                webhook=NotifyRocketChat.quote(self.webhook, safe=''),
+                webhook='{}...{}'.format(self.webhook[0:1], self.webhook[-1:])
+                if privacy else NotifyRocketChat.quote(self.webhook, safe=''),
             )
 
         default_port = 443 if self.secure else 80

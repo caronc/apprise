@@ -188,7 +188,7 @@ class NotifyTechulusPush(NotifyBase):
 
         return True
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -202,7 +202,8 @@ class NotifyTechulusPush(NotifyBase):
 
         return '{schema}://{apikey}/?{args}'.format(
             schema=self.secure_protocol,
-            apikey=NotifyTechulusPush.quote(self.apikey, safe=''),
+            apikey='{}...{}'.format(self.apikey[0:1], self.apikey[-1:])
+            if privacy else NotifyTechulusPush.quote(self.apikey, safe=''),
             args=NotifyTechulusPush.urlencode(args),
         )
 

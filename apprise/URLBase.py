@@ -183,7 +183,7 @@ class URLBase(object):
         self._last_io_datetime = datetime.now()
         return
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Assembles the URL associated with the notification based on the
         arguments provied.

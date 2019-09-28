@@ -296,7 +296,7 @@ class NotifyXBMC(NotifyBase):
 
         return True
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -315,7 +315,8 @@ class NotifyXBMC(NotifyBase):
         if self.user and self.password:
             auth = '{user}:{password}@'.format(
                 user=NotifyXBMC.quote(self.user, safe=''),
-                password=NotifyXBMC.quote(self.password, safe=''),
+                password='****'
+                if privacy else NotifyXBMC.quote(self.password, safe=''),
             )
         elif self.user:
             auth = '{user}@'.format(
@@ -327,7 +328,7 @@ class NotifyXBMC(NotifyBase):
         default_port = 443 if self.secure else self.xbmc_default_port
         if self.secure:
             # Append 's' to schema
-            default_schema + 's'
+            default_schema += 's'
 
         return '{schema}://{auth}{hostname}{port}/?{args}'.format(
             schema=default_schema,

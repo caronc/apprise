@@ -263,7 +263,7 @@ class NotifySimplePush(NotifyBase):
 
         return True
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -281,15 +281,20 @@ class NotifySimplePush(NotifyBase):
         # Determine Authentication
         auth = ''
         if self.user and self.password:
-            auth = '{salt}:{password}@'.format(
-                salt=NotifySimplePush.quote(self.user, safe=''),
-                password=NotifySimplePush.quote(self.password, safe=''),
-            )
+            if privacy:
+                auth = '****:****@'
+
+            else:
+                auth = '{salt}:{password}@'.format(
+                    salt=NotifySimplePush.quote(self.user, safe=''),
+                    password=NotifySimplePush.quote(self.password, safe=''),
+                )
 
         return '{schema}://{auth}{apikey}/?{args}'.format(
             schema=self.secure_protocol,
             auth=auth,
-            apikey=NotifySimplePush.quote(self.apikey, safe=''),
+            apikey='{}...{}'.format(self.apikey[0:1], self.apikey[-1:])
+            if privacy else NotifySimplePush.quote(self.apikey, safe=''),
             args=NotifySimplePush.urlencode(args),
         )
 

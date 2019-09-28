@@ -138,7 +138,7 @@ class NotifyXML(NotifyBase):
 
         return
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -158,7 +158,8 @@ class NotifyXML(NotifyBase):
         if self.user and self.password:
             auth = '{user}:{password}@'.format(
                 user=NotifyXML.quote(self.user, safe=''),
-                password=NotifyXML.quote(self.password, safe=''),
+                password='****'
+                if privacy else NotifyXML.quote(self.password, safe=''),
             )
         elif self.user:
             auth = '{user}@'.format(

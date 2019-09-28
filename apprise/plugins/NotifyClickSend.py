@@ -265,7 +265,7 @@ class NotifyClickSend(NotifyBase):
 
         return not has_error
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -281,7 +281,8 @@ class NotifyClickSend(NotifyBase):
         # Setup Authentication
         auth = '{user}:{password}@'.format(
             user=NotifyClickSend.quote(self.user, safe=''),
-            password=NotifyClickSend.quote(self.password, safe=''),
+            password='****'
+            if privacy else NotifyClickSend.quote(self.password, safe=''),
         )
 
         return '{schema}://{auth}{targets}?{args}'.format(

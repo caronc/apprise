@@ -388,7 +388,7 @@ class NotifyPushover(NotifyBase):
 
         return not has_error
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -424,12 +424,12 @@ class NotifyPushover(NotifyBase):
             # it from the devices list
             devices = ''
 
-        return '{schema}://{auth}{token}/{devices}/?{args}'.format(
+        return '{schema}://{user_key}@{token}/{devices}/?{args}'.format(
             schema=self.secure_protocol,
-            auth='' if not self.user
-                 else '{user}@'.format(
-                     user=NotifyPushover.quote(self.user, safe='')),
-            token=NotifyPushover.quote(self.token, safe=''),
+            user_key='{}...{}'.format(self.user[0:1], self.user[-1:])
+            if privacy else NotifyPushover.quote(self.user, safe=''),
+            token='{}...{}'.format(self.token[0:1], self.token[-1:])
+            if privacy else NotifyPushover.quote(self.token, safe=''),
             devices=devices,
             args=NotifyPushover.urlencode(args))
 

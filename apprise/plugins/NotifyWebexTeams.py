@@ -210,7 +210,7 @@ class NotifyWebexTeams(NotifyBase):
 
         return True
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -224,7 +224,8 @@ class NotifyWebexTeams(NotifyBase):
 
         return '{schema}://{token}/?{args}'.format(
             schema=self.secure_protocol,
-            token=NotifyWebexTeams.quote(self.token, safe=''),
+            token='{}...{}'.format(self.token[0:1], self.token[-1:])
+            if privacy else NotifyWebexTeams.quote(self.token, safe=''),
             args=NotifyWebexTeams.urlencode(args),
         )
 

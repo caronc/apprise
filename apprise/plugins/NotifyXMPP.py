@@ -344,7 +344,7 @@ class NotifyXMPP(NotifyBase):
 
         return True
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -374,9 +374,13 @@ class NotifyXMPP(NotifyBase):
         default_schema = self.secure_protocol if self.secure else self.protocol
 
         if self.user and self.password:
-            auth = '{}:{}'.format(
-                NotifyXMPP.quote(self.user, safe=''),
-                NotifyXMPP.quote(self.password, safe=''))
+            auth = '{user}:{password}'.format(
+                user=NotifyXMPP.quote(self.user, safe=''),
+                password='****'
+                if privacy else NotifyXMPP.quote(self.password, safe=''))
+
+        elif privacy:
+            auth = '****'
 
         else:
             auth = self.password if self.password else self.user

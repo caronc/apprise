@@ -120,7 +120,7 @@ class NotifyJSON(NotifyBase):
 
         return
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -140,7 +140,8 @@ class NotifyJSON(NotifyBase):
         if self.user and self.password:
             auth = '{user}:{password}@'.format(
                 user=NotifyJSON.quote(self.user, safe=''),
-                password=NotifyJSON.quote(self.password, safe=''),
+                password='****'
+                if privacy else NotifyJSON.quote(self.password, safe=''),
             )
         elif self.user:
             auth = '{user}@'.format(

@@ -374,7 +374,7 @@ class NotifyTwilio(NotifyBase):
 
         return not has_error
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -388,8 +388,11 @@ class NotifyTwilio(NotifyBase):
 
         return '{schema}://{sid}:{token}@{source}/{targets}/?{args}'.format(
             schema=self.secure_protocol,
-            sid=self.account_sid,
-            token=self.auth_token,
+            sid='{}...{}'.format(
+                self.account_sid[0:3], self.account_sid[-1:])
+            if privacy else NotifyTwilio.quote(self.account_sid, safe=''),
+            token='{}...{}'.format(self.auth_token[0:1], self.auth_token[-1:])
+            if privacy else NotifyTwilio.quote(self.auth_token, safe=''),
             source=NotifyTwilio.quote(self.source, safe=''),
             targets='/'.join(
                 [NotifyTwilio.quote(x, safe='') for x in self.targets]),

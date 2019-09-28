@@ -223,7 +223,7 @@ class NotifyGotify(NotifyBase):
 
         return True
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -243,7 +243,8 @@ class NotifyGotify(NotifyBase):
             hostname=NotifyGotify.quote(self.host, safe=''),
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
-            token=NotifyGotify.quote(self.token, safe=''),
+            token='{}...{}'.format(self.token[0:1], self.token[-1:])
+            if privacy else NotifyGotify.quote(self.token, safe=''),
             args=NotifyGotify.urlencode(args),
         )
 

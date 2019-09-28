@@ -89,7 +89,7 @@ class ConfigHTTP(ConfigBase):
 
         return
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -111,7 +111,8 @@ class ConfigHTTP(ConfigBase):
         if self.user and self.password:
             auth = '{user}:{password}@'.format(
                 user=self.quote(self.user, safe=''),
-                password=self.quote(self.password, safe=''),
+                password='****'
+                if privacy else self.quote(self.password, safe=''),
             )
         elif self.user:
             auth = '{user}@'.format(

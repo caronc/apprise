@@ -309,7 +309,7 @@ class NotifyDiscord(NotifyBase):
 
         return True
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -328,8 +328,12 @@ class NotifyDiscord(NotifyBase):
 
         return '{schema}://{webhook_id}/{webhook_token}/?{args}'.format(
             schema=self.secure_protocol,
-            webhook_id=NotifyDiscord.quote(self.webhook_id, safe=''),
-            webhook_token=NotifyDiscord.quote(self.webhook_token, safe=''),
+            webhook_id='{}...{}'.format(
+                self.webhook_id[0:1], self.webhook_id[-1:])
+            if privacy else NotifyDiscord.quote(self.webhook_id, safe=''),
+            webhook_token='{}...{}'.format(
+                self.webhook_token[0:1], self.webhook_token[-1:])
+            if privacy else NotifyDiscord.quote(self.webhook_token, safe=''),
             args=NotifyDiscord.urlencode(args),
         )
 

@@ -380,7 +380,7 @@ class NotifyD7Networks(NotifyBase):
 
         return not has_error
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -402,7 +402,8 @@ class NotifyD7Networks(NotifyBase):
         return '{schema}://{user}:{password}@{targets}/?{args}'.format(
             schema=self.secure_protocol,
             user=NotifyD7Networks.quote(self.user, safe=''),
-            password=NotifyD7Networks.quote(self.password, safe=''),
+            password='****'
+            if privacy else NotifyD7Networks.quote(self.password, safe=''),
             targets='/'.join(
                 [NotifyD7Networks.quote(x, safe='') for x in self.targets]),
             args=NotifyD7Networks.urlencode(args))

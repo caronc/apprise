@@ -334,7 +334,7 @@ class NotifyNexmo(NotifyBase):
 
         return not has_error
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -349,8 +349,10 @@ class NotifyNexmo(NotifyBase):
 
         return '{schema}://{key}:{secret}@{source}/{targets}/?{args}'.format(
             schema=self.secure_protocol,
-            key=self.apikey,
-            secret=self.secret,
+            key='{}...{}'.format(self.apikey[0:1], self.apikey[-1:])
+            if privacy else NotifyNexmo.quote(self.apikey, safe=''),
+            secret='****'
+            if privacy else NotifyNexmo.quote(self.secret, safe=''),
             source=NotifyNexmo.quote(self.source, safe=''),
             targets='/'.join(
                 [NotifyNexmo.quote(x, safe='') for x in self.targets]),
