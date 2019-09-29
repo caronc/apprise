@@ -45,6 +45,7 @@ import requests
 from json import loads
 
 from .NotifyBase import NotifyBase
+from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..utils import parse_list
 from ..AppriseLocale import gettext_lazy as _
@@ -388,11 +389,9 @@ class NotifyTwilio(NotifyBase):
 
         return '{schema}://{sid}:{token}@{source}/{targets}/?{args}'.format(
             schema=self.secure_protocol,
-            sid='{}...{}'.format(
-                self.account_sid[0:3], self.account_sid[-1:])
-            if privacy else NotifyTwilio.quote(self.account_sid, safe=''),
-            token='{}...{}'.format(self.auth_token[0:1], self.auth_token[-1:])
-            if privacy else NotifyTwilio.quote(self.auth_token, safe=''),
+            sid=self.pprint(
+                self.account_sid, privacy, mode=PrivacyMode.Tail, safe=''),
+            token=self.pprint(self.auth_token, privacy, safe=''),
             source=NotifyTwilio.quote(self.source, safe=''),
             targets='/'.join(
                 [NotifyTwilio.quote(x, safe='') for x in self.targets]),

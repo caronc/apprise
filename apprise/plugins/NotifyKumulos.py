@@ -228,11 +228,8 @@ class NotifyKumulos(NotifyBase):
 
         return '{schema}://{apikey}/{serverkey}/?{args}'.format(
             schema=self.secure_protocol,
-            apikey='{}...{}'.format(self.apikey[0:1], self.apikey[-1:])
-            if privacy else NotifyKumulos.quote(self.apikey, safe=''),
-            serverkey='{}...{}'.format(
-                self.serverkey[0:1], self.serverkey[-1:])
-            if privacy else NotifyKumulos.quote(self.serverkey, safe=''),
+            apikey=self.pprint(self.apikey, privacy, safe=''),
+            serverkey=self.pprint(self.serverkey, privacy, safe=''),
             args=NotifyKumulos.urlencode(args),
         )
 

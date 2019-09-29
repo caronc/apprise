@@ -42,6 +42,7 @@ from json import dumps
 from base64 import b64encode
 
 from .NotifyBase import NotifyBase
+from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..utils import parse_list
 from ..utils import parse_bool
@@ -281,8 +282,8 @@ class NotifyClickSend(NotifyBase):
         # Setup Authentication
         auth = '{user}:{password}@'.format(
             user=NotifyClickSend.quote(self.user, safe=''),
-            password='****'
-            if privacy else NotifyClickSend.quote(self.password, safe=''),
+            password=self.pprint(
+                self.password, privacy, mode=PrivacyMode.Secret, safe=''),
         )
 
         return '{schema}://{auth}{targets}?{args}'.format(

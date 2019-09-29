@@ -28,6 +28,7 @@ import ssl
 from os.path import isfile
 
 from .NotifyBase import NotifyBase
+from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..utils import parse_list
 from ..AppriseLocale import gettext_lazy as _
@@ -376,14 +377,13 @@ class NotifyXMPP(NotifyBase):
         if self.user and self.password:
             auth = '{user}:{password}'.format(
                 user=NotifyXMPP.quote(self.user, safe=''),
-                password='****'
-                if privacy else NotifyXMPP.quote(self.password, safe=''))
-
-        elif privacy:
-            auth = '****'
+                password=self.pprint(
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=''))
 
         else:
-            auth = self.password if self.password else self.user
+            auth = self.pprint(
+                self.password if self.password else self.user, privacy,
+                mode=PrivacyMode.Secret, safe='')
 
         return '{schema}://{auth}@{hostname}{port}/{jids}?{args}'.format(
             auth=auth,

@@ -29,6 +29,7 @@ from json import dumps
 from itertools import chain
 
 from .NotifyBase import NotifyBase
+from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..utils import parse_list
 from ..AppriseLocale import gettext_lazy as _
@@ -299,10 +300,9 @@ class NotifyPushed(NotifyBase):
 
         return '{schema}://{app_key}/{app_secret}/{targets}/?{args}'.format(
             schema=self.secure_protocol,
-            app_key='{}...{}'.format(self.app_key[0:1], self.app_key[-1:])
-            if privacy else NotifyPushed.quote(self.app_key, safe=''),
-            app_secret='****'
-            if privacy else NotifyPushed.quote(self.app_secret, safe=''),
+            app_key=self.pprint(self.app_key, privacy, safe=''),
+            app_secret=self.pprint(
+                self.app_secret, privacy, mode=PrivacyMode.Secret, safe=''),
             targets='/'.join(
                 [NotifyPushed.quote(x) for x in chain(
                     # Channels are prefixed with a pound/hashtag symbol

@@ -224,8 +224,7 @@ class NotifyWebexTeams(NotifyBase):
 
         return '{schema}://{token}/?{args}'.format(
             schema=self.secure_protocol,
-            token='{}...{}'.format(self.token[0:1], self.token[-1:])
-            if privacy else NotifyWebexTeams.quote(self.token, safe=''),
+            token=self.pprint(self.token, privacy, safe=''),
             args=NotifyWebexTeams.urlencode(args),
         )
 

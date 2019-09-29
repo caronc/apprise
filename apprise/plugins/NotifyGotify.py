@@ -243,8 +243,7 @@ class NotifyGotify(NotifyBase):
             hostname=NotifyGotify.quote(self.host, safe=''),
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
-            token='{}...{}'.format(self.token[0:1], self.token[-1:])
-            if privacy else NotifyGotify.quote(self.token, safe=''),
+            token=self.pprint(self.token, privacy, safe=''),
             args=NotifyGotify.urlencode(args),
         )
 

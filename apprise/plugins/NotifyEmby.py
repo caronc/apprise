@@ -35,6 +35,7 @@ from json import dumps
 from json import loads
 
 from .NotifyBase import NotifyBase
+from ..URLBase import PrivacyMode
 from ..utils import parse_bool
 from ..common import NotifyType
 from .. import __version__ as VERSION
@@ -599,8 +600,8 @@ class NotifyEmby(NotifyBase):
         if self.user and self.password:
             auth = '{user}:{password}@'.format(
                 user=NotifyEmby.quote(self.user, safe=''),
-                password='****'
-                if privacy else NotifyEmby.quote(self.password, safe=''),
+                password=self.pprint(
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
             )
         else:  # self.user is set
             auth = '{user}@'.format(

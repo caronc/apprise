@@ -31,6 +31,7 @@ from json import dumps
 from itertools import chain
 
 from .NotifyBase import NotifyBase
+from ..URLBase import PrivacyMode
 from ..common import NotifyImageSize
 from ..common import NotifyFormat
 from ..common import NotifyType
@@ -297,15 +298,14 @@ class NotifyRocketChat(NotifyBase):
         if self.mode == RocketChatAuthMode.BASIC:
             auth = '{user}:{password}@'.format(
                 user=NotifyRocketChat.quote(self.user, safe=''),
-                password='****'
-                if privacy else NotifyRocketChat.quote(self.password, safe=''),
+                password=self.pprint(
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
             )
         else:
             auth = '{user}{webhook}@'.format(
                 user='{}:'.format(NotifyRocketChat.quote(self.user, safe=''))
                 if self.user else '',
-                webhook='{}...{}'.format(self.webhook[0:1], self.webhook[-1:])
-                if privacy else NotifyRocketChat.quote(self.webhook, safe=''),
+                webhook=self.pprint(self.webhook, privacy, safe=''),
             )
 
         default_port = 443 if self.secure else 80

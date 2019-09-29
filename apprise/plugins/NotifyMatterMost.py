@@ -319,10 +319,7 @@ class NotifyMatterMost(NotifyBase):
                      else ':{}'.format(self.port),
                 fullpath='/' if not self.fullpath else '{}/'.format(
                     NotifyMatterMost.quote(self.fullpath, safe='/')),
-                authtoken='{}...{}'.format(
-                    self.authtoken[0:1], self.authtoken[-1:])
-                if privacy else NotifyMatterMost.quote(
-                    self.authtoken, safe=''),
+                authtoken=self.pprint(self.authtoken, privacy, safe=''),
                 args=NotifyMatterMost.urlencode(args),
             )
 

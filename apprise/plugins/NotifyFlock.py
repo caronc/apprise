@@ -320,8 +320,7 @@ class NotifyFlock(NotifyBase):
         return '{schema}://{token}/{targets}?{args}'\
             .format(
                 schema=self.secure_protocol,
-                token='{}...{}'.format(self.token[0:1], self.token[-1:])
-                if privacy else NotifyFlock.quote(self.token, safe=''),
+                token=self.pprint(self.token, privacy, safe=''),
                 targets='/'.join(
                     [NotifyFlock.quote(target, safe='')
                      for target in self.targets]),

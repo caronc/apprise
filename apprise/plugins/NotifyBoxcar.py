@@ -38,6 +38,7 @@ except ImportError:
     from urllib.parse import urlparse
 
 from .NotifyBase import NotifyBase
+from ..URLBase import PrivacyMode
 from ..utils import parse_bool
 from ..common import NotifyType
 from ..common import NotifyImageSize
@@ -345,10 +346,9 @@ class NotifyBoxcar(NotifyBase):
 
         return '{schema}://{access}/{secret}/{targets}?{args}'.format(
             schema=self.secure_protocol,
-            access='{}...{}'.format(self.access[0:1], self.access[-1:])
-            if privacy else NotifyBoxcar.quote(self.access, safe=''),
-            secret='****'
-            if privacy else NotifyBoxcar.quote(self.secret, safe=''),
+            access=self.pprint(self.access, privacy, safe=''),
+            secret=self.pprint(
+                self.secret, privacy, mode=PrivacyMode.Secret, safe=''),
             targets='/'.join([
                 NotifyBoxcar.quote(x, safe='') for x in chain(
                     self.tags, self.device_tokens) if x != DEFAULT_TAG]),

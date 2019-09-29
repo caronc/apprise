@@ -27,6 +27,7 @@ import requests
 from json import dumps
 
 from .NotifyBase import NotifyBase
+from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..common import NotifyImageSize
 from ..utils import parse_bool
@@ -315,8 +316,8 @@ class NotifyXBMC(NotifyBase):
         if self.user and self.password:
             auth = '{user}:{password}@'.format(
                 user=NotifyXBMC.quote(self.user, safe=''),
-                password='****'
-                if privacy else NotifyXBMC.quote(self.password, safe=''),
+                password=self.pprint(
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
             )
         elif self.user:
             auth = '{user}@'.format(

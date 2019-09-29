@@ -35,6 +35,7 @@ from json import loads
 from time import time
 
 from .NotifyBase import NotifyBase
+from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..common import NotifyImageSize
 from ..common import NotifyFormat
@@ -965,8 +966,8 @@ class NotifyMatrix(NotifyBase):
         if self.user and self.password:
             auth = '{user}:{password}@'.format(
                 user=NotifyMatrix.quote(self.user, safe=''),
-                password='****'
-                if privacy else NotifyMatrix.quote(self.password, safe=''),
+                password=self.pprint(
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
             )
 
         elif self.user:

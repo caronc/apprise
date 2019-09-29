@@ -334,8 +334,7 @@ class NotifyMSG91(NotifyBase):
 
         return '{schema}://{authkey}/{targets}/?{args}'.format(
             schema=self.secure_protocol,
-            authkey='{}...{}'.format(self.authkey[0:1], self.authkey[-1:])
-            if privacy else NotifyMSG91.quote(self.authkey, safe=''),
+            authkey=self.pprint(self.authkey, privacy, safe=''),
             targets='/'.join(
                 [NotifyMSG91.quote(x, safe='') for x in self.targets]),
             args=NotifyMSG91.urlencode(args))

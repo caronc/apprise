@@ -318,8 +318,7 @@ class NotifyMessageBird(NotifyBase):
 
         return '{schema}://{apikey}/{source}/{targets}/?{args}'.format(
             schema=self.secure_protocol,
-            apikey='{}...{}'.format(self.apikey[0:1], self.apikey[-1:])
-            if privacy else NotifyMessageBird.quote(self.apikey, safe=''),
+            apikey=self.pprint(self.apikey, privacy, safe=''),
             source=self.source,
             targets='/'.join(
                 [NotifyMessageBird.quote(x, safe='') for x in self.targets]),

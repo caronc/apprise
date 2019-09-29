@@ -2637,7 +2637,7 @@ TEST_URLS = (
         'instance': plugins.NotifyTwilio,
 
         # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'twilio://ACa...a:b...b@12345',
+        'privacy_url': 'twilio://...aaaa:b...b@12345',
     }),
     ('twilio://AC{}:{}@123456/{}'.format('a' * 32, 'b' * 32, '4' * 11), {
         # using short-code (6 characters)

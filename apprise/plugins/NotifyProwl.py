@@ -245,17 +245,10 @@ class NotifyProwl(NotifyBase):
             'verify': 'yes' if self.verify_certificate else 'no',
         }
 
-        providerkey = ''
-        if self.providerkey:
-            providerkey = '{}...{}'.format(
-                self.providerkey[0:1], self.providerkey[-1:]) \
-                if privacy else NotifyProwl.quote(self.providerkey, safe='')
-
         return '{schema}://{apikey}/{providerkey}/?{args}'.format(
             schema=self.secure_protocol,
-            apikey='{}...{}'.format(self.apikey[0:1], self.apikey[-1:])
-            if privacy else NotifyProwl.quote(self.apikey, safe=''),
-            providerkey=providerkey,
+            apikey=self.pprint(self.apikey, privacy, safe=''),
+            providerkey=self.pprint(self.providerkey, privacy, safe=''),
             args=NotifyProwl.urlencode(args),
         )
 

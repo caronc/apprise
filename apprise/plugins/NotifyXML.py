@@ -28,6 +28,7 @@ import six
 import requests
 
 from .NotifyBase import NotifyBase
+from ..URLBase import PrivacyMode
 from ..common import NotifyImageSize
 from ..common import NotifyType
 from ..AppriseLocale import gettext_lazy as _
@@ -158,8 +159,8 @@ class NotifyXML(NotifyBase):
         if self.user and self.password:
             auth = '{user}:{password}@'.format(
                 user=NotifyXML.quote(self.user, safe=''),
-                password='****'
-                if privacy else NotifyXML.quote(self.password, safe=''),
+                password=self.pprint(
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
             )
         elif self.user:
             auth = '{user}@'.format(

@@ -328,12 +328,8 @@ class NotifyDiscord(NotifyBase):
 
         return '{schema}://{webhook_id}/{webhook_token}/?{args}'.format(
             schema=self.secure_protocol,
-            webhook_id='{}...{}'.format(
-                self.webhook_id[0:1], self.webhook_id[-1:])
-            if privacy else NotifyDiscord.quote(self.webhook_id, safe=''),
-            webhook_token='{}...{}'.format(
-                self.webhook_token[0:1], self.webhook_token[-1:])
-            if privacy else NotifyDiscord.quote(self.webhook_token, safe=''),
+            webhook_id=self.pprint(self.webhook_id, privacy, safe=''),
+            webhook_token=self.pprint(self.webhook_token, privacy, safe=''),
             args=NotifyDiscord.urlencode(args),
         )
 

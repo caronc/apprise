@@ -331,8 +331,7 @@ class NotifyMailgun(NotifyBase):
             schema=self.secure_protocol,
             host=self.host,
             user=NotifyMailgun.quote(self.user, safe=''),
-            apikey='{}...{}'.format(self.apikey[0:1], self.apikey[-1:])
-            if privacy else NotifyMailgun.quote(self.apikey, safe=''),
+            apikey=self.pprint(self.apikey, privacy, safe=''),
             targets='/'.join(
                 [NotifyMailgun.quote(x, safe='') for x in self.targets]),
             args=NotifyMailgun.urlencode(args))

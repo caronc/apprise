@@ -304,8 +304,7 @@ class NotifyRyver(NotifyBase):
             schema=self.secure_protocol,
             botname=botname,
             organization=NotifyRyver.quote(self.organization, safe=''),
-            token='{}...{}'.format(self.token[0:1], self.token[-1:])
-            if privacy else NotifyRyver.quote(self.token, safe=''),
+            token=self.pprint(self.token, privacy, safe=''),
             args=NotifyRyver.urlencode(args),
         )
 

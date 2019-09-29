@@ -412,12 +412,9 @@ class NotifySlack(NotifyBase):
             '?{args}'.format(
                 schema=self.secure_protocol,
                 botname=botname,
-                token_a='{}...{}'.format(self.token_a[0:1], self.token_a[-1:])
-                if privacy else NotifySlack.quote(self.token_a, safe=''),
-                token_b='{}...{}'.format(self.token_b[0:1], self.token_b[-1:])
-                if privacy else NotifySlack.quote(self.token_b, safe=''),
-                token_c='{}...{}'.format(self.token_c[0:1], self.token_c[-1:])
-                if privacy else NotifySlack.quote(self.token_c, safe=''),
+                token_a=self.pprint(self.token_a, privacy, safe=''),
+                token_b=self.pprint(self.token_b, privacy, safe=''),
+                token_c=self.pprint(self.token_c, privacy, safe=''),
                 targets='/'.join(
                     [NotifySlack.quote(x, safe='') for x in self.channels]),
                 args=NotifySlack.urlencode(args),

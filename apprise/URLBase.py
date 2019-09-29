@@ -50,6 +50,21 @@ from .utils import parse_list
 # Used to break a path list into parts
 PATHSPLIT_LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
 
+
+class PrivacyMode(object):
+    # Defines different privacy modes strings can be printed as
+    # Astrisk sets 4 of them: e.g. ****
+    # This is used for passwords
+    Secret = '*'
+
+    # Outer takes the first and last character displaying them with
+    # 3 dots between.  Hence, 'i-am-a-token' would become 'i...n'
+    Outer = 'o'
+
+    # Displays the last four characters
+    Tail = 't'
+
+
 # Define the HTML Lookup Table
 HTML_LOOKUP = {
     400: 'Bad Request - Unsupported Parameters.',
@@ -301,6 +316,44 @@ class URLBase(object):
         except TypeError:
             # Python v2.7
             return _quote(content, safe=safe)
+
+    @staticmethod
+    def pprint(content, privacy=True, mode=PrivacyMode.Outer,
+               # privacy print; quoting is ignored when privacy is set to True
+               quote=True, safe='/', encoding=None, errors=None):
+        """
+        Privacy Print is used to mainpulate the string before passing it into
+        part of the URL.  It is used to mask/hide private details such as
+        tokens, passwords, apikeys, etc from on-lookers.  If the privacy=False
+        is set, then the quote variable is the next flag checked.
+
+        Quoting is never done if the privacy flag is set to true to avoid
+        skewing the expected output.
+        """
+
+        if not privacy:
+            if quote:
+                # Return quoted string if specified to do so
+                return URLBase.quote(
+                    content, safe=safe, encoding=encoding, errors=errors)
+
+                # Return content 'as-is'
+            return content
+
+        if mode is PrivacyMode.Secret:
+            # Return 4 Asterisks
+            return '****'
+
+        if not content:
+            # Nothing more to do
+            return ''
+
+        if mode is PrivacyMode.Tail:
+            # Return the trailing 4 characters
+            return '...{}'.format(content[-4:])
+
+        # Default mode is Outer Mode
+        return '{}...{}'.format(content[0:1], content[-1:])
 
     @staticmethod
     def urlencode(query, doseq=False, safe='', encoding=None, errors=None):

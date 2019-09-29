@@ -426,10 +426,8 @@ class NotifyPushover(NotifyBase):
 
         return '{schema}://{user_key}@{token}/{devices}/?{args}'.format(
             schema=self.secure_protocol,
-            user_key='{}...{}'.format(self.user[0:1], self.user[-1:])
-            if privacy else NotifyPushover.quote(self.user, safe=''),
-            token='{}...{}'.format(self.token[0:1], self.token[-1:])
-            if privacy else NotifyPushover.quote(self.token, safe=''),
+            user_key=self.pprint(self.user, privacy, safe=''),
+            token=self.pprint(self.token, privacy, safe=''),
             devices=devices,
             args=NotifyPushover.urlencode(args))
 

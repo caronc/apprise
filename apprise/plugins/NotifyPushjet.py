@@ -27,6 +27,7 @@ import requests
 from json import dumps
 
 from .NotifyBase import NotifyBase
+from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..AppriseLocale import gettext_lazy as _
 
@@ -124,7 +125,9 @@ class NotifyPushjet(NotifyBase):
         args = {
             'format': self.notify_format,
             'overflow': self.overflow_mode,
-            'secret': '****' if privacy else self.secret_key,
+            'secret': self.pprint(
+                self.secret_key, privacy,
+                mode=PrivacyMode.Secret, quote=False),
             'verify': 'yes' if self.verify_certificate else 'no',
         }
 
@@ -135,8 +138,8 @@ class NotifyPushjet(NotifyBase):
         if self.user and self.password:
             auth = '{user}:{password}@'.format(
                 user=NotifyPushjet.quote(self.user, safe=''),
-                password='****'
-                if privacy else NotifyPushjet.quote(self.password, safe=''),
+                password=self.pprint(
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
             )
 
         return '{schema}://{auth}{hostname}{port}/?{args}'.format(

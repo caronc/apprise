@@ -26,6 +26,7 @@
 from .gntp import notifier
 from .gntp import errors
 from ..NotifyBase import NotifyBase
+from ...URLBase import PrivacyMode
 from ...common import NotifyImageSize
 from ...common import NotifyType
 from ...utils import parse_bool
@@ -297,8 +298,8 @@ class NotifyGrowl(NotifyBase):
         if self.user:
             # The growl password is stored in the user field
             auth = '{password}@'.format(
-                password='****@'
-                if privacy else NotifyGrowl.quote(self.user, safe=''),
+                password=self.pprint(
+                    self.user, privacy, mode=PrivacyMode.Secret, safe=''),
             )
 
         return '{schema}://{auth}{hostname}{port}/?{args}'.format(

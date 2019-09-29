@@ -176,9 +176,7 @@ class NotifyFaast(NotifyBase):
 
         return '{schema}://{authtoken}/?{args}'.format(
             schema=self.protocol,
-            authtoken='{}...{}'.format(
-                self.authtoken[0:1], self.authtoken[-1:])
-            if privacy else NotifyFaast.quote(self.authtoken, safe=''),
+            authtoken=self.pprint(self.authtoken, privacy, safe=''),
             args=NotifyFaast.urlencode(args),
         )
 

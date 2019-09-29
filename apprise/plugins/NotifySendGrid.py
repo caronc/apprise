@@ -280,8 +280,7 @@ class NotifySendGrid(NotifyBase):
 
         return '{schema}://{apikey}:{from_email}/{targets}?{args}'.format(
             schema=self.secure_protocol,
-            apikey='{}...{}'.format(self.apikey[0:1], self.apikey[-1:])
-            if privacy else self.quote(self.apikey, safe=''),
+            apikey=self.pprint(self.apikey, privacy, safe=''),
             from_email=self.quote(self.from_email, safe='@'),
             targets='' if not has_targets else '/'.join(
                 [NotifySendGrid.quote(x, safe='') for x in self.targets]),

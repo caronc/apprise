@@ -202,8 +202,7 @@ class NotifyTechulusPush(NotifyBase):
 
         return '{schema}://{apikey}/?{args}'.format(
             schema=self.secure_protocol,
-            apikey='{}...{}'.format(self.apikey[0:1], self.apikey[-1:])
-            if privacy else NotifyTechulusPush.quote(self.apikey, safe=''),
+            apikey=self.pprint(self.apikey, privacy, safe=''),
             args=NotifyTechulusPush.urlencode(args),
         )
 

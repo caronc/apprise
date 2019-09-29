@@ -235,9 +235,7 @@ class NotifyPushBullet(NotifyBase):
 
         return '{schema}://{accesstoken}/{targets}/?{args}'.format(
             schema=self.secure_protocol,
-            accesstoken='{}...{}'.format(
-                self.accesstoken[0:1], self.accesstoken[-1:])
-            if privacy else NotifyPushBullet.quote(self.accesstoken, safe=''),
+            accesstoken=self.pprint(self.accesstoken, privacy, safe=''),
             targets=targets,
             args=NotifyPushBullet.urlencode(args))
 

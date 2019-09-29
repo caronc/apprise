@@ -285,8 +285,7 @@ class NotifyJoin(NotifyBase):
 
         return '{schema}://{apikey}/{devices}/?{args}'.format(
             schema=self.secure_protocol,
-            apikey='{}...{}'.format(self.apikey[0:1], self.apikey[-1:])
-            if privacy else NotifyJoin.quote(self.apikey, safe=''),
+            apikey=self.pprint(self.apikey, privacy, safe=''),
             devices='/'.join([NotifyJoin.quote(x, safe='')
                               for x in self.devices]),
             args=NotifyJoin.urlencode(args))
