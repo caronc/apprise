@@ -316,6 +316,7 @@ class ConfigBase(URLBase):
         Optionally associate an asset with the notification.
 
         """
+
         response = list()
 
         try:
@@ -416,8 +417,12 @@ class ConfigBase(URLBase):
                 # interpretation of a URL geared for them
                 schema = GET_SCHEMA_RE.match(_url)
                 if schema is None:
+                    # Log invalid entries so that maintainer of config
+                    # config file at least has something to take action
+                    # with.
                     ConfigBase.logger.warning(
-                        'Unsupported schema in urls entry #{}'.format(no + 1))
+                        'Ignored entry {} found under urls, entry #{}'
+                        .format(_url, no + 1))
                     continue
 
                 # Ensure our schema is always in lower case
@@ -426,7 +431,7 @@ class ConfigBase(URLBase):
                 # Some basic validation
                 if schema not in plugins.SCHEMA_MAP:
                     ConfigBase.logger.warning(
-                        'Unsupported schema {} in urls entry #{}'.format(
+                        'Unsupported schema {} under urls, entry #{}'.format(
                             schema, no + 1))
                     continue
 
@@ -435,7 +440,7 @@ class ConfigBase(URLBase):
                 _results = plugins.SCHEMA_MAP[schema].parse_url(_url)
                 if _results is None:
                     ConfigBase.logger.warning(
-                        'Unparseable {} based url; entry #{}'.format(
+                        'Unparseable {} based url, entry #{}'.format(
                             schema, no + 1))
                     continue
 
@@ -445,18 +450,38 @@ class ConfigBase(URLBase):
             elif isinstance(url, dict):
                 # We are a url string with additional unescaped options
                 if six.PY2:
-                    _url, tokens = next(url.iteritems())
+                    it = url.iteritems()
                 else:  # six.PY3
-                    _url, tokens = next(iter(url.items()))
+                    it = iter(url.items())
 
-                # swap hash (#) tag values with their html version
-                _url = _url.replace('/#', '/%23')
+                # Track whether a schema was found
+                schema = None
 
-                # Get our schema
-                schema = GET_SCHEMA_RE.match(_url)
+                # Track the URL to-load
+                _url = None
+                for _key, tokens in it:
+                    # swap hash (#) tag values with their html version
+                    key = _key.replace('/#', '/%23')
+
+                    # Get our schema
+                    _schema = GET_SCHEMA_RE.match(key)
+                    if _schema is None:
+                        # Log invalid entries so that maintainer of config
+                        # config file at least has something to take action
+                        # with.
+                        ConfigBase.logger.warning(
+                            'Ignored entry {} found under urls, entry #{}'
+                            .format(_key, no + 1))
+                        continue
+
+                    # Store our URL and Schema Regex
+                    _url = key
+                    schema = _schema
+
                 if schema is None:
+                    # the loop above failed to match anything
                     ConfigBase.logger.warning(
-                        'Unsupported schema in urls entry #{}'.format(no + 1))
+                        'Unsupported schema in urls, entry #{}'.format(no + 1))
                     continue
 
                 # Ensure our schema is always in lower case
@@ -465,7 +490,7 @@ class ConfigBase(URLBase):
                 # Some basic validation
                 if schema not in plugins.SCHEMA_MAP:
                     ConfigBase.logger.warning(
-                        'Unsupported schema {} in urls entry #{}'.format(
+                        'Unsupported schema {} in urls, entry #{}'.format(
                             schema, no + 1))
                     continue
 
@@ -479,7 +504,7 @@ class ConfigBase(URLBase):
                         'schema': schema,
                     }
 
-                if tokens is not None:
+                if isinstance(tokens, (list, tuple, set)):
                     # populate and/or override any results populated by
                     # parse_url()
                     for entries in tokens:

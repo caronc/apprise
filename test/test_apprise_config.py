@@ -626,9 +626,9 @@ def test_config_base_parse_inaccessible_text_file(mock_getsize, tmpdir):
     assert len(ac.servers()) == 0
 
 
-def test_config_base_parse_yaml_file(tmpdir):
+def test_config_base_parse_yaml_file01(tmpdir):
     """
-    API: ConfigBase.parse_yaml_file
+    API: ConfigBase.parse_yaml_file (#1)
 
     """
     t = tmpdir.mkdir("empty-file").join("apprise.yml")
@@ -642,3 +642,100 @@ def test_config_base_parse_yaml_file(tmpdir):
 
     # no notifications are loaded
     assert len(ac.servers()) == 0
+
+
+def test_config_base_parse_yaml_file02(tmpdir):
+    """
+    API: ConfigBase.parse_yaml_file (#2)
+
+    """
+    t = tmpdir.mkdir("matching-tags").join("apprise.yml")
+    t.write("""urls:
+  - pover://nsisxnvnqixq39t0cw54pxieyvtdd9@2jevtmstfg5a7hfxndiybasttxxfku:
+    - tag: test1
+  - pover://rg8ta87qngcrkc6t4qbykxktou0uug@tqs3i88xlufexwl8t4asglt4zp5wfn:
+    - tag: test2
+  - pover://jcqgnlyq2oetea4qg3iunahj8d5ijm@evalvutkhc8ipmz2lcgc70wtsm0qpb:
+    - tag: test3""")
+
+    # Create ourselves a config object
+    ac = AppriseConfig(paths=str(t))
+
+    # The number of configuration files that exist
+    assert len(ac) == 1
+
+    # no notifications are loaded
+    assert len(ac.servers()) == 3
+
+    # Test our ability to add Config objects to our apprise object
+    a = Apprise()
+
+    # Add our configuration object
+    assert a.add(servers=ac) is True
+
+    # Detect our 3 entry as they should have loaded successfully
+    assert len(a) == 3
+
+    # No match
+    assert sum(1 for _ in a.find('no-match')) == 0
+    # Match everything
+    assert sum(1 for _ in a.find('all')) == 3
+    # Match test1 entry
+    assert sum(1 for _ in a.find('test1')) == 1
+    # Match test2 entry
+    assert sum(1 for _ in a.find('test2')) == 1
+    # Match test3 entry
+    assert sum(1 for _ in a.find('test3')) == 1
+    # Match test1 or test3 entry
+    assert sum(1 for _ in a.find('test1, test3')) == 2
+
+
+def test_config_base_parse_yaml_file03(tmpdir):
+    """
+    API: ConfigBase.parse_yaml_file (#3)
+
+    """
+
+    t = tmpdir.mkdir("bad-first-entry").join("apprise.yml")
+    # The first entry is -tag and not <dash><space>tag
+    # The element is therefore not picked up; This causes us to display
+    # some warning messages to the screen complaining of this typo yet
+    # still allowing us to load the URL since it is valid
+    t.write("""urls:
+  - pover://nsisxnvnqixq39t0cw54pxieyvtdd9@2jevtmstfg5a7hfxndiybasttxxfku:
+    -tag: test1
+  - pover://rg8ta87qngcrkc6t4qbykxktou0uug@tqs3i88xlufexwl8t4asglt4zp5wfn:
+    - tag: test2
+  - pover://jcqgnlyq2oetea4qg3iunahj8d5ijm@evalvutkhc8ipmz2lcgc70wtsm0qpb:
+    - tag: test3""")
+
+    # Create ourselves a config object
+    ac = AppriseConfig(paths=str(t))
+
+    # The number of configuration files that exist
+    assert len(ac) == 1
+
+    # no notifications lines processed is 3
+    assert len(ac.servers()) == 3
+
+    # Test our ability to add Config objects to our apprise object
+    a = Apprise()
+
+    # Add our configuration object
+    assert a.add(servers=ac) is True
+
+    # Detect our 3 entry as they should have loaded successfully
+    assert len(a) == 3
+
+    # No match
+    assert sum(1 for _ in a.find('no-match')) == 0
+    # Match everything
+    assert sum(1 for _ in a.find('all')) == 3
+    # No match for bad entry
+    assert sum(1 for _ in a.find('test1')) == 0
+    # Match test2 entry
+    assert sum(1 for _ in a.find('test2')) == 1
+    # Match test3 entry
+    assert sum(1 for _ in a.find('test3')) == 1
+    # Match test1 or test3 entry; (only matches test3)
+    assert sum(1 for _ in a.find('test1, test3')) == 1

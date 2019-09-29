@@ -60,7 +60,7 @@ def test_apprise_cli(tmpdir):
             # Pretend everything is okay
             return True
 
-        def url(self):
+        def url(self, *args, **kwargs):
             # Support url()
             return 'good://'
 
@@ -72,7 +72,7 @@ def test_apprise_cli(tmpdir):
             # Force a notification failure
             return False
 
-        def url(self):
+        def url(self, *args, **kwargs):
             # Support url()
             return 'bad://'
 
@@ -200,10 +200,10 @@ def test_apprise_cli(tmpdir):
     ])
     assert result.exit_code == 0
     lines = re.split(r'[\r\n]', result.output.strip())
-    # 5 lines of all good:// entries matched + header
-    assert len(lines) == 6
+    # 5 lines of all good:// entries matched
+    assert len(lines) == 5
     # Verify we match against the remaining good:// entries
-    for i in range(1, 6):
+    for i in range(0, 5):
         assert lines[i].endswith('good://')
 
     # This will fail because nothing matches mytag. It's case sensitive

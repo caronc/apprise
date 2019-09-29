@@ -188,23 +188,23 @@ def main(body, title, config, urls, notification_type, theme, tag, dry_run,
         print_help_msg(main)
         sys.exit(1)
 
-    if body is None:
-        logger.trace('Reading from stdin')
-        # if no body was specified, then read from STDIN
-        body = click.get_text_stream('stdin').read()
-
     # each --tag entry comprises of a comma separated 'and' list
     # we or each of of the --tag and sets specified.
     tags = None if not tag else [parse_list(t) for t in tag]
 
     if not dry_run:
+        if body is None:
+            logger.trace('No --body (-b) specified; reading from stdin')
+            # if no body was specified, then read from STDIN
+            body = click.get_text_stream('stdin').read()
+
         # now print it out
         result = a.notify(
             body=body, title=title, notify_type=notification_type, tag=tags)
     else:
-        click.secho("Apprise Matched Notifications", bold=True)
         # Number of rows to assume in the terminal.  In future, maybe this can
-        # be detected and made dynamic
+        # be detected and made dynamic. The actual row count is 80, but 5
+        # characters are already reserved for the counter on the left
         rows = 75
 
         # Initialize our URL response;  This is populated within the for/loop
@@ -213,7 +213,7 @@ def main(body, title, config, urls, notification_type, theme, tag, dry_run,
         url = None
 
         for idx, server in enumerate(a.find(tag=tags)):
-            url = server.url()
+            url = server.url(privacy=True)
             click.echo("{: 3d}. {}".format(
                 idx + 1,
                 url if len(url) <= rows else '{}...'.format(url[:rows - 3])))
