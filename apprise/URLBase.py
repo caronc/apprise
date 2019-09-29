@@ -344,7 +344,7 @@ class URLBase(object):
             # Return 4 Asterisks
             return '****'
 
-        if not content:
+        if not isinstance(content, six.string_types) or not content:
             # Nothing more to do
             return ''
 

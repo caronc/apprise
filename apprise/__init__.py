@@ -43,6 +43,7 @@ from .common import ConfigFormat
 from .common import CONFIG_FORMATS
 
 from .URLBase import URLBase
+from .URLBase import PrivacyMode
 from .plugins.NotifyBase import NotifyBase
 from .config.ConfigBase import ConfigBase
 
@@ -63,5 +64,5 @@ __all__ = [
     # Reference
     'NotifyType', 'NotifyImageSize', 'NotifyFormat', 'OverflowMode',
     'NOTIFY_TYPES', 'NOTIFY_IMAGE_SIZES', 'NOTIFY_FORMATS', 'OVERFLOW_MODES',
-    'ConfigFormat', 'CONFIG_FORMATS',
+    'ConfigFormat', 'CONFIG_FORMATS', 'PrivacyMode',
 ]
