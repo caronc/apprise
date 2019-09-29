@@ -367,7 +367,7 @@ class NotifyGitter(NotifyBase):
 
         return (True, content)
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -382,7 +382,7 @@ class NotifyGitter(NotifyBase):
 
         return '{schema}://{token}/{targets}/?{args}'.format(
             schema=self.secure_protocol,
-            token=NotifyGitter.quote(self.token, safe=''),
+            token=self.pprint(self.token, privacy, safe=''),
             targets='/'.join(
                 [NotifyGitter.quote(x, safe='') for x in self.targets]),
             args=NotifyGitter.urlencode(args))

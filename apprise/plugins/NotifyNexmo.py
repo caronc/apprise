@@ -33,6 +33,7 @@ import re
 import requests
 
 from .NotifyBase import NotifyBase
+from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..utils import parse_list
 from ..AppriseLocale import gettext_lazy as _
@@ -334,7 +335,7 @@ class NotifyNexmo(NotifyBase):
 
         return not has_error
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -349,8 +350,9 @@ class NotifyNexmo(NotifyBase):
 
         return '{schema}://{key}:{secret}@{source}/{targets}/?{args}'.format(
             schema=self.secure_protocol,
-            key=self.apikey,
-            secret=self.secret,
+            key=self.pprint(self.apikey, privacy, safe=''),
+            secret=self.pprint(
+                self.secret, privacy, mode=PrivacyMode.Secret, safe=''),
             source=NotifyNexmo.quote(self.source, safe=''),
             targets='/'.join(
                 [NotifyNexmo.quote(x, safe='') for x in self.targets]),

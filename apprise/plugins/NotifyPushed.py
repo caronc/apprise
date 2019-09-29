@@ -29,6 +29,7 @@ from json import dumps
 from itertools import chain
 
 from .NotifyBase import NotifyBase
+from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..utils import parse_list
 from ..AppriseLocale import gettext_lazy as _
@@ -285,7 +286,7 @@ class NotifyPushed(NotifyBase):
 
         return True
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -299,8 +300,9 @@ class NotifyPushed(NotifyBase):
 
         return '{schema}://{app_key}/{app_secret}/{targets}/?{args}'.format(
             schema=self.secure_protocol,
-            app_key=NotifyPushed.quote(self.app_key, safe=''),
-            app_secret=NotifyPushed.quote(self.app_secret, safe=''),
+            app_key=self.pprint(self.app_key, privacy, safe=''),
+            app_secret=self.pprint(
+                self.app_secret, privacy, mode=PrivacyMode.Secret, safe=''),
             targets='/'.join(
                 [NotifyPushed.quote(x) for x in chain(
                     # Channels are prefixed with a pound/hashtag symbol

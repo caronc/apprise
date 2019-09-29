@@ -553,7 +553,7 @@ class NotifyTelegram(NotifyBase):
 
         return not has_error
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -571,7 +571,7 @@ class NotifyTelegram(NotifyBase):
         # appended into the list of chat ids
         return '{schema}://{bot_token}/{targets}/?{args}'.format(
             schema=self.secure_protocol,
-            bot_token=NotifyTelegram.quote(self.bot_token, safe=''),
+            bot_token=self.pprint(self.bot_token, privacy, safe=''),
             targets='/'.join(
                 [NotifyTelegram.quote('@{}'.format(x)) for x in self.targets]),
             args=NotifyTelegram.urlencode(args))

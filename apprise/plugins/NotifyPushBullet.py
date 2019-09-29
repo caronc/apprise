@@ -215,7 +215,7 @@ class NotifyPushBullet(NotifyBase):
 
         return not has_error
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -235,7 +235,7 @@ class NotifyPushBullet(NotifyBase):
 
         return '{schema}://{accesstoken}/{targets}/?{args}'.format(
             schema=self.secure_protocol,
-            accesstoken=NotifyPushBullet.quote(self.accesstoken, safe=''),
+            accesstoken=self.pprint(self.accesstoken, privacy, safe=''),
             targets=targets,
             args=NotifyPushBullet.urlencode(args))
 

@@ -223,7 +223,7 @@ class NotifyProwl(NotifyBase):
 
         return True
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -247,9 +247,8 @@ class NotifyProwl(NotifyBase):
 
         return '{schema}://{apikey}/{providerkey}/?{args}'.format(
             schema=self.secure_protocol,
-            apikey=NotifyProwl.quote(self.apikey, safe=''),
-            providerkey='' if not self.providerkey
-                        else NotifyProwl.quote(self.providerkey, safe=''),
+            apikey=self.pprint(self.apikey, privacy, safe=''),
+            providerkey=self.pprint(self.providerkey, privacy, safe=''),
             args=NotifyProwl.urlencode(args),
         )
 

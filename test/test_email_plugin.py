@@ -181,6 +181,8 @@ TEST_URLS = (
     # STARTTLS flag checking
     ('mailtos://user:pass@gmail.com?mode=starttls', {
         'instance': plugins.NotifyEmail,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'mailtos://user:****@gmail.com',
     }),
     # SSL flag checking
     ('mailtos://user:pass@gmail.com?mode=ssl', {
@@ -189,6 +191,8 @@ TEST_URLS = (
     # Can make a To address using what we have (l2g@nuxref.com)
     ('mailtos://nuxref.com?user=l2g&pass=.', {
         'instance': plugins.NotifyEmail,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'mailtos://l2g:****@nuxref.com',
     }),
     ('mailto://user:pass@localhost:2525', {
         'instance': plugins.NotifyEmail,
@@ -220,6 +224,10 @@ def test_email_plugin(mock_smtp, mock_smtpssl):
 
         # Our expected Query response (True, False, or exception type)
         response = meta.get('response', True)
+
+        # Our expected privacy url
+        # Don't set this if don't need to check it's value
+        privacy_url = meta.get('privacy_url')
 
         test_smtplib_exceptions = meta.get(
             'test_smtplib_exceptions', False)
@@ -273,6 +281,19 @@ def test_email_plugin(mock_smtp, mock_smtpssl):
             if isinstance(obj, plugins.NotifyBase):
                 # We loaded okay; now lets make sure we can reverse this url
                 assert(isinstance(obj.url(), six.string_types) is True)
+
+                # Test url() with privacy=True
+                assert(isinstance(
+                    obj.url(privacy=True), six.string_types) is True)
+
+                # Some Simple Invalid Instance Testing
+                assert instance.parse_url(None) is None
+                assert instance.parse_url(object) is None
+                assert instance.parse_url(42) is None
+
+                if privacy_url:
+                    # Assess that our privacy url is as expected
+                    assert obj.url(privacy=True).startswith(privacy_url)
 
                 # Instantiate the exact same object again using the URL from
                 # the one that was already created properly

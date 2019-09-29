@@ -35,6 +35,7 @@ from json import dumps
 from json import loads
 
 from .NotifyBase import NotifyBase
+from ..URLBase import PrivacyMode
 from ..utils import parse_bool
 from ..common import NotifyType
 from .. import __version__ as VERSION
@@ -581,7 +582,7 @@ class NotifyEmby(NotifyBase):
 
         return not has_error
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -599,7 +600,8 @@ class NotifyEmby(NotifyBase):
         if self.user and self.password:
             auth = '{user}:{password}@'.format(
                 user=NotifyEmby.quote(self.user, safe=''),
-                password=NotifyEmby.quote(self.password, safe=''),
+                password=self.pprint(
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
             )
         else:  # self.user is set
             auth = '{user}@'.format(

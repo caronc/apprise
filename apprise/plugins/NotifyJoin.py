@@ -270,7 +270,7 @@ class NotifyJoin(NotifyBase):
 
         return not has_error
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -285,7 +285,7 @@ class NotifyJoin(NotifyBase):
 
         return '{schema}://{apikey}/{devices}/?{args}'.format(
             schema=self.secure_protocol,
-            apikey=NotifyJoin.quote(self.apikey, safe=''),
+            apikey=self.pprint(self.apikey, privacy, safe=''),
             devices='/'.join([NotifyJoin.quote(x, safe='')
                               for x in self.devices]),
             args=NotifyJoin.urlencode(args))

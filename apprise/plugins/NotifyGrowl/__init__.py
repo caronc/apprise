@@ -26,6 +26,7 @@
 from .gntp import notifier
 from .gntp import errors
 from ..NotifyBase import NotifyBase
+from ...URLBase import PrivacyMode
 from ...common import NotifyImageSize
 from ...common import NotifyType
 from ...utils import parse_bool
@@ -89,25 +90,31 @@ class NotifyGrowl(NotifyBase):
     default_port = 23053
 
     # Define object templates
+    # Define object templates
     templates = (
-        '{schema}://{apikey}',
-        '{schema}://{apikey}/{providerkey}',
+        '{schema}://{host}',
+        '{schema}://{host}:{port}',
+        '{schema}://{password}@{host}',
+        '{schema}://{password}@{host}:{port}',
     )
 
     # Define our template tokens
     template_tokens = dict(NotifyBase.template_tokens, **{
-        'apikey': {
-            'name': _('API Key'),
+        'host': {
+            'name': _('Hostname'),
             'type': 'string',
-            'private': True,
             'required': True,
-            'map_to': 'host',
         },
-        'providerkey': {
-            'name': _('Provider Key'),
+        'port': {
+            'name': _('Port'),
+            'type': 'int',
+            'min': 1,
+            'max': 65535,
+        },
+        'password': {
+            'name': _('Password'),
             'type': 'string',
             'private': True,
-            'map_to': 'fullpath',
         },
     })
 
@@ -262,7 +269,7 @@ class NotifyGrowl(NotifyBase):
 
         return True
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -291,7 +298,8 @@ class NotifyGrowl(NotifyBase):
         if self.user:
             # The growl password is stored in the user field
             auth = '{password}@'.format(
-                password=NotifyGrowl.quote(self.user, safe=''),
+                password=self.pprint(
+                    self.user, privacy, mode=PrivacyMode.Secret, safe=''),
             )
 
         return '{schema}://{auth}{hostname}{port}/?{args}'.format(

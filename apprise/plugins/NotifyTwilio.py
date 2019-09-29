@@ -45,6 +45,7 @@ import requests
 from json import loads
 
 from .NotifyBase import NotifyBase
+from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..utils import parse_list
 from ..AppriseLocale import gettext_lazy as _
@@ -374,7 +375,7 @@ class NotifyTwilio(NotifyBase):
 
         return not has_error
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -388,8 +389,9 @@ class NotifyTwilio(NotifyBase):
 
         return '{schema}://{sid}:{token}@{source}/{targets}/?{args}'.format(
             schema=self.secure_protocol,
-            sid=self.account_sid,
-            token=self.auth_token,
+            sid=self.pprint(
+                self.account_sid, privacy, mode=PrivacyMode.Tail, safe=''),
+            token=self.pprint(self.auth_token, privacy, safe=''),
             source=NotifyTwilio.quote(self.source, safe=''),
             targets='/'.join(
                 [NotifyTwilio.quote(x, safe='') for x in self.targets]),

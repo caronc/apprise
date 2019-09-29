@@ -27,6 +27,7 @@ from json import loads
 import requests
 
 from .NotifyBase import NotifyBase
+from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..AppriseLocale import gettext_lazy as _
 
@@ -263,7 +264,7 @@ class NotifySimplePush(NotifyBase):
 
         return True
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -282,14 +283,16 @@ class NotifySimplePush(NotifyBase):
         auth = ''
         if self.user and self.password:
             auth = '{salt}:{password}@'.format(
-                salt=NotifySimplePush.quote(self.user, safe=''),
-                password=NotifySimplePush.quote(self.password, safe=''),
+                salt=self.pprint(
+                    self.user, privacy, mode=PrivacyMode.Secret, safe=''),
+                password=self.pprint(
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
             )
 
         return '{schema}://{auth}{apikey}/?{args}'.format(
             schema=self.secure_protocol,
             auth=auth,
-            apikey=NotifySimplePush.quote(self.apikey, safe=''),
+            apikey=self.pprint(self.apikey, privacy, safe=''),
             args=NotifySimplePush.urlencode(args),
         )
 

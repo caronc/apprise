@@ -214,7 +214,7 @@ class NotifyKumulos(NotifyBase):
             return False
         return True
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -228,8 +228,8 @@ class NotifyKumulos(NotifyBase):
 
         return '{schema}://{apikey}/{serverkey}/?{args}'.format(
             schema=self.secure_protocol,
-            apikey=NotifyKumulos.quote(self.apikey, safe=''),
-            serverkey=NotifyKumulos.quote(self.serverkey, safe=''),
+            apikey=self.pprint(self.apikey, privacy, safe=''),
+            serverkey=self.pprint(self.serverkey, privacy, safe=''),
             args=NotifyKumulos.urlencode(args),
         )
 

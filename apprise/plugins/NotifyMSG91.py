@@ -316,7 +316,7 @@ class NotifyMSG91(NotifyBase):
 
         return True
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -334,7 +334,7 @@ class NotifyMSG91(NotifyBase):
 
         return '{schema}://{authkey}/{targets}/?{args}'.format(
             schema=self.secure_protocol,
-            authkey=self.authkey,
+            authkey=self.pprint(self.authkey, privacy, safe=''),
             targets='/'.join(
                 [NotifyMSG91.quote(x, safe='') for x in self.targets]),
             args=NotifyMSG91.urlencode(args))

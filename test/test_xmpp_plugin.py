@@ -162,16 +162,41 @@ def test_xmpp_plugin(tmpdir):
         # Restore settings as they were
         del ssl.PROTOCOL_TLS
 
+    urls = (
+        {
+            'u': 'xmpps://user:pass@example.com',
+            'p': 'xmpps://user:****@example.com',
+        }, {
+            'u': 'xmpps://user:pass@example.com?'
+                 'xep=30,199,garbage,xep_99999999',
+            'p': 'xmpps://user:****@example.com',
+        }, {
+            'u': 'xmpps://user:pass@example.com?xep=ignored',
+            'p': 'xmpps://user:****@example.com',
+        }, {
+            'u': 'xmpps://pass@example.com/'
+                 'user@test.com, user2@test.com/resource',
+            'p': 'xmpps://****@example.com',
+        }, {
+            'u': 'xmpps://pass@example.com:5226?jid=user@test.com',
+            'p': 'xmpps://****@example.com:5226',
+        }, {
+            'u': 'xmpps://pass@example.com?jid=user@test.com&verify=False',
+            'p': 'xmpps://****@example.com',
+        }, {
+            'u': 'xmpps://user:pass@example.com?verify=False',
+            'p': 'xmpps://user:****@example.com',
+        }, {
+            'u': 'xmpp://user:pass@example.com?to=user@test.com',
+            'p': 'xmpp://user:****@example.com',
+        }
+    )
+
     # Try Different Variations of our URL
-    for url in (
-            'xmpps://user:pass@example.com',
-            'xmpps://user:pass@example.com?xep=30,199,garbage,xep_99999999',
-            'xmpps://user:pass@example.com?xep=ignored',
-            'xmpps://pass@example.com/user@test.com, user2@test.com/resource',
-            'xmpps://pass@example.com:5226?jid=user@test.com',
-            'xmpps://pass@example.com?jid=user@test.com&verify=False',
-            'xmpps://user:pass@example.com?verify=False',
-            'xmpp://user:pass@example.com?to=user@test.com'):
+    for entry in urls:
+
+        url = entry['u']
+        privacy_url = entry['p']
 
         obj = apprise.Apprise.instantiate(url, suppress_exceptions=False)
 
@@ -183,6 +208,11 @@ def test_xmpp_plugin(tmpdir):
 
         # Test url() call
         assert isinstance(obj.url(), six.string_types) is True
+
+        # Test url(privacy=True) call
+        assert isinstance(obj.url(privacy=True), six.string_types) is True
+
+        assert obj.url(privacy=True).startswith(privacy_url)
 
         # test notifications
         assert obj.notify(

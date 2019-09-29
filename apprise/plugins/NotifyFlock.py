@@ -305,7 +305,7 @@ class NotifyFlock(NotifyBase):
 
         return not has_error
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -320,7 +320,7 @@ class NotifyFlock(NotifyBase):
         return '{schema}://{token}/{targets}?{args}'\
             .format(
                 schema=self.secure_protocol,
-                token=NotifyFlock.quote(self.token, safe=''),
+                token=self.pprint(self.token, privacy, safe=''),
                 targets='/'.join(
                     [NotifyFlock.quote(target, safe='')
                      for target in self.targets]),

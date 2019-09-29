@@ -28,6 +28,7 @@ import six
 import requests
 from .ConfigBase import ConfigBase
 from ..common import ConfigFormat
+from ..URLBase import PrivacyMode
 
 # Support YAML formats
 # text/yaml
@@ -89,7 +90,7 @@ class ConfigHTTP(ConfigBase):
 
         return
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -111,7 +112,8 @@ class ConfigHTTP(ConfigBase):
         if self.user and self.password:
             auth = '{user}:{password}@'.format(
                 user=self.quote(self.user, safe=''),
-                password=self.quote(self.password, safe=''),
+                password=self.pprint(
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
             )
         elif self.user:
             auth = '{user}@'.format(

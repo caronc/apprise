@@ -285,7 +285,7 @@ class NotifyIFTTT(NotifyBase):
 
         return not has_error
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -303,7 +303,7 @@ class NotifyIFTTT(NotifyBase):
 
         return '{schema}://{webhook_id}@{events}/?{args}'.format(
             schema=self.secure_protocol,
-            webhook_id=NotifyIFTTT.quote(self.webhook_id, safe=''),
+            webhook_id=self.pprint(self.webhook_id, privacy, safe=''),
             events='/'.join([NotifyIFTTT.quote(x, safe='')
                              for x in self.events]),
             args=NotifyIFTTT.urlencode(args),

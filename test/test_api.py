@@ -41,6 +41,8 @@ from apprise import NotifyType
 from apprise import NotifyFormat
 from apprise import NotifyImageSize
 from apprise import __version__
+from apprise import URLBase
+from apprise import PrivacyMode
 
 from apprise.plugins import SCHEMA_MAP
 from apprise.plugins import __load_matrix
@@ -358,6 +360,55 @@ def test_apprise():
         'schema': 'throw',
         'host': 'localhost'}, suppress_exceptions=True) is None)
     assert(len(a) == 0)
+
+    # Privacy Print
+    # PrivacyMode.Secret always returns the same thing to avoid guessing
+    assert URLBase.pprint(
+        None, privacy=True, mode=PrivacyMode.Secret) == '****'
+    assert URLBase.pprint(
+        42, privacy=True, mode=PrivacyMode.Secret) == '****'
+    assert URLBase.pprint(
+        object, privacy=True, mode=PrivacyMode.Secret) == '****'
+    assert URLBase.pprint(
+        "", privacy=True, mode=PrivacyMode.Secret) == '****'
+    assert URLBase.pprint(
+        "a", privacy=True, mode=PrivacyMode.Secret) == '****'
+    assert URLBase.pprint(
+        "ab", privacy=True, mode=PrivacyMode.Secret) == '****'
+    assert URLBase.pprint(
+        "abcdefghijk", privacy=True, mode=PrivacyMode.Secret) == '****'
+
+    # PrivacyMode.Outer
+    assert URLBase.pprint(
+        None, privacy=True, mode=PrivacyMode.Outer) == ''
+    assert URLBase.pprint(
+        42, privacy=True, mode=PrivacyMode.Outer) == ''
+    assert URLBase.pprint(
+        object, privacy=True, mode=PrivacyMode.Outer) == ''
+    assert URLBase.pprint(
+        "", privacy=True, mode=PrivacyMode.Outer) == ''
+    assert URLBase.pprint(
+        "a", privacy=True, mode=PrivacyMode.Outer) == 'a...a'
+    assert URLBase.pprint(
+        "ab", privacy=True, mode=PrivacyMode.Outer) == 'a...b'
+    assert URLBase.pprint(
+        "abcdefghijk", privacy=True, mode=PrivacyMode.Outer) == 'a...k'
+
+    # PrivacyMode.Tail
+    assert URLBase.pprint(
+        None, privacy=True, mode=PrivacyMode.Tail) == ''
+    assert URLBase.pprint(
+        42, privacy=True, mode=PrivacyMode.Tail) == ''
+    assert URLBase.pprint(
+        object, privacy=True, mode=PrivacyMode.Tail) == ''
+    assert URLBase.pprint(
+        "", privacy=True, mode=PrivacyMode.Tail) == ''
+    assert URLBase.pprint(
+        "a", privacy=True, mode=PrivacyMode.Tail) == '...a'
+    assert URLBase.pprint(
+        "ab", privacy=True, mode=PrivacyMode.Tail) == '...ab'
+    assert URLBase.pprint(
+        "abcdefghijk", privacy=True, mode=PrivacyMode.Tail) == '...hijk'
 
 
 @mock.patch('requests.get')

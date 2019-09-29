@@ -304,7 +304,7 @@ class NotifyMessageBird(NotifyBase):
 
         return not has_error
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -318,7 +318,7 @@ class NotifyMessageBird(NotifyBase):
 
         return '{schema}://{apikey}/{source}/{targets}/?{args}'.format(
             schema=self.secure_protocol,
-            apikey=self.apikey,
+            apikey=self.pprint(self.apikey, privacy, safe=''),
             source=self.source,
             targets='/'.join(
                 [NotifyMessageBird.quote(x, safe='') for x in self.targets]),

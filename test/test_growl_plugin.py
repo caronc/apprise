@@ -227,6 +227,10 @@ def test_growl_plugin(mock_gntp):
                 # We loaded okay; now lets make sure we can reverse this url
                 assert(isinstance(obj.url(), six.string_types) is True)
 
+                # Test our privacy=True flag
+                assert(isinstance(
+                    obj.url(privacy=True), six.string_types) is True)
+
                 # Instantiate the exact same object again using the URL from
                 # the one that was already created properly
                 obj_cmp = Apprise.instantiate(obj.url())

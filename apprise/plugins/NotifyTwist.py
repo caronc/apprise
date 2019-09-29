@@ -32,6 +32,7 @@ from json import loads
 from itertools import chain
 
 from .NotifyBase import NotifyBase
+from ..URLBase import PrivacyMode
 from ..common import NotifyFormat
 from ..common import NotifyType
 from ..utils import parse_list
@@ -223,7 +224,7 @@ class NotifyTwist(NotifyBase):
                     self.default_notification_channel))
         return
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -237,7 +238,8 @@ class NotifyTwist(NotifyBase):
 
         return '{schema}://{password}:{user}@{host}/{targets}/?{args}'.format(
             schema=self.secure_protocol,
-            password=self.quote(self.password, safe=''),
+            password=self.pprint(
+                self.password, privacy, mode=PrivacyMode.Secret, safe=''),
             user=self.quote(self.user, safe=''),
             host=self.host,
             targets='/'.join(

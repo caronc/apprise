@@ -279,7 +279,7 @@ class NotifyRyver(NotifyBase):
 
         return True
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -304,7 +304,7 @@ class NotifyRyver(NotifyBase):
             schema=self.secure_protocol,
             botname=botname,
             organization=NotifyRyver.quote(self.organization, safe=''),
-            token=NotifyRyver.quote(self.token, safe=''),
+            token=self.pprint(self.token, privacy, safe=''),
             args=NotifyRyver.urlencode(args),
         )
 

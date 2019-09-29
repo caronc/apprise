@@ -33,6 +33,7 @@ from xml.etree import ElementTree
 from itertools import chain
 
 from .NotifyBase import NotifyBase
+from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..utils import parse_list
 from ..AppriseLocale import gettext_lazy as _
@@ -568,7 +569,7 @@ class NotifySNS(NotifyBase):
 
         return response
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -583,9 +584,10 @@ class NotifySNS(NotifyBase):
         return '{schema}://{key_id}/{key_secret}/{region}/{targets}/'\
             '?{args}'.format(
                 schema=self.secure_protocol,
-                key_id=NotifySNS.quote(self.aws_access_key_id, safe=''),
-                key_secret=NotifySNS.quote(
-                    self.aws_secret_access_key, safe=''),
+                key_id=self.pprint(self.aws_access_key_id, privacy, safe=''),
+                key_secret=self.pprint(
+                    self.aws_secret_access_key, privacy,
+                    mode=PrivacyMode.Secret, safe=''),
                 region=NotifySNS.quote(self.aws_region_name, safe=''),
                 targets='/'.join(
                     [NotifySNS.quote(x) for x in chain(

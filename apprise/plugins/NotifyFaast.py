@@ -161,7 +161,7 @@ class NotifyFaast(NotifyBase):
 
         return True
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -176,7 +176,7 @@ class NotifyFaast(NotifyBase):
 
         return '{schema}://{authtoken}/?{args}'.format(
             schema=self.protocol,
-            authtoken=NotifyFaast.quote(self.authtoken, safe=''),
+            authtoken=self.pprint(self.authtoken, privacy, safe=''),
             args=NotifyFaast.urlencode(args),
         )
 

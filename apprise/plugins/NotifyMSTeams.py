@@ -293,7 +293,7 @@ class NotifyMSTeams(NotifyBase):
 
         return True
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -309,9 +309,9 @@ class NotifyMSTeams(NotifyBase):
         return '{schema}://{token_a}/{token_b}/{token_c}/'\
             '?{args}'.format(
                 schema=self.secure_protocol,
-                token_a=NotifyMSTeams.quote(self.token_a, safe=''),
-                token_b=NotifyMSTeams.quote(self.token_b, safe=''),
-                token_c=NotifyMSTeams.quote(self.token_c, safe=''),
+                token_a=self.pprint(self.token_a, privacy, safe=''),
+                token_b=self.pprint(self.token_b, privacy, safe=''),
+                token_c=self.pprint(self.token_c, privacy, safe=''),
                 args=NotifyMSTeams.urlencode(args),
             )
 

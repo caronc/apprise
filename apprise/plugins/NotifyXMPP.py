@@ -28,6 +28,7 @@ import ssl
 from os.path import isfile
 
 from .NotifyBase import NotifyBase
+from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..utils import parse_list
 from ..AppriseLocale import gettext_lazy as _
@@ -344,7 +345,7 @@ class NotifyXMPP(NotifyBase):
 
         return True
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -374,12 +375,15 @@ class NotifyXMPP(NotifyBase):
         default_schema = self.secure_protocol if self.secure else self.protocol
 
         if self.user and self.password:
-            auth = '{}:{}'.format(
-                NotifyXMPP.quote(self.user, safe=''),
-                NotifyXMPP.quote(self.password, safe=''))
+            auth = '{user}:{password}'.format(
+                user=NotifyXMPP.quote(self.user, safe=''),
+                password=self.pprint(
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=''))
 
         else:
-            auth = self.password if self.password else self.user
+            auth = self.pprint(
+                self.password if self.password else self.user, privacy,
+                mode=PrivacyMode.Secret, safe='')
 
         return '{schema}://{auth}@{hostname}{port}/{jids}?{args}'.format(
             auth=auth,

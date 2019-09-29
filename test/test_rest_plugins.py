@@ -85,6 +85,8 @@ TEST_URLS = (
     ('boxcar://%s/%s' % ('a' * 64, 'b' * 64), {
         'instance': plugins.NotifyBoxcar,
         'requests_response_code': requests.codes.created,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'boxcar://a...a/****/',
     }),
     # Test without image set
     ('boxcar://%s/%s?image=True' % ('a' * 64, 'b' * 64), {
@@ -151,6 +153,8 @@ TEST_URLS = (
     ('clicksend://user:pass@{}?batch=yes&to={}'.format('3' * 14, '6' * 14), {
         # valid number but using the to= variable
         'instance': plugins.NotifyClickSend,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'clicksend://user:****',
     }),
     ('clicksend://user:pass@{}?batch=no'.format('3' * 14), {
         # valid number - no batch
@@ -187,6 +191,8 @@ TEST_URLS = (
     ('d7sms://user:pass@{}?batch=yes'.format('3' * 14), {
         # valid number
         'instance': plugins.NotifyD7Networks,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'd7sms://user:****@',
     }),
     ('d7sms://user:pass@{}?batch=yes'.format('7' * 14), {
         # valid number
@@ -269,6 +275,9 @@ TEST_URLS = (
         'i' * 24, 't' * 64), {
             'instance': plugins.NotifyDiscord,
             'requests_response_code': requests.codes.no_content,
+
+            # Our expected url(privacy=True) startswith() response:
+            'privacy_url': 'discord://i...i/t...t/',
     }),
     ('discord://%s/%s?format=markdown&footer=Yes&thumbnail=No' % (
         'i' * 24, 't' * 64), {
@@ -374,6 +383,9 @@ TEST_URLS = (
         # tested very well using this matrix.  It will resume in
         # in test_notify_emby_plugin()
         'response': False,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'embys://l2g:****@localhost',
     }),
     # The rest of the emby tests are in test_notify_emby_plugin()
 
@@ -386,6 +398,9 @@ TEST_URLS = (
     # Auth Token specified
     ('faast://%s' % ('a' * 32), {
         'instance': plugins.NotifyFaast,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'faast://a...a',
     }),
     ('faast://%s' % ('a' * 32), {
         'instance': plugins.NotifyFaast,
@@ -428,6 +443,9 @@ TEST_URLS = (
     # Image handling
     ('flock://%s?image=True' % ('t' * 24), {
         'instance': plugins.NotifyFlock,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'flock://t...t',
     }),
     ('flock://%s?image=False' % ('t' * 24), {
         'instance': plugins.NotifyFlock,
@@ -558,6 +576,9 @@ TEST_URLS = (
     ('gitter://%s/apprise?image=Yes' % ('a' * 40), {
         'instance': plugins.NotifyGitter,
         'response': False,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'gitter://a...a/apprise',
     }),
     # Don't include image in post (this is the default anyway)
     ('gitter://%s/apprise?image=No' % ('a' * 40), {
@@ -596,6 +617,9 @@ TEST_URLS = (
     # Provide a hostname and token
     ('gotify://hostname/%s' % ('t' * 16), {
         'instance': plugins.NotifyGotify,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'gotify://hostname/t...t',
     }),
     # Provide a priority
     ('gotify://hostname/%s?priority=high' % ('i' * 16), {
@@ -644,6 +668,9 @@ TEST_URLS = (
     # A nicely formed ifttt url with 1 event and a new key/value store
     ('ifttt://WebHookID@EventID/?+TemplateKey=TemplateVal', {
         'instance': plugins.NotifyIFTTT,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'ifttt://W...D',
     }),
     # Test to= in which case we set the host to the webhook id
     ('ifttt://WebHookID?to=EventID,EventID2', {
@@ -703,6 +730,9 @@ TEST_URLS = (
     # APIKey + device (using to=)
     ('join://%s?to=%s' % ('a' * 32, 'd' * 32), {
         'instance': plugins.NotifyJoin,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'join://a...a/',
     }),
     # APIKey + device
     ('join://%s@%s?image=True' % ('a' * 32, 'd' * 32), {
@@ -770,6 +800,9 @@ TEST_URLS = (
     }),
     ('json://user:pass@localhost', {
         'instance': plugins.NotifyJSON,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'json://user:****@localhost',
     }),
     ('json://user@localhost', {
         'instance': plugins.NotifyJSON,
@@ -789,8 +822,11 @@ TEST_URLS = (
     ('jsons://localhost:8080/path/', {
         'instance': plugins.NotifyJSON,
     }),
-    ('jsons://user:pass@localhost:8080', {
+    ('jsons://user:password@localhost:8080', {
         'instance': plugins.NotifyJSON,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'jsons://user:****@localhost:8080',
     }),
     ('json://:@/', {
         'instance': None,
@@ -817,7 +853,6 @@ TEST_URLS = (
         'instance': plugins.NotifyJSON,
     }),
 
-
     ##################################
     # NotifyKODI
     ##################################
@@ -832,6 +867,9 @@ TEST_URLS = (
     }),
     ('kodi://user:pass@localhost', {
         'instance': plugins.NotifyXBMC,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'kodi://user:****@localhost',
     }),
     ('kodi://localhost:8080', {
         'instance': plugins.NotifyXBMC,
@@ -848,8 +886,11 @@ TEST_URLS = (
     ('kodis://localhost:8080/path/', {
         'instance': plugins.NotifyXBMC,
     }),
-    ('kodis://user:pass@localhost:8080', {
+    ('kodis://user:password@localhost:8080', {
         'instance': plugins.NotifyXBMC,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'kodis://user:****@localhost:8080',
     }),
     ('kodi://localhost', {
         'instance': plugins.NotifyXBMC,
@@ -917,18 +958,27 @@ TEST_URLS = (
     ('kumulos://{}/{}/'.format(UUID4, 'w' * 36), {
         # Everything is okay
         'instance': plugins.NotifyKumulos,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'kumulos://8...2/w...w/',
     }),
     ('kumulos://{}/{}/'.format(UUID4, 'x' * 36), {
         'instance': plugins.NotifyKumulos,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'kumulos://8...2/x...x/',
     }),
     ('kumulos://{}/{}/'.format(UUID4, 'y' * 36), {
         'instance': plugins.NotifyKumulos,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'kumulos://8...2/y...y/',
     }),
     ('kumulos://{}/{}/'.format(UUID4, 'z' * 36), {
         'instance': plugins.NotifyKumulos,
@@ -1041,6 +1091,9 @@ TEST_URLS = (
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'matrix://user:****@localhost:1234/',
     }),
 
     # Matrix supports webhooks too; the following tests this now:
@@ -1134,6 +1187,9 @@ TEST_URLS = (
     }),
     ('mmost://user@localhost/3ccdd113474722377935511fc85d3dd4?to=test', {
         'instance': plugins.NotifyMatterMost,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'mmost://user@localhost/3...4/',
     }),
     ('mmost://localhost/3ccdd113474722377935511fc85d3dd4'
      '?to=test&image=True', {
@@ -1148,6 +1204,9 @@ TEST_URLS = (
          'include_image': False}),
     ('mmost://localhost:8080/3ccdd113474722377935511fc85d3dd4', {
         'instance': plugins.NotifyMatterMost,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'mmost://localhost:8080/3...4/',
     }),
     ('mmost://localhost:0/3ccdd113474722377935511fc85d3dd4', {
         'instance': plugins.NotifyMatterMost,
@@ -1251,6 +1310,9 @@ TEST_URLS = (
     ('msteams://{}@{}/{}/{}?image=No'.format(UUID4, UUID4, 'a' * 32, UUID4), {
         # All tokens provided - we're good  no image
         'instance': plugins.NotifyMSTeams,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'msteams://8...2/a...a/8...2/',
     }),
     ('msteams://{}@{}/{}/{}?tx'.format(UUID4, UUID4, 'a' * 32, UUID4), {
         'instance': plugins.NotifyMSTeams,
@@ -1266,6 +1328,82 @@ TEST_URLS = (
     }),
     ('msteams://{}@{}/{}/{}?tz'.format(UUID4, UUID4, 'a' * 32, UUID4), {
         'instance': plugins.NotifyMSTeams,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
+    # NotifyNexmo
+    ##################################
+    ('nexmo://', {
+        # No API Key specified
+        'instance': TypeError,
+    }),
+    ('nexmo://:@/', {
+        # invalid Auth key
+        'instance': TypeError,
+    }),
+    ('nexmo://{}@12345678'.format('a' * 8), {
+        # Just a key provided
+        'instance': TypeError,
+    }),
+    ('nexmo://{}:{}@_'.format('a' * 8, 'b' * 16), {
+        # key and secret provided but invalid from
+        'instance': TypeError,
+    }),
+    ('nexmo://{}:{}@{}'.format('a' * 23, 'b' * 16, '1' * 11), {
+        # key invalid and secret
+        'instance': TypeError,
+    }),
+    ('nexmo://{}:{}@{}'.format('a' * 8, 'b' * 2, '2' * 11), {
+        # key and invalid secret
+        'instance': TypeError,
+    }),
+    ('nexmo://{}:{}@{}'.format('a' * 8, 'b' * 16, '3' * 9), {
+        # key and secret provided and from but invalid from no
+        'instance': TypeError,
+    }),
+    ('nexmo://{}:{}@{}/?ttl=0'.format('a' * 8, 'b' * 16, '3' * 11), {
+        # Invalid ttl defined
+        'instance': TypeError,
+    }),
+    ('nexmo://{}:{}@{}/123/{}/abcd/'.format(
+        'a' * 8, 'b' * 16, '3' * 11, '9' * 15), {
+        # valid everything but target numbers
+        'instance': plugins.NotifyNexmo,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'nexmo://a...a:****@',
+    }),
+    ('nexmo://{}:{}@{}'.format('a' * 8, 'b' * 16, '5' * 11), {
+        # using phone no with no target - we text ourselves in
+        # this case
+        'instance': plugins.NotifyNexmo,
+    }),
+    ('nexmo://_?key={}&secret={}&from={}'.format(
+        'a' * 8, 'b' * 16, '5' * 11), {
+        # use get args to acomplish the same thing
+        'instance': plugins.NotifyNexmo,
+    }),
+    ('nexmo://_?key={}&secret={}&source={}'.format(
+        'a' * 8, 'b' * 16, '5' * 11), {
+        # use get args to acomplish the same thing (use source instead of from)
+        'instance': plugins.NotifyNexmo,
+    }),
+    ('nexmo://_?key={}&secret={}&from={}&to={}'.format(
+        'a' * 8, 'b' * 16, '5' * 11, '7' * 13), {
+        # use to=
+        'instance': plugins.NotifyNexmo,
+    }),
+    ('nexmo://{}:{}@{}'.format('a' * 8, 'b' * 16, '6' * 11), {
+        'instance': plugins.NotifyNexmo,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('nexmo://{}:{}@{}'.format('a' * 8, 'b' * 16, '6' * 11), {
+        'instance': plugins.NotifyNexmo,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -1308,12 +1446,18 @@ TEST_URLS = (
         'instance': TypeError,
     }),
     # APIKey + No Provider Key (empty)
-    ('prowl://%s///' % ('a' * 40), {
+    ('prowl://%s///' % ('w' * 40), {
         'instance': plugins.NotifyProwl,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'prowl://w...w/',
     }),
     # APIKey + Provider Key
     ('prowl://%s/%s' % ('a' * 40, 'b' * 40), {
         'instance': plugins.NotifyProwl,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'prowl://a...a/b...b',
     }),
     # APIKey + with image
     ('prowl://%s' % ('a' * 40), {
@@ -1363,6 +1507,9 @@ TEST_URLS = (
     # APIKey + 2 channels
     ('pbul://%s/#channel1/#channel2' % ('a' * 32), {
         'instance': plugins.NotifyPushBullet,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'pbul://a...a/',
     }),
     # APIKey + device
     ('pbul://%s/device/' % ('a' * 32), {
@@ -1439,6 +1586,9 @@ TEST_URLS = (
     # APIkey
     ('push://%s' % UUID4, {
         'instance': plugins.NotifyTechulusPush,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'push://8...2/',
     }),
     # APIKey + bad url
     ('push://:@/', {
@@ -1488,6 +1638,9 @@ TEST_URLS = (
     # Application Key+Secret + dropped entry
     ('pushed://%s/%s/dropped/' % ('a' * 32, 'a' * 64), {
         'instance': plugins.NotifyPushed,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'pushed://a...a/****/',
     }),
     # Application Key+Secret + 2 channels
     ('pushed://%s/%s/#channel1/#channel2' % ('a' * 32, 'a' * 64), {
@@ -1589,6 +1742,9 @@ TEST_URLS = (
     # Specify your own server with login (secret= MUST be provided)
     ('pjet://user:pass@localhost?secret=%s' % ('a' * 32), {
         'instance': plugins.NotifyPushjet,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'pjet://user:****@localhost',
     }),
     # Specify your own server with login (no secret = fail normally)
     # however this will work since we're providing depricated support
@@ -1662,6 +1818,9 @@ TEST_URLS = (
     # APIKey + Valid User + 2 Devices
     ('pover://%s@%s/DEVICE1/DEVICE2/' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'pover://u...u@a...a',
     }),
     # APIKey + Valid User + invalid device
     ('pover://%s@%s/%s/' % ('u' * 30, 'a' * 30, 'd' * 30), {
@@ -1850,6 +2009,8 @@ TEST_URLS = (
                 'userId': 'user',
             },
         },
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'rocket://user:****@localhost',
     }),
     # A user/pass where the pass matches a webtoken
     # to ensure we get the right mode, we enforce basic mode
@@ -1891,6 +2052,9 @@ TEST_URLS = (
     ('rockets://web/token@localhost/?avatar=No', {
         # a simple webhook token with default values
         'instance': plugins.NotifyRocketChat,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'rockets://w...n@localhost',
     }),
     ('rockets://localhost/@user/?mode=webhook&webhook=web/token', {
         'instance': plugins.NotifyRocketChat,
@@ -1975,6 +2139,9 @@ TEST_URLS = (
         # No username specified; this is still okay as we use whatever
         # the user told the webhook to use; set our ryver mode
         'instance': plugins.NotifyRyver,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'ryver://apprise/c...G',
     }),
     # Support Native URLs
     ('https://apprise.ryver.com/application/webhook/ckhrjW8w672m6HG', {
@@ -2058,6 +2225,9 @@ TEST_URLS = (
      '?template={}&+sub=value&+sub2=value2'.format(UUID4), {
          # A good email with a template + substitutions
          'instance': plugins.NotifySendGrid,
+
+         # Our expected url(privacy=True) startswith() response:
+         'privacy_url': 'sendgrid://a...d:user@example.com/',
      }),
     ('sendgrid://abcd:user@example.ca/newuser@example.ca', {
         'instance': plugins.NotifySendGrid,
@@ -2092,13 +2262,16 @@ TEST_URLS = (
         # Expected notify() response
         'notify_response': False,
     }),
-    ('spush://{}'.format('X' * 14), {
+    ('spush://{}'.format('Y' * 14), {
         # API Key valid and expected response was valid
         'instance': plugins.NotifySimplePush,
         # Set our response to OK
         'requests_response_text': {
             'status': 'OK',
         },
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'spush://Y...Y/',
     }),
     ('spush://{}?event=Not%20So%20Good'.format('X' * 14), {
         # API Key valid and expected response was valid
@@ -2117,6 +2290,9 @@ TEST_URLS = (
         'requests_response_text': {
             'status': 'OK',
         },
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'spush://****:****@X...X/',
     }),
     ('spush://{}'.format('Y' * 14), {
         'instance': plugins.NotifySimplePush,
@@ -2176,6 +2352,9 @@ TEST_URLS = (
     ('slack://username@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/' \
         '?to=#nuxref', {
             'instance': plugins.NotifySlack,
+
+            # Our expected url(privacy=True) startswith() response:
+            'privacy_url': 'slack://username@T...2/A...D/T...Q/',
         }),
     ('slack://username@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#nuxref', {
         'instance': plugins.NotifySlack,
@@ -2248,6 +2427,9 @@ TEST_URLS = (
     ('sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/us-east-1', {
         # Missing a topic and/or phone No
         'instance': plugins.NotifySNS,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'sns://T...2/****/us-east-1',
     }),
     ('sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/us-east-1' \
         '?to=12223334444', {
@@ -2453,6 +2635,9 @@ TEST_URLS = (
     ('twilio://AC{}:{}@12345/{}'.format('a' * 32, 'b' * 32, '4' * 11), {
         # using short-code (5 characters)
         'instance': plugins.NotifyTwilio,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'twilio://...aaaa:b...b@12345',
     }),
     ('twilio://AC{}:{}@123456/{}'.format('a' * 32, 'b' * 32, '4' * 11), {
         # using short-code (6 characters)
@@ -2518,6 +2703,9 @@ TEST_URLS = (
         # Expected notify() response is False because internally we would
         # have failed to login
         'notify_response': False,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'twist://****:user1@example.com',
     }),
     ('twist://password:user2@example.com', {
         # password:login acceptable
@@ -2572,6 +2760,9 @@ TEST_URLS = (
         # Expected notify() response False (because we won't be able
         # to detect our user)
         'notify_response': False,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'twitter://c...y/****/a...n/****',
     }),
     ('twitter://consumer_key/consumer_secret/access_token/access_secret'
         '?cache=no', {
@@ -2743,6 +2934,9 @@ TEST_URLS = (
     ('msg91://{}/15551232000'.format('a' * 23), {
         # a valid message
         'instance': plugins.NotifyMSG91,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'msg91://a...a/15551232000',
     }),
     ('msg91://{}/?to=15551232000'.format('a' * 23), {
         # a valid message
@@ -2796,6 +2990,9 @@ TEST_URLS = (
     ('msgbird://{}/15551232000/abcd'.format('a' * 25), {
         # invalid target phone number; we fall back to texting ourselves
         'instance': plugins.NotifyMessageBird,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'msgbird://a...a/15551232000',
     }),
     ('msgbird://{}/15551232000/123'.format('a' * 25), {
         # invalid target phone number; we fall back to texting ourselves
@@ -2825,79 +3022,6 @@ TEST_URLS = (
     }),
 
     ##################################
-    # NotifyNexmo
-    ##################################
-    ('nexmo://', {
-        # No API Key specified
-        'instance': TypeError,
-    }),
-    ('nexmo://:@/', {
-        # invalid Auth key
-        'instance': TypeError,
-    }),
-    ('nexmo://{}@12345678'.format('a' * 8), {
-        # Just a key provided
-        'instance': TypeError,
-    }),
-    ('nexmo://{}:{}@_'.format('a' * 8, 'b' * 16), {
-        # key and secret provided but invalid from
-        'instance': TypeError,
-    }),
-    ('nexmo://{}:{}@{}'.format('a' * 23, 'b' * 16, '1' * 11), {
-        # key invalid and secret
-        'instance': TypeError,
-    }),
-    ('nexmo://{}:{}@{}'.format('a' * 8, 'b' * 2, '2' * 11), {
-        # key and invalid secret
-        'instance': TypeError,
-    }),
-    ('nexmo://{}:{}@{}'.format('a' * 8, 'b' * 16, '3' * 9), {
-        # key and secret provided and from but invalid from no
-        'instance': TypeError,
-    }),
-    ('nexmo://{}:{}@{}/?ttl=0'.format('a' * 8, 'b' * 16, '3' * 11), {
-        # Invalid ttl defined
-        'instance': TypeError,
-    }),
-    ('nexmo://{}:{}@{}/123/{}/abcd/'.format(
-        'a' * 8, 'b' * 16, '3' * 11, '9' * 15), {
-        # valid everything but target numbers
-        'instance': plugins.NotifyNexmo,
-    }),
-    ('nexmo://{}:{}@{}'.format('a' * 8, 'b' * 16, '5' * 11), {
-        # using phone no with no target - we text ourselves in
-        # this case
-        'instance': plugins.NotifyNexmo,
-    }),
-    ('nexmo://_?key={}&secret={}&from={}'.format(
-        'a' * 8, 'b' * 16, '5' * 11), {
-        # use get args to acomplish the same thing
-        'instance': plugins.NotifyNexmo,
-    }),
-    ('nexmo://_?key={}&secret={}&source={}'.format(
-        'a' * 8, 'b' * 16, '5' * 11), {
-        # use get args to acomplish the same thing (use source instead of from)
-        'instance': plugins.NotifyNexmo,
-    }),
-    ('nexmo://_?key={}&secret={}&from={}&to={}'.format(
-        'a' * 8, 'b' * 16, '5' * 11, '7' * 13), {
-        # use to=
-        'instance': plugins.NotifyNexmo,
-    }),
-    ('nexmo://{}:{}@{}'.format('a' * 8, 'b' * 16, '6' * 11), {
-        'instance': plugins.NotifyNexmo,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('nexmo://{}:{}@{}'.format('a' * 8, 'b' * 16, '6' * 11), {
-        'instance': plugins.NotifyNexmo,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
-
-    ##################################
     # NotifyWebexTeams
     ##################################
     ('wxteams://', {
@@ -2917,6 +3041,9 @@ TEST_URLS = (
     ('wxteams://{}'.format('a' * 80), {
         # token provided - we're good
         'instance': plugins.NotifyWebexTeams,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'wxteams://a...a/',
     }),
     # Support Native URLs
     ('https://api.ciscospark.com/v1/webhooks/incoming/{}'.format('a' * 80), {
@@ -3023,6 +3150,9 @@ TEST_URLS = (
     }),
     ('xml://user:pass@localhost', {
         'instance': plugins.NotifyXML,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'xml://user:****@localhost',
     }),
     ('xml://localhost:8080', {
         'instance': plugins.NotifyXML,
@@ -3035,6 +3165,9 @@ TEST_URLS = (
     }),
     ('xmls://user:pass@localhost', {
         'instance': plugins.NotifyXML,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'xmls://user:****@localhost',
     }),
     ('xmls://localhost:8080/path/', {
         'instance': plugins.NotifyXML,
@@ -3095,6 +3228,9 @@ TEST_URLS = (
     # Valid everything - no target so default is used
     ('zulip://botname@apprise/{}'.format('a' * 32), {
         'instance': plugins.NotifyZulip,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'zulip://botname@apprise/a...a/',
     }),
     # Valid everything - organization as hostname
     ('zulip://botname@apprise.zulipchat.com/{}'.format('a' * 32), {
@@ -3177,6 +3313,10 @@ def test_rest_plugins(mock_post, mock_get):
         # Our expected Notify response (True or False)
         notify_response = meta.get('notify_response', response)
 
+        # Our expected privacy url
+        # Don't set this if don't need to check it's value
+        privacy_url = meta.get('privacy_url')
+
         # Allow us to force the server response code to be something other then
         # the defaults
         requests_response_code = meta.get(
@@ -3257,10 +3397,18 @@ def test_rest_plugins(mock_post, mock_get):
                 # We loaded okay; now lets make sure we can reverse this url
                 assert isinstance(obj.url(), six.string_types) is True
 
+                # Test url() with privacy=True
+                assert isinstance(
+                    obj.url(privacy=True), six.string_types) is True
+
                 # Some Simple Invalid Instance Testing
                 assert instance.parse_url(None) is None
                 assert instance.parse_url(object) is None
                 assert instance.parse_url(42) is None
+
+                if privacy_url:
+                    # Assess that our privacy url is as expected
+                    assert obj.url(privacy=True).startswith(privacy_url)
 
                 # Instantiate the exact same object again using the URL from
                 # the one that was already created properly
@@ -4798,6 +4946,11 @@ def test_notify_telegram_plugin(mock_post, mock_get):
 
     # test url call
     assert isinstance(obj.url(), six.string_types) is True
+
+    # test privacy version of url
+    assert isinstance(obj.url(privacy=True), six.string_types) is True
+    assert obj.url(privacy=True).startswith('tgram://1...p/') is True
+
     # Test that we can load the string we generate back:
     obj = plugins.NotifyTelegram(**plugins.NotifyTelegram.parse_url(obj.url()))
     assert isinstance(obj, plugins.NotifyTelegram) is True

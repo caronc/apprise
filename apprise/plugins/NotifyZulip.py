@@ -328,7 +328,7 @@ class NotifyZulip(NotifyBase):
 
         return not has_error
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -349,9 +349,9 @@ class NotifyZulip(NotifyBase):
         return '{schema}://{botname}@{org}/{token}/' \
             '{targets}?{args}'.format(
                 schema=self.secure_protocol,
-                botname=self.botname,
+                botname=NotifyZulip.quote(self.botname, safe=''),
                 org=NotifyZulip.quote(organization, safe=''),
-                token=NotifyZulip.quote(self.token, safe=''),
+                token=self.pprint(self.token, privacy, safe=''),
                 targets='/'.join(
                     [NotifyZulip.quote(x, safe='') for x in self.targets]),
                 args=NotifyZulip.urlencode(args),

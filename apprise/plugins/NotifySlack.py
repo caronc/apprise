@@ -388,7 +388,7 @@ class NotifySlack(NotifyBase):
 
         return not has_error
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -412,9 +412,9 @@ class NotifySlack(NotifyBase):
             '?{args}'.format(
                 schema=self.secure_protocol,
                 botname=botname,
-                token_a=NotifySlack.quote(self.token_a, safe=''),
-                token_b=NotifySlack.quote(self.token_b, safe=''),
-                token_c=NotifySlack.quote(self.token_c, safe=''),
+                token_a=self.pprint(self.token_a, privacy, safe=''),
+                token_b=self.pprint(self.token_b, privacy, safe=''),
+                token_c=self.pprint(self.token_c, privacy, safe=''),
                 targets='/'.join(
                     [NotifySlack.quote(x, safe='') for x in self.channels]),
                 args=NotifySlack.urlencode(args),

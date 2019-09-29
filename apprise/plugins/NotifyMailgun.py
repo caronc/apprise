@@ -310,7 +310,7 @@ class NotifyMailgun(NotifyBase):
 
         return not has_error
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -331,7 +331,7 @@ class NotifyMailgun(NotifyBase):
             schema=self.secure_protocol,
             host=self.host,
             user=NotifyMailgun.quote(self.user, safe=''),
-            apikey=NotifyMailgun.quote(self.apikey, safe=''),
+            apikey=self.pprint(self.apikey, privacy, safe=''),
             targets='/'.join(
                 [NotifyMailgun.quote(x, safe='') for x in self.targets]),
             args=NotifyMailgun.urlencode(args))

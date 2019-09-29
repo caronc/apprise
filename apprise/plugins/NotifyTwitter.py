@@ -33,6 +33,7 @@ from requests_oauthlib import OAuth1
 from json import dumps
 from json import loads
 from .NotifyBase import NotifyBase
+from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..utils import parse_list
 from ..utils import parse_bool
@@ -558,7 +559,7 @@ class NotifyTwitter(NotifyBase):
         """
         return 10000 if self.mode == TwitterMessageMode.DM else 280
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -578,10 +579,12 @@ class NotifyTwitter(NotifyBase):
         return '{schema}://{ckey}/{csecret}/{akey}/{asecret}' \
             '/{targets}/?{args}'.format(
                 schema=self.secure_protocol[0],
-                ckey=NotifyTwitter.quote(self.ckey, safe=''),
-                asecret=NotifyTwitter.quote(self.csecret, safe=''),
-                akey=NotifyTwitter.quote(self.akey, safe=''),
-                csecret=NotifyTwitter.quote(self.asecret, safe=''),
+                ckey=self.pprint(self.ckey, privacy, safe=''),
+                csecret=self.pprint(
+                    self.csecret, privacy, mode=PrivacyMode.Secret, safe=''),
+                akey=self.pprint(self.akey, privacy, safe=''),
+                asecret=self.pprint(
+                    self.asecret, privacy, mode=PrivacyMode.Secret, safe=''),
                 targets='/'.join(
                     [NotifyTwitter.quote('@{}'.format(target), safe='')
                      for target in self.targets]),

@@ -38,6 +38,7 @@ except ImportError:
     from urllib.parse import urlparse
 
 from .NotifyBase import NotifyBase
+from ..URLBase import PrivacyMode
 from ..utils import parse_bool
 from ..common import NotifyType
 from ..common import NotifyImageSize
@@ -330,7 +331,7 @@ class NotifyBoxcar(NotifyBase):
 
         return True
 
-    def url(self):
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
@@ -343,10 +344,11 @@ class NotifyBoxcar(NotifyBase):
             'verify': 'yes' if self.verify_certificate else 'no',
         }
 
-        return '{schema}://{access}/{secret}/{targets}/?{args}'.format(
+        return '{schema}://{access}/{secret}/{targets}?{args}'.format(
             schema=self.secure_protocol,
-            access=NotifyBoxcar.quote(self.access, safe=''),
-            secret=NotifyBoxcar.quote(self.secret, safe=''),
+            access=self.pprint(self.access, privacy, safe=''),
+            secret=self.pprint(
+                self.secret, privacy, mode=PrivacyMode.Secret, safe=''),
             targets='/'.join([
                 NotifyBoxcar.quote(x, safe='') for x in chain(
                     self.tags, self.device_tokens) if x != DEFAULT_TAG]),
