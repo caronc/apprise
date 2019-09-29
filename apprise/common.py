@@ -128,3 +128,7 @@ CONFIG_FORMATS = (
     ConfigFormat.TEXT,
     ConfigFormat.YAML,
 )
+
+# This is a reserved tag that is automatically assigned to every
+# Notification Plugin
+MATCH_ALL_TAG = 'all'

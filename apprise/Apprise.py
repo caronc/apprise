@@ -30,6 +30,7 @@ from markdown import markdown
 from itertools import chain
 from .common import NotifyType
 from .common import NotifyFormat
+from .common import MATCH_ALL_TAG
 from .utils import is_exclusive_match
 from .utils import parse_list
 from .utils import split_urls
@@ -273,29 +274,11 @@ class Apprise(object):
         """
         self.servers[:] = []
 
-    def notify(self, body, title='', notify_type=NotifyType.INFO,
-               body_format=None, tag=None):
+    def find(self, tag=MATCH_ALL_TAG):
         """
-        Send a notification to all of the plugins previously loaded.
-
-        If the body_format specified is NotifyFormat.MARKDOWN, it will
-        be converted to HTML if the Notification type expects this.
-
-        if the tag is specified (either a string or a set/list/tuple
-        of strings), then only the notifications flagged with that
-        tagged value are notified.  By default all added services
-        are notified (tag=None)
+        Returns an list of all servers matching against the tag specified.
 
         """
-
-        # Initialize our return result
-        status = len(self) > 0
-
-        if not (title or body):
-            return False
-
-        # Tracks conversions
-        conversion_map = dict()
 
         # Build our tag setup
         #   - top level entries are treated as an 'or'
@@ -319,78 +302,120 @@ class Apprise(object):
 
             for server in servers:
                 # Apply our tag matching based on our defined logic
-                if tag is not None and not is_exclusive_match(
-                        logic=tag, data=server.tags):
-                    continue
+                if is_exclusive_match(
+                        logic=tag, data=server.tags, match_all=MATCH_ALL_TAG):
+                    yield server
+        return
 
-                # If our code reaches here, we either did not define a tag (it
-                # was set to None), or we did define a tag and the logic above
-                # determined we need to notify the service it's associated with
-                if server.notify_format not in conversion_map:
-                    if body_format == NotifyFormat.MARKDOWN and \
-                            server.notify_format == NotifyFormat.HTML:
+    def notify(self, body, title='', notify_type=NotifyType.INFO,
+               body_format=None, tag=MATCH_ALL_TAG):
+        """
+        Send a notification to all of the plugins previously loaded.
 
-                        # Apply Markdown
-                        conversion_map[server.notify_format] = markdown(body)
+        If the body_format specified is NotifyFormat.MARKDOWN, it will
+        be converted to HTML if the Notification type expects this.
 
-                    elif body_format == NotifyFormat.TEXT and \
-                            server.notify_format == NotifyFormat.HTML:
+        if the tag is specified (either a string or a set/list/tuple
+        of strings), then only the notifications flagged with that
+        tagged value are notified.  By default all added services
+        are notified (tag=MATCH_ALL_TAG)
 
-                        # Basic TEXT to HTML format map; supports keys only
-                        re_map = {
-                            # Support Ampersand
-                            r'&': '&amp;',
+        This function returns True if all notifications were successfully
+        sent, False if even just one of them fails, and None if no
+        notifications were sent at all as a result of tag filtering and/or
+        simply having empty configuration files that were read.
+        """
 
-                            # Spaces to &nbsp; for formatting purposes since
-                            # multiple spaces are treated as one an this may
-                            # not be the callers intention
-                            r' ': '&nbsp;',
+        if len(self) == 0:
+            # Nothing to notify
+            return False
 
-                            # Tab support
-                            r'\t': '&nbsp;&nbsp;&nbsp;',
+        # Initialize our return result which only turns to True if we send
+        # at least one valid notification
+        status = None
 
-                            # Greater than and Less than Characters
-                            r'>': '&gt;',
-                            r'<': '&lt;',
-                        }
+        if not (title or body):
+            return False
 
-                        # Compile our map
-                        re_table = re.compile(
-                            r'(' + '|'.join(
-                                map(re.escape, re_map.keys())) + r')',
-                            re.IGNORECASE,
-                        )
+        # Tracks conversions
+        conversion_map = dict()
 
-                        # Execute our map against our body in addition to
-                        # swapping out new lines and replacing them with <br/>
-                        conversion_map[server.notify_format] = \
-                            re.sub(r'\r*\n', '<br/>\r\n',
-                                   re_table.sub(
-                                       lambda x: re_map[x.group()], body))
+        # Iterate over our loaded plugins
+        for server in self.find(tag):
+            if status is None:
+                # We have at least one server to notify; change status
+                # to be a default value of True from now (purely an
+                # initialiation at this point)
+                status = True
 
-                    else:
-                        # Store entry directly
-                        conversion_map[server.notify_format] = body
+            # If our code reaches here, we either did not define a tag (it
+            # was set to None), or we did define a tag and the logic above
+            # determined we need to notify the service it's associated with
+            if server.notify_format not in conversion_map:
+                if body_format == NotifyFormat.MARKDOWN and \
+                        server.notify_format == NotifyFormat.HTML:
 
-                try:
-                    # Send notification
-                    if not server.notify(
-                            body=conversion_map[server.notify_format],
-                            title=title,
-                            notify_type=notify_type):
+                    # Apply Markdown
+                    conversion_map[server.notify_format] = markdown(body)
 
-                        # Toggle our return status flag
-                        status = False
+                elif body_format == NotifyFormat.TEXT and \
+                        server.notify_format == NotifyFormat.HTML:
 
-                except TypeError:
-                    # These our our internally thrown notifications
+                    # Basic TEXT to HTML format map; supports keys only
+                    re_map = {
+                        # Support Ampersand
+                        r'&': '&amp;',
+
+                        # Spaces to &nbsp; for formatting purposes since
+                        # multiple spaces are treated as one an this may
+                        # not be the callers intention
+                        r' ': '&nbsp;',
+
+                        # Tab support
+                        r'\t': '&nbsp;&nbsp;&nbsp;',
+
+                        # Greater than and Less than Characters
+                        r'>': '&gt;',
+                        r'<': '&lt;',
+                    }
+
+                    # Compile our map
+                    re_table = re.compile(
+                        r'(' + '|'.join(
+                            map(re.escape, re_map.keys())) + r')',
+                        re.IGNORECASE,
+                    )
+
+                    # Execute our map against our body in addition to
+                    # swapping out new lines and replacing them with <br/>
+                    conversion_map[server.notify_format] = \
+                        re.sub(r'\r*\n', '<br/>\r\n',
+                               re_table.sub(
+                                   lambda x: re_map[x.group()], body))
+
+                else:
+                    # Store entry directly
+                    conversion_map[server.notify_format] = body
+
+            try:
+                # Send notification
+                if not server.notify(
+                        body=conversion_map[server.notify_format],
+                        title=title,
+                        notify_type=notify_type):
+
+                    # Toggle our return status flag
                     status = False
 
-                except Exception:
-                    # A catch all so we don't have to abort early
-                    # just because one of our plugins has a bug in it.
-                    logger.exception("Notification Exception")
-                    status = False
+            except TypeError:
+                # These our our internally thrown notifications
+                status = False
+
+            except Exception:
+                # A catch all so we don't have to abort early
+                # just because one of our plugins has a bug in it.
+                logger.exception("Notification Exception")
+                status = False
 
         return status
 

@@ -30,6 +30,7 @@ from . import ConfigBase
 from . import URLBase
 from .AppriseAsset import AppriseAsset
 
+from .common import MATCH_ALL_TAG
 from .utils import GET_SCHEMA_RE
 from .utils import parse_list
 from .utils import is_exclusive_match
@@ -133,7 +134,7 @@ class AppriseConfig(object):
         # Return our status
         return return_status
 
-    def servers(self, tag=None, cache=True):
+    def servers(self, tag=MATCH_ALL_TAG, cache=True):
         """
         Returns all of our servers dynamically build based on parsed
         configuration.
@@ -160,13 +161,11 @@ class AppriseConfig(object):
         for entry in self.configs:
 
             # Apply our tag matching based on our defined logic
-            if tag is not None and not is_exclusive_match(
-                    logic=tag, data=entry.tags):
-                continue
-
-            # Build ourselves a list of services dynamically and return the
-            # as a list
-            response.extend(entry.servers(cache=cache))
+            if is_exclusive_match(
+                    logic=tag, data=entry.tags, match_all=MATCH_ALL_TAG):
+                # Build ourselves a list of services dynamically and return the
+                # as a list
+                response.extend(entry.servers(cache=cache))
 
         return response
 

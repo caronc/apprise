@@ -148,6 +148,35 @@ apprise -t 'my title' -b 'my notification body' \
 apprise -t 'my title' -b 'my notification body' \
 	--config=/path/to/my/config.yml \
 	--config=https://localhost/my/apprise/config
+
+```
+
+If you just want to see the Apprise services loaded out of all of your configuration files but not actually perform the notification itself, you can use the **--dry-run** (**-d**) switch. This will just print the notifications that would have otherwise been notified with the same action and exits. The best part is that the output is carefully formatted to hide private elements such as your password, API Keys, and tokens from prying eyes.
+```bash
+# Use --dry-run (or -d) to just print out the match
+# notifications; but not actually perform the notification
+# itself.
+apprise --dry-run \
+	--config=/path/to/my/config.yml \
+	--config=https://localhost/my/apprise/config
+
+# If your notifications are hidden behind tags, then the above
+# command may not output anything.  In this case, just add the
+# --tag=all switch. 'all' matches against everything!
+apprise --dry-run \
+	--config=/path/to/my/config.yml \
+	--config=https://localhost/my/apprise/config \
+    --tag=all
+
+# Use the --dry-run with --tag (assuming you tagged your URLs)
+# to find the perfect trigger. If your configuration files have
+# all loaded from their default locations, then the command
+# can be as simple as this:
+apprise --dry-run --tag=friends
+
+# When you're happy, just drop the --dry-run to send off all of
+# your notifications:
+apprise --tag=friends
 ```
 
 ## Developers

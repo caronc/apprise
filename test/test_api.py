@@ -461,11 +461,12 @@ def test_apprise_tagging(mock_post, mock_get):
     assert(a.notify(
         title="my title", body="my body", tag=['awesome', 'mmost']) is True)
 
-    # there is nothing to notify using tags 'missing'. However we intentionally
-    # don't fail as there is value in identifying a tag that simply have
-    # nothing to notify from while the object itself contains items
+    # When we query against our loaded notifications for a tag that simply
+    # isn't assigned to anything, we return None.  None (different then False)
+    # tells us that we litterally had nothing to query.  We didn't fail...
+    # but we also didn't do anything...
     assert(a.notify(
-        title="my title", body="my body", tag='missing') is True)
+        title="my title", body="my body", tag='missing') is None)
 
     # Now to test the ability to and and/or notifications
     a = Apprise()
@@ -494,10 +495,10 @@ def test_apprise_tagging(mock_post, mock_get):
         title="my title", body="my body", tag=[('TagC', 'TagD')]) is True)
 
     # Expression: (TagY and TagZ) or TagX
-    # Matches nothing
+    # Matches nothing, None is returned in this case
     assert(a.notify(
         title="my title", body="my body",
-        tag=[('TagY', 'TagZ'), 'TagX']) is True)
+        tag=[('TagY', 'TagZ'), 'TagX']) is None)
 
     # Expression: (TagY and TagZ) or TagA
     # Matches the following only:
@@ -515,10 +516,11 @@ def test_apprise_tagging(mock_post, mock_get):
         title="my title", body="my body",
         tag=[('TagE', 'TagD'), 'TagB']) is True)
 
-    # Garbage Entries
+    # Garbage Entries; we can't do anything with the tag so we have nothing to
+    # notify as a result.  So we simply return None
     assert(a.notify(
         title="my title", body="my body",
-        tag=[(object, ), ]) is True)
+        tag=[(object, ), ]) is None)
 
 
 def test_apprise_notify_formats(tmpdir):
