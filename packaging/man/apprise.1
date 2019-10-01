@@ -1,7 +1,7 @@
 .\" generated with Ronn/v0.7.3
 .\" http://github.com/rtomayko/ronn/tree/0.7.3
 .
-.TH "APPRISE" "1" "March 2019" "" ""
+.TH "APPRISE" "1" "September 2019" "" ""
 .
 .SH "NAME"
 \fBapprise\fR \- Push Notifications that work with just about every platform!
@@ -51,6 +51,10 @@ Specify the default theme\.
 .TP
 \fB\-g\fR, \fB\-\-tag=\fRTAG
 Specify one or more tags to filter which services to notify\. Use multiple \fB\-\-tag\fR (\fB\-g\fR) entries to \fBOR\fR the tags together and comma separated to \fBAND\fR them\. If no tags are specified then all services are notified\.
+.
+.TP
+\fB\-d\fR, \fB\-\-dry\-run\fR
+Perform a trial run but only prints the notification services to\-be triggered to \fBstdout\fR\. Notifications are never sent using this mode\.
 .
 .TP
 \fB\-v\fR, \fB\-\-verbose\fR

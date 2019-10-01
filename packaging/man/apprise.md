@@ -42,6 +42,10 @@ The Apprise options are as follows:
     **--tag** (**-g**) entries to `OR` the tags together and comma separated
     to `AND` them. If no tags are specified then all services are notified.
 
+  * `-d`, `--dry-run`:
+    Perform a trial run but only prints the notification services to-be
+    triggered to **stdout**. Notifications are never sent using this mode.
+
   * `-v`, `--verbose`:
     The more of these you specify, the more verbose the output is.
 

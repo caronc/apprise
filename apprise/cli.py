@@ -113,8 +113,8 @@ def print_version_msg():
               'If no tags are specified then all services are notified.')
 @click.option('--dry-run', '-d', is_flag=True,
               help='Perform a trial run but only prints the notification '
-              'services to-be triggered to the screen instead of actually '
-              'performing the action.')
+              'services to-be triggered to stdout. Notifications are never '
+              'sent using this mode.')
 @click.option('--verbose', '-v', count=True)
 @click.option('--version', '-V', is_flag=True,
               help='Display the apprise version and exit.')
