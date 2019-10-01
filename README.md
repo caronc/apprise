@@ -6,7 +6,7 @@
 To inform or tell (someone). To make one aware of something.
 <hr/>
 
-*Apprise* allows you to send a notification to *almost* all of the most popular *notification* services available to us today such as: Telegram, Discord, Slack, Twitter, etc.
+*Apprise* allows you to send a notification to *almost* all of the most popular *notification* services available to us today such as: Telegram, Discord, Slack, Amazon SNS, Gotify, etc.
 
 * One notification library to rule them all.
 * A common and intuitive notification syntax.
@@ -28,7 +28,7 @@ System Administrators who wish to send a notification from a scheduled task or f
 The section identifies all of the services supported by this library. [Check out the wiki for more information on the supported modules here](https://github.com/caronc/apprise/wiki).
 
 ### Popular Notification Services
-The table below identifies the services this tool supports and some example service urls you need to use in order to take advantage of it.
+The table below identifies the services this tool supports and some example service urls you need to use in order to take advantage of it. Click on any of the services listed below to get more details on how you can configure Apprise to access them.
 
 | Notification Service | Service ID | Default Port | Example Syntax |
 | -------------------- | ---------- | ------------ | -------------- |
@@ -121,7 +121,7 @@ uptime | apprise \
 ```
 
 ### Configuration Files
-No one wants to put there credentials out for everyone to see on the command line.  No problem *apprise* also supports configuration files.  It can handle both a specific [YAML format](https://github.com/caronc/apprise/wiki/config_yaml) or a very simple [TEXT format](https://github.com/caronc/apprise/wiki/config_text). You can also pull these configuration files via an HTTP query too! More information concerning Apprise configuration can be found [here](https://github.com/caronc/apprise/wiki/config)
+No one wants to put there credentials out for everyone to see on the command line.  No problem *apprise* also supports configuration files.  It can handle both a specific [YAML format](https://github.com/caronc/apprise/wiki/config_yaml) or a very simple [TEXT format](https://github.com/caronc/apprise/wiki/config_text). You can also pull these configuration files via an HTTP query too! You can read more about the expected structure of the configuration files [here](https://github.com/caronc/apprise/wiki/config).
 ```bash
 # By default now if no url or configuration is specified aprise will
 # peek for this data in:
@@ -139,44 +139,16 @@ No one wants to put there credentials out for everyone to see on the command lin
 # If you loaded one of those files, your command line gets really easy:
 apprise -t 'my title' -b 'my notification body'
 
-# Know the location of the configuration source? No problem, just
-# specify it.
+# If you want to deviate from the default paths or specify more than one,
+# just specify them using the --config switch:
 apprise -t 'my title' -b 'my notification body' \
 	--config=/path/to/my/config.yml
 
-# Got lots of configuration locations? No problem, specify them all:
+# Got lots of configuration locations? No problem, you can specify them all:
+# Apprise can even fetch the configuration from over a network!
 apprise -t 'my title' -b 'my notification body' \
 	--config=/path/to/my/config.yml \
 	--config=https://localhost/my/apprise/config
-
-```
-
-If you just want to see the Apprise services loaded out of all of your configuration files but not actually perform the notification itself, you can use the **--dry-run** (**-d**) switch. This will just print the notifications that would have otherwise been notified with the same action and exits. The best part is that the output is carefully formatted to hide private elements such as your password, API Keys, and tokens from prying eyes.
-```bash
-# Use --dry-run (or -d) to just print out the match
-# notifications; but not actually perform the notification
-# itself.
-apprise --dry-run \
-	--config=/path/to/my/config.yml \
-	--config=https://localhost/my/apprise/config
-
-# If your notifications are hidden behind tags, then the above
-# command may not output anything.  In this case, just add the
-# --tag=all switch. 'all' matches against everything!
-apprise --dry-run \
-	--config=/path/to/my/config.yml \
-	--config=https://localhost/my/apprise/config \
-    --tag=all
-
-# Use the --dry-run with --tag (assuming you tagged your URLs)
-# to find the perfect trigger. If your configuration files have
-# all loaded from their default locations, then the command
-# can be as simple as this:
-apprise --dry-run --tag=friends
-
-# When you're happy, just drop the --dry-run to send off all of
-# your notifications:
-apprise --tag=friends
 ```
 
 ## Developers
@@ -188,8 +160,8 @@ import apprise
 apobj = apprise.Apprise()
 
 # Add all of the notification services by their server url.
-# A sample email notification
-apobj.add('mailto://myemail:mypass@gmail.com')
+# A sample email notification:
+apobj.add('mailto://myuserid:mypass@gmail.com')
 
 # A sample pushbullet notification
 apobj.add('pbul://o.gn5kj6nfhv736I7jC3cj3QLRiyhgl98b')
@@ -203,7 +175,7 @@ apobj.notify(
 ```
 
 ### Configuration Files
-Developers need access to configuration files too. The good news is their use just involves declaring another object (called *AppriseConfig*) that the *Apprise* object can ingest.  You can also freely mix and match config and notification entries as often as you wish!
+Developers need access to configuration files too. The good news is their use just involves declaring another object (called *AppriseConfig*) that the *Apprise* object can ingest.  You can also freely mix and match config and notification entries as often as you wish! You can read more about the expected structure of the configuration files [here](https://github.com/caronc/apprise/wiki/config).
 ```python
 import apprise
 
@@ -224,25 +196,34 @@ apobj.add(config)
 
 # You can mix and match; add an entry directly if you want too
 # In this entry we associate the 'admin' tag with our notification
-apobj.add('mailto://myemail:mypass@gmail.com', tag='admin')
+apobj.add('mailto://myuser:mypass@hotmail.com', tag='admin')
 
 # Then notify these services any time you desire. The below would
-# notify all of the services loaded into our Apprise object; this includes
-# all items identified in the configuration files.
+# notify all of the services that have not been bound to any specific
+# tag.
 apobj.notify(
     body='what a great notification service!',
     title='my notification title',
 )
 
-# If you're using tagging, then you can load all of your notifications
-# but only selectively notify the ones associated with one or more 
-# matched tags:
+# Tagging allows you to specifically target only specific notification
+# services you've loaded:
 apobj.notify(
     body='send a notification to our admin group'
     title='Attention Admins',
     # notify any services tagged with the 'admin' tag
     tag='admin',
 )
+
+# If you want to notify absolutely everything (reguardless of whether
+# it's been tagged or not), just use the reserved tag of 'all':
+apobj.notify(
+    body='send a notification to our admin group'
+    title='Attention Admins',
+    # notify absolutely everything loaded, reguardless on wether
+    # it has a tag associated with it or not:
+    tag='all',
+)
 ```
 
-If you're interested in reading more about this and other methods on how to customize your own notifications, please check out the wiki at https://github.com/caronc/apprise/wiki/Development_API
+If you're interested in reading more about this and other methods on how to customize your own notifications, please check out the wiki at https://github.com/caronc/apprise/wiki/Development_API. You can also find more examples on how to use the command line tool at: https://github.com/caronc/apprise/wiki/CLI_Usage.
