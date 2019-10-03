@@ -217,6 +217,8 @@ def main(body, title, config, urls, notification_type, theme, tag, dry_run,
             click.echo("{: 3d}. {}".format(
                 idx + 1,
                 url if len(url) <= rows else '{}...'.format(url[:rows - 3])))
+            if server.tags:
+                click.echo("{} - {}".format(' ' * 5, ', '.join(server.tags)))
 
         # Initialize a default response of nothing matched, otherwise
         # if we matched at least one entry, we can return True
