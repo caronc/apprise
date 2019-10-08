@@ -30,18 +30,13 @@ import requests
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
 from ..utils import parse_list
+from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
 # Flag used as a placeholder to sending to all devices
 PUSHOVER_SEND_TO_ALL = 'ALL_DEVICES'
 
-# Used to validate API Key
-VALIDATE_TOKEN = re.compile(r'^[a-z0-9]{30}$', re.I)
-
-# Used to detect a User and/or Group
-VALIDATE_USER_KEY = re.compile(r'^[a-z0-9]{30}$', re.I)
-
-# Used to detect a User and/or Group
+# Used to detect a Device
 VALIDATE_DEVICE = re.compile(r'^[a-z0-9_]{1,25}$', re.I)
 
 
@@ -158,20 +153,19 @@ class NotifyPushover(NotifyBase):
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'[a-z0-9]{30}', 'i'),
-            'map_to': 'user',
+            'regex': (r'^[a-z0-9]{30}$', 'i'),
         },
         'token': {
             'name': _('Access Token'),
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'[a-z0-9]{30}', 'i'),
+            'regex': (r'^[a-z0-9]{30}$', 'i'),
         },
         'target_device': {
             'name': _('Target Device'),
             'type': 'string',
-            'regex': (r'[a-z0-9_]{1,25}', 'i'),
+            'regex': (r'^[a-z0-9_]{1,25}$', 'i'),
             'map_to': 'targets',
         },
         'targets': {
@@ -191,7 +185,7 @@ class NotifyPushover(NotifyBase):
         'sound': {
             'name': _('Sound'),
             'type': 'string',
-            'regex': (r'[a-z]{1,12}', 'i'),
+            'regex': (r'^[a-z]{1,12}$', 'i'),
             'default': PushoverSound.PUSHOVER,
         },
         'retry': {
@@ -212,26 +206,28 @@ class NotifyPushover(NotifyBase):
         },
     })
 
-    def __init__(self, token, targets=None, priority=None, sound=None,
-                 retry=None, expire=None,
-                 **kwargs):
+    def __init__(self, user_key, token, targets=None, priority=None,
+                 sound=None, retry=None, expire=None, **kwargs):
         """
         Initialize Pushover Object
         """
         super(NotifyPushover, self).__init__(**kwargs)
 
-        try:
-            # The token associated with the account
-            self.token = token.strip()
-
-        except AttributeError:
-            # Token was None
-            msg = 'No API Token was specified.'
+        # Access Token (associated with project)
+        self.token = validate_regex(
+            token, *self.template_tokens['token']['regex'])
+        if not self.token:
+            msg = 'An invalid Pushover Access Token ' \
+                  '({}) was specified.'.format(token)
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        if not VALIDATE_TOKEN.match(self.token):
-            msg = 'The API Token specified (%s) is invalid.'.format(token)
+        # User Key (associated with project)
+        self.user_key = validate_regex(
+            user_key, *self.template_tokens['user_key']['regex'])
+        if not self.user_key:
+            msg = 'An invalid Pushover User Key ' \
+                  '({}) was specified.'.format(user_key)
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -249,7 +245,7 @@ class NotifyPushover(NotifyBase):
 
         # The Priority of the message
         if priority not in PUSHOVER_PRIORITIES:
-            self.priority = PushoverPriority.NORMAL
+            self.priority = self.template_args['priority']['default']
 
         else:
             self.priority = priority
@@ -258,7 +254,7 @@ class NotifyPushover(NotifyBase):
         if self.priority == PushoverPriority.EMERGENCY:
 
             # How often to resend notification, in seconds
-            self.retry = NotifyPushover.template_args['retry']['default']
+            self.retry = self.template_args['retry']['default']
             try:
                 self.retry = int(retry)
             except (ValueError, TypeError):
@@ -266,7 +262,7 @@ class NotifyPushover(NotifyBase):
                 pass
 
             # How often to resend notification, in seconds
-            self.expire = NotifyPushover.template_args['expire']['default']
+            self.expire = self.template_args['expire']['default']
             try:
                 self.expire = int(expire)
             except (ValueError, TypeError):
@@ -274,23 +270,16 @@ class NotifyPushover(NotifyBase):
                 pass
 
             if self.retry < 30:
-                msg = 'Retry must be at least 30.'
+                msg = 'Pushover retry must be at least 30 seconds.'
                 self.logger.warning(msg)
                 raise TypeError(msg)
+
             if self.expire < 0 or self.expire > 10800:
-                msg = 'Expire has a max value of at most 10800 seconds.'
+                msg = 'Pushover expire must reside in the range of ' \
+                      '0 to 10800 seconds.'
                 self.logger.warning(msg)
                 raise TypeError(msg)
-
-        if not self.user:
-            msg = 'No user key was specified.'
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        if not VALIDATE_USER_KEY.match(self.user):
-            msg = 'The user key specified (%s) is invalid.' % self.user
-            self.logger.warning(msg)
-            raise TypeError(msg)
+        return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
@@ -323,7 +312,7 @@ class NotifyPushover(NotifyBase):
             # prepare JSON Object
             payload = {
                 'token': self.token,
-                'user': self.user,
+                'user': self.user_key,
                 'priority': str(self.priority),
                 'title': title,
                 'message': body,
@@ -406,8 +395,8 @@ class NotifyPushover(NotifyBase):
             'format': self.notify_format,
             'overflow': self.overflow_mode,
             'priority':
-                _map[PushoverPriority.NORMAL] if self.priority not in _map
-                else _map[self.priority],
+                _map[self.template_args['priority']['default']]
+                if self.priority not in _map else _map[self.priority],
             'verify': 'yes' if self.verify_certificate else 'no',
         }
         # Only add expire and retry for emergency messages,
@@ -426,7 +415,7 @@ class NotifyPushover(NotifyBase):
 
         return '{schema}://{user_key}@{token}/{devices}/?{args}'.format(
             schema=self.secure_protocol,
-            user_key=self.pprint(self.user, privacy, safe=''),
+            user_key=self.pprint(self.user_key, privacy, safe=''),
             token=self.pprint(self.token, privacy, safe=''),
             devices=devices,
             args=NotifyPushover.urlencode(args))
@@ -463,6 +452,9 @@ class NotifyPushover(NotifyBase):
 
         # Retrieve all of our targets
         results['targets'] = NotifyPushover.split_path(results['fullpath'])
+
+        # User Key is retrieved from the user
+        results['user_key'] = NotifyPushover.unquote(results['user'])
 
         # Get the sound
         if 'sound' in results['qsd'] and len(results['qsd']['sound']):

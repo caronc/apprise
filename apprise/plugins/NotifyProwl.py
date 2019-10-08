@@ -23,18 +23,12 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import re
 import requests
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
+from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
-
-# Used to validate API Key
-VALIDATE_APIKEY = re.compile(r'[A-Za-z0-9]{40}')
-
-# Used to validate Provider Key
-VALIDATE_PROVIDERKEY = re.compile(r'[A-Za-z0-9]{40}')
 
 
 # Priorities
@@ -104,11 +98,13 @@ class NotifyProwl(NotifyBase):
             'type': 'string',
             'private': True,
             'required': True,
+            'regex': (r'^[A-Za-z0-9]{40}$', 'i'),
         },
         'providerkey': {
             'name': _('Provider Key'),
             'type': 'string',
             'private': True,
+            'regex': (r'^[A-Za-z0-9]{40}$', 'i'),
         },
     })
 
@@ -129,31 +125,35 @@ class NotifyProwl(NotifyBase):
         super(NotifyProwl, self).__init__(**kwargs)
 
         if priority not in PROWL_PRIORITIES:
-            self.priority = ProwlPriority.NORMAL
+            self.priority = self.template_args['priority']['default']
 
         else:
             self.priority = priority
 
-        if not VALIDATE_APIKEY.match(apikey):
-            msg = 'The API key specified ({}) is invalid.'.format(apikey)
+        # API Key (associated with project)
+        self.apikey = validate_regex(
+            apikey, *self.template_tokens['apikey']['regex'])
+        if not self.apikey:
+            msg = 'An invalid Prowl API Key ' \
+                  '({}) was specified.'.format(apikey)
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # Store the API key
-        self.apikey = apikey
-
         # Store the provider key (if specified)
         if providerkey:
-            if not VALIDATE_PROVIDERKEY.match(providerkey):
-                msg = \
-                    'The Provider key specified ({}) is invalid.' \
-                    .format(providerkey)
-
+            self.providerkey = validate_regex(
+                providerkey, *self.template_tokens['providerkey']['regex'])
+            if not self.providerkey:
+                msg = 'An invalid Prowl Provider Key ' \
+                      '({}) was specified.'.format(providerkey)
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
-        # Store the Provider Key
-        self.providerkey = providerkey
+        else:
+            # No provider key was set
+            self.providerkey = None
+
+        return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """

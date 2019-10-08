@@ -37,6 +37,7 @@ from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..utils import parse_list
 from ..utils import parse_bool
+from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
 IS_USER = re.compile(r'^\s*@?(?P<user>[A-Z0-9_]+)$', re.I)
@@ -186,23 +187,27 @@ class NotifyTwitter(NotifyBase):
         """
         super(NotifyTwitter, self).__init__(**kwargs)
 
-        if not ckey:
-            msg = 'An invalid Consumer API Key was specified.'
+        self.ckey = validate_regex(ckey)
+        if not self.ckey:
+            msg = 'An invalid Twitter Consumer Key was specified.'
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        if not csecret:
-            msg = 'An invalid Consumer Secret API Key was specified.'
+        self.csecret = validate_regex(csecret)
+        if not self.csecret:
+            msg = 'An invalid Twitter Consumer Secret was specified.'
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        if not akey:
-            msg = 'An invalid Access Token API Key was specified.'
+        self.akey = validate_regex(akey)
+        if not self.akey:
+            msg = 'An invalid Twitter Access Key was specified.'
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        if not asecret:
-            msg = 'An invalid Access Token Secret API Key was specified.'
+        self.asecret = validate_regex(asecret)
+        if not self.asecret:
+            msg = 'An invalid Access Secret was specified.'
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -219,6 +224,9 @@ class NotifyTwitter(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
+        # Track any errors
+        has_error = False
+
         # Identify our targets
         self.targets = []
         for target in parse_list(targets):
@@ -227,15 +235,19 @@ class NotifyTwitter(NotifyBase):
                 self.targets.append(match.group('user'))
                 continue
 
+            has_error = True
             self.logger.warning(
                 'Dropped invalid user ({}) specified.'.format(target),
             )
 
-        # Store our data
-        self.ckey = ckey
-        self.csecret = csecret
-        self.akey = akey
-        self.asecret = asecret
+        if has_error and not self.targets:
+            # We have specified that we want to notify one or more individual
+            # and we failed to load any of them.  Since it's also valid to
+            # notify no one at all (which means we notify ourselves), it's
+            # important we don't switch from the users original intentions
+            msg = 'No Twitter targets to notify.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         return
 
@@ -297,7 +309,7 @@ class NotifyTwitter(NotifyBase):
             }
         }
 
-        # Lookup our users
+        # Lookup our users (otherwise we look up ourselves)
         targets = self._whoami(lazy=self.cache) if not len(self.targets) \
             else self._user_lookup(self.targets, lazy=self.cache)
 

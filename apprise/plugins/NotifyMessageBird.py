@@ -35,10 +35,8 @@ import requests
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
 from ..utils import parse_list
+from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
-
-# Token required as part of the API request
-VALIDATE_APIKEY = re.compile(r'^[a-z0-9]{25}$', re.I)
 
 # Some Phone Number Detection
 IS_PHONE_NO = re.compile(r'^\+?(?P<phone>[0-9\s)(+-]+)\s*$')
@@ -83,20 +81,21 @@ class NotifyMessageBird(NotifyBase):
             'name': _('API Key'),
             'type': 'string',
             'required': True,
-            'regex': (r'[a-z0-9]{25}', 'i'),
+            'private': True,
+            'regex': (r'^[a-z0-9]{25}$', 'i'),
         },
         'source': {
             'name': _('Source Phone No'),
             'type': 'string',
             'prefix': '+',
             'required': True,
-            'regex': (r'[0-9\s)(+-]+', 'i'),
+            'regex': (r'^[0-9\s)(+-]+$', 'i'),
         },
         'target_phone': {
             'name': _('Target Phone No'),
             'type': 'string',
             'prefix': '+',
-            'regex': (r'[0-9\s)(+-]+', 'i'),
+            'regex': (r'^[0-9\s)(+-]+$', 'i'),
             'map_to': 'targets',
         },
         'targets': {
@@ -121,19 +120,12 @@ class NotifyMessageBird(NotifyBase):
         """
         super(NotifyMessageBird, self).__init__(**kwargs)
 
-        try:
-            # The authentication key associated with the account
-            self.apikey = apikey.strip()
-
-        except AttributeError:
-            # Token was None
-            msg = 'No MessageBird authentication key was specified.'
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        if not VALIDATE_APIKEY.match(self.apikey):
-            msg = 'The MessageBird authentication key specified ({}) is ' \
-                'invalid.'.format(self.apikey)
+        # API Key (associated with project)
+        self.apikey = validate_regex(
+            apikey, *self.template_tokens['apikey']['regex'])
+        if not self.apikey:
+            msg = 'An invalid MessageBird API Key ' \
+                  '({}) was specified.'.format(apikey)
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -158,7 +150,14 @@ class NotifyMessageBird(NotifyBase):
         # Parse our targets
         self.targets = list()
 
-        for target in parse_list(targets):
+        targets = parse_list(targets)
+        if not targets:
+            # No sources specified, use our own phone no
+            self.targets.append(self.source)
+            return
+
+        # otherwise, store all of our target numbers
+        for target in targets:
             # Validate targets and drop bad ones:
             result = IS_PHONE_NO.match(target)
             if result:
@@ -179,6 +178,14 @@ class NotifyMessageBird(NotifyBase):
                 'Dropped invalid phone # '
                 '({}) specified.'.format(target),
             )
+
+        if not self.targets:
+            # We have a bot token and no target(s) to message
+            msg = 'No MessageBird targets to notify.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
+        return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
@@ -202,12 +209,9 @@ class NotifyMessageBird(NotifyBase):
             'body': body,
 
         }
+
         # Create a copy of the targets list
         targets = list(self.targets)
-
-        if len(targets) == 0:
-            # No sources specified, use our own phone no
-            targets.append(self.source)
 
         while len(targets):
             # Get our target to notify

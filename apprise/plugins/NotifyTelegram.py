@@ -61,16 +61,10 @@ from ..common import NotifyImageSize
 from ..common import NotifyFormat
 from ..utils import parse_bool
 from ..utils import parse_list
+from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
 TELEGRAM_IMAGE_XY = NotifyImageSize.XY_256
-
-# Token required as part of the API request
-# allow the word 'bot' infront
-VALIDATE_BOT_TOKEN = re.compile(
-    r'^(bot)?(?P<key>[0-9]+:[a-z0-9_-]+)/*$',
-    re.IGNORECASE,
-)
 
 # Chat ID is required
 # If the Chat ID is positive, then it's addressed to a single person
@@ -119,14 +113,16 @@ class NotifyTelegram(NotifyBase):
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'(bot)?[0-9]+:[a-z0-9_-]+', 'i'),
+            # Token required as part of the API request, allow the word 'bot'
+            # infront of it
+            'regex': (r'^(bot)?(?P<key>[0-9]+:[a-z0-9_-]+)$', 'i'),
         },
         'target_user': {
             'name': _('Target Chat ID'),
             'type': 'string',
             'map_to': 'targets',
             'map_to': 'targets',
-            'regex': (r'((-?[0-9]{1,32})|([a-z_-][a-z0-9_-]+))', 'i'),
+            'regex': (r'^((-?[0-9]{1,32})|([a-z_-][a-z0-9_-]+))$', 'i'),
         },
         'targets': {
             'name': _('Targets'),
@@ -160,23 +156,14 @@ class NotifyTelegram(NotifyBase):
         """
         super(NotifyTelegram, self).__init__(**kwargs)
 
-        try:
-            self.bot_token = bot_token.strip()
-
-        except AttributeError:
-            # Token was None
-            err = 'No Bot Token was specified.'
+        self.bot_token = validate_regex(
+            bot_token, *self.template_tokens['bot_token']['regex'],
+            fmt='{key}')
+        if not self.bot_token:
+            err = 'The Telegram Bot Token specified ({}) is invalid.'.format(
+                bot_token)
             self.logger.warning(err)
             raise TypeError(err)
-
-        result = VALIDATE_BOT_TOKEN.match(self.bot_token)
-        if not result:
-            err = 'The Bot Token specified (%s) is invalid.' % bot_token
-            self.logger.warning(err)
-            raise TypeError(err)
-
-        # Store our Bot Token
-        self.bot_token = result.group('key')
 
         # Parse our list
         self.targets = parse_list(targets)

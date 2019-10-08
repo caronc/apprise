@@ -36,6 +36,7 @@ from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..utils import parse_list
+from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
 # Some Phone Number Detection
@@ -117,21 +118,21 @@ class NotifySNS(NotifyBase):
             'name': _('Region'),
             'type': 'string',
             'required': True,
-            'regex': (r'[a-z]{2}-[a-z]+-[0-9]+', 'i'),
+            'regex': (r'^[a-z]{2}-[a-z]+-[0-9]+$', 'i'),
             'map_to': 'region_name',
         },
         'target_phone_no': {
             'name': _('Target Phone No'),
             'type': 'string',
             'map_to': 'targets',
-            'regex': (r'[0-9\s)(+-]+', 'i')
+            'regex': (r'^[0-9\s)(+-]+$', 'i')
         },
         'target_topic': {
             'name': _('Target Topic'),
             'type': 'string',
             'map_to': 'targets',
             'prefix': '#',
-            'regex': (r'[A-Za-z0-9_-]+', 'i'),
+            'regex': (r'^[A-Za-z0-9_-]+$', 'i'),
         },
         'targets': {
             'name': _('Targets'),
@@ -153,18 +154,28 @@ class NotifySNS(NotifyBase):
         """
         super(NotifySNS, self).__init__(**kwargs)
 
-        if not access_key_id:
+        # Store our AWS API Access Key
+        self.aws_access_key_id = validate_regex(access_key_id)
+        if not self.aws_access_key_id:
             msg = 'An invalid AWS Access Key ID was specified.'
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        if not secret_access_key:
-            msg = 'An invalid AWS Secret Access Key was specified.'
+        # Store our AWS API Secret Access key
+        self.aws_secret_access_key = validate_regex(secret_access_key)
+        if not self.aws_secret_access_key:
+            msg = 'An invalid AWS Secret Access Key ' \
+                  '({}) was specified.'.format(secret_access_key)
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        if not (region_name and IS_REGION.match(region_name)):
-            msg = 'An invalid AWS Region was specified.'
+        # Acquire our AWS Region Name:
+        # eg. us-east-1, cn-north-1, us-west-2, ...
+        self.aws_region_name = validate_regex(
+            region_name, *self.template_tokens['region']['regex'])
+        if not self.aws_region_name:
+            msg = 'An invalid AWS Region ({}) was specified.'.format(
+                region_name)
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -173,16 +184,6 @@ class NotifySNS(NotifyBase):
 
         # Initialize numbers list
         self.phone = list()
-
-        # Store our AWS API Key
-        self.aws_access_key_id = access_key_id
-
-        # Store our AWS API Secret Access key
-        self.aws_secret_access_key = secret_access_key
-
-        # Acquire our AWS Region Name:
-        # eg. us-east-1, cn-north-1, us-west-2, ...
-        self.aws_region_name = region_name
 
         # Set our notify_url based on our region
         self.notify_url = 'https://sns.{}.amazonaws.com/'\
@@ -231,8 +232,12 @@ class NotifySNS(NotifyBase):
             )
 
         if len(self.phone) == 0 and len(self.topics) == 0:
-            self.logger.warning(
-                'There are no valid target(s) identified to notify.')
+            # We have a bot token and no target(s) to message
+            msg = 'No AWS targets to notify.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
+        return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """

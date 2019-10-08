@@ -37,10 +37,8 @@ import requests
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
 from ..utils import parse_list
+from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
-
-# Token required as part of the API request
-VALIDATE_AUTHKEY = re.compile(r'^[a-z0-9]+$', re.I)
 
 # Some Phone Number Detection
 IS_PHONE_NO = re.compile(r'^\+?(?P<phone>[0-9\s)(+-]+)\s*$')
@@ -118,13 +116,14 @@ class NotifyMSG91(NotifyBase):
             'name': _('Authentication Key'),
             'type': 'string',
             'required': True,
-            'regex': (r'[a-z0-9]+', 'i'),
+            'private': True,
+            'regex': (r'^[a-z0-9]+$', 'i'),
         },
         'target_phone': {
             'name': _('Target Phone No'),
             'type': 'string',
             'prefix': '+',
-            'regex': (r'[0-9\s)(+-]+', 'i'),
+            'regex': (r'^[0-9\s)(+-]+$', 'i'),
             'map_to': 'targets',
         },
         'targets': {
@@ -162,19 +161,12 @@ class NotifyMSG91(NotifyBase):
         """
         super(NotifyMSG91, self).__init__(**kwargs)
 
-        try:
-            # The authentication key associated with the account
-            self.authkey = authkey.strip()
-
-        except AttributeError:
-            # Token was None
-            msg = 'No MSG91 authentication key was specified.'
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        if not VALIDATE_AUTHKEY.match(self.authkey):
-            msg = 'The MSG91 authentication key specified ({}) is invalid.'\
-                .format(self.authkey)
+        # Authentication Key (associated with project)
+        self.authkey = validate_regex(
+            authkey, *self.template_tokens['authkey']['regex'])
+        if not self.authkey:
+            msg = 'An invalid MSG91 Authentication Key ' \
+                  '({}) was specified.'.format(authkey)
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -237,15 +229,18 @@ class NotifyMSG91(NotifyBase):
                 '({}) specified.'.format(target),
             )
 
+        if not self.targets:
+            # We have a bot token and no target(s) to message
+            msg = 'No MSG91 targets to notify.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
+        return
+
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform MSG91 Notification
         """
-
-        if not len(self.targets):
-            # There were no services to notify
-            self.logger.warning('There were no MSG91 targets to notify')
-            return False
 
         # Prepare our headers
         headers = {

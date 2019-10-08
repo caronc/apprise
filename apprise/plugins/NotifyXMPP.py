@@ -157,7 +157,7 @@ class NotifyXMPP(NotifyBase):
             'name': _('XEP'),
             'type': 'list:string',
             'prefix': 'xep-',
-            'regex': (r'[1-9][0-9]{0,3}', 'i'),
+            'regex': (r'^[1-9][0-9]{0,3}$', 'i'),
         },
         'jid': {
             'name': _('Source JID'),

@@ -23,6 +23,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 import six
+import pytest
 from datetime import datetime
 from datetime import timedelta
 
@@ -43,22 +44,12 @@ def test_notify_base():
     """
 
     # invalid types throw exceptions
-    try:
+    with pytest.raises(TypeError):
         NotifyBase(**{'format': 'invalid'})
-        # We should never reach here as an exception should be thrown
-        assert(False)
-
-    except TypeError:
-        assert(True)
 
     # invalid types throw exceptions
-    try:
+    with pytest.raises(TypeError):
         NotifyBase(**{'overflow': 'invalid'})
-        # We should never reach here as an exception should be thrown
-        assert(False)
-
-    except TypeError:
-        assert(True)
 
     # Bad port information
     nb = NotifyBase(port='invalid')
@@ -216,7 +207,7 @@ def test_notify_base():
 
     # Test invalid data
     assert NotifyBase.parse_list(None) == []
-    assert NotifyBase.parse_list(42) == ['42', ]
+    assert NotifyBase.parse_list(42) == []
 
     result = NotifyBase.parse_list(
         ',path,?name=Dr%20Disrespect', unquote=False)

@@ -25,6 +25,7 @@
 
 import six
 import mock
+import pytest
 import requests
 from json import dumps
 from datetime import datetime
@@ -41,57 +42,40 @@ def test_twitter_plugin_init():
 
     """
 
-    try:
+    with pytest.raises(TypeError):
         plugins.NotifyTwitter(
             ckey=None, csecret=None, akey=None, asecret=None)
-        assert False
-    except TypeError:
-        # All keys set to none
-        assert True
 
-    try:
+    with pytest.raises(TypeError):
         plugins.NotifyTwitter(
             ckey='value', csecret=None, akey=None, asecret=None)
-        assert False
-    except TypeError:
-        # csecret not set
-        assert True
 
-    try:
+    with pytest.raises(TypeError):
         plugins.NotifyTwitter(
             ckey='value', csecret='value', akey=None, asecret=None)
-        assert False
-    except TypeError:
-        # akey not set
-        assert True
 
-    try:
+    with pytest.raises(TypeError):
         plugins.NotifyTwitter(
             ckey='value', csecret='value', akey='value', asecret=None)
-        assert False
-    except TypeError:
-        # asecret not set
-        assert True
 
-    try:
+    assert isinstance(
         plugins.NotifyTwitter(
-            ckey='value', csecret='value', akey='value', asecret='value')
-        assert True
-    except TypeError:
-        # user not set; but this is okay
-        # We should not reach here
-        assert False
+            ckey='value', csecret='value', akey='value', asecret='value'),
+        plugins.NotifyTwitter,
+    )
 
-    try:
+    assert isinstance(
         plugins.NotifyTwitter(
             ckey='value', csecret='value', akey='value', asecret='value',
-            user='l2gnux')
-        # We should initialize properly
-        assert True
+            user='l2gnux'),
+        plugins.NotifyTwitter,
+    )
 
-    except TypeError:
-        # We should not reach here
-        assert False
+    # Invalid Target User
+    with pytest.raises(TypeError):
+        plugins.NotifyTwitter(
+            ckey='value', csecret='value', akey='value', asecret='value',
+            targets='%G@rB@g3')
 
 
 @mock.patch('requests.get')

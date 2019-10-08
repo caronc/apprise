@@ -46,6 +46,7 @@ from json import dumps
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
 from ..utils import parse_list
+from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
 
@@ -148,21 +149,20 @@ class NotifyIFTTT(NotifyBase):
         """
         super(NotifyIFTTT, self).__init__(**kwargs)
 
-        if not webhook_id:
-            msg = 'You must specify the Webhooks webhook_id.'
+        # Webhook ID (associated with project)
+        self.webhook_id = validate_regex(webhook_id)
+        if not self.webhook_id:
+            msg = 'An invalid IFTTT Webhook ID ' \
+                  '({}) was specified.'.format(webhook_id)
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Store our Events we wish to trigger
         self.events = parse_list(events)
-
         if not self.events:
             msg = 'You must specify at least one event you wish to trigger on.'
             self.logger.warning(msg)
             raise TypeError(msg)
-
-        # Store our APIKey
-        self.webhook_id = webhook_id
 
         # Tokens to include in post
         self.add_tokens = {}

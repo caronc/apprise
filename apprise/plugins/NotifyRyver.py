@@ -40,13 +40,8 @@ from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
 from ..common import NotifyType
 from ..utils import parse_bool
+from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
-
-# Token required as part of the API request
-VALIDATE_TOKEN = re.compile(r'[A-Z0-9]{15}', re.I)
-
-# Organization required as part of the API request
-VALIDATE_ORG = re.compile(r'[A-Z0-9_-]{3,32}', re.I)
 
 
 class RyverWebhookMode(object):
@@ -99,12 +94,14 @@ class NotifyRyver(NotifyBase):
             'name': _('Organization'),
             'type': 'string',
             'required': True,
+            'regex': (r'^[A-Z0-9_-]{3,32}$', 'i'),
         },
         'token': {
             'name': _('Token'),
             'type': 'string',
             'required': True,
             'private': True,
+            'regex': (r'^[A-Z0-9]{15}$', 'i'),
         },
         'user': {
             'name': _('Bot Name'),
@@ -135,25 +132,21 @@ class NotifyRyver(NotifyBase):
         """
         super(NotifyRyver, self).__init__(**kwargs)
 
-        if not token:
-            msg = 'No Ryver token was specified.'
+        # API Token (associated with project)
+        self.token = validate_regex(
+            token, *self.template_tokens['token']['regex'])
+        if not self.token:
+            msg = 'An invalid Ryver API Token ' \
+                  '({}) was specified.'.format(token)
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        if not organization:
-            msg = 'No Ryver organization was specified.'
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        if not VALIDATE_TOKEN.match(token.strip()):
-            msg = 'The Ryver token specified ({}) is invalid.'\
-                .format(token)
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        if not VALIDATE_ORG.match(organization.strip()):
-            msg = 'The Ryver organization specified ({}) is invalid.'\
-                .format(organization)
+        # Organization (associated with project)
+        self.organization = validate_regex(
+            organization, *self.template_tokens['organization']['regex'])
+        if not self.organization:
+            msg = 'An invalid Ryver Organization ' \
+                  '({}) was specified.'.format(organization)
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -166,12 +159,6 @@ class NotifyRyver(NotifyBase):
                 .format(mode)
             self.logger.warning(msg)
             raise TypeError(msg)
-
-        # The organization associated with the account
-        self.organization = organization.strip()
-
-        # The token associated with the account
-        self.token = token.strip()
 
         # Place an image inline with the message body
         self.include_image = include_image
@@ -192,6 +179,8 @@ class NotifyRyver(NotifyBase):
             r'(' + '|'.join(self._re_formatting_map.keys()) + r')',
             re.IGNORECASE,
         )
+
+        return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """

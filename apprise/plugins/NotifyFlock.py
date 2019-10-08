@@ -47,6 +47,7 @@ from ..common import NotifyFormat
 from ..common import NotifyImageSize
 from ..utils import parse_list
 from ..utils import parse_bool
+from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
 
@@ -56,12 +57,8 @@ FLOCK_HTTP_ERROR_MAP = {
 }
 
 # Used to detect a channel/user
-IS_CHANNEL_RE = re.compile(r'^(#|g:)(?P<id>[A-Z0-9_]{12})$', re.I)
-IS_USER_RE = re.compile(r'^(@|u:)?(?P<id>[A-Z0-9_]{12})$', re.I)
-
-# Token required as part of the API request
-# /134b8gh0-eba0-4fa9-ab9c-257ced0e8221
-IS_API_TOKEN = re.compile(r'^[a-z0-9-]{24}$', re.I)
+IS_CHANNEL_RE = re.compile(r'^(#|g:)(?P<id>[A-Z0-9_]+)$', re.I)
+IS_USER_RE = re.compile(r'^(@|u:)?(?P<id>[A-Z0-9_]+)$', re.I)
 
 
 class NotifyFlock(NotifyBase):
@@ -103,7 +100,7 @@ class NotifyFlock(NotifyBase):
         'token': {
             'name': _('Access Key'),
             'type': 'string',
-            'regex': (r'[a-z0-9-]{24}', 'i'),
+            'regex': (r'^[a-z0-9-]{24}$', 'i'),
             'private': True,
             'required': True,
         },
@@ -115,14 +112,14 @@ class NotifyFlock(NotifyBase):
             'name': _('To User ID'),
             'type': 'string',
             'prefix': '@',
-            'regex': (r'[A-Z0-9_]{12}', 'i'),
+            'regex': (r'^[A-Z0-9_]{12}$', 'i'),
             'map_to': 'targets',
         },
         'to_channel': {
             'name': _('To Channel ID'),
             'type': 'string',
             'prefix': '#',
-            'regex': (r'[A-Z0-9_]{12}', 'i'),
+            'regex': (r'^[A-Z0-9_]{12}$', 'i'),
             'map_to': 'targets',
         },
         'targets': {
@@ -153,14 +150,17 @@ class NotifyFlock(NotifyBase):
         # Build ourselves a target list
         self.targets = list()
 
-        # Initialize our token object
-        self.token = token.strip()
-
-        if not IS_API_TOKEN.match(self.token):
-            msg = 'The Flock API Token specified ({}) is invalid.'.format(
-                self.token)
+        self.token = validate_regex(
+            token, *self.template_tokens['token']['regex'])
+        if not self.token:
+            msg = 'An invalid Flock Access Key ' \
+                  '({}) was specified.'.format(token)
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        # Track whether or not we want to send an image with our notification
+        # or not.
+        self.include_image = include_image
 
         # Track any issues
         has_error = False
@@ -183,15 +183,13 @@ class NotifyFlock(NotifyBase):
             self.logger.warning(
                 'Ignoring invalid target ({}) specified.'.format(target))
 
-        if has_error and len(self.targets) == 0:
+        if has_error and not self.targets:
             # We have a bot token and no target(s) to message
-            msg = 'No targets found with specified Flock Bot Token.'
+            msg = 'No Flock targets to notify.'
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # Track whether or not we want to send an image with our notification
-        # or not.
-        self.include_image = include_image
+        return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """

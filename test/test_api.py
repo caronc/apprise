@@ -68,11 +68,11 @@ def test_apprise():
     a = Apprise()
 
     # no items
-    assert(len(a) == 0)
+    assert len(a) == 0
 
     # Apprise object can also be directly tested with 'if' keyword
     # No entries results in a False response
-    assert(not a)
+    assert not a
 
     # Create an Asset object
     asset = AppriseAsset(theme='default')
@@ -89,66 +89,62 @@ def test_apprise():
     a = Apprise(servers=servers)
 
     # 2 servers loaded
-    assert(len(a) == 2)
+    assert len(a) == 2
 
     # Apprise object can also be directly tested with 'if' keyword
     # At least one entry results in a True response
-    assert(a)
+    assert a
 
     # We can retrieve our URLs this way:
-    assert(len(a.urls()) == 2)
+    assert len(a.urls()) == 2
 
     # We can add another server
-    assert(
-        a.add('mmosts://mattermost.server.local/'
-              '3ccdd113474722377935511fc85d3dd4') is True)
-    assert(len(a) == 3)
+    assert a.add('mmosts://mattermost.server.local/'
+                 '3ccdd113474722377935511fc85d3dd4') is True
+    assert len(a) == 3
 
     # We can pop an object off of our stack by it's indexed value:
     obj = a.pop(0)
-    assert(isinstance(obj, NotifyBase) is True)
-    assert(len(a) == 2)
+    assert isinstance(obj, NotifyBase) is True
+    assert len(a) == 2
 
     # We can retrieve elements from our list too by reference:
-    assert(isinstance(a[0].url(), six.string_types) is True)
+    assert isinstance(a[0].url(), six.string_types) is True
 
     # We can iterate over our list too:
     count = 0
     for o in a:
-        assert(isinstance(o.url(), six.string_types) is True)
+        assert isinstance(o.url(), six.string_types) is True
         count += 1
     # verify that we did indeed iterate over each element
-    assert(len(a) == count)
+    assert len(a) == count
 
     # We can empty our set
     a.clear()
-    assert(len(a) == 0)
+    assert len(a) == 0
 
     # An invalid schema
-    assert(
-        a.add('this is not a parseable url at all') is False)
-    assert(len(a) == 0)
+    assert a.add('this is not a parseable url at all') is False
+    assert len(a) == 0
 
     # An unsupported schema
-    assert(
-        a.add('invalid://we.just.do.not.support.this.plugin.type') is False)
-    assert(len(a) == 0)
+    assert a.add(
+        'invalid://we.just.do.not.support.this.plugin.type') is False
+    assert len(a) == 0
 
     # A poorly formatted URL
-    assert(
-        a.add('json://user:@@@:bad?no.good') is False)
-    assert(len(a) == 0)
+    assert a.add('json://user:@@@:bad?no.good') is False
+    assert len(a) == 0
 
     # Add a server with our asset we created earlier
-    assert(
-        a.add('mmosts://mattermost.server.local/'
-              '3ccdd113474722377935511fc85d3dd4', asset=asset) is True)
+    assert a.add('mmosts://mattermost.server.local/'
+                 '3ccdd113474722377935511fc85d3dd4', asset=asset) is True
 
     # Clear our server listings again
     a.clear()
 
     # No servers to notify
-    assert(a.notify(title="my title", body="my body") is False)
+    assert a.notify(title="my title", body="my body") is False
 
     class BadNotification(NotifyBase):
         def __init__(self, **kwargs):
@@ -183,26 +179,26 @@ def test_apprise():
     # Just to explain what is happening here, we would have parsed the
     # url properly but failed when we went to go and create an instance
     # of it.
-    assert(a.add('bad://localhost') is False)
-    assert(len(a) == 0)
+    assert a.add('bad://localhost') is False
+    assert len(a) == 0
 
-    assert(a.add('good://localhost') is True)
-    assert(len(a) == 1)
+    assert a.add('good://localhost') is True
+    assert len(a) == 1
 
     # Bad Notification Type is still allowed as it is presumed the user
     # know's what their doing
-    assert(a.notify(
-        title="my title", body="my body", notify_type='bad') is True)
+    assert a.notify(
+        title="my title", body="my body", notify_type='bad') is True
 
     # No Title/Body combo's
-    assert(a.notify(title=None, body=None) is False)
-    assert(a.notify(title='', body=None) is False)
-    assert(a.notify(title=None, body='') is False)
+    assert a.notify(title=None, body=None) is False
+    assert a.notify(title='', body=None) is False
+    assert a.notify(title=None, body='') is False
 
     # As long as one is present, we're good
-    assert(a.notify(title=None, body='present') is True)
-    assert(a.notify(title='present', body=None) is True)
-    assert(a.notify(title="present", body="present") is True)
+    assert a.notify(title=None, body='present') is True
+    assert a.notify(title='present', body=None) is True
+    assert a.notify(title="present", body="present") is True
 
     # Clear our server listings again
     a.clear()
@@ -244,14 +240,14 @@ def test_apprise():
     # Store our good notification in our schema map
     SCHEMA_MAP['runtime'] = RuntimeNotification
 
-    assert(a.add('runtime://localhost') is True)
-    assert(a.add('throw://localhost') is True)
-    assert(a.add('fail://localhost') is True)
-    assert(len(a) == 3)
+    assert a.add('runtime://localhost') is True
+    assert a.add('throw://localhost') is True
+    assert a.add('fail://localhost') is True
+    assert len(a) == 3
 
     # Test when our notify both throws an exception and or just
     # simply returns False
-    assert(a.notify(title="present", body="present") is False)
+    assert a.notify(title="present", body="present") is False
 
     # Create a Notification that throws an unexected exception
     class ThrowInstantiateNotification(NotifyBase):
@@ -267,7 +263,7 @@ def test_apprise():
 
     # Reset our object
     a.clear()
-    assert(len(a) == 0)
+    assert len(a) == 0
 
     # Instantiate a bad object
     plugin = a.instantiate(object, tag="bad_object")
@@ -275,40 +271,37 @@ def test_apprise():
 
     # Instantiate a good object
     plugin = a.instantiate('good://localhost', tag="good")
-    assert(isinstance(plugin, NotifyBase))
+    assert isinstance(plugin, NotifyBase)
 
     # Test simple tagging inside of the object
-    assert("good" in plugin)
-    assert("bad" not in plugin)
+    assert "good" in plugin
+    assert "bad" not in plugin
 
     # the in (__contains__ override) is based on or'ed content; so although
     # 'bad' isn't tagged as being in the plugin, 'good' is, so the return
     # value of this is True
-    assert(["bad", "good"] in plugin)
-    assert(set(["bad", "good"]) in plugin)
-    assert(("bad", "good") in plugin)
+    assert ["bad", "good"] in plugin
+    assert set(["bad", "good"]) in plugin
+    assert ("bad", "good") in plugin
 
     # We an add already substatiated instances into our Apprise object
     a.add(plugin)
-    assert(len(a) == 1)
+    assert len(a) == 1
 
     # We can add entries as a list too (to add more then one)
     a.add([plugin, plugin, plugin])
-    assert(len(a) == 4)
+    assert len(a) == 4
 
     # Reset our object again
     a.clear()
-    try:
+    with pytest.raises(TypeError):
         a.instantiate('throw://localhost', suppress_exceptions=False)
-        assert(False)
 
-    except TypeError:
-        assert(True)
-    assert(len(a) == 0)
+    assert len(a) == 0
 
-    assert(a.instantiate(
-        'throw://localhost', suppress_exceptions=True) is None)
-    assert(len(a) == 0)
+    assert a.instantiate(
+        'throw://localhost', suppress_exceptions=True) is None
+    assert len(a) == 0
 
     #
     # We rince and repeat the same tests as above, however we do them
@@ -317,50 +310,53 @@ def test_apprise():
 
     # Reset our object
     a.clear()
-    assert(len(a) == 0)
+    assert len(a) == 0
 
     # Instantiate a good object
     plugin = a.instantiate({
         'schema': 'good',
         'host': 'localhost'}, tag="good")
-    assert(isinstance(plugin, NotifyBase))
+    assert isinstance(plugin, NotifyBase)
 
     # Test simple tagging inside of the object
-    assert("good" in plugin)
-    assert("bad" not in plugin)
+    assert "good" in plugin
+    assert "bad" not in plugin
 
     # the in (__contains__ override) is based on or'ed content; so although
     # 'bad' isn't tagged as being in the plugin, 'good' is, so the return
     # value of this is True
-    assert(["bad", "good"] in plugin)
-    assert(set(["bad", "good"]) in plugin)
-    assert(("bad", "good") in plugin)
+    assert ["bad", "good"] in plugin
+    assert set(["bad", "good"]) in plugin
+    assert ("bad", "good") in plugin
 
     # We an add already substatiated instances into our Apprise object
     a.add(plugin)
-    assert(len(a) == 1)
+    assert len(a) == 1
 
     # We can add entries as a list too (to add more then one)
     a.add([plugin, plugin, plugin])
-    assert(len(a) == 4)
+    assert len(a) == 4
 
     # Reset our object again
     a.clear()
-    try:
+    with pytest.raises(TypeError):
         a.instantiate({
             'schema': 'throw',
             'host': 'localhost'}, suppress_exceptions=False)
-        assert(False)
 
-    except TypeError:
-        assert(True)
-    assert(len(a) == 0)
+    assert len(a) == 0
 
-    assert(a.instantiate({
+    assert a.instantiate({
         'schema': 'throw',
-        'host': 'localhost'}, suppress_exceptions=True) is None)
-    assert(len(a) == 0)
+        'host': 'localhost'}, suppress_exceptions=True) is None
+    assert len(a) == 0
 
+
+def test_apprise_pretty_print(tmpdir):
+    """
+    API: Apprise() Pretty Print tests
+
+    """
     # Privacy Print
     # PrivacyMode.Secret always returns the same thing to avoid guessing
     assert URLBase.pprint(
@@ -410,6 +406,10 @@ def test_apprise():
     assert URLBase.pprint(
         "abcdefghijk", privacy=True, mode=PrivacyMode.Tail) == '...hijk'
 
+    # Quoting settings
+    assert URLBase.pprint(" ", privacy=False, safe='') == '%20'
+    assert URLBase.pprint(" ", privacy=False, quote=False, safe='') == ' '
+
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
@@ -437,90 +437,94 @@ def test_apprise_tagging(mock_post, mock_get):
     a = Apprise()
 
     # An invalid addition can't add the tag
-    assert(a.add('averyinvalidschema://localhost', tag='uhoh') is False)
-    assert(a.add({
+    assert a.add('averyinvalidschema://localhost', tag='uhoh') is False
+    assert a.add({
         'schema': 'averyinvalidschema',
-        'host': 'localhost'}, tag='uhoh') is False)
+        'host': 'localhost'}, tag='uhoh') is False
 
     # Add entry and assign it to a tag called 'awesome'
-    assert(a.add('json://localhost/path1/', tag='awesome') is True)
-    assert(a.add({
+    assert a.add('json://localhost/path1/', tag='awesome') is True
+    assert a.add({
         'schema': 'json',
         'host': 'localhost',
-        'fullpath': '/path1/'}, tag='awesome') is True)
+        'fullpath': '/path1/'}, tag='awesome') is True
 
     # Add another notification and assign it to a tag called 'awesome'
     # and another tag called 'local'
-    assert(a.add('json://localhost/path2/', tag=['mmost', 'awesome']) is True)
+    assert a.add('json://localhost/path2/', tag=['mmost', 'awesome']) is True
 
     # notify the awesome tag; this would notify both services behind the
     # scenes
-    assert(a.notify(title="my title", body="my body", tag='awesome') is True)
+    assert a.notify(title="my title", body="my body", tag='awesome') is True
 
     # notify all of the tags
-    assert(a.notify(
-        title="my title", body="my body", tag=['awesome', 'mmost']) is True)
+    assert a.notify(
+        title="my title", body="my body", tag=['awesome', 'mmost']) is True
 
     # When we query against our loaded notifications for a tag that simply
     # isn't assigned to anything, we return None.  None (different then False)
     # tells us that we litterally had nothing to query.  We didn't fail...
     # but we also didn't do anything...
-    assert(a.notify(
-        title="my title", body="my body", tag='missing') is None)
+    assert a.notify(
+        title="my title", body="my body", tag='missing') is None
 
     # Now to test the ability to and and/or notifications
     a = Apprise()
 
     # Add a tag by tuple
-    assert(a.add('json://localhost/tagA/', tag=("TagA", )) is True)
+    assert a.add('json://localhost/tagA/', tag=("TagA", )) is True
     # Add 2 tags by string
-    assert(a.add('json://localhost/tagAB/', tag="TagA, TagB") is True)
+    assert a.add('json://localhost/tagAB/', tag="TagA, TagB") is True
     # Add a tag using a set
-    assert(a.add('json://localhost/tagB/', tag=set(["TagB"])) is True)
+    assert a.add('json://localhost/tagB/', tag=set(["TagB"])) is True
     # Add a tag by string (again)
-    assert(a.add('json://localhost/tagC/', tag="TagC") is True)
+    assert a.add('json://localhost/tagC/', tag="TagC") is True
     # Add 2 tags using a list
-    assert(a.add('json://localhost/tagCD/', tag=["TagC", "TagD"]) is True)
+    assert a.add('json://localhost/tagCD/', tag=["TagC", "TagD"]) is True
     # Add a tag by string (again)
-    assert(a.add('json://localhost/tagD/', tag="TagD") is True)
+    assert a.add('json://localhost/tagD/', tag="TagD") is True
     # add a tag set by set (again)
-    assert(a.add('json://localhost/tagCDE/',
-           tag=set(["TagC", "TagD", "TagE"])) is True)
+    assert a.add('json://localhost/tagCDE/',
+                 tag=set(["TagC", "TagD", "TagE"])) is True
 
     # Expression: TagC and TagD
     # Matches the following only:
     #   - json://localhost/tagCD/
     #   - json://localhost/tagCDE/
-    assert(a.notify(
-        title="my title", body="my body", tag=[('TagC', 'TagD')]) is True)
+    assert a.notify(
+        title="my title", body="my body", tag=[('TagC', 'TagD')]) is True
 
     # Expression: (TagY and TagZ) or TagX
     # Matches nothing, None is returned in this case
-    assert(a.notify(
+    assert a.notify(
         title="my title", body="my body",
-        tag=[('TagY', 'TagZ'), 'TagX']) is None)
+        tag=[('TagY', 'TagZ'), 'TagX']) is None
 
     # Expression: (TagY and TagZ) or TagA
     # Matches the following only:
     #   - json://localhost/tagAB/
-    assert(a.notify(
+    assert a.notify(
         title="my title", body="my body",
-        tag=[('TagY', 'TagZ'), 'TagA']) is True)
+        tag=[('TagY', 'TagZ'), 'TagA']) is True
 
     # Expression: (TagE and TagD) or TagB
     # Matches the following only:
     #   - json://localhost/tagCDE/
     #   - json://localhost/tagAB/
     #   - json://localhost/tagB/
-    assert(a.notify(
+    assert a.notify(
         title="my title", body="my body",
-        tag=[('TagE', 'TagD'), 'TagB']) is True)
+        tag=[('TagE', 'TagD'), 'TagB']) is True
 
-    # Garbage Entries; we can't do anything with the tag so we have nothing to
-    # notify as a result.  So we simply return None
-    assert(a.notify(
+    # Garbage Entries in tag field just get stripped out. the below
+    # is the same as notifying no tags at all. Since we have not added
+    # any entries that do not have tags (that we can match against)
+    # we fail.  None is returned as a way of letting us know that we
+    # had Notifications to notify, but since none of them matched our tag
+    # none were notified.
+    assert a.notify(
         title="my title", body="my body",
-        tag=[(object, ), ]) is None)
+        tag=[(object, ), ]) is None
 
 
 def test_apprise_notify_formats(tmpdir):
@@ -536,7 +540,7 @@ def test_apprise_notify_formats(tmpdir):
     a = Apprise()
 
     # no items
-    assert(len(a) == 0)
+    assert len(a) == 0
 
     class TextNotification(NotifyBase):
         # set our default notification format
@@ -594,26 +598,29 @@ def test_apprise_notify_formats(tmpdir):
     # defined plugin above was defined to default to HTML which triggers
     # a markdown to take place if the body_format specified on the notify
     # call
-    assert(a.add('html://localhost') is True)
-    assert(a.add('html://another.server') is True)
-    assert(a.add('html://and.another') is True)
-    assert(a.add('text://localhost') is True)
-    assert(a.add('text://another.server') is True)
-    assert(a.add('text://and.another') is True)
-    assert(a.add('markdown://localhost') is True)
-    assert(a.add('markdown://another.server') is True)
-    assert(a.add('markdown://and.another') is True)
+    assert a.add('html://localhost') is True
+    assert a.add('html://another.server') is True
+    assert a.add('html://and.another') is True
+    assert a.add('text://localhost') is True
+    assert a.add('text://another.server') is True
+    assert a.add('text://and.another') is True
+    assert a.add('markdown://localhost') is True
+    assert a.add('markdown://another.server') is True
+    assert a.add('markdown://and.another') is True
 
-    assert(len(a) == 9)
+    assert len(a) == 9
 
-    assert(a.notify(title="markdown", body="## Testing Markdown",
-           body_format=NotifyFormat.MARKDOWN) is True)
+    assert a.notify(
+        title="markdown", body="## Testing Markdown",
+        body_format=NotifyFormat.MARKDOWN) is True
 
-    assert(a.notify(title="text", body="Testing Text",
-           body_format=NotifyFormat.TEXT) is True)
+    assert a.notify(
+        title="text", body="Testing Text",
+        body_format=NotifyFormat.TEXT) is True
 
-    assert(a.notify(title="html", body="<b>HTML</b>",
-           body_format=NotifyFormat.HTML) is True)
+    assert a.notify(
+        title="html", body="<b>HTML</b>",
+        body_format=NotifyFormat.HTML) is True
 
 
 def test_apprise_asset(tmpdir):
@@ -623,7 +630,7 @@ def test_apprise_asset(tmpdir):
     """
     a = AppriseAsset(theme=None)
     # Default theme
-    assert(a.theme == 'default')
+    assert a.theme == 'default'
 
     a = AppriseAsset(
         theme='dark',
@@ -634,58 +641,49 @@ def test_apprise_asset(tmpdir):
     a.default_html_color = '#abcabc'
     a.html_notify_map[NotifyType.INFO] = '#aaaaaa'
 
-    assert(a.color('invalid', tuple) == (171, 202, 188))
-    assert(a.color(NotifyType.INFO, tuple) == (170, 170, 170))
+    assert a.color('invalid', tuple) == (171, 202, 188)
+    assert a.color(NotifyType.INFO, tuple) == (170, 170, 170)
 
-    assert(a.color('invalid', int) == 11258556)
-    assert(a.color(NotifyType.INFO, int) == 11184810)
+    assert a.color('invalid', int) == 11258556
+    assert a.color(NotifyType.INFO, int) == 11184810
 
-    assert(a.color('invalid', None) == '#abcabc')
-    assert(a.color(NotifyType.INFO, None) == '#aaaaaa')
+    assert a.color('invalid', None) == '#abcabc'
+    assert a.color(NotifyType.INFO, None) == '#aaaaaa'
     # None is the default
-    assert(a.color(NotifyType.INFO) == '#aaaaaa')
+    assert a.color(NotifyType.INFO) == '#aaaaaa'
 
     # Invalid Type
-    try:
-        a.color(NotifyType.INFO, dict)
-        # We should not get here (exception should be thrown)
-        assert(False)
-
-    except ValueError:
+    with pytest.raises(ValueError):
         # The exception we expect since dict is not supported
-        assert(True)
+        a.color(NotifyType.INFO, dict)
 
-    except Exception:
-        # Any other exception is not good
-        assert(False)
+    assert a.image_url(NotifyType.INFO, NotifyImageSize.XY_256) == \
+        'http://localhost/dark/info-256x256.png'
 
-    assert(a.image_url(NotifyType.INFO, NotifyImageSize.XY_256) ==
-           'http://localhost/dark/info-256x256.png')
-
-    assert(a.image_path(
+    assert a.image_path(
         NotifyType.INFO,
         NotifyImageSize.XY_256,
-        must_exist=False) == '/dark/info-256x256.png')
+        must_exist=False) == '/dark/info-256x256.png'
 
     # This path doesn't exist so image_raw will fail (since we just
     # randompyl picked it for testing)
-    assert(a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is None)
+    assert a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is None
 
-    assert(a.image_path(
+    assert a.image_path(
         NotifyType.INFO,
         NotifyImageSize.XY_256,
-        must_exist=True) is None)
+        must_exist=True) is None
 
     # Create a new object (with our default settings)
     a = AppriseAsset()
 
     # Our default configuration can access our file
-    assert(a.image_path(
+    assert a.image_path(
         NotifyType.INFO,
         NotifyImageSize.XY_256,
-        must_exist=True) is not None)
+        must_exist=True) is not None
 
-    assert(a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is not None)
+    assert a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is not None
 
     # Create a temporary directory
     sub = tmpdir.mkdir("great.theme")
@@ -703,14 +701,14 @@ def test_apprise_asset(tmpdir):
     )
 
     # We'll be able to read file we just created
-    assert(a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is not None)
+    assert a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is not None
 
     # We can retrieve the filename at this point even with must_exist set
     # to True
-    assert(a.image_path(
+    assert a.image_path(
         NotifyType.INFO,
         NotifyImageSize.XY_256,
-        must_exist=True) is not None)
+        must_exist=True) is not None
 
     # If we make the file un-readable however, we won't be able to read it
     # This test is just showing that we won't throw an exception
@@ -720,37 +718,37 @@ def test_apprise_asset(tmpdir):
         pytest.skip('The Root user can not run file permission tests.')
 
     chmod(dirname(sub.strpath), 0o000)
-    assert(a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is None)
+    assert a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is None
 
     # Our path doesn't exist anymore using this logic
-    assert(a.image_path(
+    assert a.image_path(
         NotifyType.INFO,
         NotifyImageSize.XY_256,
-        must_exist=True) is None)
+        must_exist=True) is None
 
     # Return our permission so we don't have any problems with our cleanup
     chmod(dirname(sub.strpath), 0o700)
 
     # Our content is retrivable again
-    assert(a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is not None)
+    assert a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is not None
 
     # our file path is accessible again too
-    assert(a.image_path(
+    assert a.image_path(
         NotifyType.INFO,
         NotifyImageSize.XY_256,
-        must_exist=True) is not None)
+        must_exist=True) is not None
 
     # We do the same test, but set the permission on the file
     chmod(a.image_path(NotifyType.INFO, NotifyImageSize.XY_256), 0o000)
 
     # our path will still exist in this case
-    assert(a.image_path(
+    assert a.image_path(
         NotifyType.INFO,
         NotifyImageSize.XY_256,
-        must_exist=True) is not None)
+        must_exist=True) is not None
 
     # but we will not be able to open it
-    assert(a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is None)
+    assert a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is None
 
     # Restore our permissions
     chmod(a.image_path(NotifyType.INFO, NotifyImageSize.XY_256), 0o640)
@@ -759,12 +757,12 @@ def test_apprise_asset(tmpdir):
     a = AppriseAsset(image_path_mask=False, image_url_mask=False)
 
     # We always return none in these calls now
-    assert(a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is None)
-    assert(a.image_url(NotifyType.INFO, NotifyImageSize.XY_256) is None)
-    assert(a.image_path(NotifyType.INFO, NotifyImageSize.XY_256,
-           must_exist=False) is None)
-    assert(a.image_path(NotifyType.INFO, NotifyImageSize.XY_256,
-           must_exist=True) is None)
+    assert a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is None
+    assert a.image_url(NotifyType.INFO, NotifyImageSize.XY_256) is None
+    assert a.image_path(NotifyType.INFO, NotifyImageSize.XY_256,
+                        must_exist=False) is None
+    assert a.image_path(NotifyType.INFO, NotifyImageSize.XY_256,
+                        must_exist=True) is None
 
     # Test our default extension out
     a = AppriseAsset(
@@ -772,28 +770,28 @@ def test_apprise_asset(tmpdir):
         image_url_mask='http://localhost/{THEME}/{TYPE}-{XY}{EXTENSION}',
         default_extension='.jpeg',
     )
-    assert(a.image_path(
+    assert a.image_path(
         NotifyType.INFO,
         NotifyImageSize.XY_256,
-        must_exist=False) == '/default/info-256x256.jpeg')
+        must_exist=False) == '/default/info-256x256.jpeg'
 
-    assert(a.image_url(
+    assert a.image_url(
         NotifyType.INFO,
-        NotifyImageSize.XY_256) == 'http://localhost/'
-                                   'default/info-256x256.jpeg')
+        NotifyImageSize.XY_256) == \
+        'http://localhost/default/info-256x256.jpeg'
 
     # extension support
-    assert(a.image_path(
+    assert a.image_path(
         NotifyType.INFO,
         NotifyImageSize.XY_128,
         must_exist=False,
-        extension='.ico') == '/default/info-128x128.ico')
+        extension='.ico') == '/default/info-128x128.ico'
 
-    assert(a.image_url(
+    assert a.image_url(
         NotifyType.INFO,
         NotifyImageSize.XY_256,
-        extension='.test') == 'http://localhost/'
-                              'default/info-256x256.test')
+        extension='.test') == \
+        'http://localhost/default/info-256x256.test'
 
 
 def test_apprise_details():
@@ -894,6 +892,11 @@ def test_apprise_details():
                 #
                 '_exists_if': 'always_true',
             },
+            # alias_of testing
+            'test_alias_of': {
+                'alias_of': 'mylistB',
+                'delim': ('-', ' ')
+            }
         })
 
         def url(self):
@@ -1116,10 +1119,11 @@ def test_apprise_details_plugin_verification():
                             assert '{} is an invalid regex'\
                                 .format(arg['regex'][0])
 
-                        # Regex should never start and/or end with ^/$; leave
-                        # that up to the user making use of the regex instead
-                        assert re.match(r'^[()\s]*\^', arg['regex'][0]) is None
-                        assert re.match(r'[()\s$]*\$', arg['regex'][0]) is None
+                        # Regex should always start and/or end with ^/$
+                        assert re.match(
+                            r'^\^.+?$', arg['regex'][0]) is not None
+                        assert re.match(
+                            r'^.+?\$$', arg['regex'][0]) is not None
 
                     if arg['type'].startswith('list'):
                         # Delimiters MUST be defined
@@ -1132,8 +1136,55 @@ def test_apprise_details_plugin_verification():
                     assert isinstance(arg['alias_of'], six.string_types)
                     # Track our alias_of object
                     map_to_aliases.add(arg['alias_of'])
-                    # 2 entries (name, and alias_of only!)
-                    assert len(entry['details'][section][key]) == 1
+
+                    # Ensure we're not already in the tokens section
+                    # The alias_of object has no value here
+                    assert section != 'tokens'
+
+                    # We can't be an alias_of ourselves
+                    if key == arg['alias_of']:
+                        # This is acceptable as long as we exist in the tokens
+                        # table because that is truely what we map back to
+                        assert key in entry['details']['tokens']
+
+                    else:
+                        # Throw the problem into an assert tag for debugging
+                        # purposes... the mapping is not acceptable
+                        assert key != arg['alias_of']
+
+                    # alias_of always references back to tokens
+                    assert \
+                        arg['alias_of'] in entry['details']['tokens'] or \
+                        arg['alias_of'] in entry['details']['args']
+
+                    # Find a list directive in our tokens
+                    t_match = entry['details']['tokens']\
+                        .get(arg['alias_of'], {})\
+                        .get('type', '').startswith('list')
+
+                    a_match = entry['details']['args']\
+                        .get(arg['alias_of'], {})\
+                        .get('type', '').startswith('list')
+
+                    if not (t_match or a_match):
+                        # Ensure the only token we have is the alias_of
+                        assert len(entry['details'][section][key]) == 1
+
+                    else:
+                        # We're a list, we allow up to 2 variables
+                        # Obviously we have the alias_of entry; that's why
+                        # were at this part of the code.  But we can
+                        # additionally provide a 'delim' over-ride.
+                        assert len(entry['details'][section][key]) <= 2
+                        if len(entry['details'][section][key]) == 2:
+                            # Verify that it is in fact the 'delim' tag
+                            assert 'delim' in entry['details'][section][key]
+                            # If we do have a delim value set, it must be of
+                            # a list/set/tuple type
+                            assert isinstance(
+                                entry['details'][section][key]['delim'],
+                                (tuple, set, list),
+                            )
 
         if six.PY2:
             # inspect our object

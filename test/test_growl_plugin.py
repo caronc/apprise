@@ -211,7 +211,7 @@ def test_growl_plugin(mock_gntp):
         try:
             obj = Apprise.instantiate(url, suppress_exceptions=False)
 
-            assert(exception is None)
+            assert exception is None
 
             if obj is None:
                 # We're done
@@ -219,17 +219,17 @@ def test_growl_plugin(mock_gntp):
 
             if instance is None:
                 # Expected None but didn't get it
-                assert(False)
+                assert False
 
-            assert(isinstance(obj, instance) is True)
+            assert isinstance(obj, instance) is True
 
             if isinstance(obj, plugins.NotifyBase):
                 # We loaded okay; now lets make sure we can reverse this url
-                assert(isinstance(obj.url(), six.string_types) is True)
+                assert isinstance(obj.url(), six.string_types) is True
 
                 # Test our privacy=True flag
-                assert(isinstance(
-                    obj.url(privacy=True), six.string_types) is True)
+                assert isinstance(
+                    obj.url(privacy=True), six.string_types) is True
 
                 # Instantiate the exact same object again using the URL from
                 # the one that was already created properly
@@ -243,14 +243,14 @@ def test_growl_plugin(mock_gntp):
                     # assertion failure makes things easier to debug later on
                     print('TEST FAIL: {} regenerated as {}'.format(
                         url, obj.url()))
-                    assert(False)
+                    assert False
 
             if self:
                 # Iterate over our expected entries inside of our object
                 for key, val in self.items():
                     # Test that our object has the desired key
-                    assert(hasattr(key, obj))
-                    assert(getattr(key, obj) == val)
+                    assert hasattr(key, obj)
+                    assert getattr(key, obj) == val
 
             try:
                 if test_growl_notify_exceptions is False:
@@ -292,5 +292,5 @@ def test_growl_plugin(mock_gntp):
         except Exception as e:
             # Handle our exception
             print('%s / %s' % (url, str(e)))
-            assert(exception is not None)
-            assert(isinstance(e, exception))
+            assert exception is not None
+            assert isinstance(e, exception)

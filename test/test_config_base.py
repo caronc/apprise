@@ -25,6 +25,7 @@
 
 import sys
 import six
+import pytest
 from apprise.AppriseAsset import AppriseAsset
 from apprise.config.ConfigBase import ConfigBase
 from apprise.config import __load_matrix
@@ -41,22 +42,12 @@ def test_config_base():
     """
 
     # invalid types throw exceptions
-    try:
+    with pytest.raises(TypeError):
         ConfigBase(**{'format': 'invalid'})
-        # We should never reach here as an exception should be thrown
-        assert(False)
-
-    except TypeError:
-        assert(True)
 
     # Config format types are not the same as ConfigBase ones
-    try:
+    with pytest.raises(TypeError):
         ConfigBase(**{'format': 'markdown'})
-        # We should never reach here as an exception should be thrown
-        assert(False)
-
-    except TypeError:
-        assert(True)
 
     cb = ConfigBase(**{'format': 'yaml'})
     assert isinstance(cb, ConfigBase)

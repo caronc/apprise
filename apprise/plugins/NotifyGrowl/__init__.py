@@ -324,7 +324,6 @@ class NotifyGrowl(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
-        # Apply our settings now
         version = None
         if 'version' in results['qsd'] and len(results['qsd']['version']):
             # Allow the user to specify the version of the protocol to use.

@@ -24,6 +24,7 @@
 # THE SOFTWARE.
 
 import six
+import pytest
 import requests
 import mock
 from json import dumps
@@ -76,9 +77,12 @@ TEST_URLS = (
     ('boxcar://%s' % ('a' * 64), {
         'instance': TypeError,
     }),
-    # An invalid access and secret key specified
-    ('boxcar://access.key/secret.key/', {
-        # Thrown because there were no recipients specified
+    # No access specified (whitespace is trimmed)
+    ('boxcar://%%20/%s' % ('a' * 64), {
+        'instance': TypeError,
+    }),
+    # No secret specified (whitespace is trimmed)
+    ('boxcar://%s/%%20' % ('a' * 64), {
         'instance': TypeError,
     }),
     # Provide both an access and a secret
@@ -134,11 +138,11 @@ TEST_URLS = (
     # NotifyClickSend
     ##################################
     ('clicksend://', {
-        # No authentication
+        # We failed to identify any valid authentication
         'instance': TypeError,
     }),
     ('clicksend://:@/', {
-        # invalid user/pass
+        # We failed to identify any valid authentication
         'instance': TypeError,
     }),
     ('clicksend://user:pass@{}/{}/{}'.format('1' * 10, '2' * 15, 'a' * 13), {
@@ -177,15 +181,15 @@ TEST_URLS = (
     # NotifyD7Networks
     ##################################
     ('d7sms://', {
-        # No target numbers
+        # We failed to identify any valid authentication
         'instance': TypeError,
     }),
     ('d7sms://:@/', {
-        # invalid user/pass
+        # We failed to identify any valid authentication
         'instance': TypeError,
     }),
     ('d7sms://user:pass@{}/{}/{}'.format('1' * 10, '2' * 15, 'a' * 13), {
-        # invalid target numbers
+        # No valid targets to notify
         'instance': TypeError,
     }),
     ('d7sms://user:pass@{}?batch=yes'.format('3' * 14), {
@@ -502,14 +506,15 @@ TEST_URLS = (
     ('flock://%s/g:%s/u:%s?format=text' % ('i' * 24, 'g' * 12, 'u' * 10), {
         'instance': plugins.NotifyFlock,
     }),
-    # Bot API presumed if one or more targets are specified
-    # has all bad entries
-    ('flock://%s/g:%s/u:%s?format=text' % ('i' * 24, 'g' * 14, 'u' * 10), {
+    # Invalid user/group defined
+    ('flock://%s/g:/u:?format=text' % ('i' * 24), {
         'instance': TypeError,
     }),
-    # Provide invalid token
-    ('flock://%s?format=text' % ('i' * 10), {
-        'instance': TypeError,
+    # we don't focus on the invalid length of the user/group fields.
+    # As a result, the following will load and pass the data upstream
+    ('flock://%s/g:%s/u:%s?format=text' % ('i' * 24, 'g' * 14, 'u' * 10), {
+        # We will still instantiate the object
+        'instance': plugins.NotifyFlock,
     }),
     # An invalid url
     ('flock://:@/', {
@@ -550,54 +555,52 @@ TEST_URLS = (
     ('gitter://:@/', {
         'instance': None,
     }),
-    # Token specified but it's invalid
+    # Invalid Token Length
     ('gitter://%s' % ('a' * 12), {
         'instance': TypeError,
     }),
-    # Token specified but no channel - still okay
+    # Token specified but no channel
     ('gitter://%s' % ('a' * 40), {
-        'instance': plugins.NotifyGitter,
-        # our notify() will however return a False since it can't
-        # notify anything
-        'response': False,
+        'instance': TypeError,
     }),
     # Token + channel
-    ('gitter://%s/apprise' % ('a' * 40), {
+    ('gitter://%s/apprise' % ('b' * 40), {
         'instance': plugins.NotifyGitter,
-        # don't include an image by default
-        'include_image': False,
-        # This actually fails because the first thing we do is generate a list
-        # of channel's that we are a part of, and test_rest_plugins() won't
-        # be able to fulfill this task.  Hence we'll get a list of no channels
-        # and having nothing to notify will give us a failed state:
         'response': False,
     }),
     # include image in post
-    ('gitter://%s/apprise?image=Yes' % ('a' * 40), {
+    ('gitter://%s/apprise?image=Yes' % ('c' * 40), {
         'instance': plugins.NotifyGitter,
         'response': False,
 
         # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'gitter://a...a/apprise',
+        'privacy_url': 'gitter://c...c/apprise',
     }),
     # Don't include image in post (this is the default anyway)
-    ('gitter://%s/apprise?image=No' % ('a' * 40), {
+    ('gitter://%s/apprise?image=Yes' % ('d' * 40), {
+        'instance': plugins.NotifyGitter,
+        'response': False,
+        # don't include an image by default
+        'include_image': False,
+    }),
+    # Don't include image in post (this is the default anyway)
+    ('gitter://%s/apprise?image=No' % ('e' * 40), {
         'instance': plugins.NotifyGitter,
         'response': False,
     }),
-    ('gitter://%s' % ('a' * 40), {
+    ('gitter://%s/apprise' % ('f' * 40), {
         'instance': plugins.NotifyGitter,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
-    ('gitter://%s' % ('a' * 40), {
+    ('gitter://%s/apprise' % ('g' * 40), {
         'instance': plugins.NotifyGitter,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
-    ('gitter://%s' % ('a' * 40), {
+    ('gitter://%s/apprise' % ('h' * 40), {
         'instance': plugins.NotifyGitter,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
@@ -722,19 +725,26 @@ TEST_URLS = (
     ('join://%s' % ('a' * 32), {
         'instance': plugins.NotifyJoin,
     }),
-    # Invalid APIKey
-    ('join://%s' % ('a' * 24), {
-        # Missing a channel
-        'instance': TypeError,
-    }),
-    # APIKey + device (using to=)
+    # API Key + device (using to=)
     ('join://%s?to=%s' % ('a' * 32, 'd' * 32), {
         'instance': plugins.NotifyJoin,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'join://a...a/',
     }),
-    # APIKey + device
+    # API Key + priority setting
+    ('join://%s?priority=high' % ('a' * 32), {
+        'instance': plugins.NotifyJoin,
+    }),
+    # API Key + invalid priority setting
+    ('join://%s?priority=invalid' % ('a' * 32), {
+        'instance': plugins.NotifyJoin,
+    }),
+    # API Key + priority setting (empty)
+    ('join://%s?priority=' % ('a' * 32), {
+        'instance': plugins.NotifyJoin,
+    }),
+    # API Key + device
     ('join://%s@%s?image=True' % ('a' * 32, 'd' * 32), {
         'instance': plugins.NotifyJoin,
     }),
@@ -742,28 +752,27 @@ TEST_URLS = (
     ('join://%s@%s?image=False' % ('a' * 32, 'd' * 32), {
         'instance': plugins.NotifyJoin,
     }),
-    # APIKey + device
+    # API Key + invalid device
+    ('join://%s/%s' % ('a' * 32, 'k' * 12), {
+        'instance': TypeError,
+    }),
+    # API Key + device
     ('join://%s/%s' % ('a' * 32, 'd' * 32), {
         'instance': plugins.NotifyJoin,
         # don't include an image by default
         'include_image': False,
     }),
-    # APIKey + 2 devices
+    # API Key + 2 devices
     ('join://%s/%s/%s' % ('a' * 32, 'd' * 32, 'e' * 32), {
         'instance': plugins.NotifyJoin,
         # don't include an image by default
         'include_image': False,
     }),
-    # APIKey + 1 device and 1 group
+    # API Key + 1 device and 1 group
     ('join://%s/%s/%s' % ('a' * 32, 'd' * 32, 'group.chrome'), {
         'instance': plugins.NotifyJoin,
     }),
-    # APIKey + bad device
-    ('join://%s/%s' % ('a' * 32, 'd' * 10), {
-        'instance': plugins.NotifyJoin,
-        'response': False,
-    }),
-    # APIKey + bad url
+    # API Key + bad url
     ('join://:@/', {
         'instance': None,
     }),
@@ -943,16 +952,8 @@ TEST_URLS = (
         # The below errors because a second token wasn't found
         'instance': None,
     }),
-    ('kumulos://invalid-api-key', {
-        # Invalid API Key
-        'instance': TypeError,
-    }),
-    ('kumulos://{}'.format(UUID4), {
-        # Server Key not specified
-        'instance': TypeError,
-    }),
-    ('kumulos://{}/{}/'.format(UUID4, 'a' * 26), {
-        # Invalid Server Key
+    ('kumulos://{}/'.format(UUID4), {
+        # No server key was specified
         'instance': TypeError,
     }),
     ('kumulos://{}/{}/'.format(UUID4, 'w' * 36), {
@@ -1179,6 +1180,13 @@ TEST_URLS = (
     ('mmosts://', {
         'instance': None,
     }),
+    ('mmost://:@/', {
+        'instance': None,
+    }),
+    ('mmosts://localhost', {
+        # Thrown because there was no webhook id specified
+        'instance': TypeError,
+    }),
     ('mmost://localhost/3ccdd113474722377935511fc85d3dd4', {
         'instance': plugins.NotifyMatterMost,
     }),
@@ -1224,17 +1232,6 @@ TEST_URLS = (
     ('mmosts://localhost/////3ccdd113474722377935511fc85d3dd4///', {
         'instance': plugins.NotifyMatterMost,
     }),
-    ('mmosts://localhost', {
-        # Thrown because there was no webhook id specified
-        'instance': TypeError,
-    }),
-    ('mmost://localhost/bad-web-hook', {
-        # Thrown because the webhook is not in a valid format
-        'instance': TypeError,
-    }),
-    ('mmost://:@/', {
-        'instance': None,
-    }),
     ('mmost://localhost/3ccdd113474722377935511fc85d3dd4', {
         'instance': plugins.NotifyMatterMost,
         # force a failure
@@ -1277,18 +1274,6 @@ TEST_URLS = (
     }),
     ('msteams://{}@{}/{}'.format(UUID4, UUID4, 'a' * 32), {
         # Just 2 tokens provided
-        'instance': TypeError,
-    }),
-    ('msteams://{}@{}/{}/{}?ta'.format(UUID4, UUID4, 'a' * 20, UUID4), {
-        # All tokens provided - invalid token 2
-        'instance': TypeError,
-    }),
-    ('msteams://{}@{}/{}/{}?tb'.format(UUID4, UUID4, 'a' * 32, 'abcd'), {
-        # All tokens provided - invalid token 3
-        'instance': TypeError,
-    }),
-    ('msteams://{}@{}/{}/{}?tb'.format('garbage', UUID4, 'a' * 32, 'abcd'), {
-        # All tokens provided - invalid token 1
         'instance': TypeError,
     }),
     ('msteams://{}@{}/{}/{}?t1'.format(UUID4, UUID4, 'a' * 32, UUID4), {
@@ -1344,65 +1329,57 @@ TEST_URLS = (
         # invalid Auth key
         'instance': TypeError,
     }),
-    ('nexmo://{}@12345678'.format('a' * 8), {
+    ('nexmo://AC{}@12345678'.format('a' * 8), {
         # Just a key provided
         'instance': TypeError,
     }),
-    ('nexmo://{}:{}@_'.format('a' * 8, 'b' * 16), {
-        # key and secret provided but invalid from
-        'instance': TypeError,
-    }),
-    ('nexmo://{}:{}@{}'.format('a' * 23, 'b' * 16, '1' * 11), {
-        # key invalid and secret
-        'instance': TypeError,
-    }),
-    ('nexmo://{}:{}@{}'.format('a' * 8, 'b' * 2, '2' * 11), {
-        # key and invalid secret
-        'instance': TypeError,
-    }),
-    ('nexmo://{}:{}@{}'.format('a' * 8, 'b' * 16, '3' * 9), {
+    ('nexmo://AC{}:{}@{}'.format('a' * 8, 'b' * 16, '3' * 9), {
         # key and secret provided and from but invalid from no
         'instance': TypeError,
     }),
-    ('nexmo://{}:{}@{}/?ttl=0'.format('a' * 8, 'b' * 16, '3' * 11), {
+    ('nexmo://AC{}:{}@{}/?ttl=0'.format('b' * 8, 'c' * 16, '3' * 11), {
         # Invalid ttl defined
         'instance': TypeError,
     }),
-    ('nexmo://{}:{}@{}/123/{}/abcd/'.format(
-        'a' * 8, 'b' * 16, '3' * 11, '9' * 15), {
+    ('nexmo://AC{}:{}@{}'.format('d' * 8, 'e' * 16, 'a' * 11), {
+        # Invalid source number
+        'instance': TypeError,
+    }),
+    ('nexmo://AC{}:{}@{}/123/{}/abcd/'.format(
+        'f' * 8, 'g' * 16, '3' * 11, '9' * 15), {
         # valid everything but target numbers
         'instance': plugins.NotifyNexmo,
 
         # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'nexmo://a...a:****@',
+        'privacy_url': 'nexmo://A...f:****@',
     }),
-    ('nexmo://{}:{}@{}'.format('a' * 8, 'b' * 16, '5' * 11), {
+    ('nexmo://AC{}:{}@{}'.format('h' * 8, 'i' * 16, '5' * 11), {
         # using phone no with no target - we text ourselves in
         # this case
         'instance': plugins.NotifyNexmo,
     }),
-    ('nexmo://_?key={}&secret={}&from={}'.format(
+    ('nexmo://_?key=AC{}&secret={}&from={}'.format(
         'a' * 8, 'b' * 16, '5' * 11), {
         # use get args to acomplish the same thing
         'instance': plugins.NotifyNexmo,
     }),
-    ('nexmo://_?key={}&secret={}&source={}'.format(
+    ('nexmo://_?key=AC{}&secret={}&source={}'.format(
         'a' * 8, 'b' * 16, '5' * 11), {
         # use get args to acomplish the same thing (use source instead of from)
         'instance': plugins.NotifyNexmo,
     }),
-    ('nexmo://_?key={}&secret={}&from={}&to={}'.format(
+    ('nexmo://_?key=AC{}&secret={}&from={}&to={}'.format(
         'a' * 8, 'b' * 16, '5' * 11, '7' * 13), {
         # use to=
         'instance': plugins.NotifyNexmo,
     }),
-    ('nexmo://{}:{}@{}'.format('a' * 8, 'b' * 16, '6' * 11), {
+    ('nexmo://AC{}:{}@{}'.format('a' * 8, 'b' * 16, '6' * 11), {
         'instance': plugins.NotifyNexmo,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
-    ('nexmo://{}:{}@{}'.format('a' * 8, 'b' * 16, '6' * 11), {
+    ('nexmo://AC{}:{}@{}'.format('a' * 8, 'b' * 16, '6' * 11), {
         'instance': plugins.NotifyNexmo,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
@@ -1415,51 +1392,55 @@ TEST_URLS = (
     ('prowl://', {
         'instance': None,
     }),
+    # Invalid API Key
+    ('prowl://%s' % ('a' * 20), {
+        'instance': TypeError,
+    }),
+    # Provider Key
+    ('prowl://%s/%s' % ('a' * 40, 'b' * 40), {
+        'instance': plugins.NotifyProwl,
+    }),
+    # Invalid Provider Key
+    ('prowl://%s/%s' % ('a' * 40, 'b' * 20), {
+        'instance': TypeError,
+    }),
     # APIkey; no device
     ('prowl://%s' % ('a' * 40), {
         'instance': plugins.NotifyProwl,
     }),
-    # Invalid APIKey
-    ('prowl://%s' % ('a' * 24), {
-        'instance': TypeError,
-    }),
-    # APIKey
+    # API Key
     ('prowl://%s' % ('a' * 40), {
         'instance': plugins.NotifyProwl,
         # don't include an image by default
         'include_image': False,
     }),
-    # APIKey + priority setting
+    # API Key + priority setting
     ('prowl://%s?priority=high' % ('a' * 40), {
         'instance': plugins.NotifyProwl,
     }),
-    # APIKey + invalid priority setting
+    # API Key + invalid priority setting
     ('prowl://%s?priority=invalid' % ('a' * 40), {
         'instance': plugins.NotifyProwl,
     }),
-    # APIKey + priority setting (empty)
+    # API Key + priority setting (empty)
     ('prowl://%s?priority=' % ('a' * 40), {
         'instance': plugins.NotifyProwl,
     }),
-    # APIKey + Invalid Provider Key
-    ('prowl://%s/%s' % ('a' * 40, 'b' * 24), {
-        'instance': TypeError,
-    }),
-    # APIKey + No Provider Key (empty)
+    # API Key + No Provider Key (empty)
     ('prowl://%s///' % ('w' * 40), {
         'instance': plugins.NotifyProwl,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'prowl://w...w/',
     }),
-    # APIKey + Provider Key
+    # API Key + Provider Key
     ('prowl://%s/%s' % ('a' * 40, 'b' * 40), {
         'instance': plugins.NotifyProwl,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'prowl://a...a/b...b',
     }),
-    # APIKey + with image
+    # API Key + with image
     ('prowl://%s' % ('a' * 40), {
         'instance': plugins.NotifyProwl,
     }),
@@ -1496,38 +1477,38 @@ TEST_URLS = (
     ('pbul://%s' % ('a' * 32), {
         'instance': plugins.NotifyPushBullet,
     }),
-    # APIKey + channel
+    # API Key + channel
     ('pbul://%s/#channel/' % ('a' * 32), {
         'instance': plugins.NotifyPushBullet,
     }),
-    # APIKey + channel (via to=
+    # API Key + channel (via to=
     ('pbul://%s/?to=#channel' % ('a' * 32), {
         'instance': plugins.NotifyPushBullet,
     }),
-    # APIKey + 2 channels
+    # API Key + 2 channels
     ('pbul://%s/#channel1/#channel2' % ('a' * 32), {
         'instance': plugins.NotifyPushBullet,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'pbul://a...a/',
     }),
-    # APIKey + device
+    # API Key + device
     ('pbul://%s/device/' % ('a' * 32), {
         'instance': plugins.NotifyPushBullet,
     }),
-    # APIKey + 2 devices
+    # API Key + 2 devices
     ('pbul://%s/device1/device2/' % ('a' * 32), {
         'instance': plugins.NotifyPushBullet,
     }),
-    # APIKey + email
+    # API Key + email
     ('pbul://%s/user@example.com/' % ('a' * 32), {
         'instance': plugins.NotifyPushBullet,
     }),
-    # APIKey + 2 emails
+    # API Key + 2 emails
     ('pbul://%s/user@example.com/abc@def.com/' % ('a' * 32), {
         'instance': plugins.NotifyPushBullet,
     }),
-    # APIKey + Combo
+    # API Key + Combo
     ('pbul://%s/device/#channel/user@example.com/' % ('a' * 32), {
         'instance': plugins.NotifyPushBullet,
     }),
@@ -1576,10 +1557,10 @@ TEST_URLS = (
     # NotifyTechulusPush
     ##################################
     ('push://', {
-        # Missing APIKey
+        # Missing API Key
         'instance': TypeError,
     }),
-    # Invalid APIKey
+    # Invalid API Key
     ('push://%s' % ('+' * 24), {
         'instance': TypeError,
     }),
@@ -1590,7 +1571,7 @@ TEST_URLS = (
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'push://8...2/',
     }),
-    # APIKey + bad url
+    # API Key + bad url
     ('push://:@/', {
         'instance': TypeError,
     }),
@@ -1634,13 +1615,13 @@ TEST_URLS = (
     # Application Key+Secret + channel (via to=)
     ('pushed://%s/%s?to=channel' % ('a' * 32, 'a' * 64), {
         'instance': plugins.NotifyPushed,
-    }),
-    # Application Key+Secret + dropped entry
-    ('pushed://%s/%s/dropped/' % ('a' * 32, 'a' * 64), {
-        'instance': plugins.NotifyPushed,
-
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'pushed://a...a/****/',
+    }),
+    # Application Key+Secret + dropped entry
+    ('pushed://%s/%s/dropped_value/' % ('a' * 32, 'a' * 64), {
+        # No entries validated is a fail
+        'instance': TypeError,
     }),
     # Application Key+Secret + 2 channels
     ('pushed://%s/%s/#channel1/#channel2' % ('a' * 32, 'a' * 64), {
@@ -1785,101 +1766,93 @@ TEST_URLS = (
     ('pover://%s' % ('a' * 30), {
         'instance': TypeError,
     }),
-    # APIkey; invalid user
-    ('pover://%s@%s' % ('u' * 20, 'a' * 30), {
-        'instance': TypeError,
-    }),
-    # Invalid APIKey; valid User
-    ('pover://%s@%s' % ('u' * 30, 'a' * 24), {
-        'instance': TypeError,
-    }),
-    # APIKey + invalid sound setting
+    # API Key + invalid sound setting
     ('pover://%s@%s?sound=invalid' % ('u' * 30, 'a' * 30), {
         'instance': TypeError,
     }),
-    # APIKey + valid alternate sound picked
+    # API Key + valid alternate sound picked
     ('pover://%s@%s?sound=spacealarm' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
     }),
-    # APIKey + Valid User
+    # API Key + Valid User
     ('pover://%s@%s' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
         # don't include an image by default
         'include_image': False,
     }),
-    # APIKey + Valid User + 1 Device
+    # API Key + Valid User + 1 Device
     ('pover://%s@%s/DEVICE' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
     }),
-    # APIKey + Valid User + 1 Device (via to=)
+    # API Key + Valid User + 1 Device (via to=)
     ('pover://%s@%s?to=DEVICE' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
     }),
-    # APIKey + Valid User + 2 Devices
+    # API Key + Valid User + 2 Devices
     ('pover://%s@%s/DEVICE1/DEVICE2/' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'pover://u...u@a...a',
     }),
-    # APIKey + Valid User + invalid device
+    # API Key + Valid User + invalid device
     ('pover://%s@%s/%s/' % ('u' * 30, 'a' * 30, 'd' * 30), {
         'instance': plugins.NotifyPushover,
         # Notify will return False since there is a bad device in our list
         'response': False,
     }),
-    # APIKey + Valid User + device + invalid device
+    # API Key + Valid User + device + invalid device
     ('pover://%s@%s/DEVICE1/%s/' % ('u' * 30, 'a' * 30, 'd' * 30), {
         'instance': plugins.NotifyPushover,
         # Notify will return False since there is a bad device in our list
         'response': False,
     }),
-    # APIKey + priority setting
+    # API Key + priority setting
     ('pover://%s@%s?priority=high' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
     }),
-    # APIKey + invalid priority setting
+    # API Key + invalid priority setting
     ('pover://%s@%s?priority=invalid' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
     }),
-    # APIKey + emergency(2) priority setting
+    # API Key + emergency(2) priority setting
     ('pover://%s@%s?priority=emergency' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
     }),
-    # APIKey + emergency priority setting with retry and expire
+    # API Key + emergency priority setting with retry and expire
     ('pover://%s@%s?priority=emergency&%s&%s' % ('u' * 30,
                                                  'a' * 30,
                                                  'retry=30',
                                                  'expire=300'), {
         'instance': plugins.NotifyPushover,
     }),
-    # APIKey + emergency priority setting with text retry
+    # API Key + emergency priority setting with text retry
     ('pover://%s@%s?priority=emergency&%s&%s' % ('u' * 30,
                                                  'a' * 30,
                                                  'retry=invalid',
                                                  'expire=300'), {
         'instance': plugins.NotifyPushover,
     }),
-    # APIKey + emergency priority setting with text expire
+    # API Key + emergency priority setting with text expire
     ('pover://%s@%s?priority=emergency&%s&%s' % ('u' * 30,
                                                  'a' * 30,
                                                  'retry=30',
                                                  'expire=invalid'), {
         'instance': plugins.NotifyPushover,
     }),
-    # APIKey + emergency priority setting with invalid expire
+    # API Key + emergency priority setting with invalid expire
     ('pover://%s@%s?priority=emergency&%s' % ('u' * 30,
                                               'a' * 30,
                                               'expire=100000'), {
         'instance': TypeError,
     }),
-    # APIKey + emergency priority setting with invalid retry
+    # API Key + emergency priority setting with invalid retry
     ('pover://%s@%s?priority=emergency&%s' % ('u' * 30,
                                               'a' * 30,
                                               'retry=15'), {
         'instance': TypeError,
     }),
-    # APIKey + priority setting (empty)
+    # API Key + priority setting (empty)
     ('pover://%s@%s?priority=' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
     }),
@@ -2101,21 +2074,12 @@ TEST_URLS = (
         # Just org provided (no token)
         'instance': TypeError,
     }),
-    ('ryver://abc,#/ckhrjW8w672m6HG', {
-        # Invalid org provided (this isn't actually even a value url)
-        # because the hostname has ,# in it
-        'instance': None,
-    }),
-    ('ryver://a/ckhrjW8w672m6HG', {
-        # org is too short
-        'instance': TypeError,
-    }),
-    ('ryver://apprise/ckhrjW8w67HG', {
-        # Invalid token specified
-        'instance': TypeError,
-    }),
     ('ryver://apprise/ckhrjW8w672m6HG?webhook=invalid', {
         # Invalid webhook provided
+        'instance': TypeError,
+    }),
+    ('ryver://x/ckhrjW8w672m6HG?mode=slack', {
+        # Invalid org
         'instance': TypeError,
     }),
     ('ryver://apprise/ckhrjW8w672m6HG?mode=slack', {
@@ -2417,19 +2381,15 @@ TEST_URLS = (
         'instance': TypeError,
     }),
     ('sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcevi7FQ/us-west-2/12223334444', {
-        # we have a valid URL here
+        # we have a valid URL and one number to text
         'instance': plugins.NotifySNS,
     }),
     ('sns://T1JJ3TD4JD/TIiajkdnlazk7FQ/us-west-2/12223334444/12223334445', {
         # Multi SNS Suppport
         'instance': plugins.NotifySNS,
-    }),
-    ('sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/us-east-1', {
-        # Missing a topic and/or phone No
-        'instance': plugins.NotifySNS,
 
         # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'sns://T...2/****/us-east-1',
+        'privacy_url': 'sns://T...D/****/us-west-2',
     }),
     ('sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/us-east-1' \
         '?to=12223334444', {
@@ -2611,16 +2571,9 @@ TEST_URLS = (
         # sid and token provided but invalid from
         'instance': TypeError,
     }),
-    ('twilio://AC{}:{}@{}'.format('a' * 23, 'b' * 32, '1' * 11), {
-        # sid invalid and token
-        'instance': TypeError,
-    }),
-    ('twilio://AC{}:{}@{}'.format('a' * 32, 'b' * 23, '2' * 11), {
-        # sid and invalid token
-        'instance': TypeError,
-    }),
     ('twilio://AC{}:{}@{}'.format('a' * 32, 'b' * 32, '3' * 5), {
         # using short-code (5 characters) without a target
+        # We can still instantiate ourselves with a valid short code
         'instance': TypeError,
     }),
     ('twilio://AC{}:{}@{}'.format('a' * 32, 'b' * 32, '3' * 9), {
@@ -2895,25 +2848,16 @@ TEST_URLS = (
         'instance': None,
     }),
     ('msg91://{}'.format('a' * 23), {
-        # valid everything but target numbers
-        'instance': plugins.NotifyMSG91,
-        # Expected notify() response False because we have no numbers to
-        # notify
-        'notify_response': False,
+        # No number specified
+        'instance': TypeError,
     }),
     ('msg91://{}/123'.format('a' * 23), {
         # invalid phone number
-        'instance': plugins.NotifyMSG91,
-        # Expected notify() response False because we have no numbers to
-        # notify
-        'notify_response': False,
+        'instance': TypeError,
     }),
     ('msg91://{}/abcd'.format('a' * 23), {
-        # invalid phone number
-        'instance': plugins.NotifyMSG91,
-        # Expected notify() response False because we have no numbers to
-        # notify
-        'notify_response': False,
+        # No number to notify
+        'instance': TypeError,
     }),
     ('msg91://{}/15551232000/?country=invalid'.format('a' * 23), {
         # invalid country
@@ -2971,35 +2915,30 @@ TEST_URLS = (
         # No hostname/apikey specified
         'instance': None,
     }),
-    ('msgbird://{}/15551232000'.format('a' * 10), {
-        # invalid apikey
+    ('msgbird://{}/abcd'.format('a' * 25), {
+        # invalid characters in source phone number
         'instance': TypeError,
     }),
     ('msgbird://{}/123'.format('a' * 25), {
-        # invalid phone number
-        'instance': TypeError,
-    }),
-    ('msgbird://{}/abc'.format('a' * 25), {
-        # invalid phone number
+        # invalid source phone number
         'instance': TypeError,
     }),
     ('msgbird://{}/15551232000'.format('a' * 25), {
         # target phone number becomes who we text too; all is good
         'instance': plugins.NotifyMessageBird,
-    }),
-    ('msgbird://{}/15551232000/abcd'.format('a' * 25), {
-        # invalid target phone number; we fall back to texting ourselves
-        'instance': plugins.NotifyMessageBird,
-
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'msgbird://a...a/15551232000',
     }),
+    ('msgbird://{}/15551232000/abcd'.format('a' * 25), {
+        # invalid target phone number; we have no one to notify
+        'instance': TypeError,
+    }),
     ('msgbird://{}/15551232000/123'.format('a' * 25), {
-        # invalid target phone number; we fall back to texting ourselves
-        'instance': plugins.NotifyMessageBird,
+        # invalid target phone number
+        'instance': TypeError,
     }),
     ('msgbird://{}/?from=15551233000&to=15551232000'.format('a' * 25), {
-        # reference to to= and frome=
+        # reference to to= and from=
         'instance': plugins.NotifyMessageBird,
     }),
     ('msgbird://{}/15551232000'.format('a' * 25), {
@@ -3032,10 +2971,6 @@ TEST_URLS = (
         # We don't have strict host checking on for wxteams, so this URL
         # actually becomes parseable and :@ becomes a hostname.
         # The below errors because a second token wasn't found
-        'instance': TypeError,
-    }),
-    ('wxteams://{}'.format('a' * 40), {
-        # Just half of one token 1 provided
         'instance': TypeError,
     }),
     ('wxteams://{}'.format('a' * 80), {
@@ -3544,7 +3479,7 @@ def test_rest_plugins(mock_post, mock_get):
 
         except Exception as e:
             # Handle our exception
-            if(instance is None):
+            if instance is None:
                 print('%s %s' % (url, str(e)))
                 raise
 
@@ -3574,31 +3509,12 @@ def test_notify_boxcar_plugin(mock_post, mock_get):
     plugins.NotifyBoxcar(access=access, secret=secret, targets=None)
 
     # Initializes the plugin with a valid access, but invalid access key
-    try:
+    with pytest.raises(TypeError):
         plugins.NotifyBoxcar(access=None, secret=secret, targets=None)
-        assert False
-
-    except TypeError:
-        # We should throw an exception for knowingly having an invalid
-        assert True
-
-    # Initializes the plugin with a valid access, but invalid secret key
-    try:
-        plugins.NotifyBoxcar(access=access, secret='invalid', targets=None)
-        assert False
-
-    except TypeError:
-        # We should throw an exception for knowingly having an invalid key
-        assert True
 
     # Initializes the plugin with a valid access, but invalid secret
-    try:
+    with pytest.raises(TypeError):
         plugins.NotifyBoxcar(access=access, secret=None, targets=None)
-        assert False
-
-    except TypeError:
-        # We should throw an exception for knowingly having an invalid
-        assert True
 
     # Initializes the plugin with recipients list
     # the below also tests our the variation of recipient types
@@ -3644,14 +3560,19 @@ def test_notify_discord_plugin(mock_post, mock_get):
     mock_post.return_value.status_code = requests.codes.ok
     mock_get.return_value.status_code = requests.codes.ok
 
-    # Empty Channel list
-    try:
+    # Invalid webhook id
+    with pytest.raises(TypeError):
         plugins.NotifyDiscord(webhook_id=None, webhook_token=webhook_token)
-        assert False
+    # Invalid webhook id (whitespace)
+    with pytest.raises(TypeError):
+        plugins.NotifyDiscord(webhook_id="  ", webhook_token=webhook_token)
 
-    except TypeError:
-        # we'll thrown because no webhook_id was specified
-        assert True
+    # Invalid webhook token
+    with pytest.raises(TypeError):
+        plugins.NotifyDiscord(webhook_id=webhook_id, webhook_token=None)
+    # Invalid webhook token (whitespace)
+    with pytest.raises(TypeError):
+        plugins.NotifyDiscord(webhook_id=webhook_id, webhook_token="   ")
 
     obj = plugins.NotifyDiscord(
         webhook_id=webhook_id,
@@ -3953,6 +3874,124 @@ def test_notify_emby_plugin_sessions(mock_post, mock_get, mock_logout,
     assert len(sessions) == 0
 
 
+@mock.patch('requests.get')
+@mock.patch('requests.post')
+def test_notify_flock_plugin(mock_post, mock_get):
+    """
+    API: NotifyFlock() Extra Checks
+
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.request_rate_per_sec = 0
+
+    # Initializes the plugin with an invalid token
+    with pytest.raises(TypeError):
+        plugins.NotifyFlock(token=None)
+    # Whitespace also acts as an invalid token value
+    with pytest.raises(TypeError):
+        plugins.NotifyFlock(token="   ")
+
+
+def test_notify_gitter_plugin():
+    """
+    API: NotifyGitter() Extra Checks
+
+    """
+    # Define our channels
+    targets = ['apprise']
+
+    # Initializes the plugin with an invalid token
+    with pytest.raises(TypeError):
+        plugins.NotifyGitter(token=None, targets=targets)
+    # Whitespace also acts as an invalid token value
+    with pytest.raises(TypeError):
+        plugins.NotifyGitter(token="   ", targets=targets)
+
+
+def test_notify_gotify_plugin():
+    """
+    API: NotifyGotify() Extra Checks
+
+    """
+    # Initializes the plugin with an invalid token
+    with pytest.raises(TypeError):
+        plugins.NotifyGotify(token=None)
+    # Whitespace also acts as an invalid token value
+    with pytest.raises(TypeError):
+        plugins.NotifyGotify(token="   ")
+
+
+@mock.patch('requests.post')
+def test_notify_msg91_plugin(mock_post):
+    """
+    API: NotifyMSG91() Extra Checks
+
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.request_rate_per_sec = 0
+
+    # Prepare our response
+    response = requests.Request()
+    response.status_code = requests.codes.ok
+
+    # Prepare Mock
+    mock_post.return_value = response
+
+    # Initialize some generic (but valid) tokens
+    # authkey = '{}'.format('a' * 24)
+    target = '+1 (555) 123-3456'
+
+    # No authkey specified
+    with pytest.raises(TypeError):
+        plugins.NotifyMSG91(authkey=None, targets=target)
+    with pytest.raises(TypeError):
+        plugins.NotifyMSG91(authkey="    ", targets=target)
+
+
+def test_notify_msteams_plugin():
+    """
+    API: NotifyMSTeams() Extra Checks
+
+    """
+    # Initializes the plugin with an invalid token
+    with pytest.raises(TypeError):
+        plugins.NotifyMSTeams(token_a=None, token_b='abcd', token_c='abcd')
+    # Whitespace also acts as an invalid token value
+    with pytest.raises(TypeError):
+        plugins.NotifyMSTeams(token_a='  ', token_b='abcd', token_c='abcd')
+
+    with pytest.raises(TypeError):
+        plugins.NotifyMSTeams(token_a='abcd', token_b=None, token_c='abcd')
+    # Whitespace also acts as an invalid token value
+    with pytest.raises(TypeError):
+        plugins.NotifyMSTeams(token_a='abcd', token_b='  ', token_c='abcd')
+
+    with pytest.raises(TypeError):
+        plugins.NotifyMSTeams(token_a='abcd', token_b='abcd', token_c=None)
+    # Whitespace also acts as an invalid token value
+    with pytest.raises(TypeError):
+        plugins.NotifyMSTeams(token_a='abcd', token_b='abcd', token_c='  ')
+
+
+def test_notify_prowl_plugin():
+    """
+    API: NotifyProwl() Extra Checks
+
+    """
+    # Initializes the plugin with an invalid apikey
+    with pytest.raises(TypeError):
+        plugins.NotifyProwl(apikey=None)
+    # Whitespace also acts as an invalid apikey value
+    with pytest.raises(TypeError):
+        plugins.NotifyProwl(apikey='  ')
+
+    # Whitespace also acts as an invalid provider key
+    with pytest.raises(TypeError):
+        plugins.NotifyProwl(apikey='abcd', providerkey=object())
+    with pytest.raises(TypeError):
+        plugins.NotifyProwl(apikey='abcd', providerkey='  ')
+
+
 @mock.patch('requests.post')
 def test_notify_twilio_plugin(mock_post):
     """
@@ -3974,27 +4013,15 @@ def test_notify_twilio_plugin(mock_post):
     auth_token = '{}'.format('b' * 32)
     source = '+1 (555) 123-3456'
 
-    try:
+    # No account_sid specified
+    with pytest.raises(TypeError):
         plugins.NotifyTwilio(
             account_sid=None, auth_token=auth_token, source=source)
-        # No account_sid specified
-        assert False
 
-    except TypeError:
-        # Exception should be thrown about the fact the account_sid was not
-        # specified
-        assert True
-
-    try:
+    # No auth_token specified
+    with pytest.raises(TypeError):
         plugins.NotifyTwilio(
             account_sid=account_sid, auth_token=None, source=source)
-        # No account_sid specified
-        assert False
-
-    except TypeError:
-        # Exception should be thrown about the fact the auth_token was not
-        # specified
-        assert True
 
     # a error response
     response.status_code = 400
@@ -4029,31 +4056,23 @@ def test_notify_nexmo_plugin(mock_post):
     mock_post.return_value = response
 
     # Initialize some generic (but valid) tokens
-    apikey = '{}'.format('b' * 8)
+    apikey = 'AC{}'.format('b' * 8)
     secret = '{}'.format('b' * 16)
     source = '+1 (555) 123-3456'
 
-    try:
-        plugins.NotifyNexmo(
-            apikey=None, secret=secret, source=source)
-        # No apikey specified
-        assert False
+    # No apikey specified
+    with pytest.raises(TypeError):
+        plugins.NotifyNexmo(apikey=None, secret=secret, source=source)
 
-    except TypeError:
-        # Exception should be thrown about the fact the apikey was not
-        # specified
-        assert True
+    with pytest.raises(TypeError):
+        plugins.NotifyNexmo(apikey="  ", secret=secret, source=source)
 
-    try:
-        plugins.NotifyNexmo(
-            apikey=apikey, secret=None, source=source)
-        # No secret specified
-        assert False
+    # No secret specified
+    with pytest.raises(TypeError):
+        plugins.NotifyNexmo(apikey=apikey, secret=None, source=source)
 
-    except TypeError:
-        # Exception should be thrown about the fact the secret was not
-        # specified
-        assert True
+    with pytest.raises(TypeError):
+        plugins.NotifyNexmo(apikey=apikey, secret="  ", source=source)
 
     # a error response
     response.status_code = 400
@@ -4069,78 +4088,6 @@ def test_notify_nexmo_plugin(mock_post):
 
     # We will fail with the above error code
     assert obj.notify('title', 'body', 'info') is False
-
-
-@mock.patch('requests.post')
-def test_notify_msg91_plugin(mock_post):
-    """
-    API: NotifyMSG91() Extra Checks
-
-    """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
-
-    # Prepare our response
-    response = requests.Request()
-    response.status_code = requests.codes.ok
-
-    # Prepare Mock
-    mock_post.return_value = response
-
-    # Initialize some generic (but valid) tokens
-    # authkey = '{}'.format('a' * 24)
-    target = '+1 (555) 123-3456'
-
-    try:
-        # No authkey specified
-        plugins.NotifyMSG91(authkey=None, targets=target)
-        assert False
-
-    except TypeError:
-        # Exception should be thrown about the fact the authkey was not
-        # specified
-        assert True
-
-    try:
-        # invalid authkey
-        plugins.NotifyMSG91(authkey='!#$%', targets=target)
-        assert False
-
-    except TypeError:
-        # Exception should be thrown about the fact the authkey was
-        # invalid
-        assert True
-
-
-@mock.patch('requests.post')
-def test_notify_messagebird_plugin(mock_post):
-    """
-    API: NotifyMessageBird() Extra Checks
-
-    """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
-
-    # Prepare our response
-    response = requests.Request()
-    response.status_code = requests.codes.ok
-
-    # Prepare Mock
-    mock_post.return_value = response
-
-    # Initialize some generic (but valid) tokens
-    # authkey = '{}'.format('a' * 24)
-    source = '+1 (555) 123-3456'
-
-    try:
-        # No authkey specified
-        plugins.NotifyMessageBird(apikey=None, source=source)
-        assert False
-
-    except TypeError:
-        # Exception should be thrown about the fact authkey was not
-        # specified
-        assert True
 
 
 @mock.patch('apprise.plugins.NotifyEmby.login')
@@ -4322,24 +4269,24 @@ def test_notify_ifttt_plugin(mock_post, mock_get):
     mock_get.return_value.content = '{}'
     mock_post.return_value.content = '{}'
 
-    try:
-        obj = plugins.NotifyIFTTT(webhook_id=None, events=None)
-        # No webhook_id specified
-        assert False
+    # No webhook_id specified
+    with pytest.raises(TypeError):
+        plugins.NotifyIFTTT(webhook_id=None, events=None)
 
-    except TypeError:
-        # Exception should be thrown about the fact the webhook_id was
-        # specified
-        assert True
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.request_rate_per_sec = 0
 
-    try:
-        obj = plugins.NotifyIFTTT(webhook_id=webhook_id, events=None)
-        # No events specified
-        assert False
+    # Initializes the plugin with an invalid webhook id
+    with pytest.raises(TypeError):
+        plugins.NotifyIFTTT(webhook_id=None, events=events)
 
-    except TypeError:
-        # Exception should be thrown about the fact no events were specified
-        assert True
+    # Whitespace also acts as an invalid webhook id
+    with pytest.raises(TypeError):
+        plugins.NotifyIFTTT(webhook_id="   ", events=events)
+
+    # No events specified
+    with pytest.raises(TypeError):
+        plugins.NotifyIFTTT(webhook_id=webhook_id, events=None)
 
     obj = plugins.NotifyIFTTT(webhook_id=webhook_id, events=events)
     assert isinstance(obj, plugins.NotifyIFTTT) is True
@@ -4357,19 +4304,11 @@ def test_notify_ifttt_plugin(mock_post, mock_get):
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO) is True
 
-    try:
-        # Invalid del_tokens entry
-        obj = plugins.NotifyIFTTT(
+    # Invalid del_tokens entry
+    with pytest.raises(TypeError):
+        plugins.NotifyIFTTT(
             webhook_id=webhook_id, events=events,
             del_tokens=plugins.NotifyIFTTT.ifttt_default_title_key)
-
-        # we shouldn't reach here
-        assert False
-
-    except TypeError:
-        # del_tokens must be a list, so passing a string will throw
-        # an exception.
-        assert True
 
     assert isinstance(obj, plugins.NotifyIFTTT) is True
 
@@ -4406,24 +4345,6 @@ def test_notify_ifttt_plugin(mock_post, mock_get):
     assert isinstance(obj, plugins.NotifyIFTTT) is True
 
 
-def test_notify_kumulos_plugin():
-    """
-    API: NotifyKumulos() Extra Checks
-
-    """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
-
-    # Invalid API Key
-    try:
-        plugins.NotifyKumulos(None, None)
-        assert False
-
-    except TypeError:
-        # we'll thrown because an empty list of channels was provided
-        assert True
-
-
 @mock.patch('requests.get')
 @mock.patch('requests.post')
 def test_notify_join_plugin(mock_post, mock_get):
@@ -4445,6 +4366,14 @@ def test_notify_join_plugin(mock_post, mock_get):
     # Initializes the plugin with devices set to None
     plugins.NotifyJoin(apikey=apikey, targets=None)
 
+    # Initializes the plugin with an invalid apikey
+    with pytest.raises(TypeError):
+        plugins.NotifyJoin(apikey=None)
+
+    # Whitespace also acts as an invalid apikey
+    with pytest.raises(TypeError):
+        plugins.NotifyJoin(apikey="   ")
+
     # Initializes the plugin with devices set to a set
     p = plugins.NotifyJoin(apikey=apikey, targets=[group, device])
 
@@ -4460,6 +4389,69 @@ def test_notify_join_plugin(mock_post, mock_get):
     p.notify(body=None, title=None, notify_type=NotifyType.INFO) is False
 
 
+def test_notify_kumulos_plugin():
+    """
+    API: NotifyKumulos() Extra Checks
+
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.request_rate_per_sec = 0
+
+    # Invalid API Key
+    with pytest.raises(TypeError):
+        plugins.NotifyKumulos(None, None)
+    with pytest.raises(TypeError):
+        plugins.NotifyKumulos("     ", None)
+
+    # Invalid Server Key
+    with pytest.raises(TypeError):
+        plugins.NotifyKumulos("abcd", None)
+    with pytest.raises(TypeError):
+        plugins.NotifyKumulos("abcd", "       ")
+
+
+def test_notify_mattermost_plugin():
+    """
+    API: NotifyMatterMost() Extra Checks
+
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.request_rate_per_sec = 0
+
+    # Invalid Authorization Token
+    with pytest.raises(TypeError):
+        plugins.NotifyMatterMost(None)
+    with pytest.raises(TypeError):
+        plugins.NotifyMatterMost("     ")
+
+
+@mock.patch('requests.post')
+def test_notify_messagebird_plugin(mock_post):
+    """
+    API: NotifyMessageBird() Extra Checks
+
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.request_rate_per_sec = 0
+
+    # Prepare our response
+    response = requests.Request()
+    response.status_code = requests.codes.ok
+
+    # Prepare Mock
+    mock_post.return_value = response
+
+    # Initialize some generic (but valid) tokens
+    # authkey = '{}'.format('a' * 24)
+    source = '+1 (555) 123-3456'
+
+    # No apikey specified
+    with pytest.raises(TypeError):
+        plugins.NotifyMessageBird(apikey=None, source=source)
+    with pytest.raises(TypeError):
+        plugins.NotifyMessageBird(apikey="     ", source=source)
+
+
 def test_notify_pover_plugin():
     """
     API: NotifyPushover() Extra Checks
@@ -4469,13 +4461,8 @@ def test_notify_pover_plugin():
     plugins.NotifyBase.request_rate_per_sec = 0
 
     # No token
-    try:
+    with pytest.raises(TypeError):
         plugins.NotifyPushover(token=None)
-        assert False
-
-    except TypeError:
-        # we'll thrown because we provided no token
-        assert True
 
 
 def test_notify_ryver_plugin():
@@ -4486,17 +4473,42 @@ def test_notify_ryver_plugin():
     # Disable Throttling to speed testing
     plugins.NotifyBase.request_rate_per_sec = 0
 
-    # must be 15 characters long
-    token = 'a' * 15
+    # No token
+    with pytest.raises(TypeError):
+        plugins.NotifyRyver(organization="abc", token=None)
+
+    with pytest.raises(TypeError):
+        plugins.NotifyRyver(organization="abc", token="  ")
 
     # No organization
-    try:
-        plugins.NotifyRyver(organization=None, token=token)
-        assert False
+    with pytest.raises(TypeError):
+        plugins.NotifyRyver(organization=None, token="abc")
 
-    except TypeError:
-        # we'll thrown because an empty list of channels was provided
-        assert True
+    with pytest.raises(TypeError):
+        plugins.NotifyRyver(organization="  ", token="abc")
+
+
+def test_notify_simplepush_plugin():
+    """
+    API: NotifySimplePush() Extra Checks
+
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.request_rate_per_sec = 0
+
+    # No token
+    with pytest.raises(TypeError):
+        plugins.NotifySimplePush(apikey=None)
+
+    with pytest.raises(TypeError):
+        plugins.NotifySimplePush(apikey="  ")
+
+    # Bad event
+    with pytest.raises(TypeError):
+        plugins.NotifySimplePush(apikey="abc", event=object)
+
+    with pytest.raises(TypeError):
+        plugins.NotifySimplePush(apikey="abc", event="  ")
 
 
 def test_notify_zulip_plugin():
@@ -4511,14 +4523,9 @@ def test_notify_zulip_plugin():
     token = 'a' * 32
 
     # Invalid organization
-    try:
+    with pytest.raises(TypeError):
         plugins.NotifyZulip(
             botname='test', organization='#', token=token)
-        assert False
-
-    except TypeError:
-        # we'll thrown because an empty list of channels was provided
-        assert True
 
 
 @mock.patch('requests.get')
@@ -4531,33 +4538,19 @@ def test_notify_sendgrid_plugin(mock_post, mock_get):
     # Disable Throttling to speed testing
     plugins.NotifyBase.request_rate_per_sec = 0
 
-    try:
-        # no apikey
+    # no apikey
+    with pytest.raises(TypeError):
         plugins.NotifySendGrid(
             apikey=None, from_email='user@example.com')
-        # We shouldn't get here; we should thrown an exception instead
-        assert False
 
-    except TypeError:
-        assert True
-
-    try:
+    # invalid from email
+    with pytest.raises(TypeError):
         plugins.NotifySendGrid(
             apikey='abcd', from_email='!invalid')
-        # We shouldn't get here; we should thrown an exception instead
-        assert False
 
-    except TypeError:
-        assert True
-
-    try:
-        # no email
+    # no email
+    with pytest.raises(TypeError):
         plugins.NotifySendGrid(apikey='abcd', from_email=None)
-        # We shouldn't get here; we should thrown an exception instead
-        assert False
-
-    except TypeError:
-        assert True
 
     # Invalid To email address
     plugins.NotifySendGrid(
@@ -4600,15 +4593,10 @@ def test_notify_slack_plugin(mock_post, mock_get):
     mock_get.return_value.status_code = requests.codes.ok
 
     # Missing first Token
-    try:
+    with pytest.raises(TypeError):
         plugins.NotifySlack(
             token_a=None, token_b=token_b, token_c=token_c,
             targets=channels)
-        assert False
-
-    except TypeError:
-        # we'll thrown because an empty list of channels was provided
-        assert True
 
     # Test include_image
     obj = plugins.NotifySlack(
@@ -4641,6 +4629,12 @@ def test_notify_pushbullet_plugin(mock_post, mock_get):
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.ok
     mock_get.return_value.status_code = requests.codes.ok
+
+    # Invalid Access Token
+    with pytest.raises(TypeError):
+        plugins.NotifyPushBullet(accesstoken=None)
+    with pytest.raises(TypeError):
+        plugins.NotifyPushBullet(accesstoken="     ")
 
     obj = plugins.NotifyPushBullet(
         accesstoken=accesstoken, targets=recipients)
@@ -4683,32 +4677,44 @@ def test_notify_pushed_plugin(mock_post, mock_get):
     mock_post.return_value.status_code = requests.codes.ok
     mock_get.return_value.status_code = requests.codes.ok
 
-    try:
-        obj = plugins.NotifyPushed(
+    # No application Key specified
+    with pytest.raises(TypeError):
+        plugins.NotifyPushed(
+            app_key=None,
+            app_secret=app_secret,
+            recipients=None,
+        )
+
+    with pytest.raises(TypeError):
+        plugins.NotifyPushed(
+            app_key="  ",
+            app_secret=app_secret,
+            recipients=None,
+        )
+    # No application Secret specified
+    with pytest.raises(TypeError):
+        plugins.NotifyPushed(
             app_key=app_key,
             app_secret=None,
             recipients=None,
         )
-        assert False
 
-    except TypeError:
-        # No application Secret was specified; it's a good thing if
-        # this exception was thrown
-        assert True
-
-    try:
-        obj = plugins.NotifyPushed(
+    with pytest.raises(TypeError):
+        plugins.NotifyPushed(
             app_key=app_key,
-            app_secret=app_secret,
-            recipients=None,
+            app_secret="   ",
         )
-        # recipients list set to (None) is perfectly fine; in this
-        # case it will notify the App
-        assert True
 
-    except TypeError:
-        # Exception should never be thrown!
-        assert False
+    # recipients list set to (None) is perfectly fine; in this case it will
+    # notify the App
+    obj = plugins.NotifyPushed(
+        app_key=app_key,
+        app_secret=app_secret,
+        recipients=None,
+    )
+    assert isinstance(obj, plugins.NotifyPushed) is True
+    assert len(obj.channels) == 0
+    assert len(obj.users) == 0
 
     obj = plugins.NotifyPushed(
         app_key=app_key,
@@ -4724,6 +4730,22 @@ def test_notify_pushed_plugin(mock_post, mock_get):
     mock_get.return_value.status_code = requests.codes.internal_server_error
 
 
+def test_notify_pushjet_plugin():
+    """
+    API: NotifyPushjet() Extra Checks
+
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.request_rate_per_sec = 0
+
+    # No application Key specified
+    with pytest.raises(TypeError):
+        plugins.NotifyPushjet(secret_key=None)
+
+    with pytest.raises(TypeError):
+        plugins.NotifyPushjet(secret_key="  ")
+
+
 @mock.patch('requests.get')
 @mock.patch('requests.post')
 def test_notify_pushover_plugin(mock_post, mock_get):
@@ -4736,7 +4758,7 @@ def test_notify_pushover_plugin(mock_post, mock_get):
 
     # Initialize some generic (but valid) tokens
     token = 'a' * 30
-    user = 'u' * 30
+    user_key = 'u' * 30
 
     invalid_device = 'd' * 35
 
@@ -4749,24 +4771,21 @@ def test_notify_pushover_plugin(mock_post, mock_get):
     mock_post.return_value.status_code = requests.codes.ok
     mock_get.return_value.status_code = requests.codes.ok
 
-    try:
-        obj = plugins.NotifyPushover(user=user, webhook_id=None)
-        # No token specified
-        assert False
+    # No webhook id specified
+    with pytest.raises(TypeError):
+        plugins.NotifyPushover(user_key=user_key, webhook_id=None)
 
-    except TypeError:
-        # Exception should be thrown about the fact no token was specified
-        assert True
-
-    obj = plugins.NotifyPushover(user=user, token=token, targets=devices)
+    obj = plugins.NotifyPushover(
+        user_key=user_key, token=token, targets=devices)
     assert isinstance(obj, plugins.NotifyPushover) is True
     assert len(obj.targets) == 3
 
     # This call fails because there is 1 invalid device
     assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO) is False
+        body='body', title='title',
+        notify_type=NotifyType.INFO) is False
 
-    obj = plugins.NotifyPushover(user=user, token=token)
+    obj = plugins.NotifyPushover(user_key=user_key, token=token)
     assert isinstance(obj, plugins.NotifyPushover) is True
     # Default is to send to all devices, so there will be a
     # device defined here
@@ -4776,11 +4795,22 @@ def test_notify_pushover_plugin(mock_post, mock_get):
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO) is True
 
-    obj = plugins.NotifyPushover(user=user, token=token, targets=set())
+    obj = plugins.NotifyPushover(user_key=user_key, token=token, targets=set())
     assert isinstance(obj, plugins.NotifyPushover) is True
     # Default is to send to all devices, so there will be a
     # device defined here
     assert len(obj.targets) == 1
+
+    # No User Key specified
+    with pytest.raises(TypeError):
+        plugins.NotifyPushover(user_key=None, token="abcd")
+
+    # No Access Token specified
+    with pytest.raises(TypeError):
+        plugins.NotifyPushover(user_key="abcd", token=None)
+
+    with pytest.raises(TypeError):
+        plugins.NotifyPushover(user_key="abcd", token="  ")
 
 
 @mock.patch('requests.get')
@@ -4816,14 +4846,8 @@ def test_notify_rocketchat_plugin(mock_post, mock_get):
     assert len(obj.rooms) == 1
 
     # No Webhook specified
-    try:
+    with pytest.raises(TypeError):
         obj = plugins.NotifyRocketChat(webhook=None, mode='webhook')
-        # We should have thrown an exception before we get to the next
-        # assert line:
-        assert False
-    except TypeError:
-        # We're in good shape if we reach here as we got the expected error
-        assert True
 
     #
     # Logout
@@ -4908,25 +4932,14 @@ def test_notify_telegram_plugin(mock_post, mock_get):
     mock_get.return_value.content = '{}'
     mock_post.return_value.content = '{}'
 
-    try:
-        obj = plugins.NotifyTelegram(bot_token=None, targets=chat_ids)
-        # invalid bot token (None)
-        assert False
+    # Exception should be thrown about the fact no bot token was specified
+    with pytest.raises(TypeError):
+        plugins.NotifyTelegram(bot_token=None, targets=chat_ids)
 
-    except TypeError:
-        # Exception should be thrown about the fact no bot token was specified
-        assert True
-
-    try:
-        obj = plugins.NotifyTelegram(
-            bot_token=invalid_bot_token, targets=chat_ids)
-        # invalid bot token
-        assert False
-
-    except TypeError:
-        # Exception should be thrown about the fact an invalid bot token was
-        # specified
-        assert True
+    # Exception should be thrown about the fact an invalid bot token was
+    # specifed
+    with pytest.raises(TypeError):
+        plugins.NotifyTelegram(bot_token=invalid_bot_token, targets=chat_ids)
 
     obj = plugins.NotifyTelegram(
         bot_token=bot_token, targets=chat_ids, include_image=True)
@@ -5047,14 +5060,10 @@ def test_notify_telegram_plugin(mock_post, mock_get):
             }},
         ],
     })
-    try:
-        obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
-        # No chat_ids specified
-        assert False
 
-    except TypeError:
-        # Exception should be thrown about the fact no bot token was specified
-        assert True
+    # Exception should be thrown about the fact no bot token was specified
+    with pytest.raises(TypeError):
+        plugins.NotifyTelegram(bot_token=bot_token, targets=None)
 
     # Detect the bot with a bad response
     mock_post.return_value.content = dumps({})
@@ -5062,36 +5071,23 @@ def test_notify_telegram_plugin(mock_post, mock_get):
 
     # Test our bot detection with a internal server error
     mock_post.return_value.status_code = requests.codes.internal_server_error
-    try:
-        obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
-        # No chat_ids specified
-        assert False
 
-    except TypeError:
-        # Exception should be thrown over internal server error caused
-        assert True
+    # Exception should be thrown over internal server error caused
+    with pytest.raises(TypeError):
+        plugins.NotifyTelegram(bot_token=bot_token, targets=None)
 
     # Test our bot detection with an unmappable html error
     mock_post.return_value.status_code = 999
-    try:
-        obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
-        # No chat_ids specified
-        assert False
-
-    except TypeError:
-        # Exception should be thrown over invali internal error no
-        assert True
+    # Exception should be thrown over invali internal error no
+    with pytest.raises(TypeError):
+        plugins.NotifyTelegram(bot_token=bot_token, targets=None)
 
     # Do it again but this time provide a failure message
     mock_post.return_value.content = dumps({'description': 'Failure Message'})
-    try:
-        obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
-        # No chat_ids specified
-        assert False
 
-    except TypeError:
-        # Exception should be thrown about the fact no bot token was specified
-        assert True
+    # Exception should be thrown about the fact no bot token was specified
+    with pytest.raises(TypeError):
+        plugins.NotifyTelegram(bot_token=bot_token, targets=None)
 
     # Do it again but this time provide a failure message and perform a
     # notification without a bot detection by providing at least 1 chat id
@@ -5102,15 +5098,10 @@ def test_notify_telegram_plugin(mock_post, mock_get):
     # iterate over our exceptions and test them
     for _exception in REQUEST_EXCEPTIONS:
         mock_post.side_effect = _exception
-        try:
-            obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
-            # No chat_ids specified
-            assert False
 
-        except TypeError:
-            # Exception should be thrown about the fact no bot token was
-            # specified
-            assert True
+        # No chat_ids specified
+        with pytest.raises(TypeError):
+            obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
 
 
 def test_notify_overflow_truncate():
@@ -5158,17 +5149,10 @@ def test_notify_overflow_truncate():
             # Pretend everything is okay
             return True
 
-    try:
+    # We should throw an exception because our specified overflow is wrong.
+    with pytest.raises(TypeError):
         # Load our object
         obj = TestNotification(overflow='invalid')
-
-        # We should have thrown an exception because our specified overflow
-        # is wrong.
-        assert False
-
-    except TypeError:
-        # Expected to be here
-        assert True
 
     # Load our object
     obj = TestNotification(overflow=OverflowMode.TRUNCATE)

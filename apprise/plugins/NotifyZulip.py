@@ -61,14 +61,12 @@ import requests
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
 from ..utils import parse_list
+from ..utils import validate_regex
 from ..utils import GET_EMAIL_RE
 from ..AppriseLocale import gettext_lazy as _
 
 # A Valid Bot Name
 VALIDATE_BOTNAME = re.compile(r'(?P<name>[A-Z0-9_]{1,32})(-bot)?', re.I)
-
-# A Valid Bot Token is 32 characters of alpha/numeric
-VALIDATE_TOKEN = re.compile(r'[A-Z0-9]{32}', re.I)
 
 # Organization required as part of the API request
 VALIDATE_ORG = re.compile(
@@ -124,18 +122,20 @@ class NotifyZulip(NotifyBase):
         'botname': {
             'name': _('Bot Name'),
             'type': 'string',
+            'regex': (r'^[A-Z0-9_]{1,32}(-bot)?$', 'i'),
         },
         'organization': {
             'name': _('Organization'),
             'type': 'string',
             'required': True,
+            'regex': (r'^[A-Z0-9_-]{1,32})$', 'i')
         },
         'token': {
             'name': _('Token'),
             'type': 'string',
             'required': True,
             'private': True,
-            'regex': (r'[A-Z0-9]{32}', 'i'),
+            'regex': (r'^[A-Z0-9]{32}$', 'i'),
         },
         'target_user': {
             'name': _('Target User'),
@@ -208,19 +208,13 @@ class NotifyZulip(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        try:
-            if not VALIDATE_TOKEN.match(token.strip()):
-                # let outer exception handle this
-                raise TypeError
-
-        except (TypeError, AttributeError):
+        self.token = validate_regex(
+            token, *self.template_tokens['token']['regex'])
+        if not self.token:
             msg = 'The Zulip token specified ({}) is invalid.'\
                 .format(token)
             self.logger.warning(msg)
             raise TypeError(msg)
-
-        # The token associated with the account
-        self.token = token.strip()
 
         self.targets = parse_list(targets)
         if len(self.targets) == 0:
