@@ -15,10 +15,9 @@ to be acknowledged for it, the syntax is as follows:
   * [Month Year] - [Brief summary of your contribution]
 ```
 
-The contributors have been listed in alphabetical order:
-
+The contributors have been listed in chronological order:
 * Wim de With <wf@dewith.io>
   * Dec 2018 - Added Matrix Support
-
+  
 * Hitesh Sondhi <hitesh@cropsly.com>
   * Mar 2019 - Added Flock Support
