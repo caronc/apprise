@@ -33,26 +33,13 @@
 # The API reference used to build this plugin was documented here:
 #  https://docs.kumulos.com/messaging/api/#sending-in-app-messages
 #
-import re
 import requests
 from json import dumps
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
+from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
-
-#
-# API Key is a UUID; below is the regex matching
-UUID4_RE = \
-    r'[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
-
-# Secret Key Regex Mapping
-SERVER_KEY_RE = r'[A-Z0-9+]{36}'
-
-# API Key
-VALIDATE_APIKEY = re.compile(UUID4_RE, re.I)
-
-VALIDATE_SERVER_KEY = re.compile(SERVER_KEY_RE, re.I)
 
 # Extend HTTP Error Messages
 KUMULOS_HTTP_ERROR_MAP = {
@@ -60,9 +47,6 @@ KUMULOS_HTTP_ERROR_MAP = {
     422: 'Unprocessable Entity - The request was unparsable.',
     400: 'Bad Request - Targeted users do not exist or have unsubscribed.',
 }
-
-# Used to break path apart into list of channels
-TARGET_LIST_DELIM = re.compile(r'[ \t\r\n,#\\/]+')
 
 
 class NotifyKumulos(NotifyBase):
@@ -103,14 +87,16 @@ class NotifyKumulos(NotifyBase):
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (UUID4_RE, 'i'),
+            # UUID4
+            'regex': (r'^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-'
+                      r'[89ab][0-9a-f]{3}-[0-9a-f]{12}$', 'i')
         },
         'serverkey': {
             'name': _('Server Key'),
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (SERVER_KEY_RE, 'i'),
+            'regex': (r'^[A-Z0-9+]{36}$', 'i'),
         },
     })
 
@@ -120,27 +106,21 @@ class NotifyKumulos(NotifyBase):
         """
         super(NotifyKumulos, self).__init__(**kwargs)
 
-        if not apikey:
-            msg = 'The Kumulos API Key is not specified.'
+        # API Key (associated with project)
+        self.apikey = validate_regex(
+            apikey, *self.template_tokens['apikey']['regex'])
+        if not self.apikey:
+            msg = 'An invalid Kumulos API Key ' \
+                  '({}) was specified.'.format(apikey)
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        self.apikey = apikey.strip()
-        if not VALIDATE_APIKEY.match(self.apikey):
-            msg = 'The Kumulos API Key specified ({}) is invalid.'\
-                .format(apikey)
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        if not serverkey:
-            msg = 'The Kumulos Server Key is not specified.'
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        self.serverkey = serverkey.strip()
-        if not VALIDATE_SERVER_KEY.match(self.serverkey):
-            msg = 'The Kumulos Server Key specified ({}) is invalid.'\
-                .format(serverkey)
+        # Server Key (associated with project)
+        self.serverkey = validate_regex(
+            serverkey, *self.template_tokens['serverkey']['regex'])
+        if not self.serverkey:
+            msg = 'An invalid Kumulos Server Key ' \
+                  '({}) was specified.'.format(serverkey)
             self.logger.warning(msg)
             raise TypeError(msg)
 

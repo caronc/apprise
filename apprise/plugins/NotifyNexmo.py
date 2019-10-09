@@ -36,11 +36,8 @@ from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..utils import parse_list
+from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
-
-# Token required as part of the API request
-VALIDATE_APIKEY = re.compile(r'^[a-z0-9]{8}$', re.I)
-VALIDATE_SECRET = re.compile(r'^[a-z0-9]{16}$', re.I)
 
 # Some Phone Number Detection
 IS_PHONE_NO = re.compile(r'^\+?(?P<phone>[0-9\s)(+-]+)\s*$')
@@ -94,27 +91,28 @@ class NotifyNexmo(NotifyBase):
             'name': _('API Key'),
             'type': 'string',
             'required': True,
-            'regex': (r'AC[a-z0-9]{8}', 'i'),
+            'regex': (r'^AC[a-z0-9]{8}$', 'i'),
+            'private': True,
         },
         'secret': {
             'name': _('API Secret'),
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'[a-z0-9]{16}', 'i'),
+            'regex': (r'^[a-z0-9]{16}$', 'i'),
         },
         'from_phone': {
             'name': _('From Phone No'),
             'type': 'string',
             'required': True,
-            'regex': (r'\+?[0-9\s)(+-]+', 'i'),
+            'regex': (r'^\+?[0-9\s)(+-]+$', 'i'),
             'map_to': 'source',
         },
         'target_phone': {
             'name': _('Target Phone No'),
             'type': 'string',
             'prefix': '+',
-            'regex': (r'[0-9\s)(+-]+', 'i'),
+            'regex': (r'^[0-9\s)(+-]+$', 'i'),
             'map_to': 'targets',
         },
         'targets': {
@@ -153,35 +151,21 @@ class NotifyNexmo(NotifyBase):
         """
         super(NotifyNexmo, self).__init__(**kwargs)
 
-        try:
-            # The Account SID associated with the account
-            self.apikey = apikey.strip()
-
-        except AttributeError:
-            # Token was None
-            msg = 'No Nexmo APIKey was specified.'
+        # API Key (associated with project)
+        self.apikey = validate_regex(
+            apikey, *self.template_tokens['apikey']['regex'])
+        if not self.apikey:
+            msg = 'An invalid Nexmo API Key ' \
+                  '({}) was specified.'.format(apikey)
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        if not VALIDATE_APIKEY.match(self.apikey):
-            msg = 'The Nexmo API Key specified ({}) is invalid.'\
-                .format(self.apikey)
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        try:
-            # The Account SID associated with the account
-            self.secret = secret.strip()
-
-        except AttributeError:
-            # Token was None
-            msg = 'No Nexmo API Secret was specified.'
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        if not VALIDATE_SECRET.match(self.secret):
-            msg = 'The Nexmo API Secret specified ({}) is invalid.'\
-                .format(self.secret)
+        # API Secret (associated with project)
+        self.secret = validate_regex(
+            secret, *self.template_tokens['secret']['regex'])
+        if not self.secret:
+            msg = 'An invalid Nexmo API Secret ' \
+                  '({}) was specified.'.format(secret)
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -241,6 +225,8 @@ class NotifyNexmo(NotifyBase):
                 'Dropped invalid phone # '
                 '({}) specified.'.format(target),
             )
+
+        return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """

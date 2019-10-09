@@ -26,7 +26,7 @@ import six
 import mock
 import requests
 from apprise import plugins
-# from apprise import AppriseAsset
+
 from json import dumps
 from datetime import datetime
 
@@ -86,16 +86,6 @@ def test_notify_gitter_plugin_general(mock_post, mock_get):
     # Prepare Mock
     mock_get.return_value = request
     mock_post.return_value = request
-
-    # Variation Initializations (no token)
-    try:
-        obj = plugins.NotifyGitter(token=None, targets='apprise')
-        # No Token should throw an exception
-        assert False
-
-    except TypeError:
-        # We should get here
-        assert True
 
     # Variation Initializations
     obj = plugins.NotifyGitter(token=token, targets='apprise')
@@ -181,8 +171,22 @@ def test_notify_gitter_plugin_general(mock_post, mock_get):
     assert obj.send(body="test") is True
 
     # Variation Initializations
-    obj = plugins.NotifyGitter(token=token, targets='missing')
+    obj = plugins.NotifyGitter(token=token, targets='apprise')
     assert isinstance(obj, plugins.NotifyGitter) is True
     assert isinstance(obj.url(), six.string_types) is True
-    # missing room was found
+    # apprise room was not found
     assert obj.send(body="test") is False
+
+    # Test exception handling
+    mock_post.side_effect = \
+        requests.ConnectionError(0, 'requests.ConnectionError()')
+
+    # Create temporary _room_mapping object so we will find the apprise
+    # channel on our second call to send()
+    obj._room_mapping = {
+        'apprise': {
+            'id': '5c981cecd73408ce4fbbad31',
+            'uri': 'apprise-notifications/community',
+        }
+    }
+    assert obj.send(body='test body', title='test title') is False

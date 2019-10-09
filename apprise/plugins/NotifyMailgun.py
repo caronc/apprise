@@ -57,6 +57,7 @@ from .NotifyBase import NotifyBase
 from ..common import NotifyType
 from ..utils import parse_list
 from ..utils import is_email
+from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
 # Provide some known codes Mailgun uses and what they translate to:
@@ -169,19 +170,17 @@ class NotifyMailgun(NotifyBase):
         """
         super(NotifyMailgun, self).__init__(**kwargs)
 
-        try:
-            # The personal access apikey associated with the account
-            self.apikey = apikey.strip()
-
-        except AttributeError:
-            # Token was None
-            msg = 'No API Key was specified.'
+        # API Key (associated with project)
+        self.apikey = validate_regex(apikey)
+        if not self.apikey:
+            msg = 'An invalid Mailgun API Key ' \
+                  '({}) was specified.'.format(apikey)
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Validate our username
         if not self.user:
-            msg = 'No username was specified.'
+            msg = 'No Mailgun username was specified.'
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -198,7 +197,7 @@ class NotifyMailgun(NotifyBase):
                 raise
         except:
             # Invalid region specified
-            msg = 'The region specified ({}) is invalid.' \
+            msg = 'The Mailgun region specified ({}) is invalid.' \
                   .format(region_name)
             self.logger.warning(msg)
             raise TypeError(msg)

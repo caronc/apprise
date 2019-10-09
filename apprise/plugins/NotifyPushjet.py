@@ -29,6 +29,7 @@ from json import dumps
 from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyType
+from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
 
@@ -107,14 +108,15 @@ class NotifyPushjet(NotifyBase):
         """
         super(NotifyPushjet, self).__init__(**kwargs)
 
-        if not secret_key:
-            # You must provide a Pushjet key to work with
-            msg = 'You must specify a Pushjet Secret Key.'
+        # Secret Key (associated with project)
+        self.secret_key = validate_regex(secret_key)
+        if not self.secret_key:
+            msg = 'An invalid Pushjet Secret Key ' \
+                  '({}) was specified.'.format(secret_key)
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # store our key
-        self.secret_key = secret_key
+        return
 
     def url(self, privacy=False, *args, **kwargs):
         """
@@ -125,9 +127,6 @@ class NotifyPushjet(NotifyBase):
         args = {
             'format': self.notify_format,
             'overflow': self.overflow_mode,
-            'secret': self.pprint(
-                self.secret_key, privacy,
-                mode=PrivacyMode.Secret, quote=False),
             'verify': 'yes' if self.verify_certificate else 'no',
         }
 
@@ -142,12 +141,14 @@ class NotifyPushjet(NotifyBase):
                     self.password, privacy, mode=PrivacyMode.Secret, safe=''),
             )
 
-        return '{schema}://{auth}{hostname}{port}/?{args}'.format(
+        return '{schema}://{auth}{hostname}{port}/{secret}/?{args}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
             hostname=NotifyPushjet.quote(self.host, safe=''),
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
+            secret=self.pprint(
+                self.secret_key, privacy, mode=PrivacyMode.Secret, safe=''),
             args=NotifyPushjet.urlencode(args),
         )
 
@@ -273,7 +274,7 @@ class NotifyPushjet(NotifyBase):
         # through it in addition to supporting the secret key
         if 'secret' in results['qsd'] and len(results['qsd']['secret']):
             results['secret_key'] = \
-                NotifyPushjet.parse_list(results['qsd']['secret'])
+                NotifyPushjet.unquote(results['qsd']['secret'])
 
         if results.get('secret_key') is None:
             # Deprication Notice issued for v0.7.9

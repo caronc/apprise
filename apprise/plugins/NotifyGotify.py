@@ -31,12 +31,12 @@
 #        f2c2688f0b5e6a816bbcec768ca1c0de5af76b88/ADD_MESSAGE_EXAMPLES.md#python
 # API: https://gotify.net/docs/swagger-docs
 
-import six
 import requests
 from json import dumps
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
+from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
 
@@ -121,9 +121,12 @@ class NotifyGotify(NotifyBase):
         """
         super(NotifyGotify, self).__init__(**kwargs)
 
-        if not isinstance(token, six.string_types):
-            msg = 'An invalid Gotify token was specified.'
-            self.logger.warning('msg')
+        # Token (associated with project)
+        self.token = validate_regex(token)
+        if not self.token:
+            msg = 'An invalid Gotify Token ' \
+                  '({}) was specified.'.format(token)
+            self.logger.warning(msg)
             raise TypeError(msg)
 
         if priority not in GOTIFY_PRIORITIES:
@@ -137,11 +140,6 @@ class NotifyGotify(NotifyBase):
 
         else:
             self.schema = 'http'
-
-        # Our access token does not get created until we first
-        # authenticate with our Gotify server. The same goes for the
-        # user id below.
-        self.token = token
 
         return
 

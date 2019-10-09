@@ -40,6 +40,7 @@ except ImportError:
 from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
 from ..utils import parse_bool
+from ..utils import validate_regex
 from ..common import NotifyType
 from ..common import NotifyImageSize
 from ..AppriseLocale import gettext_lazy as _
@@ -57,11 +58,6 @@ IS_TAG = re.compile(r'^[@](?P<name>[A-Z0-9]{1,63})$', re.I)
 # It's not likely you'll send a message directly to a device, but if you do;
 # this plugin supports it.
 IS_DEVICETOKEN = re.compile(r'^[A-Z0-9]{64}$', re.I)
-
-# Both an access key and seret key are created and assigned to each project
-# you create on the boxcar website
-VALIDATE_ACCESS = re.compile(r'[A-Z0-9_-]{64}', re.I)
-VALIDATE_SECRET = re.compile(r'[A-Z0-9_-]{64}', re.I)
 
 # Used to break apart list of potential tags by their delimiter into a useable
 # list.
@@ -105,30 +101,30 @@ class NotifyBoxcar(NotifyBase):
         'access_key': {
             'name': _('Access Key'),
             'type': 'string',
-            'regex': (r'[A-Z0-9_-]{64}', 'i'),
             'private': True,
             'required': True,
+            'regex': (r'^[A-Z0-9_-]{64}$', 'i'),
             'map_to': 'access',
         },
         'secret_key': {
             'name': _('Secret Key'),
             'type': 'string',
-            'regex': (r'[A-Z0-9_-]{64}', 'i'),
             'private': True,
             'required': True,
+            'regex': (r'^[A-Z0-9_-]{64}$', 'i'),
             'map_to': 'secret',
         },
         'target_tag': {
             'name': _('Target Tag ID'),
             'type': 'string',
             'prefix': '@',
-            'regex': (r'[A-Z0-9]{1,63}', 'i'),
+            'regex': (r'^[A-Z0-9]{1,63}$', 'i'),
             'map_to': 'targets',
         },
         'target_device': {
             'name': _('Target Device ID'),
             'type': 'string',
-            'regex': (r'[A-Z0-9]{64}', 'i'),
+            'regex': (r'^[A-Z0-9]{64}$', 'i'),
             'map_to': 'targets',
         },
         'targets': {
@@ -163,33 +159,21 @@ class NotifyBoxcar(NotifyBase):
         # Initialize device_token list
         self.device_tokens = list()
 
-        try:
-            # Access Key (associated with project)
-            self.access = access.strip()
-
-        except AttributeError:
-            msg = 'The specified access key is invalid.'
+        # Access Key (associated with project)
+        self.access = validate_regex(
+            access, *self.template_tokens['access_key']['regex'])
+        if not self.access:
+            msg = 'An invalid Boxcar Access Key ' \
+                  '({}) was specified.'.format(access)
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        try:
-            # Secret Key (associated with project)
-            self.secret = secret.strip()
-
-        except AttributeError:
-            msg = 'The specified secret key is invalid.'
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        if not VALIDATE_ACCESS.match(self.access):
-            msg = 'The access key specified ({}) is invalid.'\
-                .format(self.access)
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        if not VALIDATE_SECRET.match(self.secret):
-            msg = 'The secret key specified ({}) is invalid.'\
-                .format(self.secret)
+        # Secret Key (associated with project)
+        self.secret = validate_regex(
+            secret, *self.template_tokens['secret_key']['regex'])
+        if not self.secret:
+            msg = 'An invalid Boxcar Secret Key ' \
+                  '({}) was specified.'.format(secret)
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -228,7 +212,6 @@ class NotifyBoxcar(NotifyBase):
         """
         Perform Boxcar Notification
         """
-
         headers = {
             'User-Agent': self.app_id,
             'Content-Type': 'application/json'

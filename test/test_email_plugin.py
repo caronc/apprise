@@ -274,17 +274,17 @@ def test_email_plugin(mock_smtp, mock_smtpssl):
                 # Expected None but didn't get it
                 print('%s instantiated %s (but expected None)' % (
                     url, str(obj)))
-                assert(False)
+                assert False
 
-            assert(isinstance(obj, instance))
+            assert isinstance(obj, instance)
 
             if isinstance(obj, plugins.NotifyBase):
                 # We loaded okay; now lets make sure we can reverse this url
-                assert(isinstance(obj.url(), six.string_types) is True)
+                assert isinstance(obj.url(), six.string_types) is True
 
                 # Test url() with privacy=True
-                assert(isinstance(
-                    obj.url(privacy=True), six.string_types) is True)
+                assert isinstance(
+                    obj.url(privacy=True), six.string_types) is True
 
                 # Some Simple Invalid Instance Testing
                 assert instance.parse_url(None) is None
@@ -307,14 +307,14 @@ def test_email_plugin(mock_smtp, mock_smtpssl):
                     # assertion failure makes things easier to debug later on
                     print('TEST FAIL: {} regenerated as {}'.format(
                         url, obj.url()))
-                    assert(False)
+                    assert False
 
             if self:
                 # Iterate over our expected entries inside of our object
                 for key, val in self.items():
                     # Test that our object has the desired key
-                    assert(hasattr(key, obj))
-                    assert(getattr(key, obj) == val)
+                    assert hasattr(key, obj)
+                    assert getattr(key, obj) == val
 
             try:
                 if test_smtplib_exceptions is False:
@@ -389,7 +389,7 @@ def test_webbase_lookup(mock_smtp, mock_smtpssl):
     obj = Apprise.instantiate(
         'mailto://user:pass@l2g.com', suppress_exceptions=True)
 
-    assert(isinstance(obj, plugins.NotifyEmail))
+    assert isinstance(obj, plugins.NotifyEmail)
     assert len(obj.targets) == 1
     assert 'user@l2g.com' in obj.targets
     assert obj.from_addr == 'user@l2g.com'
@@ -417,7 +417,7 @@ def test_smtplib_init_fail(mock_smtplib):
 
     obj = Apprise.instantiate(
         'mailto://user:pass@gmail.com', suppress_exceptions=False)
-    assert(isinstance(obj, plugins.NotifyEmail))
+    assert isinstance(obj, plugins.NotifyEmail)
 
     # Support Exception handling of smtplib.SMTP
     mock_smtplib.side_effect = RuntimeError('Test')
@@ -443,7 +443,7 @@ def test_smtplib_send_okay(mock_smtplib):
     # Defaults to HTML
     obj = Apprise.instantiate(
         'mailto://user:pass@gmail.com', suppress_exceptions=False)
-    assert(isinstance(obj, plugins.NotifyEmail))
+    assert isinstance(obj, plugins.NotifyEmail)
 
     # Support an email simulation where we can correctly quit
     mock_smtplib.starttls.return_value = True
@@ -451,16 +451,16 @@ def test_smtplib_send_okay(mock_smtplib):
     mock_smtplib.sendmail.return_value = True
     mock_smtplib.quit.return_value = True
 
-    assert(obj.notify(
-        body='body', title='test', notify_type=NotifyType.INFO) is True)
+    assert obj.notify(
+        body='body', title='test', notify_type=NotifyType.INFO) is True
 
     # Set Text
     obj = Apprise.instantiate(
         'mailto://user:pass@gmail.com?format=text', suppress_exceptions=False)
-    assert(isinstance(obj, plugins.NotifyEmail))
+    assert isinstance(obj, plugins.NotifyEmail)
 
-    assert(obj.notify(
-        body='body', title='test', notify_type=NotifyType.INFO) is True)
+    assert obj.notify(
+        body='body', title='test', notify_type=NotifyType.INFO) is True
 
 
 def test_email_url_escaping():

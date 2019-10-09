@@ -63,10 +63,8 @@ from json import dumps
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
 from ..common import NotifyFormat
+from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
-
-# Token required as part of the API request
-VALIDATE_TOKEN = re.compile(r'[a-z0-9]{80}', re.I)
 
 # Extend HTTP Error Messages
 # Based on: https://developer.webex.com/docs/api/basics/rate-limiting
@@ -119,7 +117,7 @@ class NotifyWebexTeams(NotifyBase):
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'[a-z0-9]{80}', 'i'),
+            'regex': (r'^[a-z0-9]{80}$', 'i'),
         },
     })
 
@@ -129,19 +127,14 @@ class NotifyWebexTeams(NotifyBase):
         """
         super(NotifyWebexTeams, self).__init__(**kwargs)
 
-        if not token:
-            msg = 'The Webex Teams token is not specified.'
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        if not VALIDATE_TOKEN.match(token.strip()):
+        # The token associated with the account
+        self.token = validate_regex(
+            token, *self.template_tokens['token']['regex'])
+        if not self.token:
             msg = 'The Webex Teams token specified ({}) is invalid.'\
                 .format(token)
             self.logger.warning(msg)
             raise TypeError(msg)
-
-        # The token associated with the account
-        self.token = token.strip()
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """

@@ -131,7 +131,7 @@ class NotifyD7Networks(NotifyBase):
             'name': _('Target Phone No'),
             'type': 'string',
             'prefix': '+',
-            'regex': (r'[0-9\s)(+-]+', 'i'),
+            'regex': (r'^[0-9\s)(+-]+$', 'i'),
             'map_to': 'targets',
         },
         'targets': {
@@ -226,6 +226,8 @@ class NotifyD7Networks(NotifyBase):
             msg = 'There are no valid targets identified to notify.'
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """

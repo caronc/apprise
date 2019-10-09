@@ -48,12 +48,9 @@ from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..utils import parse_list
+from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
-
-# Used to validate your personal access apikey
-VALIDATE_AUTH_TOKEN = re.compile(r'^[a-f0-9]{32}$', re.I)
-VALIDATE_ACCOUNT_SID = re.compile(r'^AC[a-f0-9]{32}$', re.I)
 
 # Some Phone Number Detection
 IS_PHONE_NO = re.compile(r'^\+?(?P<phone>[0-9\s)(+-]+)\s*$')
@@ -108,33 +105,33 @@ class NotifyTwilio(NotifyBase):
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'AC[a-f0-9]{32}', 'i'),
+            'regex': (r'^AC[a-f0-9]+$', 'i'),
         },
         'auth_token': {
             'name': _('Auth Token'),
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'[a-f0-9]{32}', 'i'),
+            'regex': (r'^[a-f0-9]+$', 'i'),
         },
         'from_phone': {
             'name': _('From Phone No'),
             'type': 'string',
             'required': True,
-            'regex': (r'\+?[0-9\s)(+-]+', 'i'),
+            'regex': (r'^\+?[0-9\s)(+-]+$', 'i'),
             'map_to': 'source',
         },
         'target_phone': {
             'name': _('Target Phone No'),
             'type': 'string',
             'prefix': '+',
-            'regex': (r'[0-9\s)(+-]+', 'i'),
+            'regex': (r'^[0-9\s)(+-]+$', 'i'),
             'map_to': 'targets',
         },
         'short_code': {
             'name': _('Target Short Code'),
             'type': 'string',
-            'regex': (r'[0-9]{5,6}', 'i'),
+            'regex': (r'^[0-9]{5,6}$', 'i'),
             'map_to': 'targets',
         },
         'targets': {
@@ -166,35 +163,21 @@ class NotifyTwilio(NotifyBase):
         """
         super(NotifyTwilio, self).__init__(**kwargs)
 
-        try:
-            # The Account SID associated with the account
-            self.account_sid = account_sid.strip()
-
-        except AttributeError:
-            # Token was None
-            msg = 'No Account SID was specified.'
+        # The Account SID associated with the account
+        self.account_sid = validate_regex(
+            account_sid, *self.template_tokens['account_sid']['regex'])
+        if not self.account_sid:
+            msg = 'An invalid Twilio Account SID ' \
+                  '({}) was specified.'.format(account_sid)
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        if not VALIDATE_ACCOUNT_SID.match(self.account_sid):
-            msg = 'The Account SID specified ({}) is invalid.' \
-                  .format(account_sid)
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        try:
-            # The authentication token associated with the account
-            self.auth_token = auth_token.strip()
-
-        except AttributeError:
-            # Token was None
-            msg = 'No Auth Token was specified.'
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        if not VALIDATE_AUTH_TOKEN.match(self.auth_token):
-            msg = 'The Auth Token specified ({}) is invalid.' \
-                  .format(auth_token)
+        # The Authentication Token associated with the account
+        self.auth_token = validate_regex(
+            auth_token, *self.template_tokens['auth_token']['regex'])
+        if not self.auth_token:
+            msg = 'An invalid Twilio Authentication Token ' \
+                  '({}) was specified.'.format(auth_token)
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -254,13 +237,15 @@ class NotifyTwilio(NotifyBase):
                 '({}) specified.'.format(target),
             )
 
-        if len(self.targets) == 0:
-            msg = 'There are no valid targets identified to notify.'
+        if not self.targets:
             if len(self.source) in (5, 6):
                 # raise a warning since we're a short-code.  We need
                 # a number to message
+                msg = 'There are no valid Twilio targets to notify.'
                 self.logger.warning(msg)
                 raise TypeError(msg)
+
+        return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """

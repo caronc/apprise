@@ -113,37 +113,41 @@ def test_windows_plugin():
     obj.duration = 0
 
     # Test URL functionality
-    assert(isinstance(obj.url(), six.string_types) is True)
+    assert isinstance(obj.url(), six.string_types) is True
 
     # Check that it found our mocked environments
-    assert(obj._enabled is True)
+    assert obj._enabled is True
 
     # _on_destroy check
     obj._on_destroy(0, '', 0, 0)
 
     # test notifications
-    assert(obj.notify(title='title', body='body',
-           notify_type=apprise.NotifyType.INFO) is True)
+    assert obj.notify(
+        title='title', body='body',
+        notify_type=apprise.NotifyType.INFO) is True
 
     obj = apprise.Apprise.instantiate(
         'windows://_/?image=True', suppress_exceptions=False)
     obj.duration = 0
-    assert(isinstance(obj.url(), six.string_types) is True)
-    assert(obj.notify(title='title', body='body',
-           notify_type=apprise.NotifyType.INFO) is True)
+    assert isinstance(obj.url(), six.string_types) is True
+    assert obj.notify(
+        title='title', body='body',
+        notify_type=apprise.NotifyType.INFO) is True
 
     obj = apprise.Apprise.instantiate(
         'windows://_/?image=False', suppress_exceptions=False)
     obj.duration = 0
-    assert(isinstance(obj.url(), six.string_types) is True)
-    assert(obj.notify(title='title', body='body',
-           notify_type=apprise.NotifyType.INFO) is True)
+    assert isinstance(obj.url(), six.string_types) is True
+    assert obj.notify(
+        title='title', body='body',
+        notify_type=apprise.NotifyType.INFO) is True
 
     obj = apprise.Apprise.instantiate(
         'windows://_/?duration=1', suppress_exceptions=False)
-    assert(isinstance(obj.url(), six.string_types) is True)
-    assert(obj.notify(title='title', body='body',
-           notify_type=apprise.NotifyType.INFO) is True)
+    assert isinstance(obj.url(), six.string_types) is True
+    assert obj.notify(
+        title='title', body='body',
+        notify_type=apprise.NotifyType.INFO) is True
     # loads okay
     assert obj.duration == 1
 
@@ -165,20 +169,23 @@ def test_windows_plugin():
     # Test our loading of our icon exception; it will still allow the
     # notification to be sent
     win32gui.LoadImage.side_effect = AttributeError
-    assert(obj.notify(title='title', body='body',
-           notify_type=apprise.NotifyType.INFO) is True)
+    assert obj.notify(
+        title='title', body='body',
+        notify_type=apprise.NotifyType.INFO) is True
     # Undo our change
     win32gui.LoadImage.side_effect = None
 
     # Test our global exception handling
     win32gui.UpdateWindow.side_effect = AttributeError
-    assert(obj.notify(title='title', body='body',
-           notify_type=apprise.NotifyType.INFO) is False)
+    assert obj.notify(
+        title='title', body='body',
+        notify_type=apprise.NotifyType.INFO) is False
     # Undo our change
     win32gui.UpdateWindow.side_effect = None
 
     # Toggle our testing for when we can't send notifications because the
     # package has been made unavailable to us
     obj._enabled = False
-    assert(obj.notify(title='title', body='body',
-           notify_type=apprise.NotifyType.INFO) is False)
+    assert obj.notify(
+        title='title', body='body',
+        notify_type=apprise.NotifyType.INFO) is False

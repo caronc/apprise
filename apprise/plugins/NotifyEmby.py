@@ -139,7 +139,7 @@ class NotifyEmby(NotifyBase):
 
         if not self.user:
             # User was not specified
-            msg = 'No Username was specified.'
+            msg = 'No Emby username was specified.'
             self.logger.warning(msg)
             raise TypeError(msg)
 

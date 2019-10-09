@@ -150,6 +150,8 @@ class NotifyGnome(NotifyBase):
         # or not.
         self.include_image = include_image
 
+        return
+
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Gnome Notification

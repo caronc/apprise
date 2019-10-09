@@ -50,13 +50,11 @@ from ..common import NotifyFormat
 from ..common import NotifyType
 from ..utils import parse_list
 from ..utils import parse_bool
+from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
 # API Gitter URL
 GITTER_API_URL = 'https://api.gitter.im/v1'
-
-# Used to validate your personal access token
-VALIDATE_TOKEN = re.compile(r'^[a-z0-9]{40}$', re.I)
 
 # Used to break path apart into list of targets
 TARGET_LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
@@ -112,9 +110,9 @@ class NotifyGitter(NotifyBase):
         'token': {
             'name': _('Token'),
             'type': 'string',
-            'regex': (r'[a-z0-9]{40}', 'i'),
             'private': True,
             'required': True,
+            'regex': (r'^[a-z0-9]{40}$', 'i'),
         },
         'targets': {
             'name': _('Rooms'),
@@ -141,24 +139,21 @@ class NotifyGitter(NotifyBase):
         """
         super(NotifyGitter, self).__init__(**kwargs)
 
-        try:
-            # The personal access token associated with the account
-            self.token = token.strip()
-
-        except AttributeError:
-            # Token was None
-            msg = 'No API Token was specified.'
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        if not VALIDATE_TOKEN.match(self.token):
-            msg = 'The Personal Access Token specified ({}) is invalid.' \
-                  .format(token)
+        # Secret Key (associated with project)
+        self.token = validate_regex(
+            token, *self.template_tokens['token']['regex'])
+        if not self.token:
+            msg = 'An invalid Gitter API Token ' \
+                  '({}) was specified.'.format(token)
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Parse our targets
         self.targets = parse_list(targets)
+        if not self.targets:
+            msg = 'There are no valid Gitter targets to notify.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         # Used to track maping of rooms to their numeric id lookup for
         # messaging
@@ -167,6 +162,8 @@ class NotifyGitter(NotifyBase):
         # Track whether or not we want to send an image with our notification
         # or not.
         self.include_image = include_image
+
+        return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
@@ -183,8 +180,6 @@ class NotifyGitter(NotifyBase):
         if image_url:
             body = '![alt]({})\n{}'.format(image_url, body)
 
-        # Create a copy of the targets list
-        targets = list(self.targets)
         if self._room_mapping is None:
             # Populate our room mapping
             self._room_mapping = {}
@@ -225,10 +220,8 @@ class NotifyGitter(NotifyBase):
                     'uri': entry['uri'],
                 }
 
-        if len(targets) == 0:
-            # No targets specified
-            return False
-
+        # Create a copy of the targets list
+        targets = list(self.targets)
         while len(targets):
             target = targets.pop(0).lower()
 

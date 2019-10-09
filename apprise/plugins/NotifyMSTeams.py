@@ -69,23 +69,12 @@ from ..common import NotifyImageSize
 from ..common import NotifyType
 from ..common import NotifyFormat
 from ..utils import parse_bool
+from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
 # Used to prepare our UUID regex matching
 UUID4_RE = \
     r'[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
-
-# Token required as part of the API request
-#  /AAAAAAAAA@AAAAAAAAA/........./.........
-VALIDATE_TOKEN_A = re.compile(r'{}@{}'.format(UUID4_RE, UUID4_RE), re.I)
-
-# Token required as part of the API request
-#  /................../BBBBBBBBB/..........
-VALIDATE_TOKEN_B = re.compile(r'[A-Za-z0-9]{32}')
-
-# Token required as part of the API request
-#  /........./........./CCCCCCCCCCCCCCCCCCCCCCCC
-VALIDATE_TOKEN_C = re.compile(UUID4_RE, re.I)
 
 
 class NotifyMSTeams(NotifyBase):
@@ -124,26 +113,32 @@ class NotifyMSTeams(NotifyBase):
 
     # Define our template tokens
     template_tokens = dict(NotifyBase.template_tokens, **{
+        # Token required as part of the API request
+        #  /AAAAAAAAA@AAAAAAAAA/........./.........
         'token_a': {
             'name': _('Token A'),
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'{}@{}'.format(UUID4_RE, UUID4_RE), 'i'),
+            'regex': (r'^{}@{}$'.format(UUID4_RE, UUID4_RE), 'i'),
         },
+        # Token required as part of the API request
+        #  /................../BBBBBBBBB/..........
         'token_b': {
             'name': _('Token B'),
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'[a-z0-9]{32}', 'i'),
+            'regex': (r'^[A-Za-z0-9]{32}$', 'i'),
         },
+        # Token required as part of the API request
+        #  /........./........./CCCCCCCCCCCCCCCCCCCCCCCC
         'token_c': {
             'name': _('Token C'),
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (UUID4_RE, 'i'),
+            'regex': (r'^{}$'.format(UUID4_RE), 'i'),
         },
     })
 
@@ -164,50 +159,34 @@ class NotifyMSTeams(NotifyBase):
         """
         super(NotifyMSTeams, self).__init__(**kwargs)
 
-        if not token_a:
-            msg = 'The first MSTeams API token is not specified.'
+        self.token_a = validate_regex(
+            token_a, *self.template_tokens['token_a']['regex'])
+        if not self.token_a:
+            msg = 'An invalid MSTeams (first) Token ' \
+                  '({}) was specified.'.format(token_a)
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        if not token_b:
-            msg = 'The second MSTeams API token is not specified.'
+        self.token_b = validate_regex(
+            token_b, *self.template_tokens['token_b']['regex'])
+        if not self.token_b:
+            msg = 'An invalid MSTeams (second) Token ' \
+                  '({}) was specified.'.format(token_b)
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        if not token_c:
-            msg = 'The third MSTeams API token is not specified.'
+        self.token_c = validate_regex(
+            token_c, *self.template_tokens['token_c']['regex'])
+        if not self.token_c:
+            msg = 'An invalid MSTeams (third) Token ' \
+                  '({}) was specified.'.format(token_c)
             self.logger.warning(msg)
             raise TypeError(msg)
-
-        if not VALIDATE_TOKEN_A.match(token_a.strip()):
-            msg = 'The first MSTeams API token specified ({}) is invalid.'\
-                .format(token_a)
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        # The token associated with the account
-        self.token_a = token_a.strip()
-
-        if not VALIDATE_TOKEN_B.match(token_b.strip()):
-            msg = 'The second MSTeams API token specified ({}) is invalid.'\
-                .format(token_b)
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        # The token associated with the account
-        self.token_b = token_b.strip()
-
-        if not VALIDATE_TOKEN_C.match(token_c.strip()):
-            msg = 'The third MSTeams API token specified ({}) is invalid.'\
-                .format(token_c)
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        # The token associated with the account
-        self.token_c = token_c.strip()
 
         # Place a thumbnail image inline with the message body
         self.include_image = include_image
+
+        return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """

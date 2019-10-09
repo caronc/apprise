@@ -49,6 +49,7 @@ from ..common import NotifyImageSize
 from ..common import NotifyFormat
 from ..common import NotifyType
 from ..utils import parse_bool
+from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
 
@@ -144,19 +145,21 @@ class NotifyDiscord(NotifyBase):
         """
         super(NotifyDiscord, self).__init__(**kwargs)
 
-        if not webhook_id:
-            msg = 'An invalid Client ID was specified.'
+        # Webhook ID (associated with project)
+        self.webhook_id = validate_regex(webhook_id)
+        if not self.webhook_id:
+            msg = 'An invalid Discord Webhook ID ' \
+                  '({}) was specified.'.format(webhook_id)
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        if not webhook_token:
-            msg = 'An invalid Webhook Token was specified.'
+        # Webhook Token (associated with project)
+        self.webhook_token = validate_regex(webhook_token)
+        if not self.webhook_token:
+            msg = 'An invalid Discord Webhook Token ' \
+                  '({}) was specified.'.format(webhook_token)
             self.logger.warning(msg)
             raise TypeError(msg)
-
-        # Store our data
-        self.webhook_id = webhook_id
-        self.webhook_token = webhook_token
 
         # Text To Speech
         self.tts = tts

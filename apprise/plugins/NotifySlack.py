@@ -46,19 +46,8 @@ from ..common import NotifyType
 from ..common import NotifyFormat
 from ..utils import parse_bool
 from ..utils import parse_list
+from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
-
-# Token required as part of the API request
-#  /AAAAAAAAA/........./........................
-VALIDATE_TOKEN_A = re.compile(r'[A-Z0-9]{9}')
-
-# Token required as part of the API request
-#  /........./BBBBBBBBB/........................
-VALIDATE_TOKEN_B = re.compile(r'[A-Z0-9]{9}')
-
-# Token required as part of the API request
-#  /........./........./CCCCCCCCCCCCCCCCCCCCCCCC
-VALIDATE_TOKEN_C = re.compile(r'[A-Za-z0-9]{24}')
 
 # Extend HTTP Error Messages
 SLACK_HTTP_ERROR_MAP = {
@@ -67,9 +56,6 @@ SLACK_HTTP_ERROR_MAP = {
 
 # Used to break path apart into list of channels
 CHANNEL_LIST_DELIM = re.compile(r'[ \t\r\n,#\\/]+')
-
-# Used to detect a channel
-IS_VALID_TARGET_RE = re.compile(r'[+#@]?([A-Z0-9_]{1,32})', re.I)
 
 
 class NotifySlack(NotifyBase):
@@ -116,26 +102,32 @@ class NotifySlack(NotifyBase):
             'type': 'string',
             'map_to': 'user',
         },
+        # Token required as part of the API request
+        #  /AAAAAAAAA/........./........................
         'token_a': {
             'name': _('Token A'),
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'[A-Z0-9]{9}', 'i'),
+            'regex': (r'^[A-Z0-9]{9}$', 'i'),
         },
+        # Token required as part of the API request
+        #  /........./BBBBBBBBB/........................
         'token_b': {
             'name': _('Token B'),
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'[A-Z0-9]{9}', 'i'),
+            'regex': (r'^[A-Z0-9]{9}$', 'i'),
         },
+        # Token required as part of the API request
+        #  /........./........./CCCCCCCCCCCCCCCCCCCCCCCC
         'token_c': {
             'name': _('Token C'),
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'[A-Za-z0-9]{24}', 'i'),
+            'regex': (r'^[A-Za-z0-9]{24}$', 'i'),
         },
         'target_encoded_id': {
             'name': _('Target Encoded ID'),
@@ -181,47 +173,29 @@ class NotifySlack(NotifyBase):
         """
         super(NotifySlack, self).__init__(**kwargs)
 
-        if not token_a:
-            msg = 'The first API token is not specified.'
+        self.token_a = validate_regex(
+            token_a, *self.template_tokens['token_a']['regex'])
+        if not self.token_a:
+            msg = 'An invalid Slack (first) Token ' \
+                  '({}) was specified.'.format(token_a)
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        if not token_b:
-            msg = 'The second API token is not specified.'
+        self.token_b = validate_regex(
+            token_b, *self.template_tokens['token_b']['regex'])
+        if not self.token_b:
+            msg = 'An invalid Slack (second) Token ' \
+                  '({}) was specified.'.format(token_b)
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        if not token_c:
-            msg = 'The third API token is not specified.'
+        self.token_c = validate_regex(
+            token_c, *self.template_tokens['token_c']['regex'])
+        if not self.token_c:
+            msg = 'An invalid Slack (third) Token ' \
+                  '({}) was specified.'.format(token_c)
             self.logger.warning(msg)
             raise TypeError(msg)
-
-        if not VALIDATE_TOKEN_A.match(token_a.strip()):
-            msg = 'The first API token specified ({}) is invalid.'\
-                .format(token_a)
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        # The token associated with the account
-        self.token_a = token_a.strip()
-
-        if not VALIDATE_TOKEN_B.match(token_b.strip()):
-            msg = 'The second API token specified ({}) is invalid.'\
-                .format(token_b)
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        # The token associated with the account
-        self.token_b = token_b.strip()
-
-        if not VALIDATE_TOKEN_C.match(token_c.strip()):
-            msg = 'The third API token specified ({}) is invalid.'\
-                .format(token_c)
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        # The token associated with the account
-        self.token_c = token_c.strip()
 
         if not self.user:
             self.logger.warning(
@@ -254,6 +228,8 @@ class NotifySlack(NotifyBase):
 
         # Place a thumbnail image inline with the message body
         self.include_image = include_image
+
+        return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
@@ -303,27 +279,30 @@ class NotifySlack(NotifyBase):
             channel = channels.pop(0)
 
             if channel is not None:
-                # Channel over-ride was specified
-                if not IS_VALID_TARGET_RE.match(channel):
+                _channel = validate_regex(
+                    channel, r'[+#@]?([A-Z0-9_]{1,32})')
+
+                if not _channel:
+                    # Channel over-ride was specified
                     self.logger.warning(
                         "The specified target {} is invalid;"
-                        "skipping.".format(channel))
+                        "skipping.".format(_channel))
 
                     # Mark our failure
                     has_error = True
                     continue
 
-                if len(channel) > 1 and channel[0] == '+':
+                if len(_channel) > 1 and _channel[0] == '+':
                     # Treat as encoded id if prefixed with a +
-                    payload['channel'] = channel[1:]
+                    payload['channel'] = _channel[1:]
 
-                elif len(channel) > 1 and channel[0] == '@':
+                elif len(_channel) > 1 and _channel[0] == '@':
                     # Treat @ value 'as is'
-                    payload['channel'] = channel
+                    payload['channel'] = _channel
 
                 else:
                     # Prefix with channel hash tag
-                    payload['channel'] = '#%s' % channel
+                    payload['channel'] = '#{}'.format(_channel)
 
             # Acquire our to-be footer icon if configured to do so
             image_url = None if not self.include_image \
@@ -478,9 +457,9 @@ class NotifySlack(NotifyBase):
 
         result = re.match(
             r'^https?://hooks\.slack\.com/services/'
-            r'(?P<token_a>[A-Z0-9]{9})/'
-            r'(?P<token_b>[A-Z0-9]{9})/'
-            r'(?P<token_c>[A-Z0-9]{24})/?'
+            r'(?P<token_a>[A-Z0-9]+)/'
+            r'(?P<token_b>[A-Z0-9]+)/'
+            r'(?P<token_c>[A-Z0-9]+)/?'
             r'(?P<args>\?[.+])?$', url, re.I)
 
         if result:

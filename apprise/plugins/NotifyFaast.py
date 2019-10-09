@@ -91,6 +91,8 @@ class NotifyFaast(NotifyBase):
         # Associate an image with our post
         self.include_image = include_image
 
+        return
+
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Faast Notification

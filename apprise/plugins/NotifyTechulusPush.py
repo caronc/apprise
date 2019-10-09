@@ -47,21 +47,18 @@
 # - https://push.techulus.com/ - Main Website
 # - https://pushtechulus.docs.apiary.io - API Documentation
 
-import re
 import requests
 from json import dumps
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
+from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
 # Token required as part of the API request
 # Used to prepare our UUID regex matching
 UUID4_RE = \
     r'[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
-
-# API Key
-VALIDATE_APIKEY = re.compile(UUID4_RE, re.I)
 
 
 class NotifyTechulusPush(NotifyBase):
@@ -99,7 +96,7 @@ class NotifyTechulusPush(NotifyBase):
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (UUID4_RE, 'i'),
+            'regex': (r'^{}$'.format(UUID4_RE), 'i'),
         },
     })
 
@@ -109,19 +106,14 @@ class NotifyTechulusPush(NotifyBase):
         """
         super(NotifyTechulusPush, self).__init__(**kwargs)
 
-        if not apikey:
-            msg = 'The Techulus Push apikey is not specified.'
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        if not VALIDATE_APIKEY.match(apikey.strip()):
-            msg = 'The Techulus Push apikey specified ({}) is invalid.'\
-                .format(apikey)
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
         # The apikey associated with the account
-        self.apikey = apikey.strip()
+        self.apikey = validate_regex(
+            apikey, *self.template_tokens['apikey']['regex'])
+        if not self.apikey:
+            msg = 'An invalid Techulus Push API key ' \
+                  '({}) was specified.'.format(apikey)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """

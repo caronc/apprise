@@ -378,6 +378,16 @@ def details(plugin):
     # Argument/Option Handling
     for key in list(template_args.keys()):
 
+        if 'alias_of' in template_args[key]:
+            # Check if the mapped reference is a list; if it is, then
+            # we need to store a different delimiter
+            alias_of = template_tokens.get(template_args[key]['alias_of'], {})
+            if alias_of.get('type', '').startswith('list') \
+                    and 'delim' not in template_args[key]:
+                # Set a default delimiter of a comma and/or space if one
+                # hasn't already been specified
+                template_args[key]['delim'] = (',', ' ')
+
         # _lookup_default looks up what the default value
         if '_lookup_default' in template_args[key]:
             template_args[key]['default'] = getattr(

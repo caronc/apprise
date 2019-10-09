@@ -43,7 +43,6 @@
 #  - https://sendgrid.com/docs/ui/sending-email/\
 #       how-to-send-an-email-with-dynamic-transactional-templates/
 
-import re
 import requests
 from json import dumps
 
@@ -52,9 +51,8 @@ from ..common import NotifyFormat
 from ..common import NotifyType
 from ..utils import parse_list
 from ..utils import GET_EMAIL_RE
+from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
-
-IS_APIKEY_RE = re.compile(r'^([A-Z0-9._-]+)$', re.I)
 
 # Extend HTTP Error Messages
 SENDGRID_HTTP_ERROR_MAP = {
@@ -109,6 +107,7 @@ class NotifySendGrid(NotifyBase):
             'type': 'string',
             'private': True,
             'required': True,
+            'regex': (r'^[A-Z0-9._-]+$', 'i'),
         },
         'from_email': {
             'name': _('Source Email'),
@@ -162,16 +161,12 @@ class NotifySendGrid(NotifyBase):
         """
         super(NotifySendGrid, self).__init__(**kwargs)
 
-        # The API Key needed to perform all SendMail API i/o
-        self.apikey = apikey
-        try:
-            result = IS_APIKEY_RE.match(self.apikey)
-            if not result:
-                # let outer exception handle this
-                raise TypeError
-
-        except (TypeError, AttributeError):
-            msg = 'Invalid API Key specified: {}'.format(self.apikey)
+        # API Key (associated with project)
+        self.apikey = validate_regex(
+            apikey, *self.template_tokens['apikey']['regex'])
+        if not self.apikey:
+            msg = 'An invalid SendGrid API Key ' \
+                  '({}) was specified.'.format(apikey)
             self.logger.warning(msg)
             raise TypeError(msg)
 

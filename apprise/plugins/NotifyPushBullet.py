@@ -30,6 +30,7 @@ from .NotifyBase import NotifyBase
 from ..utils import GET_EMAIL_RE
 from ..common import NotifyType
 from ..utils import parse_list
+from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
 # Flag used as a placeholder to sending to all devices
@@ -110,11 +111,19 @@ class NotifyPushBullet(NotifyBase):
         """
         super(NotifyPushBullet, self).__init__(**kwargs)
 
-        self.accesstoken = accesstoken
+        # Access Token (associated with project)
+        self.accesstoken = validate_regex(accesstoken)
+        if not self.accesstoken:
+            msg = 'An invalid PushBullet Access Token ' \
+                  '({}) was specified.'.format(accesstoken)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         self.targets = parse_list(targets)
         if len(self.targets) == 0:
             self.targets = (PUSHBULLET_SEND_TO_ALL, )
+
+        return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """

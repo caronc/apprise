@@ -32,10 +32,11 @@ from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..utils import parse_list
+from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
 # Used to detect and parse channels
-IS_CHANNEL = re.compile(r'^#(?P<name>[A-Za-z0-9]+)$')
+IS_CHANNEL = re.compile(r'^#?(?P<name>[A-Za-z0-9]+)$')
 
 # Used to detect and parse a users push id
 IS_USER_PUSHED_ID = re.compile(r'^@(?P<name>[A-Za-z0-9]+)$')
@@ -121,13 +122,19 @@ class NotifyPushed(NotifyBase):
         """
         super(NotifyPushed, self).__init__(**kwargs)
 
-        if not app_key:
-            msg = 'An invalid Application Key was specified.'
+        # Application Key (associated with project)
+        self.app_key = validate_regex(app_key)
+        if not self.app_key:
+            msg = 'An invalid Pushed Application Key ' \
+                  '({}) was specified.'.format(app_key)
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        if not app_secret:
-            msg = 'An invalid Application Secret was specified.'
+        # Access Secret (associated with project)
+        self.app_secret = validate_regex(app_secret)
+        if not self.app_secret:
+            msg = 'An invalid Pushed Application Secret ' \
+                  '({}) was specified.'.format(app_secret)
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -137,28 +144,34 @@ class NotifyPushed(NotifyBase):
         # Initialize user list
         self.users = list()
 
-        # Validate recipients and drop bad ones:
-        for target in parse_list(targets):
-            result = IS_CHANNEL.match(target)
-            if result:
-                # store valid device
-                self.channels.append(result.group('name'))
-                continue
+        # Get our targets
+        targets = parse_list(targets)
+        if targets:
+            # Validate recipients and drop bad ones:
+            for target in targets:
+                result = IS_CHANNEL.match(target)
+                if result:
+                    # store valid device
+                    self.channels.append(result.group('name'))
+                    continue
 
-            result = IS_USER_PUSHED_ID.match(target)
-            if result:
-                # store valid room
-                self.users.append(result.group('name'))
-                continue
+                result = IS_USER_PUSHED_ID.match(target)
+                if result:
+                    # store valid room
+                    self.users.append(result.group('name'))
+                    continue
 
-            self.logger.warning(
-                'Dropped invalid channel/userid '
-                '(%s) specified.' % target,
-            )
+                self.logger.warning(
+                    'Dropped invalid channel/userid '
+                    '(%s) specified.' % target,
+                )
 
-        # Store our data
-        self.app_key = app_key
-        self.app_secret = app_secret
+            if len(self.channels) + len(self.users) == 0:
+                # We have no valid channels or users to notify after
+                # explicitly identifying at least one.
+                msg = 'No Pushed targets to notify.'
+                self.logger.warning(msg)
+                raise TypeError(msg)
 
         return
 
@@ -324,8 +337,6 @@ class NotifyPushed(NotifyBase):
         if not results:
             # We're done early as we couldn't load the results
             return results
-
-        # Apply our settings now
 
         # The first token is stored in the hostname
         app_key = NotifyPushed.unquote(results['host'])
