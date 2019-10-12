@@ -352,7 +352,7 @@ class NotifyRyver(NotifyBase):
         result = re.match(
             r'^https?://(?P<org>[A-Z0-9_-]+)\.ryver\.com/application/webhook/'
             r'(?P<webhook_token>[A-Z0-9]+)/?'
-            r'(?P<args>\?[.+])?$', url, re.I)
+            r'(?P<args>\?.+)?$', url, re.I)
 
         if result:
             return NotifyRyver.parse_url(

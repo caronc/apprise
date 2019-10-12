@@ -363,7 +363,7 @@ class NotifyFlock(NotifyBase):
         result = re.match(
             r'^https?://api\.flock\.com/hooks/sendMessage/'
             r'(?P<token>[a-z0-9-]{24})/?'
-            r'(?P<args>\?[.+])?$', url, re.I)
+            r'(?P<args>\?.+)?$', url, re.I)
 
         if result:
             return NotifyFlock.parse_url(

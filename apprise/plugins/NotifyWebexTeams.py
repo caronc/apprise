@@ -248,7 +248,7 @@ class NotifyWebexTeams(NotifyBase):
         result = re.match(
             r'^https?://api\.ciscospark\.com/v[1-9][0-9]*/webhooks/incoming/'
             r'(?P<webhook_token>[A-Z0-9_-]+)/?'
-            r'(?P<args>\?[.+])?$', url, re.I)
+            r'(?P<args>\?.+)?$', url, re.I)
 
         if result:
             return NotifyWebexTeams.parse_url(

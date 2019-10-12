@@ -356,7 +356,7 @@ class NotifyIFTTT(NotifyBase):
             r'^https?://maker\.ifttt\.com/use/'
             r'(?P<webhook_id>[A-Z0-9_-]+)'
             r'/?(?P<events>([A-Z0-9_-]+/?)+)?'
-            r'/?(?P<args>\?[.+])?$', url, re.I)
+            r'/?(?P<args>\?.+)?$', url, re.I)
 
         if result:
             return NotifyIFTTT.parse_url(

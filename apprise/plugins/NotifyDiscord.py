@@ -408,7 +408,7 @@ class NotifyDiscord(NotifyBase):
             r'^https?://discordapp\.com/api/webhooks/'
             r'(?P<webhook_id>[0-9]+)/'
             r'(?P<webhook_token>[A-Z0-9_-]+)/?'
-            r'(?P<args>\?[.+])?$', url, re.I)
+            r'(?P<args>\?.+)?$', url, re.I)
 
         if result:
             return NotifyDiscord.parse_url(

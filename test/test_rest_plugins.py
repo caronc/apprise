@@ -310,6 +310,12 @@ TEST_URLS = (
             'instance': plugins.NotifyDiscord,
             'requests_response_code': requests.codes.no_content,
     }),
+    ('https://discordapp.com/api/webhooks/{}/{}?footer=yes'.format(
+        '0' * 10, 'B' * 40), {
+            # Native URL Support with arguments
+            'instance': plugins.NotifyDiscord,
+            'requests_response_code': requests.codes.no_content,
+    }),
     ('discord://%s/%s?format=markdown&avatar=No&footer=No' % (
         'i' * 24, 't' * 64), {
             'instance': plugins.NotifyDiscord,
@@ -474,6 +480,11 @@ TEST_URLS = (
     }),
     # Native URL Support, take the slack URL and still build from it
     ('https://api.flock.com/hooks/sendMessage/{}/'.format('i' * 24), {
+        'instance': plugins.NotifyFlock,
+    }),
+    # Native URL Support with arguments
+    ('https://api.flock.com/hooks/sendMessage/{}/?format=markdown'.format(
+        'i' * 24), {
         'instance': plugins.NotifyFlock,
     }),
     # Bot API presumed if one or more targets are specified
@@ -687,12 +698,16 @@ TEST_URLS = (
     ('ifttt://WebHookID@EventID/EventID2/', {
         'instance': plugins.NotifyIFTTT,
     }),
-    # Support native URL references
+    # Support Native URL references
     ('https://maker.ifttt.com/use/WebHookID/', {
         # No EventID specified
         'instance': TypeError,
     }),
     ('https://maker.ifttt.com/use/WebHookID/EventID/', {
+        'instance': plugins.NotifyIFTTT,
+    }),
+    #  Native URL with arguments
+    ('https://maker.ifttt.com/use/WebHookID/EventID/?-Value1=', {
         'instance': plugins.NotifyIFTTT,
     }),
     # Test website connection failures
@@ -2111,6 +2126,12 @@ TEST_URLS = (
     ('https://apprise.ryver.com/application/webhook/ckhrjW8w672m6HG', {
         'instance': plugins.NotifyRyver,
     }),
+    # Support Native URLs with arguments
+    ('https://apprise.ryver.com/application/webhook/ckhrjW8w672m6HG'
+     '?webhook=ryver',
+        {
+            'instance': plugins.NotifyRyver,
+        }),
     ('ryver://caronc@apprise/ckhrjW8w672m6HG', {
         'instance': plugins.NotifyRyver,
         # don't include an image by default
@@ -2329,6 +2350,11 @@ TEST_URLS = (
     }),
     # Native URL Support, take the slack URL and still build from it
     ('https://hooks.slack.com/services/{}/{}/{}'.format(
+        'A' * 9, 'B' * 9, 'c' * 24), {
+        'instance': plugins.NotifySlack,
+    }),
+    # Native URL Support with arguments
+    ('https://hooks.slack.com/services/{}/{}/{}?format=text'.format(
         'A' * 9, 'B' * 9, 'c' * 24), {
         'instance': plugins.NotifySlack,
     }),
@@ -2982,6 +3008,12 @@ TEST_URLS = (
     }),
     # Support Native URLs
     ('https://api.ciscospark.com/v1/webhooks/incoming/{}'.format('a' * 80), {
+        # token provided - we're good
+        'instance': plugins.NotifyWebexTeams,
+    }),
+    # Support Native URLs with arguments
+    ('https://api.ciscospark.com/v1/webhooks/incoming/{}?format=text'.format(
+        'a' * 80), {
         # token provided - we're good
         'instance': plugins.NotifyWebexTeams,
     }),

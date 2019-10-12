@@ -359,7 +359,7 @@ class NotifyMSTeams(NotifyBase):
             r'IncomingWebhook/'
             r'(?P<token_b>[A-Z0-9]+)/'
             r'(?P<token_c>[A-Z0-9-]+)/?'
-            r'(?P<args>\?[.+])?$', url, re.I)
+            r'(?P<args>\?.+)?$', url, re.I)
 
         if result:
             return NotifyMSTeams.parse_url(
