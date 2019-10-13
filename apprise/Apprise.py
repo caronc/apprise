@@ -34,7 +34,6 @@ from .common import MATCH_ALL_TAG
 from .utils import is_exclusive_match
 from .utils import parse_list
 from .utils import split_urls
-from .utils import GET_SCHEMA_RE
 from .logger import logger
 
 from .AppriseAsset import AppriseAsset
@@ -108,38 +107,8 @@ class Apprise(object):
         results = None
 
         if isinstance(url, six.string_types):
-            # swap hash (#) tag values with their html version
-            _url = url.replace('/#', '/%23')
-
-            # Attempt to acquire the schema at the very least to allow our
-            # plugins to determine if they can make a better interpretation of
-            # a URL geared for them
-            schema = GET_SCHEMA_RE.match(_url)
-            if schema is None:
-                logger.error(
-                    'Unparseable schema:// found in URL {}.'.format(url))
-                return None
-
-            # Ensure our schema is always in lower case
-            schema = schema.group('schema').lower()
-
-            # Some basic validation
-            if schema not in plugins.SCHEMA_MAP:
-                # Give the user the benefit of the doubt that the user may be
-                # using one of the URLs provided to them by their notification
-                # service. Before we fail for good, just scan all the plugins
-                # that support he native_url() parse function
-                results = \
-                    next((r['plugin'].parse_native_url(_url)
-                          for r in plugins.MODULE_MAP.values()
-                          if r['plugin'].parse_native_url(_url) is not None),
-                         None)
-
-            else:
-                # Parse our url details of the server object as dictionary
-                # containing all of the information parsed from our URL
-                results = plugins.SCHEMA_MAP[schema].parse_url(_url)
-
+            # Acquire our url tokens
+            results = plugins.url_to_dict(url)
             if results is None:
                 # Failed to parse the server URL
                 logger.error('Unparseable URL {}.'.format(url))
