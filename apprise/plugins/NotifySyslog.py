@@ -124,16 +124,25 @@ class NotifySyslog(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://_/',
+        '{schema}://',
+        '{schema}://{facility}',
     )
+
+    # Define our template tokens
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'facility': {
+            'name': _('Facility'),
+            'type': 'choice:string',
+            'values': [k for k in SYSLOG_FACILITY_MAP.keys()],
+            'default': SyslogFacility.USER,
+        },
+    })
 
     # Define our template arguments
     template_args = dict(NotifyBase.template_args, **{
         'facility': {
-            'name': _('Facility'),
-            'type': 'choice:int',
-            'values': [k for k in SYSLOG_FACILITY_MAP.keys()],
-            'default': SyslogFacility.USER,
+            # We map back to the same element defined in template_tokens
+            'alias_of': 'facility',
         },
         'logpid': {
             'name': _('Log PID'),
@@ -168,7 +177,7 @@ class NotifySyslog(NotifyBase):
         else:
             self.facility = \
                 SYSLOG_FACILITY_MAP[
-                    self.template_args['facility']['default']]
+                    self.template_tokens['facility']['default']]
 
         # Logging Options
         self.logoptions = 0
@@ -230,12 +239,13 @@ class NotifySyslog(NotifyBase):
             'logpid': 'yes' if self.log_pid else 'no',
             'format': self.notify_format,
             'overflow': self.overflow_mode,
-            'facility': 'info' if self.facility not in SYSLOG_FACILITY_RMAP
-                        else SYSLOG_FACILITY_RMAP[self.facility],
             'verify': 'yes' if self.verify_certificate else 'no',
         }
 
-        return '{schema}://_/?{args}'.format(
+        return '{schema}://{facility}/?{args}'.format(
+            facility=self.template_tokens['facility']['default']
+            if self.facility not in SYSLOG_FACILITY_RMAP
+            else SYSLOG_FACILITY_RMAP[self.facility],
             schema=self.secure_protocol,
             args=NotifySyslog.urlencode(args),
         )
@@ -251,17 +261,26 @@ class NotifySyslog(NotifyBase):
         if not results:
             return results
 
-        if 'facility' in results['qsd'] and len(results['qsd']['facility']):
-            key = results['qsd']['facility'].lower()
+        # if specified; save hostname into facility
+        facility = None if not results['host'] \
+            else NotifySyslog.unquote(results['host'])
 
+        # However if specified on the URL, that will over-ride what was
+        # identified
+        if 'facility' in results['qsd'] and len(results['qsd']['facility']):
+            facility = results['qsd']['facility'].lower()
+
+        if facility and facility not in SYSLOG_FACILITY_MAP:
             # Find first match; if no match is found we set the result
             # to the matching key.  This allows us to throw a TypeError
             # during the __init__() call. The benifit of doing this
             # check here is if we do have a valid match, we can support
             # short form matches like 'u' which will match against user
-            results['facility'] = \
-                next((f for f in SYSLOG_FACILITY_MAP.keys()
-                      if f.startswith(key)), key)
+            facility = next((f for f in SYSLOG_FACILITY_MAP.keys()
+                             if f.startswith(facility)), facility)
+
+        # Save facility
+        results['facility'] = facility
 
         # Include PID as part of the message logged
         results['log_pid'] = \
