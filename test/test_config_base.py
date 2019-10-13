@@ -111,19 +111,26 @@ def test_config_base_config_parse_text():
     # A comment line over top of a URL
     mailto://userb:pass@gmail.com
 
+    # Test a URL using it's native format; in this case Ryver
+    https://apprise.ryver.com/application/webhook/ckhrjW8w672m6HG
+
+    # Invalid URL as it's not associated with a plugin
+    # or a native url
+    https://not.a.native.url/
+
     # A line with mulitiple tag assignments to it
     taga,tagb=kde://
     """, asset=AppriseAsset())
 
-    # We expect to parse 2 entries from the above
+    # We expect to parse 3 entries from the above
     assert isinstance(result, list)
-    assert len(result) == 2
+    assert len(result) == 3
     assert len(result[0].tags) == 0
 
-    # Our second element will have tags associated with it
-    assert len(result[1].tags) == 2
-    assert 'taga' in result[1].tags
-    assert 'tagb' in result[1].tags
+    # Our last element will have 2 tags associated with it
+    assert len(result[-1].tags) == 2
+    assert 'taga' in result[-1].tags
+    assert 'tagb' in result[-1].tags
 
     # Here is a similar result set however this one has an invalid line
     # in it which invalidates the entire file
@@ -347,11 +354,14 @@ version: 1
 urls:
   - pbul://o.gn5kj6nfhv736I7jC3cj3QLRiyhgl98b
   - mailto://test:password@gmail.com
+  - https://apprise.ryver.com/application/webhook/ckhrjW8w672m6HG
+  - https://not.a.native.url/
 """, asset=asset)
 
-    # We expect to parse 2 entries from the above
+    # We expect to parse 3 entries from the above
+    # The Ryver one is in a native form and the 4th one is invalid
     assert isinstance(result, list)
-    assert len(result) == 2
+    assert len(result) == 3
     assert len(result[0].tags) == 0
 
     # Valid Configuration
@@ -372,6 +382,12 @@ urls:
   # we'll accept it
   - mailto://oscar:pass@gmail.com:
 
+  # A Ryver URL (using Native format); still accepted
+  - https://apprise.ryver.com/application/webhook/ckhrjW8w672m6HG:
+
+  # An invalid URL with colon (ignored)
+  - https://not.a.native.url/:
+
   # A telegram entry (returns a None in parse_url())
   - tgram://invalid
 
@@ -380,7 +396,7 @@ urls:
     # We expect to parse 4 entries from the above because the tgram:// entry
     # would have failed to be loaded
     assert isinstance(result, list)
-    assert len(result) == 4
+    assert len(result) == 5
     assert len(result[0].tags) == 2
 
     # Global Tags

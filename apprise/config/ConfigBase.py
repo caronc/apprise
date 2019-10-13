@@ -236,35 +236,14 @@ class ConfigBase(URLBase):
                 # otherwise.
                 return list()
 
-            if not result.group('url'):
+            # Store our url read in
+            url = result.group('url')
+            if not url:
                 # Comment/empty line; do nothing
                 continue
 
-            # Store our url read in
-            url = result.group('url')
-
-            # swap hash (#) tag values with their html version
-            _url = url.replace('/#', '/%23')
-
-            # Attempt to acquire the schema at the very least to allow our
-            # plugins to determine if they can make a better
-            # interpretation of a URL geared for them
-            schema = GET_SCHEMA_RE.match(_url)
-
-            # Ensure our schema is always in lower case
-            schema = schema.group('schema').lower()
-
-            # Some basic validation
-            if schema not in plugins.SCHEMA_MAP:
-                ConfigBase.logger.warning(
-                    'Unsupported schema {} on line {}.'.format(
-                        schema, line))
-                continue
-
-            # Parse our url details of the server object as dictionary
-            # containing all of the information parsed from our URL
-            results = plugins.SCHEMA_MAP[schema].parse_url(_url)
-
+            # Acquire our url tokens
+            results = plugins.url_to_dict(url)
             if results is None:
                 # Failed to parse the server URL
                 ConfigBase.logger.warning(
@@ -407,63 +386,46 @@ class ConfigBase(URLBase):
             results = list()
 
             if isinstance(url, six.string_types):
-                # We're just a simple URL string
-
-                # swap hash (#) tag values with their html version
-                _url = url.replace('/#', '/%23')
-
-                # Attempt to acquire the schema at the very least to allow our
-                # plugins to determine if they can make a better
-                # interpretation of a URL geared for them
-                schema = GET_SCHEMA_RE.match(_url)
+                # We're just a simple URL string...
+                schema = GET_SCHEMA_RE.match(url)
                 if schema is None:
                     # Log invalid entries so that maintainer of config
                     # config file at least has something to take action
                     # with.
                     ConfigBase.logger.warning(
-                        'Ignored entry {} found under urls, entry #{}'
-                        .format(_url, no + 1))
+                        'Invalid URL {}, entry #{}'.format(url, no + 1))
                     continue
 
-                # Ensure our schema is always in lower case
-                schema = schema.group('schema').lower()
-
-                # Some basic validation
-                if schema not in plugins.SCHEMA_MAP:
-                    ConfigBase.logger.warning(
-                        'Unsupported schema {} under urls, entry #{}'.format(
-                            schema, no + 1))
-                    continue
-
-                # Parse our url details of the server object as dictionary
-                # containing all of the information parsed from our URL
-                _results = plugins.SCHEMA_MAP[schema].parse_url(_url)
+                # We found a valid schema worthy of tracking; store it's
+                # details:
+                _results = plugins.url_to_dict(url)
                 if _results is None:
                     ConfigBase.logger.warning(
-                        'Unparseable {} based url, entry #{}'.format(
-                            schema, no + 1))
+                        'Unparseable URL {}, entry #{}'.format(
+                            url, no + 1))
                     continue
 
                 # add our results to our global set
                 results.append(_results)
 
             elif isinstance(url, dict):
-                # We are a url string with additional unescaped options
+                # We are a url string with additional unescaped options. In
+                # this case we want to iterate over all of our options so we
+                # can at least tell the end user what entries were ignored
+                # due to errors
+
                 if six.PY2:
                     it = url.iteritems()
                 else:  # six.PY3
                     it = iter(url.items())
 
-                # Track whether a schema was found
-                schema = None
-
                 # Track the URL to-load
                 _url = None
-                for _key, tokens in it:
-                    # swap hash (#) tag values with their html version
-                    key = _key.replace('/#', '/%23')
 
-                    # Get our schema
+                # Track last acquired schema
+                schema = None
+                for key, tokens in it:
+                    # Test our schema
                     _schema = GET_SCHEMA_RE.match(key)
                     if _schema is None:
                         # Log invalid entries so that maintainer of config
@@ -471,32 +433,22 @@ class ConfigBase(URLBase):
                         # with.
                         ConfigBase.logger.warning(
                             'Ignored entry {} found under urls, entry #{}'
-                            .format(_key, no + 1))
+                            .format(key, no + 1))
                         continue
 
                     # Store our URL and Schema Regex
                     _url = key
-                    schema = _schema
 
-                if schema is None:
+                    # Store our schema
+                    schema = _schema.group('schema').lower()
+
+                if _url is None:
                     # the loop above failed to match anything
                     ConfigBase.logger.warning(
                         'Unsupported schema in urls, entry #{}'.format(no + 1))
                     continue
 
-                # Ensure our schema is always in lower case
-                schema = schema.group('schema').lower()
-
-                # Some basic validation
-                if schema not in plugins.SCHEMA_MAP:
-                    ConfigBase.logger.warning(
-                        'Unsupported schema {} in urls, entry #{}'.format(
-                            schema, no + 1))
-                    continue
-
-                # Parse our url details of the server object as dictionary
-                # containing all of the information parsed from our URL
-                _results = plugins.SCHEMA_MAP[schema].parse_url(_url)
+                _results = plugins.url_to_dict(_url)
                 if _results is None:
                     # Setup dictionary
                     _results = {
