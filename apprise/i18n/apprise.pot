@@ -6,9 +6,9 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: apprise 0.8.0\n"
+"Project-Id-Version: apprise 0.8.1\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2019-09-20 21:05-0400\n"
+"POT-Creation-Date: 2019-10-13 21:39-0400\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -122,6 +122,9 @@ msgstr ""
 msgid "Expire"
 msgstr ""
 
+msgid "Facility"
+msgstr ""
+
 msgid "Footer Logo"
 msgstr ""
 
@@ -143,7 +146,19 @@ msgstr ""
 msgid "Hostname"
 msgstr ""
 
+msgid "IRC Colors"
+msgstr ""
+
 msgid "Include Image"
+msgstr ""
+
+msgid "Log PID"
+msgstr ""
+
+msgid "Log to STDERR"
+msgstr ""
+
+msgid "Message Hook"
 msgstr ""
 
 msgid "Message Mode"
@@ -173,7 +188,13 @@ msgstr ""
 msgid "Port"
 msgstr ""
 
+msgid "Prefix"
+msgstr ""
+
 msgid "Priority"
+msgstr ""
+
+msgid "Project ID"
 msgstr ""
 
 msgid "Provider Key"
