@@ -65,6 +65,9 @@ class NotifyNotica(NotifyBase):
     # Notica URL
     notify_url = 'https://notica.us/?{token}'
 
+    # Notica does not support a title
+    title_maxlen = 0
+
     # Define object templates
     templates = (
         '{schema}://{token}',
