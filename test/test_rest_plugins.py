@@ -1402,6 +1402,53 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifyNotica
+    ##################################
+    ('notica://', {
+        'instance': TypeError,
+    }),
+    ('notica://:@/', {
+        'instance': TypeError,
+    }),
+    # Native URL
+    ('https://notica.us/?%s' % ('z' * 6), {
+        'instance': plugins.NotifyNotica,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'notica://z...z',
+    }),
+    # Token specified
+    ('notica://%s' % ('a' * 6), {
+        'instance': plugins.NotifyNotica,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'notica://a...a',
+    }),
+    ('notica://%s' % ('b' * 6), {
+        'instance': plugins.NotifyNotica,
+        # don't include an image by default
+        'include_image': False,
+    }),
+    ('notica://%s' % ('c' * 6), {
+        'instance': plugins.NotifyNotica,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('notica://%s' % ('d' * 7), {
+        'instance': plugins.NotifyNotica,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('notica://%s' % ('e' * 8), {
+        'instance': plugins.NotifyNotica,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifyNotifico
     ##################################
     ('notifico://', {
