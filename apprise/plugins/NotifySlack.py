@@ -310,6 +310,7 @@ class NotifySlack(NotifyBase):
 
             if image_url:
                 payload['attachments'][0]['footer_icon'] = image_url
+                payload['icon_url'] = image_url
 
             self.logger.debug('Slack POST URL: %s (cert_verify=%r)' % (
                 url, self.verify_certificate,
