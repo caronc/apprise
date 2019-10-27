@@ -1415,19 +1415,72 @@ TEST_URLS = (
         'instance': plugins.NotifyNotica,
 
         # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'notica://z...z',
+        'privacy_url': 'notica://z...z/',
+    }),
+    # Native URL with additional arguments
+    ('https://notica.us/?%s&overflow=upstream' % ('z' * 6), {
+        'instance': plugins.NotifyNotica,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'notica://z...z/',
     }),
     # Token specified
     ('notica://%s' % ('a' * 6), {
         'instance': plugins.NotifyNotica,
 
         # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'notica://a...a',
+        'privacy_url': 'notica://a...a/',
+    }),
+    # Self-Hosted configuration
+    ('notica://localhost/%s' % ('b' * 6), {
+        'instance': plugins.NotifyNotica,
+    }),
+    ('notica://user@localhost/%s' % ('c' * 6), {
+        'instance': plugins.NotifyNotica,
+    }),
+    ('notica://user:pass@localhost/%s/' % ('d' * 6), {
+        'instance': plugins.NotifyNotica,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'notica://user:****@localhost/d...d',
+    }),
+    ('notica://user:pass@localhost/a/path/%s/' % ('r' * 6), {
+        'instance': plugins.NotifyNotica,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'notica://user:****@localhost/a/path/r...r',
+    }),
+    ('notica://localhost:8080/%s' % ('a' * 6), {
+        'instance': plugins.NotifyNotica,
+    }),
+    ('notica://user:pass@localhost:8080/%s' % ('b' * 6), {
+        'instance': plugins.NotifyNotica,
+    }),
+    ('noticas://localhost/%s' % ('j' * 6), {
+        'instance': plugins.NotifyNotica,
+        'privacy_url': 'noticas://localhost/j...j',
+    }),
+    ('noticas://user:pass@localhost/%s' % ('e' * 6), {
+        'instance': plugins.NotifyNotica,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'noticas://user:****@localhost/e...e',
+    }),
+    ('noticas://localhost:8080/path/%s' % ('5' * 6), {
+        'instance': plugins.NotifyNotica,
+        'privacy_url': 'noticas://localhost:8080/path/5...5',
+    }),
+    ('noticas://user:pass@localhost:8080/%s' % ('6' * 6), {
+        'instance': plugins.NotifyNotica,
     }),
     ('notica://%s' % ('b' * 6), {
         'instance': plugins.NotifyNotica,
         # don't include an image by default
         'include_image': False,
+    }),
+    # Test Header overrides
+    ('notica://localhost:8080//%s/?+HeaderKey=HeaderValue' % ('7' * 6), {
+        'instance': plugins.NotifyNotica,
     }),
     ('notica://%s' % ('c' * 6), {
         'instance': plugins.NotifyNotica,

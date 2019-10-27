@@ -37,12 +37,33 @@
 #       notica://abc123
 #
 import re
+import six
 import requests
 
 from .NotifyBase import NotifyBase
+from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
+
+
+class NoticaMode(object):
+    """
+    Tracks if we're accessing the notica upstream server or a locally hosted
+    one.
+    """
+    # We're dealing with a self hosted service
+    SELFHOSTED = 'selfhosted'
+
+    # We're dealing with the official hosted service at https://notica.us
+    OFFICIAL = 'official'
+
+
+# Define our Notica Modes
+NOTICA_MODES = (
+    NoticaMode.SELFHOSTED,
+    NoticaMode.OFFICIAL,
+)
 
 
 class NotifyNotica(NotifyBase):
@@ -56,8 +77,11 @@ class NotifyNotica(NotifyBase):
     # The services URL
     service_url = 'https://notica.us/'
 
+    # Insecure protocol (for those self hosted requests)
+    protocol = 'notica'
+
     # The default protocol (this is secure for notica)
-    secure_protocol = 'notica'
+    secure_protocol = 'noticas'
 
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_notica'
@@ -71,6 +95,14 @@ class NotifyNotica(NotifyBase):
     # Define object templates
     templates = (
         '{schema}://{token}',
+
+        # Self-hosted notica servers
+        '{schema}://{host}/{token}',
+        '{schema}://{host}:{port}/{token}',
+        '{schema}://{user}@{host}/{token}',
+        '{schema}://{user}@{host}:{port}/{token}',
+        '{schema}://{user}:{password}@{host}/{token}',
+        '{schema}://{user}:{password}@{host}:{port}/{token}',
     )
 
     # Define our template tokens
@@ -82,9 +114,36 @@ class NotifyNotica(NotifyBase):
             'required': True,
             'regex': r'^\?*(?P<token>[^/]+)\s*$'
         },
+        'host': {
+            'name': _('Hostname'),
+            'type': 'string',
+        },
+        'port': {
+            'name': _('Port'),
+            'type': 'int',
+            'min': 1,
+            'max': 65535,
+        },
+        'user': {
+            'name': _('Username'),
+            'type': 'string',
+        },
+        'password': {
+            'name': _('Password'),
+            'type': 'string',
+            'private': True,
+        },
     })
 
-    def __init__(self, token, **kwargs):
+    # Define any kwargs we're using
+    template_kwargs = {
+        'headers': {
+            'name': _('HTTP Header'),
+            'prefix': '+',
+        },
+    }
+
+    def __init__(self, token, headers=None, **kwargs):
         """
         Initialize Notica Object
         """
@@ -97,6 +156,19 @@ class NotifyNotica(NotifyBase):
                   '({}) was specified.'.format(token)
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        # Setup our mode
+        self.mode = NoticaMode.SELFHOSTED if self.host else NoticaMode.OFFICIAL
+
+        # prepare our fullpath
+        self.fullpath = kwargs.get('fullpath')
+        if not isinstance(self.fullpath, six.string_types):
+            self.fullpath = '/'
+
+        self.headers = {}
+        if headers:
+            # Store our extra headers
+            self.headers.update(headers)
 
         return
 
@@ -113,8 +185,33 @@ class NotifyNotica(NotifyBase):
         # Prepare our payload
         payload = 'd:{}'.format(body)
 
-        # prepare our notify url
-        notify_url = self.notify_url.format(token=self.token)
+        # Auth is used for SELFHOSTED queries
+        auth = None
+
+        if self.mode is NoticaMode.OFFICIAL:
+            # prepare our notify url
+            notify_url = self.notify_url.format(token=self.token)
+
+        else:
+            # Prepare our self hosted URL
+
+            # Apply any/all header over-rides defined
+            headers.update(self.headers)
+
+            if self.user:
+                auth = (self.user, self.password)
+
+            # Set our schema
+            schema = 'https' if self.secure else 'http'
+
+            # Prepare our notify_url
+            notify_url = '%s://%s' % (schema, self.host)
+            if isinstance(self.port, int):
+                notify_url += ':%d' % self.port
+
+            notify_url += '{fullpath}?token={token}'.format(
+                fullpath=self.fullpath.strip('/'),
+                token=self.token)
 
         self.logger.debug('Notica POST URL: %s (cert_verify=%r)' % (
             notify_url, self.verify_certificate,
@@ -129,6 +226,7 @@ class NotifyNotica(NotifyBase):
                 notify_url.format(token=self.token),
                 data=payload,
                 headers=headers,
+                auth=auth,
                 verify=self.verify_certificate,
             )
             if r.status_code != requests.codes.ok:
@@ -174,11 +272,49 @@ class NotifyNotica(NotifyBase):
             'verify': 'yes' if self.verify_certificate else 'no',
         }
 
-        return '{schema}://{token}/?{args}'.format(
-            schema=self.secure_protocol,
-            token=self.pprint(self.token, privacy, safe=''),
-            args=NotifyNotica.urlencode(args),
-        )
+        if self.mode == NoticaMode.OFFICIAL:
+            # Official URLs are easy to assemble
+            return '{schema}://{token}/?{args}'.format(
+                schema=self.protocol,
+                token=self.pprint(self.token, privacy, safe=''),
+                args=NotifyNotica.urlencode(args),
+            )
+
+        # If we reach here then we are assembling a self hosted URL
+
+        # Append our headers into our args
+        args.update({'+{}'.format(k): v for k, v in self.headers.items()})
+
+        # Authorization can be used for self-hosted sollutions
+        auth = ''
+
+        # Determine Authentication
+        if self.user and self.password:
+            auth = '{user}:{password}@'.format(
+                user=NotifyNotica.quote(self.user, safe=''),
+                password=self.pprint(
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
+            )
+        elif self.user:
+            auth = '{user}@'.format(
+                user=NotifyNotica.quote(self.user, safe=''),
+            )
+
+        default_port = 443 if self.secure else 80
+
+        return '{schema}://{auth}{hostname}{port}{fullpath}{token}/?{args}' \
+               .format(
+                   schema=self.secure_protocol
+                   if self.secure else self.protocol,
+                   auth=auth,
+                   hostname=NotifyNotica.quote(self.host, safe=''),
+                   port='' if self.port is None or self.port == default_port
+                        else ':{}'.format(self.port),
+                   fullpath=NotifyNotica.quote(
+                       self.fullpath, safe='/'),
+                   token=self.pprint(self.token, privacy, safe=''),
+                   args=NotifyNotica.urlencode(args),
+               )
 
     @staticmethod
     def parse_url(url):
@@ -192,8 +328,34 @@ class NotifyNotica(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
-        # Store our token using the host
-        results['token'] = NotifyNotica.unquote(results['host'])
+        # Get unquoted entries
+        entries = NotifyNotica.split_path(results['fullpath'])
+        if not entries:
+            # If there are no path entries, then we're only dealing with the
+            # official website
+            results['mode'] = NoticaMode.OFFICIAL
+
+            # Store our token using the host
+            results['token'] = NotifyNotica.unquote(results['host'])
+
+            # Unset our host
+            results['host'] = None
+
+        else:
+            # Otherwise we're running a self hosted instance
+            results['mode'] = NoticaMode.SELFHOSTED
+
+            # The last element in the list is our token
+            results['token'] = entries.pop()
+
+            # Re-assemble our full path
+            results['fullpath'] = \
+                '/' if not entries else '/{}/'.format('/'.join(entries))
+
+            # Add our headers that the user can potentially over-ride if they
+            # wish to to our returned result set
+            results['headers'] = results['qsd-']
+            results['headers'].update(results['qsd+'])
 
         return results
 
@@ -205,12 +367,14 @@ class NotifyNotica(NotifyBase):
 
         result = re.match(
             r'^https?://notica\.us/?'
-            r'\??(?P<token>[^/&=]+)$', url, re.I)
+            r'\??(?P<token>[^&]+)([&\s]*(?P<args>.+))?$', url, re.I)
 
         if result:
             return NotifyNotica.parse_url(
-                '{schema}://{token}'.format(
-                    schema=NotifyNotica.secure_protocol,
-                    token=result.group('token')))
+                '{schema}://{token}/{args}'.format(
+                    schema=NotifyNotica.protocol,
+                    token=result.group('token'),
+                    args='' if not result.group('args')
+                    else '?{}'.format(result.group('args'))))
 
         return None
