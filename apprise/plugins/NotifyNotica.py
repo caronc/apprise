@@ -210,7 +210,7 @@ class NotifyNotica(NotifyBase):
                 notify_url += ':%d' % self.port
 
             notify_url += '{fullpath}?token={token}'.format(
-                fullpath=self.fullpath.strip('/'),
+                fullpath=self.fullpath,
                 token=self.token)
 
         self.logger.debug('Notica POST URL: %s (cert_verify=%r)' % (

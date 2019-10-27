@@ -813,6 +813,9 @@ TEST_URLS = (
     ##################################
     # NotifyJSON
     ##################################
+    ('json://:@/', {
+        'instance': None,
+    }),
     ('json://', {
         'instance': None,
     }),
@@ -845,6 +848,8 @@ TEST_URLS = (
     }),
     ('jsons://localhost:8080/path/', {
         'instance': plugins.NotifyJSON,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'jsons://localhost:8080/path/',
     }),
     ('jsons://user:password@localhost:8080', {
         'instance': plugins.NotifyJSON,
@@ -852,8 +857,8 @@ TEST_URLS = (
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'jsons://user:****@localhost:8080',
     }),
-    ('json://:@/', {
-        'instance': None,
+    ('json://localhost:8080/path?-HeaderKey=HeaderValue', {
+        'instance': plugins.NotifyJSON,
     }),
     ('json://user:pass@localhost:8081', {
         'instance': plugins.NotifyJSON,
@@ -872,9 +877,6 @@ TEST_URLS = (
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
-    }),
-    ('json://localhost:8080/path?-HeaderKey=HeaderValue', {
-        'instance': plugins.NotifyJSON,
     }),
 
     ##################################
@@ -3283,6 +3285,9 @@ TEST_URLS = (
     ##################################
     # NotifyXML
     ##################################
+    ('xml://:@/', {
+        'instance': None,
+    }),
     ('xml://', {
         'instance': None,
     }),
@@ -3318,12 +3323,14 @@ TEST_URLS = (
     }),
     ('xmls://localhost:8080/path/', {
         'instance': plugins.NotifyXML,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'xmls://localhost:8080/path/',
     }),
     ('xmls://user:pass@localhost:8080', {
         'instance': plugins.NotifyXML,
     }),
-    ('xml://:@/', {
-        'instance': None,
+    ('xml://localhost:8080/path?-HeaderKey=HeaderValue', {
+        'instance': plugins.NotifyXML,
     }),
     ('xml://user:pass@localhost:8081', {
         'instance': plugins.NotifyXML,
@@ -3342,9 +3349,6 @@ TEST_URLS = (
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
-    }),
-    ('xml://localhost:8080/path?-HeaderKey=HeaderValue', {
-        'instance': plugins.NotifyXML,
     }),
 
     ##################################

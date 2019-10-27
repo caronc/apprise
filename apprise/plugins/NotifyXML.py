@@ -59,7 +59,6 @@ class NotifyXML(NotifyBase):
     request_rate_per_sec = 0
 
     # Define object templates
-    # Define object templates
     templates = (
         '{schema}://{host}',
         '{schema}://{host}:{port}',
@@ -169,12 +168,13 @@ class NotifyXML(NotifyBase):
 
         default_port = 443 if self.secure else 80
 
-        return '{schema}://{auth}{hostname}{port}/?{args}'.format(
+        return '{schema}://{auth}{hostname}{port}{fullpath}/?{args}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
             hostname=NotifyXML.quote(self.host, safe=''),
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
+            fullpath=NotifyXML.quote(self.fullpath, safe='/'),
             args=NotifyXML.urlencode(args),
         )
 
