@@ -23,6 +23,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import re
 import six
 import pytest
 import mock
@@ -137,12 +138,20 @@ def test_dbus_plugin(mock_mainloop, mock_byte, mock_bytearray,
     # Create our instance (identify all supported types)
     obj = apprise.Apprise.instantiate('dbus://', suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyDBus) is True
+    assert isinstance(obj.url(), six.string_types) is True
+    assert obj.url().startswith('dbus://_/')
     obj = apprise.Apprise.instantiate('kde://', suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyDBus) is True
+    assert isinstance(obj.url(), six.string_types) is True
+    assert obj.url().startswith('kde://_/')
     obj = apprise.Apprise.instantiate('qt://', suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyDBus) is True
+    assert isinstance(obj.url(), six.string_types) is True
+    assert obj.url().startswith('qt://_/')
     obj = apprise.Apprise.instantiate('glib://', suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyDBus) is True
+    assert isinstance(obj.url(), six.string_types) is True
+    assert obj.url().startswith('glib://_/')
     obj.duration = 0
 
     # Check that it found our mocked environments
@@ -176,6 +185,9 @@ def test_dbus_plugin(mock_mainloop, mock_byte, mock_bytearray,
         'dbus://_/?image=True', suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyDBus) is True
     assert isinstance(obj.url(), six.string_types) is True
+    assert obj.url().startswith('dbus://_/')
+    assert re.search('image=yes', obj.url())
+
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True
@@ -184,6 +196,9 @@ def test_dbus_plugin(mock_mainloop, mock_byte, mock_bytearray,
         'dbus://_/?image=False', suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyDBus) is True
     assert isinstance(obj.url(), six.string_types) is True
+    assert obj.url().startswith('dbus://_/')
+    assert re.search('image=no', obj.url())
+
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True

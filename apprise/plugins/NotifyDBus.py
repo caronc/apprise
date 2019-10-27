@@ -159,10 +159,6 @@ class NotifyDBus(NotifyBase):
     # content to display
     body_max_line_count = 10
 
-    # A title can not be used for SMS Messages.  Setting this to zero will
-    # cause any title (if defined) to get placed into the message body.
-    title_maxlen = 0
-
     # This entry is a bit hacky, but it allows us to unit-test this library
     # in an environment that simply doesn't have the gnome packages
     # available to us.  It also allows us to handle situations where the
@@ -364,7 +360,7 @@ class NotifyDBus(NotifyBase):
             args['y'] = str(self.y_axis)
 
         return '{schema}://_/?{args}'.format(
-            schema=self.protocol,
+            schema=self.schema,
             args=NotifyDBus.urlencode(args),
         )
 
