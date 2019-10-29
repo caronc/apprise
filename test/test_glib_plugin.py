@@ -50,6 +50,8 @@ if 'dbus' not in sys.modules:
     # Environment doesn't allow for dbus
     pytest.skip("Skipping dbus-python based tests", allow_module_level=True)
 
+from dbus import DBusException  # noqa E402
+
 
 @mock.patch('dbus.SessionBus')
 @mock.patch('dbus.Interface')
@@ -343,6 +345,15 @@ def test_dbus_plugin(mock_mainloop, mock_byte, mock_bytearray,
 
     # Verify this all works in the event a ValueError is also thronw
     # out of the call to gi.require_version()
+
+    mock_sessionbus.side_effect = DBusException('test')
+    # Handle Dbus Session Initialization error
+    assert obj.notify(
+        title='title', body='body',
+        notify_type=apprise.NotifyType.INFO) is False
+
+    # Return side effect to normal
+    mock_sessionbus.side_effect = None
 
     # Emulate require_version function:
     gi.require_version.side_effect = ValueError()

@@ -54,6 +54,7 @@ try:
     from dbus import Interface
     from dbus import Byte
     from dbus import ByteArray
+    from dbus import DBusException
 
     #
     # now we try to determine which mainloop(s) we can access
@@ -249,7 +250,20 @@ class NotifyDBus(NotifyBase):
             return False
 
         # Acquire our session
-        session = SessionBus(mainloop=MAINLOOP_MAP[self.schema])
+        try:
+            session = SessionBus(mainloop=MAINLOOP_MAP[self.schema])
+
+        except DBusException:
+            # Handle exception
+            self.logger.warning('Failed to send DBus notification.')
+            self.logger.exception('DBus Exception')
+            return False
+
+        # If there is no title, but there is a body, swap the two to get rid
+        # of the weird whitespace
+        if not title:
+            title = body
+            body = ''
 
         # acquire our dbus object
         dbus_obj = session.get_object(
