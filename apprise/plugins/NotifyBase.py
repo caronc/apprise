@@ -241,7 +241,7 @@ class NotifyBase(URLBase):
         )
 
     def notify(self, body, title=None, notify_type=NotifyType.INFO,
-               overflow=None, **kwargs):
+               overflow=None, attach=None, **kwargs):
         """
         Performs notification
 
@@ -255,7 +255,7 @@ class NotifyBase(URLBase):
                                           overflow=overflow):
             # Send notification
             if not self.send(body=chunk['body'], title=chunk['title'],
-                             notify_type=notify_type):
+                             notify_type=notify_type, attach=attach):
 
                 # Toggle our return status flag
                 return False

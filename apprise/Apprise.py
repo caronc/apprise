@@ -38,6 +38,7 @@ from .logger import logger
 
 from .AppriseAsset import AppriseAsset
 from .AppriseConfig import AppriseConfig
+from .AppriseAttachment import AppriseAttachment
 from .AppriseLocale import AppriseLocale
 from .config.ConfigBase import ConfigBase
 from .plugins.NotifyBase import NotifyBase
@@ -277,7 +278,7 @@ class Apprise(object):
         return
 
     def notify(self, body, title='', notify_type=NotifyType.INFO,
-               body_format=None, tag=MATCH_ALL_TAG):
+               body_format=None, tag=MATCH_ALL_TAG, attach=None):
         """
         Send a notification to all of the plugins previously loaded.
 
@@ -293,6 +294,10 @@ class Apprise(object):
         sent, False if even just one of them fails, and None if no
         notifications were sent at all as a result of tag filtering and/or
         simply having empty configuration files that were read.
+
+        Attach can contain a list of attachment URLs.  attach can also be
+        represented by a an AttachBase() (or list of) object(s). This
+        identifies the products you wish to notify
         """
 
         if len(self) == 0:
@@ -308,6 +313,10 @@ class Apprise(object):
 
         # Tracks conversions
         conversion_map = dict()
+
+        # Prepare attachments
+        if attach is not None and not isinstance(attach, AppriseAttachment):
+            attach = AppriseAttachment(attach, asset=self.asset)
 
         # Iterate over our loaded plugins
         for server in self.find(tag):
@@ -371,7 +380,8 @@ class Apprise(object):
                 if not server.notify(
                         body=conversion_map[server.notify_format],
                         title=title,
-                        notify_type=notify_type):
+                        notify_type=notify_type,
+                        attach=attach):
 
                     # Toggle our return status flag
                     status = False

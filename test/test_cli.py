@@ -25,6 +25,8 @@
 from __future__ import print_function
 import re
 import mock
+from os.path import dirname
+from os.path import join
 from apprise import cli
 from apprise import NotifyBase
 from click.testing import CliRunner
@@ -227,10 +229,11 @@ def test_apprise_cli(tmpdir):
     ])
     assert result.exit_code == 2
 
-    # Here is a case where we get what was expected
+    # Here is a case where we get what was expected; we also attach a file
     result = runner.invoke(cli.main, [
         '-b', 'has taga',
         '--config', str(t),
+        '--attach', join(dirname(__file__), 'var', 'apprise-test.gif'),
         '--tag', 'myTag',
     ])
     assert result.exit_code == 0

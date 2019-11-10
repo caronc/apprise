@@ -99,6 +99,9 @@ def print_version_msg():
 @click.option('--config', '-c', default=None, type=str, multiple=True,
               metavar='CONFIG_URL',
               help='Specify one or more configuration locations.')
+@click.option('--attach', '-a', default=None, type=str, multiple=True,
+              metavar='ATTACHMENT_URL',
+              help='Specify one or more configuration locations.')
 @click.option('--notification-type', '-n', default=NotifyType.INFO, type=str,
               metavar='TYPE',
               help='Specify the message type (default=info). Possible values'
@@ -120,8 +123,8 @@ def print_version_msg():
               help='Display the apprise version and exit.')
 @click.argument('urls', nargs=-1,
                 metavar='SERVER_URL [SERVER_URL2 [SERVER_URL3]]',)
-def main(body, title, config, urls, notification_type, theme, tag, dry_run,
-         verbose, version):
+def main(body, title, config, attach, urls, notification_type, theme, tag,
+         dry_run, verbose, version):
     """
     Send a notification to all of the specified servers identified by their
     URLs the content provided within the title, body and notification-type.
@@ -200,7 +203,8 @@ def main(body, title, config, urls, notification_type, theme, tag, dry_run,
 
         # now print it out
         result = a.notify(
-            body=body, title=title, notify_type=notification_type, tag=tags)
+            body=body, title=title, notify_type=notification_type, tag=tags,
+            attach=attach)
     else:
         # Number of rows to assume in the terminal.  In future, maybe this can
         # be detected and made dynamic. The actual row count is 80, but 5
