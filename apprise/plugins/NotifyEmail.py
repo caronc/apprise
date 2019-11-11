@@ -27,8 +27,9 @@ import re
 import six
 import smtplib
 from email.mime.text import MIMEText
-from email.MIMEMultipart import MIMEMultipart
 from email.mime.application import MIMEApplication
+from email.mime.multipart import MIMEMultipart
+
 from socket import error as SocketError
 from datetime import datetime
 

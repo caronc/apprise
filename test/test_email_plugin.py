@@ -23,6 +23,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import os
 import re
 import six
 import mock
@@ -31,11 +32,16 @@ import smtplib
 from apprise import plugins
 from apprise import NotifyType
 from apprise import Apprise
+from apprise import AttachBase
+from apprise import AppriseAttachment
 from apprise.plugins import NotifyEmailBase
 
 # Disable logging for a cleaner testing output
 import logging
 logging.disable(logging.CRITICAL)
+
+# Attachment Directory
+TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), 'var')
 
 
 TEST_URLS = (
@@ -461,6 +467,42 @@ def test_smtplib_send_okay(mock_smtplib):
 
     assert obj.notify(
         body='body', title='test', notify_type=NotifyType.INFO) is True
+
+    # Create an apprise object to work with as well
+    a = Apprise()
+    assert a.add('mailto://user:pass@gmail.com?format=text')
+
+    # Send Attachment with success
+    attach = os.path.join(TEST_VAR_DIR, 'apprise-test.gif')
+    assert obj.notify(
+        body='body', title='test', notify_type=NotifyType.INFO,
+        attach=attach) is True
+
+    # same results happen from our Apprise object
+    assert a.notify(body='body', title='test', attach=attach) is True
+
+    # test using an Apprise Attachment object
+    assert obj.notify(
+        body='body', title='test', notify_type=NotifyType.INFO,
+        attach=AppriseAttachment(attach)) is True
+
+    # same results happen from our Apprise object
+    assert a.notify(
+        body='body', title='test', attach=AppriseAttachment(attach)) is True
+
+    max_file_size = AttachBase.max_file_size
+    # Now do a case where the file can't be sent
+
+    AttachBase.max_file_size = 1
+    assert obj.notify(
+        body='body', title='test', notify_type=NotifyType.INFO,
+        attach=attach) is False
+
+    # same results happen from our Apprise object
+    assert a.notify(body='body', title='test', attach=attach) is False
+
+    # Restore value
+    AttachBase.max_file_size = max_file_size
 
 
 def test_email_url_escaping():

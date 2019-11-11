@@ -131,10 +131,15 @@ class AttachHTTP(AttachBase):
                 # Handle Errors
                 r.raise_for_status()
 
-                # Store our response if within reason
-                if self.max_file_size > 0 \
-                        and r.headers.get(
-                            'Content-Length', 0) > self.max_file_size:
+                # Get our file-size (if known)
+                try:
+                    file_size = int(r.headers.get('Content-Length', '0'))
+                except (TypeError, ValueError):
+                    # Handle edge case where Content-Length is a bad value
+                    file_size = 0
+
+                # Perform a little Q/A on file limitations and restrictions
+                if self.max_file_size > 0 and file_size > self.max_file_size:
 
                     # The content retrieved is to large
                     self.logger.error(

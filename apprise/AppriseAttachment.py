@@ -26,7 +26,6 @@
 import six
 
 from . import attachment
-from . import AttachBase
 from . import URLBase
 from .AppriseAsset import AppriseAsset
 from .logger import logger
@@ -58,7 +57,9 @@ class AppriseAttachment(object):
         # Now parse any paths specified
         if paths is not None:
             # Store our path(s)
-            self.add(paths)
+            if not self.add(paths):
+                # Parse Source domain based on from_addr
+                raise TypeError("One or more attachments could not be added.")
 
     def add(self, attachments, asset=None, db=None):
         """
@@ -72,7 +73,7 @@ class AppriseAttachment(object):
             # prepare default asset
             asset = self.asset
 
-        if isinstance(attachments, AttachBase):
+        if isinstance(attachments, attachment.AttachBase):
             # Go ahead and just add our attachments into our list
             self.attachments.append(attachments)
             return True
@@ -90,7 +91,7 @@ class AppriseAttachment(object):
         # Iterate over our attachments
         for _attachment in attachments:
 
-            if isinstance(_attachment, AttachBase):
+            if isinstance(_attachment, attachment.AttachBase):
                 # Go ahead and just add our attachment into our list
                 self.attachments.append(_attachment)
                 continue
@@ -107,7 +108,7 @@ class AppriseAttachment(object):
             # Instantiate ourselves an object, this function throws or
             # returns None if it fails
             instance = AppriseAttachment.instantiate(_attachment, asset=asset)
-            if not isinstance(instance, AttachBase):
+            if not isinstance(instance, attachment.AttachBase):
                 return_status = False
                 continue
 

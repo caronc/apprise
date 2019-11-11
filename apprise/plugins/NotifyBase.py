@@ -33,6 +33,7 @@ from ..common import NOTIFY_FORMATS
 from ..common import OverflowMode
 from ..common import OVERFLOW_MODES
 from ..AppriseLocale import gettext_lazy as _
+from ..AppriseAttachment import AppriseAttachment
 
 
 class NotifyBase(URLBase):
@@ -246,6 +247,15 @@ class NotifyBase(URLBase):
         Performs notification
 
         """
+
+        # Prepare attachments if required
+        if attach is not None and not isinstance(attach, AppriseAttachment):
+            try:
+                attach = AppriseAttachment(attach, asset=self.asset)
+
+            except TypeError:
+                # bad attachments
+                return False
 
         # Handle situations where the title is None
         title = '' if not title else title

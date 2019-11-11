@@ -140,6 +140,11 @@ def test_apprise_attachment():
     assert len(aa) == 0
     assert not aa
 
+    # if instantiating attachments from the class, it will throw a TypeError
+    # if attachments couldn't be loaded
+    with pytest.raises(TypeError):
+        AppriseAttachment('garbage://')
+
     # Garbage in produces garbage out
     assert aa.add(None) is False
     assert aa.add(object()) is False

@@ -314,9 +314,14 @@ class Apprise(object):
         # Tracks conversions
         conversion_map = dict()
 
-        # Prepare attachments
+        # Prepare attachments if required
         if attach is not None and not isinstance(attach, AppriseAttachment):
-            attach = AppriseAttachment(attach, asset=self.asset)
+            try:
+                attach = AppriseAttachment(attach, asset=self.asset)
+
+            except TypeError:
+                # bad attachments
+                return False
 
         # Iterate over our loaded plugins
         for server in self.find(tag):

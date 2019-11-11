@@ -33,9 +33,11 @@ import mock
 from os import chmod
 from os import getuid
 from os.path import dirname
+from os.path import join
 
 from apprise import Apprise
 from apprise import AppriseAsset
+from apprise import AppriseAttachment
 from apprise import NotifyBase
 from apprise import NotifyType
 from apprise import NotifyFormat
@@ -53,6 +55,9 @@ import inspect
 # Disable logging for a cleaner testing output
 import logging
 logging.disable(logging.CRITICAL)
+
+# Attachment Directory
+TEST_VAR_DIR = join(dirname(__file__), 'var')
 
 
 def test_apprise():
@@ -166,7 +171,7 @@ def test_apprise():
             # Support URL
             return ''
 
-        def notify(self, **kwargs):
+        def send(self, **kwargs):
             # Pretend everything is okay
             return True
 
@@ -199,6 +204,39 @@ def test_apprise():
     assert a.notify(title=None, body='present') is True
     assert a.notify(title='present', body=None) is True
     assert a.notify(title="present", body="present") is True
+
+    # Send Attachment with success
+    attach = join(TEST_VAR_DIR, 'apprise-test.gif')
+    assert a.notify(
+        body='body', title='test', notify_type=NotifyType.INFO,
+        attach=attach) is True
+
+    # Send the attachment as an AppriseAttachment object
+    assert a.notify(
+        body='body', title='test', notify_type=NotifyType.INFO,
+        attach=AppriseAttachment(attach)) is True
+
+    # test a invalid attachment
+    assert a.notify(
+        body='body', title='test', notify_type=NotifyType.INFO,
+        attach='invalid://') is False
+
+    # Repeat the same tests above...
+    # however do it by directly accessing the object; this grants the similar
+    # results:
+    assert a[0].notify(
+        body='body', title='test', notify_type=NotifyType.INFO,
+        attach=attach) is True
+
+    # Send the attachment as an AppriseAttachment object
+    assert a[0].notify(
+        body='body', title='test', notify_type=NotifyType.INFO,
+        attach=AppriseAttachment(attach)) is True
+
+    # test a invalid attachment
+    assert a[0].notify(
+        body='body', title='test', notify_type=NotifyType.INFO,
+        attach='invalid://') is False
 
     # Clear our server listings again
     a.clear()

@@ -238,6 +238,7 @@ def test_attach_http(mock_get):
 
     # Set our limit to be the length of our image; everything should work
     # without a problem
+    max_file_size = AttachHTTP.max_file_size
     AttachHTTP.max_file_size = getsize(path)
     # Set ourselves a Content-Disposition (providing a filename)
     dummy_response.headers['Content-Disposition'] = \
@@ -298,6 +299,25 @@ def test_attach_http(mock_get):
     assert attachment
     assert len(attachment) == getsize(path)
 
+    # Set our header up with an invalid Content-Length; we can still process
+    # this data. It just means we track it lower when reading back content
+    dummy_response.headers = {
+        'Content-Length': 'invalid'
+    }
+    results = AttachHTTP.parse_url('http://localhost/invalid-length.gif')
+    assert isinstance(results, dict)
+    attachment = AttachHTTP(**results)
+    assert isinstance(attachment.url(), six.string_types) is True
+    # No mime-type and/or filename over-ride was specified, so therefore it
+    # won't show up in the generated URL
+    assert re.search(r'[?&]mime=', attachment.url()) is None
+    assert re.search(r'[?&]name=', attachment.url()) is None
+    assert attachment.mimetype == 'image/gif'
+    # Because we could determine our mime type, we could build an extension
+    # for our unknown filename
+    assert attachment.name == 'invalid-length.gif'
+    assert attachment
+
     # Give ourselves nothing to work with
     dummy_response.headers = {}
     results = AttachHTTP.parse_url('http://user@localhost')
@@ -328,3 +348,6 @@ def test_attach_http(mock_get):
 
         mock_get.side_effect = _exception
         assert not aa
+
+    # Restore value
+    AttachHTTP.max_file_size = max_file_size
