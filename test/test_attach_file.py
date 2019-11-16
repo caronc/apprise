@@ -24,6 +24,7 @@
 # THE SOFTWARE.
 
 import re
+import time
 import mock
 from os.path import dirname
 from os.path import join
@@ -49,6 +50,35 @@ def test_attach_file_parse_url():
 
     # no file path specified
     assert AttachFile.parse_url('file://') is None
+
+
+def test_file_expiry(tmpdir):
+    """
+    API: AttachFile Expiry
+    """
+    path = join(TEST_VAR_DIR, 'apprise-test.gif')
+    image = tmpdir.mkdir("apprise_file").join("test.jpg")
+    with open(path, 'rb') as data:
+        image.write(data)
+
+    aa = AppriseAttachment.instantiate(str(image), cache=30)
+
+    # Our file is now available
+    assert aa.exists()
+
+    # Our second call has the file already downloaded, but now compares
+    # it's date against when we consider it to have expire.  We're well
+    # under 30 seconds here (our set value), so this will succeed
+    assert aa.exists()
+
+    with mock.patch('time.time', return_value=time.time() + 31):
+        # This will force a re-download as our cache will have
+        # expired
+        assert aa.exists()
+
+    with mock.patch('time.time', side_effect=OSError):
+        # We will throw an exception
+        assert aa.exists()
 
 
 def test_attach_file():

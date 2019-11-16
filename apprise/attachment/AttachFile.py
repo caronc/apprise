@@ -81,6 +81,9 @@ class AttachFile(AttachBase):
         validate it.
         """
 
+        # Ensure any existing content set has been invalidated
+        self.invalidate()
+
         if not os.path.isfile(self.dirty_path):
             return False
 
@@ -100,6 +103,9 @@ class AttachFile(AttachBase):
         # a call do download() before returning a success
         self.download_path = self.dirty_path
         self.detected_name = os.path.basename(self.download_path)
+
+        # We don't need to set our self.detected_mimetype as it can be
+        # pulled at the time it's needed based on the detected_name
         return True
 
     @staticmethod

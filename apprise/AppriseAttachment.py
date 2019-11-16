@@ -38,17 +38,34 @@ class AppriseAttachment(object):
 
     """
 
-    def __init__(self, paths=None, asset=None, **kwargs):
+    def __init__(self, paths=None, asset=None, cache=True, **kwargs):
         """
         Loads all of the paths/urls specified (if any).
 
         The path can either be a single string identifying one explicit
         location, otherwise you can pass in a series of locations to scan
         via a list.
+
+        By default we cache our responses so that subsiquent calls does not
+        cause the content to be retrieved again.  For local file references
+        this makes no difference at all.  But for remote content, this does
+        mean more then one call can be made to retrieve the (same) data.  This
+        method can be somewhat inefficient if disabled.  Only disable caching
+        if you understand the consequences.
+
+        You can alternatively set the cache value to an int identifying the
+        number of seconds the previously retrieved can exist for before it
+        should be considered expired.
+
+        It's also worth nothing that the cache value is only set to elements
+        that are not already of subclass AttachBase()
         """
 
         # Initialize our attachment listings
         self.attachments = list()
+
+        # Set our cache flag
+        self.cache = cache
 
         # Prepare our Asset Object
         self.asset = \
@@ -61,13 +78,29 @@ class AppriseAttachment(object):
                 # Parse Source domain based on from_addr
                 raise TypeError("One or more attachments could not be added.")
 
-    def add(self, attachments, asset=None, db=None):
+    def add(self, attachments, asset=None, cache=None):
         """
         Adds one or more attachments into our list.
 
+        By default we cache our responses so that subsiquent calls does not
+        cause the content to be retrieved again.  For local file references
+        this makes no difference at all.  But for remote content, this does
+        mean more then one call can be made to retrieve the (same) data.  This
+        method can be somewhat inefficient if disabled.  Only disable caching
+        if you understand the consequences.
+
+        You can alternatively set the cache value to an int identifying the
+        number of seconds the previously retrieved can exist for before it
+        should be considered expired.
+
+        It's also worth nothing that the cache value is only set to elements
+        that are not already of subclass AttachBase()
         """
         # Initialize our return status
         return_status = True
+
+        # Initialize our default cache value
+        cache = cache if cache is not None else self.cache
 
         if isinstance(asset, AppriseAsset):
             # prepare default asset
@@ -107,7 +140,8 @@ class AppriseAttachment(object):
 
             # Instantiate ourselves an object, this function throws or
             # returns None if it fails
-            instance = AppriseAttachment.instantiate(_attachment, asset=asset)
+            instance = AppriseAttachment.instantiate(
+                _attachment, asset=asset, cache=cache)
             if not isinstance(instance, attachment.AttachBase):
                 return_status = False
                 continue
@@ -119,11 +153,13 @@ class AppriseAttachment(object):
         return return_status
 
     @staticmethod
-    def instantiate(url, asset=None, suppress_exceptions=True):
+    def instantiate(url, asset=None, cache=None, suppress_exceptions=True):
         """
         Returns the instance of a instantiated attachment plugin based on
         the provided Attachment URL.  If the url fails to be parsed, then None
         is returned.
+
+        A specified cache value will over-ride anything set
 
         """
         # Attempt to acquire the schema at the very least to allow our
@@ -155,6 +191,10 @@ class AppriseAttachment(object):
         # Prepare our Asset Object
         results['asset'] = \
             asset if isinstance(asset, AppriseAsset) else AppriseAsset()
+
+        if cache is not None:
+            # Force an over-ride of the cache value to what we have specified
+            results['cache'] = cache
 
         if suppress_exceptions:
             try:

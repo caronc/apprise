@@ -58,7 +58,8 @@ def test_apprise_attachment():
     assert not aa
 
     # An attachment object using a custom Apprise Asset object
-    aa = AppriseAttachment(asset=AppriseAsset())
+    # Set a cache expiry of 5 minutes (300 seconds)
+    aa = AppriseAttachment(asset=AppriseAsset(), cache=300)
 
     # still no attachments added
     assert len(aa) == 0
@@ -69,6 +70,9 @@ def test_apprise_attachment():
 
     # There is now 1 attachment
     assert len(aa) == 1
+
+    # our attachment took on our cache value
+    assert aa[0].cache == 300
 
     # we can test the object as a boolean and get a value of True now
     assert aa
@@ -81,22 +85,33 @@ def test_apprise_attachment():
     # There is now 2 attachments
     assert len(aa) == 2
 
+    # No cache set, so our cache defaults to True
+    assert aa[1].cache is True
+
     # Reset our object
     aa = AppriseAttachment()
 
     # We can add by lists as well in a variety of formats
     attachments = (
         path,
-        'file://{}?name=newfilename.gif'.format(path),
+        'file://{}?name=newfilename.gif?cache=120'.format(path),
         AppriseAttachment.instantiate(
-            'file://{}?name=anotherfilename.gif'.format(path)),
+            'file://{}?name=anotherfilename.gif'.format(path), cache=100),
     )
 
     # Add them
-    assert aa.add(attachments)
+    assert aa.add(attachments, cache=False)
 
     # There is now 3 attachments
     assert len(aa) == 3
+
+    # Take on our fixed cache value of False.
+    # The last entry will have our set value of 100
+    assert aa[0].cache is False
+    # Even though we set a value of 120, we take on the value of False because
+    # it was forced on the instantiate call
+    assert aa[1].cache is False
+    assert aa[2].cache == 100
 
     # We can pop the last element off of the list as well
     attachment = aa.pop()
@@ -139,6 +154,30 @@ def test_apprise_attachment():
     aa.clear()
     assert len(aa) == 0
     assert not aa
+
+    assert aa.add(AppriseAttachment.instantiate(
+        'file://{}?name=andanother.png&cache=Yes'.format(path)))
+    assert aa.add(AppriseAttachment.instantiate(
+        'file://{}?name=andanother.png&cache=No'.format(path)))
+    AppriseAttachment.instantiate(
+        'file://{}?name=andanother.png&cache=600'.format(path))
+    assert aa.add(AppriseAttachment.instantiate(
+        'file://{}?name=andanother.png&cache=600'.format(path)))
+
+    assert len(aa) == 3
+    assert aa[0].cache is True
+    assert aa[1].cache is False
+    assert aa[2].cache == 600
+
+    # Negative cache are not allowed
+    assert not aa.add(AppriseAttachment.instantiate(
+        'file://{}?name=andanother.png&cache=-600'.format(path)))
+
+    # No length change
+    assert len(aa) == 3
+
+    # Reset our object
+    aa.clear()
 
     # if instantiating attachments from the class, it will throw a TypeError
     # if attachments couldn't be loaded

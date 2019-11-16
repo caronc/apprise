@@ -43,7 +43,6 @@ logging.disable(logging.CRITICAL)
 # Attachment Directory
 TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), 'var')
 
-
 TEST_URLS = (
     ##################################
     # NotifyEmail

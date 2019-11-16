@@ -85,10 +85,8 @@ class AttachHTTP(AttachBase):
         Perform retrieval of the configuration based on the specified request
         """
 
-        if self._temp_file is not None:
-            # There is nothing to do; we're already pointing at our downloaded
-            # content
-            return True
+        # Ensure any existing content set has been invalidated
+        self.invalidate()
 
         # prepare header
         headers = {
@@ -188,13 +186,8 @@ class AttachHTTP(AttachBase):
                                         int(self.max_file_size / 1024),
                                         self.url(privacy=True)))
 
-                                # Reset our temporary object
-                                self._temp_file = None
-
-                                # Ensure our detected name and mimetype are
-                                # reset
-                                self.detected_name = None
-                                self.detected_mimetype = None
+                                # Invalidate any variables previously set
+                                self.invalidate()
 
                                 # Return False (signifying a failure)
                                 return False
@@ -220,12 +213,8 @@ class AttachHTTP(AttachBase):
                 'configuration from %s.' % self.host)
             self.logger.debug('Socket Exception: %s' % str(e))
 
-            # Reset our temporary object
-            self._temp_file = None
-
-            # Ensure our detected name and mimetype are reset
-            self.detected_name = None
-            self.detected_mimetype = None
+            # Invalidate any variables previously set
+            self.invalidate()
 
             # Return False (signifying a failure)
             return False
@@ -239,12 +228,8 @@ class AttachHTTP(AttachBase):
                 'Could not write attachment to disk: {}'.format(
                     self.url(privacy=True)))
 
-            # Reset our temporary object
-            self._temp_file = None
-
-            # Ensure our detected name and mimetype are reset
-            self.detected_name = None
-            self.detected_mimetype = None
+            # Invalidate any variables previously set
+            self.invalidate()
 
             # Return False (signifying a failure)
             return False
@@ -252,14 +237,31 @@ class AttachHTTP(AttachBase):
         # Return our success
         return True
 
+    def invalidate(self):
+        """
+        Close our temporary file
+        """
+        if self._temp_file:
+            self._temp_file.close()
+            self._temp_file = None
+
+        super(AttachHTTP, self).invalidate()
+
     def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
 
+        # Prepare our cache value
+        if isinstance(self.cache, bool) or not self.cache:
+            cache = 'yes' if self.cache else 'no'
+        else:
+            cache = int(self.cache)
+
         # Define any arguments set
         args = {
             'verify': 'yes' if self.verify_certificate else 'no',
+            'cache': cache,
         }
 
         if self._mimetype:

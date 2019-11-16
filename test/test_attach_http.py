@@ -333,17 +333,15 @@ def test_attach_http(mock_get):
 
     # Handle edge-case where detected_name is None for whatever reason
     attachment.detected_name = None
-    assert attachment.mimetype == 'application/octet-stream'
-    assert attachment.name == '{}{}'.format(
-        AttachHTTP.unknown_filename,
-        mimetypes.guess_extension(attachment.mimetype)
-    )
+    assert attachment.mimetype == attachment.unknown_mimetype
+    assert attachment.name.startswith(AttachHTTP.unknown_filename)
     assert len(attachment) == getsize(path)
 
     # Exception handling
     mock_get.return_value = None
     for _exception in REQUEST_EXCEPTIONS:
-        aa = AppriseAttachment.instantiate('http://localhost/exception.gif')
+        aa = AppriseAttachment.instantiate(
+            'http://localhost/exception.gif?cache=30')
         assert isinstance(aa, AttachHTTP)
 
         mock_get.side_effect = _exception

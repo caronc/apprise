@@ -24,8 +24,10 @@
 # THE SOFTWARE.
 
 import os
+import time
 import mimetypes
 from ..URLBase import URLBase
+from ..utils import parse_bool
 
 
 class AttachBase(URLBase):
@@ -59,7 +61,7 @@ class AttachBase(URLBase):
     # 5 MB = 5242880 bytes
     max_file_size = 5242880
 
-    def __init__(self, name=None, mimetype=None, **kwargs):
+    def __init__(self, name=None, mimetype=None, cache=True, **kwargs):
         """
         Initialize some general logging and common server arguments that will
         keep things consistent when working with the configurations that
@@ -70,6 +72,17 @@ class AttachBase(URLBase):
 
         The mime-type is automatically detected, but you can over-ride this by
         explicitly stating what it should be.
+
+        By default we cache our responses so that subsiquent calls does not
+        cause the content to be retrieved again.  For local file references
+        this makes no difference at all.  But for remote content, this does
+        mean more then one call can be made to retrieve the (same) data.  This
+        method can be somewhat inefficient if disabled.  Only disable caching
+        if you understand the consequences.
+
+        You can alternatively set the cache value to an int identifying the
+        number of seconds the previously retrieved can exist for before it
+        should be considered expired.
         """
 
         super(AttachBase, self).__init__(**kwargs)
@@ -96,6 +109,18 @@ class AttachBase(URLBase):
         # Absolute path to attachment
         self.download_path = None
 
+        # Set our cache flag
+        # it can be True, or an integer
+        try:
+            self.cache = cache if isinstance(cache, bool) else int(cache)
+            if self.cache < 0:
+                raise ValueError()
+
+        except (ValueError, TypeError):
+            err = 'An invalid cache value ({}) was specified.'.format(cache)
+            self.logger.warning(err)
+            raise TypeError(err)
+
         # Validate mimetype if specified
         if self._mimetype:
             if next((t for t in mimetypes.types_map.values()
@@ -110,13 +135,13 @@ class AttachBase(URLBase):
     @property
     def path(self):
         """
-        Returns the absolute path to the filename
+        Returns the absolute path to the filename. If this is not known or
+        is know but has been considered expired (due to cache setting), then
+        content is re-retrieved prior to returning.
         """
-        if self.download_path:
-            # return our fixed content
-            return self.download_path
 
-        if not self.download():
+        if not self.exists():
+            # we could not obtain our path
             return None
 
         return self.download_path
@@ -130,7 +155,7 @@ class AttachBase(URLBase):
             # return our fixed content
             return self._name
 
-        if not self.detected_name and not self.download():
+        if not self.exists():
             # we could not obtain our name
             return None
 
@@ -157,8 +182,8 @@ class AttachBase(URLBase):
             # return our pre-calculated cached content
             return self._mimetype
 
-        if not self.detected_mimetype and not self.download():
-            # we could not obtain our name
+        if not self.exists():
+            # we could not obtain our attachment
             return None
 
         if not self.detected_mimetype:
@@ -179,14 +204,58 @@ class AttachBase(URLBase):
         return self.detected_mimetype \
             if self.detected_mimetype else self.unknown_mimetype
 
+    def exists(self):
+        """
+        Simply returns true if the object has downloaded and stored the
+        attachment AND the attachment has not expired.
+        """
+        if self.download_path and os.path.isfile(self.download_path) \
+                and self.cache:
+
+            # We have enough reason to look further into our cached value
+            if self.cache is True:
+                # return our fixed content as is; we will always cache it
+                return True
+
+            # Verify our cache time to determine whether we will get our
+            # content again.
+            try:
+                age_in_sec = time.time() - os.stat(self.download_path).st_mtime
+                if age_in_sec <= self.cache:
+                    return True
+
+            except (OSError, IOError):
+                # The file is not present
+                pass
+
+        return self.download()
+
+    def invalidate(self):
+        """
+        Release any temporary data that may be open by child classes.
+        Externally fetched content should be automatically cleaned up when
+        this function is called.
+
+        This function should also reset the following entries to None:
+          - detected_name : Should identify a human readable filename
+          - download_path: Must contain a absolute path to content
+          - detected_mimetype: Should identify mimetype of content
+        """
+        self.detected_name = None
+        self.download_path = None
+        self.detected_mimetype = None
+        return
+
     def download(self):
         """
         This function must be over-ridden by inheriting classes.
 
-        Inherited classes should populate:
-          - detected_name : Should identify a human readable filename
+        Inherited classes MUST populate:
+          - detected_name: Should identify a human readable filename
           - download_path: Must contain a absolute path to content
           - detected_mimetype: Should identify mimetype of content
+
+        If a download fails, you should ensure these values are set to None.
         """
         raise NotImplementedError(
             "download() is implimented by the child class.")
@@ -225,6 +294,17 @@ class AttachBase(URLBase):
         if 'name' in results['qsd']:
             results['name'] = results['qsd'].get('name', '') \
                 .strip().lower()
+
+        # Our cache value
+        if 'cache' in results['qsd']:
+            # First try to get it's integer value
+            try:
+                results['cache'] = int(results['qsd']['cache'])
+
+            except (ValueError, TypeError):
+                # No problem, it just isn't an integer; now treat it as a bool
+                # instead:
+                results['cache'] = parse_bool(results['qsd']['cache'])
 
         return results
 
