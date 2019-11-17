@@ -42,7 +42,6 @@
 #
 import re
 import requests
-from json import dumps
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
@@ -178,17 +177,12 @@ class NotifyDiscord(NotifyBase):
 
         return
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
+             **kwargs):
         """
         Perform Discord Notification
         """
 
-        headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'multipart/form-data',
-        }
-
-        # Prepare JSON Object
         payload = {
             # Text-To-Speech
             'tts': self.tts,
@@ -258,6 +252,50 @@ class NotifyDiscord(NotifyBase):
             # Optionally override the default username of the webhook
             payload['username'] = self.user
 
+        if not self._send(payload):
+            # We failed to post our message
+            return False
+
+        if attach:
+            # Update our payload; the idea is to preserve it's other detected
+            # and assigned values for re-use here too
+            payload.update({
+                # Text-To-Speech
+                'tts': False,
+                # Wait until the upload has posted itself before continuing
+                'wait': True,
+            })
+
+            # Remove our text/title based content for attachment use
+            if 'embeds' in payload:
+                # Markdown
+                del payload['embeds']
+
+            if 'content' in payload:
+                # Markdown
+                del payload['content']
+
+            # Send our attachments
+            for attachment in attach:
+                self.logger.info(
+                    'Posting Discord Attachment {}'.format(attachment.name))
+                if not self._send(payload, attach=attachment):
+                    # We failed to post our message
+                    return False
+
+        # Otherwise return
+        return True
+
+    def _send(self, payload, attach=None, **kwargs):
+        """
+        Wrapper to the requests (post) object
+        """
+
+        # Our headers
+        headers = {
+            'User-Agent': self.app_id,
+        }
+
         # Construct Notify URL
         notify_url = '{0}/{1}/{2}'.format(
             self.notify_url,
@@ -273,11 +311,19 @@ class NotifyDiscord(NotifyBase):
         # Always call throttle before any remote server i/o is made
         self.throttle()
 
+        # Our attachment path (if specified)
+        files = None
         try:
+
+            # Open our attachment path if required:
+            if attach:
+                files = (attach.name, open(attach.path, 'rb'))
+
             r = requests.post(
                 notify_url,
-                data=dumps(payload),
+                data=payload,
                 headers=headers,
+                files=files,
                 verify=self.verify_certificate,
             )
             if r.status_code not in (
@@ -288,8 +334,9 @@ class NotifyDiscord(NotifyBase):
                     NotifyBase.http_response_code_lookup(r.status_code)
 
                 self.logger.warning(
-                    'Failed to send Discord notification: '
+                    'Failed to send {}to Discord notification: '
                     '{}{}error={}.'.format(
+                        attach.name if attach else '',
                         status_str,
                         ', ' if status_str else '',
                         r.status_code))
@@ -304,11 +351,23 @@ class NotifyDiscord(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured sending Discord '
-                'notification.'
-            )
+                'A Connection error occured posting {}to Discord.'.format(
+                    attach.name if attach else ''))
             self.logger.debug('Socket Exception: %s' % str(e))
             return False
+
+        except (OSError, IOError) as e:
+            self.logger.warning(
+                'An I/O error occured while reading {}.'.format(
+                    attach.name if attach else 'attachment'))
+            self.logger.debug('I/O Exception: %s' % str(e))
+            return False
+
+        finally:
+            # Close our file (if it's open) stored in the second element
+            # of our files tuple (index 1)
+            if files:
+                files[1].close()
 
         return True
 

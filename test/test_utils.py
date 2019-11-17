@@ -736,7 +736,7 @@ def test_exclusive_match():
         logic='match_me', data=data, match_all='match_me') is True
 
 
-def test_apprise_validate_regex(tmpdir):
+def test_apprise_validate_regex():
     """
     API: Apprise() Validate Regex tests
 

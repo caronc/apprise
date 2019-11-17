@@ -10,7 +10,7 @@ To inform or tell (someone). To make one aware of something.
 
 * One notification library to rule them all.
 * A common and intuitive notification syntax.
-* Supports the handling of images (to the notification services that will accept them).
+* Supports the handling of images and attachments (to the notification services that will accept them).
 
 System owners who wish to provide a notification service no longer need to research each and every new one as they appear. They just need to include this one library and then they can immediately gain access to almost all of the notifications services available to us today.
 
@@ -153,6 +153,23 @@ apprise -t 'my title' -b 'my notification body' \
 	--config=https://localhost/my/apprise/config
 ```
 
+### Attaching Files
+Apprise also supports file attachments too! Specify as many attachments to a notification as you want.
+```bash
+# Send a funny image you found on the internet to a colleage:
+apprise --title 'Agile Joke' \
+        --body 'Did you see this one yet?' \
+        --attach https://i.redd.it/my2t4d2fx0u31.jpg \
+      'mailto://myemail:mypass@gmail.com'
+
+# Easily send an update from a critical server to your dev team
+apprise --title 'system crash' \
+        --body 'I do not think Jim fixed the bug; see attached...' \
+        --attach /var/log/myprogram.log \
+        --attach /var/debug/core.2345 \
+        --tag devteam
+```
+
 ## Developers
 To send a notification from within your python application, just do the following:
 ```python
@@ -228,4 +245,56 @@ apobj.notify(
 )
 ```
 
+### Attaching Files
+Attachments are very easy to send using the Apprise API:
+```python
+import apprise
+
+# Create an Apprise instance
+apobj = apprise.Apprise()
+
+# Add at least one service you want to notify
+apobj.add('mailto://myuser:mypass@hotmail.com')
+
+# Then send your attachment.
+apobj.notify(
+    title='A great photo of our family',
+    body='The flash caused Jane to close her eyes! hah! :)',
+    attach='/local/path/to/my/DSC_003.jpg',
+)
+
+# Send a web based attachment too! In the below example, we connect to a home
+# security camera and send a live image to an email. By default remote web
+# content is cached but for a security camera, we might want to call notify
+# again later in our code so we want our last image retrieved to expire(in
+# this case after 3 seconds).
+apobj.notify(
+    title='Latest security image',
+    attach='http:/admin:password@hikvision-cam01/ISAPI/Streaming/channels/101/picture?cache=3'
+)
+
+# To send more than one attachment, you just need another object:
+from apprise import AppriseAttachment
+
+# Initialize our attachment object
+aa = AppriseAttachment()
+
+# Now add all of the entries we're intrested in:
+# ?name= allows us to rename the actual jpeg as found on the site
+# to be another name when sent to our receipient(s)
+aa.add('https://i.redd.it/my2t4d2fx0u31.jpg?name=FlyingToMars.jpg')
+
+# Now add another:
+aa.add('/path/to/funny/joke.gif')
+
+# Send your multiple attachments with a single notify call:
+apobj.notify(
+    title='Some good jokes.'
+    body='Hey guys, check out these!'
+    attach=aa,
+    tag=friends
+)
+```
+
+## Want To Learn More?
 If you're interested in reading more about this and other methods on how to customize your own notifications, please check out the wiki at https://github.com/caronc/apprise/wiki/Development_API. You can also find more examples on how to use the command line tool at: https://github.com/caronc/apprise/wiki/CLI_Usage.

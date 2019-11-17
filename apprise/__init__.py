@@ -46,10 +46,12 @@ from .URLBase import URLBase
 from .URLBase import PrivacyMode
 from .plugins.NotifyBase import NotifyBase
 from .config.ConfigBase import ConfigBase
+from .attachment.AttachBase import AttachBase
 
 from .Apprise import Apprise
 from .AppriseAsset import AppriseAsset
 from .AppriseConfig import AppriseConfig
+from .AppriseAttachment import AppriseAttachment
 
 # Set default logging handler to avoid "No handler found" warnings.
 import logging
@@ -58,8 +60,8 @@ logging.getLogger(__name__).addHandler(NullHandler())
 
 __all__ = [
     # Core
-    'Apprise', 'AppriseAsset', 'AppriseConfig', 'URLBase', 'NotifyBase',
-    'ConfigBase',
+    'Apprise', 'AppriseAsset', 'AppriseConfig', 'AppriseAttachment', 'URLBase',
+    'NotifyBase', 'ConfigBase', 'AttachBase',
 
     # Reference
     'NotifyType', 'NotifyImageSize', 'NotifyFormat', 'OverflowMode',

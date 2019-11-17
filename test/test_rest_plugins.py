@@ -23,6 +23,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import os
 import six
 import pytest
 import requests
@@ -37,6 +38,7 @@ from apprise import NotifyType
 from apprise import NotifyBase
 from apprise import Apprise
 from apprise import AppriseAsset
+from apprise import AppriseAttachment
 from apprise.common import NotifyFormat
 from apprise.common import OverflowMode
 
@@ -60,6 +62,9 @@ REQUEST_EXCEPTIONS = (
     requests.TooManyRedirects(
         0, 'requests.TooManyRedirects() not handled'),
 )
+
+# Attachment Directory
+TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), 'var')
 
 TEST_URLS = (
     ##################################
@@ -2483,10 +2488,10 @@ TEST_URLS = (
     # NotifySlack
     ##################################
     ('slack://', {
-        'instance': None,
+        'instance': TypeError,
     }),
     ('slack://:@/', {
-        'instance': None,
+        'instance': TypeError,
     }),
     ('slack://T1JJ3T3L2', {
         # Just Token 1 provided
@@ -2503,6 +2508,10 @@ TEST_URLS = (
         # There is an invalid channel that we will fail to deliver to
         # as a result the response type will be false
         'response': False,
+        'requests_response_text': {
+            'ok': False,
+            'message': 'Bad Channel',
+        },
     }),
     ('slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#channel', {
         # No username specified; this is still okay as we sub in
@@ -2510,11 +2519,19 @@ TEST_URLS = (
         'instance': plugins.NotifySlack,
         # don't include an image by default
         'include_image': False,
+        'requests_response_text': {
+            'ok': True,
+            'message': '',
+        },
     }),
     ('slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/+id/@id/', {
         # + encoded id,
         # @ userid
         'instance': plugins.NotifySlack,
+        'requests_response_text': {
+            'ok': True,
+            'message': '',
+        },
     }),
     ('slack://username@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/' \
         '?to=#nuxref', {
@@ -2522,23 +2539,67 @@ TEST_URLS = (
 
             # Our expected url(privacy=True) startswith() response:
             'privacy_url': 'slack://username@T...2/A...D/T...Q/',
+            'requests_response_text': {
+                'ok': True,
+                'message': '',
+            },
         }),
     ('slack://username@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#nuxref', {
         'instance': plugins.NotifySlack,
+        'requests_response_text': {
+            'ok': True,
+            'message': '',
+        },
     }),
+    # Test using a bot-token (also test footer set to no flag)
+    ('slack://username@xoxb-1234-1234-abc124/#nuxref?footer=no', {
+        'instance': plugins.NotifySlack,
+        'requests_response_text': {
+            'ok': True,
+            'message': '',
+            # support attachments
+            'file': {
+                'url_private': 'http://localhost/',
+            },
+        },
+    }),
+
+    ('slack://username@xoxb-1234-1234-abc124/#nuxref', {
+        'instance': plugins.NotifySlack,
+        'requests_response_text': {
+            'ok': True,
+            'message': '',
+        },
+        # we'll fail to send attachments because we had no 'file' response in
+        # our object
+        'response': False,
+    }),
+
     ('slack://username@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ', {
         # Missing a channel, falls back to webhook channel bindings
         'instance': plugins.NotifySlack,
+        'requests_response_text': {
+            'ok': True,
+            'message': '',
+        },
     }),
     # Native URL Support, take the slack URL and still build from it
     ('https://hooks.slack.com/services/{}/{}/{}'.format(
         'A' * 9, 'B' * 9, 'c' * 24), {
         'instance': plugins.NotifySlack,
+        'requests_response_text': {
+            'ok': True,
+            'message': '',
+        },
     }),
     # Native URL Support with arguments
     ('https://hooks.slack.com/services/{}/{}/{}?format=text'.format(
         'A' * 9, 'B' * 9, 'c' * 24), {
         'instance': plugins.NotifySlack,
+        'requests_response_text': {
+            'ok': True,
+            'message': '',
+        },
     }),
     ('slack://username@INVALID/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#cool', {
         # invalid 1st Token
@@ -2557,18 +2618,30 @@ TEST_URLS = (
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
+        'requests_response_text': {
+            'ok': False,
+            'message': '',
+        },
     }),
     ('slack://respect@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#a', {
         'instance': plugins.NotifySlack,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
+        'requests_response_text': {
+            'ok': False,
+            'message': '',
+        },
     }),
     ('slack://notify@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#b', {
         'instance': plugins.NotifySlack,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
+        'requests_response_text': {
+            'ok': False,
+            'message': '',
+        },
     }),
 
     ##################################
@@ -3613,6 +3686,26 @@ def test_rest_plugins(mock_post, mock_get):
                         notify_type=notify_type,
                         overflow=OverflowMode.SPLIT) == notify_response
 
+                    # Test single attachment support; even if the service
+                    # doesn't support attachments, it should still gracefully
+                    # ignore the data
+                    attach = os.path.join(TEST_VAR_DIR, 'apprise-test.gif')
+                    assert obj.notify(
+                        body=body, title=title,
+                        notify_type=notify_type,
+                        attach=attach) == notify_response
+
+                    # Same results should apply to a list of attachments
+                    attach = AppriseAttachment((
+                        os.path.join(TEST_VAR_DIR, 'apprise-test.gif'),
+                        os.path.join(TEST_VAR_DIR, 'apprise-test.png'),
+                        os.path.join(TEST_VAR_DIR, 'apprise-test.jpeg'),
+                    ))
+                    assert obj.notify(
+                        body=body, title=title,
+                        notify_type=notify_type,
+                        attach=attach) == notify_response
+
                 else:
                     # Disable throttling
                     obj.request_rate_per_sec = 0
@@ -3754,125 +3847,6 @@ def test_notify_boxcar_plugin(mock_post, mock_get):
         access=access, secret=secret,
         targets=','.join([device, device, device]))
     assert len(p.device_tokens) == 3
-
-
-@mock.patch('requests.get')
-@mock.patch('requests.post')
-def test_notify_discord_plugin(mock_post, mock_get):
-    """
-    API: NotifyDiscord() Extra Checks
-
-    """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
-
-    # Initialize some generic (but valid) tokens
-    webhook_id = 'A' * 24
-    webhook_token = 'B' * 64
-
-    # Prepare Mock
-    mock_get.return_value = requests.Request()
-    mock_post.return_value = requests.Request()
-    mock_post.return_value.status_code = requests.codes.ok
-    mock_get.return_value.status_code = requests.codes.ok
-
-    # Invalid webhook id
-    with pytest.raises(TypeError):
-        plugins.NotifyDiscord(webhook_id=None, webhook_token=webhook_token)
-    # Invalid webhook id (whitespace)
-    with pytest.raises(TypeError):
-        plugins.NotifyDiscord(webhook_id="  ", webhook_token=webhook_token)
-
-    # Invalid webhook token
-    with pytest.raises(TypeError):
-        plugins.NotifyDiscord(webhook_id=webhook_id, webhook_token=None)
-    # Invalid webhook token (whitespace)
-    with pytest.raises(TypeError):
-        plugins.NotifyDiscord(webhook_id=webhook_id, webhook_token="   ")
-
-    obj = plugins.NotifyDiscord(
-        webhook_id=webhook_id,
-        webhook_token=webhook_token,
-        footer=True, thumbnail=False)
-
-    # This call includes an image with it's payload:
-    assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO) is True
-
-    # Test our header parsing
-    test_markdown = "## Heading one\nbody body\n\n" + \
-        "# Heading 2 ##\n\nTest\n\n" + \
-        "more content\n" + \
-        "even more content  \t\r\n\n\n" + \
-        "# Heading 3 ##\n\n\n" + \
-        "normal content\n" + \
-        "# heading 4\n" + \
-        "#### Heading 5"
-
-    results = obj.extract_markdown_sections(test_markdown)
-    assert isinstance(results, list) is True
-    # We should have 5 sections (since there are 5 headers identified above)
-    assert len(results) == 5
-    assert results[0]['name'] == 'Heading one'
-    assert results[0]['value'] == '```md\nbody body\n```'
-    assert results[1]['name'] == 'Heading 2'
-    assert results[1]['value'] == \
-        '```md\nTest\n\nmore content\neven more content\n```'
-    assert results[2]['name'] == 'Heading 3'
-    assert results[2]['value'] == \
-        '```md\nnormal content\n```'
-    assert results[3]['name'] == 'heading 4'
-    assert results[3]['value'] == '```md\n\n```'
-    assert results[4]['name'] == 'Heading 5'
-    assert results[4]['value'] == '```md\n\n```'
-
-    # Test our markdown
-    obj = Apprise.instantiate(
-        'discord://{}/{}/?format=markdown'.format(webhook_id, webhook_token))
-    assert isinstance(obj, plugins.NotifyDiscord)
-    assert obj.notify(
-        body=test_markdown, title='title', notify_type=NotifyType.INFO) is True
-
-    # Empty String
-    results = obj.extract_markdown_sections("")
-    assert isinstance(results, list) is True
-    assert len(results) == 0
-
-    # String without Heading
-    test_markdown = "Just a string without any header entries.\n" + \
-        "A second line"
-    results = obj.extract_markdown_sections(test_markdown)
-    assert isinstance(results, list) is True
-    assert len(results) == 0
-
-    # Use our test markdown string during a notification
-    assert obj.notify(
-        body=test_markdown, title='title', notify_type=NotifyType.INFO) is True
-
-    # Create an apprise instance
-    a = Apprise()
-
-    # Our processing is slightly different when we aren't using markdown
-    # as we do not pre-parse content during our notifications
-    assert a.add(
-        'discord://{webhook_id}/{webhook_token}/'
-        '?format=markdown&footer=Yes'.format(
-            webhook_id=webhook_id,
-            webhook_token=webhook_token)) is True
-
-    # This call includes an image with it's payload:
-    assert a.notify(body=test_markdown, title='title',
-                    notify_type=NotifyType.INFO,
-                    body_format=NotifyFormat.TEXT) is True
-
-    assert a.notify(body=test_markdown, title='title',
-                    notify_type=NotifyType.INFO,
-                    body_format=NotifyFormat.MARKDOWN) is True
-
-    # Toggle our logo availability
-    a.asset.image_url_logo = None
-    assert a.notify(
-        body='body', title='title', notify_type=NotifyType.INFO) is True
 
 
 @mock.patch('requests.get')
@@ -4778,50 +4752,6 @@ def test_notify_sendgrid_plugin(mock_post, mock_get):
         from_email='l2g@example.com',
         bcc=('abc@def.com', '!invalid'),
         cc=('abc@test.org', '!invalid')), plugins.NotifySendGrid)
-
-
-@mock.patch('requests.get')
-@mock.patch('requests.post')
-def test_notify_slack_plugin(mock_post, mock_get):
-    """
-    API: NotifySlack() Extra Checks
-
-    """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
-
-    # Initialize some generic (but valid) tokens
-    token_a = 'A' * 9
-    token_b = 'B' * 9
-    token_c = 'c' * 24
-
-    # Support strings
-    channels = 'chan1,#chan2,+id,@user,,,'
-
-    obj = plugins.NotifySlack(
-        token_a=token_a, token_b=token_b, token_c=token_c, targets=channels)
-    assert len(obj.channels) == 4
-
-    # Prepare Mock
-    mock_get.return_value = requests.Request()
-    mock_post.return_value = requests.Request()
-    mock_post.return_value.status_code = requests.codes.ok
-    mock_get.return_value.status_code = requests.codes.ok
-
-    # Missing first Token
-    with pytest.raises(TypeError):
-        plugins.NotifySlack(
-            token_a=None, token_b=token_b, token_c=token_c,
-            targets=channels)
-
-    # Test include_image
-    obj = plugins.NotifySlack(
-        token_a=token_a, token_b=token_b, token_c=token_c, targets=channels,
-        include_image=True)
-
-    # This call includes an image with it's payload:
-    assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO) is True
 
 
 @mock.patch('requests.get')
