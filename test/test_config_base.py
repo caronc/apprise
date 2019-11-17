@@ -651,10 +651,10 @@ class ConfigGoober(ConfigBase):
     # This class tests the fact we have a new class name, but we're
     # trying to over-ride items previously used
 
-    # The default simple (insecure) protocol (used by ConfigMail)
+    # The default simple (insecure) protocol
     protocol = 'http'
 
-    # The default secure protocol (used by ConfigMail)
+    # The default secure protocol
     secure_protocol = 'https'""")
 
     # Utilizes a schema:// already occupied (as tuple)
@@ -664,11 +664,10 @@ class ConfigBugger(ConfigBase):
     # This class tests the fact we have a new class name, but we're
     # trying to over-ride items previously used
 
-    # The default simple (insecure) protocol (used by ConfigMail), the other
-    # isn't
+    # The default simple (insecure) protocol
     protocol = ('http', 'bugger-test' )
 
-    # The default secure protocol (used by ConfigMail), the other isn't
+    # The default secure protocol
     secure_protocol = ('https', 'bugger-tests')""")
 
     __load_matrix(path=str(base), name=module_name)

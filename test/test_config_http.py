@@ -24,6 +24,8 @@
 # THE SOFTWARE.
 
 import six
+import time
+import pytest
 import mock
 import requests
 from apprise.common import ConfigFormat
@@ -51,9 +53,8 @@ REQUEST_EXCEPTIONS = (
 )
 
 
-@mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_config_http(mock_post, mock_get):
+def test_config_http(mock_post):
     """
     API: ConfigHTTP() object
 
@@ -75,20 +76,39 @@ def test_config_http(mock_post, mock_get):
     # Store our good notification in our schema map
     SCHEMA_MAP['good'] = GoodNotification
 
-    # Prepare Mock
-    dummy_request = mock.Mock()
-    dummy_request.close.return_value = True
-    dummy_request.status_code = requests.codes.ok
-    dummy_request.content = """
-    taga,tagb=good://server01
-    """
-    dummy_request.headers = {
-        'Content-Length': len(dummy_request.content),
-        'Content-Type': 'text/plain',
-    }
+    # Our default content
+    default_content = """taga,tagb=good://server01"""
 
-    mock_post.return_value = dummy_request
-    mock_get.return_value = dummy_request
+    class DummyResponse(object):
+        """
+        A dummy response used to manage our object
+        """
+        status_code = requests.codes.ok
+        headers = {
+            'Content-Length': len(default_content),
+            'Content-Type': 'text/plain',
+        }
+
+        content = default_content
+
+        # Pointer to file
+        ptr = None
+
+        def close(self):
+            return
+
+        def raise_for_status(self):
+            return
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args, **kwargs):
+            return
+
+    # Prepare Mock
+    dummy_response = DummyResponse()
+    mock_post.return_value = dummy_response
 
     assert ConfigHTTP.parse_url('garbage://') is None
 
@@ -109,6 +129,86 @@ def test_config_http(mock_post, mock_get):
 
     # one entry added
     assert len(ch) == 1
+
+    # Clear all our mock counters
+    mock_post.reset_mock()
+
+    # Cache Handling; cache each request for 30 seconds
+    results = ConfigHTTP.parse_url('http://localhost:8080/path/?cache=30')
+    assert mock_post.call_count == 0
+    assert isinstance(ch.url(), six.string_types) is True
+
+    assert isinstance(results, dict)
+    ch = ConfigHTTP(**results)
+    assert mock_post.call_count == 0
+
+    assert isinstance(ch.url(), six.string_types) is True
+    assert mock_post.call_count == 0
+
+    assert isinstance(ch.read(), six.string_types) is True
+    assert mock_post.call_count == 1
+
+    # Clear all our mock counters
+    mock_post.reset_mock()
+
+    # Behind the scenes we haven't actually made a fetch yet. We can consider
+    # our content expired at this point
+    assert ch.expired() is True
+
+    # Test using boolean check; this will force a remote fetch
+    assert ch
+
+    # Now a call was made
+    assert mock_post.call_count == 1
+    mock_post.reset_mock()
+
+    # Our content hasn't expired yet (it's good for 30 seconds)
+    assert ch.expired() is False
+    assert len(ch) == 1
+    assert mock_post.call_count == 0
+
+    # Test using boolean check; we will re-use our cache and not
+    # make another remote request
+    mock_post.reset_mock()
+    assert ch
+    assert len(ch.servers()) == 1
+    assert len(ch) == 1
+
+    # No remote post has been made
+    assert mock_post.call_count == 0
+
+    with mock.patch('time.time', return_value=time.time() + 10):
+        # even with 10 seconds elapsed, no fetch will be made
+        assert ch.expired() is False
+        assert ch
+        assert len(ch.servers()) == 1
+        assert len(ch) == 1
+
+    # No remote post has been made
+    assert mock_post.call_count == 0
+
+    with mock.patch('time.time', return_value=time.time() + 31):
+        # but 30+ seconds from now is considered expired
+        assert ch.expired() is True
+        assert ch
+        assert len(ch.servers()) == 1
+        assert len(ch) == 1
+
+    # Our content would have been renewed with a single new fetch
+    assert mock_post.call_count == 1
+
+    # one entry added
+    assert len(ch) == 1
+
+    # Invalid cache
+    results = ConfigHTTP.parse_url('http://localhost:8080/path/?cache=False')
+    assert isinstance(results, dict)
+    assert isinstance(ch.url(), six.string_types) is True
+
+    results = ConfigHTTP.parse_url('http://localhost:8080/path/?cache=-10')
+    assert isinstance(results, dict)
+    with pytest.raises(TypeError):
+        ch = ConfigHTTP(**results)
 
     results = ConfigHTTP.parse_url('http://user@localhost?format=text')
     assert isinstance(results, dict)
@@ -157,7 +257,7 @@ def test_config_http(mock_post, mock_get):
     iter(ch)
 
     # Test a buffer size limit reach
-    ch.max_buffer_size = len(dummy_request.content)
+    ch.max_buffer_size = len(dummy_response.content)
     assert isinstance(ch.read(), six.string_types) is True
 
     # Test YAML detection
@@ -165,7 +265,7 @@ def test_config_http(mock_post, mock_get):
         'text/yaml', 'text/x-yaml', 'application/yaml', 'application/x-yaml')
 
     for st in yaml_supported_types:
-        dummy_request.headers['Content-Type'] = st
+        dummy_response.headers['Content-Type'] = st
         ch.default_config_format = None
         assert isinstance(ch.read(), six.string_types) is True
         # Set to YAML
@@ -175,7 +275,7 @@ def test_config_http(mock_post, mock_get):
     text_supported_types = ('text/plain', 'text/html')
 
     for st in text_supported_types:
-        dummy_request.headers['Content-Type'] = st
+        dummy_response.headers['Content-Type'] = st
         ch.default_config_format = None
         assert isinstance(ch.read(), six.string_types) is True
         # Set to TEXT
@@ -185,27 +285,52 @@ def test_config_http(mock_post, mock_get):
     ukwn_supported_types = ('text/css', 'application/zip')
 
     for st in ukwn_supported_types:
-        dummy_request.headers['Content-Type'] = st
+        dummy_response.headers['Content-Type'] = st
         ch.default_config_format = None
         assert isinstance(ch.read(), six.string_types) is True
         # Remains unchanged
         assert ch.default_config_format is None
 
     # When the entry is missing; we handle this too
-    del dummy_request.headers['Content-Type']
+    del dummy_response.headers['Content-Type']
     ch.default_config_format = None
     assert isinstance(ch.read(), six.string_types) is True
     # Remains unchanged
     assert ch.default_config_format is None
 
     # Restore our content type object for lower tests
-    dummy_request.headers['Content-Type'] = 'text/plain'
+    dummy_response.headers['Content-Type'] = 'text/plain'
 
-    ch.max_buffer_size = len(dummy_request.content) - 1
+    # Take a snapshot
+    max_buffer_size = ch.max_buffer_size
+
+    ch.max_buffer_size = len(dummy_response.content) - 1
+    assert ch.read() is None
+
+    # Restore buffer size count
+    ch.max_buffer_size = max_buffer_size
+
+    # Test erroneous Content-Length
+    # Our content is still within the limits, so we're okay
+    dummy_response.headers['Content-Length'] = 'garbage'
+
+    assert isinstance(ch.read(), six.string_types) is True
+
+    dummy_response.headers['Content-Length'] = 'None'
+    # Our content is still within the limits, so we're okay
+    assert isinstance(ch.read(), six.string_types) is True
+
+    # Handle cases where the content length is exactly at our limit
+    dummy_response.content = 'a' * ch.max_buffer_size
+    # This is acceptable
+    assert isinstance(ch.read(), six.string_types) is True
+
+    # If we are over our limit though..
+    dummy_response.content = 'b' * (ch.max_buffer_size + 1)
     assert ch.read() is None
 
     # Test an invalid return code
-    dummy_request.status_code = 400
+    dummy_response.status_code = 400
     assert ch.read() is None
     ch.max_error_buffer_size = 0
     assert ch.read() is None
@@ -213,5 +338,7 @@ def test_config_http(mock_post, mock_get):
     # Exception handling
     for _exception in REQUEST_EXCEPTIONS:
         mock_post.side_effect = _exception
-        mock_get.side_effect = _exception
         assert ch.read() is None
+
+    # Restore buffer size count
+    ch.max_buffer_size = max_buffer_size

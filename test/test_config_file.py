@@ -45,7 +45,7 @@ def test_config_file(tmpdir):
     t = tmpdir.mkdir("testing").join("apprise")
     t.write("gnome://")
 
-    assert ConfigFile.parse_url('file://?'.format(str(t))) is None
+    assert ConfigFile.parse_url('file://?') is None
 
     # Initialize our object
     cf = ConfigFile(path=str(t), format='text')
@@ -83,9 +83,16 @@ def test_config_file(tmpdir):
     # Second reference actually uses cache
     iter(cf)
 
+    # Cache Handling; cache each request for 30 seconds
+    results = ConfigFile.parse_url(
+        'file://{}?cache=30'.format(str(t)))
+    assert isinstance(results, dict)
+    cf = ConfigFile(**results)
+    assert isinstance(cf.url(), six.string_types) is True
+    assert isinstance(cf.read(), six.string_types) is True
 
-@mock.patch('io.open')
-def test_config_file_exceptions(mock_open, tmpdir):
+
+def test_config_file_exceptions(tmpdir):
     """
     API: ConfigFile() i/o exception handling
 
@@ -95,10 +102,17 @@ def test_config_file_exceptions(mock_open, tmpdir):
     t = tmpdir.mkdir("testing").join("apprise")
     t.write("gnome://")
 
-    mock_open.side_effect = OSError
-
     # Initialize our object
     cf = ConfigFile(path=str(t), format='text')
 
     # Internal Exception would have been thrown and this would fail
+    with mock.patch('io.open', side_effect=OSError):
+        assert cf.read() is None
+
+    # handle case where the file is to large for what was expected:
+    max_buffer_size = cf.max_buffer_size
+    cf.max_buffer_size = 1
     assert cf.read() is None
+
+    # Restore default value
+    cf.max_buffer_size = max_buffer_size

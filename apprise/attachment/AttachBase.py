@@ -109,12 +109,14 @@ class AttachBase(URLBase):
         # Absolute path to attachment
         self.download_path = None
 
-        # Set our cache flag
-        # it can be True, or an integer
+        # Set our cache flag; it can be True or a (positive) integer
         try:
             self.cache = cache if isinstance(cache, bool) else int(cache)
             if self.cache < 0:
-                raise ValueError()
+                err = 'A negative cache value ({}) was specified.'.format(
+                    cache)
+                self.logger.warning(err)
+                raise TypeError(err)
 
         except (ValueError, TypeError):
             err = 'An invalid cache value ({}) was specified.'.format(cache)
@@ -212,7 +214,8 @@ class AttachBase(URLBase):
         if self.download_path and os.path.isfile(self.download_path) \
                 and self.cache:
 
-            # We have enough reason to look further into our cached value
+            # We have enough reason to look further into our cached content
+            # and verify it has not expired.
             if self.cache is True:
                 # return our fixed content as is; we will always cache it
                 return True

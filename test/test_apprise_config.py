@@ -26,6 +26,7 @@
 import six
 import io
 import mock
+import pytest
 from apprise import NotifyFormat
 from apprise.Apprise import Apprise
 from apprise.AppriseConfig import AppriseConfig
@@ -212,9 +213,6 @@ def test_apprise_config(tmpdir):
     # above, our results have been cached so we get a 1 response.
     assert len(ac.servers()) == 1
 
-    # Now do the same check but force a flushed cache
-    assert len(ac.servers(cache=False)) == 0
-
 
 def test_apprise_multi_config_entries(tmpdir):
     """
@@ -311,7 +309,7 @@ def test_apprise_config_tagging(tmpdir):
     assert len(ac.servers(tag='all')) == 3
 
 
-def test_apprise_instantiate():
+def test_apprise_config_instantiate():
     """
     API: AppriseConfig.instantiate()
 
@@ -332,15 +330,9 @@ def test_apprise_instantiate():
     # Store our bad configuration in our schema map
     CONFIG_SCHEMA_MAP['bad'] = BadConfig
 
-    try:
+    with pytest.raises(TypeError):
         AppriseConfig.instantiate(
             'bad://path', suppress_exceptions=False)
-        # We should never make it to this line
-        assert False
-
-    except TypeError:
-        # Exception caught as expected
-        assert True
 
     # Same call but exceptions suppressed
     assert AppriseConfig.instantiate(
@@ -378,7 +370,7 @@ def test_apprise_config_with_apprise_obj(tmpdir):
     # Store our good notification in our schema map
     NOTIFY_SCHEMA_MAP['good'] = GoodNotification
 
-    # Create ourselves a config object
+    # Create ourselves a config object with caching disbled
     ac = AppriseConfig(cache=False)
 
     # Nothing loaded yet
@@ -587,7 +579,7 @@ def test_apprise_config_matrix_load():
         # protocol as string
         protocol = 'true'
 
-    # Generate ourselfs a fake entry
+    # Generate ourselves a fake entry
     apprise.config.ConfigDummy = ConfigDummy
     apprise.config.ConfigDummy2 = ConfigDummy2
     apprise.config.ConfigDummy3 = ConfigDummy3
