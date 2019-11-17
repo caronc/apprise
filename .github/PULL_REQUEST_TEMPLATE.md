@@ -1,6 +1,8 @@
 ## Description:
 **Related issue (if applicable):** fixes #<!--apprise issue number goes here-->
 
+<!-- Have anything else to describe? Define it here -->
+
 ## New Service Completion Status
 <!-- This section is only applicable if you're adding a new service -->
 * [ ] apprise/plugins/Notify<!--ServiceName goes here-->.py

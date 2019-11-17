@@ -27,6 +27,7 @@ import os
 import re
 import six
 import yaml
+import time
 
 from .. import plugins
 from ..AppriseAsset import AppriseAsset
@@ -35,6 +36,7 @@ from ..common import ConfigFormat
 from ..common import CONFIG_FORMATS
 from ..utils import GET_SCHEMA_RE
 from ..utils import parse_list
+from ..utils import parse_bool
 
 
 class ConfigBase(URLBase):
@@ -58,15 +60,30 @@ class ConfigBase(URLBase):
     # anything else. 128KB (131072B)
     max_buffer_size = 131072
 
-    def __init__(self, **kwargs):
+    def __init__(self, cache=True, **kwargs):
         """
         Initialize some general logging and common server arguments that will
         keep things consistent when working with the configurations that
         inherit this class.
 
+        By default we cache our responses so that subsiquent calls does not
+        cause the content to be retrieved again.  For local file references
+        this makes no difference at all.  But for remote content, this does
+        mean more then one call can be made to retrieve the (same) data.  This
+        method can be somewhat inefficient if disabled.  Only disable caching
+        if you understand the consequences.
+
+        You can alternatively set the cache value to an int identifying the
+        number of seconds the previously retrieved can exist for before it
+        should be considered expired.
         """
 
         super(ConfigBase, self).__init__(**kwargs)
+
+        # Tracks the time the content was last retrieved on.  This place a role
+        # for cases where we are not caching our response and are required to
+        # re-retrieve our settings.
+        self._cached_time = None
 
         # Tracks previously loaded content for speed
         self._cached_servers = None
@@ -86,20 +103,34 @@ class ConfigBase(URLBase):
                 self.logger.warning(err)
                 raise TypeError(err)
 
+        # Set our cache flag; it can be True or a (positive) integer
+        try:
+            self.cache = cache if isinstance(cache, bool) else int(cache)
+            if self.cache < 0:
+                err = 'A negative cache value ({}) was specified.'.format(
+                    cache)
+                self.logger.warning(err)
+                raise TypeError(err)
+
+        except (ValueError, TypeError):
+            err = 'An invalid cache value ({}) was specified.'.format(cache)
+            self.logger.warning(err)
+            raise TypeError(err)
+
         return
 
-    def servers(self, asset=None, cache=True, **kwargs):
+    def servers(self, asset=None, **kwargs):
         """
         Performs reads loaded configuration and returns all of the services
         that could be parsed and loaded.
 
         """
 
-        if cache is True and isinstance(self._cached_servers, list):
+        if not self.expired():
             # We already have cached results to return; use them
             return self._cached_servers
 
-        # Our response object
+        # Our cached response object
         self._cached_servers = list()
 
         # read() causes the child class to do whatever it takes for the
@@ -107,8 +138,11 @@ class ConfigBase(URLBase):
         # None is returned if there was an error or simply no data
         content = self.read(**kwargs)
         if not isinstance(content, six.string_types):
-            # Nothing more to do
-            return list()
+            # Set the time our content was cached at
+            self._cached_time = time.time()
+
+            # Nothing more to do; return our empty cache list
+            return self._cached_servers
 
         # Our Configuration format uses a default if one wasn't one detected
         # or enfored.
@@ -129,6 +163,9 @@ class ConfigBase(URLBase):
             self.logger.warning('Failed to load configuration from {}'.format(
                 self.url()))
 
+        # Set the time our content was cached at
+        self._cached_time = time.time()
+
         return self._cached_servers
 
     def read(self):
@@ -138,12 +175,34 @@ class ConfigBase(URLBase):
         """
         return None
 
+    def expired(self):
+        """
+        Simply returns True if the configuration should be considered
+        as expired or False if content should be retrieved.
+        """
+        if isinstance(self._cached_servers, list) and self.cache:
+            # We have enough reason to look further into our cached content
+            # and verify it has not expired.
+            if self.cache is True:
+                # we have not expired, return False
+                return False
+
+            # Verify our cache time to determine whether we will get our
+            # content again.
+            age_in_sec = time.time() - self._cached_time
+            if age_in_sec <= self.cache:
+                # We have not expired; return False
+                return False
+
+        # If we reach here our configuration should be considered
+        # missing and/or expired.
+        return True
+
     @staticmethod
     def parse_url(url, verify_host=True):
         """Parses the URL and returns it broken apart into a dictionary.
 
         This is very specific and customized for Apprise.
-
 
         Args:
             url (str): The URL you want to fully parse.
@@ -176,6 +235,17 @@ class ConfigBase(URLBase):
         # Defines the encoding of the payload
         if 'encoding' in results['qsd']:
             results['encoding'] = results['qsd'].get('encoding')
+
+        # Our cache value
+        if 'cache' in results['qsd']:
+            # First try to get it's integer value
+            try:
+                results['cache'] = int(results['qsd']['cache'])
+
+            except (ValueError, TypeError):
+                # No problem, it just isn't an integer; now treat it as a bool
+                # instead:
+                results['cache'] = parse_bool(results['qsd']['cache'])
 
         return results
 
@@ -542,15 +612,16 @@ class ConfigBase(URLBase):
 
         return response
 
-    def pop(self, index):
+    def pop(self, index=-1):
         """
-        Removes an indexed Notification Service from the stack and
-        returns it.
+        Removes an indexed Notification Service from the stack and returns it.
+
+        By default, the last element of the list is removed.
         """
 
         if not isinstance(self._cached_servers, list):
             # Generate ourselves a list of content we can pull from
-            self.servers(cache=True)
+            self.servers()
 
         # Pop the element off of the stack
         return self._cached_servers.pop(index)
@@ -562,7 +633,7 @@ class ConfigBase(URLBase):
         """
         if not isinstance(self._cached_servers, list):
             # Generate ourselves a list of content we can pull from
-            self.servers(cache=True)
+            self.servers()
 
         return self._cached_servers[index]
 
@@ -572,7 +643,7 @@ class ConfigBase(URLBase):
         """
         if not isinstance(self._cached_servers, list):
             # Generate ourselves a list of content we can pull from
-            self.servers(cache=True)
+            self.servers()
 
         return iter(self._cached_servers)
 
@@ -582,6 +653,28 @@ class ConfigBase(URLBase):
         """
         if not isinstance(self._cached_servers, list):
             # Generate ourselves a list of content we can pull from
-            self.servers(cache=True)
+            self.servers()
 
         return len(self._cached_servers)
+
+    def __bool__(self):
+        """
+        Allows the Apprise object to be wrapped in an Python 3.x based 'if
+        statement'.  True is returned if our content was downloaded correctly.
+        """
+        if not isinstance(self._cached_servers, list):
+            # Generate ourselves a list of content we can pull from
+            self.servers()
+
+        return True if self._cached_servers else False
+
+    def __nonzero__(self):
+        """
+        Allows the Apprise object to be wrapped in an Python 2.x based 'if
+        statement'.  True is returned if our content was downloaded correctly.
+        """
+        if not isinstance(self._cached_servers, list):
+            # Generate ourselves a list of content we can pull from
+            self.servers()
+
+        return True if self._cached_servers else False

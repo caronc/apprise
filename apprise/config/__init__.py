@@ -43,7 +43,7 @@ def __load_matrix(path=abspath(dirname(__file__)), name='apprise.config'):
     skip over modules we simply don't have the dependencies for.
 
     """
-    # Used for the detection of additional Notify Services objects
+    # Used for the detection of additional Configuration Services objects
     # The .py extension is optional as we support loading directories too
     module_re = re.compile(r'^(?P<name>Config[a-z0-9]+)(\.py)?$', re.I)
 

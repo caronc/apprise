@@ -29,6 +29,7 @@ import requests
 from .ConfigBase import ConfigBase
 from ..common import ConfigFormat
 from ..URLBase import PrivacyMode
+from ..AppriseLocale import gettext_lazy as _
 
 # Support YAML formats
 # text/yaml
@@ -48,8 +49,8 @@ class ConfigHTTP(ConfigBase):
     A wrapper for HTTP based configuration sources
     """
 
-    # The default descriptive name associated with the Notification
-    service_name = 'HTTP'
+    # The default descriptive name associated with the service
+    service_name = _('Web Based')
 
     # The default protocol
     protocol = 'http'
@@ -95,9 +96,18 @@ class ConfigHTTP(ConfigBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
+        # Prepare our cache value
+        if isinstance(self.cache, bool) or not self.cache:
+            cache = 'yes' if self.cache else 'no'
+
+        else:
+            cache = int(self.cache)
+
         # Define any arguments set
         args = {
+            'verify': 'yes' if self.verify_certificate else 'no',
             'encoding': self.encoding,
+            'cache': cache,
         }
 
         if self.config_format:
@@ -122,12 +132,13 @@ class ConfigHTTP(ConfigBase):
 
         default_port = 443 if self.secure else 80
 
-        return '{schema}://{auth}{hostname}{port}/?{args}'.format(
+        return '{schema}://{auth}{hostname}{port}{fullpath}/?{args}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
-            hostname=self.host,
+            hostname=self.quote(self.host, safe=''),
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
+            fullpath=self.quote(self.fullpath, safe='/'),
             args=self.urlencode(args),
         )
 
@@ -169,61 +180,48 @@ class ConfigHTTP(ConfigBase):
 
         try:
             # Make our request
-            r = requests.post(
-                url,
-                headers=headers,
-                auth=auth,
-                verify=self.verify_certificate,
-                timeout=self.connection_timeout_sec,
-                stream=True,
-            )
+            with requests.post(
+                    url,
+                    headers=headers,
+                    auth=auth,
+                    verify=self.verify_certificate,
+                    timeout=self.connection_timeout_sec,
+                    stream=True) as r:
 
-            if r.status_code != requests.codes.ok:
-                status_str = \
-                    ConfigBase.http_response_code_lookup(r.status_code)
-                self.logger.error(
-                    'Failed to get HTTP configuration: '
-                    '{}{} error={}.'.format(
-                        status_str,
-                        ',' if status_str else '',
-                        r.status_code))
+                # Handle Errors
+                r.raise_for_status()
 
-                # Display payload for debug information only; Don't read any
-                # more than the first X bytes since we're potentially accessing
-                # content from untrusted servers.
-                if self.max_error_buffer_size > 0:
-                    self.logger.debug(
-                        'Response Details:\r\n{}'.format(
-                            r.content[0:self.max_error_buffer_size]))
+                # Get our file-size (if known)
+                try:
+                    file_size = int(r.headers.get('Content-Length', '0'))
+                except (TypeError, ValueError):
+                    # Handle edge case where Content-Length is a bad value
+                    file_size = 0
 
-                # Close out our connection if it exists to eliminate any
-                # potential inefficiencies with the Request connection pool as
-                # documented on their site when using the stream=True option.
-                r.close()
+                # Store our response
+                if self.max_buffer_size > 0 \
+                        and file_size > self.max_buffer_size:
 
-                # Return None (signifying a failure)
-                return None
+                    # Provide warning of data truncation
+                    self.logger.error(
+                        'HTTP config response exceeds maximum buffer length '
+                        '({}KB);'.format(int(self.max_buffer_size / 1024)))
 
-            # Store our response
-            if self.max_buffer_size > 0 and \
-                    r.headers['Content-Length'] > self.max_buffer_size:
+                    # Return None - buffer execeeded
+                    return None
 
-                # Provide warning of data truncation
-                self.logger.error(
-                    'HTTP config response exceeds maximum buffer length '
-                    '({}KB);'.format(int(self.max_buffer_size / 1024)))
+                # Store our result (but no more than our buffer length)
+                response = r.content[:self.max_buffer_size + 1]
 
-                # Close out our connection if it exists to eliminate any
-                # potential inefficiencies with the Request connection pool as
-                # documented on their site when using the stream=True option.
-                r.close()
+                # Verify that our content did not exceed the buffer size:
+                if len(response) > self.max_buffer_size:
+                    # Provide warning of data truncation
+                    self.logger.error(
+                        'HTTP config response exceeds maximum buffer length '
+                        '({}KB);'.format(int(self.max_buffer_size / 1024)))
 
-                # Return None - buffer execeeded
-                return None
-
-            else:
-                # Store our result
-                response = r.content
+                    # Return None - buffer execeeded
+                    return None
 
                 # Detect config format based on mime if the format isn't
                 # already enforced
@@ -248,11 +246,6 @@ class ConfigHTTP(ConfigBase):
 
             # Return None (signifying a failure)
             return None
-
-        # Close out our connection if it exists to eliminate any potential
-        # inefficiencies with the Request connection pool as documented on
-        # their site when using the stream=True option.
-        r.close()
 
         # Return our response object
         return response
