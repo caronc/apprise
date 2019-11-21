@@ -30,6 +30,9 @@ The Apprise options are as follows:
   * `-c`, `--config=`<CONFIG-URL>:
     Specify one or more configuration locations.
 
+  * `-a`, `--attach=`<ATTACH-URL>:
+    Specify one or more file attachment locations.
+
   * `-n`, `--notification-type=`<TYPE>:
     Specify the message type (default=info). Possible values are "info",
     "success", "failure", and "warning".
@@ -89,6 +92,11 @@ notification service URLs and only notify the ones tagged as _devops_.
     $ apprise -t 'my title' -b 'my notification body' \
        --config=https://localhost/my/apprise/config \
        -t devops
+
+Include an attachment:
+
+    $ apprise -t 'School Assignment' -b 'See attached' \
+       --attach=Documents/FinalReport.docx
 
 ## BUGS
 

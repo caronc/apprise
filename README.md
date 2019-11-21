@@ -277,21 +277,21 @@ apobj.notify(
 from apprise import AppriseAttachment
 
 # Initialize our attachment object
-aa = AppriseAttachment()
+attachment = AppriseAttachment()
 
 # Now add all of the entries we're intrested in:
 # ?name= allows us to rename the actual jpeg as found on the site
 # to be another name when sent to our receipient(s)
-aa.add('https://i.redd.it/my2t4d2fx0u31.jpg?name=FlyingToMars.jpg')
+attachment.add('https://i.redd.it/my2t4d2fx0u31.jpg?name=FlyingToMars.jpg')
 
 # Now add another:
-aa.add('/path/to/funny/joke.gif')
+attachment.add('/path/to/funny/joke.gif')
 
 # Send your multiple attachments with a single notify call:
 apobj.notify(
     title='Some good jokes.'
     body='Hey guys, check out these!'
-    attach=aa,
+    attach=attachment,
     tag=friends
 )
 ```

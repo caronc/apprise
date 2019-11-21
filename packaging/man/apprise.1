@@ -1,7 +1,7 @@
 .\" generated with Ronn/v0.7.3
 .\" http://github.com/rtomayko/ronn/tree/0.7.3
 .
-.TH "APPRISE" "1" "September 2019" "" ""
+.TH "APPRISE" "1" "November 2019" "" ""
 .
 .SH "NAME"
 \fBapprise\fR \- Push Notifications that work with just about every platform!
@@ -39,6 +39,10 @@ Specify the message title\. This field is complete optional\.
 .TP
 \fB\-c\fR, \fB\-\-config=\fR\fICONFIG\-URL\fR
 Specify one or more configuration locations\.
+.
+.TP
+\fB\-a\fR, \fB\-\-attach=\fR\fIATTACH\-URL\fR
+Specify one or more file attachment locations\.
 .
 .TP
 \fB\-n\fR, \fB\-\-notification\-type=\fR\fITYPE\fR
@@ -124,6 +128,20 @@ Load in a configuration file from a remote server that identifies all of your no
 $ apprise \-t \'my title\' \-b \'my notification body\' \e
    \-\-config=https://localhost/my/apprise/config \e
    \-t devops
+.
+.fi
+.
+.IP "" 0
+.
+.P
+Include an attachment:
+.
+.IP "" 4
+.
+.nf
+
+$ apprise \-t \'School Assignment\' \-b \'See attached\' \e
+   \-\-attach=Documents/FinalReport\.docx
 .
 .fi
 .
