@@ -89,7 +89,7 @@ try:
         from gi.repository import GdkPixbuf
         NOTIFY_DBUS_IMAGE_SUPPORT = True
 
-    except (ImportError, ValueError):
+    except (ImportError, ValueError, AttributeError):
         # No problem; this will get caught in outer try/catch
 
         # A ValueError will get thrown upon calling gi.require_version() if
