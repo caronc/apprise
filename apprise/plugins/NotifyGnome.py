@@ -49,7 +49,7 @@ try:
     # We're good to go!
     NOTIFY_GNOME_SUPPORT_ENABLED = True
 
-except (ImportError, ValueError):
+except (ImportError, ValueError, AttributeError):
     # No problem; we just simply can't support this plugin; we could
     # be in microsoft windows, or we just don't have the python-gobject
     # library available to us (or maybe one we don't support)?
