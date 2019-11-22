@@ -487,7 +487,7 @@ class NotifySlack(NotifyBase):
         try:
             # Open our attachment path if required:
             if attach:
-                files = (attach.name, open(attach.path, 'rb'))
+                files = {'file': (attach.name, open(attach.path, 'rb'))}
 
             r = requests.post(
                 url,
@@ -622,7 +622,7 @@ class NotifySlack(NotifyBase):
             # Close our file (if it's open) stored in the second element
             # of our files tuple (index 1)
             if files:
-                files[1].close()
+                files['file'][1].close()
 
         # Return the response for processing
         return response

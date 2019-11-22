@@ -317,7 +317,7 @@ class NotifyDiscord(NotifyBase):
 
             # Open our attachment path if required:
             if attach:
-                files = (attach.name, open(attach.path, 'rb'))
+                files = {'file': (attach.name, open(attach.path, 'rb'))}
 
             r = requests.post(
                 notify_url,
@@ -347,7 +347,8 @@ class NotifyDiscord(NotifyBase):
                 return False
 
             else:
-                self.logger.info('Sent Discord notification.')
+                self.logger.info('Sent Discord {}.'.format(
+                    'attachment' if attach else 'notification'))
 
         except requests.RequestException as e:
             self.logger.warning(
@@ -367,7 +368,7 @@ class NotifyDiscord(NotifyBase):
             # Close our file (if it's open) stored in the second element
             # of our files tuple (index 1)
             if files:
-                files[1].close()
+                files['file'][1].close()
 
         return True
 
