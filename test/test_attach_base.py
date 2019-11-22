@@ -63,6 +63,10 @@ def test_attach_base():
     # Create an object with no mimetype over-ride
     obj = AttachBase()
 
+    # Get our string object
+    with pytest.raises(NotImplementedError):
+        str(obj)
+
     # We can not process name/path/mimetype at a Base level
     with pytest.raises(NotImplementedError):
         obj.download()
@@ -90,3 +94,5 @@ def test_attach_base():
     assert isinstance(results, dict)
     # mime defined
     assert results.get('mimetype') == 'image/jpeg'
+    # We can retrieve our url
+    assert str(results)

@@ -1675,17 +1675,61 @@ TEST_URLS = (
     ('pbul://', {
         'instance': None,
     }),
+    ('pbul://:@/', {
+        'instance': None,
+    }),
     # APIkey
     ('pbul://%s' % ('a' * 32), {
         'instance': plugins.NotifyPushBullet,
+        'check_attachments': False,
+    }),
+    # APIkey; but support attachment response
+    ('pbul://%s' % ('a' * 32), {
+        'instance': plugins.NotifyPushBullet,
+
+        # Test what happens if a batch send fails to return a messageCount
+        'requests_response_text': {
+            'file_name': 'cat.jpeg',
+            'file_type': 'image/jpeg',
+            'file_url': 'http://file_url',
+            'upload_url': 'http://upload_url',
+        },
+    }),
+    # APIkey; attachment testing that isn't an image type
+    ('pbul://%s' % ('a' * 32), {
+        'instance': plugins.NotifyPushBullet,
+
+        # Test what happens if a batch send fails to return a messageCount
+        'requests_response_text': {
+            'file_name': 'test.pdf',
+            'file_type': 'application/pdf',
+            'file_url': 'http://file_url',
+            'upload_url': 'http://upload_url',
+        },
+    }),
+    # APIkey; attachment testing were expected entry in payload is missing
+    ('pbul://%s' % ('a' * 32), {
+        'instance': plugins.NotifyPushBullet,
+
+        # Test what happens if a batch send fails to return a messageCount
+        'requests_response_text': {
+            'file_name': 'test.pdf',
+            'file_type': 'application/pdf',
+            'file_url': 'http://file_url',
+            # upload_url missing
+        },
+        # Our Notification calls associated with attachments will fail:
+        'attach_response': False,
     }),
     # API Key + channel
     ('pbul://%s/#channel/' % ('a' * 32), {
         'instance': plugins.NotifyPushBullet,
+        'check_attachments': False,
     }),
     # API Key + channel (via to=
     ('pbul://%s/?to=#channel' % ('a' * 32), {
         'instance': plugins.NotifyPushBullet,
+        'check_attachments': False,
     }),
     # API Key + 2 channels
     ('pbul://%s/#channel1/#channel2' % ('a' * 32), {
@@ -1693,26 +1737,32 @@ TEST_URLS = (
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'pbul://a...a/',
+        'check_attachments': False,
     }),
     # API Key + device
     ('pbul://%s/device/' % ('a' * 32), {
         'instance': plugins.NotifyPushBullet,
+        'check_attachments': False,
     }),
     # API Key + 2 devices
     ('pbul://%s/device1/device2/' % ('a' * 32), {
         'instance': plugins.NotifyPushBullet,
+        'check_attachments': False,
     }),
     # API Key + email
     ('pbul://%s/user@example.com/' % ('a' * 32), {
         'instance': plugins.NotifyPushBullet,
+        'check_attachments': False,
     }),
     # API Key + 2 emails
     ('pbul://%s/user@example.com/abc@def.com/' % ('a' * 32), {
         'instance': plugins.NotifyPushBullet,
+        'check_attachments': False,
     }),
     # API Key + Combo
     ('pbul://%s/device/#channel/user@example.com/' % ('a' * 32), {
         'instance': plugins.NotifyPushBullet,
+        'check_attachments': False,
     }),
     # ,
     ('pbul://%s' % ('a' * 32), {
@@ -1720,39 +1770,42 @@ TEST_URLS = (
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
+        'check_attachments': False,
     }),
     ('pbul://%s' % ('a' * 32), {
         'instance': plugins.NotifyPushBullet,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
+        'check_attachments': False,
     }),
     ('pbul://%s' % ('a' * 32), {
         'instance': plugins.NotifyPushBullet,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
-    }),
-    ('pbul://:@/', {
-        'instance': None,
+        'check_attachments': False,
     }),
     ('pbul://%s' % ('a' * 32), {
         'instance': plugins.NotifyPushBullet,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
+        'check_attachments': False,
     }),
     ('pbul://%s' % ('a' * 32), {
         'instance': plugins.NotifyPushBullet,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
+        'check_attachments': False,
     }),
     ('pbul://%s' % ('a' * 32), {
         'instance': plugins.NotifyPushBullet,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
+        'check_attachments': False,
     }),
 
     ##################################
@@ -3537,9 +3590,16 @@ def test_rest_plugins(mock_post, mock_get):
         # Our expected Notify response (True or False)
         notify_response = meta.get('notify_response', response)
 
+        # Our expected Notify Attachment response (True or False)
+        attach_response = meta.get('attach_response', notify_response)
+
         # Our expected privacy url
         # Don't set this if don't need to check it's value
         privacy_url = meta.get('privacy_url')
+
+        # Test attachments
+        # Don't set this if don't need to check it's value
+        check_attachments = meta.get('check_attachments', True)
 
         # Allow us to force the server response code to be something other then
         # the defaults
@@ -3686,25 +3746,26 @@ def test_rest_plugins(mock_post, mock_get):
                         notify_type=notify_type,
                         overflow=OverflowMode.SPLIT) == notify_response
 
-                    # Test single attachment support; even if the service
-                    # doesn't support attachments, it should still gracefully
-                    # ignore the data
-                    attach = os.path.join(TEST_VAR_DIR, 'apprise-test.gif')
-                    assert obj.notify(
-                        body=body, title=title,
-                        notify_type=notify_type,
-                        attach=attach) == notify_response
+                    if check_attachments:
+                        # Test single attachment support; even if the service
+                        # doesn't support attachments, it should still
+                        # gracefully ignore the data
+                        attach = os.path.join(TEST_VAR_DIR, 'apprise-test.gif')
+                        assert obj.notify(
+                            body=body, title=title,
+                            notify_type=notify_type,
+                            attach=attach) == attach_response
 
-                    # Same results should apply to a list of attachments
-                    attach = AppriseAttachment((
-                        os.path.join(TEST_VAR_DIR, 'apprise-test.gif'),
-                        os.path.join(TEST_VAR_DIR, 'apprise-test.png'),
-                        os.path.join(TEST_VAR_DIR, 'apprise-test.jpeg'),
-                    ))
-                    assert obj.notify(
-                        body=body, title=title,
-                        notify_type=notify_type,
-                        attach=attach) == notify_response
+                        # Same results should apply to a list of attachments
+                        attach = AppriseAttachment((
+                            os.path.join(TEST_VAR_DIR, 'apprise-test.gif'),
+                            os.path.join(TEST_VAR_DIR, 'apprise-test.png'),
+                            os.path.join(TEST_VAR_DIR, 'apprise-test.jpeg'),
+                        ))
+                        assert obj.notify(
+                            body=body, title=title,
+                            notify_type=notify_type,
+                            attach=attach) == attach_response
 
                 else:
                     # Disable throttling
