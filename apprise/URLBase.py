@@ -219,6 +219,12 @@ class URLBase(object):
         # return any match
         return tags in self.tags
 
+    def __str__(self):
+        """
+        Returns the url path
+        """
+        return self.url(privacy=True)
+
     @staticmethod
     def escape_html(html, convert_new_lines=False, whitespace=True):
         """
