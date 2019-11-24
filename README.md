@@ -272,12 +272,20 @@ apobj.notify(
     title='Latest security image',
     attach='http:/admin:password@hikvision-cam01/ISAPI/Streaming/channels/101/picture?cache=3'
 )
+```
 
-# To send more than one attachment, you just need another object:
-from apprise import AppriseAttachment
+To send more than one attachment, you just need the **AppriseAttachment** object:
+```python
+import apprise
+
+# Create an Apprise instance
+apobj = apprise.Apprise()
+
+# Add at least one service you want to notify
+apobj.add('mailto://myuser:mypass@hotmail.com')
 
 # Initialize our attachment object
-attachment = AppriseAttachment()
+attachment = apprise.AppriseAttachment()
 
 # Now add all of the entries we're intrested in:
 # ?name= allows us to rename the actual jpeg as found on the site
@@ -292,9 +300,16 @@ apobj.notify(
     title='Some good jokes.'
     body='Hey guys, check out these!'
     attach=attachment,
-    tag=friends
 )
 ```
 
 ## Want To Learn More?
-If you're interested in reading more about this and other methods on how to customize your own notifications, please check out the wiki at https://github.com/caronc/apprise/wiki/Development_API. You can also find more examples on how to use the command line tool at: https://github.com/caronc/apprise/wiki/CLI_Usage.
+If you're interested in reading more about this and other methods on how to customize your own notifications, please check out the following links:
+* 📣 [Using the CLI](https://github.com/caronc/apprise/wiki/CLI_Usage)
+* 🛠️ [Development API](https://github.com/caronc/apprise/wiki/Development_API)
+* 🔧 [Troubleshooting](https://github.com/caronc/apprise/wiki/Troubleshooting)
+* ⚙️ [Configuration File Help](https://github.com/caronc/apprise/wiki/config)
+
+Want to help Apprise get better?
+* 💡 [Contribute to the Apprise Code Base](https://github.com/caronc/apprise/wiki/Development_Contribution)
+* ❤️ [Sponsorship and Donations](https://github.com/caronc/apprise/wiki/Sponsors)
