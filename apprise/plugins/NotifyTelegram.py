@@ -51,6 +51,7 @@
 #  - https://core.telegram.org/bots/api
 import requests
 import re
+import os
 
 from json import loads
 from json import dumps
@@ -63,6 +64,7 @@ from ..utils import parse_bool
 from ..utils import parse_list
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
+from ..attachment.AttachBase import AttachBase
 
 TELEGRAM_IMAGE_XY = NotifyImageSize.XY_256
 
@@ -100,10 +102,69 @@ class NotifyTelegram(NotifyBase):
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 4096
 
+    # Telegram is limited to sending a maximum of 100 requests per second.
+    request_rate_per_sec = 0.001
+
     # Define object templates
     templates = (
         '{schema}://{bot_token}',
         '{schema}://{bot_token}/{targets}',
+    )
+
+    # Telegram Attachment Support
+    mime_lookup = (
+        # This list is intentionally ordered so that it can be scanned
+        # from top to bottom.  The last entry is a catch-all
+
+        # Animations are documented to only support gif or H.264/MPEG-4
+        # Source: https://core.telegram.org/bots/api#sendanimation
+        {
+            'regex': re.compile(r'^(image/gif|video/H264)', re.I),
+            'function_name': 'sendAnimation',
+            'key': 'animation',
+        },
+
+        # This entry is intentially placed below the sendAnimiation allowing
+        # it to catch gif files.  This then becomes a catch all to remaining
+        # image types.
+        # Source: https://core.telegram.org/bots/api#sendphoto
+        {
+            'regex': re.compile(r'^image/.*', re.I),
+            'function_name': 'sendPhoto',
+            'key': 'photo',
+        },
+
+        # Video is documented to only support .mp4
+        # Source: https://core.telegram.org/bots/api#sendvideo
+        {
+            'regex': re.compile(r'^video/mp4', re.I),
+            'function_name': 'sendVideo',
+            'key': 'video',
+        },
+
+        # Voice supports ogg
+        # Source: https://core.telegram.org/bots/api#sendvoice
+        {
+            'regex': re.compile(r'^(application|audio)/ogg', re.I),
+            'function_name': 'sendVoice',
+            'key': 'voice',
+        },
+
+        # Audio supports mp3 and m4a only
+        # Source: https://core.telegram.org/bots/api#sendaudio
+        {
+            'regex': re.compile(r'^audio/(mpeg|mp4a-latm)', re.I),
+            'function_name': 'sendAudio',
+            'key': 'audio',
+        },
+
+        # Catch All (all other types)
+        # Source: https://core.telegram.org/bots/api#senddocument
+        {
+            'regex': re.compile(r'.*', re.I),
+            'function_name': 'sendDocument',
+            'key': 'document',
+        },
     )
 
     # Define our template tokens
@@ -189,82 +250,101 @@ class NotifyTelegram(NotifyBase):
         # or not.
         self.include_image = include_image
 
-    def send_image(self, chat_id, notify_type):
+    def send_media(self, chat_id, notify_type, attach=None):
         """
         Sends a sticker based on the specified notify type
 
         """
 
-        # The URL; we do not set headers because the api doesn't seem to like
-        # when we set one.
+        # Prepare our Headers
+        headers = {
+            'User-Agent': self.app_id,
+        }
+
+        # Our function name and payload are determined on the path
+        function_name = 'SendPhoto'
+        key = 'photo'
+        path = None
+
+        if isinstance(attach, AttachBase):
+            # Store our path to our file
+            path = attach.path
+            file_name = attach.name
+            mimetype = attach.mimetype
+
+            if not path:
+                # Could not load attachment
+                return False
+
+            # Process our attachment
+            function_name, key = \
+                next(((x['function_name'], x['key']) for x in self.mime_lookup
+                     if x['regex'].match(mimetype)))  # pragma: no cover
+
+        else:
+            attach = self.image_path(notify_type) if attach is None else attach
+            if attach is None:
+                # Nothing specified to send
+                return True
+
+            # Take on specified attachent as path
+            path = attach
+            file_name = os.path.basename(path)
+
         url = '%s%s/%s' % (
             self.notify_url,
             self.bot_token,
-            'sendPhoto'
+            function_name,
         )
 
-        # Acquire our image path if configured to do so; we don't bother
-        # checking to see if selfinclude_image is set here because the
-        # send_image() function itself (this function) checks this flag
-        # already
-        path = self.image_path(notify_type)
-
-        if not path:
-            # No image to send
-            self.logger.debug(
-                'Telegram image does not exist for %s' % (notify_type))
-
-            # No need to fail; we may have been configured this way through
-            # the apprise.AssetObject()
-            return True
+        # Always call throttle before any remote server i/o is made;
+        # Telegram throttles to occur before sending the image so that
+        # content can arrive together.
+        self.throttle()
 
         try:
             with open(path, 'rb') as f:
                 # Configure file payload (for upload)
-                files = {
-                    'photo': f,
-                }
-
-                payload = {
-                    'chat_id': chat_id,
-                }
+                files = {key: (file_name, f)}
+                payload = {'chat_id': chat_id}
 
                 self.logger.debug(
-                    'Telegram image POST URL: %s (cert_verify=%r)' % (
+                    'Telegram attachment POST URL: %s (cert_verify=%r)' % (
                         url, self.verify_certificate))
 
-                try:
-                    r = requests.post(
-                        url,
-                        files=files,
-                        data=payload,
-                        verify=self.verify_certificate,
-                    )
+                r = requests.post(
+                    url,
+                    headers=headers,
+                    files=files,
+                    data=payload,
+                    verify=self.verify_certificate,
+                )
 
-                    if r.status_code != requests.codes.ok:
-                        # We had a problem
-                        status_str = NotifyTelegram\
-                            .http_response_code_lookup(r.status_code)
+                if r.status_code != requests.codes.ok:
+                    # We had a problem
+                    status_str = NotifyTelegram\
+                        .http_response_code_lookup(r.status_code)
 
-                        self.logger.warning(
-                            'Failed to send Telegram image: '
-                            '{}{}error={}.'.format(
-                                status_str,
-                                ', ' if status_str else '',
-                                r.status_code))
-
-                        self.logger.debug(
-                            'Response Details:\r\n{}'.format(r.content))
-
-                        return False
-
-                except requests.RequestException as e:
                     self.logger.warning(
-                        'A connection error occured posting Telegram image.')
-                    self.logger.debug('Socket Exception: %s' % str(e))
+                        'Failed to send Telegram attachment: '
+                        '{}{}error={}.'.format(
+                            status_str,
+                            ', ' if status_str else '',
+                            r.status_code))
+
+                    self.logger.debug(
+                        'Response Details:\r\n{}'.format(r.content))
+
                     return False
 
-            return True
+                # Content was sent successfully if we got here
+                return True
+
+        except requests.RequestException as e:
+            self.logger.warning(
+                'A connection error occured posting Telegram '
+                'attachment.')
+            self.logger.debug('Socket Exception: %s' % str(e))
 
         except (IOError, OSError):
             # IOError is present for backwards compatibility with Python
@@ -364,26 +444,20 @@ class NotifyTelegram(NotifyBase):
 
         # Load our response and attempt to fetch our userid
         response = loads(r.content)
-        if 'ok' in response and response['ok'] is True:
-            start = re.compile(r'^\s*\/start', re.I)
-            for _msg in iter(response['result']):
-                # Find /start
-                if not start.search(_msg['message']['text']):
-                    continue
-
-                _id = _msg['message']['from'].get('id', 0)
-                _user = _msg['message']['from'].get('first_name')
-                self.logger.info('Detected telegram user %s (userid=%d)' % (
-                    _user, _id))
-                # Return our detected userid
-                return _id
-
-            self.logger.warning(
-                'Could not detect bot owner. Is it running (/start)?')
+        if 'ok' in response and response['ok'] is True \
+                and 'result' in response and len(response['result']):
+            entry = response['result'][0]
+            _id = entry['message']['from'].get('id', 0)
+            _user = entry['message']['from'].get('first_name')
+            self.logger.info('Detected telegram user %s (userid=%d)' % (
+                _user, _id))
+            # Return our detected userid
+            return _id
 
         return 0
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
+             **kwargs):
         """
         Perform Telegram Notification
         """
@@ -476,14 +550,19 @@ class NotifyTelegram(NotifyBase):
                 # ID
                 payload['chat_id'] = int(chat_id.group('idno'))
 
+            if self.include_image is True:
+                # Define our path
+                if not self.send_media(payload['chat_id'], notify_type):
+                    # We failed to send the image associated with our
+                    notify_type
+                    self.logger.warning(
+                        'Failed to send Telegram type image to {}.',
+                        payload['chat_id'])
+
             # Always call throttle before any remote server i/o is made;
             # Telegram throttles to occur before sending the image so that
             # content can arrive together.
             self.throttle()
-
-            if self.include_image is True:
-                # Send an image
-                self.send_image(payload['chat_id'], notify_type)
 
             self.logger.debug('Telegram POST URL: %s (cert_verify=%r)' % (
                 url, self.verify_certificate,
@@ -524,9 +603,6 @@ class NotifyTelegram(NotifyBase):
                     has_error = True
                     continue
 
-                else:
-                    self.logger.info('Sent Telegram notification.')
-
             except requests.RequestException as e:
                 self.logger.warning(
                     'A connection error occured sending Telegram:%s ' % (
@@ -537,6 +613,22 @@ class NotifyTelegram(NotifyBase):
                 # Flag our error
                 has_error = True
                 continue
+
+            self.logger.info('Sent Telegram notification.')
+
+            if attach:
+                # Send our attachments now (if specified and if it exists)
+                for attachment in attach:
+                    sent_attachment = self.send_media(
+                        payload['chat_id'], notify_type, attach=attachment)
+
+                    if not sent_attachment:
+                        # We failed; don't continue
+                        has_error = True
+                        break
+
+                    self.logger.info(
+                        'Sent Telegram attachment: {}.'.format(attachment))
 
         return not has_error
 
