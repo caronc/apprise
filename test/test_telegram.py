@@ -70,6 +70,22 @@ def test_notify_telegram_plugin(mock_post, mock_get, tmpdir):
     with pytest.raises(TypeError):
         plugins.NotifyTelegram(bot_token=None, targets=chat_ids)
 
+    # Invalid JSON while trying to detect bot owner
+    mock_get.return_value.content = '{'
+    mock_post.return_value.content = '}'
+    with pytest.raises(TypeError):
+        plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+
+    # Invalid JSON while trying to detect bot owner + 400 error
+    mock_get.return_value.status_code = requests.codes.internal_server_error
+    mock_post.return_value.status_code = requests.codes.internal_server_error
+    with pytest.raises(TypeError):
+        plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+
+    # Return status back to how they were
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_get.return_value.status_code = requests.codes.ok
+
     # Exception should be thrown about the fact an invalid bot token was
     # specifed
     with pytest.raises(TypeError):

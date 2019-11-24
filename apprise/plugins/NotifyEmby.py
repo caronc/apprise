@@ -240,9 +240,12 @@ class NotifyEmby(NotifyBase):
         try:
             results = loads(r.content)
 
-        except ValueError:
-            # A string like '' would cause this; basicallly the content
-            # that was provided was not a JSON string. We can stop here
+        except (AttributeError, TypeError, ValueError):
+            # ValueError = r.content is Unparsable
+            # TypeError = r.content is None
+            # AttributeError = r is None
+
+            # This is a problem; abort
             return False
 
         # Acquire our Access Token
@@ -400,10 +403,12 @@ class NotifyEmby(NotifyBase):
         try:
             results = loads(r.content)
 
-        except ValueError:
-            # A string like '' would cause this; basicallly the content
-            # that was provided was not a JSON string. There is nothing
-            # more we can do at this point
+        except (AttributeError, TypeError, ValueError):
+            # ValueError = r.content is Unparsable
+            # TypeError = r.content is None
+            # AttributeError = r is None
+
+            # We need to abort at this point
             return sessions
 
         for entry in results:

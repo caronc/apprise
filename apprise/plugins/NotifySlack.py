@@ -518,8 +518,10 @@ class NotifySlack(NotifyBase):
             try:
                 response = loads(r.content)
 
-            except (AttributeError, ValueError):
-                # AttributeError means r.content was None
+            except (AttributeError, TypeError, ValueError):
+                # ValueError = r.content is Unparsable
+                # TypeError = r.content is None
+                # AttributeError = r is None
                 pass
 
             if not (response and response.get('ok', True)):

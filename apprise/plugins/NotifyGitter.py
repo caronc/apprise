@@ -333,9 +333,10 @@ class NotifyGitter(NotifyBase):
             try:
                 content = loads(r.content)
 
-            except (TypeError, ValueError):
+            except (AttributeError, TypeError, ValueError):
                 # ValueError = r.content is Unparsable
                 # TypeError = r.content is None
+                # AttributeError = r is None
                 content = {}
 
             try:

@@ -921,8 +921,11 @@ class NotifyMatrix(NotifyBase):
                     # Return; we're done
                     return (False, response)
 
-            except ValueError:
+            except (AttributeError, TypeError, ValueError):
                 # This gets thrown if we can't parse our JSON Response
+                #  - ValueError = r.content is Unparsable
+                #  - TypeError = r.content is None
+                #  - AttributeError = r is None
                 self.logger.warning('Invalid response from Matrix server.')
                 self.logger.debug(
                     'Response Details:\r\n{}'.format(r.content))

@@ -5061,7 +5061,14 @@ def test_notify_rocketchat_plugin(mock_post, mock_get):
     #
     assert obj.logout() is True
 
+    # Invalid JSON during Login
+    mock_post.return_value.content = '{'
+    mock_get.return_value.content = '}'
+    assert obj.login() is False
+
     # Prepare Mock to fail
+    mock_post.return_value.content = ''
+    mock_get.return_value.content = ''
     mock_post.return_value.status_code = requests.codes.internal_server_error
     mock_get.return_value.status_code = requests.codes.internal_server_error
 

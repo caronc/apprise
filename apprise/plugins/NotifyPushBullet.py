@@ -307,10 +307,13 @@ class NotifyPushBullet(NotifyBase):
             try:
                 response = loads(r.content)
 
-            except (TypeError, AttributeError, ValueError):
-                # AttributeError means r.content was None
+            except (AttributeError, TypeError, ValueError):
+                # ValueError = r.content is Unparsable
+                # TypeError = r.content is None
+                # AttributeError = r is None
+
+                # Fall back to the existing unparsed value
                 response = r.content
-                pass
 
             if r.status_code not in (
                     requests.codes.ok, requests.codes.no_content):

@@ -378,6 +378,9 @@ class NotifyTelegram(NotifyBase):
             'Telegram User Detection POST URL: %s (cert_verify=%r)' % (
                 url, self.verify_certificate))
 
+        # Track our response object
+        response = None
+
         try:
             r = requests.post(
                 url,
@@ -392,9 +395,12 @@ class NotifyTelegram(NotifyBase):
 
                 try:
                     # Try to get the error message if we can:
-                    error_msg = loads(r.content)['description']
+                    error_msg = loads(r.content).get('description', 'unknown')
 
-                except Exception:
+                except (AttributeError, TypeError, ValueError):
+                    # ValueError = r.content is Unparsable
+                    # TypeError = r.content is None
+                    # AttributeError = r is None
                     error_msg = None
 
                 if error_msg:
@@ -413,6 +419,18 @@ class NotifyTelegram(NotifyBase):
                 self.logger.debug('Response Details:\r\n{}'.format(r.content))
 
                 return 0
+
+            # Load our response and attempt to fetch our userid
+            response = loads(r.content)
+
+        except (AttributeError, TypeError, ValueError):
+            # Our response was not the JSON type we had expected it to be
+            # - ValueError = r.content is Unparsable
+            # - TypeError = r.content is None
+            # - AttributeError = r is None
+            self.logger.warning(
+                'A communication error occured detecting the Telegram User.')
+            return 0
 
         except requests.RequestException as e:
             self.logger.warning(
@@ -442,8 +460,6 @@ class NotifyTelegram(NotifyBase):
         #      "text":"/start",
         #      "entities":[{"offset":0,"length":6,"type":"bot_command"}]}}]
 
-        # Load our response and attempt to fetch our userid
-        response = loads(r.content)
         if 'ok' in response and response['ok'] is True \
                 and 'result' in response and len(response['result']):
             entry = response['result'][0]
@@ -584,9 +600,13 @@ class NotifyTelegram(NotifyBase):
 
                     try:
                         # Try to get the error message if we can:
-                        error_msg = loads(r.content)['description']
+                        error_msg = loads(r.content).get(
+                            'description', 'unknown')
 
-                    except Exception:
+                    except (AttributeError, TypeError, ValueError):
+                        # ValueError = r.content is Unparsable
+                        # TypeError = r.content is None
+                        # AttributeError = r is None
                         error_msg = None
 
                     self.logger.warning(

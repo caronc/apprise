@@ -318,11 +318,13 @@ class NotifyD7Networks(NotifyBase):
                         json_response = loads(r.content)
                         status_str = json_response.get('message', status_str)
 
-                    except (AttributeError, ValueError):
-                        # could not parse JSON response... just use the status
-                        # we already have.
+                    except (AttributeError, TypeError, ValueError):
+                        # ValueError = r.content is Unparsable
+                        # TypeError = r.content is None
+                        # AttributeError = r is None
 
-                        # AttributeError means r.content was None
+                        # We could not parse JSON response.
+                        # We will just use the status we already have.
                         pass
 
                     self.logger.warning(
@@ -350,9 +352,13 @@ class NotifyD7Networks(NotifyBase):
                             count = int(json_response.get(
                                 'data', {}).get('messageCount', -1))
 
-                        except (AttributeError, ValueError, TypeError):
-                            # could not parse JSON response... just assume
-                            # that our delivery is okay for now
+                        except (AttributeError, TypeError, ValueError):
+                            # ValueError = r.content is Unparsable
+                            # TypeError = r.content is None
+                            # AttributeError = r is None
+
+                            # We could not parse JSON response. Assume that
+                            # our delivery is okay for now.
                             pass
 
                         if count != len(self.targets):

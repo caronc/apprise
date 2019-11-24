@@ -321,11 +321,13 @@ class NotifyTwilio(NotifyBase):
                         status_code = json_response.get('code', status_code)
                         status_str = json_response.get('message', status_str)
 
-                    except (AttributeError, ValueError):
-                        # could not parse JSON response... just use the status
-                        # we already have.
+                    except (AttributeError, TypeError, ValueError):
+                        # ValueError = r.content is Unparsable
+                        # TypeError = r.content is None
+                        # AttributeError = r is None
 
-                        # AttributeError means r.content was None
+                        # We could not parse JSON response.
+                        # We will just use the status we already have.
                         pass
 
                     self.logger.warning(
