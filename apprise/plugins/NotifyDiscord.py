@@ -42,6 +42,7 @@
 #
 import re
 import requests
+from json import dumps
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
@@ -319,9 +320,12 @@ class NotifyDiscord(NotifyBase):
             if attach:
                 files = {'file': (attach.name, open(attach.path, 'rb'))}
 
+            else:
+                headers['Content-Type'] = 'application/json; charset=utf-8'
+
             r = requests.post(
                 notify_url,
-                data=payload,
+                data=payload if files else dumps(payload),
                 headers=headers,
                 files=files,
                 verify=self.verify_certificate,
