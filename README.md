@@ -1,4 +1,4 @@
-![Apprise Logo](http://repo.nuxref.com/pub/img/logo-apprise.png)
+![Apprise Logo](https://raw.githubusercontent.com/caronc/apprise/master/apprise/assets/themes/default/apprise-logo.png)
 
 <hr/>
 
