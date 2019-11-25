@@ -1,7 +1,19 @@
-diff -Naur apprise-0.7.4/test/test_config_http.py apprise-0.7.4-patched/test/test_config_http.py
---- apprise-0.7.4/test/test_config_http.py	2019-03-05 19:39:56.000000000 -0500
-+++ apprise-0.7.4-patched/test/test_config_http.py	2019-03-12 18:58:01.796635838 -0400
-@@ -44,8 +44,6 @@
+diff -Naur apprise-0.8.2/test/test_attach_http.py apprise-0.8.2-patched/test/test_attach_http.py
+--- apprise-0.8.2/test/test_attach_http.py	2019-11-17 08:07:36.000000000 -0500
++++ apprise-0.8.2-patched/test/test_attach_http.py	2019-11-25 19:06:33.350512555 -0500
+@@ -50,8 +50,6 @@
+         0, 'requests.RequestException() not handled'),
+     requests.HTTPError(
+         0, 'requests.HTTPError() not handled'),
+-    requests.ReadTimeout(
+-        0, 'requests.ReadTimeout() not handled'),
+     requests.TooManyRedirects(
+         0, 'requests.TooManyRedirects() not handled'),
+ 
+diff -Naur apprise-0.8.2/test/test_config_http.py apprise-0.8.2-patched/test/test_config_http.py
+--- apprise-0.8.2/test/test_config_http.py	2019-11-21 17:00:14.000000000 -0500
++++ apprise-0.8.2-patched/test/test_config_http.py	2019-11-25 19:06:35.454513337 -0500
+@@ -46,8 +46,6 @@
          0, 'requests.RequestException() not handled'),
      requests.HTTPError(
          0, 'requests.HTTPError() not handled'),
@@ -10,22 +22,22 @@ diff -Naur apprise-0.7.4/test/test_config_http.py apprise-0.7.4-patched/test/tes
      requests.TooManyRedirects(
          0, 'requests.TooManyRedirects() not handled'),
  )
-diff -Naur apprise-0.7.4/test/test_glib_plugin.py apprise-0.7.4-patched/test/test_glib_plugin.py
---- apprise-0.7.4/test/test_glib_plugin.py	2019-03-05 19:39:56.000000000 -0500
-+++ apprise-0.7.4-patched/test/test_glib_plugin.py	2019-03-12 18:59:32.764545807 -0400
-@@ -47,7 +47,7 @@
+diff -Naur apprise-0.8.2/test/test_glib_plugin.py apprise-0.8.2-patched/test/test_glib_plugin.py
+--- apprise-0.8.2/test/test_glib_plugin.py	2019-10-29 19:55:24.000000000 -0400
++++ apprise-0.8.2-patched/test/test_glib_plugin.py	2019-11-25 19:05:56.822498971 -0500
+@@ -48,7 +48,7 @@
  
  if 'dbus' not in sys.modules:
      # Environment doesn't allow for dbus
 -    pytest.skip("Skipping dbus-python based tests", allow_module_level=True)
 +    pytest.skip("Skipping dbus-python based tests")
  
+ from dbus import DBusException  # noqa E402
  
- @mock.patch('dbus.SessionBus')
-diff -Naur apprise-0.7.4/test/test_rest_plugins.py apprise-0.7.4-patched/test/test_rest_plugins.py
---- apprise-0.7.4/test/test_rest_plugins.py	2019-03-10 14:28:40.000000000 -0400
-+++ apprise-0.7.4-patched/test/test_rest_plugins.py	2019-03-12 18:58:08.538542247 -0400
-@@ -51,8 +51,6 @@
+diff -Naur apprise-0.8.2/test/test_rest_plugins.py apprise-0.8.2-patched/test/test_rest_plugins.py
+--- apprise-0.8.2/test/test_rest_plugins.py	2019-11-24 13:43:28.000000000 -0500
++++ apprise-0.8.2-patched/test/test_rest_plugins.py	2019-11-25 19:06:38.337514409 -0500
+@@ -57,8 +57,6 @@
          0, 'requests.RequestException() not handled'),
      requests.HTTPError(
          0, 'requests.HTTPError() not handled'),

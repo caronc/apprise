@@ -6,9 +6,9 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: apprise 0.8.1\n"
+"Project-Id-Version: apprise 0.8.2\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2019-10-13 21:39-0400\n"
+"POT-Creation-Date: 2019-11-25 18:50-0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -149,7 +149,13 @@ msgstr ""
 msgid "IRC Colors"
 msgstr ""
 
+msgid "Include Footer"
+msgstr ""
+
 msgid "Include Image"
+msgstr ""
+
+msgid "Local File"
 msgstr ""
 
 msgid "Log PID"
@@ -168,6 +174,9 @@ msgid "Modal"
 msgstr ""
 
 msgid "Notify Format"
+msgstr ""
+
+msgid "OAuth Access Token"
 msgstr ""
 
 msgid "Organization"
@@ -354,6 +363,9 @@ msgid "Verify SSL"
 msgstr ""
 
 msgid "Version"
+msgstr ""
+
+msgid "Web Based"
 msgstr ""
 
 msgid "Webhook"
