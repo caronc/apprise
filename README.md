@@ -156,7 +156,7 @@ apprise -t 'my title' -b 'my notification body' \
 ### Attaching Files
 Apprise also supports file attachments too! Specify as many attachments to a notification as you want.
 ```bash
-# Send a funny image you found on the internet to a colleage:
+# Send a funny image you found on the internet to a colleague:
 apprise --title 'Agile Joke' \
         --body 'Did you see this one yet?' \
         --attach https://i.redd.it/my2t4d2fx0u31.jpg \
