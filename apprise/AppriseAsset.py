@@ -86,23 +86,32 @@ class AppriseAsset(object):
         'apprise-{TYPE}-{XY}{EXTENSION}',
     ))
 
-    def __init__(self, theme='default', image_path_mask=None,
-                 image_url_mask=None, default_extension=None):
+    # This value can also be set on calls to Apprise.notify(). This allows
+    # you to let Apprise upfront the type of data being passed in.  This
+    # must be of type NotifyFormat. Possible values could be:
+    # - NotifyFormat.TEXT
+    # - NotifyFormat.MARKDOWN
+    # - NotifyFormat.HTML
+    # - None
+    #
+    # If no format is specified (hence None), then no special pre-formating
+    # actions will take place during a notificaton. This has been and always
+    # will be the default.
+    body_format = None
+
+    def __init__(self, **kwargs):
         """
         Asset Initialization
 
         """
-        if theme:
-            self.theme = theme
+        # Assign default arguments if specified
+        for key, value in kwargs.items():
+            if not hasattr(AppriseAsset, key):
+                raise AttributeError(
+                    'AppriseAsset init(): '
+                    'An invalid key {} was specified.'.format(key))
 
-        if image_path_mask is not None:
-            self.image_path_mask = image_path_mask
-
-        if image_url_mask is not None:
-            self.image_url_mask = image_url_mask
-
-        if default_extension is not None:
-            self.default_extension = default_extension
+            setattr(self, key, value)
 
     def color(self, notify_type, color_type=None):
         """
