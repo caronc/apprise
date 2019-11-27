@@ -323,6 +323,10 @@ class Apprise(object):
                 # bad attachments
                 return False
 
+        # Allow Asset default value
+        body_format = self.asset.body_format \
+            if body_format is None else body_format
+
         # Iterate over our loaded plugins
         for server in self.find(tag):
             if status is None:

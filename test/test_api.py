@@ -666,9 +666,13 @@ def test_apprise_asset(tmpdir):
     API: AppriseAsset() object
 
     """
-    a = AppriseAsset(theme=None)
+    a = AppriseAsset(theme='light')
     # Default theme
-    assert a.theme == 'default'
+    assert a.theme == 'light'
+
+    # Invalid kw handling
+    with pytest.raises(AttributeError):
+        AppriseAsset(invalid_kw='value')
 
     a = AppriseAsset(
         theme='dark',
