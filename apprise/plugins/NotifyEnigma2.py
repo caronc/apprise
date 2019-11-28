@@ -24,6 +24,8 @@
 # THE SOFTWARE.
 
 # Sources
+# - https://dreambox.de/en/
+# - https://dream.reichholf.net/wiki/Hauptseite
 # - https://dream.reichholf.net/wiki/Enigma2:WebInterface#Message
 # - https://github.com/E2OpenPlugins/e2openplugin-OpenWebif
 # - https://github.com/E2OpenPlugins/e2openplugin-OpenWebif/wiki/\
@@ -64,7 +66,7 @@ class NotifyEnigma2(NotifyBase):
     service_name = 'Enigma2'
 
     # The services URL
-    service_url = 'https://github.com/E2OpenPlugins/e2openplugin-Enigma2'
+    service_url = 'https://dreambox.de/'
 
     # The default protocol
     protocol = 'enigma2'
