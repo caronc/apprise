@@ -405,6 +405,155 @@ TEST_URLS = (
     # The rest of the emby tests are in test_notify_emby_plugin()
 
     ##################################
+    # NotifyEnigma2
+    ##################################
+    ('enigma2://:@/', {
+        'instance': None,
+    }),
+    ('enigma2://', {
+        'instance': None,
+    }),
+    ('enigma2s://', {
+        'instance': None,
+    }),
+    ('enigma2://localhost', {
+        'instance': plugins.NotifyEnigma2,
+        # This will fail because we're also expecting a server acknowledgement
+        'notify_response': False,
+    }),
+    ('enigma2://localhost', {
+        'instance': plugins.NotifyEnigma2,
+        # invalid JSON response
+        'requests_response_text': '{',
+        'notify_response': False,
+    }),
+    ('enigma2://localhost', {
+        'instance': plugins.NotifyEnigma2,
+        # False is returned
+        'requests_response_text': {
+            'result': False
+        },
+        'notify_response': False,
+    }),
+    ('enigma2://localhost', {
+        'instance': plugins.NotifyEnigma2,
+        # With the right content, this will succeed
+        'requests_response_text': {
+            'result': True
+        }
+    }),
+    ('enigma2://user@localhost', {
+        'instance': plugins.NotifyEnigma2,
+        'requests_response_text': {
+            'result': True
+        }
+    }),
+    # Set timeout
+    ('enigma2://user@localhost?timeout=-1', {
+        'instance': plugins.NotifyEnigma2,
+        'requests_response_text': {
+            'result': True
+        }
+    }),
+    # Set timeout
+    ('enigma2://user@localhost?timeout=-1000', {
+        'instance': plugins.NotifyEnigma2,
+        'requests_response_text': {
+            'result': True
+        }
+    }),
+    # Set invalid timeout (defaults to a set value)
+    ('enigma2://user@localhost?timeout=invalid', {
+        'instance': plugins.NotifyEnigma2,
+        'requests_response_text': {
+            'result': True
+        }
+    }),
+    ('enigma2://user:pass@localhost', {
+        'instance': plugins.NotifyEnigma2,
+        'requests_response_text': {
+            'result': True
+        },
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'enigma2://user:****@localhost',
+    }),
+    ('enigma2://localhost:8080', {
+        'instance': plugins.NotifyEnigma2,
+        'requests_response_text': {
+            'result': True
+        },
+    }),
+    ('enigma2://user:pass@localhost:8080', {
+        'instance': plugins.NotifyEnigma2,
+        'requests_response_text': {
+            'result': True
+        },
+    }),
+    ('enigma2s://localhost', {
+        'instance': plugins.NotifyEnigma2,
+        'requests_response_text': {
+            'result': True
+        },
+    }),
+    ('enigma2s://user:pass@localhost', {
+        'instance': plugins.NotifyEnigma2,
+        'requests_response_text': {
+            'result': True
+        },
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'enigma2s://user:****@localhost',
+    }),
+    ('enigma2s://localhost:8080/path/', {
+        'instance': plugins.NotifyEnigma2,
+        'requests_response_text': {
+            'result': True
+        },
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'enigma2s://localhost:8080/path/',
+    }),
+    ('enigma2s://user:pass@localhost:8080', {
+        'instance': plugins.NotifyEnigma2,
+        'requests_response_text': {
+            'result': True
+        },
+    }),
+    ('enigma2://localhost:8080/path?-HeaderKey=HeaderValue', {
+        'instance': plugins.NotifyEnigma2,
+        'requests_response_text': {
+            'result': True
+        },
+    }),
+    ('enigma2://user:pass@localhost:8081', {
+        'instance': plugins.NotifyEnigma2,
+        'requests_response_text': {
+            'result': True
+        },
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('enigma2://user:pass@localhost:8082', {
+        'instance': plugins.NotifyEnigma2,
+        'requests_response_text': {
+            'result': True
+        },
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('enigma2://user:pass@localhost:8083', {
+        'instance': plugins.NotifyEnigma2,
+        'requests_response_text': {
+            'result': True
+        },
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifyFaast
     ##################################
     ('faast://', {
