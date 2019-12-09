@@ -1958,6 +1958,174 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifyPushSafer
+    ##################################
+    ('psafer://:@/', {
+        'instance': None,
+    }),
+    ('psafer://', {
+        'instance': None,
+    }),
+    ('psafers://', {
+        'instance': None,
+    }),
+    ('psafer://{}'.format('a' * 20), {
+        'instance': plugins.NotifyPushSafer,
+        # This will fail because we're also expecting a server acknowledgement
+        'notify_response': False,
+    }),
+    ('psafer://{}'.format('b' * 20), {
+        'instance': plugins.NotifyPushSafer,
+        # invalid JSON response
+        'requests_response_text': '{',
+        'notify_response': False,
+    }),
+    ('psafer://{}'.format('c' * 20), {
+        'instance': plugins.NotifyPushSafer,
+        # A failure has status set to zero
+        # We also expect an 'error' flag to be set
+        'requests_response_text': {
+            'status': 0,
+            'error': 'we failed'
+        },
+        'notify_response': False,
+    }),
+    ('psafers://{}'.format('d' * 20), {
+        'instance': plugins.NotifyPushSafer,
+        # A failure has status set to zero
+        # Test without an 'error' flag
+        'requests_response_text': {
+            'status': 0,
+        },
+        'notify_response': False,
+    }),
+    # This will notify all users ('a')
+    ('psafer://{}'.format('e' * 20), {
+        'instance': plugins.NotifyPushSafer,
+        # A status of 1 is a success
+        'requests_response_text': {
+            'status': 1,
+        }
+    }),
+    # This will notify a selected set of devices
+    ('psafer://{}/12/24/53'.format('e' * 20), {
+        'instance': plugins.NotifyPushSafer,
+        # A status of 1 is a success
+        'requests_response_text': {
+            'status': 1,
+        }
+    }),
+    # Same as above, but exercises the to= argument
+    ('psafer://{}?to=12,24,53'.format('e' * 20), {
+        'instance': plugins.NotifyPushSafer,
+        # A status of 1 is a success
+        'requests_response_text': {
+            'status': 1,
+        }
+    }),
+    # Set priority
+    ('psafer://{}?priority=emergency'.format('f' * 20), {
+        'instance': plugins.NotifyPushSafer,
+        'requests_response_text': {
+            'status': 1,
+        }
+    }),
+    # Support integer value too
+    ('psafer://{}?priority=-1'.format('f' * 20), {
+        'instance': plugins.NotifyPushSafer,
+        'requests_response_text': {
+            'status': 1,
+        }
+    }),
+    # Invalid priority
+    ('psafer://{}?priority=invalid'.format('f' * 20), {
+        # Invalid Priority
+        'instance': TypeError,
+    }),
+    # Invalid priority
+    ('psafer://{}?priority=25'.format('f' * 20), {
+        # Invalid Priority
+        'instance': TypeError,
+    }),
+    # Set sound
+    ('psafer://{}?sound=ok'.format('g' * 20), {
+        'instance': plugins.NotifyPushSafer,
+        'requests_response_text': {
+            'status': 1,
+        }
+    }),
+    # Support integer value too
+    ('psafers://{}?sound=14'.format('g' * 20), {
+        'instance': plugins.NotifyPushSafer,
+        'requests_response_text': {
+            'status': 1,
+        },
+        'privacy_url': 'psafers://g...g',
+    }),
+    # Invalid sound
+    ('psafer://{}?sound=invalid'.format('h' * 20), {
+        # Invalid Sound
+        'instance': TypeError,
+    }),
+    ('psafer://{}?sound=94000'.format('h' * 20), {
+        # Invalid Sound
+        'instance': TypeError,
+    }),
+    # Set vibration (integer only)
+    ('psafers://{}?vibration=1'.format('h' * 20), {
+        'instance': plugins.NotifyPushSafer,
+        'requests_response_text': {
+            'status': 1,
+        },
+        'privacy_url': 'psafers://h...h',
+    }),
+    # Invalid sound
+    ('psafer://{}?vibration=invalid'.format('h' * 20), {
+        # Invalid Vibration
+        'instance': TypeError,
+    }),
+    # Invalid vibration
+    ('psafer://{}?vibration=25000'.format('h' * 20), {
+        # Invalid Vibration
+        'instance': TypeError,
+    }),
+    ('psafers://{}'.format('d' * 20), {
+        'instance': plugins.NotifyPushSafer,
+        # A failure has status set to zero
+        # Test without an 'error' flag
+        'requests_response_text': {
+            'status': 0,
+        },
+
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('psafer://{}'.format('d' * 20), {
+        'instance': plugins.NotifyPushSafer,
+        # A failure has status set to zero
+        # Test without an 'error' flag
+        'requests_response_text': {
+            'status': 0,
+        },
+
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('psafers://{}'.format('d' * 20), {
+        'instance': plugins.NotifyPushSafer,
+        # A failure has status set to zero
+        # Test without an 'error' flag
+        'requests_response_text': {
+            'status': 0,
+        },
+        # Throws a series of connection and transfer exceptions when this
+        # flag is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifyTechulusPush
     ##################################
     ('push://', {
