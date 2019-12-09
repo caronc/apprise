@@ -23,9 +23,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+# We use io because it allows us to test the open() call
+import io
+import base64
 import requests
 from json import loads
-import base64
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
@@ -38,8 +40,6 @@ class PushSaferSound(object):
     """
     Defines all of the supported PushSafe sounds
     """
-    # Use Default
-    DEFAULT = None
     # Silent
     SILENT = 0
     # Ahem (IM)
@@ -166,7 +166,6 @@ class PushSaferSound(object):
 
 PUSHSAFER_SOUND_MAP = {
     # Device Default,
-    'default': PushSaferSound.DEFAULT,
     'silent': PushSaferSound.SILENT,
     'ahem': PushSaferSound.AHEM,
     'applause': PushSaferSound.APPLAUSE,
@@ -208,6 +207,7 @@ PUSHSAFER_SOUND_MAP = {
     'okay': PushSaferSound.OKAY,
     'ok': PushSaferSound.OKAY,
     'ooohhhweee': PushSaferSound.OOOHHHWEEE,
+    'warn': PushSaferSound.WARNING,
     'warning': PushSaferSound.WARNING,
     'welcome': PushSaferSound.WELCOME,
     'yeah': PushSaferSound.YEAH,
@@ -227,19 +227,24 @@ PUSHSAFER_SOUND_MAP = {
     'beep3': PushSaferSound.BEEP3,
     'beep4': PushSaferSound.BEEP4,
     'alarmarmed': PushSaferSound.ALARM_ARMED,
+    'armed': PushSaferSound.ALARM_ARMED,
     'alarmdisarmed': PushSaferSound.ALARM_DISARMED,
+    'disarmed': PushSaferSound.ALARM_DISARMED,
     'backupready': PushSaferSound.BACKUP_READY,
     'dooropen': PushSaferSound.DOOR_OPENED,
+    'dopen': PushSaferSound.DOOR_OPENED,
     'doorclosed': PushSaferSound.DOOR_CLOSED,
+    'dclosed': PushSaferSound.DOOR_CLOSED,
     'windowopen': PushSaferSound.WINDOW_OPEN,
+    'wopen': PushSaferSound.WINDOW_OPEN,
     'windowclosed': PushSaferSound.WINDOW_CLOSED,
+    'wclosed': PushSaferSound.WINDOW_CLOSED,
     'lighton': PushSaferSound.LIGHT_ON,
+    'lon': PushSaferSound.LIGHT_ON,
     'lightoff': PushSaferSound.LIGHT_OFF,
+    'loff': PushSaferSound.LIGHT_OFF,
     'doorbellrang': PushSaferSound.DOORBELL_RANG,
 }
-
-# Identify the sounds
-PUSHSAFER_SOUNDS = [x for x in PUSHSAFER_SOUND_MAP.keys()]
 
 
 # Priorities
@@ -259,6 +264,43 @@ PUSHSAFER_PRIORITIES = (
     PushSaferPriority.EMERGENCY,
 )
 
+PUSHSAFER_PRIORITY_MAP = {
+    # short for 'low'
+    'low': PushSaferPriority.LOW,
+    # short for 'medium'
+    'medium': PushSaferPriority.MODERATE,
+    # short for 'normal'
+    'normal': PushSaferPriority.NORMAL,
+    # short for 'high'
+    'high': PushSaferPriority.HIGH,
+    # short for 'emergency'
+    'emergency': PushSaferPriority.EMERGENCY,
+}
+
+# Identify the priority ou want to designate as the fall back
+DEFAULT_PRIORITY = "normal"
+
+
+# Vibrations
+class PushSaferVibration(object):
+    """
+    Defines the acceptable vibration settings for notification
+    """
+    # x1
+    LOW = 1
+    # x2
+    NORMAL = 2
+    # x3
+    HIGH = 3
+
+
+# Identify all of the vibrations in one place
+PUSHSAFER_VIBRATIONS = (
+    PushSaferVibration.LOW,
+    PushSaferVibration.NORMAL,
+    PushSaferVibration.HIGH,
+)
+
 # At this time, the following pictures can be attached to each notification
 # at one time. When more are supported, just add their argument below
 PICTURE_PARAMETER = (
@@ -268,35 +310,8 @@ PICTURE_PARAMETER = (
 )
 
 
-# Vibrations
-class PushSaferVibration(object):
-    """
-    Defines the acceptable vibration settings for notification
-    """
-    # Default is the 'device' default option
-    OFF = 0
-    # x1
-    LOW = 1
-    # x2
-    NORMAL = 2
-    # x3
-    HIGH = 3
-
-
-PUSHSAFER_VIBRATIONS = (
-    PushSaferVibration.OFF,
-    PushSaferVibration.LOW,
-    PushSaferVibration.NORMAL,
-    PushSaferVibration.HIGH,
-)
-
 # Flag used as a placeholder to sending to all devices
 PUSHSAFER_SEND_TO_ALL = 'a'
-
-# Provide some known codes Pushbullet uses and what they translate to:
-PUSHSAFER_HTTP_ERROR_MAP = {
-    401: 'Unauthorized - Invalid Token.',
-}
 
 
 class NotifyPushSafer(NotifyBase):
@@ -311,14 +326,16 @@ class NotifyPushSafer(NotifyBase):
     service_url = 'https://www.pushsafer.com/'
 
     # The default insecure protocol
-    secure_protocol = 'psafer'
+    protocol = 'psafer'
 
     # The default secure protocol
     secure_protocol = 'psafers'
 
-    # Allow 50 requests per minute (Tier 2).
-    # 60/50 = 0.2
+    # Number of requests to a allow per second
     request_rate_per_sec = 1.2
+
+    # The icon ID of 25 looks like a megaphone
+    default_pushsafer_icon = 25
 
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_pushsafer'
@@ -364,19 +381,16 @@ class NotifyPushSafer(NotifyBase):
             'name': _('Priority'),
             'type': 'choice:int',
             'values': PUSHSAFER_PRIORITIES,
-            'default': PushSaferPriority.NORMAL,
         },
         'sound': {
             'name': _('Sound'),
             'type': 'choice:string',
-            'values': PUSHSAFER_SOUNDS,
-            'default': PushSaferSound.DEFAULT,
+            'values': PUSHSAFER_SOUND_MAP,
         },
         'vibration': {
             'name': _('Vibration'),
             'type': 'choice:int',
             'values': PUSHSAFER_VIBRATIONS,
-            'default': PushSaferVibration.NORMAL,
         },
         'to': {
             'alias_of': 'targets',
@@ -390,48 +404,118 @@ class NotifyPushSafer(NotifyBase):
         """
         super(NotifyPushSafer, self).__init__(**kwargs)
 
-        if priority not in PUSHSAFER_PRIORITIES:
-            self.priority = self.template_args['priority']['default']
-
-        else:
-            self.priority = priority
-
+        #
+        # Priority
+        #
         try:
-            # Use defined integer as is if defined, no further error checking
-            # is performed
+            # Acquire our priority if we can:
+            #  - We accept both the integer form as well as a string
+            #    representation
+            self.priority = int(priority)
+
+        except TypeError:
+            # NoneType means use Default; this is an okay exception
+            self.priority = None
+
+        except ValueError:
+            # Input is a string; attempt to get the lookup from our
+            # priority mapping
+            priority = priority.lower().strip()
+
+            # This little bit of black magic allows us to match against
+            # low, lo, l (for low);
+            # normal, norma, norm, nor, no, n (for normal)
+            # ... etc
+            match = next((key for key in PUSHSAFER_PRIORITY_MAP.keys()
+                         if key.startswith(priority)), None) \
+                if priority else None
+
+            # Now test to see if we got a match
+            if not match:
+                msg = 'An invalid PushSafer priority ' \
+                      '({}) was specified.'.format(priority)
+                self.logger.warning(msg)
+                raise TypeError(msg)
+
+            # store our successfully looked up priority
+            self.priority = PUSHSAFER_PRIORITY_MAP[match]
+
+        if self.priority is not None and \
+                self.priority not in PUSHSAFER_PRIORITY_MAP.values():
+            msg = 'An invalid PushSafer priority ' \
+                  '({}) was specified.'.format(priority)
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
+        #
+        # Sound
+        #
+        try:
+            # Acquire our sound if we can:
+            #  - We accept both the integer form as well as a string
+            #    representation
             self.sound = int(sound)
 
         except TypeError:
             # NoneType means use Default; this is an okay exception
-            self.sound = self.template_args['sound']['default']
+            self.sound = None
 
         except ValueError:
-            try:
-                # Input is a string; attempt to get the lookup from our
-                # sound mapping
-                sound = sound.lower().strip()
-                if sound not in PUSHSAFER_SOUNDS:
-                    msg = 'An invalid PushSafer sound ' \
-                          '({}) was specified.'.format(sound)
-                    self.logger.warning(msg)
-                    raise TypeError(msg)
+            # Input is a string; attempt to get the lookup from our
+            # sound mapping
+            sound = sound.lower().strip()
 
-                # store our successfully looked up sound
-                self.sound = PUSHSAFER_SOUNDS[sound]
+            # This little bit of black magic allows us to match against
+            # against multiple versions of the same string
+            # ... etc
+            match = next((key for key in PUSHSAFER_SOUND_MAP.keys()
+                         if key.startswith(sound)), None) \
+                if sound else None
 
-            except AttributeError:
-                self.sound = self.template_args['sound']['default']
+            # Now test to see if we got a match
+            if not match:
+                msg = 'An invalid PushSafer sound ' \
+                      '({}) was specified.'.format(sound)
+                self.logger.warning(msg)
+                raise TypeError(msg)
 
+            # store our successfully looked up sound
+            self.sound = PUSHSAFER_SOUND_MAP[match]
+
+        if self.sound is not None and \
+                self.sound not in PUSHSAFER_SOUND_MAP.values():
+            msg = 'An invalid PushSafer sound ' \
+                  '({}) was specified.'.format(sound)
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
+        #
+        # Vibration
+        #
         try:
             # Use defined integer as is if defined, no further error checking
             # is performed
             self.vibration = int(vibration)
 
-        except (ValueError, TypeError):
-            # Use Default
-            self.vibration = self.template_args['vibration']['default']
+        except TypeError:
+            # NoneType means use Default; this is an okay exception
+            self.vibration = None
 
+        except ValueError:
+            msg = 'An invalid PushSafer vibration ' \
+                  '({}) was specified.'.format(vibration)
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
+        if self.vibration and self.vibration not in PUSHSAFER_VIBRATIONS:
+            msg = 'An invalid PushSafer vibration ' \
+                  '({}) was specified.'.format(vibration)
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
+        #
         # Private Key (associated with project)
+        #
         self.privatekey = validate_regex(privatekey)
         if not self.privatekey:
             msg = 'An invalid PushSafer Private Key ' \
@@ -462,13 +546,19 @@ class NotifyPushSafer(NotifyBase):
             # in remaining messages
             for attachment in attach:
                 # prepare payload
-                if not (attachment and
-                        attachment.mimetype.startswith('image/')):
+                if not attachment:
+                    # We could not access the attachment
+                    self.logger.warning(
+                        'Could not access {}.'.format(
+                            attachment.url(privacy=True)))
+                    return False
+
+                if not attachment.mimetype.startswith('image/'):
                     # Attachment not supported; continue peacefully
                     continue
 
                 try:
-                    with open(attachment.path, 'rb') as f:
+                    with io.open(attachment.path, 'rb') as f:
                         # Output must be in a DataURL format (that's what
                         # PushSafer calls it):
                         attachment = (
@@ -496,13 +586,21 @@ class NotifyPushSafer(NotifyBase):
             payload = {
                 't': title,
                 'm': body,
-                's': '' if self.sound is None else str(self.sound),
-                'v': '' if self.vibration is None else str(self.vibration),
-                # 25 looks like a megaphone
-                'i': 25,
+                # Our default icon to use
+                'i': self.default_pushsafer_icon,
+                # Notification Color
                 'c': self.color(notify_type),
+                # Target Recipient
                 'd': recipient,
             }
+
+            if self.sound is not None:
+                # Only apply sound setting if it was specified
+                payload['s'] = str(self.sound)
+
+            if self.vibration is not None:
+                # Only apply vibration setting
+                payload['v'] = str(self.vibration)
 
             if not attachments:
                 okay, response = self._send(payload)
@@ -577,6 +675,10 @@ class NotifyPushSafer(NotifyBase):
         # Default response type
         response = None
 
+        # Initialize our Pushsafer expected responses
+        _code = None
+        _str = 'Unknown'
+
         try:
             # Open our attachment path if required:
             r = requests.post(
@@ -588,6 +690,9 @@ class NotifyPushSafer(NotifyBase):
 
             try:
                 response = loads(r.content)
+                _code = response.get('status')
+                _str = response.get('success', _str) \
+                    if _code == 1 else response.get('error', _str)
 
             except (AttributeError, TypeError, ValueError):
                 # ValueError = r.content is Unparsable
@@ -602,7 +707,7 @@ class NotifyPushSafer(NotifyBase):
                 # We had a problem
                 status_str = \
                     NotifyPushSafer.http_response_code_lookup(
-                        r.status_code, PUSHSAFER_HTTP_ERROR_MAP)
+                        r.status_code)
 
                 self.logger.warning(
                     'Failed to deliver payload to PushSafer:'
@@ -610,6 +715,19 @@ class NotifyPushSafer(NotifyBase):
                         status_str,
                         ', ' if status_str else '',
                         r.status_code))
+
+                self.logger.debug(
+                    'Response Details:\r\n{}'.format(r.content))
+
+                return False, response
+
+            elif _code != 1:
+                # It's a bit backwards, but:
+                #    1 is returned if we succeed
+                #    0 is returned if we fail
+                self.logger.warning(
+                    'Failed to deliver payload to PushSafer;'
+                    ' error={}.'.format(_str))
 
                 self.logger.debug(
                     'Response Details:\r\n{}'.format(r.content))
@@ -626,34 +744,34 @@ class NotifyPushSafer(NotifyBase):
 
             return False, response
 
-        except (OSError, IOError) as e:
-            self.logger.warning(
-                'An I/O error occured while reading {}.'.format(
-                    payload.name if payload else 'attachment'))
-            self.logger.debug('I/O Exception: %s' % str(e))
-            return False, response
-
     def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
-
-        _map = {
-            PushSaferPriority.LOW: 'low',
-            PushSaferPriority.MODERATE: 'moderate',
-            PushSaferPriority.NORMAL: 'normal',
-            PushSaferPriority.HIGH: 'high',
-            PushSaferPriority.EMERGENCY: 'emergency',
-        }
 
         # Define any arguments set
         args = {
             'format': self.notify_format,
             'overflow': self.overflow_mode,
             'verify': 'yes' if self.verify_certificate else 'no',
-            'priority': 'normal' if self.priority not in _map
-                        else _map[self.priority],
         }
+
+        if self.priority is not None:
+            # Store our priority; but only if it was specified
+            args['priority'] = \
+                next((key for key, value in PUSHSAFER_PRIORITY_MAP.items()
+                      if value == self.priority),
+                     DEFAULT_PRIORITY)  # pragma: no cover
+
+        if self.sound is not None:
+            # Store our sound; but only if it was specified
+            args['sound'] = \
+                next((key for key, value in PUSHSAFER_SOUND_MAP.items()
+                      if value == self.sound), '')  # pragma: no cover
+
+        if self.vibration is not None:
+            # Store our vibration; but only if it was specified
+            args['vibration'] = str(self.vibration)
 
         targets = '/'.join([NotifyPushSafer.quote(x) for x in self.targets])
         if targets == PUSHSAFER_SEND_TO_ALL:
@@ -661,7 +779,7 @@ class NotifyPushSafer(NotifyBase):
             # it from the recipients list
             targets = ''
 
-        return '{schema}://{privatekey}/{targets}/?{args}'.format(
+        return '{schema}://{privatekey}/{targets}?{args}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             privatekey=self.pprint(self.privatekey, privacy, safe=''),
             targets=targets,
@@ -675,7 +793,6 @@ class NotifyPushSafer(NotifyBase):
 
         """
         results = NotifyBase.parse_url(url)
-
         if not results:
             # We're done early as we couldn't load the results
             return results
@@ -694,19 +811,15 @@ class NotifyPushSafer(NotifyBase):
         results['privatekey'] = NotifyPushSafer.unquote(results['host'])
 
         if 'priority' in results['qsd'] and len(results['qsd']['priority']):
-            _map = {
-                'l': PushSaferPriority.LOW,
-                'm': PushSaferPriority.MODERATE,
-                'n': PushSaferPriority.NORMAL,
-                'h': PushSaferPriority.HIGH,
-                'e': PushSaferPriority.EMERGENCY,
-            }
-            try:
-                results['priority'] = \
-                    _map[results['qsd']['priority'][0].lower()]
+            results['priority'] = \
+                NotifyPushSafer.unquote(results['qsd']['priority'])
 
-            except KeyError:
-                # No priority was set
-                pass
+        if 'sound' in results['qsd'] and len(results['qsd']['sound']):
+            results['sound'] = \
+                NotifyPushSafer.unquote(results['qsd']['sound'])
+
+        if 'vibration' in results['qsd'] and len(results['qsd']['vibration']):
+            results['vibration'] = \
+                NotifyPushSafer.unquote(results['qsd']['vibration'])
 
         return results
