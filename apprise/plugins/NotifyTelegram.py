@@ -273,7 +273,10 @@ class NotifyTelegram(NotifyBase):
             mimetype = attach.mimetype
 
             if not path:
-                # Could not load attachment
+                # We could not access the attachment
+                self.logger.warning(
+                    'Could not access {}.'.format(
+                        attach.url(privacy=True)))
                 return False
 
             # Process our attachment
