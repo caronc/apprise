@@ -70,15 +70,6 @@ class NotifyNexmo(NotifyBase):
     # cause any title (if defined) to get placed into the message body.
     title_maxlen = 0
 
-    # Default Time To Live
-    # By default Nexmo attempt delivery for 72 hours, however the maximum
-    # effective value depends on the operator and is typically 24 - 48 hours.
-    # We recommend this value should be kept at its default or at least 30
-    # minutes.
-    default_ttl = 900000
-    ttl_max = 604800000
-    ttl_min = 20000
-
     # Define object templates
     templates = (
         '{schema}://{apikey}:{secret}@{from_phone}',
@@ -135,6 +126,12 @@ class NotifyNexmo(NotifyBase):
         'secret': {
             'alias_of': 'secret',
         },
+
+        # Default Time To Live
+        # By default Nexmo attempt delivery for 72 hours, however the maximum
+        # effective value depends on the operator and is typically 24 - 48
+        # hours. We recommend this value should be kept at its default or at
+        # least 30 minutes.
         'ttl': {
             'name': _('ttl'),
             'type': 'int',
@@ -170,7 +167,7 @@ class NotifyNexmo(NotifyBase):
             raise TypeError(msg)
 
         # Set our Time to Live Flag
-        self.ttl = self.default_ttl
+        self.ttl = self.template_args['ttl']['default']
         try:
             self.ttl = int(ttl)
 
@@ -178,7 +175,8 @@ class NotifyNexmo(NotifyBase):
             # Do nothing
             pass
 
-        if self.ttl < self.ttl_min or self.ttl > self.ttl_max:
+        if self.ttl < self.template_args['ttl']['min'] or \
+                self.ttl > self.template_args['ttl']['max']:
             msg = 'The Nexmo TTL specified ({}) is out of range.'\
                 .format(self.ttl)
             self.logger.warning(msg)
