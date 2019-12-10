@@ -43,10 +43,10 @@ class NotifyNextCloud(NotifyBase):
     service_url = 'https://github.com/nextcloud/notifications'
 
     # Insecure protocol (for those self hosted requests)
-    protocol = 'nextcloud'
+    protocol = 'ncloud'
 
     # The default protocol (this is secure for notica)
-    secure_protocol = 'nextclouds'
+    secure_protocol = 'nclouds'
 
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_nextcloud'
@@ -89,13 +89,11 @@ class NotifyNextCloud(NotifyBase):
         'user': {
             'name': _('Username'),
             'type': 'string',
-            'required': True,
         },
         'password': {
             'name': _('Password'),
             'type': 'string',
             'private': True,
-            'required': True,
         },
         'target_user': {
             'name': _('Target User'),
@@ -162,8 +160,9 @@ class NotifyNextCloud(NotifyBase):
             else:
                 payload['shortMessage'] = body
 
-            # Auth is used for SELFHOSTED queries
-            auth = (self.user, self.password)
+            auth = None
+            if self.user:
+                auth = (self.user, self.password)
 
             notify_url = self.notify_url.format(
                 schema='https' if self.secure else 'http',
@@ -182,7 +181,7 @@ class NotifyNextCloud(NotifyBase):
 
             try:
                 r = requests.post(
-                    notify_url.format(token=self.token),
+                    notify_url,
                     data=payload,
                     headers=headers,
                     auth=auth,
@@ -238,11 +237,18 @@ class NotifyNextCloud(NotifyBase):
         # Append our headers into our args
         args.update({'+{}'.format(k): v for k, v in self.headers.items()})
 
-        auth = '{user}:{password}@'.format(
-            user=NotifyNextCloud.quote(self.user, safe=''),
-            password=self.pprint(
-                self.password, privacy, mode=PrivacyMode.Secret, safe=''),
-        )
+        # Determine Authentication
+        auth = ''
+        if self.user and self.password:
+            auth = '{user}:{password}@'.format(
+                user=NotifyNextCloud.quote(self.user, safe=''),
+                password=self.pprint(
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
+            )
+        elif self.user:
+            auth = '{user}@'.format(
+                user=NotifyNextCloud.quote(self.user, safe=''),
+            )
 
         default_port = 443 if self.secure else 80
 
@@ -254,8 +260,6 @@ class NotifyNextCloud(NotifyBase):
                    hostname=NotifyNextCloud.quote(self.host, safe=''),
                    port='' if self.port is None or self.port == default_port
                         else ':{}'.format(self.port),
-                   fullpath=NotifyNextCloud.quote(
-                       self.fullpath, safe='/'),
                    targets='/'.join([NotifyNextCloud.quote(x)
                                      for x in self.targets]),
                    args=NotifyNextCloud.urlencode(args),
@@ -268,7 +272,8 @@ class NotifyNextCloud(NotifyBase):
         us to substantiate this object.
 
         """
-        results = NotifyBase.parse_url(url, verify_host=False)
+
+        results = NotifyBase.parse_url(url)
         if not results:
             # We're done early as we couldn't load the results
             return results
