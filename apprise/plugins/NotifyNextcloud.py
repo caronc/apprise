@@ -31,13 +31,13 @@ from ..utils import parse_list
 from ..AppriseLocale import gettext_lazy as _
 
 
-class NotifyNextCloud(NotifyBase):
+class NotifyNextcloud(NotifyBase):
     """
-    A wrapper for NextCloud Notifications
+    A wrapper for Nextcloud Notifications
     """
 
     # The default descriptive name associated with the Notification
-    service_name = 'NextCloud'
+    service_name = 'Nextcloud'
 
     # The services URL
     service_url = 'https://github.com/nextcloud/notifications'
@@ -51,21 +51,15 @@ class NotifyNextCloud(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_nextcloud'
 
-    # NextCloud URL
+    # Nextcloud URL
     notify_url = '{schema}://{host}/ocs/v2.php/apps/admin_notifications/' \
                  'api/v1/notifications/{target}'
 
-    # NextCloud does not support a title
-    title_maxlen = 0
+    # Nextcloud does not support a title
+    title_maxlen = 255
 
     # Defines the maximum allowable characters per message.
     body_maxlen = 4000
-
-    # If the message is less than this number of characters, there is another
-    # method of posting the message to Nextcloud. We use this if we can, but
-    # otherwise fall back to the larger size (which is our Apprise fixed limit)
-    # defined above.
-    short_message_length = 255
 
     # Define object templates
     templates = (
@@ -117,13 +111,13 @@ class NotifyNextCloud(NotifyBase):
 
     def __init__(self, targets=None, headers=None, **kwargs):
         """
-        Initialize NextCloud Object
+        Initialize Nextcloud Object
         """
-        super(NotifyNextCloud, self).__init__(**kwargs)
+        super(NotifyNextcloud, self).__init__(**kwargs)
 
         self.targets = parse_list(targets)
         if len(self.targets) == 0:
-            msg = 'At least one NextCloud target user must be specified.'
+            msg = 'At least one Nextcloud target user must be specified.'
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -136,13 +130,17 @@ class NotifyNextCloud(NotifyBase):
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
-        Perform NextCloud Notification
+        Perform Nextcloud Notification
         """
 
         # Prepare our Header
         headers = {
             'User-Agent': self.app_id,
+            'OCS-APIREQUEST': 'true',
         }
+
+        # Apply any/all header over-rides defined
+        headers.update(self.headers)
 
         # error tracking (used for function return)
         has_error = False
@@ -153,12 +151,10 @@ class NotifyNextCloud(NotifyBase):
             target = targets.pop(0)
 
             # Prepare our Payload
-            payload = {}
-            if len(body) > 255:
-                payload['longMessage'] = body
-
-            else:
-                payload['shortMessage'] = body
+            payload = {
+                'shortMessage': title,
+                'longMessage': body,
+            }
 
             auth = None
             if self.user:
@@ -171,10 +167,10 @@ class NotifyNextCloud(NotifyBase):
                 target=target,
             )
 
-            self.logger.debug('NextCloud POST URL: %s (cert_verify=%r)' % (
+            self.logger.debug('Nextcloud POST URL: %s (cert_verify=%r)' % (
                 notify_url, self.verify_certificate,
             ))
-            self.logger.debug('NextCloud Payload: %s' % str(payload))
+            self.logger.debug('Nextcloud Payload: %s' % str(payload))
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -190,11 +186,11 @@ class NotifyNextCloud(NotifyBase):
                 if r.status_code != requests.codes.ok:
                     # We had a problem
                     status_str = \
-                        NotifyNextCloud.http_response_code_lookup(
+                        NotifyNextcloud.http_response_code_lookup(
                             r.status_code)
 
                     self.logger.warning(
-                        'Failed to send NextCloud notification:'
+                        'Failed to send Nextcloud notification:'
                         '{}{}error={}.'.format(
                             status_str,
                             ', ' if status_str else '',
@@ -207,11 +203,11 @@ class NotifyNextCloud(NotifyBase):
                     continue
 
                 else:
-                    self.logger.info('Sent NextCloud notification.')
+                    self.logger.info('Sent Nextcloud notification.')
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occured sending NextCloud '
+                    'A Connection error occured sending Nextcloud '
                     'notification.',
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))
@@ -241,13 +237,13 @@ class NotifyNextCloud(NotifyBase):
         auth = ''
         if self.user and self.password:
             auth = '{user}:{password}@'.format(
-                user=NotifyNextCloud.quote(self.user, safe=''),
+                user=NotifyNextcloud.quote(self.user, safe=''),
                 password=self.pprint(
                     self.password, privacy, mode=PrivacyMode.Secret, safe=''),
             )
         elif self.user:
             auth = '{user}@'.format(
-                user=NotifyNextCloud.quote(self.user, safe=''),
+                user=NotifyNextcloud.quote(self.user, safe=''),
             )
 
         default_port = 443 if self.secure else 80
@@ -257,12 +253,12 @@ class NotifyNextCloud(NotifyBase):
                    schema=self.secure_protocol
                    if self.secure else self.protocol,
                    auth=auth,
-                   hostname=NotifyNextCloud.quote(self.host, safe=''),
+                   hostname=NotifyNextcloud.quote(self.host, safe=''),
                    port='' if self.port is None or self.port == default_port
                         else ':{}'.format(self.port),
-                   targets='/'.join([NotifyNextCloud.quote(x)
+                   targets='/'.join([NotifyNextcloud.quote(x)
                                      for x in self.targets]),
-                   args=NotifyNextCloud.urlencode(args),
+                   args=NotifyNextcloud.urlencode(args),
                )
 
     @staticmethod
@@ -280,12 +276,12 @@ class NotifyNextCloud(NotifyBase):
 
         # Fetch our targets
         results['targets'] = \
-            NotifyNextCloud.split_path(results['fullpath'])
+            NotifyNextcloud.split_path(results['fullpath'])
 
         # The 'to' makes it easier to use yaml configuration
         if 'to' in results['qsd'] and len(results['qsd']['to']):
             results['targets'] += \
-                NotifyNextCloud.parse_list(results['qsd']['to'])
+                NotifyNextcloud.parse_list(results['qsd']['to'])
 
         # Add our headers that the user can potentially over-ride if they
         # wish to to our returned result set

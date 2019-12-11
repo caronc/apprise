@@ -1738,7 +1738,7 @@ TEST_URLS = (
     }),
 
     ##################################
-    # NotifyNextCloud
+    # NotifyNextcloud
     ##################################
     ('ncloud://:@/', {
         'instance': None,
@@ -1755,49 +1755,49 @@ TEST_URLS = (
         'instance': TypeError,
     }),
     ('ncloud://localhost/admin', {
-        'instance': plugins.NotifyNextCloud,
+        'instance': plugins.NotifyNextcloud,
     }),
     ('ncloud://user@localhost/admin', {
-        'instance': plugins.NotifyNextCloud,
+        'instance': plugins.NotifyNextcloud,
     }),
     ('ncloud://user@localhost?to=user1,user2', {
-        'instance': plugins.NotifyNextCloud,
+        'instance': plugins.NotifyNextcloud,
     }),
     ('ncloud://user:pass@localhost/user1/user2', {
-        'instance': plugins.NotifyNextCloud,
+        'instance': plugins.NotifyNextcloud,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'ncloud://user:****@localhost/user1/user2',
     }),
     ('ncloud://user:pass@localhost:8080/admin', {
-        'instance': plugins.NotifyNextCloud,
+        'instance': plugins.NotifyNextcloud,
     }),
     ('nclouds://user:pass@localhost/admin', {
-        'instance': plugins.NotifyNextCloud,
+        'instance': plugins.NotifyNextcloud,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'nclouds://user:****@localhost/admin',
     }),
     ('nclouds://user:pass@localhost:8080/admin/', {
-        'instance': plugins.NotifyNextCloud,
+        'instance': plugins.NotifyNextcloud,
     }),
     ('ncloud://localhost:8080/admin?-HeaderKey=HeaderValue', {
-        'instance': plugins.NotifyNextCloud,
+        'instance': plugins.NotifyNextcloud,
     }),
     ('ncloud://user:pass@localhost:8081/admin', {
-        'instance': plugins.NotifyNextCloud,
+        'instance': plugins.NotifyNextcloud,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('ncloud://user:pass@localhost:8082/admin', {
-        'instance': plugins.NotifyNextCloud,
+        'instance': plugins.NotifyNextcloud,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('ncloud://user:pass@localhost:8083/user1/user2/user3', {
-        'instance': plugins.NotifyNextCloud,
+        'instance': plugins.NotifyNextcloud,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
