@@ -40,7 +40,7 @@ class NotifyNextcloud(NotifyBase):
     service_name = 'Nextcloud'
 
     # The services URL
-    service_url = 'https://github.com/nextcloud/notifications'
+    service_url = 'https://nextcloud.com/'
 
     # Insecure protocol (for those self hosted requests)
     protocol = 'ncloud'
@@ -152,9 +152,12 @@ class NotifyNextcloud(NotifyBase):
 
             # Prepare our Payload
             payload = {
-                'shortMessage': title,
-                'longMessage': body,
+                'shortMessage': title if title else self.app_desc,
             }
+            if body:
+                # Only store the longMessage if a body was defined; nextcloud
+                # doesn't take kindly to empty longMessage entries.
+                payload['longMessage'] = body
 
             auth = None
             if self.user:
