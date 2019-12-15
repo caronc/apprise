@@ -78,6 +78,11 @@ class AttachHTTP(AttachBase):
         # Where our content is written to upon a call to download.
         self._temp_file = None
 
+        # Our Query String Dictionary; we use this to track arguments
+        # specified that aren't otherwise part of this class
+        self.qsd = {k: v for k, v in kwargs.get('qsd', {}).items()
+                    if k not in self.template_args}
+
         return
 
     def download(self, **kwargs):
@@ -122,6 +127,7 @@ class AttachHTTP(AttachBase):
                     url,
                     headers=headers,
                     auth=auth,
+                    params=self.qsd,
                     verify=self.verify_certificate,
                     timeout=self.connection_timeout_sec,
                     stream=True) as r:
@@ -252,17 +258,20 @@ class AttachHTTP(AttachBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Prepare our cache value
-        if isinstance(self.cache, bool) or not self.cache:
-            cache = 'yes' if self.cache else 'no'
-        else:
-            cache = int(self.cache)
-
         # Define any arguments set
         args = {
             'verify': 'yes' if self.verify_certificate else 'no',
-            'cache': cache,
         }
+
+        # Prepare our cache value
+        if self.cache is not None:
+            if isinstance(self.cache, bool) or not self.cache:
+                cache = 'yes' if self.cache else 'no'
+            else:
+                cache = int(self.cache)
+
+            # Set our cache value
+            args['cache'] = cache
 
         if self._mimetype:
             # A format was enforced
@@ -274,6 +283,9 @@ class AttachHTTP(AttachBase):
 
         # Append our headers into our args
         args.update({'+{}'.format(k): v for k, v in self.headers.items()})
+
+        # Apply any remaining entries to our URL
+        args.update(self.qsd)
 
         # Determine Authentication
         auth = ''
@@ -290,7 +302,7 @@ class AttachHTTP(AttachBase):
 
         default_port = 443 if self.secure else 80
 
-        return '{schema}://{auth}{hostname}{port}{fullpath}/?{args}'.format(
+        return '{schema}://{auth}{hostname}{port}{fullpath}?{args}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
             hostname=self.quote(self.host, safe=''),
