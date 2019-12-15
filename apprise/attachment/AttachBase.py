@@ -28,6 +28,7 @@ import time
 import mimetypes
 from ..URLBase import URLBase
 from ..utils import parse_bool
+from ..AppriseLocale import gettext_lazy as _
 
 
 class AttachBase(URLBase):
@@ -61,7 +62,35 @@ class AttachBase(URLBase):
     # 5 MB = 5242880 bytes
     max_file_size = 5242880
 
-    def __init__(self, name=None, mimetype=None, cache=True, **kwargs):
+    # Here is where we define all of the arguments we accept on the url
+    # such as: schema://whatever/?overflow=upstream&format=text
+    # These act the same way as tokens except they are optional and/or
+    # have default values set if mandatory. This rule must be followed
+    template_args = {
+        'cache': {
+            'name': _('Cache Age'),
+            'type': 'int',
+            # We default to (600) which means we cache for 10 minutes
+            'default': 600,
+        },
+        'mime': {
+            'name': _('Forced Mime Type'),
+            'type': 'string',
+        },
+        'name': {
+            'name': _('Forced File Name'),
+            'type': 'string',
+        },
+        'verify': {
+            'name': _('Verify SSL'),
+            # SSL Certificate Authority Verification
+            'type': 'bool',
+            # Provide a default
+            'default': True,
+        },
+    }
+
+    def __init__(self, name=None, mimetype=None, cache=None, **kwargs):
         """
         Initialize some general logging and common server arguments that will
         keep things consistent when working with the configurations that
@@ -109,19 +138,27 @@ class AttachBase(URLBase):
         # Absolute path to attachment
         self.download_path = None
 
-        # Set our cache flag; it can be True or a (positive) integer
-        try:
-            self.cache = cache if isinstance(cache, bool) else int(cache)
+        # Set our cache flag; it can be True, False, None, or a (positive)
+        # integer... nothing else
+        if cache is not None:
+            try:
+                self.cache = cache if isinstance(cache, bool) else int(cache)
+
+            except (TypeError, ValueError):
+                err = 'An invalid cache value ({}) was specified.'.format(
+                    cache)
+                self.logger.warning(err)
+                raise TypeError(err)
+
+            # Some simple error checking
             if self.cache < 0:
                 err = 'A negative cache value ({}) was specified.'.format(
                     cache)
                 self.logger.warning(err)
                 raise TypeError(err)
 
-        except (ValueError, TypeError):
-            err = 'An invalid cache value ({}) was specified.'.format(cache)
-            self.logger.warning(err)
-            raise TypeError(err)
+        else:
+            self.cache = None
 
         # Validate mimetype if specified
         if self._mimetype:
@@ -211,12 +248,16 @@ class AttachBase(URLBase):
         Simply returns true if the object has downloaded and stored the
         attachment AND the attachment has not expired.
         """
+
+        cache = self.template_args['cache']['default'] \
+            if self.cache is None else self.cache
+
         if self.download_path and os.path.isfile(self.download_path) \
-                and self.cache:
+                and cache:
 
             # We have enough reason to look further into our cached content
             # and verify it has not expired.
-            if self.cache is True:
+            if cache is True:
                 # return our fixed content as is; we will always cache it
                 return True
 
@@ -224,7 +265,7 @@ class AttachBase(URLBase):
             # content again.
             try:
                 age_in_sec = time.time() - os.stat(self.download_path).st_mtime
-                if age_in_sec <= self.cache:
+                if age_in_sec <= cache:
                     return True
 
             except (OSError, IOError):

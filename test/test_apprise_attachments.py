@@ -78,14 +78,14 @@ def test_apprise_attachment():
     assert aa
 
     # Add another entry already in it's AttachBase format
-    response = AppriseAttachment.instantiate(path)
+    response = AppriseAttachment.instantiate(path, cache=True)
     assert isinstance(response, AttachBase)
     assert aa.add(response, asset=AppriseAsset())
 
     # There is now 2 attachments
     assert len(aa) == 2
 
-    # No cache set, so our cache defaults to True
+    # Cache is initialized to True
     assert aa[1].cache is True
 
     # Reset our object
@@ -172,6 +172,10 @@ def test_apprise_attachment():
     # Negative cache are not allowed
     assert not aa.add(AppriseAttachment.instantiate(
         'file://{}?name=andanother.png&cache=-600'.format(path)))
+
+    # Invalid cache value
+    assert not aa.add(AppriseAttachment.instantiate(
+        'file://{}?name=andanother.png'.format(path), cache='invalid'))
 
     # No length change
     assert len(aa) == 3

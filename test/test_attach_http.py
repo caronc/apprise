@@ -73,6 +73,39 @@ def test_attach_http_parse_url():
     assert AttachHTTP.parse_url('http://') is None
 
 
+def test_attach_http_query_string_dictionary():
+    """
+    API: AttachHTTP() Query String Dictionary
+
+    """
+
+    # no qsd specified
+    results = AttachHTTP.parse_url('http://localhost')
+    assert isinstance(results, dict)
+
+    # Create our object
+    obj = AttachHTTP(**results)
+    assert isinstance(obj, AttachHTTP)
+
+    assert re.search(r'[?&]verify=yes', obj.url())
+
+    # Now lets create a URL with a custom Query String entry
+
+    # some custom qsd entries specified
+    results = AttachHTTP.parse_url('http://localhost?dl=1&_var=test')
+    assert isinstance(results, dict)
+
+    # Create our object
+    obj = AttachHTTP(**results)
+    assert isinstance(obj, AttachHTTP)
+
+    assert re.search(r'[?&]verify=yes', obj.url())
+
+    # But now test that our custom arguments have also been set
+    assert re.search(r'[?&]dl=1', obj.url())
+    assert re.search(r'[?&]_var=test', obj.url())
+
+
 @mock.patch('requests.get')
 def test_attach_http(mock_get):
     """
@@ -147,8 +180,26 @@ def test_attach_http(mock_get):
     dummy_response = DummyResponse()
     mock_get.return_value = dummy_response
 
+    # Test custom url get parameters
     results = AttachHTTP.parse_url(
-        'http://user:pass@localhost/apprise.gif?+key=value')
+        'http://user:pass@localhost/apprise.gif?dl=1&cache=300')
+    assert isinstance(results, dict)
+    attachment = AttachHTTP(**results)
+    assert isinstance(attachment.url(), six.string_types) is True
+
+    # Test that our extended variables are passed along
+    assert mock_get.call_count == 0
+    assert attachment
+    assert mock_get.call_count == 1
+    assert 'params' in mock_get.call_args_list[0][1]
+    assert 'dl' in mock_get.call_args_list[0][1]['params']
+
+    # Verify that arguments that are reserved for apprise are not
+    # passed along
+    assert 'cache' not in mock_get.call_args_list[0][1]['params']
+
+    results = AttachHTTP.parse_url(
+        'http://user:pass@localhost/apprise.gif?+key=value&cache=True')
     assert isinstance(results, dict)
     attachment = AttachHTTP(**results)
     assert isinstance(attachment.url(), six.string_types) is True
