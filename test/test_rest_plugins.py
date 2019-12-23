@@ -1241,11 +1241,16 @@ TEST_URLS = (
     ('matrixs://', {
         'instance': None,
     }),
-    ('matrix://localhost', {
+    ('matrix://localhost?mode=off', {
         # treats it as a anonymous user to register
         'instance': plugins.NotifyMatrix,
         # response is false because we have nothing to notify
         'response': False,
+    }),
+    ('matrix://localhost', {
+        # response is TypeError because we'll try to initialize as
+        # a t2bot and fail (localhost is too short of a api key)
+        'instance': TypeError
     }),
     ('matrix://user:pass@localhost/#room1/#room2/#room3', {
         'instance': plugins.NotifyMatrix,
@@ -1310,6 +1315,27 @@ TEST_URLS = (
         # user and token specified; image set to True
         'instance': plugins.NotifyMatrix,
     }),
+    ('matrixs://user@{}?mode=t2bot&format=markdown&image=True'
+     .format('a' * 64), {
+         # user and token specified; image set to True
+         'instance': plugins.NotifyMatrix}),
+    ('matrix://user@{}?mode=t2bot&format=markdown&image=False'
+     .format('z' * 64), {
+         # user and token specified; image set to True
+         'instance': plugins.NotifyMatrix}),
+    # This will default to t2bot because no targets were specified and no
+    # password
+    ('matrixs://{}'.format('c' * 64), {
+        'instance': plugins.NotifyMatrix,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+    # Test Native URL
+    ('https://webhooks.t2bot.io/api/v1/matrix/hook/{}/'.format('d' * 64), {
+        # user and token specified; image set to True
+        'instance': plugins.NotifyMatrix,
+    }),
     # Legacy (Depricated) image reference
     ('matrixs://user:token@localhost?mode=slack&thumbnail=False', {
         # user and token specified; image set to True
@@ -1340,7 +1366,12 @@ TEST_URLS = (
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
     }),
-
+    ('matrix://{}/?mode=t2bot'.format('b' * 64), {
+        'instance': plugins.NotifyMatrix,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
 
     ##################################
     # NotifyMatterMost

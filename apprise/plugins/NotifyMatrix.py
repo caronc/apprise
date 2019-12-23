@@ -41,6 +41,7 @@ from ..common import NotifyImageSize
 from ..common import NotifyFormat
 from ..utils import parse_bool
 from ..utils import parse_list
+from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
 # Define default path
@@ -74,12 +75,16 @@ class MatrixWebhookMode(object):
     # Support the slack webhook plugin
     SLACK = "slack"
 
+    # Support the t2bot webhook plugin
+    T2BOT = "t2bot"
+
 
 # webhook modes are placed ito this list for validation purposes
 MATRIX_WEBHOOK_MODES = (
     MatrixWebhookMode.DISABLED,
     MatrixWebhookMode.MATRIX,
     MatrixWebhookMode.SLACK,
+    MatrixWebhookMode.T2BOT,
 )
 
 
@@ -122,6 +127,11 @@ class NotifyMatrix(NotifyBase):
 
     # Define object templates
     templates = (
+        # Targets are ignored when using t2bot mode; only a token is required
+        '{schema}://{token}',
+        '{schema}://{user}@{token}',
+
+        # All other non-t2bot setups require targets
         '{schema}://{user}:{password}@{host}/{targets}',
         '{schema}://{user}:{password}@{host}:{port}/{targets}',
         '{schema}://{token}:{password}@{host}/{targets}',
@@ -199,8 +209,7 @@ class NotifyMatrix(NotifyBase):
         },
     })
 
-    def __init__(self, targets=None, mode=None, include_image=False,
-                 **kwargs):
+    def __init__(self, targets=None, mode=None, include_image=False, **kwargs):
         """
         Initialize Matrix Object
         """
@@ -233,6 +242,16 @@ class NotifyMatrix(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
+        if self.mode == MatrixWebhookMode.T2BOT:
+            # t2bot configuration requires that a webhook id is specified
+            self.access_token = validate_regex(
+                self.host, r'^[a-z0-9]{64}$', 'i')
+            if not self.access_token:
+                msg = 'An invalid T2Bot/Matrix Webhook ID ' \
+                      '({}) was specified.'.format(self.host)
+                self.logger.warning(msg)
+                raise TypeError(msg)
+
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Matrix Notification
@@ -257,20 +276,30 @@ class NotifyMatrix(NotifyBase):
             'Content-Type': 'application/json',
         }
 
-        # Acquire our access token from our URL
-        access_token = self.password if self.password else self.user
+        if self.mode != MatrixWebhookMode.T2BOT:
+            # Acquire our access token from our URL
+            access_token = self.password if self.password else self.user
 
-        default_port = 443 if self.secure else 80
+            default_port = 443 if self.secure else 80
 
-        # Prepare our URL
-        url = '{schema}://{hostname}:{port}/{webhook_path}/{token}'.format(
-            schema='https' if self.secure else 'http',
-            hostname=self.host,
-            port='' if self.port is None
-            or self.port == default_port else self.port,
-            webhook_path=MATRIX_V1_WEBHOOK_PATH,
-            token=access_token,
-        )
+            # Prepare our URL
+            url = '{schema}://{hostname}:{port}/{webhook_path}/{token}'.format(
+                schema='https' if self.secure else 'http',
+                hostname=self.host,
+                port='' if self.port is None
+                or self.port == default_port else self.port,
+                webhook_path=MATRIX_V1_WEBHOOK_PATH,
+                token=access_token,
+            )
+
+        else:
+            #
+            # t2bot Setup
+            #
+
+            # Prepare our URL
+            url = 'https://webhooks.t2bot.io/api/v1/matrix/hook/' \
+                '{token}'.format(token=self.access_token)
 
         # Retrieve our payload
         payload = getattr(self, '_{}_webhook_payload'.format(self.mode))(
@@ -381,7 +410,7 @@ class NotifyMatrix(NotifyBase):
 
         payload = {
             'displayName':
-                self.user if self.user else self.matrix_default_user,
+                self.user if self.user else self.app_id,
             'format': 'html',
         }
 
@@ -396,6 +425,27 @@ class NotifyMatrix(NotifyBase):
 
             payload['text'] = '{}{}'.format(
                 '' if not title else '<h4>{}</h4>'.format(title), body)
+
+        return payload
+
+    def _t2bot_webhook_payload(self, body, title='',
+                               notify_type=NotifyType.INFO, **kwargs):
+        """
+        Format the payload for a T2Bot Matrix based messages
+
+        """
+
+        # Retrieve our payload
+        payload = self._matrix_webhook_payload(
+            body=body, title=title, notify_type=notify_type, **kwargs)
+
+        # Acquire our image url if we're configured to do so
+        image_url = None if not self.include_image else \
+            self.image_url(notify_type)
+
+        if image_url:
+            # t2bot can take an avatarUrl Entry
+            payload['avatarUrl'] = image_url
 
         return payload
 
@@ -867,6 +917,9 @@ class NotifyMatrix(NotifyBase):
             ))
             self.logger.debug('Matrix Payload: %s' % str(payload))
 
+            # Initialize our response object
+            r = None
+
             try:
                 r = fn(
                     url,
@@ -948,7 +1001,8 @@ class NotifyMatrix(NotifyBase):
         """
         Ensure we relinquish our token
         """
-        self._logout()
+        if self.mode != MatrixWebhookMode.T2BOT:
+            self._logout()
 
     def url(self, privacy=False, *args, **kwargs):
         """
@@ -997,11 +1051,13 @@ class NotifyMatrix(NotifyBase):
         us to substantiate this object.
 
         """
-        results = NotifyBase.parse_url(url)
-
+        results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
+
+        if not results.get('host'):
+            return None
 
         # Get our rooms
         results['targets'] = NotifyMatrix.split_path(results['fullpath'])
@@ -1040,4 +1096,37 @@ class NotifyMatrix(NotifyBase):
         results['mode'] = results['qsd'].get(
             'mode', results['qsd'].get('webhook'))
 
+        # t2bot detection... look for just a hostname, and/or just a user/host
+        # if we match this; we can go ahead and set the mode (but only if
+        # it was otherwise not set)
+        if results['mode'] is None \
+                and not results['password'] \
+                and not results['targets']:
+
+            # Default mode to t2bot
+            results['mode'] = MatrixWebhookMode.T2BOT
+
         return results
+
+    @staticmethod
+    def parse_native_url(url):
+        """
+        Support https://webhooks.t2bot.io/api/v1/matrix/hook/WEBHOOK_TOKEN/
+        """
+
+        result = re.match(
+            r'^https?://webhooks\.t2bot\.io/api/v1/matrix/hook/'
+            r'(?P<webhook_token>[A-Z0-9_-]+)/?'
+            r'(?P<args>\?.+)?$', url, re.I)
+
+        if result:
+            mode = 'mode={}'.format(MatrixWebhookMode.T2BOT)
+
+            return NotifyMatrix.parse_url(
+                '{schema}://{webhook_token}/{args}'.format(
+                    schema=NotifyMatrix.secure_protocol,
+                    webhook_token=result.group('webhook_token'),
+                    args='?{}'.format(mode) if not result.group('args')
+                    else '{}&{}'.format(result.group('args'), mode)))
+
+        return None
