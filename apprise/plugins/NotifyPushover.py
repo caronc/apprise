@@ -32,6 +32,7 @@ from ..common import NotifyType
 from ..utils import parse_list
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
+from ..attachment.AttachBase import AttachBase
 
 # Flag used as a placeholder to sending to all devices
 PUSHOVER_SEND_TO_ALL = 'ALL_DEVICES'
@@ -139,6 +140,14 @@ class NotifyPushover(NotifyBase):
 
     # Default Pushover sound
     default_pushover_sound = PushoverSound.PUSHOVER
+
+    # 2.5MB is the maximum supported image filesize as per documentation
+    # here: https://pushover.net/api#attachments (Dec 26th, 2019)
+    attach_max_size_bytes = 2621440
+
+    # The regular expression of the current attachment supported mime types
+    # At this time it is only images
+    attach_supported_mime_type = r'^image/.*'
 
     # Define object templates
     templates = (
@@ -281,16 +290,11 @@ class NotifyPushover(NotifyBase):
                 raise TypeError(msg)
         return
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
+             **kwargs):
         """
         Perform Pushover Notification
         """
-
-        headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/x-www-form-urlencoded'
-        }
-        auth = (self.token, '')
 
         # error tracking (used for function return)
         has_error = False
@@ -314,7 +318,7 @@ class NotifyPushover(NotifyBase):
                 'token': self.token,
                 'user': self.user_key,
                 'priority': str(self.priority),
-                'title': title,
+                'title': title if title else self.app_desc,
                 'message': body,
                 'device': device,
                 'sound': self.sound,
@@ -323,59 +327,157 @@ class NotifyPushover(NotifyBase):
             if self.priority == PushoverPriority.EMERGENCY:
                 payload.update({'retry': self.retry, 'expire': self.expire})
 
-            self.logger.debug('Pushover POST URL: %s (cert_verify=%r)' % (
-                self.notify_url, self.verify_certificate,
-            ))
-            self.logger.debug('Pushover Payload: %s' % str(payload))
+            if attach:
+                # Create a copy of our payload
+                _payload = payload.copy()
 
-            # Always call throttle before any remote server i/o is made
-            self.throttle()
+                # Send with attachments
+                for attachment in attach:
+                    # Simple send
+                    if not self._send(_payload, attachment):
+                        # Mark our failure
+                        has_error = True
+                        # clean exit from our attachment loop
+                        break
 
-            try:
-                r = requests.post(
-                    self.notify_url,
-                    data=payload,
-                    headers=headers,
-                    auth=auth,
-                    verify=self.verify_certificate,
-                )
-                if r.status_code != requests.codes.ok:
-                    # We had a problem
-                    status_str = \
-                        NotifyPushover.http_response_code_lookup(
-                            r.status_code, PUSHOVER_HTTP_ERROR_MAP)
+                    # To handle multiple attachments, clean up our message
+                    _payload['title'] = '...'
+                    _payload['message'] = attachment.name
+                    # No need to alarm for each consecutive attachment uploaded
+                    # afterwards
+                    _payload['sound'] = PushoverSound.NONE
 
-                    self.logger.warning(
-                        'Failed to send Pushover notification to {}: '
-                        '{}{}error={}.'.format(
-                            device,
-                            status_str,
-                            ', ' if status_str else '',
-                            r.status_code))
-
-                    self.logger.debug(
-                        'Response Details:\r\n{}'.format(r.content))
-
+            else:
+                # Simple send
+                if not self._send(payload):
                     # Mark our failure
                     has_error = True
-                    continue
-
-                else:
-                    self.logger.info(
-                        'Sent Pushover notification to %s.' % device)
-
-            except requests.RequestException as e:
-                self.logger.warning(
-                    'A Connection error occured sending Pushover:%s ' % (
-                        device) + 'notification.'
-                )
-                self.logger.debug('Socket Exception: %s' % str(e))
-
-                # Mark our failure
-                has_error = True
-                continue
 
         return not has_error
+
+    def _send(self, payload, attach=None):
+        """
+        Wrapper to the requests (post) object
+        """
+
+        if isinstance(attach, AttachBase):
+            # Perform some simple error checking
+            if not attach:
+                # We could not access the attachment
+                self.logger.warning(
+                    'Could not access {}.'.format(
+                        attach.url(privacy=True)))
+                return False
+
+            # Perform some basic checks as we want to gracefully skip
+            # over unsupported mime types.
+            if not re.match(
+                    self.attach_supported_mime_type,
+                    attach.mimetype,
+                    re.I):
+                # No problem; we just don't support this attachment
+                # type; gracefully move along
+                self.logger.debug(
+                    'Ignored unsupported Pushover attachment ({}): {}'
+                    .format(
+                        attach.mimetype,
+                        attach.url(privacy=True)))
+
+                return True
+
+            # If we get here, we're dealing with a supported image.
+            # Verify that the filesize is okay though.
+            file_size = len(attach)
+            if not (file_size > 0
+                    and file_size <= self.attach_max_size_bytes):
+
+                # File size is no good
+                self.logger.warning(
+                    'Pushover attachment size ({}B) exceeds limit: {}'
+                    .format(file_size, attach.url(privacy=True)))
+
+                return False
+
+        # Default Header
+        headers = {
+            'User-Agent': self.app_id,
+        }
+
+        # Authentication
+        auth = (self.token, '')
+
+        # Some default values for our request object to which we'll update
+        # depending on what our payload is
+        files = None
+
+        self.logger.debug('Pushover POST URL: %s (cert_verify=%r)' % (
+            self.notify_url, self.verify_certificate,
+        ))
+        self.logger.debug('Pushover Payload: %s' % str(payload))
+
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+
+        try:
+            # Open our attachment path if required:
+            if attach:
+                files = {'attachment': (attach.name, open(attach.path, 'rb'))}
+
+            r = requests.post(
+                self.notify_url,
+                data=payload,
+                headers=headers,
+                files=files,
+                auth=auth,
+                verify=self.verify_certificate,
+            )
+
+            if r.status_code != requests.codes.ok:
+                # We had a problem
+                status_str = \
+                    NotifyPushover.http_response_code_lookup(
+                        r.status_code, PUSHOVER_HTTP_ERROR_MAP)
+
+                self.logger.warning(
+                    'Failed to send Pushover notification to {}: '
+                    '{}{}error={}.'.format(
+                        payload['device'],
+                        status_str,
+                        ', ' if status_str else '',
+                        r.status_code))
+
+                self.logger.debug(
+                    'Response Details:\r\n{}'.format(r.content))
+
+                return False
+
+            else:
+                self.logger.info(
+                    'Sent Pushover notification to %s.' % payload['device'])
+
+        except requests.RequestException as e:
+            self.logger.warning(
+                'A Connection error occured sending Pushover:%s ' % (
+                    payload['device']) + 'notification.'
+            )
+            self.logger.debug('Socket Exception: %s' % str(e))
+
+            return False
+
+        except (OSError, IOError) as e:
+            self.logger.warning(
+                'An I/O error occured while reading {}.'.format(
+                    attach.name if attach else 'attachment'))
+            self.logger.debug('I/O Exception: %s' % str(e))
+            return False
+
+        finally:
+            # Close our file (if it's open) stored in the second element
+            # of our files tuple (index 1)
+            if files:
+                files['attachment'][1].close()
+
+        return True
 
     def url(self, privacy=False, *args, **kwargs):
         """
