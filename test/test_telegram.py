@@ -43,7 +43,7 @@ TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), 'var')
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_notify_telegram_plugin(mock_post, mock_get, tmpdir):
+def test_notify_telegram_plugin(mock_post, mock_get):
     """
     API: NotifyTelegram() Tests
 

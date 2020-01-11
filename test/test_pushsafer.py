@@ -40,7 +40,7 @@ TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), 'var')
 
 
 @mock.patch('requests.post')
-def test_notify_pushsafer_plugin(mock_post, tmpdir):
+def test_notify_pushsafer_plugin(mock_post):
     """
     API: NotifyPushSafer() Tests
 
