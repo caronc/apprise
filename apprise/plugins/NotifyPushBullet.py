@@ -147,6 +147,19 @@ class NotifyPushBullet(NotifyBase):
             # We need to upload our payload first so that we can source it
             # in remaining messages
             for attachment in attach:
+
+                # Perform some simple error checking
+                if not attachment:
+                    # We could not access the attachment
+                    self.logger.error(
+                        'Could not access attachment {}.'.format(
+                            attachment.url(privacy=True)))
+                    return False
+
+                self.logger.debug(
+                    'Preparing PushBullet attachment {}'.format(
+                        attachment.url(privacy=True)))
+
                 # prepare payload
                 payload = {
                     'file_name': attachment.name,
@@ -253,7 +266,7 @@ class NotifyPushBullet(NotifyBase):
                     continue
 
                 self.logger.info(
-                    'Sent PushBullet attachment (%s) to "%s".' % (
+                    'Sent PushBullet attachment ({}) to "{}".'.format(
                         attach_payload['file_name'], recipient))
 
         return not has_error

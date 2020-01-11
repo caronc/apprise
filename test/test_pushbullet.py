@@ -59,6 +59,7 @@ def test_pushbullet_attachments(mock_post):
         "upload_url": "https://upload.pushbullet.com/abcd123",
     })
     response.status_code = requests.codes.ok
+    mock_post.return_value = response
 
     # prepare our attachment
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
@@ -67,7 +68,23 @@ def test_pushbullet_attachments(mock_post):
     obj = Apprise.instantiate(
         'pbul://{}/?format=markdown'.format(access_token))
 
+    # Send a good attachment
+    assert obj.notify(body="test", attach=attach) is True
+
+    # Add another attachment so we drop into the area of the PushBullet code
+    # that sends remaining attachments (if more detected)
+    attach.add(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
+
+    # Send our attachments
+    assert obj.notify(body="test", attach=attach) is True
+
+    # An invalid attachment will cause a failure
+    path = os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
+    attach = AppriseAttachment(path)
+    assert obj.notify(body="test", attach=attach) is False
+
     # Throw an exception on the first call to requests.post()
+    mock_post.return_value = None
     mock_post.side_effect = requests.RequestException()
 
     # We'll fail now because of an internal exception
@@ -99,3 +116,47 @@ def test_pushbullet_attachments(mock_post):
 
     # We'll fail because of an invalid json object
     assert obj.send(body="test", attach=attach) is False
+
+    #
+    # Test bad responses
+    #
+
+    # Prepare a bad response
+    response.content = dumps({
+        "file_name": "cat.jpg",
+        "file_type": "image/jpeg",
+        "file_url": "https://dl.pushb.com/abc/cat.jpg",
+        "upload_url": "https://upload.pushbullet.com/abcd123",
+    })
+    bad_response = mock.Mock()
+    bad_response.content = response.content
+    bad_response.status_code = 400
+
+    # Throw an exception on the third call to requests.post()
+    mock_post.return_value = bad_response
+
+    # prepare our attachment
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
+
+    # We'll fail now because we were unable to send the attachment
+    assert obj.send(body="test", attach=attach) is False
+
+    # Throw an exception on the second call
+    mock_post.side_effect = [response, bad_response, response]
+    assert obj.send(body="test", attach=attach) is False
+
+    # Throw an OSError
+    mock_post.side_effect = [response, OSError()]
+    assert obj.send(body="test", attach=attach) is False
+
+    # Throw an exception on the third call
+    mock_post.side_effect = [response, response, bad_response]
+    assert obj.send(body="test", attach=attach) is False
+
+    # Throw an exception on the fourth call
+    mock_post.side_effect = [response, response, response, bad_response]
+    assert obj.send(body="test", attach=attach) is False
+
+    # A good message
+    mock_post.side_effect = [response, response, response, response]
+    assert obj.send(body="test", attach=attach) is True

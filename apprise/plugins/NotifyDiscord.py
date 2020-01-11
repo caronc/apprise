@@ -51,6 +51,7 @@ from ..common import NotifyType
 from ..utils import parse_bool
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
+from ..attachment.AttachBase import AttachBase
 
 
 class NotifyDiscord(NotifyBase):
@@ -311,6 +312,19 @@ class NotifyDiscord(NotifyBase):
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
+
+        # Perform some simple error checking
+        if isinstance(attach, AttachBase):
+            if not attach:
+                # We could not access the attachment
+                self.logger.error(
+                    'Could not access attachment {}.'.format(
+                        attach.url(privacy=True)))
+                return False
+
+            self.logger.debug(
+                'Posting Discord attachment {}'.format(
+                    attach.url(privacy=True)))
 
         # Our attachment path (if specified)
         files = None

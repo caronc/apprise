@@ -267,17 +267,21 @@ class NotifyTelegram(NotifyBase):
         path = None
 
         if isinstance(attach, AttachBase):
+            if not attach:
+                # We could not access the attachment
+                self.logger.error(
+                    'Could not access attachment {}.'.format(
+                        attach.url(privacy=True)))
+                return False
+
+            self.logger.debug(
+                'Posting Telegram attachment {}'.format(
+                    attach.url(privacy=True)))
+
             # Store our path to our file
             path = attach.path
             file_name = attach.name
             mimetype = attach.mimetype
-
-            if not path:
-                # We could not access the attachment
-                self.logger.warning(
-                    'Could not access {}.'.format(
-                        attach.url(privacy=True)))
-                return False
 
             # Process our attachment
             function_name, key = \
@@ -642,10 +646,10 @@ class NotifyTelegram(NotifyBase):
             if attach:
                 # Send our attachments now (if specified and if it exists)
                 for attachment in attach:
-                    sent_attachment = self.send_media(
-                        payload['chat_id'], notify_type, attach=attachment)
+                    if not self.send_media(
+                            payload['chat_id'], notify_type,
+                            attach=attachment):
 
-                    if not sent_attachment:
                         # We failed; don't continue
                         has_error = True
                         break
