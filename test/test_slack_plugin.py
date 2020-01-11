@@ -22,18 +22,23 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import os
 import six
 import mock
 import pytest
 import requests
 from apprise import plugins
 from apprise import NotifyType
+from apprise import AppriseAttachment
 
 from json import dumps
 
 # Disable logging for a cleaner testing output
 import logging
 logging.disable(logging.CRITICAL)
+
+# Attachment Directory
+TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), 'var')
 
 
 @mock.patch('requests.post')
@@ -52,6 +57,11 @@ def test_slack_oauth_access_token(mock_post):
     request.content = dumps({
         'ok': True,
         'message': '',
+
+        # Attachment support
+        'file': {
+            'url_private': 'http://localhost',
+        }
     })
     request.status_code = requests.codes.ok
 
@@ -72,6 +82,34 @@ def test_slack_oauth_access_token(mock_post):
 
     # apprise room was found
     assert obj.send(body="test") is True
+
+    # Test Valid Attachment
+    path = os.path.join(TEST_VAR_DIR, 'apprise-test.gif')
+    attach = AppriseAttachment(path)
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=attach) is True
+
+    # Test invalid attachment
+    path = os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=path) is False
+
+    # Test case where expected return attachment payload is invalid
+    request.content = dumps({
+        'ok': True,
+        'message': '',
+
+        # Attachment support
+        'file': None
+    })
+    path = os.path.join(TEST_VAR_DIR, 'apprise-test.gif')
+    attach = AppriseAttachment(path)
+    # We'll fail because of the bad 'file' response
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=attach) is False
 
     # Slack requests pay close attention to the response to determine
     # if things go well... this is not a good JSON response:

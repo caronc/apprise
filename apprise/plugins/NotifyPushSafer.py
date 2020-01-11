@@ -548,14 +548,21 @@ class NotifyPushSafer(NotifyBase):
                 # prepare payload
                 if not attachment:
                     # We could not access the attachment
-                    self.logger.warning(
-                        'Could not access {}.'.format(
+                    self.logger.error(
+                        'Could not access attachment {}.'.format(
                             attachment.url(privacy=True)))
                     return False
 
                 if not attachment.mimetype.startswith('image/'):
                     # Attachment not supported; continue peacefully
+                    self.logger.debug(
+                        'Ignoring unsupported PushSafer attachment {}.'.format(
+                            attachment.url(privacy=True)))
                     continue
+
+                self.logger.debug(
+                    'Posting PushSafer attachment {}'.format(
+                        attachment.url(privacy=True)))
 
                 try:
                     with io.open(attachment.path, 'rb') as f:

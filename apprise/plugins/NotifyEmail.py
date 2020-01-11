@@ -573,21 +573,22 @@ class NotifyEmail(NotifyBase):
                 # First attach our body to our content as the first element
                 base.attach(content)
 
-                attach_error = False
-
                 # Now store our attachments
                 for attachment in attach:
                     if not attachment:
                         # We could not load the attachment; take an early
                         # exit since this isn't what the end user wanted
 
-                        self.logger.warning(
-                            'The specified attachment could not be referenced:'
-                            ' {}.'.format(attachment.url(privacy=True)))
+                        # We could not access the attachment
+                        self.logger.error(
+                            'Could not access attachment {}.'.format(
+                                attachment.url(privacy=True)))
 
-                        # Mark our failure
-                        attach_error = True
-                        break
+                        return False
+
+                    self.logger.debug(
+                        'Preparing Email attachment {}'.format(
+                            attachment.url(privacy=True)))
 
                     with open(attachment.path, "rb") as abody:
                         app = MIMEApplication(
@@ -599,11 +600,6 @@ class NotifyEmail(NotifyBase):
                                 attachment.name))
 
                         base.attach(app)
-
-                if attach_error:
-                    # Mark our error and quit early
-                    has_error = True
-                    break
 
             # bind the socket variable to the current namespace
             socket = None

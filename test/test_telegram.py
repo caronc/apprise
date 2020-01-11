@@ -43,7 +43,7 @@ TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), 'var')
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_notify_telegram_plugin(mock_post, mock_get, tmpdir):
+def test_notify_telegram_plugin(mock_post, mock_get):
     """
     API: NotifyTelegram() Tests
 
@@ -205,13 +205,14 @@ def test_notify_telegram_plugin(mock_post, mock_get, tmpdir):
     assert len(obj.targets) == 1
     assert obj.targets[0] == '12345'
 
-    path = os.path.join(TEST_VAR_DIR, 'apprise-test.gif')
-    attach = AppriseAttachment(path)
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=attach) is True
 
+    # An invalid attachment will cause a failure
     path = os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
+    attach = AppriseAttachment(path)
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=path) is False

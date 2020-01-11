@@ -4210,11 +4210,11 @@ def test_rest_plugins(mock_post, mock_get):
                 # Check that we were expecting this exception to happen
                 try:
                     if not isinstance(e, response):
-                        raise
+                        raise e
 
                 except TypeError:
                     print('%s Unhandled response %s' % (url, type(e)))
-                    raise
+                    raise e
 
             #
             # Stage 2: without title defined
@@ -4250,7 +4250,7 @@ def test_rest_plugins(mock_post, mock_get):
             except Exception as e:
                 # Check that we were expecting this exception to happen
                 if not isinstance(e, response):
-                    raise
+                    raise e
 
             # Tidy our object and allow any possible defined deconstructors to
             # be executed.
@@ -4265,11 +4265,11 @@ def test_rest_plugins(mock_post, mock_get):
             # Handle our exception
             if instance is None:
                 print('%s %s' % (url, str(e)))
-                raise
+                raise e
 
             if not isinstance(e, instance):
                 print('%s %s' % (url, str(e)))
-                raise
+                raise e
 
 
 @mock.patch('requests.get')

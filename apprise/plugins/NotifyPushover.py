@@ -364,8 +364,8 @@ class NotifyPushover(NotifyBase):
             # Perform some simple error checking
             if not attach:
                 # We could not access the attachment
-                self.logger.warning(
-                    'Could not access {}.'.format(
+                self.logger.error(
+                    'Could not access attachment {}.'.format(
                         attach.url(privacy=True)))
                 return False
 
@@ -397,6 +397,10 @@ class NotifyPushover(NotifyBase):
                     .format(file_size, attach.url(privacy=True)))
 
                 return False
+
+            self.logger.debug(
+                'Posting Pushover attachment {}'.format(
+                    attach.url(privacy=True)))
 
         # Default Header
         headers = {

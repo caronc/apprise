@@ -174,11 +174,8 @@ def test_discord_attachments(mock_post):
     webhook_token = 'D' * 64
 
     # Prepare Mock return object
-    response = mock.Mock()
-    response.status_code = requests.codes.ok
-
-    # Throw an exception on the second call to requests.post()
-    mock_post.side_effect = [response, OSError()]
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
 
     # Test our markdown
     obj = Apprise.instantiate(
@@ -186,6 +183,27 @@ def test_discord_attachments(mock_post):
 
     # attach our content
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
+
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=attach) is True
+
+    # An invalid attachment will cause a failure
+    path = os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
+    attach = AppriseAttachment(path)
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=path) is False
+
+    # Throw an exception on the second call to requests.post()
+    mock_post.return_value = None
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    mock_post.side_effect = [response, OSError()]
+
+    # update our attachment to be valid
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
+    # Test our markdown
 
     # We'll fail now because of an internal exception
     assert obj.send(body="test", attach=attach) is False

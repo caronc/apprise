@@ -435,8 +435,18 @@ class NotifySlack(NotifyBase):
         if attach and self.mode is SlackMode.BOT and attach_channel_list:
             # Send our attachments (can only be done in bot mode)
             for attachment in attach:
-                self.logger.info(
-                    'Posting Slack Attachment {}'.format(attachment.name))
+
+                # Perform some simple error checking
+                if not attachment:
+                    # We could not access the attachment
+                    self.logger.error(
+                        'Could not access attachment {}.'.format(
+                            attachment.url(privacy=True)))
+                    return False
+
+                self.logger.debug(
+                    'Posting Slack attachment {}'.format(
+                        attachment.url(privacy=True)))
 
                 # Prepare API Upload Payload
                 _payload = {
