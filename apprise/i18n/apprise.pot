@@ -1,21 +1,21 @@
 # Translations template for apprise.
-# Copyright (C) 2019 Chris Caron
+# Copyright (C) 2020 Chris Caron
 # This file is distributed under the same license as the apprise project.
-# FIRST AUTHOR <EMAIL@ADDRESS>, 2019.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2020.
 #
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: apprise 0.8.2\n"
+"Project-Id-Version: apprise 0.8.3\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2019-11-25 18:50-0500\n"
+"POT-Creation-Date: 2020-01-12 18:39-0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.7.0\n"
+"Generated-By: Babel 2.8.0\n"
 
 msgid "API Key"
 msgstr ""
@@ -69,6 +69,9 @@ msgid "Bot Name"
 msgstr ""
 
 msgid "Bot Token"
+msgstr ""
+
+msgid "Cache Age"
 msgstr ""
 
 msgid "Cache Results"
@@ -126,6 +129,12 @@ msgid "Facility"
 msgstr ""
 
 msgid "Footer Logo"
+msgstr ""
+
+msgid "Forced File Name"
+msgstr ""
+
+msgid "Forced Mime Type"
 msgstr ""
 
 msgid "From Email"
@@ -201,6 +210,9 @@ msgid "Prefix"
 msgstr ""
 
 msgid "Priority"
+msgstr ""
+
+msgid "Private Key"
 msgstr ""
 
 msgid "Project ID"
@@ -363,6 +375,9 @@ msgid "Verify SSL"
 msgstr ""
 
 msgid "Version"
+msgstr ""
+
+msgid "Vibration"
 msgstr ""
 
 msgid "Web Based"
