@@ -73,9 +73,9 @@ setup(
         'Discord Dbus Emby Faast Flock Gitter Gnome Gotify Growl IFTTT Join '
         'KODI Kumulos Mailgun Matrix Mattermost MessageBird MSG91 Nexmo '
         'Nextcloud Notica, Notifico Prowl PushBullet Pushjet Pushed Pushover '
-        'PushSafer Rocket.Chat Ryver SendGrid SimplePush Slack Stride Syslog '
-        'Techulus Push Telegram Twilio Twist Twitter XBMC Microsoft MSTeams '
-        'Windows Webex CLI API',
+        'PushSafer Rocket.Chat Ryver SendGrid SimplePush Sinch Slack Stride '
+        'Syslog Techulus Push Telegram Twilio Twist Twitter XBMC Microsoft '
+        'MSTeams Windows Webex CLI API',
     author='Chris Caron',
     author_email='lead2gold@gmail.com',
     packages=find_packages(),
