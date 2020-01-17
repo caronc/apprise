@@ -116,7 +116,7 @@ def test_slack_oauth_access_token(mock_post):
     request.content = '{'
 
     # As a result, we'll fail to send our notification
-    assert obj.send(body="test") is False
+    assert obj.send(body="test", attach=attach) is False
 
     request.content = dumps({
         'ok': False,
@@ -125,7 +125,7 @@ def test_slack_oauth_access_token(mock_post):
 
     # A response from Slack (even with a 200 response) still
     # results in a failure:
-    assert obj.send(body="test") is False
+    assert obj.send(body="test", attach=attach) is False
 
     # Handle exceptions reading our attachment from disk (should it happen)
     mock_post.side_effect = OSError("Attachment Error")
