@@ -118,7 +118,9 @@ def print_version_msg():
               help='Perform a trial run but only prints the notification '
               'services to-be triggered to stdout. Notifications are never '
               'sent using this mode.')
-@click.option('--verbose', '-v', count=True)
+@click.option('--verbose', '-v', count=True,
+              help='Makes the operation more talkative. Use multiple v to '
+              'increase the verbosity. I.e.: -vvvv')
 @click.option('--version', '-V', is_flag=True,
               help='Display the apprise version and exit.')
 @click.argument('urls', nargs=-1,
