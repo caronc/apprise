@@ -165,6 +165,39 @@ class AppriseConfig(object):
         # Return our status
         return return_status
 
+    def add_config(self, content, asset=None, tag=None, format=None):
+        """
+        Adds one or more configuration file in it's raw format. Content
+        gets loaded as a memory based object and only exists for the life
+        of this AppriseConfig object it was loaded into.
+
+        If you know the format ('yaml' or 'text') you can specify
+        it for slightly less overhead during this call.  Otherwise the
+        configuration is auto-detected.
+        """
+
+        if isinstance(asset, AppriseAsset):
+            # prepare default asset
+            asset = self.asset
+
+        if not isinstance(content, six.string_types):
+            logger.warning(
+                "An invalid configuration (type={}) was specified.".format(
+                    type(content)))
+            return False
+
+        logger.debug("Loading raw configuration: {}".format(content))
+
+        # Create ourselves a ConfigMemory Object to store our configuration
+        instance = config.ConfigMemory(
+            content=content, format=format, asset=asset, tag=tag)
+
+        # Add our initialized plugin to our server listings
+        self.configs.append(instance)
+
+        # Return our status
+        return True
+
     def servers(self, tag=MATCH_ALL_TAG, *args, **kwargs):
         """
         Returns all of our servers dynamically build based on parsed

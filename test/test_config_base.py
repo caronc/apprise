@@ -29,6 +29,7 @@ import pytest
 from apprise.AppriseAsset import AppriseAsset
 from apprise.config.ConfigBase import ConfigBase
 from apprise.config import __load_matrix
+from apprise import ConfigFormat
 
 # Disable logging for a cleaner testing output
 import logging
@@ -93,6 +94,110 @@ def test_config_base():
     assert isinstance(results.get('qsd'), dict)
     assert results['qsd'].get('encoding') == 'latin-1'
     assert results['qsd'].get('format') == 'invalid'
+
+
+def test_config_base_detect_config_format():
+    """
+    API: ConfigBase.detect_config_format
+
+    """
+
+    # Garbage Handling
+    assert ConfigBase.detect_config_format(object()) is None
+    assert ConfigBase.detect_config_format(None) is None
+    assert ConfigBase.detect_config_format(12) is None
+
+    # Empty files are valid
+    assert ConfigBase.detect_config_format('') is ConfigFormat.TEXT
+
+    # Valid Text Configuration
+    assert ConfigBase.detect_config_format("""
+    # A comment line over top of a URL
+    mailto://userb:pass@gmail.com
+    """) is ConfigFormat.TEXT
+
+    # A text file that has semi-colon as comment characters
+    # is valid too
+    assert ConfigBase.detect_config_format("""
+    ; A comment line over top of a URL
+    mailto://userb:pass@gmail.com
+    """) is ConfigFormat.TEXT
+
+    # Valid YAML Configuration
+    assert ConfigBase.detect_config_format("""
+    # A comment line over top of a URL
+    version: 1
+    """) is ConfigFormat.YAML
+
+    # Just a whole lot of blank lines...
+    assert ConfigBase.detect_config_format('\n\n\n') is ConfigFormat.TEXT
+
+    # Invalid Config
+    assert ConfigBase.detect_config_format("3") is None
+
+
+def test_config_base_config_parse():
+    """
+    API: ConfigBase.config_parse
+
+    """
+
+    # Garbage Handling
+    assert isinstance(ConfigBase.config_parse(object()), list)
+    assert isinstance(ConfigBase.config_parse(None), list)
+    assert isinstance(ConfigBase.config_parse(''), list)
+    assert isinstance(ConfigBase.config_parse(12), list)
+
+    # Valid Text Configuration
+    result = ConfigBase.config_parse("""
+    # A comment line over top of a URL
+    mailto://userb:pass@gmail.com
+    """, asset=AppriseAsset())
+    # We expect to parse 1 entry from the above
+    assert isinstance(result, list)
+    assert len(result) == 1
+    assert len(result[0].tags) == 0
+
+    # Valid Configuration
+    result = ConfigBase.config_parse("""
+# if no version is specified then version 1 is presumed
+version: 1
+
+#
+# Define your notification urls:
+#
+urls:
+  - pbul://o.gn5kj6nfhv736I7jC3cj3QLRiyhgl98b
+  - mailto://test:password@gmail.com
+  - syslog://:
+      - tag: devops, admin
+    """, asset=AppriseAsset())
+
+    # We expect to parse 3 entries from the above
+    assert isinstance(result, list)
+    assert len(result) == 3
+    assert len(result[0].tags) == 0
+    assert len(result[1].tags) == 0
+    assert len(result[2].tags) == 2
+
+    # Test case where we pass in a bad format
+    result = ConfigBase.config_parse("""
+    ; A comment line over top of a URL
+    mailto://userb:pass@gmail.com
+    """, config_format='invalid-format')
+
+    # This is not parseable despite the valid text
+    assert isinstance(result, list)
+    assert len(result) == 0
+
+    result = ConfigBase.config_parse("""
+    ; A comment line over top of a URL
+    mailto://userb:pass@gmail.com
+    """, config_format=ConfigFormat.TEXT)
+
+    # Parseable
+    assert isinstance(result, list)
+    assert len(result) == 1
 
 
 def test_config_base_config_parse_text():
