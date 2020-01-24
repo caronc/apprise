@@ -131,7 +131,7 @@ class ConfigBase(URLBase):
             # We already have cached results to return; use them
             return self._cached_servers
 
-        # Our cached response object starts with any manually loaded servers
+        # Our cached response object
         self._cached_servers = list()
 
         # read() causes the child class to do whatever it takes for the

@@ -115,7 +115,7 @@ class AppriseConfig(object):
         # Initialize our default cache value
         cache = cache if cache is not None else self.cache
 
-        if isinstance(asset, AppriseAsset):
+        if asset is None:
             # prepare default asset
             asset = self.asset
 
@@ -167,16 +167,16 @@ class AppriseConfig(object):
 
     def add_config(self, content, asset=None, tag=None, format=None):
         """
-        Adds one or more configuration file in it's raw format. Content
-        gets loaded as a memory based object and only exists for the life
-        of this AppriseConfig object it was loaded into.
+        Adds one configuration file in it's raw format. Content gets loaded as
+        a memory based object and only exists for the life of this
+        AppriseConfig object it was loaded into.
 
         If you know the format ('yaml' or 'text') you can specify
         it for slightly less overhead during this call.  Otherwise the
         configuration is auto-detected.
         """
 
-        if isinstance(asset, AppriseAsset):
+        if asset is None:
             # prepare default asset
             asset = self.asset
 
