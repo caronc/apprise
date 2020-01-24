@@ -92,7 +92,8 @@ class ConfigBase(URLBase):
             # Store the encoding
             self.encoding = kwargs.get('encoding')
 
-        if 'format' in kwargs:
+        if 'format' in kwargs \
+                and isinstance(kwargs['format'], six.string_types):
             # Store the enforced config format
             self.config_format = kwargs.get('format').lower()
 
@@ -250,6 +251,109 @@ class ConfigBase(URLBase):
         return results
 
     @staticmethod
+    def detect_config_format(content, **kwargs):
+        """
+        Takes the specified content and attempts to detect the format type
+
+        The function returns the actual format type if detected, otherwise
+        it returns None
+        """
+
+        # Detect Format Logic:
+        #  - A pound/hashtag (#) is alawys a comment character so we skip over
+        #     lines matched here.
+        #  - Detection begins on the first non-comment and non blank line
+        #     matched.
+        #  - If we find a string followed by a colon, we know we're dealing
+        #     with a YAML file.
+        #  - If we find a string that starts with a URL, or our tag
+        #     definitions (accepting commas) followed by an equal sign we know
+        #     we're dealing with a TEXT format.
+
+        # Define what a valid line should look like
+        valid_line_re = re.compile(
+            r'^\s*(?P<line>([;#]+(?P<comment>.*))|'
+            r'(?P<text>((?P<tag>[ \t,a-z0-9_-]+)=)?[a-z0-9]+://.*)|'
+            r'((?P<yaml>[a-z0-9]+):.*))?$', re.I)
+
+        try:
+            # split our content up to read line by line
+            content = re.split(r'\r*\n', content)
+
+        except TypeError:
+            # content was not expected string type
+            ConfigBase.logger.error('Invalid apprise config specified')
+            return None
+
+        # By default set our return value to None since we don't know
+        # what the format is yet
+        config_format = None
+
+        # iterate over each line of the file to attempt to detect it
+        # stop the moment a the type has been determined
+        for line, entry in enumerate(content, start=1):
+
+            result = valid_line_re.match(entry)
+            if not result:
+                # Invalid syntax
+                ConfigBase.logger.error(
+                    'Undetectable apprise configuration found '
+                    'based on line {}.'.format(line))
+                # Take an early exit
+                return None
+
+            # Attempt to detect configuration
+            if result.group('yaml'):
+                config_format = ConfigFormat.YAML
+                ConfigBase.logger.debug(
+                    'Detected YAML configuration '
+                    'based on line {}.'.format(line))
+                break
+
+            elif result.group('text'):
+                config_format = ConfigFormat.TEXT
+                ConfigBase.logger.debug(
+                    'Detected TEXT configuration '
+                    'based on line {}.'.format(line))
+                break
+
+            # If we reach here, we have a comment entry
+            # Adjust default format to TEXT
+            config_format = ConfigFormat.TEXT
+
+        return config_format
+
+    @staticmethod
+    def config_parse(content, asset=None, config_format=None, **kwargs):
+        """
+        Takes the specified config content and loads it based on the specified
+        config_format. If a format isn't specified, then it is auto detected.
+
+        """
+
+        if config_format is None:
+            # Detect the format
+            config_format = ConfigBase.detect_config_format(content)
+
+            if not config_format:
+                # We couldn't detect configuration
+                ConfigBase.logger.error('Could not detect configuration')
+                return list()
+
+        if config_format not in CONFIG_FORMATS:
+            # Invalid configuration type specified
+            ConfigBase.logger.error(
+                'An invalid configuration format ({}) was specified'.format(
+                    config_format))
+            return list()
+
+        # Dynamically load our parse_ function based on our config format
+        fn = getattr(ConfigBase, 'config_parse_{}'.format(config_format))
+
+        # Execute our config parse function which always returns a list
+        return fn(content=content, asset=asset)
+
+    @staticmethod
     def config_parse_text(content, asset=None):
         """
         Parse the specified content as though it were a simple text file only
@@ -270,9 +374,6 @@ class ConfigBase(URLBase):
             <URL>
 
         """
-        # For logging, track the line number
-        line = 0
-
         response = list()
 
         # Define what a valid line should look like
@@ -290,10 +391,7 @@ class ConfigBase(URLBase):
             ConfigBase.logger.error('Invalid apprise text data specified')
             return list()
 
-        for entry in content:
-            # Increment our line count
-            line += 1
-
+        for line, entry in enumerate(content, start=1):
             result = valid_line_re.match(entry)
             if not result:
                 # Invalid syntax

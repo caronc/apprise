@@ -278,6 +278,64 @@ def test_apprise_multi_config_entries(tmpdir):
             ac.server_pop(len(ac.servers()) - 1), NotifyBase) is True
 
 
+def test_apprise_add_config():
+    """
+    API AppriseConfig.add_config()
+
+    """
+    content = """
+    # A comment line over top of a URL
+    mailto://usera:pass@gmail.com
+
+    # A line with mulitiple tag assignments to it
+    taga,tagb=gnome://
+
+    # Event if there is accidental leading spaces, this configuation
+    # is accepting of htat and will not exclude them
+                tagc=kde://
+
+    # A very poorly structured url
+    sns://:@/
+
+    # Just 1 token provided causes exception
+    sns://T1JJ3T3L2/
+    """
+    # Create ourselves a config object
+    ac = AppriseConfig()
+    assert ac.add_config(content=content)
+
+    # One configuration file should have been found
+    assert len(ac) == 1
+
+    # Object can be directly checked as a boolean; response is True
+    # when there is at least one entry
+    assert ac
+
+    # We should be able to read our 3 servers from that
+    assert len(ac.servers()) == 3
+
+    # Get our URL back
+    assert isinstance(ac[0].url(), six.string_types)
+
+    # Test invalid content
+    assert ac.add_config(content=object()) is False
+    assert ac.add_config(content=42) is False
+    assert ac.add_config(content=None) is False
+
+    # Still only one server loaded
+    assert len(ac) == 1
+
+    # Test having a pre-defined asset object and tag created
+    assert ac.add_config(
+        content=content, asset=AppriseAsset(), tag='a') is True
+
+    # Now there are 2 servers loaded
+    assert len(ac) == 2
+
+    # and 6 urls.. (as we've doubled up)
+    assert len(ac.servers()) == 6
+
+
 def test_apprise_config_tagging(tmpdir):
     """
     API: AppriseConfig tagging

@@ -102,7 +102,7 @@ class AppriseAttachment(object):
         # Initialize our default cache value
         cache = cache if cache is not None else self.cache
 
-        if isinstance(asset, AppriseAsset):
+        if asset is None:
             # prepare default asset
             asset = self.asset
 
