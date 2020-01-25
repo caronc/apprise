@@ -58,12 +58,19 @@ The Apprise options are as follows:
   * `--help`:
     Show this message and exit.
 
+## EXIT STATUS
+
+**apprise** exits with a status 0 if all notifications were sent successfully otherwise **apprise** returns a value of 1.
+
+**apprise** exits with a status of 2 if there were no notifcations sent due (as a result of end user actions).  This occurs in the case where you have assigned one or more tags to all of the Apprise URLs being notified and did not match any when actually executing the **apprise** tool.  This can also occur if you specified a tag that has not been assigned to anything defined in your configuration.
+
+
 ## SERVICE URLS
 
 There are to many service URL and combinations to list here. It's best to
 visit the [Apprise GitHub page][serviceurls] and see what's available.
 
-[serviceurls]: https://github.com/caronc/apprise
+[serviceurls]: https://github.com/caronc/apprise/wiki#notification-services
 
 ## EXAMPLES
 
@@ -107,4 +114,4 @@ all the time. If you find any bugs, please make them known at:
 
 ## COPYRIGHT
 
-Apprise is Copyright (C) 2019 Chris Caron <lead2gold@gmail.com>
+Apprise is Copyright (C) 2020 Chris Caron <lead2gold@gmail.com>
