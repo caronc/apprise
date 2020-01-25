@@ -101,7 +101,7 @@ class NotifyMailgun(NotifyBase):
     # The services URL
     service_url = 'https://www.mailgun.com/'
 
-    # All pushover requests are secure
+    # All notification requests are secure
     secure_protocol = 'mailgun'
 
     # Mailgun advertises they allow 300 requests per minute.

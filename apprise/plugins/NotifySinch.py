@@ -73,7 +73,7 @@ class NotifySinch(NotifyBase):
     # The services URL
     service_url = 'https://sinch.com/'
 
-    # All pushover requests are secure
+    # All notification requests are secure
     secure_protocol = 'sinch'
 
     # Allow 300 requests per minute.

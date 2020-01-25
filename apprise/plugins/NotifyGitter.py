@@ -71,7 +71,7 @@ class NotifyGitter(NotifyBase):
     # The services URL
     service_url = 'https://gitter.im/'
 
-    # All pushover requests are secure
+    # All notification requests are secure
     secure_protocol = 'gitter'
 
     # A URL that takes you to the setup/help of the specific protocol
@@ -102,7 +102,7 @@ class NotifyGitter(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{token}:{targets}/',
+        '{schema}://{token}/{targets}/',
     )
 
     # Define our template tokens

@@ -86,7 +86,7 @@ class NotifyD7Networks(NotifyBase):
     # The services URL
     service_url = 'https://d7networks.com/'
 
-    # All pushover requests are secure
+    # All notification requests are secure
     secure_protocol = 'd7sms'
 
     # Allow 300 requests per minute.

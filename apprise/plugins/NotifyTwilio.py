@@ -67,7 +67,7 @@ class NotifyTwilio(NotifyBase):
     # The services URL
     service_url = 'https://www.twilio.com/'
 
-    # All pushover requests are secure
+    # All notification requests are secure
     secure_protocol = 'twilio'
 
     # Allow 300 requests per minute.
