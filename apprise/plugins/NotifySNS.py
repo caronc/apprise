@@ -89,7 +89,7 @@ class NotifySNS(NotifyBase):
 
     # The maximum length of the body
     # Source: https://docs.aws.amazon.com/sns/latest/api/API_Publish.html
-    body_maxlen = 140
+    body_maxlen = 160
 
     # A title can not be used for SMS Messages.  Setting this to zero will
     # cause any title (if defined) to get placed into the message body.

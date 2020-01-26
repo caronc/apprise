@@ -63,7 +63,7 @@ class NotifyMessageBird(NotifyBase):
     notify_url = 'https://rest.messagebird.com/messages'
 
     # The maximum length of the body
-    body_maxlen = 140
+    body_maxlen = 160
 
     # A title can not be used for SMS Messages.  Setting this to zero will
     # cause any title (if defined) to get placed into the message body.

@@ -98,7 +98,7 @@ class NotifyMSG91(NotifyBase):
     notify_url = 'https://world.msg91.com/api/sendhttp.php'
 
     # The maximum length of the body
-    body_maxlen = 140
+    body_maxlen = 160
 
     # A title can not be used for SMS Messages.  Setting this to zero will
     # cause any title (if defined) to get placed into the message body.

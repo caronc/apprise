@@ -68,7 +68,7 @@ class NotifyPushed(NotifyBase):
     title_maxlen = 0
 
     # The maximum allowable characters allowed in the body per message
-    body_maxlen = 140
+    body_maxlen = 160
 
     # Define object templates
     templates = (
