@@ -1034,6 +1034,66 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifyKavenegar
+    ##################################
+    ('kavenegar://', {
+        # We failed to identify any valid authentication
+        'instance': TypeError,
+    }),
+    ('kavenegar://:@/', {
+        # We failed to identify any valid authentication
+        'instance': TypeError,
+    }),
+    ('kavenegar://{}/{}/{}'.format('1' * 10, '2' * 15, 'a' * 13), {
+        # No valid targets to notify
+        'instance': TypeError,
+    }),
+    ('kavenegar://{}/{}'.format('a' * 24, '3' * 14), {
+        # valid api key and valid number
+        'instance': plugins.NotifyKavenegar,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'kavenegar://a...a/',
+    }),
+    ('kavenegar://{}?to={}'.format('a' * 24, '3' * 14), {
+        # valid api key and valid number
+        'instance': plugins.NotifyKavenegar,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'kavenegar://a...a/',
+    }),
+    ('kavenegar://{}@{}/{}'.format('1' * 14, 'b' * 24, '3' * 14), {
+        # valid api key and valid number
+        'instance': plugins.NotifyKavenegar,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'kavenegar://{}@b...b/'.format('1' * 14),
+    }),
+    ('kavenegar://{}@{}/{}'.format('a' * 14, 'b' * 24, '3' * 14), {
+        # invalid from number
+        'instance': TypeError,
+    }),
+    ('kavenegar://{}@{}/{}'.format('3' * 4, 'b' * 24, '3' * 14), {
+        # invalid from number
+        'instance': TypeError,
+    }),
+    ('kavenegar://{}/{}?from={}'.format('b' * 24, '3' * 14, '1' * 14), {
+        # valid api key and valid number
+        'instance': plugins.NotifyKavenegar,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'kavenegar://{}@b...b/'.format('1' * 14),
+    }),
+    ('kavenegar://{}/{}'.format('b' * 24, '4' * 14), {
+        'instance': plugins.NotifyKavenegar,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('kavenegar://{}/{}'.format('c' * 24, '5' * 14), {
+        'instance': plugins.NotifyKavenegar,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifyKODI
     ##################################
     ('kodi://', {
