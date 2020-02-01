@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2019 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2020 Chris Caron <lead2gold@gmail.com>
 # All rights reserved.
 #
 # This code is licensed under the MIT License.
@@ -62,7 +62,7 @@ else:
 
 setup(
     name='apprise',
-    version='0.8.3',
+    version='0.8.4',
     description='Push Notifications that work with just about every platform!',
     license='MIT',
     long_description=open('README.md').read(),

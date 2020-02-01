@@ -1,4 +1,4 @@
-# Copyright (C) 2019 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2020 Chris Caron <lead2gold@gmail.com>
 # All rights reserved.
 #
 # This code is licensed under the MIT License.
@@ -56,7 +56,7 @@ Toasty, Stride, Syslog, Techulus Push, Telegram, Twilio, Twitter, Twist, XBMC,
 XMPP, Webex Teams}
 
 Name:           python-%{pypi_name}
-Version:        0.8.3
+Version:        0.8.4
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        MIT
@@ -222,6 +222,9 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 %endif
 
 %changelog
+* Sat Feb  1 2020 Chris Caron <lead2gold@gmail.com> - 0.8.4-1
+- Updated to v0.8.4
+
 * Sun Jan 12 2020 Chris Caron <lead2gold@gmail.com> - 0.8.3-1
 - Updated to v0.8.3
 
