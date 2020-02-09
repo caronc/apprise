@@ -477,6 +477,9 @@ class NotifyTelegram(NotifyBase):
             # Return our detected userid
             return _id
 
+        self.logger.warning(
+            'Failed to detect a Telegram user; '
+            'try sending your bot a message first.')
         return 0
 
     def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
@@ -505,8 +508,12 @@ class NotifyTelegram(NotifyBase):
         if self.notify_format == NotifyFormat.MARKDOWN:
             payload['parse_mode'] = 'MARKDOWN'
 
-        else:
-            # Either TEXT or HTML; if TEXT we'll make it HTML
+            payload['text'] = '{}{}'.format(
+                '{}\r\n'.format(title) if title else '',
+                body,
+            )
+
+        elif self.notify_format == NotifyFormat.HTML:
             payload['parse_mode'] = 'HTML'
 
             # HTML Spaces (&nbsp;) and tabs (&emsp;) aren't supported
@@ -524,30 +531,22 @@ class NotifyTelegram(NotifyBase):
                 # Tabs become 3 spaces
                 title = re.sub('&emsp;?', '   ', title, re.I)
 
-                # HTML
-                title = NotifyTelegram.escape_html(title, whitespace=False)
+            payload['text'] = '{}{}'.format(
+                '<b>{}</b>\r\n'.format(title) if title else '',
+                body,
+            )
 
-            # HTML
+        else:  # TEXT
+            payload['parse_mode'] = 'HTML'
+
+            # Escape content
+            title = NotifyTelegram.escape_html(title, whitespace=False)
             body = NotifyTelegram.escape_html(body, whitespace=False)
 
-        if title and self.notify_format == NotifyFormat.TEXT:
-            # Text HTML Formatting
-            payload['text'] = '<b>%s</b>\r\n%s' % (
-                title,
+            payload['text'] = '{}{}'.format(
+                '<b>{}</b>\r\n'.format(title) if title else '',
                 body,
             )
-
-        elif title:
-            # Already HTML; trust developer has wrapped
-            # the title appropriately
-            payload['text'] = '%s\r\n%s' % (
-                title,
-                body,
-            )
-
-        else:
-            # Assign the body
-            payload['text'] = body
 
         # Create a copy of the chat_ids list
         targets = list(self.targets)
