@@ -130,6 +130,11 @@ class NotifyJoin(NotifyBase):
             'regex': (r'^[a-z0-9]{32}$', 'i'),
             'map_to': 'targets',
         },
+        'device_name': {
+            'name': _('Device Name'),
+            'type': 'string',
+            'map_to': 'targets',
+        },
         'group': {
             'name': _('Group'),
             'type': 'choice:string',
@@ -210,18 +215,7 @@ class NotifyJoin(NotifyBase):
                     'group.{}'.format(group_re.group('name').lower()))
                 continue
 
-            elif IS_DEVICE_RE.match(target):
-                self.targets.append(target)
-                continue
-
-            self.logger.warning(
-                'Ignoring invalid Join device/group "{}"'.format(target)
-            )
-
-        if not self.targets:
-            msg = 'No Join targets to notify.'
-            self.logger.warning(msg)
-            raise TypeError(msg)
+            self.targets.append(target)
 
         return
 
@@ -247,11 +241,17 @@ class NotifyJoin(NotifyBase):
 
             url_args = {
                 'apikey': self.apikey,
-                'deviceId': target,
                 'priority': str(self.priority),
                 'title': title,
                 'text': body,
             }
+
+            if IS_GROUP_RE.match(target) or IS_DEVICE_RE.match(target):
+                url_args['deviceId'] = target
+
+            else:
+                # Support Device Names
+                url_args['deviceNames'] = target
 
             # prepare our image for display if configured to do so
             image_url = None if not self.include_image \
