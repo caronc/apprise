@@ -921,9 +921,9 @@ TEST_URLS = (
     ('join://%s@%s?image=False' % ('a' * 32, 'd' * 32), {
         'instance': plugins.NotifyJoin,
     }),
-    # API Key + invalid device
-    ('join://%s/%s' % ('a' * 32, 'k' * 12), {
-        'instance': TypeError,
+    # API Key + Device Name
+    ('join://%s/%s' % ('a' * 32, 'My Device'), {
+        'instance': plugins.NotifyJoin,
     }),
     # API Key + device
     ('join://%s/%s' % ('a' * 32, 'd' * 32), {
