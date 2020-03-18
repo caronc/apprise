@@ -88,6 +88,10 @@ class NotifyXMPP(NotifyBase):
     # The default XMPP secure port
     default_secure_port = 5223
 
+    # The maximum amount of time to wait when interacting with the server (in
+    # seconds) before timing out.
+    response_timeout = 15
+
     # XMPP does not support a title
     title_maxlen = 0
 
@@ -309,7 +313,7 @@ class NotifyXMPP(NotifyBase):
         xmpp.send_presence()
 
         try:
-            xmpp.get_roster()
+            xmpp.get_roster(timeout=self.response_timeout)
 
         except sleekxmpp.exceptions.IqError as e:
             self.logger.warning('There was an error getting the XMPP roster.')
