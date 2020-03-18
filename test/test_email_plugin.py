@@ -205,6 +205,11 @@ TEST_URLS = (
         # is set and tests that we gracfully handle them
         'test_smtplib_exceptions': True,
     }),
+    # Test no auth at all
+    ('mailto://localhost?from=test@example.com&to=test@example.com', {
+        'instance': plugins.NotifyEmail,
+        'privacy_url': 'mailto://localhost',
+    }),
 )
 
 

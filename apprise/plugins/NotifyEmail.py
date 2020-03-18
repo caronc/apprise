@@ -269,6 +269,14 @@ class NotifyEmail(NotifyBase):
 
     # Define object templates
     templates = (
+        '{schema}://{host}',
+        '{schema}://{host}:{port}',
+        '{schema}://{host}/{targets}',
+        '{schema}://{host}:{port}/{targets}',
+        '{schema}://{user}@{host}',
+        '{schema}://{user}@{host}:{port}',
+        '{schema}://{user}@{host}/{targets}',
+        '{schema}://{user}@{host}:{port}/{targets}',
         '{schema}://{user}:{password}@{host}',
         '{schema}://{user}:{password}@{host}:{port}',
         '{schema}://{user}:{password}@{host}/{targets}',
@@ -280,13 +288,11 @@ class NotifyEmail(NotifyBase):
         'user': {
             'name': _('User Name'),
             'type': 'string',
-            'required': True,
         },
         'password': {
             'name': _('Password'),
             'type': 'string',
             'private': True,
-            'required': True,
         },
         'host': {
             'name': _('Domain'),
@@ -388,7 +394,7 @@ class NotifyEmail(NotifyBase):
         self.from_name = from_name
         self.from_addr = from_addr
 
-        if not self.from_addr:
+        if self.user and not self.from_addr:
             # detect our email address
             self.from_addr = '{}@{}'.format(
                 re.split(r'[\s@]+', self.user)[0],
@@ -446,6 +452,10 @@ class NotifyEmail(NotifyBase):
         # Apply any defaults based on certain known configurations
         self.NotifyEmailDefaults()
 
+        # if there is still no smtp_host then we fall back to the hostname
+        if not self.smtp_host:
+            self.smtp_host = self.host
+
         return
 
     def NotifyEmailDefaults(self):
@@ -454,10 +464,11 @@ class NotifyEmail(NotifyBase):
         it was provided.
         """
 
-        if self.smtp_host:
+        if self.smtp_host or not self.user:
             # SMTP Server was explicitly specified, therefore it is assumed
             # the caller knows what he's doing and is intentionally
-            # over-riding any smarts to be applied
+            # over-riding any smarts to be applied. We also can not apply
+            # any default if there was no user specified.
             return
 
         # detect our email address using our user/host combo
@@ -683,7 +694,7 @@ class NotifyEmail(NotifyBase):
             args['bcc'] = ','.join(self.bcc)
 
         # pull email suffix from username (if present)
-        user = self.user.split('@')[0]
+        user = None if not self.user else self.user.split('@')[0]
 
         # Determine Authentication
         auth = ''
@@ -693,7 +704,7 @@ class NotifyEmail(NotifyBase):
                 password=self.pprint(
                     self.password, privacy, mode=PrivacyMode.Secret, safe=''),
             )
-        else:
+        elif user:
             # user url
             auth = '{user}@'.format(
                 user=NotifyEmail.quote(user, safe=''),
