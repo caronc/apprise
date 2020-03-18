@@ -1,5 +1,5 @@
 ## Description:
-**Related issue (if applicable):** fixes #<!--apprise issue number goes here-->
+**Related issue (if applicable):** #<!--apprise issue number goes here-->
 
 <!-- Have anything else to describe? Define it here -->
 
