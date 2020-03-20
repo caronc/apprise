@@ -83,6 +83,9 @@ class NotifyXMPP(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_xmpp'
 
+    # Lower throttle rate for XMPP
+    request_rate_per_sec = 0.5
+
     # The default XMPP port
     default_unsecure_port = 5222
 
@@ -378,13 +381,15 @@ class NotifyXMPP(NotifyBase):
         return results
 
 
-class SleekXmppAdapter:
+class SleekXmppAdapter(object):
+    """
+    Wrapper to SleekXmpp
+    """
 
     def __init__(self,
                  host=None, port=None, secure=None, verify_certificate=None,
-                 xep=None, jid=None, password=None,
-                 body=None, targets=None, before_message=None,
-                 logger=None):
+                 xep=None, jid=None, password=None, body=None, targets=None,
+                 before_message=None, logger=None):
 
         self.host = host
         self.port = port
@@ -462,9 +467,8 @@ class SleekXmppAdapter:
         # Establish connection to XMPP server.
         # To speed up sending messages, don't use the "reattempt" feature,
         # it will add a nasty delay even before connecting to XMPP server.
-        use_ssl = self.port == NotifyXMPP.default_secure_port
         if not self.xmpp.connect((self.host, self.port),
-                                 use_ssl=use_ssl, reattempt=False):
+                                 use_ssl=self.secure, reattempt=False):
             return False
 
         # Process XMPP communication.
@@ -473,27 +477,8 @@ class SleekXmppAdapter:
         return self.success
 
     def session_start(self, event):
-
-        # [amo, 2020-03-19]
-        # To speed up sending messages, let's skip presence signalling and
-        # roster inquiry. I believe both XMPP features resonate more with
-        # human users than bots.
         """
-        self.xmpp.send_presence()
-
-        try:
-            self.xmpp.get_roster()
-
-        except sleekxmpp.exceptions.IqError as e:
-            self.logger.warning('There was an error getting the XMPP roster.')
-            self.logger.debug(e.iq['error']['condition'])
-            self.xmpp.disconnect()
-            return False
-
-        except sleekxmpp.exceptions.IqTimeout:
-            self.logger.warning('XMPP Server is taking too long to respond.')
-            self.xmpp.disconnect()
-            return False
+        Session Manager
         """
 
         targets = list(self.targets)
