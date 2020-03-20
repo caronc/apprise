@@ -26,8 +26,20 @@
 import six
 import sys
 import ssl
+import mock
 
 import apprise
+
+try:
+    # Python v3.4+
+    from importlib import reload
+except ImportError:
+    try:
+        # Python v3.0-v3.3
+        from imp import reload
+    except ImportError:
+        # Python v2.7
+        pass
 
 # Disable logging for a cleaner testing output
 import logging
@@ -39,12 +51,32 @@ def test_xmpp_plugin(tmpdir):
     API: NotifyXMPP Plugin()
     """
 
-    class MockedSleekXmppAdapter(apprise.plugins.NotifyXMPP.SleekXmppAdapter):
+    # Mock the sleekxmpp module completely.
+    sys.modules['sleekxmpp'] = mock.MagicMock()
+
+    # The following libraries need to be reloaded to prevent
+    #  TypeError: super(type, obj): obj must be an instance or subtype of type
+    #  This is better explained in this StackOverflow post:
+    #     https://stackoverflow.com/questions/31363311/\
+    #       any-way-to-manually-fix-operation-of-\
+    #          super-after-ipython-reload-avoiding-ty
+    #
+    reload(sys.modules['apprise.plugins.NotifyXMPP'])
+    reload(sys.modules['apprise.plugins'])
+    reload(sys.modules['apprise.Apprise'])
+    reload(sys.modules['apprise'])
+
+    # Mock the XMPP adapter to override "self.success".
+    # This will signal a successful message delivery.
+    from apprise.plugins.NotifyXMPP import SleekXmppAdapter
+    class MockedSleekXmppAdapter(SleekXmppAdapter):
 
         def __init__(self, *args, **kwargs):
             super(MockedSleekXmppAdapter, self).__init__(*args, **kwargs)
-            # Mock the XMPP adapter to override "self.success".
             self.success = True
+
+    NotifyXMPP = sys.modules['apprise.plugins.NotifyXMPP']
+    NotifyXMPP.SleekXmppAdapter = MockedSleekXmppAdapter
 
     # Disable Throttling to speed testing
     apprise.plugins.NotifyBase.request_rate_per_sec = 0
