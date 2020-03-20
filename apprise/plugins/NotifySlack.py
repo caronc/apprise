@@ -176,7 +176,7 @@ class NotifySlack(NotifyBase):
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'^[A-Z0-9]{9}$', 'i'),
+            'regex': (r'^[A-Z0-9]+$', 'i'),
         },
         # Token required as part of the Webhook request
         #  /........./BBBBBBBBB/........................
@@ -185,7 +185,7 @@ class NotifySlack(NotifyBase):
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'^[A-Z0-9]{9}$', 'i'),
+            'regex': (r'^[A-Z0-9]+$', 'i'),
         },
         # Token required as part of the Webhook request
         #  /........./........./CCCCCCCCCCCCCCCCCCCCCCCC
@@ -194,7 +194,7 @@ class NotifySlack(NotifyBase):
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'^[A-Za-z0-9]{24}$', 'i'),
+            'regex': (r'^[A-Za-z0-9]+$', 'i'),
         },
         'target_encoded_id': {
             'name': _('Target Encoded ID'),

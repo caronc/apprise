@@ -3213,15 +3213,15 @@ TEST_URLS = (
             'message': '',
         },
     }),
-    ('slack://username@INVALID/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#cool', {
+    ('slack://username@-INVALID-/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#cool', {
         # invalid 1st Token
         'instance': TypeError,
     }),
-    ('slack://username@T1JJ3T3L2/INVALID/TIiajkdnlazkcOXrIdevi7FQ/#great', {
+    ('slack://username@T1JJ3T3L2/-INVALID-/TIiajkdnlazkcOXrIdevi7FQ/#great', {
         # invalid 2rd Token
         'instance': TypeError,
     }),
-    ('slack://username@T1JJ3T3L2/A1BRTD4JD/INVALID/#channel', {
+    ('slack://username@T1JJ3T3L2/A1BRTD4JD/-INVALID-/#channel', {
         # invalid 3rd Token
         'instance': TypeError,
     }),
