@@ -6,3 +6,6 @@ pytest-cov
 tox
 babel
 cryptography
+
+# Plugin Dependencies
+sleekxmpp

@@ -24,9 +24,9 @@
 # THE SOFTWARE.
 
 import six
-import mock
 import sys
 import ssl
+import mock
 
 import apprise
 
@@ -49,47 +49,10 @@ logging.disable(logging.CRITICAL)
 def test_xmpp_plugin(tmpdir):
     """
     API: NotifyXMPP Plugin()
-
     """
 
-    # Our module base
-    sleekxmpp_name = 'sleekxmpp'
-
-    # First we do an import without the sleekxmpp library available to ensure
-    # we can handle cases when the library simply isn't available
-
-    if sleekxmpp_name in sys.modules:
-        # Test cases where the sleekxmpp library exists; we want to remove it
-        # for the purpose of testing and capture the handling of the
-        # library when it is missing
-        del sys.modules[sleekxmpp_name]
-        reload(sys.modules['apprise.plugins.NotifyXMPP'])
-
-    # We need to fake our gnome environment for testing purposes since
-    # the sleekxmpp library isn't available in Travis CI
-    sys.modules[sleekxmpp_name] = mock.MagicMock()
-
-    xmpp = mock.Mock()
-    xmpp.register_plugin.return_value = True
-    xmpp.send_message.return_value = True
-    xmpp.connect.return_value = True
-    xmpp.disconnect.return_value = True
-    xmpp.send_presence.return_value = True
-    xmpp.get_roster.return_value = True
-    xmpp.ssl_version = None
-
-    class IqError(Exception):
-        iq = {'error': {'condition': 'test'}}
-        pass
-
-    class IqTimeout(Exception):
-        pass
-
-    # Setup our Exceptions
-    sys.modules[sleekxmpp_name].exceptions.IqError = IqError
-    sys.modules[sleekxmpp_name].exceptions.IqTimeout = IqTimeout
-
-    sys.modules[sleekxmpp_name].ClientXMPP.return_value = xmpp
+    # Mock the sleekxmpp module completely.
+    sys.modules['sleekxmpp'] = mock.MagicMock()
 
     # The following libraries need to be reloaded to prevent
     #  TypeError: super(type, obj): obj must be an instance or subtype of type
@@ -103,9 +66,17 @@ def test_xmpp_plugin(tmpdir):
     reload(sys.modules['apprise.Apprise'])
     reload(sys.modules['apprise'])
 
-    # An empty CA list
-    sys.modules['apprise.plugins.NotifyXMPP']\
-        .CA_CERTIFICATE_FILE_LOCATIONS = []
+    # Mock the XMPP adapter to override "self.success".
+    # This will signal a successful message delivery.
+    from apprise.plugins.NotifyXMPP import SleekXmppAdapter
+    class MockedSleekXmppAdapter(SleekXmppAdapter):
+
+        def __init__(self, *args, **kwargs):
+            super(MockedSleekXmppAdapter, self).__init__(*args, **kwargs)
+            self.success = True
+
+    NotifyXMPP = sys.modules['apprise.plugins.NotifyXMPP']
+    NotifyXMPP.SleekXmppAdapter = MockedSleekXmppAdapter
 
     # Disable Throttling to speed testing
     apprise.plugins.NotifyBase.request_rate_per_sec = 0
@@ -136,7 +107,7 @@ def test_xmpp_plugin(tmpdir):
         del ssl.PROTOCOL_TLS
 
         # Test our URL
-        url = 'xmpps://user:pass@example.com'
+        url = 'xmpps://user:pass@localhost'
         obj = apprise.Apprise.instantiate(url, suppress_exceptions=False)
         # Test we loaded
         assert isinstance(obj, apprise.plugins.NotifyXMPP) is True
@@ -151,7 +122,7 @@ def test_xmpp_plugin(tmpdir):
         # Handle case where it is not missing
         setattr(ssl, 'PROTOCOL_TLS', ssl.PROTOCOL_TLSv1)
         # Test our URL
-        url = 'xmpps://user:pass@example.com'
+        url = 'xmpps://user:pass@localhost'
         obj = apprise.Apprise.instantiate(url, suppress_exceptions=False)
         # Test we loaded
         assert isinstance(obj, apprise.plugins.NotifyXMPP) is True
@@ -164,31 +135,31 @@ def test_xmpp_plugin(tmpdir):
 
     urls = (
         {
-            'u': 'xmpps://user:pass@example.com',
-            'p': 'xmpps://user:****@example.com',
+            'u': 'xmpps://user:pass@localhost',
+            'p': 'xmpps://user:****@localhost',
         }, {
-            'u': 'xmpps://user:pass@example.com?'
+            'u': 'xmpps://user:pass@localhost?'
                  'xep=30,199,garbage,xep_99999999',
-            'p': 'xmpps://user:****@example.com',
+            'p': 'xmpps://user:****@localhost',
         }, {
-            'u': 'xmpps://user:pass@example.com?xep=ignored',
-            'p': 'xmpps://user:****@example.com',
+            'u': 'xmpps://user:pass@localhost?xep=ignored',
+            'p': 'xmpps://user:****@localhost',
         }, {
-            'u': 'xmpps://pass@example.com/'
+            'u': 'xmpps://pass@localhost/'
                  'user@test.com, user2@test.com/resource',
-            'p': 'xmpps://****@example.com',
+            'p': 'xmpps://****@localhost',
         }, {
-            'u': 'xmpps://pass@example.com:5226?jid=user@test.com',
-            'p': 'xmpps://****@example.com:5226',
+            'u': 'xmpps://pass@localhost:5226?jid=user@test.com',
+            'p': 'xmpps://****@localhost:5226',
         }, {
-            'u': 'xmpps://pass@example.com?jid=user@test.com&verify=False',
-            'p': 'xmpps://****@example.com',
+            'u': 'xmpps://pass@localhost?jid=user@test.com&verify=False',
+            'p': 'xmpps://****@localhost',
         }, {
-            'u': 'xmpps://user:pass@example.com?verify=False',
-            'p': 'xmpps://user:****@example.com',
+            'u': 'xmpps://user:pass@localhost?verify=False',
+            'p': 'xmpps://user:****@localhost',
         }, {
-            'u': 'xmpp://user:pass@example.com?to=user@test.com',
-            'p': 'xmpp://user:****@example.com',
+            'u': 'xmpp://user:pass@localhost?to=user@test.com',
+            'p': 'xmpp://user:****@localhost',
         }
     )
 
@@ -241,31 +212,9 @@ def test_xmpp_plugin(tmpdir):
         .CA_CERTIFICATE_FILE_LOCATIONS = [str(ca_cert), ]
 
     obj = apprise.Apprise.instantiate(
-        'xmpps://pass@example.com/user@test.com',
+        'xmpps://pass@localhost/user@test.com',
         suppress_exceptions=False)
 
     # Our notification now should be able to get a ca_cert to reference
     assert obj.notify(
         title='', body='body', notify_type=apprise.NotifyType.INFO) is True
-
-    # Test Connect Failures
-    xmpp.connect.return_value = False
-    assert obj.notify(
-        title='', body='body', notify_type=apprise.NotifyType.INFO) is False
-
-    # Return our object value so we don't obstruct other tests
-    xmpp.connect.return_value = True
-
-    # Test Exceptions
-    xmpp.get_roster.side_effect = \
-        sys.modules[sleekxmpp_name].exceptions.IqTimeout()
-
-    assert obj.notify(
-        title='', body='body', notify_type=apprise.NotifyType.INFO) is False
-    xmpp.get_roster.side_effect = None
-
-    xmpp.get_roster.side_effect = \
-        sys.modules[sleekxmpp_name].exceptions.IqError()
-    assert obj.notify(
-        title='', body='body', notify_type=apprise.NotifyType.INFO) is False
-    xmpp.get_roster.side_effect = None

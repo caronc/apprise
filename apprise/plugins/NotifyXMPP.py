@@ -25,6 +25,7 @@
 
 import re
 import ssl
+import logging
 from os.path import isfile
 
 from .NotifyBase import NotifyBase
@@ -81,6 +82,9 @@ class NotifyXMPP(NotifyBase):
 
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_xmpp'
+
+    # Lower throttle rate for XMPP
+    request_rate_per_sec = 0.5
 
     # The default XMPP port
     default_unsecure_port = 5222
@@ -267,34 +271,7 @@ class NotifyXMPP(NotifyBase):
                 jid = self.host
                 password = self.password if self.password else self.user
 
-        # Prepare our object
-        xmpp = sleekxmpp.ClientXMPP(jid, password)
-
-        for xep in self.xep:
-            # Load xep entries
-            xmpp.register_plugin('xep_{0:04d}'.format(xep))
-
-        if self.secure:
-            xmpp.ssl_version = ssl.PROTOCOL_TLSv1
-            # If the python version supports it, use highest TLS version
-            # automatically
-            if hasattr(ssl, "PROTOCOL_TLS"):
-                # Use the best version of TLS available to us
-                xmpp.ssl_version = ssl.PROTOCOL_TLS
-
-            xmpp.ca_certs = None
-            if self.verify_certificate:
-                # Set the ca_certs variable for certificate verification
-                xmpp.ca_certs = next(
-                    (cert for cert in CA_CERTIFICATE_FILE_LOCATIONS
-                     if isfile(cert)), None)
-
-                if xmpp.ca_certs is None:
-                    self.logger.warning(
-                        'XMPP Secure comunication can not be verified; '
-                        'no CA certificate found')
-
-        # Acquire our port number
+        # Compute port number
         if not self.port:
             port = self.default_secure_port \
                 if self.secure else self.default_unsecure_port
@@ -302,48 +279,23 @@ class NotifyXMPP(NotifyBase):
         else:
             port = self.port
 
-        # Establish our connection
-        if not xmpp.connect((self.host, port)):
-            return False
-
-        xmpp.send_presence()
-
-        try:
-            xmpp.get_roster()
-
-        except sleekxmpp.exceptions.IqError as e:
-            self.logger.warning('There was an error getting the XMPP roster.')
-            self.logger.debug(e.iq['error']['condition'])
-            xmpp.disconnect()
-            return False
-
-        except sleekxmpp.exceptions.IqTimeout:
-            self.logger.warning('XMPP Server is taking too long to respond.')
-            xmpp.disconnect()
-            return False
-
-        targets = list(self.targets)
-        if not targets:
-            # We always default to notifying ourselves
-            targets.append(jid)
-
-        while len(targets) > 0:
-
-            # Get next target (via JID)
-            target = targets.pop(0)
-
-            # Always call throttle before any remote server i/o is made
+        # Handler function to be called before each message.
+        # Always call throttle before any remote server i/o is made.
+        def on_before_message():
             self.throttle()
 
-            # The message we wish to send, and the JID that
-            # will receive it.
-            xmpp.send_message(mto=target, mbody=body, mtype='chat')
+        # Communicate with XMPP.
+        xmpp_adapter = SleekXmppAdapter(
+            host=self.host, port=port, secure=self.secure,
+            verify_certificate=self.verify_certificate,
+            xep=self.xep, jid=jid, password=password,
+            body=body, targets=self.targets, before_message=on_before_message,
+            logger=self.logger)
 
-        # Using wait=True ensures that the send queue will be
-        # emptied before ending the session.
-        xmpp.disconnect(wait=True)
+        # Initialize XMPP machinery and begin processing the XML stream.
+        outcome = xmpp_adapter.process()
 
-        return True
+        return outcome
 
     def url(self, privacy=False, *args, **kwargs):
         """
@@ -427,3 +379,132 @@ class NotifyXMPP(NotifyBase):
                 NotifyXMPP.parse_list(results['qsd']['to'])
 
         return results
+
+
+class SleekXmppAdapter(object):
+    """
+    Wrapper to SleekXmpp
+    """
+
+    def __init__(self,
+                 host=None, port=None, secure=None, verify_certificate=None,
+                 xep=None, jid=None, password=None, body=None, targets=None,
+                 before_message=None, logger=None):
+
+        self.host = host
+        self.port = port
+        self.secure = secure
+        self.verify_certificate = verify_certificate
+
+        self.xep = xep
+        self.jid = jid
+        self.password = password
+
+        self.body = body
+        self.targets = targets
+        self.before_message = before_message
+
+        self.logger = logger or logging.getLogger(__name__)
+
+        # Reference to XMPP client.
+        self.xmpp = None
+
+        # Whether everything succeeded.
+        self.success = False
+
+        self.configure_logging()
+        self.setup()
+
+    def configure_logging(self):
+
+        # Use the Apprise log handlers for configuring
+        # the sleekxmpp logger.
+        apprise_logger = logging.getLogger('apprise')
+        sleek_logger = logging.getLogger('sleekxmpp')
+
+        for handler in apprise_logger.handlers:
+            sleek_logger.addHandler(handler)
+
+        sleek_logger.setLevel(apprise_logger.level)
+
+    def setup(self):
+
+        # Prepare our object
+        self.xmpp = sleekxmpp.ClientXMPP(self.jid, self.password)
+
+        self.xmpp.add_event_handler("session_start", self.session_start)
+        self.xmpp.add_event_handler("failed_auth", self.failed_auth)
+
+        for xep in self.xep:
+            # Load xep entries
+            self.xmpp.register_plugin('xep_{0:04d}'.format(xep))
+
+        if self.secure:
+
+            # Don't even try to use the outdated ssl.PROTOCOL_SSLx
+            self.xmpp.ssl_version = ssl.PROTOCOL_TLSv1
+
+            # If the python version supports it, use highest TLS version
+            # automatically
+            if hasattr(ssl, "PROTOCOL_TLS"):
+                # Use the best version of TLS available to us
+                self.xmpp.ssl_version = ssl.PROTOCOL_TLS
+
+            self.xmpp.ca_certs = None
+            if self.verify_certificate:
+                # Set the ca_certs variable for certificate verification
+                self.xmpp.ca_certs = next(
+                    (cert for cert in CA_CERTIFICATE_FILE_LOCATIONS
+                     if isfile(cert)), None)
+
+                if self.xmpp.ca_certs is None:
+                    self.logger.warning(
+                        'XMPP Secure comunication can not be verified; '
+                        'no CA certificate found')
+
+    def process(self):
+
+        # Establish connection to XMPP server.
+        # To speed up sending messages, don't use the "reattempt" feature,
+        # it will add a nasty delay even before connecting to XMPP server.
+        if not self.xmpp.connect((self.host, self.port),
+                                 use_ssl=self.secure, reattempt=False):
+            return False
+
+        # Process XMPP communication.
+        self.xmpp.process(block=True)
+
+        return self.success
+
+    def session_start(self, event):
+        """
+        Session Manager
+        """
+
+        targets = list(self.targets)
+        if not targets:
+            # We always default to notifying ourselves
+            targets.append(self.jid)
+
+        while len(targets) > 0:
+
+            # Get next target (via JID)
+            target = targets.pop(0)
+
+            # Invoke "before_message" event hook.
+            # Here, it will indirectly invoke the throttling feature,
+            # which adds a delay before any remote server i/o is made.
+            if callable(self.before_message):
+                self.before_message()
+
+            # The message we wish to send, and the JID that will receive it.
+            self.xmpp.send_message(mto=target, mbody=self.body, mtype='chat')
+
+        # Using wait=True ensures that the send queue will be
+        # emptied before ending the session.
+        self.xmpp.disconnect(wait=True)
+
+        self.success = True
+
+    def failed_auth(self, event):
+        self.logger.error('Authentication with XMPP server failed')

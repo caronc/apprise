@@ -7,7 +7,7 @@
 ## Contributors
 
 The following users have contributed to this project and their deserved
-recogition has been identified here.  If you have contributed and wish
+recognition has been identified here.  If you have contributed and wish
 to be acknowledged for it, the syntax is as follows:
 
 ```
@@ -18,6 +18,9 @@ to be acknowledged for it, the syntax is as follows:
 The contributors have been listed in chronological order:
 * Wim de With <wf@dewith.io>
   * Dec 2018 - Added Matrix Support
-  
+
 * Hitesh Sondhi <hitesh@cropsly.com>
   * Mar 2019 - Added Flock Support
+
+* Andreas Motl <andreas@getkotori.org>
+  * Mar 2020 - Fix XMPP Support
