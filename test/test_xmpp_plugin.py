@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2019 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2020 Chris Caron <lead2gold@gmail.com>
 # All rights reserved.
 #
 # This code is licensed under the MIT License.
@@ -156,11 +156,11 @@ def test_xmpp_plugin(tmpdir):
         url = 'xmpps://user:pass@127.0.0.1'
         obj = apprise.Apprise.instantiate(url, suppress_exceptions=False)
 
-        # Check that it found our mocked environments
-        assert obj._enabled is True
-
         # Test we loaded
         assert isinstance(obj, apprise.plugins.NotifyXMPP) is True
+
+        # Check that it found our mocked environments
+        assert obj._enabled is True
 
         with mock.patch('sleekxmpp.ClientXMPP') as mock_stream:
             client_stream = mock.Mock()
@@ -182,11 +182,11 @@ def test_xmpp_plugin(tmpdir):
         url = 'xmpps://user:pass@localhost'
         obj = apprise.Apprise.instantiate(url, suppress_exceptions=False)
 
-        # Check that it found our mocked environments
-        assert obj._enabled is True
-
         # Test we loaded
         assert isinstance(obj, apprise.plugins.NotifyXMPP) is True
+
+        # Check that it found our mocked environments
+        assert obj._enabled is True
 
         with mock.patch('sleekxmpp.ClientXMPP') as mock_stream:
             client_stream = mock.Mock()

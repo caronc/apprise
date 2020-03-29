@@ -264,20 +264,13 @@ class NotifyXMPP(NotifyBase):
         else:
             port = self.port
 
-        def on_before_message():
-            """
-            Handler function to be called before each message.
-            Always call throttle before any remote server i/o is made.
-            """
-            self.throttle()
-
         try:
             # Communicate with XMPP.
             xmpp_adapter = SleekXmppAdapter(
                 host=self.host, port=port, secure=self.secure,
                 verify_certificate=self.verify_certificate, xep=self.xep,
                 jid=jid, password=password, body=body, targets=self.targets,
-                before_message=on_before_message, logger=self.logger)
+                before_message=self.throttle, logger=self.logger)
 
         except ValueError:
             # We failed
