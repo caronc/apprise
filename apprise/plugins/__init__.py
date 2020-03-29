@@ -34,6 +34,7 @@ from os.path import abspath
 # Used for testing
 from . import NotifyEmail as NotifyEmailBase
 from .NotifyGrowl import gntp
+from .NotifyXMPP import SleekXmppAdapter
 
 # NotifyBase object is passed in as a module not class
 from . import NotifyBase
@@ -63,6 +64,9 @@ __all__ = [
 
     # gntp (used for NotifyGrowl Testing)
     'gntp',
+
+    # sleekxmpp access points (used for NotifyXMPP Testing)
+    'SleekXmppAdapter',
 ]
 
 # we mirror our base purely for the ability to reset everything; this
