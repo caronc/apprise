@@ -106,9 +106,21 @@ class NotifyMacOSX(NotifyBase):
             major, minor = platform.mac_ver()[0].split('.')[:2]
 
             # Toggle our _enabled flag if verion is correct and executable
-            # found
-            self._enabled = (int(major) > 10 or int(minor) >= 8) \
-                and os.access(self.notify_path, os.X_OK)
+            # found. This is done in such a way to provide verbosity to the
+            # end user so they know why it may or may not work for them.
+            if not (int(major) > 10 or (int(major) == 10 and int(minor) >= 8)):
+                self.logger.warning(
+                    "MacOSX Notifications require your OS to be at least "
+                    "v10.8 (detected {}.{})".format(major, minor))
+
+            elif not os.access(self.notify_path, os.X_OK):
+                self.logger.warning(
+                    "MacOSX Notifications require '{}' to be in place."
+                    .format(self.notify_path))
+
+            else:
+                # We're good to go
+                self._enabled = True
 
         # Set sound object (no q/a for now)
         self.sound = sound

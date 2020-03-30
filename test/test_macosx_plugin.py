@@ -136,6 +136,16 @@ def test_macosx_plugin(mock_macver, mock_system, mock_popen, tmpdir):
     # Restore valid mac environment
     mock_macver.return_value = ('10.8', ('', '', ''), '')
 
+    mock_macver.return_value = ('9.12', ('', '', ''), '')
+    obj = apprise.Apprise.instantiate(
+        'macosx://_/?sound=default', suppress_exceptions=False)
+    assert isinstance(obj, apprise.plugins.NotifyMacOSX) is True
+    assert obj._enabled is False
+    assert obj.notify(title='title', body='body',
+                      notify_type=apprise.NotifyType.INFO) is False
+    # Restore valid mac environment
+    mock_macver.return_value = ('10.8', ('', '', ''), '')
+
     # Test cases where the script just flat out fails
     mock_cmd_response.returncode = 1
     obj = apprise.Apprise.instantiate(
