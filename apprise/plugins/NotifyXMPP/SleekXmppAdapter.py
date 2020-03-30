@@ -2,13 +2,27 @@
 
 import ssl
 from os.path import isfile
-import sleekxmpp
 import logging
+
+
+# Default our global support flag
+SLEEKXMPP_SUPPORT_AVAILABLE = False
+
+try:
+    # Import sleekxmpp if available
+    import sleekxmpp
+
+    SLEEKXMPP_SUPPORT_AVAILABLE = True
+
+except ImportError:
+    # No problem; we just simply can't support this plugin because we're
+    # either using Linux, or simply do not have sleekxmpp installed.
+    pass
 
 
 class SleekXmppAdapter(object):
     """
-    Wrapper to SleekXmpp
+    Wrapper to sleekxmpp
 
     """
 
@@ -43,6 +57,15 @@ class SleekXmppAdapter(object):
         # CentOS/RHEL 7
         "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
     ]
+
+    # This entry is a bit hacky, but it allows us to unit-test this library
+    # in an environment that simply doesn't have the sleekxmpp package
+    # available to us.
+    #
+    # If anyone is seeing this had knows a better way of testing this
+    # outside of what is defined in test/test_xmpp_plugin.py, please
+    # let me know! :)
+    _enabled = SLEEKXMPP_SUPPORT_AVAILABLE
 
     def __init__(self, host=None, port=None, secure=False,
                  verify_certificate=True, xep=None, jid=None, password=None,

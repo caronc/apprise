@@ -29,7 +29,6 @@ import sys
 import ssl
 import mock
 import pytest
-
 import apprise
 
 try:
@@ -43,11 +42,14 @@ except ImportError:
         # Python v2.7
         pass
 
+
 # Disable logging for a cleaner testing output
 import logging
 logging.disable(logging.CRITICAL)
 
 
+@pytest.mark.skipif(
+    'sleekxmpp' not in sys.modules, reason="requires sleekxmpp")
 def test_xmpp_plugin_import_error(tmpdir):
     """
     API: NotifyXMPP Plugin() Import Error
@@ -111,13 +113,15 @@ def test_xmpp_plugin_import_error(tmpdir):
     sys.path.remove(str(suite))
 
     # Reload the libraries we care about
-    reload(sys.modules['apprise.plugins.NotifyXMPP'])
     reload(sys.modules['apprise.plugins.NotifyXMPP.SleekXmppAdapter'])
+    reload(sys.modules['apprise.plugins.NotifyXMPP'])
     reload(sys.modules['apprise.plugins'])
     reload(sys.modules['apprise.Apprise'])
     reload(sys.modules['apprise'])
 
 
+@pytest.mark.skipif(
+    'sleekxmpp' not in sys.modules, reason="requires sleekxmpp")
 def test_xmpp_plugin(tmpdir):
     """
     API: NotifyXMPP Plugin()
@@ -318,6 +322,8 @@ def test_xmpp_plugin(tmpdir):
         ca_backup
 
 
+@pytest.mark.skipif(
+    'sleekxmpp' not in sys.modules, reason="requires sleekxmpp")
 def test_sleekxmpp_callbacks():
     """
     API: NotifyXMPP Plugin() Sleekxmpp callback tests

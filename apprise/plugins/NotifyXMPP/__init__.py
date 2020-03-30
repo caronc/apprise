@@ -30,24 +30,10 @@ from ...URLBase import PrivacyMode
 from ...common import NotifyType
 from ...utils import parse_list
 from ...AppriseLocale import gettext_lazy as _
+from .SleekXmppAdapter import SleekXmppAdapter
 
 # xep string parser
 XEP_PARSE_RE = re.compile('^[^1-9]*(?P<xep>[1-9][0-9]{0,3})$')
-
-# Default our global support flag
-NOTIFY_XMPP_SUPPORT_ENABLED = False
-
-try:
-    # Import sleekxmpp if available
-
-    from .SleekXmppAdapter import SleekXmppAdapter
-
-    NOTIFY_XMPP_SUPPORT_ENABLED = True
-
-except ImportError:
-    # No problem; we just simply can't support this plugin because we're
-    # either using Linux, or simply do not have sleekxmpp installed.
-    pass
 
 
 class NotifyXMPP(NotifyBase):
@@ -86,7 +72,7 @@ class NotifyXMPP(NotifyBase):
     # If anyone is seeing this had knows a better way of testing this
     # outside of what is defined in test/test_xmpp_plugin.py, please
     # let me know! :)
-    _enabled = NOTIFY_XMPP_SUPPORT_ENABLED
+    _enabled = SleekXmppAdapter._enabled
 
     # Define object templates
     templates = (
