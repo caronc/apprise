@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2019 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2020 Chris Caron <lead2gold@gmail.com>
 # All rights reserved.
 #
 # This code is licensed under the MIT License.
@@ -24,7 +24,7 @@
 # THE SOFTWARE.
 
 __title__ = 'apprise'
-__version__ = '0.8.4'
+__version__ = '0.8.5'
 __author__ = 'Chris Caron'
 __license__ = 'MIT'
 __copywrite__ = 'Copyright (C) 2020 Chris Caron <lead2gold@gmail.com>'
