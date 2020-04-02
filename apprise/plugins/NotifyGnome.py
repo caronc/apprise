@@ -141,7 +141,7 @@ class NotifyGnome(NotifyBase):
 
         # The urgency of the message
         if urgency not in GNOME_URGENCIES:
-            self.urgency = GnomeUrgency.NORMAL
+            self.urgency = self.template_args['urgency']['default']
 
         else:
             self.urgency = urgency
