@@ -171,7 +171,7 @@ class NotifyTechulusPush(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured sending Techulus Push '
+                'A Connection error occurred sending Techulus Push '
                 'notification.'
             )
             self.logger.debug('Socket Exception: %s' % str(e))

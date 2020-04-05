@@ -229,7 +229,7 @@ class NotifyEmby(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured authenticating a user with Emby '
+                'A Connection error occurred authenticating a user with Emby '
                 'at %s.' % self.host)
             self.logger.debug('Socket Exception: %s' % str(e))
 
@@ -392,7 +392,7 @@ class NotifyEmby(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured querying Emby '
+                'A Connection error occurred querying Emby '
                 'for session information at %s.' % self.host)
             self.logger.debug('Socket Exception: %s' % str(e))
 
@@ -477,7 +477,7 @@ class NotifyEmby(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured querying Emby '
+                'A Connection error occurred querying Emby '
                 'to logoff user %s at %s.' % (self.user, self.host))
             self.logger.debug('Socket Exception: %s' % str(e))
 
@@ -577,7 +577,7 @@ class NotifyEmby(NotifyBase):
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occured sending Emby '
+                    'A Connection error occurred sending Emby '
                     'notification to %s.' % self.host)
                 self.logger.debug('Socket Exception: %s' % str(e))
 

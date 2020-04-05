@@ -274,7 +274,7 @@ class NotifyIFTTT(NotifyBase):
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occured sending IFTTT:%s ' % (
+                    'A Connection error occurred sending IFTTT:%s ' % (
                         event) + 'notification.'
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))

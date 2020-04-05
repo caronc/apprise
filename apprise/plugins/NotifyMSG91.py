@@ -302,7 +302,7 @@ class NotifyMSG91(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured sending MSG91:%s '
+                'A Connection error occurred sending MSG91:%s '
                 'notification.' % ','.join(self.targets)
             )
             self.logger.debug('Socket Exception: %s' % str(e))

@@ -390,7 +390,7 @@ class NotifySendGrid(NotifyBase):
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occured sending SendGrid '
+                    'A Connection error occurred sending SendGrid '
                     'notification to {}.'.format(target))
                 self.logger.debug('Socket Exception: %s' % str(e))
 

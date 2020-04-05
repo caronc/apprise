@@ -264,7 +264,7 @@ class NotifyMSTeams(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured sending MSTeams notification.')
+                'A Connection error occurred sending MSTeams notification.')
             self.logger.debug('Socket Exception: %s' % str(e))
 
             # We failed

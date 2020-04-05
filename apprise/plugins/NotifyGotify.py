@@ -212,7 +212,7 @@ class NotifyGotify(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured sending Gotify '
+                'A Connection error occurred sending Gotify '
                 'notification to %s.' % self.host)
             self.logger.debug('Socket Exception: %s' % str(e))
 

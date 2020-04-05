@@ -256,7 +256,7 @@ class NotifyClickSend(NotifyBase):
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occured sending {} ClickSend '
+                    'A Connection error occurred sending {} ClickSend '
                     'notification(s).'.format(len(payload['messages'])))
                 self.logger.debug('Socket Exception: %s' % str(e))
 

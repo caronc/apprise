@@ -313,7 +313,7 @@ class NotifyEnigma2(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured sending Enigma2 '
+                'A Connection error occurred sending Enigma2 '
                 'notification to %s.' % self.host)
             self.logger.debug('Socket Exception: %s' % str(e))
 

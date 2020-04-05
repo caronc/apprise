@@ -502,7 +502,7 @@ class NotifyRocketChat(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured sending Rocket.Chat '
+                'A Connection error occurred sending Rocket.Chat '
                 '{}:notification.'.format(self.mode))
             self.logger.debug('Socket Exception: %s' % str(e))
 
@@ -570,13 +570,13 @@ class NotifyRocketChat(NotifyBase):
             # - TypeError = r.content is None
             # - AttributeError = r is None
             self.logger.warning(
-                'A commuication error occured authenticating {} on '
+                'A commuication error occurred authenticating {} on '
                 'Rocket.Chat.'.format(self.user))
             return False
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A connection error occured authenticating {} on '
+                'A connection error occurred authenticating {} on '
                 'Rocket.Chat.'.format(self.user))
             self.logger.debug('Socket Exception: %s' % str(e))
             return False
@@ -622,7 +622,7 @@ class NotifyRocketChat(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured logging off the '
+                'A Connection error occurred logging off the '
                 'Rocket.Chat server')
             self.logger.debug('Socket Exception: %s' % str(e))
             return False

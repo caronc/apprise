@@ -194,7 +194,7 @@ class NotifyWebexTeams(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured sending Webex Teams '
+                'A Connection error occurred sending Webex Teams '
                 'notification.'
             )
             self.logger.debug('Socket Exception: %s' % str(e))

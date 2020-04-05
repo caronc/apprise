@@ -304,7 +304,7 @@ class NotifyBoxcar(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured sending Boxcar '
+                'A Connection error occurred sending Boxcar '
                 'notification to %s.' % (host))
 
             self.logger.debug('Socket Exception: %s' % str(e))

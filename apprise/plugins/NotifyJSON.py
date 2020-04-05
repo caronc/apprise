@@ -238,7 +238,7 @@ class NotifyJSON(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured sending JSON '
+                'A Connection error occurred sending JSON '
                 'notification to %s.' % self.host)
             self.logger.debug('Socket Exception: %s' % str(e))
 

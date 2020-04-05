@@ -215,7 +215,7 @@ class NotifyProwl(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured sending Prowl notification.')
+                'A Connection error occurred sending Prowl notification.')
             self.logger.debug('Socket Exception: %s' % str(e))
 
             # Return; we're done

@@ -351,7 +351,7 @@ class NotifyTwilio(NotifyBase):
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occured sending Twilio:%s ' % (
+                    'A Connection error occurred sending Twilio:%s ' % (
                         target) + 'notification.'
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))

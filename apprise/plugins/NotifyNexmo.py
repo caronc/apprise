@@ -308,7 +308,7 @@ class NotifyNexmo(NotifyBase):
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occured sending Nexmo:%s '
+                    'A Connection error occurred sending Nexmo:%s '
                     'notification.' % target
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))

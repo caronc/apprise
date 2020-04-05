@@ -260,7 +260,7 @@ class NotifyRyver(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured sending Ryver:%s ' % (
+                'A Connection error occurred sending Ryver:%s ' % (
                     self.organization) + 'notification.'
             )
             self.logger.debug('Socket Exception: %s' % str(e))

@@ -622,14 +622,14 @@ class NotifySlack(NotifyBase):
             # }
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured posting {}to Slack.'.format(
+                'A Connection error occurred posting {}to Slack.'.format(
                     attach.name if attach else ''))
             self.logger.debug('Socket Exception: %s' % str(e))
             return False
 
         except (OSError, IOError) as e:
             self.logger.warning(
-                'An I/O error occured while reading {}.'.format(
+                'An I/O error occurred while reading {}.'.format(
                     attach.name if attach else 'attachment'))
             self.logger.debug('I/O Exception: %s' % str(e))
             return False

@@ -187,7 +187,7 @@ class NotifyKumulos(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured sending Kumulos '
+                'A Connection error occurred sending Kumulos '
                 'notification.')
             self.logger.debug('Socket Exception: %s' % str(e))
 

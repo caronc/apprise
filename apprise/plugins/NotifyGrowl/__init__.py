@@ -183,19 +183,19 @@ class NotifyGrowl(NotifyBase):
             )
 
         except errors.NetworkError:
-            msg = 'A network error occured sending Growl ' \
+            msg = 'A network error occurred sending Growl ' \
                   'notification to {}.'.format(self.host)
             self.logger.warning(msg)
             raise TypeError(msg)
 
         except errors.AuthError:
-            msg = 'An authentication error occured sending Growl ' \
+            msg = 'An authentication error occurred sending Growl ' \
                   'notification to {}.'.format(self.host)
             self.logger.warning(msg)
             raise TypeError(msg)
 
         except errors.UnsupportedError:
-            msg = 'An unsupported error occured sending Growl ' \
+            msg = 'An unsupported error occurred sending Growl ' \
                   'notification to {}.'.format(self.host)
             self.logger.warning(msg)
             raise TypeError(msg)
@@ -260,7 +260,7 @@ class NotifyGrowl(NotifyBase):
             # However, if the host/server is unavailable, you will get to this
             # point of the code.
             self.logger.warning(
-                'A Connection error occured sending Growl '
+                'A Connection error occurred sending Growl '
                 'notification to %s.' % self.host)
             self.logger.debug('Growl Exception: %s' % str(e))
 

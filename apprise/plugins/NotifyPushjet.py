@@ -222,7 +222,7 @@ class NotifyPushjet(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured sending Pushjet '
+                'A Connection error occurred sending Pushjet '
                 'notification to %s.' % self.host)
             self.logger.debug('Socket Exception: %s' % str(e))
 

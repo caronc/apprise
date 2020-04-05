@@ -259,7 +259,7 @@ class NotifyMatterMost(NotifyBase):
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occured sending MatterMost '
+                    'A Connection error occurred sending MatterMost '
                     'notification{}.'.format(
                         '' if not channel
                         else ' to channel {}'.format(channel)))

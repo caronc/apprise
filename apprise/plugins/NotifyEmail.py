@@ -653,7 +653,7 @@ class NotifyEmail(NotifyBase):
 
             except (SocketError, smtplib.SMTPException, RuntimeError) as e:
                 self.logger.warning(
-                    'A Connection error occured sending Email '
+                    'A Connection error occurred sending Email '
                     'notification to {}.'.format(self.smtp_host))
                 self.logger.debug('Socket Exception: %s' % str(e))
 

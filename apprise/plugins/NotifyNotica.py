@@ -251,7 +251,7 @@ class NotifyNotica(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured sending Notica notification.',
+                'A Connection error occurred sending Notica notification.',
             )
             self.logger.debug('Socket Exception: %s' % str(e))
 

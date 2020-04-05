@@ -298,7 +298,7 @@ class NotifyMailgun(NotifyBase):
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occured sending Mailgun:%s ' % (
+                    'A Connection error occurred sending Mailgun:%s ' % (
                         email) + 'notification.'
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))

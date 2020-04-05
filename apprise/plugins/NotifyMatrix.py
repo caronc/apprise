@@ -343,7 +343,7 @@ class NotifyMatrix(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured sending Matrix notification.'
+                'A Connection error occurred sending Matrix notification.'
             )
             self.logger.debug('Socket Exception: %s' % str(e))
             # Return; we're done
@@ -986,7 +986,7 @@ class NotifyMatrix(NotifyBase):
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occured while registering with Matrix'
+                    'A Connection error occurred while registering with Matrix'
                     ' server.')
                 self.logger.debug('Socket Exception: %s' % str(e))
                 # Return; we're done

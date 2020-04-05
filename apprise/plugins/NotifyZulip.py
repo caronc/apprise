@@ -312,7 +312,7 @@ class NotifyZulip(NotifyBase):
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occured sending Zulip '
+                    'A Connection error occurred sending Zulip '
                     'notification to {}.'.format(target))
                 self.logger.debug('Socket Exception: %s' % str(e))
 

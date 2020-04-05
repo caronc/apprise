@@ -311,7 +311,7 @@ class NotifyNotifico(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured sending Notifico '
+                'A Connection error occurred sending Notifico '
                 'notification.')
             self.logger.debug('Socket Exception: %s' % str(e))
 

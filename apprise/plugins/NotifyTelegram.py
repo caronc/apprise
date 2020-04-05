@@ -349,7 +349,7 @@ class NotifyTelegram(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A connection error occured posting Telegram '
+                'A connection error occurred posting Telegram '
                 'attachment.')
             self.logger.debug('Socket Exception: %s' % str(e))
 
@@ -436,12 +436,12 @@ class NotifyTelegram(NotifyBase):
             # - TypeError = r.content is None
             # - AttributeError = r is None
             self.logger.warning(
-                'A communication error occured detecting the Telegram User.')
+                'A communication error occurred detecting the Telegram User.')
             return 0
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A connection error occured detecting the Telegram User.')
+                'A connection error occurred detecting the Telegram User.')
             self.logger.debug('Socket Exception: %s' % str(e))
             return 0
 
@@ -631,7 +631,7 @@ class NotifyTelegram(NotifyBase):
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A connection error occured sending Telegram:%s ' % (
+                    'A connection error occurred sending Telegram:%s ' % (
                         payload['chat_id']) + 'notification.'
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))

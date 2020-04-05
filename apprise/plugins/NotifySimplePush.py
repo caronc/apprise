@@ -272,7 +272,7 @@ class NotifySimplePush(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured sending SimplePush notification.')
+                'A Connection error occurred sending SimplePush notification.')
             self.logger.debug('Socket Exception: %s' % str(e))
 
             # Return; we're done

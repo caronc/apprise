@@ -310,7 +310,7 @@ class NotifyKavenegar(NotifyBase):
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occured sending Kavenegar:%s ' % (
+                    'A Connection error occurred sending Kavenegar:%s ' % (
                         ', '.join(self.targets)) + 'notification.'
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))

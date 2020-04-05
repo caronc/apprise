@@ -308,7 +308,7 @@ class NotifyJoin(NotifyBase):
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occured sending Join:%s '
+                    'A Connection error occurred sending Join:%s '
                     'notification.' % target
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))

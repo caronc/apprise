@@ -576,7 +576,7 @@ class NotifyPushSafer(NotifyBase):
 
                 except (OSError, IOError) as e:
                     self.logger.warning(
-                        'An I/O error occured while reading {}.'.format(
+                        'An I/O error occurred while reading {}.'.format(
                             attachment.name if attachment else 'attachment'))
                     self.logger.debug('I/O Exception: %s' % str(e))
                     return False
@@ -746,7 +746,7 @@ class NotifyPushSafer(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured communicating with PushSafer.')
+                'A Connection error occurred communicating with PushSafer.')
             self.logger.debug('Socket Exception: %s' % str(e))
 
             return False, response

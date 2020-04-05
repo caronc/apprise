@@ -368,7 +368,7 @@ class NotifySNS(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured sending AWS '
+                'A Connection error occurred sending AWS '
                 'notification to "%s".' % (to),
             )
             self.logger.debug('Socket Exception: %s' % str(e))

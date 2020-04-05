@@ -379,7 +379,7 @@ class NotifyD7Networks(NotifyBase):
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occured sending D7 Networks:%s ' % (
+                    'A Connection error occurred sending D7 Networks:%s ' % (
                         ', '.join(self.targets)) + 'notification.'
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))
