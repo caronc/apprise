@@ -1912,29 +1912,32 @@ TEST_URLS = (
         # invalid url
         'instance': TypeError,
     }),
-    ('o365://{tenant}:{cid}@{secret}/{targets}'.format(
+    ('o365://{tenant}:{aid}/{cid}/{secret}/{targets}'.format(
         # invalid tenant
         tenant=',',
         cid='ab-cd-ef-gh',
+        aid='user@example.com',
         secret='abcd/123/3343/@jack/test',
         targets='/'.join(['email1@test.ca'])), {
 
         # We're valid and good to go
         'instance': TypeError,
     }),
-    ('o365://{tenant}:{cid}@{secret}/{targets}'.format(
+    ('o365://{tenant}:{aid}/{cid}/{secret}/{targets}'.format(
         tenant='tenant',
         # invalid client id
         cid='ab.',
+        aid='user@example.com',
         secret='abcd/123/3343/@jack/test',
         targets='/'.join(['email1@test.ca'])), {
 
         # We're valid and good to go
         'instance': TypeError,
     }),
-    ('o365://{tenant}:{cid}@{secret}/{targets}'.format(
+    ('o365://{tenant}:{aid}/{cid}/{secret}/{targets}'.format(
         tenant='tenant',
         cid='ab-cd-ef-gh',
+        aid='user@example.com',
         secret='abcd/123/3343/@jack/test',
         targets='/'.join(['email1@test.ca'])), {
 
@@ -1948,13 +1951,14 @@ TEST_URLS = (
         },
 
         # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'o365://tenant:a...h@****/email1%40test.ca',
-    }),
+        'privacy_url': 'o365://t...t:user@example.com/a...h/' \
+                       '****/email1%40test.ca/'}),
     # test our arguments
     ('o365://_/?oauth_id={cid}&oauth_secret={secret}&tenant={tenant}'
-        '&to={targets}'.format(
+        '&to={targets}&from={aid}'.format(
             tenant='tenant',
             cid='ab-cd-ef-gh',
+            aid='user@example.com',
             secret='abcd/123/3343/@jack/test',
             targets='email1@test.ca'),
         {
@@ -1968,11 +1972,13 @@ TEST_URLS = (
             },
 
             # Our expected url(privacy=True) startswith() response:
-            'privacy_url': 'o365://tenant:a...h@****/email1%40test.ca'}),
-    # Test invalid JSON
-    ('o365://{tenant}:{cid}@{secret}/{targets}'.format(
+            'privacy_url': 'o365://t...t:user@example.com/a...h/' \
+                           '****/email1%40test.ca/'}),
+    # Test invalid JSON (no tenant defaults to email domain)
+    ('o365://{tenant}:{aid}/{cid}/{secret}/{targets}'.format(
         tenant='tenant',
         cid='ab-cd-ef-gh',
+        aid='user@example.com',
         secret='abcd/123/3343/@jack/test',
         targets='/'.join(['email1@test.ca'])), {
 
@@ -1984,24 +1990,25 @@ TEST_URLS = (
         'notify_response': False,
     }),
     # No Targets specified
-    ('o365://{tenant}:{cid}@{secret}'.format(
+    ('o365://{tenant}:{aid}/{cid}/{secret}'.format(
         tenant='tenant',
         cid='ab-cd-ef-gh',
+        aid='user@example.com',
         secret='abcd/123/3343/@jack/test'), {
 
         # We're valid and good to go
         'instance': plugins.NotifyOffice365,
 
-        # There were no targets to notify
+        # There were no targets to notify; so we use our own email
         'requests_response_text': {
             'expires_in': 2000,
             'access_token': 'abcd1234',
         },
-        'notify_response': False,
     }),
-    ('o365://{tenant}:{cid}@{secret}/{targets}'.format(
+    ('o365://{tenant}:{aid}/{cid}/{secret}/{targets}'.format(
         tenant='tenant',
         cid='zz-zz-zz-zz',
+        aid='user@example.com',
         secret='abcd/abc/dcba/@john/test',
         targets='/'.join(['email1@test.ca'])), {
         'instance': plugins.NotifyOffice365,
@@ -2009,9 +2016,10 @@ TEST_URLS = (
         'response': False,
         'requests_response_code': 999,
     }),
-    ('o365://{tenant}:{cid}@{secret}/{targets}'.format(
+    ('o365://{tenant}:{aid}/{cid}/{secret}/{targets}'.format(
         tenant='tenant',
         cid='01-12-23-34',
+        aid='user@example.com',
         secret='abcd/321/4321/@test/test',
         targets='/'.join(['email1@test.ca'])), {
         'instance': plugins.NotifyOffice365,

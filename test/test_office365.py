@@ -49,7 +49,8 @@ def test_office365_general(mock_post):
     plugins.NotifyBase.request_rate_per_sec = 0
 
     # Initialize some generic (but valid) tokens
-    tenant = 'tenant.domain'
+    email = 'user@example.net'
+    tenant = 'ff-gg-hh-ii-jj'
     client_id = 'aa-bb-cc-dd-ee'
     secret = 'abcd/1234/abcd@ajd@/test'
     targets = 'target@example.com'
@@ -67,9 +68,10 @@ def test_office365_general(mock_post):
 
     # Instantiate our object
     obj = Apprise.instantiate(
-        'o365://{tenant}:{client_id}@{secret}/{targets}'.format(
-            client_id=client_id,
+        'o365://{tenant}:{email}/{tenant}/{secret}/{targets}'.format(
             tenant=tenant,
+            client_id=client_id,
+            email=email,
             secret=secret,
             targets=targets))
 
@@ -81,19 +83,50 @@ def test_office365_general(mock_post):
     with pytest.raises(TypeError):
         # No secret
         plugins.NotifyOffice365(
-            tenant='abc123',
-            client_id='ab-cd-ef-gh',
+            email=email,
+            client_id=client_id,
+            tenant=tenant,
             secret=None,
+            targets=None,
+        )
+
+    with pytest.raises(TypeError):
+        # Invalid email
+        plugins.NotifyOffice365(
+            email=None,
+            client_id=client_id,
+            tenant=tenant,
+            secret=secret,
+            targets=None,
+        )
+
+    with pytest.raises(TypeError):
+        # Invalid email
+        plugins.NotifyOffice365(
+            email='garbage',
+            client_id=client_id,
+            tenant=tenant,
+            secret=secret,
             targets=None,
         )
 
     # One of the targets are invalid
     plugins.NotifyOffice365(
-        tenant='abc123',
-        client_id='ab-cd-ef-gh',
-        secret='secret',
+        email=email,
+        client_id=client_id,
+        tenant=tenant,
+        secret=secret,
         targets=('abc@gmail.com', 'garbage'),
     )
+
+    # all of the targets are invalid
+    assert plugins.NotifyOffice365(
+        email=email,
+        client_id=client_id,
+        tenant=tenant,
+        secret=secret,
+        targets=('invalid', 'garbage'),
+    ).notify(body="test") is False
 
 
 @mock.patch('requests.post')
@@ -106,7 +139,8 @@ def test_office365_authentication(mock_post):
     plugins.NotifyBase.request_rate_per_sec = 0
 
     # Initialize some generic (but valid) tokens
-    tenant = 'tenant.domain'
+    tenant = 'ff-gg-hh-ii-jj'
+    email = 'user@example.net'
     client_id = 'aa-bb-cc-dd-ee'
     secret = 'abcd/1234/abcd@ajd@/test'
     targets = 'target@example.com'
@@ -132,11 +166,14 @@ def test_office365_authentication(mock_post):
 
     # Instantiate our object
     obj = Apprise.instantiate(
-        'o365://{tenant}:{client_id}@{secret}/{targets}'.format(
+        'o365://{tenant}:{email}/{client_id}/{secret}/{targets}'.format(
             client_id=client_id,
             tenant=tenant,
+            email=email,
             secret=secret,
             targets=targets))
+
+    assert isinstance(obj, plugins.NotifyOffice365)
 
     # Authenticate
     assert obj.authenticate() is True

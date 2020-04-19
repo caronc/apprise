@@ -31,8 +31,32 @@
 # https://docs.microsoft.com/en-us/graph/api/user-sendmail\
 #       ?view=graph-rest-1.0&tabs=http
 
+# Steps to get your Microsoft Client ID, Client Secret, and Tenant ID:
+# 1. You should have valid Microsoft personal account. Go to Azure Portal
+# 2. Go to -> Microsoft Active Directory --> App Registrations
+# 3. Click new -> give any name (your choice) in Name field -> select
+#     personal Microsoft accounts only --> Register
+# 4.  Now you have your client_id & Tenant id.
+# 5. To create client_secret , go to active directory ->
+#          Certificate & Tokens -> New client secret
+#               **This is auto-generated string which may have '@' and '?'
+#                 characters in it. You should encode these to prevent
+#                 from having any issues.**
+# 6. Now need to set permission Active directory -> API permissions ->
+#         Add permission (search mail) , add relevant permission.
+# 7. Set the redirect uri (Web) to:
+#        https://login.microsoftonline.com/common/oauth2/nativeclient
+#
+#     ...and click register.
+#
+#     This needs to be inserted into the "Redirect URI" text box as simply
+#     checking the check box next to this link seems to be insufficient.
+#     This is the default redirect uri used by this library, but you can use
+#     any other if you want.
+#
+# 8. Now you're good to go
+
 import requests
-from itertools import chain
 from datetime import datetime
 from datetime import timedelta
 from json import loads
@@ -66,7 +90,7 @@ class NotifyOffice365(NotifyBase):
     request_rate_per_sec = 0.20
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_o365'
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_office365'
 
     # URL to Microsoft Graph Server
     graph_url = 'https://graph.microsoft.com'
@@ -86,7 +110,8 @@ class NotifyOffice365(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{tenant}:{client_id}@{secret}/{targets}',
+        '{schema}://{tenant}:{email}/{client_id}/{secret}',
+        '{schema}://{tenant}:{email}/{client_id}/{secret}/{targets}',
     )
 
     # Define our template tokens
@@ -94,7 +119,14 @@ class NotifyOffice365(NotifyBase):
         'tenant': {
             'name': _('Tenant Domain'),
             'type': 'string',
-            'regex': (r'^[a-z0-9.-]+$', 'i'),
+            'required': True,
+            'private': True,
+            'regex': (r'^[a-z0-9-]+$', 'i'),
+        },
+        'email': {
+            'name': _('Account Email'),
+            'type': 'string',
+            'required': True,
         },
         'client_id': {
             'name': _('Client ID'),
@@ -128,13 +160,14 @@ class NotifyOffice365(NotifyBase):
         },
     })
 
-    def __init__(self, tenant, client_id, secret, targets=None, **kwargs):
+    def __init__(self, tenant, email, client_id, secret,
+                 targets=None, **kwargs):
         """
         Initialize Office 365 Object
         """
         super(NotifyOffice365, self).__init__(**kwargs)
 
-        # Office Tenant identifier
+        # Tenant identifier
         self.tenant = validate_regex(
             tenant, *self.template_tokens['tenant']['regex'])
         if not self.tenant:
@@ -142,6 +175,13 @@ class NotifyOffice365(NotifyBase):
                   '({}) was specified.'.format(tenant)
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        if not is_email(email):
+            msg = 'An invalid Office 365 Email Account ID' \
+                  '({}) was specified.'.format(email)
+            self.logger.warning(msg)
+            raise TypeError(msg)
+        self.email = email
 
         # Client Key (associated with generated OAuth2 Login)
         self.client_id = validate_regex(
@@ -163,15 +203,20 @@ class NotifyOffice365(NotifyBase):
         # Parse our targets
         self.targets = list()
 
-        for target in parse_list(targets):
-            # Validate targets and drop bad ones:
-            if not is_email(target):
-                self.logger.warning(
-                    'Dropped invalid email specified: {}'.format(target))
-                continue
+        targets = parse_list(targets)
+        if targets:
+            for target in targets:
+                # Validate targets and drop bad ones:
+                if not is_email(target):
+                    self.logger.warning(
+                        'Dropped invalid email specified: {}'.format(target))
+                    continue
 
-            # Add our email to our target list
-            self.targets.append(target)
+                # Add our email to our target list
+                self.targets.append(target)
+        else:
+            # Default to adding ourselves
+            self.targets.append(self.email)
 
         # Our token is acquired upon a successful login
         self.token = None
@@ -215,7 +260,10 @@ class NotifyOffice365(NotifyBase):
         targets = list(self.targets)
 
         # Define our URL to post to
-        url = '{graph_url}/v1.0/me/sendMail'.format(graph_url=self.graph_url)
+        url = '{graph_url}/v1.0/users/{email}/sendmail'.format(
+            email=self.email,
+            graph_url=self.graph_url,
+        )
 
         while len(targets):
             # Get our target to notify
@@ -260,7 +308,7 @@ class NotifyOffice365(NotifyBase):
         # Prepare our payload
         payload = {
             'client_id': self.client_id,
-            'client_secret': self.secret,
+            'secret': self.secret,
             'scope': '{graph_url}/{scope}'.format(
                 graph_url=self.graph_url,
                 scope=self.scope),
@@ -334,7 +382,7 @@ class NotifyOffice365(NotifyBase):
 
         if self.token:
             # Are we authenticated?
-            headers['Authorization'] = 'Bearer ' + self.token,
+            headers['Authorization'] = 'Bearer ' + self.token
 
         # Default content response object
         content = {}
@@ -408,13 +456,17 @@ class NotifyOffice365(NotifyBase):
             'verify': 'yes' if self.verify_certificate else 'no',
         }
 
-        return '{schema}://{tenant}:{client_id}@{secret}/{targets}/' \
-            '?{args}'.format(
+        return '{schema}://{tenant}:{email}/{client_id}/{secret}' \
+            '/{targets}/?{args}'.format(
                 schema=self.secure_protocol,
-                tenant=NotifyOffice365.quote(self.tenant, safe=''),
+                tenant=self.pprint(self.tenant, privacy, safe=''),
+                # email does not need to be escaped because it should
+                # already be a valid host and username at this point
+                email=self.email,
                 client_id=self.pprint(self.client_id, privacy, safe=''),
                 secret=self.pprint(
-                    self.secret, privacy, mode=PrivacyMode.Secret, safe=''),
+                    self.secret, privacy, mode=PrivacyMode.Secret,
+                    safe=''),
                 targets='/'.join(
                     [NotifyOffice365.quote(x, safe='') for x in self.targets]),
                 args=NotifyOffice365.urlencode(args))
@@ -439,6 +491,15 @@ class NotifyOffice365(NotifyBase):
         # of the secret key (since it can contain slashes in it)
         entries = NotifyOffice365.split_path(results['fullpath'])
 
+        try:
+            # Get our client_id is the first entry on the path
+            results['client_id'] = NotifyOffice365.unquote(entries.pop(0))
+
+        except IndexError:
+            # no problem, we may get the client_id another way through
+            # arguments...
+            pass
+
         # Prepare our target listing
         results['targets'] = list()
         while entries:
@@ -457,15 +518,29 @@ class NotifyOffice365(NotifyBase):
             # We're done
             break
 
+        # Initialize our tenant
+        results['tenant'] = None
+
         # Assemble our secret key which is a combination of the host followed
         # by all entries in the full path that follow up until the first email
-        results['secret'] = '/'.join(chain(
-            [NotifyOffice365.unquote(results['host'])],
-            [NotifyOffice365.unquote(x) for x in entries]))
+        results['secret'] = '/'.join(
+            [NotifyOffice365.unquote(x) for x in entries])
 
-        # Get our tenant and client_id out of the user/pass
-        results['tenant'] = NotifyOffice365.unquote(results['user'])
-        results['client_id'] = NotifyOffice365.unquote(results['password'])
+        # Assemble our client id from the user@hostname
+        if results['password']:
+            results['email'] = '{}@{}'.format(
+                NotifyOffice365.unquote(results['password']),
+                NotifyOffice365.unquote(results['host']),
+            )
+            # Update our tenant
+            results['tenant'] = NotifyOffice365.unquote(results['user'])
+
+        else:
+            # No tenant specified..
+            results['email'] = '{}@{}'.format(
+                NotifyOffice365.unquote(results['user']),
+                NotifyOffice365.unquote(results['host']),
+            )
 
         # OAuth2 ID
         if 'oauth_id' in results['qsd'] and len(results['qsd']['oauth_id']):
@@ -479,6 +554,13 @@ class NotifyOffice365(NotifyBase):
             # Extract the API Secret from an argument
             results['secret'] = \
                 NotifyOffice365.unquote(results['qsd']['oauth_secret'])
+
+        # Tenant
+        if 'from' in results['qsd'] and \
+                len(results['qsd']['from']):
+            # Extract the sending account's information
+            results['email'] = \
+                NotifyOffice365.unquote(results['qsd']['from'])
 
         # Tenant
         if 'tenant' in results['qsd'] and \
