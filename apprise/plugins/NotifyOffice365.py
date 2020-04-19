@@ -342,8 +342,7 @@ class NotifyOffice365(NotifyBase):
         # Some Debug Logging
         self.logger.debug('Office 365 POST URL: {} (cert_verify={})'.format(
             url, self.verify_certificate))
-        if payload:
-            self.logger.debug('Office 365 Payload: {}' .format(payload))
+        self.logger.debug('Office 365 Payload: {}' .format(payload))
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -472,7 +471,7 @@ class NotifyOffice365(NotifyBase):
         if 'oauth_id' in results['qsd'] and len(results['qsd']['oauth_id']):
             # Extract the API Key from an argument
             results['client_id'] = \
-                NotifyOffice365.unquote(results['qsd']['client_id'])
+                NotifyOffice365.unquote(results['qsd']['oauth_id'])
 
         # OAuth2 Secret
         if 'oauth_secret' in results['qsd'] and \

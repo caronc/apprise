@@ -24,6 +24,7 @@
 
 import os
 import mock
+import pytest
 import requests
 from datetime import datetime
 from json import dumps
@@ -76,6 +77,23 @@ def test_office365_general(mock_post):
 
     # Test our notification
     assert obj.notify(title='title', body='test') is True
+
+    with pytest.raises(TypeError):
+        # No secret
+        plugins.NotifyOffice365(
+            tenant='abc123',
+            client_id='ab-cd-ef-gh',
+            secret=None,
+            targets=None,
+        )
+
+    # One of the targets are invalid
+    plugins.NotifyOffice365(
+        tenant='abc123',
+        client_id='ab-cd-ef-gh',
+        secret='secret',
+        targets=('abc@gmail.com', 'garbage'),
+    )
 
 
 @mock.patch('requests.post')
@@ -132,12 +150,17 @@ def test_office365_authentication(mock_post):
     # Re-authentiate
     assert obj.authenticate() is True
 
+    # Change our response
+    response.status_code = 400
+
+    # We'll fail to send a notification now...
+    assert obj.notify(title='title', body='test') is False
+
     # Expire our token
     obj.token_expiry = datetime.now()
 
     # Set a failure response
     response.content = dumps(authentication_failure)
-    response.status_code = 400
 
     # We will fail to authenticate at this point
     assert obj.authenticate() is False

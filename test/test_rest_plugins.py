@@ -1913,10 +1913,31 @@ TEST_URLS = (
         'instance': TypeError,
     }),
     ('o365://{tenant}:{cid}@{secret}/{targets}'.format(
+        # invalid tenant
+        tenant=',',
+        cid='ab-cd-ef-gh',
+        secret='abcd/123/3343/@jack/test',
+        targets='/'.join(['email1@test.ca'])), {
+
+        # We're valid and good to go
+        'instance': TypeError,
+    }),
+    ('o365://{tenant}:{cid}@{secret}/{targets}'.format(
+        tenant='tenant',
+        # invalid client id
+        cid='ab.',
+        secret='abcd/123/3343/@jack/test',
+        targets='/'.join(['email1@test.ca'])), {
+
+        # We're valid and good to go
+        'instance': TypeError,
+    }),
+    ('o365://{tenant}:{cid}@{secret}/{targets}'.format(
         tenant='tenant',
         cid='ab-cd-ef-gh',
         secret='abcd/123/3343/@jack/test',
         targets='/'.join(['email1@test.ca'])), {
+
         # We're valid and good to go
         'instance': plugins.NotifyOffice365,
 
@@ -1929,6 +1950,26 @@ TEST_URLS = (
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'o365://tenant:a...h@****/email1%40test.ca',
     }),
+    # test our arguments
+    ('o365://_/?oauth_id={cid}&oauth_secret={secret}&tenant={tenant}'
+        '&to={targets}'.format(
+            tenant='tenant',
+            cid='ab-cd-ef-gh',
+            secret='abcd/123/3343/@jack/test',
+            targets='email1@test.ca'),
+        {
+            # We're valid and good to go
+            'instance': plugins.NotifyOffice365,
+
+            # Test what happens if a batch send fails to return a messageCount
+            'requests_response_text': {
+                'expires_in': 2000,
+                'access_token': 'abcd1234',
+            },
+
+            # Our expected url(privacy=True) startswith() response:
+            'privacy_url': 'o365://tenant:a...h@****/email1%40test.ca'}),
+    # Test invalid JSON
     ('o365://{tenant}:{cid}@{secret}/{targets}'.format(
         tenant='tenant',
         cid='ab-cd-ef-gh',
@@ -1940,6 +1981,22 @@ TEST_URLS = (
 
         # invalid JSON response
         'requests_response_text': '{',
+        'notify_response': False,
+    }),
+    # No Targets specified
+    ('o365://{tenant}:{cid}@{secret}'.format(
+        tenant='tenant',
+        cid='ab-cd-ef-gh',
+        secret='abcd/123/3343/@jack/test'), {
+
+        # We're valid and good to go
+        'instance': plugins.NotifyOffice365,
+
+        # There were no targets to notify
+        'requests_response_text': {
+            'expires_in': 2000,
+            'access_token': 'abcd1234',
+        },
         'notify_response': False,
     }),
     ('o365://{tenant}:{cid}@{secret}/{targets}'.format(
@@ -3214,7 +3271,7 @@ TEST_URLS = (
             'message': '',
         },
     }),
-    ('slack://username@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/' \
+    ('slack://username@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/'
         '?to=#nuxref', {
             'instance': plugins.NotifySlack,
 
@@ -3353,7 +3410,7 @@ TEST_URLS = (
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'sns://T...D/****/us-west-2',
     }),
-    ('sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/us-east-1' \
+    ('sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/us-east-1'
         '?to=12223334444', {
             # Missing a topic and/or phone No
             'instance': plugins.NotifySNS,
