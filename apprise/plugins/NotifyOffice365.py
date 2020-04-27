@@ -308,7 +308,7 @@ class NotifyOffice365(NotifyBase):
         # Prepare our payload
         payload = {
             'client_id': self.client_id,
-            'secret': self.secret,
+            'client_secret': self.secret,
             'scope': '{graph_url}/{scope}'.format(
                 graph_url=self.graph_url,
                 scope=self.scope),
