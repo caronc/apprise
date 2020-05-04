@@ -48,9 +48,9 @@ notification services that are out there. Apprise opens the door and makes
 it easy to access:
 
 Boxcar, ClickSend, Discord, E-Mail, Emby, Faast, Flock, Gitter, Gotify, Growl,
-IFTTT, Join, Kavenegar, KODI, Kumulos, Mailgun, MatterMost, Matrix, Microsoft
-Windows Notifications, Microsoft Teams, MessageBird, MSG91, Nexmo, Nextcloud,
-Notica, Notifico, Notify MacOSX, MyAndroid, Prowl, Pushalot, PushBullet,
+IFTTT, Join, Kavenegar, KODI, Kumulos, MacOSX, Mailgun, MatterMost, Matrix,
+Microsoft Windows, Microsoft Teams, MessageBird, MSG91, MyAndroid, Nexmo,
+Nextcloud, Notica, Notifico, Office365, Prowl, Pushalot, PushBullet,
 Pushjet, Pushover, PushSafer, Rocket.Chat, SendGrid, SimplePush, Sinch, Slack,
 Super Toasty, Stride, Syslog, Techulus Push, Telegram, Twilio, Twitter, Twist,
 XBMC, XMPP, Webex Teams}

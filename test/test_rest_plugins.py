@@ -1229,63 +1229,70 @@ TEST_URLS = (
         'instance': None,
     }),
     # No Token specified
-    ('mailgun://user@host', {
+    ('mailgun://user@localhost.localdomain', {
         'instance': TypeError,
     }),
     # Token is valid, but no user name specified
-    ('mailgun://host/{}-{}-{}'.format('a' * 32, 'b' * 8, 'c' * 8), {
+    ('mailgun://localhost.localdomain/{}-{}-{}'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
         'instance': TypeError,
     }),
     # Invalid from email address
-    ('mailgun://!@host/{}-{}-{}'.format('a' * 32, 'b' * 8, 'c' * 8), {
+    ('mailgun://!@localhost.localdomain/{}-{}-{}'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
         'instance': TypeError,
     }),
     # No To email address, but everything else is valid
-    ('mailgun://user@host/{}-{}-{}'.format('a' * 32, 'b' * 8, 'c' * 8), {
+    ('mailgun://user@localhost.localdomain/{}-{}-{}'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
         'instance': plugins.NotifyMailgun,
     }),
     # valid url with region specified (case insensitve)
-    ('mailgun://user@host/{}-{}-{}?region=uS'.format(
+    ('mailgun://user@localhost.localdomain/{}-{}-{}?region=uS'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
             'instance': plugins.NotifyMailgun,
     }),
     # valid url with region specified (case insensitve)
-    ('mailgun://user@host/{}-{}-{}?region=EU'.format(
+    ('mailgun://user@localhost.localdomain/{}-{}-{}?region=EU'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
             'instance': plugins.NotifyMailgun,
     }),
     # invalid url with region specified (case insensitve)
-    ('mailgun://user@host/{}-{}-{}?region=invalid'.format(
+    ('mailgun://user@localhost.localdomain/{}-{}-{}?region=invalid'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
             'instance': TypeError,
     }),
     # One To Email address
-    ('mailgun://user@host/{}-{}-{}/test@example.com'.format(
+    ('mailgun://user@localhost.localdomain/{}-{}-{}/test@example.com'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
             'instance': plugins.NotifyMailgun,
     }),
-    ('mailgun://user@host/{}-{}-{}?to=test@example.com'.format(
-        'a' * 32, 'b' * 8, 'c' * 8), {
-            'instance': plugins.NotifyMailgun,
-    }),
+    ('mailgun://user@localhost.localdomain/'
+        '{}-{}-{}?to=test@example.com'.format(
+            'a' * 32, 'b' * 8, 'c' * 8), {
+                'instance': plugins.NotifyMailgun}),
+
     # One To Email address, a from name specified too
-    ('mailgun://user@host/{}-{}-{}/test@example.com?name="Frodo"'.format(
+    ('mailgun://user@localhost.localdomain/{}-{}-{}/'
+        'test@example.com?name="Frodo"'.format(
+            'a' * 32, 'b' * 8, 'c' * 8), {
+                'instance': plugins.NotifyMailgun}),
+    ('mailgun://user@localhost.localdomain/{}-{}-{}'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-            'instance': plugins.NotifyMailgun,
-    }),
-    ('mailgun://user@host/{}-{}-{}'.format('a' * 32, 'b' * 8, 'c' * 8), {
         'instance': plugins.NotifyMailgun,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
-    ('mailgun://user@host/{}-{}-{}'.format('a' * 32, 'b' * 8, 'c' * 8), {
+    ('mailgun://user@localhost.localdomain/{}-{}-{}'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
         'instance': plugins.NotifyMailgun,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
-    ('mailgun://user@host/{}-{}-{}'.format('a' * 32, 'b' * 8, 'c' * 8), {
+    ('mailgun://user@localhost.localdomain/{}-{}-{}'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
         'instance': plugins.NotifyMailgun,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
@@ -1889,6 +1896,133 @@ TEST_URLS = (
     }),
     ('ncloud://user:pass@localhost:8083/user1/user2/user3', {
         'instance': plugins.NotifyNextcloud,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
+    # NotifyOffice365
+    ##################################
+    ('o365://', {
+        # Missing tenant, client_id, secret, and targets!
+        'instance': TypeError,
+    }),
+    ('o365://:@/', {
+        # invalid url
+        'instance': TypeError,
+    }),
+    ('o365://{tenant}:{aid}/{cid}/{secret}/{targets}'.format(
+        # invalid tenant
+        tenant=',',
+        cid='ab-cd-ef-gh',
+        aid='user@example.com',
+        secret='abcd/123/3343/@jack/test',
+        targets='/'.join(['email1@test.ca'])), {
+
+        # We're valid and good to go
+        'instance': TypeError,
+    }),
+    ('o365://{tenant}:{aid}/{cid}/{secret}/{targets}'.format(
+        tenant='tenant',
+        # invalid client id
+        cid='ab.',
+        aid='user@example.com',
+        secret='abcd/123/3343/@jack/test',
+        targets='/'.join(['email1@test.ca'])), {
+
+        # We're valid and good to go
+        'instance': TypeError,
+    }),
+    ('o365://{tenant}:{aid}/{cid}/{secret}/{targets}'.format(
+        tenant='tenant',
+        cid='ab-cd-ef-gh',
+        aid='user@example.com',
+        secret='abcd/123/3343/@jack/test',
+        targets='/'.join(['email1@test.ca'])), {
+
+        # We're valid and good to go
+        'instance': plugins.NotifyOffice365,
+
+        # Test what happens if a batch send fails to return a messageCount
+        'requests_response_text': {
+            'expires_in': 2000,
+            'access_token': 'abcd1234',
+        },
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'o365://t...t:user@example.com/a...h/' \
+                       '****/email1%40test.ca/'}),
+    # test our arguments
+    ('o365://_/?oauth_id={cid}&oauth_secret={secret}&tenant={tenant}'
+        '&to={targets}&from={aid}'.format(
+            tenant='tenant',
+            cid='ab-cd-ef-gh',
+            aid='user@example.com',
+            secret='abcd/123/3343/@jack/test',
+            targets='email1@test.ca'),
+        {
+            # We're valid and good to go
+            'instance': plugins.NotifyOffice365,
+
+            # Test what happens if a batch send fails to return a messageCount
+            'requests_response_text': {
+                'expires_in': 2000,
+                'access_token': 'abcd1234',
+            },
+
+            # Our expected url(privacy=True) startswith() response:
+            'privacy_url': 'o365://t...t:user@example.com/a...h/' \
+                           '****/email1%40test.ca/'}),
+    # Test invalid JSON (no tenant defaults to email domain)
+    ('o365://{tenant}:{aid}/{cid}/{secret}/{targets}'.format(
+        tenant='tenant',
+        cid='ab-cd-ef-gh',
+        aid='user@example.com',
+        secret='abcd/123/3343/@jack/test',
+        targets='/'.join(['email1@test.ca'])), {
+
+        # We're valid and good to go
+        'instance': plugins.NotifyOffice365,
+
+        # invalid JSON response
+        'requests_response_text': '{',
+        'notify_response': False,
+    }),
+    # No Targets specified
+    ('o365://{tenant}:{aid}/{cid}/{secret}'.format(
+        tenant='tenant',
+        cid='ab-cd-ef-gh',
+        aid='user@example.com',
+        secret='abcd/123/3343/@jack/test'), {
+
+        # We're valid and good to go
+        'instance': plugins.NotifyOffice365,
+
+        # There were no targets to notify; so we use our own email
+        'requests_response_text': {
+            'expires_in': 2000,
+            'access_token': 'abcd1234',
+        },
+    }),
+    ('o365://{tenant}:{aid}/{cid}/{secret}/{targets}'.format(
+        tenant='tenant',
+        cid='zz-zz-zz-zz',
+        aid='user@example.com',
+        secret='abcd/abc/dcba/@john/test',
+        targets='/'.join(['email1@test.ca'])), {
+        'instance': plugins.NotifyOffice365,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('o365://{tenant}:{aid}/{cid}/{secret}/{targets}'.format(
+        tenant='tenant',
+        cid='01-12-23-34',
+        aid='user@example.com',
+        secret='abcd/321/4321/@test/test',
+        targets='/'.join(['email1@test.ca'])), {
+        'instance': plugins.NotifyOffice365,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -3145,7 +3279,7 @@ TEST_URLS = (
             'message': '',
         },
     }),
-    ('slack://username@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/' \
+    ('slack://username@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/'
         '?to=#nuxref', {
             'instance': plugins.NotifySlack,
 
@@ -3284,7 +3418,7 @@ TEST_URLS = (
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'sns://T...D/****/us-west-2',
     }),
-    ('sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/us-east-1' \
+    ('sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/us-east-1'
         '?to=12223334444', {
             # Missing a topic and/or phone No
             'instance': plugins.NotifySNS,

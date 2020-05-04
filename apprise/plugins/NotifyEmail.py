@@ -116,6 +116,21 @@ EMAIL_TEMPLATES = (
         },
     ),
 
+    # Microsoft Office 365 (Email Server)
+    # You must specify an authenticated sender address in the from= settings
+    # and a valid email in the to= to deliver your emails to
+    (
+        'Microsoft Office 365',
+        re.compile(
+            r'^[^@]+@(?P<domain>(smtp\.)?office365\.com)$', re.I),
+        {
+            'port': 587,
+            'smtp_host': 'smtp.office365.com',
+            'secure': True,
+            'secure_mode': SecureMailMode.STARTTLS,
+        },
+    ),
+
     # Yahoo Mail
     (
         'Yahoo Mail',
