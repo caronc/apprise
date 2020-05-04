@@ -98,7 +98,7 @@ def print_version_msg():
               'optional.')
 @click.option('--config', '-c', default=None, type=str, multiple=True,
               metavar='CONFIG_URL',
-              help='Specify one or more configuration locations.')
+              help='Specify one or more attachment.')
 @click.option('--attach', '-a', default=None, type=str, multiple=True,
               metavar='ATTACHMENT_URL',
               help='Specify one or more configuration locations.')
