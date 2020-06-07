@@ -3201,7 +3201,7 @@ TEST_URLS = (
         # Expected notify() response
         'notify_response': False,
     }),
-    ('spush://salt:pass@{}'.format('X' * 14, 'A' * 16), {
+    ('spush://salt:pass@{}'.format('X' * 14), {
         # Now we'll test encrypted messages with new salt
         'instance': plugins.NotifySimplePush,
         # Set our response to OK

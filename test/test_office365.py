@@ -70,7 +70,6 @@ def test_office365_general(mock_post):
     obj = Apprise.instantiate(
         'o365://{tenant}:{email}/{tenant}/{secret}/{targets}'.format(
             tenant=tenant,
-            client_id=client_id,
             email=email,
             secret=secret,
             targets=targets))

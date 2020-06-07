@@ -161,7 +161,7 @@ class NotifyBase(URLBase):
             # Store the specified format if specified
             notify_format = kwargs.get('format', '')
             if notify_format.lower() not in NOTIFY_FORMATS:
-                msg = 'Invalid notification format %s'.format(notify_format)
+                msg = 'Invalid notification format {}'.format(notify_format)
                 self.logger.error(msg)
                 raise TypeError(msg)
 
