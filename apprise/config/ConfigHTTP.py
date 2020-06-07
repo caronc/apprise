@@ -211,7 +211,7 @@ class ConfigHTTP(ConfigBase):
                     return None
 
                 # Store our result (but no more than our buffer length)
-                response = r.content[:self.max_buffer_size + 1]
+                response = r.text[:self.max_buffer_size + 1]
 
                 # Verify that our content did not exceed the buffer size:
                 if len(response) > self.max_buffer_size:

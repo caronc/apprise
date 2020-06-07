@@ -89,7 +89,7 @@ def test_config_http(mock_post):
             'Content-Type': 'text/plain',
         }
 
-        content = default_content
+        text = default_content
 
         # Pointer to file
         ptr = None
@@ -257,7 +257,7 @@ def test_config_http(mock_post):
     iter(ch)
 
     # Test a buffer size limit reach
-    ch.max_buffer_size = len(dummy_response.content)
+    ch.max_buffer_size = len(dummy_response.text)
     assert isinstance(ch.read(), six.string_types) is True
 
     # Test YAML detection
@@ -304,7 +304,7 @@ def test_config_http(mock_post):
     # Take a snapshot
     max_buffer_size = ch.max_buffer_size
 
-    ch.max_buffer_size = len(dummy_response.content) - 1
+    ch.max_buffer_size = len(dummy_response.text) - 1
     assert ch.read() is None
 
     # Restore buffer size count
@@ -321,12 +321,12 @@ def test_config_http(mock_post):
     assert isinstance(ch.read(), six.string_types) is True
 
     # Handle cases where the content length is exactly at our limit
-    dummy_response.content = 'a' * ch.max_buffer_size
+    dummy_response.text = 'a' * ch.max_buffer_size
     # This is acceptable
     assert isinstance(ch.read(), six.string_types) is True
 
     # If we are over our limit though..
-    dummy_response.content = 'b' * (ch.max_buffer_size + 1)
+    dummy_response.text = 'b' * (ch.max_buffer_size + 1)
     assert ch.read() is None
 
     # Test an invalid return code
