@@ -335,6 +335,12 @@ TEST_URLS = (
         'instance': plugins.NotifyDiscord,
         'requests_response_code': requests.codes.no_content,
     }),
+    # Test with avatar URL
+    ('discord://%s/%s?avatar_url=http://localhost/test.jpg' % (
+        'i' * 24, 't' * 64), {
+            'instance': plugins.NotifyDiscord,
+            'requests_response_code': requests.codes.no_content,
+    }),
     # Test without image set
     ('discord://%s/%s' % ('i' * 24, 't' * 64), {
         'instance': plugins.NotifyDiscord,

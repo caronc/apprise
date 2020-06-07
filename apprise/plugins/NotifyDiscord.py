@@ -119,6 +119,10 @@ class NotifyDiscord(NotifyBase):
             'type': 'bool',
             'default': True,
         },
+        'avatar_url': {
+            'name': _('Avatar URL'),
+            'type': 'string',
+        },
         'footer': {
             'name': _('Display Footer'),
             'type': 'bool',
@@ -139,7 +143,7 @@ class NotifyDiscord(NotifyBase):
 
     def __init__(self, webhook_id, webhook_token, tts=False, avatar=True,
                  footer=False, footer_logo=True, include_image=False,
-                 **kwargs):
+                 avatar_url=None, **kwargs):
         """
         Initialize Discord Object
 
@@ -176,6 +180,11 @@ class NotifyDiscord(NotifyBase):
 
         # Place a thumbnail image inline with the message body
         self.include_image = include_image
+
+        # Avatar URL
+        # This allows a user to provide an over-ride to the otherwise
+        # dynamically generated avatar url images
+        self.avatar_url = avatar_url
 
         return
 
@@ -247,8 +256,9 @@ class NotifyDiscord(NotifyBase):
             payload['content'] = \
                 body if not title else "{}\r\n{}".format(title, body)
 
-        if self.avatar and image_url:
-            payload['avatar_url'] = image_url
+        if self.avatar and (image_url or self.avatar_url):
+            payload['avatar_url'] = \
+                self.avatar_url if self.avatar_url else image_url
 
         if self.user:
             # Optionally override the default username of the webhook
@@ -473,6 +483,11 @@ class NotifyDiscord(NotifyBase):
         results['include_image'] = \
             parse_bool(results['qsd'].get(
                 'image', results['qsd'].get('thumbnail', False)))
+
+        # Extract avatar url if it was specified
+        if 'avatar_url' in results['qsd']:
+            results['avatar_url'] = \
+                NotifyDiscord.unquote(results['qsd']['avatar_url'])
 
         return results
 
