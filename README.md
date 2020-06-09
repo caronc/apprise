@@ -127,11 +127,11 @@ apprise -t 'my title' -b 'my notification body' \
 # If you don't specify a --body (-b) then stdin is used allowing
 # you to use the tool as part of your every day administration:
 cat /proc/cpuinfo | apprise -t 'cpu info' \
-      'mailto://myemail:mypass@gmail.com'
+   'mailto://myemail:mypass@gmail.com'
 
 # The title field is totally optional
 uptime | apprise \
- 'discord:///4174216298/JHMHI8qBe7bk2ZwO5U711o3dV_js'
+   'discord:///4174216298/JHMHI8qBe7bk2ZwO5U711o3dV_js'
 ```
 
 ### Configuration Files
@@ -156,13 +156,13 @@ apprise -t 'my title' -b 'my notification body'
 # If you want to deviate from the default paths or specify more than one,
 # just specify them using the --config switch:
 apprise -t 'my title' -b 'my notification body' \
-	--config=/path/to/my/config.yml
+   --config=/path/to/my/config.yml
 
 # Got lots of configuration locations? No problem, you can specify them all:
 # Apprise can even fetch the configuration from over a network!
 apprise -t 'my title' -b 'my notification body' \
-	--config=/path/to/my/config.yml \
-	--config=https://localhost/my/apprise/config
+   --config=/path/to/my/config.yml \
+   --config=https://localhost/my/apprise/config
 ```
 
 ### Attaching Files
@@ -172,7 +172,7 @@ Apprise also supports file attachments too! Specify as many attachments to a not
 apprise --title 'Agile Joke' \
         --body 'Did you see this one yet?' \
         --attach https://i.redd.it/my2t4d2fx0u31.jpg \
-      'mailto://myemail:mypass@gmail.com'
+        'mailto://myemail:mypass@gmail.com'
 
 # Easily send an update from a critical server to your dev team
 apprise --title 'system crash' \
@@ -240,7 +240,7 @@ apobj.notify(
 # Tagging allows you to specifically target only specific notification
 # services you've loaded:
 apobj.notify(
-    body='send a notification to our admin group'
+    body='send a notification to our admin group',
     title='Attention Admins',
     # notify any services tagged with the 'admin' tag
     tag='admin',
@@ -249,7 +249,7 @@ apobj.notify(
 # If you want to notify absolutely everything (reguardless of whether
 # it's been tagged or not), just use the reserved tag of 'all':
 apobj.notify(
-    body='send a notification to our admin group'
+    body='send a notification to our admin group',
     title='Attention Admins',
     # notify absolutely everything loaded, reguardless on wether
     # it has a tag associated with it or not:
@@ -286,7 +286,7 @@ apobj.notify(
 )
 ```
 
-To send more than one attachment, you just need the **AppriseAttachment** object:
+To send more than one attachment, just use a list, set, or tuple instead:
 ```python
 import apprise
 
@@ -296,22 +296,21 @@ apobj = apprise.Apprise()
 # Add at least one service you want to notify
 apobj.add('mailto://myuser:mypass@hotmail.com')
 
-# Initialize our attachment object
-attachment = apprise.AppriseAttachment()
-
 # Now add all of the entries we're intrested in:
-# ?name= allows us to rename the actual jpeg as found on the site
-# to be another name when sent to our receipient(s)
-attachment.add('https://i.redd.it/my2t4d2fx0u31.jpg?name=FlyingToMars.jpg')
+attach = (
+    # ?name= allows us to rename the actual jpeg as found on the site
+    # to be another name when sent to our receipient(s)
+    'https://i.redd.it/my2t4d2fx0u31.jpg?name=FlyingToMars.jpg',
 
-# Now add another:
-attachment.add('/path/to/funny/joke.gif')
+    # Now add another:
+    '/path/to/funny/joke.gif',
+)
 
 # Send your multiple attachments with a single notify call:
 apobj.notify(
-    title='Some good jokes.'
-    body='Hey guys, check out these!'
-    attach=attachment,
+    title='Some good jokes.',
+    body='Hey guys, check out these!',
+    attach=attach,
 )
 ```
 
