@@ -31,6 +31,7 @@ from ...common import NotifyType
 from ...utils import parse_list
 from ...AppriseLocale import gettext_lazy as _
 from .SleekXmppAdapter import SleekXmppAdapter
+from .SliXmppAdapter import SliXmppAdapter
 
 # xep string parser
 XEP_PARSE_RE = re.compile('^[^1-9]*(?P<xep>[1-9][0-9]{0,3})$')
@@ -72,7 +73,8 @@ class NotifyXMPP(NotifyBase):
     # If anyone is seeing this had knows a better way of testing this
     # outside of what is defined in test/test_xmpp_plugin.py, please
     # let me know! :)
-    _enabled = SleekXmppAdapter._enabled
+    _enabled = SleekXmppAdapter._enabled or SliXmppAdapter._enabled
+    _adapter = SliXmppAdapter if SliXmppAdapter._enabled else SleekXmppAdapter
 
     # Define object templates
     templates = (
@@ -226,7 +228,7 @@ class NotifyXMPP(NotifyBase):
         if not self._enabled:
             self.logger.warning(
                 'XMPP Notifications are not supported by this system '
-                '- install sleekxmpp.')
+                '- install sleekxmpp or slixmpp.')
             return False
 
         # Detect our JID if it isn't otherwise specified
@@ -252,7 +254,7 @@ class NotifyXMPP(NotifyBase):
 
         try:
             # Communicate with XMPP.
-            xmpp_adapter = SleekXmppAdapter(
+            xmpp_adapter = self._adapter(
                 host=self.host, port=port, secure=self.secure,
                 verify_certificate=self.verify_certificate, xep=self.xep,
                 jid=jid, password=password, body=body, targets=self.targets,
