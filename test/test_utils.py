@@ -542,6 +542,12 @@ def test_split_urls():
     assert 'windows://' in results
     assert 'gnome://' in results
 
+    # We don't want to parse out URLs that are part of another URL's arguments
+    results = utils.split_urls('discord://host?url=https://localhost')
+    assert isinstance(results, list)
+    assert len(results) == 1
+    assert 'discord://host?url=https://localhost' in results
+
     # Commas and spaces found inside URLs are ignored
     urls = [
         'mailgun://noreply@sandbox.mailgun.org/apikey/?to=test@example.com,'

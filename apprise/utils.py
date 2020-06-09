@@ -120,7 +120,7 @@ GET_PHONE_NO_RE = re.compile(r'^\+?(?P<phone>[0-9\s)(+-]+)\s*$')
 
 # Regular expression used to destinguish between multiple URLs
 URL_DETECTION_RE = re.compile(
-    r'([a-z0-9]+?:\/\/.*?)[\s,]*(?=$|[a-z0-9]+?:\/\/)', re.I)
+    r'([a-z0-9]+?:\/\/.*?)(?=$|[\s,]+[a-z0-9]{2,9}?:\/\/)', re.I)
 
 # validate_regex() utilizes this mapping to track and re-use pre-complied
 # regular expressions
@@ -481,13 +481,6 @@ def split_urls(urls):
 
     except TypeError:
         results = []
-
-    if len(results) > 0 and results[len(results) - 1][-1] != urls[-1]:
-        # we always want to save the end of url URL if we can; This handles
-        # cases where there is actually a comma (,) at the end of a single URL
-        # that would have otherwise got lost when our regex passed over it.
-        results[len(results) - 1] += \
-            re.match(r'.*?([\s,]+)?$', urls).group(1).rstrip()
 
     return results
 
