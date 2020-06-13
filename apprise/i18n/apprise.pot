@@ -6,16 +6,16 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: apprise 0.8.5\n"
+"Project-Id-Version: apprise 0.8.6\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2020-03-30 16:00-0400\n"
+"POT-Creation-Date: 2020-06-13 10:55-0400\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.8.0\n"
+"Generated-By: Babel 2.7.0\n"
 
 msgid "API Key"
 msgstr ""
@@ -33,6 +33,9 @@ msgid "Access Secret"
 msgstr ""
 
 msgid "Access Token"
+msgstr ""
+
+msgid "Account Email"
 msgstr ""
 
 msgid "Account SID"
@@ -59,6 +62,9 @@ msgstr ""
 msgid "Avatar Image"
 msgstr ""
 
+msgid "Avatar URL"
+msgstr ""
+
 msgid "Batch Mode"
 msgstr ""
 
@@ -81,6 +87,12 @@ msgid "Carbon Copy"
 msgstr ""
 
 msgid "Channels"
+msgstr ""
+
+msgid "Client ID"
+msgstr ""
+
+msgid "Client Secret"
 msgstr ""
 
 msgid "Consumer Key"
@@ -336,6 +348,9 @@ msgid "Template"
 msgstr ""
 
 msgid "Template Data"
+msgstr ""
+
+msgid "Tenant Domain"
 msgstr ""
 
 msgid "Text To Speech"

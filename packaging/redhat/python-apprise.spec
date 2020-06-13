@@ -56,7 +56,7 @@ Super Toasty, Stride, Syslog, Techulus Push, Telegram, Twilio, Twitter, Twist,
 XBMC, XMPP, Webex Teams}
 
 Name:           python-%{pypi_name}
-Version:        0.8.5
+Version:        0.8.6
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        MIT
@@ -222,6 +222,9 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 %endif
 
 %changelog
+* Sat Jun 13 2020 Chris Caron <lead2gold@gmail.com> - 0.8.6-1
+- Updated to v0.8.6
+
 * Mon Mar 30 2020 Chris Caron <lead2gold@gmail.com> - 0.8.5-1
 - Updated to v0.8.5
 
