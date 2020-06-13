@@ -31,15 +31,15 @@ class NotifyType(object):
     """
     INFO = 'info'
     SUCCESS = 'success'
-    FAILURE = 'failure'
     WARNING = 'warning'
+    FAILURE = 'failure'
 
 
 NOTIFY_TYPES = (
     NotifyType.INFO,
     NotifyType.SUCCESS,
-    NotifyType.FAILURE,
     NotifyType.WARNING,
+    NotifyType.FAILURE,
 )
 
 
