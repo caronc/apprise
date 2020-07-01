@@ -80,6 +80,10 @@ class NotifyGotify(NotifyBase):
     # Disable throttle rate
     request_rate_per_sec = 0
 
+    # If no bytes have been received on the underlining socket for
+    # connection_timeout seconds, close the connection.
+    connection_timeout = 2.5
+
     # Define object templates
     templates = (
         '{schema}://{host}/{token}',
@@ -191,6 +195,7 @@ class NotifyGotify(NotifyBase):
                 data=dumps(payload),
                 headers=headers,
                 verify=self.verify_certificate,
+                timeout=self.connection_timeout,
             )
             if r.status_code != requests.codes.ok:
                 # We had a problem
