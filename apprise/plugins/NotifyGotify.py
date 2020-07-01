@@ -77,6 +77,9 @@ class NotifyGotify(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_gotify'
 
+    # Disable throttle rate
+    request_rate_per_sec = 0
+
     # Define object templates
     templates = (
         '{schema}://{host}/{token}',
