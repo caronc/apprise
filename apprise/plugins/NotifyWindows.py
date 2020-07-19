@@ -48,7 +48,7 @@ try:
 
 except ImportError:
     # No problem; we just simply can't support this plugin because we're
-    # either using Linux, or simply do not have pypiwin32 installed.
+    # either using Linux, or simply do not have pywin32 installed.
     pass
 
 
@@ -146,7 +146,8 @@ class NotifyWindows(NotifyBase):
 
         if not self._enabled:
             self.logger.warning(
-                "Windows Notifications are not supported by this system.")
+                "Windows Notifications are not supported by this system; "
+                "`pip install pywin32`.")
             return False
 
         # Always call throttle before any remote server i/o is made

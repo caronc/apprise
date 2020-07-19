@@ -64,7 +64,7 @@ def test_xmpp_plugin_import_error(tmpdir):
 
     # So we create a temporary directory called sleekxmpp (simulating the
     # library itself) and writing an __init__.py in it that does nothing
-    # but throw an ImportError exception (simulating that hte library
+    # but throw an ImportError exception (simulating that the library
     # isn't found).
     suite = tmpdir.mkdir("sleekxmpp")
     suite.join("__init__.py").write('')
@@ -101,7 +101,7 @@ def test_xmpp_plugin_import_error(tmpdir):
     reload(sys.modules['apprise'])
 
     # This tests that Apprise still works without sleekxmpp.
-    # XMPP objects can't be istantiated though.
+    # XMPP objects can still be instantiated in these cases.
     obj = apprise.Apprise.instantiate('xmpp://user:pass@localhost')
     assert obj is not None
 
