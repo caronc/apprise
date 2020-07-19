@@ -309,9 +309,17 @@ TEST_URLS = (
             # don't include an image by default
             'include_image': True,
     }),
+    ('https://discord.com/api/webhooks/{}/{}'.format(
+        '0' * 10, 'B' * 40), {
+            # Native URL Support, support the provided discord URL from their
+            # webpage.
+            'instance': plugins.NotifyDiscord,
+            'requests_response_code': requests.codes.no_content,
+    }),
     ('https://discordapp.com/api/webhooks/{}/{}'.format(
         '0' * 10, 'B' * 40), {
-            # Native URL Support, take the discord URL and still build from it
+            # Legacy Native URL Support, support the older URL (to be
+            # decomissioned on Nov 7th 2020)
             'instance': plugins.NotifyDiscord,
             'requests_response_code': requests.codes.no_content,
     }),

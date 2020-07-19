@@ -28,17 +28,17 @@
 # here you'll be able to access the Webhooks menu and create a new one.
 #
 #  When you've completed, you'll get a URL that looks a little like this:
-#  https://discordapp.com/api/webhooks/417429632418316298/\
+#  https://discord.com/api/webhooks/417429632418316298/\
 #         JHZ7lQml277CDHmQKMHI8qBe7bk2ZwO5UKjCiOAF7711o33MyqU344Qpgv7YTpadV_js
 #
 #  Simplified, it looks like this:
-#     https://discordapp.com/api/webhooks/WEBHOOK_ID/WEBHOOK_TOKEN
+#     https://discord.com/api/webhooks/WEBHOOK_ID/WEBHOOK_TOKEN
 #
 #  This plugin will simply work using the url of:
 #     discord://WEBHOOK_ID/WEBHOOK_TOKEN
 #
 # API Documentation on Webhooks:
-#    - https://discordapp.com/developers/docs/resources/webhook
+#    - https://discord.com/developers/docs/resources/webhook
 #
 import re
 import requests
@@ -63,7 +63,7 @@ class NotifyDiscord(NotifyBase):
     service_name = 'Discord'
 
     # The services URL
-    service_url = 'https://discordapp.com/'
+    service_url = 'https://discord.com/'
 
     # The default secure protocol
     secure_protocol = 'discord'
@@ -72,7 +72,7 @@ class NotifyDiscord(NotifyBase):
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_discord'
 
     # Discord Webhook
-    notify_url = 'https://discordapp.com/api/webhooks'
+    notify_url = 'https://discord.com/api/webhooks'
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_256
@@ -494,11 +494,13 @@ class NotifyDiscord(NotifyBase):
     @staticmethod
     def parse_native_url(url):
         """
-        Support https://discordapp.com/api/webhooks/WEBHOOK_ID/WEBHOOK_TOKEN
+        Support https://discord.com/api/webhooks/WEBHOOK_ID/WEBHOOK_TOKEN
+        Support Legacy URL as well:
+            https://discordapp.com/api/webhooks/WEBHOOK_ID/WEBHOOK_TOKEN
         """
 
         result = re.match(
-            r'^https?://discordapp\.com/api/webhooks/'
+            r'^https?://discord(app)?\.com/api/webhooks/'
             r'(?P<webhook_id>[0-9]+)/'
             r'(?P<webhook_token>[A-Z0-9_-]+)/?'
             r'(?P<args>\?.+)?$', url, re.I)
