@@ -1,1 +1,1 @@
-pypiwin32
+pywin32
