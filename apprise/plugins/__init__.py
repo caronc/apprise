@@ -33,7 +33,6 @@ from os.path import abspath
 
 # Used for testing
 from . import NotifyEmail as NotifyEmailBase
-from .NotifyGrowl import gntp
 from .NotifyXMPP import SleekXmppAdapter
 
 # NotifyBase object is passed in as a module not class
@@ -62,9 +61,6 @@ __all__ = [
 
     # Tokenizer
     'url_to_dict',
-
-    # gntp (used for NotifyGrowl Testing)
-    'gntp',
 
     # sleekxmpp access points (used for NotifyXMPP Testing)
     'SleekXmppAdapter',
