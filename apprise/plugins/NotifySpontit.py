@@ -52,7 +52,8 @@ from ..AppriseLocale import gettext_lazy as _
 # specified.  If not, we use the user of the person sending the notification
 # Finally the channel identifier is detected
 CHANNEL_REGEX = re.compile(
-    r'#?((?P<user>[a-z0-9]+)[/\])?(?P<channel>[a-z0-9_-]+)\s*$', re.I)
+    r'^\s*(#|%23)?((?P<user>[a-z0-9]+)([/\\]|%2F))?'
+    r'(?P<channel>[a-z0-9_-]+)\s*$', re.I)
 
 
 class NotifySpontit(NotifyBase):
@@ -231,6 +232,7 @@ class NotifySpontit(NotifyBase):
                     params=payload,
                     headers=headers,
                     verify=self.verify_certificate,
+                    timeout=self.request_timeout,
                 )
 
                 if r.status_code not in (

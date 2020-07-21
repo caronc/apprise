@@ -3195,6 +3195,74 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifySpontit
+    ##################################
+    ('spontit://', {
+        # invalid url
+        'instance': TypeError,
+    }),
+    # Another bad url
+    ('spontit://:@/', {
+        'instance': TypeError,
+    }),
+    # No user specified
+    ('spontit://%s' % ('a' * 100), {
+        'instance': TypeError,
+    }),
+    # Invalid API Key specified
+    ('spontit://user@%%20_', {
+        'instance': TypeError,
+    }),
+    # Provide a valid user and API Key
+    ('spontit://%s@%s' % ('u' * 11, 'b' * 100), {
+        'instance': plugins.NotifySpontit,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'spontit://{}@b...b/'.format('u' * 11),
+    }),
+    # Provide a valid user and API Key, but provide an invalid channel
+    ('spontit://%s@%s/#!!' % ('u' * 11, 'b' * 100), {
+        'instance': plugins.NotifySpontit,
+    }),
+    # Provide a valid user and API Key, but provide a valid channel
+    ('spontit://%s@%s/#abcd' % ('u' * 11, 'b' * 100), {
+        'instance': plugins.NotifySpontit,
+    }),
+    # Provide a valid user and API Key, but provide a valid channel (that is
+    # not ours).
+    # Spontit uses a slash (/) to delimite the user from the channel id when
+    # specifying channel entries. For Apprise we need to encode this
+    # so we convert the slash (/) into %2F
+    ('spontit://{}@{}/#1245%2Fabcd'.format('u' * 11, 'b' * 100), {
+        'instance': plugins.NotifySpontit,
+    }),
+    # Provide multipe channels
+    ('spontit://{}@{}/#1245%2Fabcd/defg'.format('u' * 11, 'b' * 100), {
+        'instance': plugins.NotifySpontit,
+    }),
+    # Provide multipe channels through the use of the to= variable
+    ('spontit://{}@{}/?to=#1245/abcd'.format('u' * 11, 'b' * 100), {
+        'instance': plugins.NotifySpontit,
+    }),
+    ('spontit://%s@%s' % ('u' * 11, 'b' * 100), {
+        'instance': plugins.NotifySpontit,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('spontit://%s@%s' % ('u' * 11, 'b' * 100), {
+        'instance': plugins.NotifySpontit,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('spontit://%s@%s' % ('u' * 11, 'b' * 100), {
+        'instance': plugins.NotifySpontit,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifySimplePush
     ##################################
     ('spush://', {
