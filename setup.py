@@ -74,7 +74,7 @@ setup(
         'Kavenegar KODI Kumulos MacOS Mailgun Matrix Mattermost MessageBird '
         'MSG91 Nexmo Nextcloud Notica Notifico Office365 PopcornNotify Prowl '
         'PushBullet Pushjet Pushed Pushover PushSafer Rocket.Chat Ryver '
-        'SendGrid SimplePush Sinch Slack Stride Syslog Techulus Push '
+        'SendGrid SimplePush Sinch Slack Spontit Stride Syslog Techulus Push '
         'Telegram Twilio Twist Twitter XBMC Microsoft MSTeams Windows Webex '
         'CLI API',
     author='Chris Caron',
