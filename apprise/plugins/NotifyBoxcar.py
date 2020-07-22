@@ -279,6 +279,7 @@ class NotifyBoxcar(NotifyBase):
                 data=dumps(payload),
                 headers=headers,
                 verify=self.verify_certificate,
+                timeout=self.request_timeout,
             )
 
             # Boxcar returns 201 (Created) when successful

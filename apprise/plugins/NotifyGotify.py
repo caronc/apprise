@@ -80,9 +80,10 @@ class NotifyGotify(NotifyBase):
     # Disable throttle rate
     request_rate_per_sec = 0
 
-    # If no bytes have been received on the underlining socket for
-    # connection_timeout seconds, close the connection.
-    connection_timeout = 2.5
+    # The connect timeout is the number of seconds Requests will wait for your
+    # client to establish a connection to a remote machine (corresponding to
+    # the connect()) call on the socket.
+    request_connect_timeout = 2.5
 
     # Define object templates
     templates = (
@@ -195,7 +196,7 @@ class NotifyGotify(NotifyBase):
                 data=dumps(payload),
                 headers=headers,
                 verify=self.verify_certificate,
-                timeout=self.connection_timeout,
+                timeout=self.request_timeout,
             )
             if r.status_code != requests.codes.ok:
                 # We had a problem

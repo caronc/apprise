@@ -234,6 +234,7 @@ class NotifyMessageBird(NotifyBase):
                     data=payload,
                     headers=headers,
                     verify=self.verify_certificate,
+                    timeout=self.request_timeout,
                 )
 
                 # Sample output of a successful transmission

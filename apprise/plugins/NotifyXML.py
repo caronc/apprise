@@ -234,6 +234,7 @@ class NotifyXML(NotifyBase):
                 headers=headers,
                 auth=auth,
                 verify=self.verify_certificate,
+                timeout=self.request_timeout,
             )
             if r.status_code != requests.codes.ok:
                 # We had a problem

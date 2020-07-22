@@ -325,6 +325,7 @@ class NotifyTelegram(NotifyBase):
                     files=files,
                     data=payload,
                     verify=self.verify_certificate,
+                    timeout=self.request_timeout,
                 )
 
                 if r.status_code != requests.codes.ok:
@@ -393,6 +394,7 @@ class NotifyTelegram(NotifyBase):
                 url,
                 headers=headers,
                 verify=self.verify_certificate,
+                timeout=self.request_timeout,
             )
 
             if r.status_code != requests.codes.ok:
@@ -597,6 +599,7 @@ class NotifyTelegram(NotifyBase):
                     data=dumps(payload),
                     headers=headers,
                     verify=self.verify_certificate,
+                    timeout=self.request_timeout,
                 )
 
                 if r.status_code != requests.codes.ok:

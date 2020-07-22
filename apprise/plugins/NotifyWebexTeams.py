@@ -168,6 +168,7 @@ class NotifyWebexTeams(NotifyBase):
                 data=dumps(payload),
                 headers=headers,
                 verify=self.verify_certificate,
+                timeout=self.request_timeout,
             )
             if r.status_code not in (
                     requests.codes.ok, requests.codes.no_content):

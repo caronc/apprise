@@ -207,6 +207,7 @@ class NotifyEmby(NotifyBase):
                 headers=headers,
                 data=dumps(payload),
                 verify=self.verify_certificate,
+                timeout=self.request_timeout,
             )
 
             if r.status_code != requests.codes.ok:
@@ -370,6 +371,7 @@ class NotifyEmby(NotifyBase):
                 url,
                 headers=headers,
                 verify=self.verify_certificate,
+                timeout=self.request_timeout,
             )
 
             if r.status_code != requests.codes.ok:
@@ -449,6 +451,7 @@ class NotifyEmby(NotifyBase):
                 url,
                 headers=headers,
                 verify=self.verify_certificate,
+                timeout=self.request_timeout,
             )
 
             if r.status_code not in (
@@ -550,6 +553,7 @@ class NotifyEmby(NotifyBase):
                     data=dumps(payload),
                     headers=headers,
                     verify=self.verify_certificate,
+                    timeout=self.request_timeout,
                 )
                 if r.status_code not in (
                         requests.codes.ok,

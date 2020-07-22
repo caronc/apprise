@@ -269,6 +269,7 @@ class NotifyEnigma2(NotifyBase):
                 headers=headers,
                 auth=auth,
                 verify=self.verify_certificate,
+                timeout=self.request_timeout,
             )
 
             if r.status_code != requests.codes.ok:

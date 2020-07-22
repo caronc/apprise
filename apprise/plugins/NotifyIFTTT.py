@@ -242,6 +242,7 @@ class NotifyIFTTT(NotifyBase):
                     data=dumps(payload),
                     headers=headers,
                     verify=self.verify_certificate,
+                    timeout=self.request_timeout,
                 )
                 self.logger.debug(
                     u"IFTTT HTTP response headers: %r" % r.headers)

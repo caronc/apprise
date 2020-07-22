@@ -693,6 +693,7 @@ class NotifyPushSafer(NotifyBase):
                 data=payload,
                 headers=headers,
                 verify=self.verify_certificate,
+                timeout=self.request_timeout,
             )
 
             try:

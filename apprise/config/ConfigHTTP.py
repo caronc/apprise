@@ -58,10 +58,6 @@ class ConfigHTTP(ConfigBase):
     # The default secure protocol
     secure_protocol = 'https'
 
-    # The maximum number of seconds to wait for a connection to be established
-    # before out-right just giving up
-    connection_timeout_sec = 5.0
-
     # If an HTTP error occurs, define the number of characters you still want
     # to read back.  This is useful for debugging purposes, but nothing else.
     # The idea behind enforcing this kind of restriction is to prevent abuse
@@ -185,7 +181,7 @@ class ConfigHTTP(ConfigBase):
                     headers=headers,
                     auth=auth,
                     verify=self.verify_certificate,
-                    timeout=self.connection_timeout_sec,
+                    timeout=self.request_timeout,
                     stream=True) as r:
 
                 # Handle Errors

@@ -322,6 +322,7 @@ class NotifySinch(NotifyBase):
                     data=json.dumps(payload),
                     headers=headers,
                     verify=self.verify_certificate,
+                    timeout=self.request_timeout,
                 )
 
                 # The responsne might look like:

@@ -315,6 +315,7 @@ class NotifyPushBullet(NotifyBase):
                 files=files,
                 auth=auth,
                 verify=self.verify_certificate,
+                timeout=self.request_timeout,
             )
 
             try:
