@@ -280,6 +280,7 @@ class NotifyJoin(NotifyBase):
                     data=payload,
                     headers=headers,
                     verify=self.verify_certificate,
+                    timeout=self.request_timeout,
                 )
 
                 if r.status_code != requests.codes.ok:

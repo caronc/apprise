@@ -236,6 +236,7 @@ class NotifySimplePush(NotifyBase):
                 data=payload,
                 headers=headers,
                 verify=self.verify_certificate,
+                timeout=self.request_timeout,
             )
 
             # Get our SimplePush response (if it's possible)

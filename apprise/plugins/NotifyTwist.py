@@ -640,7 +640,9 @@ class NotifyTwist(NotifyBase):
                 api_url,
                 data=payload,
                 headers=headers,
-                verify=self.verify_certificate)
+                verify=self.verify_certificate,
+                timeout=self.request_timeout,
+            )
 
             # Get our JSON content if it's possible
             try:
@@ -679,7 +681,9 @@ class NotifyTwist(NotifyBase):
                         api_url,
                         data=payload,
                         headers=headers,
-                        verify=self.verify_certificate)
+                        verify=self.verify_certificate,
+                        timeout=self.request_timeout
+                    )
 
                     # Get our JSON content if it's possible
                     try:

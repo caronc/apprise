@@ -476,6 +476,7 @@ class NotifyRocketChat(NotifyBase):
                 data=payload,
                 headers=headers,
                 verify=self.verify_certificate,
+                timeout=self.request_timeout,
             )
             if r.status_code != requests.codes.ok:
                 # We had a problem
@@ -529,6 +530,7 @@ class NotifyRocketChat(NotifyBase):
                 api_url,
                 data=payload,
                 verify=self.verify_certificate,
+                timeout=self.request_timeout,
             )
             if r.status_code != requests.codes.ok:
                 # We had a problem
@@ -595,6 +597,7 @@ class NotifyRocketChat(NotifyBase):
                 api_url,
                 headers=self.headers,
                 verify=self.verify_certificate,
+                timeout=self.request_timeout,
             )
             if r.status_code != requests.codes.ok:
                 # We had a problem

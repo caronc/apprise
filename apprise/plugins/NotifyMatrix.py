@@ -319,6 +319,7 @@ class NotifyMatrix(NotifyBase):
                 data=dumps(payload),
                 headers=headers,
                 verify=self.verify_certificate,
+                timeout=self.request_timeout,
             )
             if r.status_code != requests.codes.ok:
                 # We had a problem
@@ -927,6 +928,7 @@ class NotifyMatrix(NotifyBase):
                     params=params,
                     headers=headers,
                     verify=self.verify_certificate,
+                    timeout=self.request_timeout,
                 )
 
                 response = loads(r.content)

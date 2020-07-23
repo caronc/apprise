@@ -98,6 +98,16 @@ class URLBase(object):
     # Throttle
     request_rate_per_sec = 0
 
+    # The connect timeout is the number of seconds Requests will wait for your
+    # client to establish a connection to a remote machine (corresponding to
+    # the connect()) call on the socket.
+    request_connect_timeout = 4.0
+
+    # The read timeout is the number of seconds the client will wait for the
+    # server to send a response.
+    request_read_timeout = 2.5
+
+    # Handle
     # Maintain a set of tags to associate with this specific notification
     tags = set()
 
@@ -465,6 +475,13 @@ class URLBase(object):
     @property
     def app_url(self):
         return self.asset.app_url
+
+    @property
+    def request_timeout(self):
+        """This is primarily used to fullfill the `timeout` keyword argument
+        that is used by requests.get() and requests.put() calls.
+        """
+        return (self.request_connect_timeout, self.request_read_timeout)
 
     @staticmethod
     def parse_url(url, verify_host=True):

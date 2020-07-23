@@ -505,6 +505,7 @@ class NotifySlack(NotifyBase):
                 headers=headers,
                 files=files,
                 verify=self.verify_certificate,
+                timeout=self.request_timeout,
             )
 
             if r.status_code != requests.codes.ok:

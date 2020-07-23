@@ -47,10 +47,6 @@ class AttachHTTP(AttachBase):
     # The default secure protocol
     secure_protocol = 'https'
 
-    # The maximum number of seconds to wait for a connection to be established
-    # before out-right just giving up
-    connection_timeout_sec = 5.0
-
     # The number of bytes in memory to read from the remote source at a time
     chunk_size = 8192
 
@@ -129,7 +125,7 @@ class AttachHTTP(AttachBase):
                     auth=auth,
                     params=self.qsd,
                     verify=self.verify_certificate,
-                    timeout=self.connection_timeout_sec,
+                    timeout=self.request_timeout,
                     stream=True) as r:
 
                 # Handle Errors

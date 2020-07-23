@@ -353,6 +353,7 @@ class NotifyDiscord(NotifyBase):
                 headers=headers,
                 files=files,
                 verify=self.verify_certificate,
+                timeout=self.request_timeout,
             )
             if r.status_code not in (
                     requests.codes.ok, requests.codes.no_content):
