@@ -422,11 +422,6 @@ class ConfigBase(URLBase):
             # notifications if any were set
             results['tag'] = set(parse_list(result.group('tags')))
 
-            ConfigBase.logger.trace(
-                'URL {} unpacked as:{}{}'.format(
-                    url, os.linesep, os.linesep.join(
-                        ['{}="{}"'.format(k, v) for k, v in results.items()])))
-
             # Prepare our Asset Object
             results['asset'] = \
                 asset if isinstance(asset, AppriseAsset) else AppriseAsset()
