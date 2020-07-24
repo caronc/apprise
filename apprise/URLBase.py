@@ -562,15 +562,15 @@ class URLBase(object):
 
     @property
     def app_id(self):
-        return self.asset.app_id
+        return self.asset.app_id if self.asset.app_id else ''
 
     @property
     def app_desc(self):
-        return self.asset.app_desc
+        return self.asset.app_desc if self.asset.app_desc else ''
 
     @property
     def app_url(self):
-        return self.asset.app_url
+        return self.asset.app_url if self.asset.app_url else ''
 
     @property
     def request_timeout(self):

@@ -52,7 +52,7 @@ from ..AppriseLocale import gettext_lazy as _
 # specified.  If not, we use the user of the person sending the notification
 # Finally the channel identifier is detected
 CHANNEL_REGEX = re.compile(
-    r'^\s*(#|%23)?((?P<user>[a-z0-9]+)([/\\]|%2F))?'
+    r'^\s*(#|%23)?((?P<user>[a-z0-9_]+)([/\\]|%2F))?'
     r'(?P<channel>[a-z0-9_-]+)\s*$', re.I)
 
 
@@ -81,10 +81,18 @@ class NotifySpontit(NotifyBase):
     notify_url = 'https://api.spontit.com/v3/push'
 
     # The maximum length of the body
-    body_maxlen = 100
+    body_maxlen = 5000
 
     # The maximum length of the title
     title_maxlen = 100
+
+    # If we don't have the specified min length, then we don't bother using
+    # the body directive
+    spontit_body_minlen = 100
+
+    # Subtitle support; this is the maximum allowed characters defined by
+    # the API page
+    spontit_subtitle_maxlen = 20
 
     # Define object templates
     templates = (
@@ -98,7 +106,7 @@ class NotifySpontit(NotifyBase):
             'name': _('User ID'),
             'type': 'string',
             'required': True,
-            'regex': (r'^[a-z0-9]+$', 'i'),
+            'regex': (r'^[a-z0-9_]+$', 'i'),
         },
         'apikey': {
             'name': _('API Key'),
@@ -129,9 +137,14 @@ class NotifySpontit(NotifyBase):
         'to': {
             'alias_of': 'targets',
         },
+        'subtitle': {
+            # Subtitle is available for MacOS users
+            'name': _('Subtitle'),
+            'type': 'string',
+        },
     })
 
-    def __init__(self, apikey, targets=None, **kwargs):
+    def __init__(self, apikey, targets=None, subtitle=None, **kwargs):
         """
         Initialize Spontit Object
         """
@@ -156,6 +169,9 @@ class NotifySpontit(NotifyBase):
                   '({}) was specified.'.format(apikey)
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        # Save our subtitle information
+        self.subtitle = subtitle
 
         # Parse our targets
         self.targets = list()
@@ -210,6 +226,28 @@ class NotifySpontit(NotifyBase):
             payload = {
                 'message': body,
             }
+
+            # Use our body directive if we exceed the minimum message
+            # limitation
+            if len(body) > self.spontit_body_minlen:
+                payload['message'] = '{}...'.format(
+                    body[:self.spontit_body_minlen - 3])
+                payload['body'] = body
+
+            if self.subtitle:
+                # Set title if specified
+                payload['subtitle'] = \
+                    self.subtitle[:self.spontit_subtitle_maxlen]
+
+            elif self.app_desc:
+                # fall back to app description
+                payload['subtitle'] = \
+                    self.app_desc[:self.spontit_subtitle_maxlen]
+
+            elif self.app_id:
+                # fall back to app id
+                payload['subtitle'] = \
+                    self.app_id[:self.spontit_subtitle_maxlen]
 
             if title:
                 # Set title if specified
@@ -301,6 +339,9 @@ class NotifySpontit(NotifyBase):
             'verify': 'yes' if self.verify_certificate else 'no',
         }
 
+        if self.subtitle:
+            args['subtitle'] = self.subtitle
+
         return '{schema}://{userid}@{apikey}/{targets}?{args}'.format(
             schema=self.secure_protocol,
             userid=self.user,
@@ -328,6 +369,10 @@ class NotifySpontit(NotifyBase):
 
         # The hostname is our authentication key
         results['apikey'] = NotifySpontit.unquote(results['host'])
+
+        # Support MacOS subtitle option
+        if 'subtitle' in results['qsd'] and len(results['qsd']['subtitle']):
+            results['subtitle'] = results['qsd']['subtitle']
 
         # Support the 'to' variable so that we can support targets this way too
         # The 'to' makes it easier to use yaml configuration
