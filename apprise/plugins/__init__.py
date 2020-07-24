@@ -23,11 +23,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import os
 import six
 import re
 import copy
 
-from os import listdir
 from os.path import dirname
 from os.path import abspath
 
@@ -45,6 +45,7 @@ from ..common import NotifyType
 from ..common import NOTIFY_TYPES
 from ..utils import parse_list
 from ..utils import GET_SCHEMA_RE
+from ..logger import logger
 from ..AppriseLocale import gettext_lazy as _
 from ..AppriseLocale import LazyTranslation
 
@@ -85,7 +86,7 @@ def __load_matrix(path=abspath(dirname(__file__)), name='apprise.plugins'):
     # The .py extension is optional as we support loading directories too
     module_re = re.compile(r'^(?P<name>Notify[a-z0-9]+)(\.py)?$', re.I)
 
-    for f in listdir(path):
+    for f in os.listdir(path):
         match = module_re.match(f)
         if not match:
             # keep going
@@ -452,6 +453,7 @@ def url_to_dict(url):
     schema = GET_SCHEMA_RE.match(_url)
     if schema is None:
         # Not a valid URL; take an early exit
+        logger.error('Unparseable URL {}.'.format(url))
         return None
 
     # Ensure our schema is always in lower case
@@ -466,10 +468,28 @@ def url_to_dict(url):
                   for r in MODULE_MAP.values()
                   if r['plugin'].parse_native_url(_url) is not None),
                  None)
+
+        if not results:
+            logger.error('Unparseable URL {}.'.format(url))
+            return None
+
+        logger.trace('URL {} unpacked as:{}{}'.format(
+            url, os.linesep, os.linesep.join(
+                ['{}="{}"'.format(k, v) for k, v in results.items()])))
+
     else:
         # Parse our url details of the server object as dictionary
         # containing all of the information parsed from our URL
         results = SCHEMA_MAP[schema].parse_url(_url)
+        if not results:
+            logger.error('Unparseable {} URL {}.'.format(
+                SCHEMA_MAP[schema].service_name, url))
+            return None
+
+        logger.trace('{} URL {} unpacked as:{}{}'.format(
+            SCHEMA_MAP[schema].service_name, url,
+            os.linesep, os.linesep.join(
+                ['{}="{}"'.format(k, v) for k, v in results.items()])))
 
     # Return our results
     return results

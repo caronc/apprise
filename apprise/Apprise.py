@@ -111,13 +111,9 @@ class Apprise(object):
             # Acquire our url tokens
             results = plugins.url_to_dict(url)
             if results is None:
-                # Failed to parse the server URL
-                logger.error('Unparseable URL {}.'.format(url))
+                # Failed to parse the server URL; detailed logging handled
+                # inside url_to_dict - nothing to report here.
                 return None
-
-            logger.trace('URL {} unpacked as:{}{}'.format(
-                url, os.linesep, os.linesep.join(
-                    ['{}="{}"'.format(k, v) for k, v in results.items()])))
 
         elif isinstance(url, dict):
             # We already have our result set
@@ -154,11 +150,14 @@ class Apprise(object):
                 plugin = plugins.SCHEMA_MAP[results['schema']](**results)
 
                 # Create log entry of loaded URL
-                logger.debug('Loaded URL: {}'.format(plugin.url()))
+                logger.debug('Loaded {} URL: {}'.format(
+                    plugins.SCHEMA_MAP[results['schema']].service_name,
+                    plugin.url()))
 
             except Exception:
                 # the arguments are invalid or can not be used.
-                logger.error('Could not load URL: %s' % url)
+                logger.error('Could not load {} URL: {}'.format(
+                    plugins.SCHEMA_MAP[results['schema']].service_name, url))
                 return None
 
         else:
@@ -226,7 +225,7 @@ class Apprise(object):
             # returns None if it fails
             instance = Apprise.instantiate(_server, asset=asset, tag=tag)
             if not isinstance(instance, NotifyBase):
-                # No logging is requird as instantiate() handles failure
+                # No logging is required as instantiate() handles failure
                 # and/or success reasons for us
                 return_status = False
                 continue
