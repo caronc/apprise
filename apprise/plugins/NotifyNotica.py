@@ -103,6 +103,14 @@ class NotifyNotica(NotifyBase):
         '{schema}://{user}@{host}:{port}/{token}',
         '{schema}://{user}:{password}@{host}/{token}',
         '{schema}://{user}:{password}@{host}:{port}/{token}',
+
+        # Self-hosted notica servers (with custom path)
+        '{schema}://{host}{path}{token}',
+        '{schema}://{host}:{port}{path}{token}',
+        '{schema}://{user}@{host}{path}{token}',
+        '{schema}://{user}@{host}:{port}{path}{token}',
+        '{schema}://{user}:{password}@{host}{path}{token}',
+        '{schema}://{user}:{password}@{host}:{port}{path}{token}',
     )
 
     # Define our template tokens
@@ -132,6 +140,12 @@ class NotifyNotica(NotifyBase):
             'name': _('Password'),
             'type': 'string',
             'private': True,
+        },
+        'path': {
+            'name': _('Path'),
+            'type': 'string',
+            'map_to': 'fullpath',
+            'default': '/',
         },
     })
 

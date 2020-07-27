@@ -89,6 +89,8 @@ class NotifyGotify(NotifyBase):
     templates = (
         '{schema}://{host}/{token}',
         '{schema}://{host}:{port}/{token}',
+        '{schema}://{host}{path}{token}',
+        '{schema}://{host}:{port}{path}{token}',
     )
 
     # Define our template tokens
@@ -102,6 +104,13 @@ class NotifyGotify(NotifyBase):
         'host': {
             'name': _('Hostname'),
             'type': 'string',
+            'required': True,
+        },
+        'path': {
+            'name': _('Path'),
+            'type': 'string',
+            'map_to': 'fullpath',
+            'default': '/',
             'required': True,
         },
         'port': {
@@ -137,6 +146,9 @@ class NotifyGotify(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
+        # prepare our fullpath
+        self.fullpath = kwargs.get('fullpath', '/')
+
         if priority not in GOTIFY_PRIORITIES:
             self.priority = GotifyPriority.NORMAL
 
@@ -161,7 +173,7 @@ class NotifyGotify(NotifyBase):
             url += ':%d' % self.port
 
         # Append our remaining path
-        url += '/message'
+        url += '{fullpath}message'.format(fullpath=self.fullpath)
 
         # Define our parameteers
         params = {
@@ -245,11 +257,12 @@ class NotifyGotify(NotifyBase):
 
         default_port = 443 if self.secure else 80
 
-        return '{schema}://{hostname}{port}/{token}/?{args}'.format(
+        return '{schema}://{hostname}{port}{fullpath}{token}/?{args}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             hostname=NotifyGotify.quote(self.host, safe=''),
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
+            fullpath=NotifyGotify.quote(self.fullpath, safe='/'),
             token=self.pprint(self.token, privacy, safe=''),
             args=NotifyGotify.urlencode(args),
         )
@@ -271,12 +284,16 @@ class NotifyGotify(NotifyBase):
 
         # optionally find the provider key
         try:
-            # The first entry is our token
-            results['token'] = entries.pop(0)
+            # The last entry is our token
+            results['token'] = entries.pop()
 
         except IndexError:
             # No token was set
             results['token'] = None
+
+        # Re-assemble our full path
+        results['fullpath'] = \
+            '/' if not entries else '/{}/'.format('/'.join(entries))
 
         if 'priority' in results['qsd'] and len(results['qsd']['priority']):
             _map = {

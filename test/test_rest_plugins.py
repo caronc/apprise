@@ -803,6 +803,20 @@ TEST_URLS = (
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'gotify://hostname/t...t',
     }),
+    # Provide a hostname, path, and token
+    ('gotify://hostname/a/path/ending/in/a/slash/%s' % ('u' * 16), {
+        'instance': plugins.NotifyGotify,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'gotify://hostname/a/path/ending/in/a/slash/u...u/',
+    }),
+    # Provide a hostname, path, and token
+    ('gotify://hostname/a/path/not/ending/in/a/slash/%s' % ('v' * 16), {
+        'instance': plugins.NotifyGotify,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'gotify://hostname/a/path/not/ending/in/a/slash/v...v/',
+    }),
     # Provide a priority
     ('gotify://hostname/%s?priority=high' % ('i' * 16), {
         'instance': plugins.NotifyGotify,
