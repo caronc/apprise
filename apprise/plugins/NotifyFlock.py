@@ -100,7 +100,7 @@ class NotifyFlock(NotifyBase):
         'token': {
             'name': _('Access Key'),
             'type': 'string',
-            'regex': (r'^[a-z0-9-]{24}$', 'i'),
+            'regex': (r'^[a-z0-9-]+$', 'i'),
             'private': True,
             'required': True,
         },
@@ -112,14 +112,14 @@ class NotifyFlock(NotifyBase):
             'name': _('To User ID'),
             'type': 'string',
             'prefix': '@',
-            'regex': (r'^[A-Z0-9_]{12}$', 'i'),
+            'regex': (r'^[A-Z0-9_]+$', 'i'),
             'map_to': 'targets',
         },
         'to_channel': {
             'name': _('To Channel ID'),
             'type': 'string',
             'prefix': '#',
-            'regex': (r'^[A-Z0-9_]{12}$', 'i'),
+            'regex': (r'^[A-Z0-9_]+$', 'i'),
             'map_to': 'targets',
         },
         'targets': {
