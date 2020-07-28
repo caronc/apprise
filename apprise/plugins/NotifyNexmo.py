@@ -82,7 +82,7 @@ class NotifyNexmo(NotifyBase):
             'name': _('API Key'),
             'type': 'string',
             'required': True,
-            'regex': (r'^AC[a-z0-9]{8}$', 'i'),
+            'regex': (r'^[a-z0-9]+$', 'i'),
             'private': True,
         },
         'secret': {
@@ -90,7 +90,7 @@ class NotifyNexmo(NotifyBase):
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'^[a-z0-9]{16}$', 'i'),
+            'regex': (r'^[a-z0-9]+$', 'i'),
         },
         'from_phone': {
             'name': _('From Phone No'),
