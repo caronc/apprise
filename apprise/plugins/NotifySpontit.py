@@ -52,7 +52,7 @@ from ..AppriseLocale import gettext_lazy as _
 # specified.  If not, we use the user of the person sending the notification
 # Finally the channel identifier is detected
 CHANNEL_REGEX = re.compile(
-    r'^\s*(#|%23)?((?P<user>[a-z0-9_]+)([/\\]|%2F))?'
+    r'^\s*(#|%23)?((@|%40)?(?P<user>[a-z0-9_]+)([/\\]|%2F))?'
     r'(?P<channel>[a-z0-9_-]+)\s*$', re.I)
 
 
@@ -180,12 +180,9 @@ class NotifySpontit(NotifyBase):
             # Validate targets and drop bad ones:
             result = CHANNEL_REGEX.match(target)
             if result:
-                # We're dealing with a channel; re-assemble it
-                user = result.group('user') \
-                    if result.group('user') else self.user
-
+                # Just extract the channel
                 self.targets.append(
-                    '{}/{}'.format(user, result.group('channel')))
+                    '{}'.format(result.group('channel')))
                 continue
 
             self.logger.warning(
