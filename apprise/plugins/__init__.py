@@ -453,7 +453,7 @@ def url_to_dict(url):
     schema = GET_SCHEMA_RE.match(_url)
     if schema is None:
         # Not a valid URL; take an early exit
-        logger.error('Unparseable URL {}.'.format(url))
+        logger.error('Unsupported URL {}'.format(url))
         return None
 
     # Ensure our schema is always in lower case
@@ -470,7 +470,7 @@ def url_to_dict(url):
                  None)
 
         if not results:
-            logger.error('Unparseable URL {}.'.format(url))
+            logger.error('Unparseable URL {}'.format(url))
             return None
 
         logger.trace('URL {} unpacked as:{}{}'.format(
@@ -482,7 +482,7 @@ def url_to_dict(url):
         # containing all of the information parsed from our URL
         results = SCHEMA_MAP[schema].parse_url(_url)
         if not results:
-            logger.error('Unparseable {} URL {}.'.format(
+            logger.error('Unparseable {} URL {}'.format(
                 SCHEMA_MAP[schema].service_name, url))
             return None
 
