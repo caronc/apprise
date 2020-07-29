@@ -193,6 +193,56 @@ def test_apprise_cli(tmpdir):
     ])
     assert result.exit_code == 0
 
+    # Test our notification type switch (it defaults to info) so we want to
+    # try it as a different value. Should return without a problem
+    result = runner.invoke(cli.main, [
+        '-b', '# test config',
+        '--config', str(t),
+        '-n', 'success',
+    ])
+    assert result.exit_code == 0
+
+    # Test our notification type switch when set to something unsupported
+    result = runner.invoke(cli.main, [
+        '-b', 'test config',
+        '--config', str(t),
+        '--notification-type', 'invalid',
+    ])
+    assert result.exit_code == 1
+
+    # The notification type switch is case-insensitive
+    result = runner.invoke(cli.main, [
+        '-b', 'test config',
+        '--config', str(t),
+        '--notification-type', 'WARNING',
+    ])
+    assert result.exit_code == 0
+
+    # Test our formatting switch (it defaults to text) so we want to try it as
+    # a different value. Should return without a problem
+    result = runner.invoke(cli.main, [
+        '-b', '# test config',
+        '--config', str(t),
+        '-i', 'markdown',
+    ])
+    assert result.exit_code == 0
+
+    # Test our formatting switch when set to something unsupported
+    result = runner.invoke(cli.main, [
+        '-b', 'test config',
+        '--config', str(t),
+        '--input-format', 'invalid',
+    ])
+    assert result.exit_code == 1
+
+    # The formatting switch is not case sensitive
+    result = runner.invoke(cli.main, [
+        '-b', '# test config',
+        '--config', str(t),
+        '--input-format', 'HTML',
+    ])
+    assert result.exit_code == 0
+
     # As a way of ensuring we match the first 5 entries, we can run a
     # --dry-run against the same result set above and verify the output
     result = runner.invoke(cli.main, [

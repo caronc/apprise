@@ -37,6 +37,10 @@ The Apprise options are as follows:
     Specify the message type (default=info). Possible values are "info",
     "success", "failure", and "warning".
 
+  * `-i`, `--input-format=`<FORMAT>:
+    Specify the input message format (default=text). Possible values are "text",
+    "html", and "markdown".
+
   * `-T`, `--theme=`THEME:
     Specify the default theme.
 
@@ -107,9 +111,7 @@ Include an attachment:
 
 ## BUGS
 
-**Apprise** is written in Python with 100% test coverage; but it still makes
-it far from perfect since the notification services it talks to change
-all the time. If you find any bugs, please make them known at:
+If you find any bugs, please make them known at:
 <https://github.com/caronc/apprise/issues>
 
 ## COPYRIGHT

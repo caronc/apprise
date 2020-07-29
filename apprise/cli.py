@@ -32,11 +32,13 @@ from os.path import expanduser
 from os.path import expandvars
 
 from . import NotifyType
+from . import NotifyFormat
 from . import Apprise
 from . import AppriseAsset
 from . import AppriseConfig
 from .utils import parse_list
 from .common import NOTIFY_TYPES
+from .common import NOTIFY_FORMATS
 from .logger import logger
 
 from . import __title__
@@ -104,9 +106,16 @@ def print_version_msg():
               help='Specify one or more configuration locations.')
 @click.option('--notification-type', '-n', default=NotifyType.INFO, type=str,
               metavar='TYPE',
-              help='Specify the message type (default=info). Possible values'
-              ' are "{}", and "{}".'.format(
-                  '", "'.join(NOTIFY_TYPES[:-1]), NOTIFY_TYPES[-1]))
+              help='Specify the message type (default={}). '
+              'Possible values are "{}", and "{}".'.format(
+                  NotifyType.INFO, '", "'.join(NOTIFY_TYPES[:-1]),
+                  NOTIFY_TYPES[-1]))
+@click.option('--input-format', '-i', default=NotifyFormat.TEXT, type=str,
+              metavar='FORMAT',
+              help='Specify the message input format (default={}). '
+              'Possible values are "{}", and "{}".'.format(
+                  NotifyFormat.TEXT, '", "'.join(NOTIFY_FORMATS[:-1]),
+                  NOTIFY_FORMATS[-1]))
 @click.option('--theme', '-T', default='default', type=str, metavar='THEME',
               help='Specify the default theme.')
 @click.option('--tag', '-g', default=None, type=str, multiple=True,
@@ -126,7 +135,7 @@ def print_version_msg():
 @click.argument('urls', nargs=-1,
                 metavar='SERVER_URL [SERVER_URL2 [SERVER_URL3]]',)
 def main(body, title, config, attach, urls, notification_type, theme, tag,
-         dry_run, verbose, version):
+         input_format, dry_run, verbose, version):
     """
     Send a notification to all of the specified servers identified by their
     URLs the content provided within the title, body and notification-type.
@@ -170,8 +179,23 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
         print_version_msg()
         sys.exit(0)
 
+    # Simple Error Checking
+    notification_type = notification_type.strip().lower()
+    if notification_type not in NOTIFY_TYPES:
+        logger.error(
+            'The --notification-type (-n) value of {} is not supported.'
+            .format(notification_type))
+        sys.exit(1)
+
+    input_format = input_format.strip().lower()
+    if input_format not in NOTIFY_FORMATS:
+        logger.error(
+            'The --input-format (-i) value of {} is not supported.'
+            .format(input_format))
+        sys.exit(1)
+
     # Prepare our asset
-    asset = AppriseAsset(theme=theme)
+    asset = AppriseAsset(body_format=input_format, theme=theme)
 
     # Create our object
     a = Apprise(asset=asset)
