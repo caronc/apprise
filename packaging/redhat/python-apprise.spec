@@ -52,8 +52,8 @@ IFTTT, Join, Kavenegar, KODI, Kumulos, MacOSX, Mailgun, MatterMost, Matrix,
 Microsoft Windows, Microsoft Teams, MessageBird, MSG91, MyAndroid, Nexmo,
 Nextcloud, Notica, Notifico, Office365, PopcornNotify, Prowl, Pushalot,
 PushBullet, Pushjet, Pushover, PushSafer, Rocket.Chat, SendGrid, SimplePush,
-Sinch, Slack, Super Toasty, Stride, Syslog, Techulus Push, Telegram, Twilio,
-Twitter, Twist, XBMC, XMPP, Webex Teams}
+Sinch, Slack, Spontit, Super Toasty, Stride, Syslog, Techulus Push, Telegram,
+Twilio, Twitter, Twist, XBMC, XMPP, Webex Teams}
 
 Name:           python-%{pypi_name}
 Version:        0.8.6
