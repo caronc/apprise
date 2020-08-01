@@ -329,23 +329,19 @@ class NotifySpontit(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
-        }
+        # Our URL parameters
+        params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         if self.subtitle:
-            args['subtitle'] = self.subtitle
+            params['subtitle'] = self.subtitle
 
-        return '{schema}://{userid}@{apikey}/{targets}?{args}'.format(
+        return '{schema}://{userid}@{apikey}/{targets}?{params}'.format(
             schema=self.secure_protocol,
             userid=self.user,
             apikey=self.pprint(self.apikey, privacy, safe=''),
             targets='/'.join(
                 [NotifySpontit.quote(x, safe='') for x in self.targets]),
-            args=NotifySpontit.urlencode(args))
+            params=NotifySpontit.urlencode(params))
 
     @staticmethod
     def parse_url(url):
