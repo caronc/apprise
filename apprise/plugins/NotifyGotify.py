@@ -80,11 +80,6 @@ class NotifyGotify(NotifyBase):
     # Disable throttle rate
     request_rate_per_sec = 0
 
-    # The connect timeout is the number of seconds Requests will wait for your
-    # client to establish a connection to a remote machine (corresponding to
-    # the connect()) call on the socket.
-    request_connect_timeout = 2.5
-
     # Define object templates
     templates = (
         '{schema}://{host}/{token}',
@@ -247,24 +242,25 @@ class NotifyGotify(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
+        # Define any URL parameters
+        params = {
             'priority': self.priority,
-            'verify': 'yes' if self.verify_certificate else 'no',
         }
 
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+
+        # Our default port
         default_port = 443 if self.secure else 80
 
-        return '{schema}://{hostname}{port}{fullpath}{token}/?{args}'.format(
+        return '{schema}://{hostname}{port}{fullpath}{token}/?{params}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             hostname=NotifyGotify.quote(self.host, safe=''),
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
             fullpath=NotifyGotify.quote(self.fullpath, safe='/'),
             token=self.pprint(self.token, privacy, safe=''),
-            args=NotifyGotify.urlencode(args),
+            params=NotifyGotify.urlencode(params),
         )
 
     @staticmethod

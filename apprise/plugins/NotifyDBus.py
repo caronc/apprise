@@ -355,27 +355,27 @@ class NotifyDBus(NotifyBase):
             DBusUrgency.HIGH: 'high',
         }
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
+        # Define any URL parameters
+        params = {
             'image': 'yes' if self.include_image else 'no',
             'urgency': 'normal' if self.urgency not in _map
                        else _map[self.urgency],
-            'verify': 'yes' if self.verify_certificate else 'no',
         }
+
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # x in (x,y) screen coordinates
         if self.x_axis:
-            args['x'] = str(self.x_axis)
+            params['x'] = str(self.x_axis)
 
         # y in (x,y) screen coordinates
         if self.y_axis:
-            args['y'] = str(self.y_axis)
+            params['y'] = str(self.y_axis)
 
-        return '{schema}://_/?{args}'.format(
+        return '{schema}://_/?{params}'.format(
             schema=self.schema,
-            args=NotifyDBus.urlencode(args),
+            params=NotifyDBus.urlencode(params),
         )
 
     @staticmethod

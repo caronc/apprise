@@ -596,13 +596,13 @@ class NotifyEmby(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
+        # Define any URL parameters
+        params = {
             'modal': 'yes' if self.modal else 'no',
-            'verify': 'yes' if self.verify_certificate else 'no',
         }
+
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Determine Authentication
         auth = ''
@@ -617,13 +617,13 @@ class NotifyEmby(NotifyBase):
                 user=NotifyEmby.quote(self.user, safe=''),
             )
 
-        return '{schema}://{auth}{hostname}{port}/?{args}'.format(
+        return '{schema}://{auth}{hostname}{port}/?{params}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
             hostname=NotifyEmby.quote(self.host, safe=''),
             port='' if self.port is None or self.port == self.emby_default_port
                  else ':{}'.format(self.port),
-            args=NotifyEmby.urlencode(args),
+            params=NotifyEmby.urlencode(params),
         )
 
     @property

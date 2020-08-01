@@ -305,14 +305,10 @@ class NotifyPushed(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
-        }
+        # Our URL parameters
+        params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
-        return '{schema}://{app_key}/{app_secret}/{targets}/?{args}'.format(
+        return '{schema}://{app_key}/{app_secret}/{targets}/?{params}'.format(
             schema=self.secure_protocol,
             app_key=self.pprint(self.app_key, privacy, safe=''),
             app_secret=self.pprint(
@@ -324,7 +320,7 @@ class NotifyPushed(NotifyBase):
                     # Users are prefixed with an @ symbol
                     ['@{}'.format(x) for x in self.users],
                 )]),
-            args=NotifyPushed.urlencode(args))
+            params=NotifyPushed.urlencode(params))
 
     @staticmethod
     def parse_url(url):

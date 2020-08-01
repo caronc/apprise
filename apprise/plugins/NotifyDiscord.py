@@ -406,23 +406,23 @@ class NotifyDiscord(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
+        # Define any URL parameters
+        params = {
             'tts': 'yes' if self.tts else 'no',
             'avatar': 'yes' if self.avatar else 'no',
             'footer': 'yes' if self.footer else 'no',
             'footer_logo': 'yes' if self.footer_logo else 'no',
             'image': 'yes' if self.include_image else 'no',
-            'verify': 'yes' if self.verify_certificate else 'no',
         }
 
-        return '{schema}://{webhook_id}/{webhook_token}/?{args}'.format(
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+
+        return '{schema}://{webhook_id}/{webhook_token}/?{params}'.format(
             schema=self.secure_protocol,
             webhook_id=self.pprint(self.webhook_id, privacy, safe=''),
             webhook_token=self.pprint(self.webhook_token, privacy, safe=''),
-            args=NotifyDiscord.urlencode(args),
+            params=NotifyDiscord.urlencode(params),
         )
 
     @staticmethod
@@ -504,16 +504,16 @@ class NotifyDiscord(NotifyBase):
             r'^https?://discord(app)?\.com/api/webhooks/'
             r'(?P<webhook_id>[0-9]+)/'
             r'(?P<webhook_token>[A-Z0-9_-]+)/?'
-            r'(?P<args>\?.+)?$', url, re.I)
+            r'(?P<params>\?.+)?$', url, re.I)
 
         if result:
             return NotifyDiscord.parse_url(
-                '{schema}://{webhook_id}/{webhook_token}/{args}'.format(
+                '{schema}://{webhook_id}/{webhook_token}/{params}'.format(
                     schema=NotifyDiscord.secure_protocol,
                     webhook_id=result.group('webhook_id'),
                     webhook_token=result.group('webhook_token'),
-                    args='' if not result.group('args')
-                    else result.group('args')))
+                    params='' if not result.group('params')
+                    else result.group('params')))
 
         return None
 

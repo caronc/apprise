@@ -233,21 +233,21 @@ class NotifySyslog(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
+        # Define any URL parameters
+        params = {
             'logperror': 'yes' if self.log_perror else 'no',
             'logpid': 'yes' if self.log_pid else 'no',
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
         }
 
-        return '{schema}://{facility}/?{args}'.format(
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+
+        return '{schema}://{facility}/?{params}'.format(
             facility=self.template_tokens['facility']['default']
             if self.facility not in SYSLOG_FACILITY_RMAP
             else SYSLOG_FACILITY_RMAP[self.facility],
             schema=self.secure_protocol,
-            args=NotifySyslog.urlencode(args),
+            params=NotifySyslog.urlencode(params),
         )
 
     @staticmethod

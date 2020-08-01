@@ -291,23 +291,19 @@ class NotifyIFTTT(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
-        }
+        # Our URL parameters
+        params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         # Store any new key/value pairs added to our list
-        args.update({'+{}'.format(k): v for k, v in self.add_tokens})
-        args.update({'-{}'.format(k): '' for k in self.del_tokens})
+        params.update({'+{}'.format(k): v for k, v in self.add_tokens})
+        params.update({'-{}'.format(k): '' for k in self.del_tokens})
 
-        return '{schema}://{webhook_id}@{events}/?{args}'.format(
+        return '{schema}://{webhook_id}@{events}/?{params}'.format(
             schema=self.secure_protocol,
             webhook_id=self.pprint(self.webhook_id, privacy, safe=''),
             events='/'.join([NotifyIFTTT.quote(x, safe='')
                              for x in self.events]),
-            args=NotifyIFTTT.urlencode(args),
+            params=NotifyIFTTT.urlencode(params),
         )
 
     @staticmethod
@@ -357,16 +353,16 @@ class NotifyIFTTT(NotifyBase):
             r'^https?://maker\.ifttt\.com/use/'
             r'(?P<webhook_id>[A-Z0-9_-]+)'
             r'/?(?P<events>([A-Z0-9_-]+/?)+)?'
-            r'/?(?P<args>\?.+)?$', url, re.I)
+            r'/?(?P<params>\?.+)?$', url, re.I)
 
         if result:
             return NotifyIFTTT.parse_url(
-                '{schema}://{webhook_id}{events}{args}'.format(
+                '{schema}://{webhook_id}{events}{params}'.format(
                     schema=NotifyIFTTT.secure_protocol,
                     webhook_id=result.group('webhook_id'),
                     events='' if not result.group('events')
                     else '@{}'.format(result.group('events')),
-                    args='' if not result.group('args')
-                    else result.group('args')))
+                    params='' if not result.group('params')
+                    else result.group('params')))
 
         return None

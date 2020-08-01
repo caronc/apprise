@@ -317,23 +317,23 @@ class NotifyMSG91(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
+        # Define any URL parameters
+        params = {
             'route': str(self.route),
         }
 
-        if self.country:
-            args['country'] = str(self.country)
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        return '{schema}://{authkey}/{targets}/?{args}'.format(
+        if self.country:
+            params['country'] = str(self.country)
+
+        return '{schema}://{authkey}/{targets}/?{params}'.format(
             schema=self.secure_protocol,
             authkey=self.pprint(self.authkey, privacy, safe=''),
             targets='/'.join(
                 [NotifyMSG91.quote(x, safe='') for x in self.targets]),
-            args=NotifyMSG91.urlencode(args))
+            params=NotifyMSG91.urlencode(params))
 
     @staticmethod
     def parse_url(url):

@@ -245,41 +245,37 @@ class NotifySendGrid(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
-        }
+        # Our URL parameters
+        params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         if len(self.cc) > 0:
             # Handle our Carbon Copy Addresses
-            args['cc'] = ','.join(self.cc)
+            params['cc'] = ','.join(self.cc)
 
         if len(self.bcc) > 0:
             # Handle our Blind Carbon Copy Addresses
-            args['bcc'] = ','.join(self.bcc)
+            params['bcc'] = ','.join(self.bcc)
 
         if self.template:
             # Handle our Template ID if if was specified
-            args['template'] = self.template
+            params['template'] = self.template
 
-        # Append our template_data into our args
-        args.update({'+{}'.format(k): v
-                    for k, v in self.template_data.items()})
+        # Append our template_data into our parameter list
+        params.update(
+            {'+{}'.format(k): v for k, v in self.template_data.items()})
 
         # a simple boolean check as to whether we display our target emails
         # or not
         has_targets = \
             not (len(self.targets) == 1 and self.targets[0] == self.from_email)
 
-        return '{schema}://{apikey}:{from_email}/{targets}?{args}'.format(
+        return '{schema}://{apikey}:{from_email}/{targets}?{params}'.format(
             schema=self.secure_protocol,
             apikey=self.pprint(self.apikey, privacy, safe=''),
             from_email=self.quote(self.from_email, safe='@'),
             targets='' if not has_targets else '/'.join(
                 [NotifySendGrid.quote(x, safe='') for x in self.targets]),
-            args=NotifySendGrid.urlencode(args),
+            params=NotifySendGrid.urlencode(params),
         )
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):

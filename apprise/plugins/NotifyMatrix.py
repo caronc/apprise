@@ -1011,14 +1011,14 @@ class NotifyMatrix(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
+        # Define any URL parameters
+        params = {
             'image': 'yes' if self.include_image else 'no',
-            'verify': 'yes' if self.verify_certificate else 'no',
             'mode': self.mode,
         }
+
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Determine Authentication
         auth = ''
@@ -1036,14 +1036,14 @@ class NotifyMatrix(NotifyBase):
 
         default_port = 443 if self.secure else 80
 
-        return '{schema}://{auth}{hostname}{port}/{rooms}?{args}'.format(
+        return '{schema}://{auth}{hostname}{port}/{rooms}?{params}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
             hostname=NotifyMatrix.quote(self.host, safe=''),
             port='' if self.port is None
             or self.port == default_port else ':{}'.format(self.port),
             rooms=NotifyMatrix.quote('/'.join(self.rooms)),
-            args=NotifyMatrix.urlencode(args),
+            params=NotifyMatrix.urlencode(params),
         )
 
     @staticmethod
@@ -1119,16 +1119,16 @@ class NotifyMatrix(NotifyBase):
         result = re.match(
             r'^https?://webhooks\.t2bot\.io/api/v1/matrix/hook/'
             r'(?P<webhook_token>[A-Z0-9_-]+)/?'
-            r'(?P<args>\?.+)?$', url, re.I)
+            r'(?P<params>\?.+)?$', url, re.I)
 
         if result:
             mode = 'mode={}'.format(MatrixWebhookMode.T2BOT)
 
             return NotifyMatrix.parse_url(
-                '{schema}://{webhook_token}/{args}'.format(
+                '{schema}://{webhook_token}/{params}'.format(
                     schema=NotifyMatrix.secure_protocol,
                     webhook_token=result.group('webhook_token'),
-                    args='?{}'.format(mode) if not result.group('args')
-                    else '{}&{}'.format(result.group('args'), mode)))
+                    params='?{}'.format(mode) if not result.group('params')
+                    else '{}&{}'.format(result.group('params'), mode)))
 
         return None

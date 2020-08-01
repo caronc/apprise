@@ -395,28 +395,28 @@ class NotifyD7Networks(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
+        # Define any URL parameters
+        params = {
             'batch': 'yes' if self.batch else 'no',
         }
 
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+
         if self.priority != self.template_args['priority']['default']:
-            args['priority'] = str(self.priority)
+            params['priority'] = str(self.priority)
 
         if self.source:
-            args['from'] = self.source
+            params['from'] = self.source
 
-        return '{schema}://{user}:{password}@{targets}/?{args}'.format(
+        return '{schema}://{user}:{password}@{targets}/?{params}'.format(
             schema=self.secure_protocol,
             user=NotifyD7Networks.quote(self.user, safe=''),
             password=self.pprint(
                 self.password, privacy, mode=PrivacyMode.Secret, safe=''),
             targets='/'.join(
                 [NotifyD7Networks.quote(x, safe='') for x in self.targets]),
-            args=NotifyD7Networks.urlencode(args))
+            params=NotifyD7Networks.urlencode(params))
 
     @staticmethod
     def parse_url(url):

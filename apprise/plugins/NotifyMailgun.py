@@ -315,26 +315,26 @@ class NotifyMailgun(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
+        # Define any URL parameters
+        params = {
             'region': self.region_name,
         }
 
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+
         if self.from_name is not None:
             # from_name specified; pass it back on the url
-            args['name'] = self.from_name
+            params['name'] = self.from_name
 
-        return '{schema}://{user}@{host}/{apikey}/{targets}/?{args}'.format(
+        return '{schema}://{user}@{host}/{apikey}/{targets}/?{params}'.format(
             schema=self.secure_protocol,
             host=self.host,
             user=NotifyMailgun.quote(self.user, safe=''),
             apikey=self.pprint(self.apikey, privacy, safe=''),
             targets='/'.join(
                 [NotifyMailgun.quote(x, safe='') for x in self.targets]),
-            args=NotifyMailgun.urlencode(args))
+            params=NotifyMailgun.urlencode(params))
 
     @staticmethod
     def parse_url(url):

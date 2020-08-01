@@ -450,15 +450,11 @@ class NotifyOffice365(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
-        }
+        # Our URL parameters
+        params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         return '{schema}://{tenant}:{email}/{client_id}/{secret}' \
-            '/{targets}/?{args}'.format(
+            '/{targets}/?{params}'.format(
                 schema=self.secure_protocol,
                 tenant=self.pprint(self.tenant, privacy, safe=''),
                 # email does not need to be escaped because it should
@@ -470,7 +466,7 @@ class NotifyOffice365(NotifyBase):
                     safe=''),
                 targets='/'.join(
                     [NotifyOffice365.quote(x, safe='') for x in self.targets]),
-                args=NotifyOffice365.urlencode(args))
+                params=NotifyOffice365.urlencode(params))
 
     @staticmethod
     def parse_url(url):

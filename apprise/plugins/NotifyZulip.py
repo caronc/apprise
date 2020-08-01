@@ -328,12 +328,8 @@ class NotifyZulip(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
-        }
+        # Our URL parameters
+        params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         # simplify our organization in our URL if we can
         organization = '{}{}'.format(
@@ -342,14 +338,14 @@ class NotifyZulip(NotifyBase):
             if self.hostname != self.default_hostname else '')
 
         return '{schema}://{botname}@{org}/{token}/' \
-            '{targets}?{args}'.format(
+            '{targets}?{params}'.format(
                 schema=self.secure_protocol,
                 botname=NotifyZulip.quote(self.botname, safe=''),
                 org=NotifyZulip.quote(organization, safe=''),
                 token=self.pprint(self.token, privacy, safe=''),
                 targets='/'.join(
                     [NotifyZulip.quote(x, safe='') for x in self.targets]),
-                args=NotifyZulip.urlencode(args),
+                params=NotifyZulip.urlencode(params),
             )
 
     @staticmethod

@@ -209,17 +209,13 @@ class NotifyWebexTeams(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
-        }
+        # Our URL parameters
+        params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
-        return '{schema}://{token}/?{args}'.format(
+        return '{schema}://{token}/?{params}'.format(
             schema=self.secure_protocol,
             token=self.pprint(self.token, privacy, safe=''),
-            args=NotifyWebexTeams.urlencode(args),
+            params=NotifyWebexTeams.urlencode(params),
         )
 
     @staticmethod
@@ -249,14 +245,14 @@ class NotifyWebexTeams(NotifyBase):
         result = re.match(
             r'^https?://api\.ciscospark\.com/v[1-9][0-9]*/webhooks/incoming/'
             r'(?P<webhook_token>[A-Z0-9_-]+)/?'
-            r'(?P<args>\?.+)?$', url, re.I)
+            r'(?P<params>\?.+)?$', url, re.I)
 
         if result:
             return NotifyWebexTeams.parse_url(
-                '{schema}://{webhook_token}/{args}'.format(
+                '{schema}://{webhook_token}/{params}'.format(
                     schema=NotifyWebexTeams.secure_protocol,
                     webhook_token=result.group('webhook_token'),
-                    args='' if not result.group('args')
-                    else result.group('args')))
+                    params='' if not result.group('params')
+                    else result.group('params')))
 
         return None

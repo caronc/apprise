@@ -303,14 +303,14 @@ class NotifyXBMC(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
+        # Define any URL parameters
+        params = {
             'image': 'yes' if self.include_image else 'no',
             'duration': str(self.duration),
-            'verify': 'yes' if self.verify_certificate else 'no',
         }
+
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Determine Authentication
         auth = ''
@@ -332,13 +332,13 @@ class NotifyXBMC(NotifyBase):
             # Append 's' to schema
             default_schema += 's'
 
-        return '{schema}://{auth}{hostname}{port}/?{args}'.format(
+        return '{schema}://{auth}{hostname}{port}/?{params}'.format(
             schema=default_schema,
             auth=auth,
             hostname=NotifyXBMC.quote(self.host, safe=''),
             port='' if not self.port or self.port == default_port
                  else ':{}'.format(self.port),
-            args=NotifyXBMC.urlencode(args),
+            params=NotifyXBMC.urlencode(params),
         )
 
     @staticmethod

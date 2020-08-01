@@ -326,20 +326,16 @@ class NotifyKavenegar(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
-        }
+        # Our URL parameters
+        params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
-        return '{schema}://{source}{apikey}/{targets}?{args}'.format(
+        return '{schema}://{source}{apikey}/{targets}?{params}'.format(
             schema=self.secure_protocol,
             source='' if not self.source else '{}@'.format(self.source),
             apikey=self.pprint(self.apikey, privacy, safe=''),
             targets='/'.join(
                 [NotifyKavenegar.quote(x, safe='') for x in self.targets]),
-            args=NotifyKavenegar.urlencode(args))
+            params=NotifyKavenegar.urlencode(params))
 
     @staticmethod
     def parse_url(url):

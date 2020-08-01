@@ -400,15 +400,15 @@ class NotifySinch(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
+        # Define any URL parameters
+        params = {
             'region': self.region,
         }
 
-        return '{schema}://{spi}:{token}@{source}/{targets}/?{args}'.format(
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+
+        return '{schema}://{spi}:{token}@{source}/{targets}/?{params}'.format(
             schema=self.secure_protocol,
             spi=self.pprint(
                 self.service_plan_id, privacy, mode=PrivacyMode.Tail, safe=''),
@@ -416,7 +416,7 @@ class NotifySinch(NotifyBase):
             source=NotifySinch.quote(self.source, safe=''),
             targets='/'.join(
                 [NotifySinch.quote(x, safe='') for x in self.targets]),
-            args=NotifySinch.urlencode(args))
+            params=NotifySinch.urlencode(params))
 
     @staticmethod
     def parse_url(url):

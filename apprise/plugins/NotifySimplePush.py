@@ -286,15 +286,11 @@ class NotifySimplePush(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
-        }
+        # Our URL parameters
+        params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         if self.event:
-            args['event'] = self.event
+            params['event'] = self.event
 
         # Determine Authentication
         auth = ''
@@ -306,11 +302,11 @@ class NotifySimplePush(NotifyBase):
                     self.password, privacy, mode=PrivacyMode.Secret, safe=''),
             )
 
-        return '{schema}://{auth}{apikey}/?{args}'.format(
+        return '{schema}://{auth}{apikey}/?{params}'.format(
             schema=self.secure_protocol,
             auth=auth,
             apikey=self.pprint(self.apikey, privacy, safe=''),
-            args=NotifySimplePush.urlencode(args),
+            params=NotifySimplePush.urlencode(params),
         )
 
     @staticmethod

@@ -278,21 +278,21 @@ class NotifyMSTeams(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
+        # Define any URL parameters
+        params = {
             'image': 'yes' if self.include_image else 'no',
-            'verify': 'yes' if self.verify_certificate else 'no',
         }
 
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+
         return '{schema}://{token_a}/{token_b}/{token_c}/'\
-            '?{args}'.format(
+            '?{params}'.format(
                 schema=self.secure_protocol,
                 token_a=self.pprint(self.token_a, privacy, safe=''),
                 token_b=self.pprint(self.token_b, privacy, safe=''),
                 token_c=self.pprint(self.token_c, privacy, safe=''),
-                args=NotifyMSTeams.urlencode(args),
+                params=NotifyMSTeams.urlencode(params),
             )
 
     @staticmethod
@@ -360,16 +360,16 @@ class NotifyMSTeams(NotifyBase):
             r'IncomingWebhook/'
             r'(?P<token_b>[A-Z0-9]+)/'
             r'(?P<token_c>[A-Z0-9-]+)/?'
-            r'(?P<args>\?.+)?$', url, re.I)
+            r'(?P<params>\?.+)?$', url, re.I)
 
         if result:
             return NotifyMSTeams.parse_url(
-                '{schema}://{token_a}/{token_b}/{token_c}/{args}'.format(
+                '{schema}://{token_a}/{token_b}/{token_c}/{params}'.format(
                     schema=NotifyMSTeams.secure_protocol,
                     token_a=result.group('token_a'),
                     token_b=result.group('token_b'),
                     token_c=result.group('token_c'),
-                    args='' if not result.group('args')
-                    else result.group('args')))
+                    params='' if not result.group('params')
+                    else result.group('params')))
 
         return None

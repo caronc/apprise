@@ -274,14 +274,14 @@ class NotifyRyver(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
+        # Define any URL parameters
+        params = {
             'image': 'yes' if self.include_image else 'no',
             'mode': self.mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
         }
+
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Determine if there is a botname present
         botname = ''
@@ -290,12 +290,12 @@ class NotifyRyver(NotifyBase):
                 botname=NotifyRyver.quote(self.user, safe=''),
             )
 
-        return '{schema}://{botname}{organization}/{token}/?{args}'.format(
+        return '{schema}://{botname}{organization}/{token}/?{params}'.format(
             schema=self.secure_protocol,
             botname=botname,
             organization=NotifyRyver.quote(self.organization, safe=''),
             token=self.pprint(self.token, privacy, safe=''),
-            args=NotifyRyver.urlencode(args),
+            params=NotifyRyver.urlencode(params),
         )
 
     @staticmethod
@@ -353,15 +353,15 @@ class NotifyRyver(NotifyBase):
         result = re.match(
             r'^https?://(?P<org>[A-Z0-9_-]+)\.ryver\.com/application/webhook/'
             r'(?P<webhook_token>[A-Z0-9]+)/?'
-            r'(?P<args>\?.+)?$', url, re.I)
+            r'(?P<params>\?.+)?$', url, re.I)
 
         if result:
             return NotifyRyver.parse_url(
-                '{schema}://{org}/{webhook_token}/{args}'.format(
+                '{schema}://{org}/{webhook_token}/{params}'.format(
                     schema=NotifyRyver.secure_protocol,
                     org=result.group('org'),
                     webhook_token=result.group('webhook_token'),
-                    args='' if not result.group('args')
-                    else result.group('args')))
+                    params='' if not result.group('params')
+                    else result.group('params')))
 
         return None

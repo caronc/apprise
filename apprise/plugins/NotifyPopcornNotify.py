@@ -255,20 +255,20 @@ class NotifyPopcornNotify(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
+        # Define any URL parameters
+        params = {
             'batch': 'yes' if self.batch else 'no',
         }
 
-        return '{schema}://{apikey}/{targets}/?{args}'.format(
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+
+        return '{schema}://{apikey}/{targets}/?{params}'.format(
             schema=self.secure_protocol,
             apikey=self.pprint(self.apikey, privacy, safe=''),
             targets='/'.join(
                 [NotifyPopcornNotify.quote(x, safe='') for x in self.targets]),
-            args=NotifyPopcornNotify.urlencode(args))
+            params=NotifyPopcornNotify.urlencode(params))
 
     @staticmethod
     def parse_url(url):

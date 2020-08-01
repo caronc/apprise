@@ -282,17 +282,17 @@ class NotifyGrowl(NotifyBase):
             GrowlPriority.EMERGENCY: 'emergency',
         }
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
+        # Define any URL parameters
+        params = {
             'image': 'yes' if self.include_image else 'no',
             'priority':
                 _map[GrowlPriority.NORMAL] if self.priority not in _map
                 else _map[self.priority],
             'version': self.version,
-            'verify': 'yes' if self.verify_certificate else 'no',
         }
+
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         auth = ''
         if self.user:
@@ -302,13 +302,13 @@ class NotifyGrowl(NotifyBase):
                     self.user, privacy, mode=PrivacyMode.Secret, safe=''),
             )
 
-        return '{schema}://{auth}{hostname}{port}/?{args}'.format(
+        return '{schema}://{auth}{hostname}{port}/?{params}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
             hostname=NotifyGrowl.quote(self.host, safe=''),
             port='' if self.port is None or self.port == self.default_port
                  else ':{}'.format(self.port),
-            args=NotifyGrowl.urlencode(args),
+            params=NotifyGrowl.urlencode(params),
         )
 
     @staticmethod

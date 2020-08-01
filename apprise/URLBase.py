@@ -42,6 +42,7 @@ except ImportError:
     from urllib.parse import quote as _quote
     from urllib.parse import urlencode as _urlencode
 
+from .AppriseLocale import gettext_lazy as _
 from .AppriseAsset import AppriseAsset
 from .utils import parse_url
 from .utils import parse_bool
@@ -101,11 +102,11 @@ class URLBase(object):
     # The connect timeout is the number of seconds Requests will wait for your
     # client to establish a connection to a remote machine (corresponding to
     # the connect()) call on the socket.
-    request_connect_timeout = 4.0
+    socket_connect_timeout = 4.0
 
     # The read timeout is the number of seconds the client will wait for the
     # server to send a response.
-    request_read_timeout = 2.5
+    socket_read_timeout = 4.0
 
     # Handle
     # Maintain a set of tags to associate with this specific notification
@@ -116,6 +117,78 @@ class URLBase(object):
 
     # Logging
     logger = logging.getLogger(__name__)
+
+    # Define a default set of template arguments used for dynamically building
+    # details about our individual plugins for developers.
+
+    # Define object templates
+    templates = ()
+
+    # Provides a mapping of tokens, certain entries are fixed and automatically
+    # configured if found (such as schema, host, user, pass, and port)
+    template_tokens = {}
+
+    # Here is where we define all of the arguments we accept on the url
+    # such as: schema://whatever/?cto=5.0&rto=15
+    # These act the same way as tokens except they are optional and/or
+    # have default values set if mandatory. This rule must be followed
+    template_args = {
+        'verify': {
+            'name': _('Verify SSL'),
+            # SSL Certificate Authority Verification
+            'type': 'bool',
+            # Provide a default
+            'default': verify_certificate,
+            # look up default using the following parent class value at
+            # runtime.
+            '_lookup_default': 'verify_certificate',
+        },
+        'rto': {
+            'name': _('Socket Read Timeout'),
+            'type': 'float',
+            # Provide a default
+            'default': socket_read_timeout,
+            # look up default using the following parent class value at
+            # runtime. The variable name identified here (in this case
+            # socket_read_timeout) is checked and it's result is placed
+            # over-top of  the 'default'. This is done because once a parent
+            # class inherits this one, the overflow_mode already set as a
+            # default 'could' be potentially over-ridden and changed to a
+            # different value.
+            '_lookup_default': 'socket_read_timeout',
+        },
+        'cto': {
+            'name': _('Socket Connect Timeout'),
+            'type': 'float',
+            # Provide a default
+            'default': socket_connect_timeout,
+            # look up default using the following parent class value at
+            # runtime. The variable name identified here (in this case
+            # socket_connect_timeout) is checked and it's result is placed
+            # over-top of  the 'default'. This is done because once a parent
+            # class inherits this one, the overflow_mode already set as a
+            # default 'could' be potentially over-ridden and changed to a
+            # different value.
+            '_lookup_default': 'socket_connect_timeout',
+        },
+    }
+
+    # kwargs are dynamically built because a prefix causes us to parse the
+    # content slightly differently. The prefix is required and can be either
+    # a (+ or -). Below would handle the +key=value:
+    #    {
+    #        'headers': {
+    #           'name': _('HTTP Header'),
+    #           'prefix': '+',
+    #           'type': 'string',
+    #        },
+    #    },
+    #
+    # In a kwarg situation, the 'key' is always presumed to be treated as
+    # a string.  When the 'type' is defined, it is being defined to respect
+    # the 'value'.
+
+    template_kwargs = {}
 
     def __init__(self, asset=None, **kwargs):
         """
@@ -141,6 +214,9 @@ class URLBase(object):
                 self.port = int(self.port)
 
             except (TypeError, ValueError):
+                self.logger.warning(
+                    'Invalid port number specified {}'
+                    .format(self.port))
                 self.port = None
 
         self.user = kwargs.get('user')
@@ -152,6 +228,26 @@ class URLBase(object):
         if self.password:
             # Always unquote the password if it exists
             self.password = URLBase.unquote(self.password)
+
+        # Store our Timeout Variables
+        if 'socket_read_timeout' in kwargs:
+            try:
+                self.socket_read_timeout = \
+                    float(kwargs.get('socket_read_timeout'))
+            except (TypeError, ValueError):
+                self.logger.warning(
+                    'Invalid socket read timeout (rto) was specified {}'
+                    .format(kwargs.get('socket_read_timeout')))
+
+        if 'socket_connect_timeout' in kwargs:
+            try:
+                self.socket_connect_timeout = \
+                    float(kwargs.get('socket_connect_timeout'))
+
+            except (TypeError, ValueError):
+                self.logger.warning(
+                    'Invalid socket connect timeout (cto) was specified {}'
+                    .format(kwargs.get('socket_connect_timeout')))
 
         if 'tag' in kwargs:
             # We want to associate some tags with our notification service.
@@ -481,7 +577,26 @@ class URLBase(object):
         """This is primarily used to fullfill the `timeout` keyword argument
         that is used by requests.get() and requests.put() calls.
         """
-        return (self.request_connect_timeout, self.request_read_timeout)
+        return (self.socket_connect_timeout, self.socket_read_timeout)
+
+    def url_parameters(self, *args, **kwargs):
+        """
+        Provides a default set of args to work with. This can greatly
+        simplify URL construction in the acommpanied url() function.
+
+        The following property returns a dictionary (of strings) containing
+        all of the parameters that can be set on a URL and managed through
+        this class.
+        """
+
+        return {
+            # The socket read timeout
+            'rto': str(self.socket_read_timeout),
+            # The request/socket connect timeout
+            'cto': str(self.socket_connect_timeout),
+            # Certificate verification
+            'verify': 'yes' if self.verify_certificate else 'no',
+        }
 
     @staticmethod
     def parse_url(url, verify_host=True):
@@ -527,6 +642,14 @@ class URLBase(object):
         # User overrides
         if 'user' in results['qsd']:
             results['user'] = results['qsd']['user']
+
+        # Store our socket read timeout if specified
+        if 'rto' in results['qsd']:
+            results['socket_read_timeout'] = results['qsd']['rto']
+
+        # Store our socket connect timeout if specified
+        if 'cto' in results['qsd']:
+            results['socket_connect_timeout'] = results['qsd']['cto']
 
         return results
 

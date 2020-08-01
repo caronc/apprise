@@ -69,19 +69,19 @@ class ConfigFile(ConfigBase):
         else:
             cache = int(self.cache)
 
-        # Define any arguments set
-        args = {
+        # Define any URL parameters
+        params = {
             'encoding': self.encoding,
             'cache': cache,
         }
 
         if self.config_format:
             # A format was enforced; make sure it's passed back with the url
-            args['format'] = self.config_format
+            params['format'] = self.config_format
 
-        return 'file://{path}{args}'.format(
+        return 'file://{path}{params}'.format(
             path=self.quote(self.path),
-            args='?{}'.format(self.urlencode(args)) if args else '',
+            params='?{}'.format(self.urlencode(params)) if params else '',
         )
 
     def read(self, **kwargs):

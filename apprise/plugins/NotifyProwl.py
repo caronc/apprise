@@ -237,20 +237,20 @@ class NotifyProwl(NotifyBase):
             ProwlPriority.EMERGENCY: 'emergency',
         }
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
+        # Define any URL parameters
+        params = {
             'priority': 'normal' if self.priority not in _map
                         else _map[self.priority],
-            'verify': 'yes' if self.verify_certificate else 'no',
         }
 
-        return '{schema}://{apikey}/{providerkey}/?{args}'.format(
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+
+        return '{schema}://{apikey}/{providerkey}/?{params}'.format(
             schema=self.secure_protocol,
             apikey=self.pprint(self.apikey, privacy, safe=''),
             providerkey=self.pprint(self.providerkey, privacy, safe=''),
-            args=NotifyProwl.urlencode(args),
+            params=NotifyProwl.urlencode(params),
         )
 
     @staticmethod

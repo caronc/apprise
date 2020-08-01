@@ -332,23 +332,23 @@ class NotifyJoin(NotifyBase):
             JoinPriority.EMERGENCY: 'emergency',
         }
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
+        # Define any URL parameters
+        params = {
             'priority':
                 _map[self.template_args['priority']['default']]
                 if self.priority not in _map else _map[self.priority],
             'image': 'yes' if self.include_image else 'no',
-            'verify': 'yes' if self.verify_certificate else 'no',
         }
 
-        return '{schema}://{apikey}/{targets}/?{args}'.format(
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+
+        return '{schema}://{apikey}/{targets}/?{params}'.format(
             schema=self.secure_protocol,
             apikey=self.pprint(self.apikey, privacy, safe=''),
             targets='/'.join([NotifyJoin.quote(x, safe='')
                               for x in self.targets]),
-            args=NotifyJoin.urlencode(args))
+            params=NotifyJoin.urlencode(params))
 
     @staticmethod
     def parse_url(url):

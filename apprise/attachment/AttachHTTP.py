@@ -254,10 +254,8 @@ class AttachHTTP(AttachBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'verify': 'yes' if self.verify_certificate else 'no',
-        }
+        # Our URL parameters
+        params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         # Prepare our cache value
         if self.cache is not None:
@@ -267,21 +265,21 @@ class AttachHTTP(AttachBase):
                 cache = int(self.cache)
 
             # Set our cache value
-            args['cache'] = cache
+            params['cache'] = cache
 
         if self._mimetype:
             # A format was enforced
-            args['mime'] = self._mimetype
+            params['mime'] = self._mimetype
 
         if self._name:
             # A name was enforced
-            args['name'] = self._name
+            params['name'] = self._name
 
-        # Append our headers into our args
-        args.update({'+{}'.format(k): v for k, v in self.headers.items()})
+        # Append our headers into our parameters
+        params.update({'+{}'.format(k): v for k, v in self.headers.items()})
 
         # Apply any remaining entries to our URL
-        args.update(self.qsd)
+        params.update(self.qsd)
 
         # Determine Authentication
         auth = ''
@@ -298,14 +296,14 @@ class AttachHTTP(AttachBase):
 
         default_port = 443 if self.secure else 80
 
-        return '{schema}://{auth}{hostname}{port}{fullpath}?{args}'.format(
+        return '{schema}://{auth}{hostname}{port}{fullpath}?{params}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
             hostname=self.quote(self.host, safe=''),
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
             fullpath=self.quote(self.fullpath, safe='/'),
-            args=self.urlencode(args),
+            params=self.urlencode(params),
         )
 
     @staticmethod

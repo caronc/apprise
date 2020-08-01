@@ -100,18 +100,20 @@ class ConfigHTTP(ConfigBase):
             cache = int(self.cache)
 
         # Define any arguments set
-        args = {
-            'verify': 'yes' if self.verify_certificate else 'no',
+        params = {
             'encoding': self.encoding,
             'cache': cache,
         }
 
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+
         if self.config_format:
             # A format was enforced; make sure it's passed back with the url
-            args['format'] = self.config_format
+            params['format'] = self.config_format
 
         # Append our headers into our args
-        args.update({'+{}'.format(k): v for k, v in self.headers.items()})
+        params.update({'+{}'.format(k): v for k, v in self.headers.items()})
 
         # Determine Authentication
         auth = ''
@@ -128,14 +130,14 @@ class ConfigHTTP(ConfigBase):
 
         default_port = 443 if self.secure else 80
 
-        return '{schema}://{auth}{hostname}{port}{fullpath}/?{args}'.format(
+        return '{schema}://{auth}{hostname}{port}{fullpath}/?{params}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
             hostname=self.quote(self.host, safe=''),
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
             fullpath=self.quote(self.fullpath, safe='/'),
-            args=self.urlencode(args),
+            params=self.urlencode(params),
         )
 
     def read(self, **kwargs):

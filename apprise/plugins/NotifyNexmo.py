@@ -325,15 +325,15 @@ class NotifyNexmo(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
+        # Define any URL parameters
+        params = {
             'ttl': str(self.ttl),
         }
 
-        return '{schema}://{key}:{secret}@{source}/{targets}/?{args}'.format(
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+
+        return '{schema}://{key}:{secret}@{source}/{targets}/?{params}'.format(
             schema=self.secure_protocol,
             key=self.pprint(self.apikey, privacy, safe=''),
             secret=self.pprint(
@@ -341,7 +341,7 @@ class NotifyNexmo(NotifyBase):
             source=NotifyNexmo.quote(self.source, safe=''),
             targets='/'.join(
                 [NotifyNexmo.quote(x, safe='') for x in self.targets]),
-            args=NotifyNexmo.urlencode(args))
+            params=NotifyNexmo.urlencode(params))
 
     @staticmethod
     def parse_url(url):
