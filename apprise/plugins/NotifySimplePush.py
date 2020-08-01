@@ -142,14 +142,6 @@ class NotifySimplePush(NotifyBase):
             # Default Event Name
             self.event = None
 
-        # Encrypt Message (providing support is available)
-        if self.password and self.user and not CRYPTOGRAPHY_AVAILABLE:
-            # Provide the end user at least some notification that they're
-            # not getting what they asked for
-            self.logger.warning(
-                'SimplePush extended encryption is not supported by this '
-                'system.')
-
         # Used/cached in _encrypt() function
         self._iv = None
         self._iv_hex = None
@@ -188,6 +180,15 @@ class NotifySimplePush(NotifyBase):
         """
         Perform SimplePush Notification
         """
+
+        # Encrypt Message (providing support is available)
+        if self.password and self.user and not CRYPTOGRAPHY_AVAILABLE:
+            # Provide the end user at least some notification that they're
+            # not getting what they asked for
+            self.logger.warning(
+                "Authenticated SimplePush Notifications are not supported by "
+                "this system; `pip install cryptography`.")
+            return False
 
         headers = {
             'User-Agent': self.app_id,
