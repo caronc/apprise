@@ -106,7 +106,7 @@ class NotifySpontit(NotifyBase):
             'name': _('User ID'),
             'type': 'string',
             'required': True,
-            'regex': (r'^[a-z0-9_]+$', 'i'),
+            'regex': (r'^[a-z0-9_-]+$', 'i'),
         },
         'apikey': {
             'name': _('API Key'),
