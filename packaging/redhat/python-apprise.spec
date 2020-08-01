@@ -182,7 +182,7 @@ BuildRequires: python%{python3_pkgversion}-pytest-runner
 %endif
 
 install -p -D -T -m 0644 packaging/man/%{pypi_name}.1 \
-	%{buildroot}%{_mandir}/man1/%{pypi_name}.1
+   %{buildroot}%{_mandir}/man1/%{pypi_name}.1
 
 %if %{with tests}
 %check
