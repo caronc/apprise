@@ -82,9 +82,11 @@ BuildRequires: python-six
 BuildRequires: python2-click >= 5.0
 BuildRequires: python-markdown
 %if 0%{?rhel} && 0%{?rhel} <= 7
+BuildRequires: python-cryptography
 BuildRequires: python-babel
 BuildRequires: python-yaml
 %else
+BuildRequires: python2-cryptography
 BuildRequires: python2-babel
 BuildRequires: python2-yaml
 %endif
@@ -140,6 +142,7 @@ BuildRequires: python%{python3_pkgversion}-click >= 5.0
 BuildRequires: python%{python3_pkgversion}-markdown
 BuildRequires: python%{python3_pkgversion}-yaml
 BuildRequires: python%{python3_pkgversion}-babel
+BuildRequires: python%{python3_pkgversion}-cryptography
 Requires: python%{python3_pkgversion}-requests
 Requires: python%{python3_pkgversion}-requests-oauthlib
 Requires: python%{python3_pkgversion}-six
@@ -179,7 +182,7 @@ BuildRequires: python%{python3_pkgversion}-pytest-runner
 %endif
 
 install -p -D -T -m 0644 packaging/man/%{pypi_name}.1 \
-	%{buildroot}%{_mandir}/man1/%{pypi_name}.1
+   %{buildroot}%{_mandir}/man1/%{pypi_name}.1
 
 %if %{with tests}
 %check

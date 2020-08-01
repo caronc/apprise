@@ -25,6 +25,7 @@
 
 import os
 import sys
+import pytest
 import apprise
 
 try:
@@ -43,6 +44,8 @@ import logging
 logging.disable(logging.CRITICAL)
 
 
+@pytest.mark.skipif(
+    'cryptography' not in sys.modules, reason="requires cryptography")
 def test_simplepush_plugin(tmpdir):
     """
     API: NotifySimplePush Plugin()
@@ -73,10 +76,14 @@ def test_simplepush_plugin(tmpdir):
     reload(sys.modules['apprise.Apprise'])
     reload(sys.modules['apprise'])
 
-    # imported and therefore the extra encryption offered by SimplePush is
-    # not available...
+    # Without the cryptography library objects can still be instantiated
+    # however notifications will fail
     obj = apprise.Apprise.instantiate('spush://salt:pass@valid_api_key')
     assert obj is not None
+
+    # We can't notify with a user/pass combo and no cryptography library
+    assert obj.notify(
+        title="test message title", body="message body") is False
 
     # Tidy-up / restore things to how they were
     os.unlink(str(suite.join("{}.py".format(module_name))))
