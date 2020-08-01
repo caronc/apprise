@@ -368,14 +368,10 @@ class NotifyTwilio(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
-        }
+        # Our URL parameters
+        params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
-        return '{schema}://{sid}:{token}@{source}/{targets}/?{args}'.format(
+        return '{schema}://{sid}:{token}@{source}/{targets}/?{params}'.format(
             schema=self.secure_protocol,
             sid=self.pprint(
                 self.account_sid, privacy, mode=PrivacyMode.Tail, safe=''),
@@ -383,7 +379,7 @@ class NotifyTwilio(NotifyBase):
             source=NotifyTwilio.quote(self.source, safe=''),
             targets='/'.join(
                 [NotifyTwilio.quote(x, safe='') for x in self.targets]),
-            args=NotifyTwilio.urlencode(args))
+            params=NotifyTwilio.urlencode(params))
 
     @staticmethod
     def parse_url(url):

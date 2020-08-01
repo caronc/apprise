@@ -57,20 +57,20 @@ class AttachFile(AttachBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {}
+        # Define any URL parameters
+        params = {}
 
         if self._mimetype:
             # A mime-type was enforced
-            args['mime'] = self._mimetype
+            params['mime'] = self._mimetype
 
         if self._name:
             # A name was enforced
-            args['name'] = self._name
+            params['name'] = self._name
 
-        return 'file://{path}{args}'.format(
+        return 'file://{path}{params}'.format(
             path=self.quote(self.dirty_path),
-            args='?{}'.format(self.urlencode(args)) if args else '',
+            params='?{}'.format(self.urlencode(params)) if params else '',
         )
 
     def download(self, **kwargs):

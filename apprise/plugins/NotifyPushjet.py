@@ -123,12 +123,8 @@ class NotifyPushjet(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
-        }
+        # Our URL parameters
+        params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         default_port = 443 if self.secure else 80
 
@@ -141,7 +137,7 @@ class NotifyPushjet(NotifyBase):
                     self.password, privacy, mode=PrivacyMode.Secret, safe=''),
             )
 
-        return '{schema}://{auth}{hostname}{port}/{secret}/?{args}'.format(
+        return '{schema}://{auth}{hostname}{port}/{secret}/?{params}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
             hostname=NotifyPushjet.quote(self.host, safe=''),
@@ -149,7 +145,7 @@ class NotifyPushjet(NotifyBase):
                  else ':{}'.format(self.port),
             secret=self.pprint(
                 self.secret_key, privacy, mode=PrivacyMode.Secret, safe=''),
-            args=NotifyPushjet.urlencode(args),
+            params=NotifyPushjet.urlencode(params),
         )
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):

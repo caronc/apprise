@@ -229,28 +229,25 @@ class NotifyTwist(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
-        }
+        # Our URL parameters
+        params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
-        return '{schema}://{password}:{user}@{host}/{targets}/?{args}'.format(
-            schema=self.secure_protocol,
-            password=self.pprint(
-                self.password, privacy, mode=PrivacyMode.Secret, safe=''),
-            user=self.quote(self.user, safe=''),
-            host=self.host,
-            targets='/'.join(
-                [NotifyTwist.quote(x, safe='') for x in chain(
-                    # Channels are prefixed with a pound/hashtag symbol
-                    ['#{}'.format(x) for x in self.channels],
-                    # Channel IDs
-                    self.channel_ids,
-                )]),
-            args=NotifyTwist.urlencode(args),
-        )
+        return '{schema}://{password}:{user}@{host}/{targets}/' \
+            '?{params}'.format(
+                schema=self.secure_protocol,
+                password=self.pprint(
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
+                user=self.quote(self.user, safe=''),
+                host=self.host,
+                targets='/'.join(
+                    [NotifyTwist.quote(x, safe='') for x in chain(
+                        # Channels are prefixed with a pound/hashtag symbol
+                        ['#{}'.format(x) for x in self.channels],
+                        # Channel IDs
+                        self.channel_ids,
+                    )]),
+                params=NotifyTwist.urlencode(params),
+            )
 
     def login(self):
         """

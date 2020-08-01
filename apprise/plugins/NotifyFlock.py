@@ -309,21 +309,22 @@ class NotifyFlock(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
+        # Define any URL parameters
+        params = {
             'image': 'yes' if self.include_image else 'no',
-            'verify': 'yes' if self.verify_certificate else 'no',
         }
 
-        return '{schema}://{token}/{targets}?{args}'\
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+
+        return '{schema}://{token}/{targets}?{params}'\
             .format(
                 schema=self.secure_protocol,
                 token=self.pprint(self.token, privacy, safe=''),
                 targets='/'.join(
                     [NotifyFlock.quote(target, safe='')
                      for target in self.targets]),
-                args=NotifyFlock.urlencode(args),
+                params=NotifyFlock.urlencode(params),
             )
 
     @staticmethod
@@ -364,14 +365,14 @@ class NotifyFlock(NotifyBase):
         result = re.match(
             r'^https?://api\.flock\.com/hooks/sendMessage/'
             r'(?P<token>[a-z0-9-]{24})/?'
-            r'(?P<args>\?.+)?$', url, re.I)
+            r'(?P<params>\?.+)?$', url, re.I)
 
         if result:
             return NotifyFlock.parse_url(
-                '{schema}://{token}/{args}'.format(
+                '{schema}://{token}/{params}'.format(
                     schema=NotifyFlock.secure_protocol,
                     token=result.group('token'),
-                    args='' if not result.group('args')
-                    else result.group('args')))
+                    params='' if not result.group('params')
+                    else result.group('params')))
 
         return None

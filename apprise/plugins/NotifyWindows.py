@@ -223,18 +223,18 @@ class NotifyWindows(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
+        # Define any URL parameters
+        params = {
             'image': 'yes' if self.include_image else 'no',
             'duration': str(self.duration),
-            'verify': 'yes' if self.verify_certificate else 'no',
         }
 
-        return '{schema}://_/?{args}'.format(
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+
+        return '{schema}://_/?{params}'.format(
             schema=self.protocol,
-            args=NotifyWindows.urlencode(args),
+            params=NotifyWindows.urlencode(params),
         )
 
     @staticmethod

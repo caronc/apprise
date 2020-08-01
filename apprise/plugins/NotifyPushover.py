@@ -497,19 +497,20 @@ class NotifyPushover(NotifyBase):
             PushoverPriority.EMERGENCY: 'emergency',
         }
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
+        # Define any URL parameters
+        params = {
             'priority':
                 _map[self.template_args['priority']['default']]
                 if self.priority not in _map else _map[self.priority],
-            'verify': 'yes' if self.verify_certificate else 'no',
         }
+
         # Only add expire and retry for emergency messages,
         # pushover ignores for all other priorities
         if self.priority == PushoverPriority.EMERGENCY:
-            args.update({'expire': self.expire, 'retry': self.retry})
+            params.update({'expire': self.expire, 'retry': self.retry})
+
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Escape our devices
         devices = '/'.join([NotifyPushover.quote(x, safe='')
@@ -520,12 +521,12 @@ class NotifyPushover(NotifyBase):
             # it from the devices list
             devices = ''
 
-        return '{schema}://{user_key}@{token}/{devices}/?{args}'.format(
+        return '{schema}://{user_key}@{token}/{devices}/?{params}'.format(
             schema=self.secure_protocol,
             user_key=self.pprint(self.user_key, privacy, safe=''),
             token=self.pprint(self.token, privacy, safe=''),
             devices=devices,
-            args=NotifyPushover.urlencode(args))
+            params=NotifyPushover.urlencode(params))
 
     @staticmethod
     def parse_url(url):

@@ -580,15 +580,11 @@ class NotifySNS(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
-        }
+        # Our URL parameters
+        params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         return '{schema}://{key_id}/{key_secret}/{region}/{targets}/'\
-            '?{args}'.format(
+            '?{params}'.format(
                 schema=self.secure_protocol,
                 key_id=self.pprint(self.aws_access_key_id, privacy, safe=''),
                 key_secret=self.pprint(
@@ -602,7 +598,7 @@ class NotifySNS(NotifyBase):
                         # Topics are prefixed with a pound/hashtag symbol
                         ['#{}'.format(x) for x in self.topics],
                     )]),
-                args=NotifySNS.urlencode(args),
+                params=NotifySNS.urlencode(params),
             )
 
     @staticmethod

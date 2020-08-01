@@ -278,19 +278,19 @@ class NotifyMatterMost(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
+        # Define any URL parameters
+        params = {
             'image': 'yes' if self.include_image else 'no',
-            'verify': 'yes' if self.verify_certificate else 'no',
         }
+
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         if self.channels:
             # historically the value only accepted one channel and is
             # therefore identified as 'channel'. Channels have always been
             # optional, so that is why this setting is nested in an if block
-            args['channel'] = ','.join(self.channels)
+            params['channel'] = ','.join(self.channels)
 
         default_port = 443 if self.secure else self.default_port
         default_schema = self.secure_protocol if self.secure else self.protocol
@@ -304,7 +304,7 @@ class NotifyMatterMost(NotifyBase):
 
         return \
             '{schema}://{botname}{hostname}{port}{fullpath}{authtoken}' \
-            '/?{args}'.format(
+            '/?{params}'.format(
                 schema=default_schema,
                 botname=botname,
                 hostname=NotifyMatterMost.quote(self.host, safe=''),
@@ -313,7 +313,7 @@ class NotifyMatterMost(NotifyBase):
                 fullpath='/' if not self.fullpath else '{}/'.format(
                     NotifyMatterMost.quote(self.fullpath, safe='/')),
                 authtoken=self.pprint(self.authtoken, privacy, safe=''),
-                args=NotifyMatterMost.urlencode(args),
+                params=NotifyMatterMost.urlencode(params),
             )
 
     @staticmethod

@@ -303,6 +303,23 @@ def test_apprise():
     a.clear()
     assert len(a) == 0
 
+    # Test our socket details
+    # rto = Socket Read Timeout
+    # cto = Socket Connect Timeout
+    plugin = a.instantiate('good://localhost?rto=5.1&cto=10')
+    assert isinstance(plugin, NotifyBase)
+    assert plugin.socket_connect_timeout == 10.0
+    assert plugin.socket_read_timeout == 5.1
+
+    plugin = a.instantiate('good://localhost?rto=invalid&cto=invalid')
+    assert isinstance(plugin, NotifyBase)
+    assert plugin.socket_connect_timeout == URLBase.socket_connect_timeout
+    assert plugin.socket_read_timeout == URLBase.socket_read_timeout
+
+    # Reset our object
+    a.clear()
+    assert len(a) == 0
+
     # Instantiate a bad object
     plugin = a.instantiate(object, tag="bad_object")
     assert plugin is None
@@ -1024,10 +1041,12 @@ def test_apprise_details_plugin_verification():
     # Define acceptable map_to arguments that can be tied in with the
     # kwargs function definitions.
     valid_kwargs = set([
-        # URL prepared kwargs
+        # General Parameters
         'user', 'password', 'port', 'host', 'schema', 'fullpath',
-        # URLBase and NotifyBase args:
-        'verify', 'format', 'overflow',
+        # NotifyBase parameters:
+        'format', 'overflow',
+        # URLBase parameters:
+        'verify', 'cto', 'rto',
     ])
 
     # Valid Schema Entries:

@@ -280,25 +280,21 @@ class NotifyNotica(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
-        }
+        # Our URL parameters
+        params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         if self.mode == NoticaMode.OFFICIAL:
             # Official URLs are easy to assemble
-            return '{schema}://{token}/?{args}'.format(
+            return '{schema}://{token}/?{params}'.format(
                 schema=self.protocol,
                 token=self.pprint(self.token, privacy, safe=''),
-                args=NotifyNotica.urlencode(args),
+                params=NotifyNotica.urlencode(params),
             )
 
         # If we reach here then we are assembling a self hosted URL
 
-        # Append our headers into our args
-        args.update({'+{}'.format(k): v for k, v in self.headers.items()})
+        # Append URL parameters from our headers
+        params.update({'+{}'.format(k): v for k, v in self.headers.items()})
 
         # Authorization can be used for self-hosted sollutions
         auth = ''
@@ -317,7 +313,7 @@ class NotifyNotica(NotifyBase):
 
         default_port = 443 if self.secure else 80
 
-        return '{schema}://{auth}{hostname}{port}{fullpath}{token}/?{args}' \
+        return '{schema}://{auth}{hostname}{port}{fullpath}{token}/?{params}' \
                .format(
                    schema=self.secure_protocol
                    if self.secure else self.protocol,
@@ -328,7 +324,7 @@ class NotifyNotica(NotifyBase):
                    fullpath=NotifyNotica.quote(
                        self.fullpath, safe='/'),
                    token=self.pprint(self.token, privacy, safe=''),
-                   args=NotifyNotica.urlencode(args),
+                   params=NotifyNotica.urlencode(params),
                )
 
     @staticmethod
@@ -382,14 +378,14 @@ class NotifyNotica(NotifyBase):
 
         result = re.match(
             r'^https?://notica\.us/?'
-            r'\??(?P<token>[^&]+)([&\s]*(?P<args>.+))?$', url, re.I)
+            r'\??(?P<token>[^&]+)([&\s]*(?P<params>.+))?$', url, re.I)
 
         if result:
             return NotifyNotica.parse_url(
-                '{schema}://{token}/{args}'.format(
+                '{schema}://{token}/{params}'.format(
                     schema=NotifyNotica.protocol,
                     token=result.group('token'),
-                    args='' if not result.group('args')
-                    else '?{}'.format(result.group('args'))))
+                    params='' if not result.group('params')
+                    else '?{}'.format(result.group('params'))))
 
         return None

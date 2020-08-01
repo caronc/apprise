@@ -687,26 +687,26 @@ class NotifyEmail(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
+        # Define an URL parameters
+        params = {
             'from': self.from_addr,
             'name': self.from_name,
             'mode': self.secure_mode,
             'smtp': self.smtp_host,
             'timeout': self.timeout,
             'user': self.user,
-            'verify': 'yes' if self.verify_certificate else 'no',
         }
+
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         if len(self.cc) > 0:
             # Handle our Carbon Copy Addresses
-            args['cc'] = ','.join(self.cc)
+            params['cc'] = ','.join(self.cc)
 
         if len(self.bcc) > 0:
             # Handle our Blind Carbon Copy Addresses
-            args['bcc'] = ','.join(self.bcc)
+            params['bcc'] = ','.join(self.bcc)
 
         # pull email suffix from username (if present)
         user = None if not self.user else self.user.split('@')[0]
@@ -734,7 +734,7 @@ class NotifyEmail(NotifyBase):
         has_targets = \
             not (len(self.targets) == 1 and self.targets[0] == self.from_addr)
 
-        return '{schema}://{auth}{hostname}{port}/{targets}?{args}'.format(
+        return '{schema}://{auth}{hostname}{port}/{targets}?{params}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
             hostname=NotifyEmail.quote(self.host, safe=''),
@@ -742,7 +742,7 @@ class NotifyEmail(NotifyBase):
                  else ':{}'.format(self.port),
             targets='' if not has_targets else '/'.join(
                 [NotifyEmail.quote(x, safe='') for x in self.targets]),
-            args=NotifyEmail.urlencode(args),
+            params=NotifyEmail.urlencode(params),
         )
 
     @staticmethod

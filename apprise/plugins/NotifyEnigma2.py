@@ -184,16 +184,16 @@ class NotifyEnigma2(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
+        # Define any URL parameters
+        params = {
             'timeout': str(self.timeout),
         }
 
-        # Append our headers into our args
-        args.update({'+{}'.format(k): v for k, v in self.headers.items()})
+        # Append our headers into our parameters
+        params.update({'+{}'.format(k): v for k, v in self.headers.items()})
+
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Determine Authentication
         auth = ''
@@ -210,14 +210,14 @@ class NotifyEnigma2(NotifyBase):
 
         default_port = 443 if self.secure else 80
 
-        return '{schema}://{auth}{hostname}{port}{fullpath}?{args}'.format(
+        return '{schema}://{auth}{hostname}{port}{fullpath}?{params}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
             hostname=NotifyEnigma2.quote(self.host, safe=''),
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
             fullpath=NotifyEnigma2.quote(self.fullpath, safe='/'),
-            args=NotifyEnigma2.urlencode(args),
+            params=NotifyEnigma2.urlencode(params),
         )
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):

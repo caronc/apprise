@@ -200,18 +200,14 @@ class NotifyKumulos(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
-        }
+        # Our URL parameters
+        params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
-        return '{schema}://{apikey}/{serverkey}/?{args}'.format(
+        return '{schema}://{apikey}/{serverkey}/?{params}'.format(
             schema=self.secure_protocol,
             apikey=self.pprint(self.apikey, privacy, safe=''),
             serverkey=self.pprint(self.serverkey, privacy, safe=''),
-            args=NotifyKumulos.urlencode(args),
+            params=NotifyKumulos.urlencode(params),
         )
 
     @staticmethod

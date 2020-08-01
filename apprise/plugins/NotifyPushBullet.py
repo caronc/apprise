@@ -376,12 +376,8 @@ class NotifyPushBullet(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
-        }
+        # Our URL parameters
+        params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         targets = '/'.join([NotifyPushBullet.quote(x) for x in self.targets])
         if targets == PUSHBULLET_SEND_TO_ALL:
@@ -389,11 +385,11 @@ class NotifyPushBullet(NotifyBase):
             # it from the recipients list
             targets = ''
 
-        return '{schema}://{accesstoken}/{targets}/?{args}'.format(
+        return '{schema}://{accesstoken}/{targets}/?{params}'.format(
             schema=self.secure_protocol,
             accesstoken=self.pprint(self.accesstoken, privacy, safe=''),
             targets=targets,
-            args=NotifyPushBullet.urlencode(args))
+            params=NotifyPushBullet.urlencode(params))
 
     @staticmethod
     def parse_url(url):

@@ -579,20 +579,20 @@ class NotifyTwitter(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
+        # Define any URL parameters
+        params = {
             'mode': self.mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
         }
 
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+
         if len(self.targets) > 0:
-            args['to'] = ','.join([NotifyTwitter.quote(x, safe='')
-                                   for x in self.targets])
+            params['to'] = ','.join(
+                [NotifyTwitter.quote(x, safe='') for x in self.targets])
 
         return '{schema}://{ckey}/{csecret}/{akey}/{asecret}' \
-            '/{targets}/?{args}'.format(
+            '/{targets}/?{params}'.format(
                 schema=self.secure_protocol[0],
                 ckey=self.pprint(self.ckey, privacy, safe=''),
                 csecret=self.pprint(
@@ -603,7 +603,7 @@ class NotifyTwitter(NotifyBase):
                 targets='/'.join(
                     [NotifyTwitter.quote('@{}'.format(target), safe='')
                      for target in self.targets]),
-                args=NotifyTwitter.urlencode(args))
+                params=NotifyTwitter.urlencode(params))
 
     @staticmethod
     def parse_url(url):

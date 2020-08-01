@@ -272,13 +272,13 @@ class NotifyClickSend(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
+        # Define any URL parameters
+        params = {
             'batch': 'yes' if self.batch else 'no',
         }
+
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Setup Authentication
         auth = '{user}:{password}@'.format(
@@ -287,12 +287,12 @@ class NotifyClickSend(NotifyBase):
                 self.password, privacy, mode=PrivacyMode.Secret, safe=''),
         )
 
-        return '{schema}://{auth}{targets}?{args}'.format(
+        return '{schema}://{auth}{targets}?{params}'.format(
             schema=self.secure_protocol,
             auth=auth,
             targets='/'.join(
                 [NotifyClickSend.quote(x, safe='') for x in self.targets]),
-            args=NotifyClickSend.urlencode(args),
+            params=NotifyClickSend.urlencode(params),
         )
 
     @staticmethod

@@ -666,23 +666,23 @@ class NotifyTelegram(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
+        # Define any URL parameters
+        params = {
             'image': self.include_image,
-            'verify': 'yes' if self.verify_certificate else 'no',
             'detect': 'yes' if self.detect_owner else 'no',
         }
 
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+
         # No need to check the user token because the user automatically gets
         # appended into the list of chat ids
-        return '{schema}://{bot_token}/{targets}/?{args}'.format(
+        return '{schema}://{bot_token}/{targets}/?{params}'.format(
             schema=self.secure_protocol,
             bot_token=self.pprint(self.bot_token, privacy, safe=''),
             targets='/'.join(
                 [NotifyTelegram.quote('@{}'.format(x)) for x in self.targets]),
-            args=NotifyTelegram.urlencode(args))
+            params=NotifyTelegram.urlencode(params))
 
     @staticmethod
     def parse_url(url):

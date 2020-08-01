@@ -199,20 +199,20 @@ class NotifyNotifico(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
+        # Define any URL parameters
+        params = {
             'color': 'yes' if self.color else 'no',
             'prefix': 'yes' if self.prefix else 'no',
         }
 
-        return '{schema}://{proj}/{hook}/?{args}'.format(
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+
+        return '{schema}://{proj}/{hook}/?{params}'.format(
             schema=self.secure_protocol,
             proj=self.pprint(self.project_id, privacy, safe=''),
             hook=self.pprint(self.msghook, privacy, safe=''),
-            args=NotifyNotifico.urlencode(args),
+            params=NotifyNotifico.urlencode(params),
         )
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
@@ -365,15 +365,15 @@ class NotifyNotifico(NotifyBase):
             r'^https?://n\.tkte\.ch/h/'
             r'(?P<proj>[0-9]+)/'
             r'(?P<hook>[A-Z0-9]+)/?'
-            r'(?P<args>\?.+)?$', url, re.I)
+            r'(?P<params>\?.+)?$', url, re.I)
 
         if result:
             return NotifyNotifico.parse_url(
-                '{schema}://{proj}/{hook}/{args}'.format(
+                '{schema}://{proj}/{hook}/{params}'.format(
                     schema=NotifyNotifico.secure_protocol,
                     proj=result.group('proj'),
                     hook=result.group('hook'),
-                    args='' if not result.group('args')
-                    else result.group('args')))
+                    params='' if not result.group('params')
+                    else result.group('params')))
 
         return None

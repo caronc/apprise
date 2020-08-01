@@ -180,20 +180,21 @@ class NotifyMacOSX(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
+        # Define any URL parametrs
+        params = {
             'image': 'yes' if self.include_image else 'no',
         }
 
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+
         if self.sound:
             # Store our sound
-            args['sound'] = self.sound
+            params['sound'] = self.sound
 
-        return '{schema}://_/?{args}'.format(
+        return '{schema}://_/?{params}'.format(
             schema=self.protocol,
-            args=NotifyMacOSX.urlencode(args),
+            params=NotifyMacOSX.urlencode(params),
         )
 
     @staticmethod

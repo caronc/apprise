@@ -757,29 +757,25 @@ class NotifyPushSafer(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
-        }
+        # Our URL parameters
+        params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         if self.priority is not None:
             # Store our priority; but only if it was specified
-            args['priority'] = \
+            params['priority'] = \
                 next((key for key, value in PUSHSAFER_PRIORITY_MAP.items()
                       if value == self.priority),
                      DEFAULT_PRIORITY)  # pragma: no cover
 
         if self.sound is not None:
             # Store our sound; but only if it was specified
-            args['sound'] = \
+            params['sound'] = \
                 next((key for key, value in PUSHSAFER_SOUND_MAP.items()
                       if value == self.sound), '')  # pragma: no cover
 
         if self.vibration is not None:
             # Store our vibration; but only if it was specified
-            args['vibration'] = str(self.vibration)
+            params['vibration'] = str(self.vibration)
 
         targets = '/'.join([NotifyPushSafer.quote(x) for x in self.targets])
         if targets == PUSHSAFER_SEND_TO_ALL:
@@ -787,11 +783,11 @@ class NotifyPushSafer(NotifyBase):
             # it from the recipients list
             targets = ''
 
-        return '{schema}://{privatekey}/{targets}?{args}'.format(
+        return '{schema}://{privatekey}/{targets}?{params}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             privatekey=self.pprint(self.privatekey, privacy, safe=''),
             targets=targets,
-            args=NotifyPushSafer.urlencode(args))
+            params=NotifyPushSafer.urlencode(params))
 
     @staticmethod
     def parse_url(url):

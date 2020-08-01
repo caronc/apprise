@@ -80,21 +80,11 @@ class NotifyBase(URLBase):
     # use a <b> tag.  The below causes the <b>title</b> to get generated:
     default_html_tag_id = 'b'
 
-    # Define a default set of template arguments used for dynamically building
-    # details about our individual plugins for developers.
-
-    # Define object templates
-    templates = ()
-
-    # Provides a mapping of tokens, certain entries are fixed and automatically
-    # configured if found (such as schema, host, user, pass, and port)
-    template_tokens = {}
-
     # Here is where we define all of the arguments we accept on the url
     # such as: schema://whatever/?overflow=upstream&format=text
     # These act the same way as tokens except they are optional and/or
     # have default values set if mandatory. This rule must be followed
-    template_args = {
+    template_args = dict(URLBase.template_args, **{
         'overflow': {
             'name': _('Overflow Mode'),
             'type': 'choice:string',
@@ -119,34 +109,7 @@ class NotifyBase(URLBase):
             # runtime.
             '_lookup_default': 'notify_format',
         },
-        'verify': {
-            'name': _('Verify SSL'),
-            # SSL Certificate Authority Verification
-            'type': 'bool',
-            # Provide a default
-            'default': URLBase.verify_certificate,
-            # look up default using the following parent class value at
-            # runtime.
-            '_lookup_default': 'verify_certificate',
-        },
-    }
-
-    # kwargs are dynamically built because a prefix causes us to parse the
-    # content slightly differently. The prefix is required and can be either
-    # a (+ or -). Below would handle the +key=value:
-    #    {
-    #        'headers': {
-    #           'name': _('HTTP Header'),
-    #           'prefix': '+',
-    #           'type': 'string',
-    #        },
-    #    },
-    #
-    # In a kwarg situation, the 'key' is always presumed to be treated as
-    # a string.  When the 'type' is defined, it is being defined to respect
-    # the 'value'.
-
-    template_kwargs = {}
+    })
 
     def __init__(self, **kwargs):
         """
@@ -367,6 +330,23 @@ class NotifyBase(URLBase):
         """
         raise NotImplementedError(
             "send() is not implimented by the child class.")
+
+    def url_parameters(self, *args, **kwargs):
+        """
+        Provides a default set of parameters to work with. This can greatly
+        simplify URL construction in the acommpanied url() function in all
+        defined plugin services.
+        """
+
+        params = {
+            'format': self.notify_format,
+            'overflow': self.overflow_mode,
+        }
+
+        params.update(super(NotifyBase, self).url_parameters(*args, **kwargs))
+
+        # return default arguments
+        return kwargs
 
     @staticmethod
     def parse_url(url, verify_host=True):

@@ -285,14 +285,14 @@ class NotifyRocketChat(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
+        # Define any URL parameters
+        params = {
             'avatar': 'yes' if self.avatar else 'no',
             'mode': self.mode,
         }
+
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Determine Authentication
         if self.mode == RocketChatAuthMode.BASIC:
@@ -310,7 +310,7 @@ class NotifyRocketChat(NotifyBase):
 
         default_port = 443 if self.secure else 80
 
-        return '{schema}://{auth}{hostname}{port}/{targets}/?{args}'.format(
+        return '{schema}://{auth}{hostname}{port}/{targets}/?{params}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
             hostname=NotifyRocketChat.quote(self.host, safe=''),
@@ -325,7 +325,7 @@ class NotifyRocketChat(NotifyBase):
                     # Users
                     ['@{}'.format(x) for x in self.users],
                 )]),
-            args=NotifyRocketChat.urlencode(args),
+            params=NotifyRocketChat.urlencode(params),
         )
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
