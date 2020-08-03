@@ -159,9 +159,16 @@ class NotifyGrowl(NotifyBase):
             'default': True,
             'map_to': 'include_image',
         },
+        'sticky': {
+            'name': _('Sticky'),
+            'type': 'bool',
+            'default': True,
+            'map_to': 'sticky',
+        },
     })
 
-    def __init__(self, priority=None, version=2, include_image=True, **kwargs):
+    def __init__(self, priority=None, version=2, include_image=True,
+                 sticky=False, **kwargs):
         """
         Initialize Growl Object
         """
@@ -180,8 +187,8 @@ class NotifyGrowl(NotifyBase):
         # Our Registered object
         self.growl = None
 
-        # Always default the sticky flag to False
-        self.sticky = False
+        # Sticky flag
+        self.sticky = sticky
 
         # Store Version
         self.version = version
@@ -276,7 +283,7 @@ class NotifyGrowl(NotifyBase):
             'title': title,
             'description': body,
             'icon': icon is not None,
-            'sticky': False,
+            'sticky': self.sticky,
             'priority': self.priority,
         }
         self.logger.debug('Growl Payload: %s' % str(payload))
@@ -335,6 +342,7 @@ class NotifyGrowl(NotifyBase):
         # Define any URL parameters
         params = {
             'image': 'yes' if self.include_image else 'no',
+            'sticky': 'yes' if self.sticky else 'no',
             'priority':
                 _map[GrowlPriority.NORMAL] if self.priority not in _map
                 else _map[self.priority],
@@ -415,7 +423,13 @@ class NotifyGrowl(NotifyBase):
 
         # Include images with our message
         results['include_image'] = \
-            parse_bool(results['qsd'].get('image', True))
+            parse_bool(results['qsd'].get('image',
+                       NotifyGrowl.template_args['image']['default']))
+
+        # Include images with our message
+        results['sticky'] = \
+            parse_bool(results['qsd'].get('sticky',
+                       NotifyGrowl.template_args['sticky']['default']))
 
         # Set our version
         if version:

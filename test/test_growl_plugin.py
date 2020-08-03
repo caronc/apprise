@@ -233,6 +233,13 @@ def test_growl_plugin(mock_gntp):
         ('growl://growl.server?version=1', {
             'instance': apprise.plugins.NotifyGrowl,
         }),
+        # Test sticky flag
+        ('growl://growl.server?sticky=yes', {
+            'instance': apprise.plugins.NotifyGrowl,
+        }),
+        ('growl://growl.server?sticky=no', {
+            'instance': apprise.plugins.NotifyGrowl,
+        }),
         # Force a failure
         ('growl://growl.server?version=1', {
             'instance': apprise.plugins.NotifyGrowl,
