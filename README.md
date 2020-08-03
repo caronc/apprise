@@ -121,18 +121,19 @@ pip install apprise
 A small command line tool is also provided with this package called *apprise*. If you know the server url's you wish to notify, you can simply provide them all on the command line and send your notifications that way:
 ```bash
 # Send a notification to as many servers as you want
-# as you can easily chain one after another:
-apprise -t 'my title' -b 'my notification body' \
+# as you can easily chain one after another (the -vv provides some
+# additional verbosity to help let you know what is going on):
+apprise -vv -t 'my title' -b 'my notification body' \
    'mailto://myemail:mypass@gmail.com' \
    'pbul://o.gn5kj6nfhv736I7jC3cj3QLRiyhgl98b'
 
 # If you don't specify a --body (-b) then stdin is used allowing
 # you to use the tool as part of your every day administration:
-cat /proc/cpuinfo | apprise -t 'cpu info' \
+cat /proc/cpuinfo | apprise -vv -t 'cpu info' \
    'mailto://myemail:mypass@gmail.com'
 
 # The title field is totally optional
-uptime | apprise \
+uptime | apprise -vv \
    'discord:///4174216298/JHMHI8qBe7bk2ZwO5U711o3dV_js'
 ```
 
@@ -153,16 +154,16 @@ No one wants to put there credentials out for everyone to see on the command lin
 #  %LOCALAPPDATA%/Apprise/apprise.yml
 
 # If you loaded one of those files, your command line gets really easy:
-apprise -t 'my title' -b 'my notification body'
+apprise -vv -t 'my title' -b 'my notification body'
 
 # If you want to deviate from the default paths or specify more than one,
 # just specify them using the --config switch:
-apprise -t 'my title' -b 'my notification body' \
+apprise -vv -t 'my title' -b 'my notification body' \
    --config=/path/to/my/config.yml
 
 # Got lots of configuration locations? No problem, you can specify them all:
 # Apprise can even fetch the configuration from over a network!
-apprise -t 'my title' -b 'my notification body' \
+apprise -vv -t 'my title' -b 'my notification body' \
    --config=/path/to/my/config.yml \
    --config=https://localhost/my/apprise/config
 ```
@@ -171,13 +172,13 @@ apprise -t 'my title' -b 'my notification body' \
 Apprise also supports file attachments too! Specify as many attachments to a notification as you want.
 ```bash
 # Send a funny image you found on the internet to a colleague:
-apprise --title 'Agile Joke' \
+apprise -vv --title 'Agile Joke' \
         --body 'Did you see this one yet?' \
         --attach https://i.redd.it/my2t4d2fx0u31.jpg \
         'mailto://myemail:mypass@gmail.com'
 
 # Easily send an update from a critical server to your dev team
-apprise --title 'system crash' \
+apprise -vv --title 'system crash' \
         --body 'I do not think Jim fixed the bug; see attached...' \
         --attach /var/log/myprogram.log \
         --attach /var/debug/core.2345 \
