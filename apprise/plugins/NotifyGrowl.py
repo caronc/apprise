@@ -97,10 +97,6 @@ class NotifyGrowl(NotifyBase):
     # local anyway
     request_rate_per_sec = 0
 
-    # A title can not be used for Growl Messages.  Setting this to zero will
-    # cause any title (if defined) to get placed into the message body.
-    title_maxlen = 0
-
     # Limit results to just the first 10 line otherwise there is just to much
     # content to display
     body_max_line_count = 2
