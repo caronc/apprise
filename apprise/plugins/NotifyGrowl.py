@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2019 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2020 Chris Caron <lead2gold@gmail.com>
 # All rights reserved.
 #
 # This code is licensed under the MIT License.
@@ -23,14 +23,26 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-from .gntp import notifier
-from .gntp import errors
-from ..NotifyBase import NotifyBase
-from ...URLBase import PrivacyMode
-from ...common import NotifyImageSize
-from ...common import NotifyType
-from ...utils import parse_bool
-from ...AppriseLocale import gettext_lazy as _
+from .NotifyBase import NotifyBase
+from ..URLBase import PrivacyMode
+from ..common import NotifyImageSize
+from ..common import NotifyType
+from ..utils import parse_bool
+from ..AppriseLocale import gettext_lazy as _
+
+# Default our global support flag
+NOTIFY_GROWL_SUPPORT_ENABLED = False
+
+try:
+    import gntp.notifier
+
+    # We're good to go!
+    NOTIFY_GROWL_SUPPORT_ENABLED = True
+
+except ImportError:
+    # No problem; we just simply can't support this plugin until
+    # gntp is installed
+    pass
 
 
 # Priorities
@@ -49,8 +61,6 @@ GROWL_PRIORITIES = (
     GrowlPriority.HIGH,
     GrowlPriority.EMERGENCY,
 )
-
-GROWL_NOTIFICATION_TYPE = "New Messages"
 
 
 class NotifyGrowl(NotifyBase):
@@ -74,13 +84,18 @@ class NotifyGrowl(NotifyBase):
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_72
 
+    # This entry is a bit hacky, but it allows us to unit-test this library
+    # in an environment that simply doesn't have the windows packages
+    # available to us.  It also allows us to handle situations where the
+    # packages actually are present but we need to test that they aren't.
+    # If anyone is seeing this had knows a better way of testing this
+    # outside of what is defined in test/test_growl_plugin.py, please
+    # let me know! :)
+    _enabled = NOTIFY_GROWL_SUPPORT_ENABLED
+
     # Disable throttle rate for Growl requests since they are normally
     # local anyway
     request_rate_per_sec = 0
-
-    # A title can not be used for Growl Messages.  Setting this to zero will
-    # cause any title (if defined) to get placed into the message body.
-    title_maxlen = 0
 
     # Limit results to just the first 10 line otherwise there is just to much
     # content to display
@@ -89,7 +104,9 @@ class NotifyGrowl(NotifyBase):
     # Default Growl Port
     default_port = 23053
 
-    # Define object templates
+    # The Growl notification type used
+    growl_notification_type = "New Messages"
+
     # Define object templates
     templates = (
         '{schema}://{host}',
@@ -138,9 +155,16 @@ class NotifyGrowl(NotifyBase):
             'default': True,
             'map_to': 'include_image',
         },
+        'sticky': {
+            'name': _('Sticky'),
+            'type': 'bool',
+            'default': True,
+            'map_to': 'sticky',
+        },
     })
 
-    def __init__(self, priority=None, version=2, include_image=True, **kwargs):
+    def __init__(self, priority=None, version=2, include_image=True,
+                 sticky=False, **kwargs):
         """
         Initialize Growl Object
         """
@@ -156,16 +180,29 @@ class NotifyGrowl(NotifyBase):
         else:
             self.priority = priority
 
-        # Always default the sticky flag to False
-        self.sticky = False
+        # Our Registered object
+        self.growl = None
+
+        # Sticky flag
+        self.sticky = sticky
 
         # Store Version
         self.version = version
 
+        # Track whether or not we want to send an image with our notification
+        # or not.
+        self.include_image = include_image
+
+        return
+
+    def register(self):
+        """
+        Registers with the Growl server
+        """
         payload = {
             'applicationName': self.app_id,
-            'notifications': [GROWL_NOTIFICATION_TYPE, ],
-            'defaultNotifications': [GROWL_NOTIFICATION_TYPE, ],
+            'notifications': [self.growl_notification_type, ],
+            'defaultNotifications': [self.growl_notification_type, ],
             'hostname': self.host,
             'port': self.port,
         }
@@ -174,42 +211,57 @@ class NotifyGrowl(NotifyBase):
             payload['password'] = self.password
 
         self.logger.debug('Growl Registration Payload: %s' % str(payload))
-        self.growl = notifier.GrowlNotifier(**payload)
+        self.growl = gntp.notifier.GrowlNotifier(**payload)
 
         try:
             self.growl.register()
-            self.logger.debug(
-                'Growl server registration completed successfully.'
-            )
 
-        except errors.NetworkError:
-            msg = 'A network error occurred sending Growl ' \
-                  'notification to {}.'.format(self.host)
+        except gntp.errors.NetworkError:
+            msg = 'A network error error occurred registering ' \
+                  'with Growl at {}.'.format(self.host)
             self.logger.warning(msg)
-            raise TypeError(msg)
+            return False
 
-        except errors.AuthError:
-            msg = 'An authentication error occurred sending Growl ' \
-                  'notification to {}.'.format(self.host)
+        except gntp.errors.ParseError:
+            msg = 'A parsing error error occurred registering ' \
+                  'with Growl at {}.'.format(self.host)
             self.logger.warning(msg)
-            raise TypeError(msg)
+            return False
 
-        except errors.UnsupportedError:
-            msg = 'An unsupported error occurred sending Growl ' \
-                  'notification to {}.'.format(self.host)
+        except gntp.errors.AuthError:
+            msg = 'An authentication error error occurred registering ' \
+                  'with Growl at {}.'.format(self.host)
             self.logger.warning(msg)
-            raise TypeError(msg)
+            return False
 
-        # Track whether or not we want to send an image with our notification
-        # or not.
-        self.include_image = include_image
+        except gntp.errors.UnsupportedError:
+            msg = 'An unsupported error occurred registering with ' \
+                  'Growl at {}.'.format(self.host)
+            self.logger.warning(msg)
+            return False
 
-        return
+        self.logger.debug(
+            'Growl server registration completed successfully.'
+        )
+
+        # Return our state
+        return True
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Growl Notification
         """
+
+        if not self._enabled:
+            self.logger.warning(
+                "Growl Notifications are not supported by this system; "
+                "`pip install gntp`.")
+            return False
+
+        # Register ourselves with the server if we haven't done so already
+        if not self.growl and not self.register():
+            # We failed to register
+            return False
 
         icon = None
         if self.version >= 2:
@@ -223,11 +275,11 @@ class NotifyGrowl(NotifyBase):
                 else self.image_raw(notify_type)
 
         payload = {
-            'noteType': GROWL_NOTIFICATION_TYPE,
+            'noteType': self.growl_notification_type,
             'title': title,
             'description': body,
             'icon': icon is not None,
-            'sticky': False,
+            'sticky': self.sticky,
             'priority': self.priority,
         }
         self.logger.debug('Growl Payload: %s' % str(payload))
@@ -241,6 +293,7 @@ class NotifyGrowl(NotifyBase):
         self.throttle()
 
         try:
+            # Perform notification
             response = self.growl.notify(**payload)
             if not isinstance(response, bool):
                 self.logger.warning(
@@ -251,7 +304,7 @@ class NotifyGrowl(NotifyBase):
             else:
                 self.logger.info('Sent Growl notification.')
 
-        except errors.BaseError as e:
+        except gntp.errors.BaseError as e:
             # Since Growl servers listen for UDP broadcasts, it's possible
             # that you will never get to this part of the code since there is
             # no acknowledgement as to whether it accepted what was sent to it
@@ -285,6 +338,7 @@ class NotifyGrowl(NotifyBase):
         # Define any URL parameters
         params = {
             'image': 'yes' if self.include_image else 'no',
+            'sticky': 'yes' if self.sticky else 'no',
             'priority':
                 _map[GrowlPriority.NORMAL] if self.priority not in _map
                 else _map[self.priority],
@@ -365,7 +419,13 @@ class NotifyGrowl(NotifyBase):
 
         # Include images with our message
         results['include_image'] = \
-            parse_bool(results['qsd'].get('image', True))
+            parse_bool(results['qsd'].get('image',
+                       NotifyGrowl.template_args['image']['default']))
+
+        # Include images with our message
+        results['sticky'] = \
+            parse_bool(results['qsd'].get('sticky',
+                       NotifyGrowl.template_args['sticky']['default']))
 
         # Set our version
         if version:

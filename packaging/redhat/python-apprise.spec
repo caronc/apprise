@@ -84,10 +84,12 @@ BuildRequires: python-markdown
 %if 0%{?rhel} && 0%{?rhel} <= 7
 BuildRequires: python-cryptography
 BuildRequires: python-babel
+BuildRequires: python-gntp
 BuildRequires: python-yaml
 %else
 BuildRequires: python2-cryptography
 BuildRequires: python2-babel
+BuildRequires: python2-gntp
 BuildRequires: python2-yaml
 %endif
 
@@ -96,8 +98,10 @@ Requires: python2-requests-oauthlib
 Requires: python-six
 Requires: python-markdown
 %if 0%{?rhel} && 0%{?rhel} <= 7
+Requires: python-gntp
 Requires: python-yaml
 %else
+Requires: python2-gntp
 Requires: python2-yaml
 %endif
 
@@ -140,6 +144,7 @@ BuildRequires: python%{python3_pkgversion}-requests-oauthlib
 BuildRequires: python%{python3_pkgversion}-six
 BuildRequires: python%{python3_pkgversion}-click >= 5.0
 BuildRequires: python%{python3_pkgversion}-markdown
+BuildRequires: python%{python3_pkgversion}-gntp
 BuildRequires: python%{python3_pkgversion}-yaml
 BuildRequires: python%{python3_pkgversion}-babel
 BuildRequires: python%{python3_pkgversion}-cryptography
@@ -147,6 +152,7 @@ Requires: python%{python3_pkgversion}-requests
 Requires: python%{python3_pkgversion}-requests-oauthlib
 Requires: python%{python3_pkgversion}-six
 Requires: python%{python3_pkgversion}-markdown
+Requires: python%{python3_pkgversion}-gntp
 Requires: python%{python3_pkgversion}-yaml
 
 %if %{with tests}
