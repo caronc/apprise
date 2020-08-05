@@ -487,6 +487,29 @@ def test_is_hostname():
     assert utils.is_hostname('') is False
 
 
+def test_is_ipaddr():
+    """
+    API: is_ipaddr() function
+
+    """
+    # Valid IPv4 Addresses
+    assert utils.is_ipaddr('127.0.0.1') is True
+    assert utils.is_ipaddr('0.0.0.0') is True
+    assert utils.is_ipaddr('255.255.255.255') is True
+
+    # Invalid IPv4 Addresses
+    assert utils.is_ipaddr('1.2.3') is False
+    assert utils.is_ipaddr('256.256.256.256') is False
+    assert utils.is_ipaddr('999.0.0.0') is False
+    assert utils.is_ipaddr('1.2.3.4.5') is False
+    assert utils.is_ipaddr('    127.0.0.1   ') is False
+    assert utils.is_ipaddr('       ') is False
+    assert utils.is_ipaddr('') is False
+
+    # Valid IPv6 Addresses
+    assert utils.is_ipaddr('2001:0db8:85a3:0000:0000:8a2e:0370:7334') is True
+
+
 def test_is_email():
     """
     API: is_email() function

@@ -141,6 +141,40 @@ def is_hostname(hostname):
     return all(allowed.match(x) for x in hostname.split("."))
 
 
+def is_ipaddr(addr):
+    """
+    Validates against IPV4 and IPV6 IP Addresses
+    """
+
+    # Based on https://stackoverflow.com/questions/5284147/\
+    #       validating-ipv4-addresses-with-regexp
+    re_ipv4 = re.compile(
+        r'^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}'
+        r'(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$'
+    )
+
+    # Based on https://stackoverflow.com/questions/53497/\
+    #              regular-expression-that-matches-valid-ipv6-addresses
+    re_ipv6 = re.compile(
+        r'(([0-9a-f]{1,4}:){7,7}[0-9a-f]{1,4}|([0-9a-f]{1,4}:){1,7}:'
+        r'|([0-9a-f]{1,4}:){1,6}:[0-9a-f]{1,4}|([0-9a-f]{1,4}:){1,5}'
+        r'(:[0-9a-f]{1,4}){1,2}|([0-9a-f]{1,4}:){1,4}'
+        r'(:[0-9a-f]{1,4}){1,3}|([0-9a-f]{1,4}:){1,3}'
+        r'(:[0-9a-f]{1,4}){1,4}|([0-9a-f]{1,4}:){1,2}'
+        r'(:[0-9a-f]{1,4}){1,5}|[0-9a-f]{1,4}:'
+        r'((:[0-9a-f]{1,4}){1,6})|:((:[0-9a-f]{1,4}){1,7}|:)|'
+        r'fe80:(:[0-9a-f]{0,4}){0,4}%[0-9a-z]{1,}|::'
+        r'(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]'
+        r'|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|'
+        r'1{0,1}[0-9]){0,1}[0-9])|([0-9a-f]{1,4}:){1,4}:((25[0-5]|'
+        r'(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|'
+        r'1{0,1}[0-9]){0,1}[0-9]))', re.I,
+    )
+
+    # Returns true if we match an IP and/or
+    return (re_ipv4.match(addr) is not None or re_ipv6.match(addr) is not None)
+
+
 def is_email(address):
     """Determine if the specified entry is an email address
 

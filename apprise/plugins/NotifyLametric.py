@@ -25,7 +25,8 @@
 
 # For LaMetric to work, you need to first setup a custom application on their
 # website. it can be done as follows:
-#
+
+# Cloud Mode:
 # - Sign Up and login to the developer webpage https://developer.lametric.com
 # - Click the Create button in the upper right corner, then select
 #    Notification App and click Create again.
@@ -36,10 +37,21 @@
 #    and the Client Secret. These are crutial components needed to assemble
 #    the Apprise API with.
 
+# Device Mode:
+# - Sign Up and login to the developer webpage https://developer.lametric.com
+# - Locate your Device API Key; you can find it here:
+#      https://developer.lametric.com/user/devices
+# - You just need to know your API Key for the device you plan to notify
+# - Your devices IP Address can be found in LaMetric Time app at:
+#       Settings -> Wi-Fi -> IP Address
 
-# A great source for API examples:
+# A great source for API examples (Device Mode):
 # - https://lametric-documentation.readthedocs.io/en/latest/reference-docs\
 #       /device-notifications.html
+
+# A great source for API examples (Cloud Mode):
+# - https://lametric-documentation.readthedocs.io/en/latest/reference-docs\
+#       /lametric-cloud-reference.html
 
 # A great source for the icon reference:
 # - https://developer.lametric.com/icons
@@ -49,9 +61,10 @@ from json import dumps
 from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyType
-from ..utils import is_email
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
+from ..utils import is_hostname
+from ..utils import is_ipaddr
 
 
 class LametricMode(object):
@@ -59,14 +72,14 @@ class LametricMode(object):
     Define Lametric Notification Modes
     """
     # App posts upstream to the developer API on Lametric's website
-    APPLICATION = "app"
+    CLOUD = "cloud"
 
     # Device mode posts directly to the device that you identify
-    DEVICE = "dev"
+    DEVICE = "device"
 
 
 LAMETRIC_MODES = (
-    LametricMode.APPLICATION,
+    LametricMode.CLOUD,
     LametricMode.DEVICE,
 )
 
@@ -128,9 +141,9 @@ class LametricIconType(object):
 
 
 LAMETRIC_ICON_TYPES = (
-    LametricPriority.INFO,
-    LametricPriority.WARNING,
-    LametricPriority.CRITICAL,
+    LametricIconType.INFO,
+    LametricIconType.ALERT,
+    LametricIconType.NONE,
 )
 
 
@@ -279,18 +292,17 @@ class NotifyLametric(NotifyBase):
     title_maxlen = 0
 
     # URL used for notifying Lametric App's created in the Dev Portal
-    app_notify_url = 'https://developer.lametric.com/api/v1' \
-                     '/dev/widget/update/com.lametric.{client_id}'
+    cloud_notify_url = 'https://developer.lametric.com/api/v1' \
+                       '/dev/widget/update/com.lametric.{client_id}'
 
     # URL used for local notifications directly to the device
-    dev_notify_url = '{schema}://{host}{port}/api/v2/device/notifications'
+    device_notify_url = '{schema}://{host}{port}/api/v2/device/notifications'
 
     # LaMetric Default port
-    default_dev_port = 8080
+    default_device_port = 8080
 
-    # The default User ID when making a local connection and one isn't
-    # otherwise specified
-    default_local_user = 'dev'
+    # The Device User ID
+    default_device_user = 'dev'
 
     # Track all icon mappings back to Apprise Icon NotifyType's
     # See: https://developer.lametric.com/icons
@@ -323,10 +335,29 @@ class NotifyLametric(NotifyBase):
 
     # Define our template tokens
     template_tokens = dict(NotifyBase.template_tokens, **{
+        'apikey': {
+            'name': _('Device API Key'),
+            'type': 'string',
+            'private': True,
+        },
+        'host': {
+            'name': _('Hostname'),
+            'type': 'string',
+            'required': True,
+        },
+        'port': {
+            'name': _('Port'),
+            'type': 'int',
+            'min': 1,
+            'max': 65535,
+        },
+        'user': {
+            'name': _('Username'),
+            'type': 'string',
+        },
         'client_id': {
             'name': _('Client ID'),
             'type': 'string',
-            'required': True,
             'private': True,
             'regex': (r'^[a-z0-9-]+$', 'i'),
         },
@@ -334,7 +365,6 @@ class NotifyLametric(NotifyBase):
             'name': _('Client Secret'),
             'type': 'string',
             'private': True,
-            'required': True,
         },
     })
 
@@ -345,6 +375,9 @@ class NotifyLametric(NotifyBase):
         },
         'oauth_secret': {
             'alias_of': 'secret',
+        },
+        'apikey': {
+            'alias_of': 'apikey',
         },
         'priority': {
             'name': _('Priority'),
@@ -367,33 +400,15 @@ class NotifyLametric(NotifyBase):
         'sound': {
             'name': _('Sound'),
             'type': 'string',
-            'default': LametricIconType.NONE,
         },
     })
 
-    def __init__(self, client_id, secret, priority=None, icon_type=None,
-                 sound=None, mode=None, **kwargs):
+    def __init__(self, apikey=None, client_id=None, secret=None, priority=None,
+                 icon_type=None, sound=None, mode=None, **kwargs):
         """
         Initialize LaMetric Object
         """
         super(NotifyLametric, self).__init__(**kwargs)
-
-        # Client ID
-        self.client_id = validate_regex(
-            client_id, *self.template_tokens['client_id']['regex'])
-        if not self.client_id:
-            msg = 'An invalid LaMetric Client OAuth2 ID ' \
-                  '({}) was specified.'.format(client_id)
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        # Client Secret
-        self.secret = validate_regex(secret)
-        if not self.secret:
-            msg = 'An invalid LaMetric Client OAuth2 Secret ' \
-                  '({}) was specified.'.format(secret)
-            self.logger.warning(msg)
-            raise TypeError(msg)
 
         self.mode = mode.strip().lower() \
             if isinstance(sound, six.string_types) \
@@ -404,6 +419,41 @@ class NotifyLametric(NotifyBase):
                   '({}) was specified.'.format(mode)
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        # Default Cloud Arguments
+        self.secret = None
+        self.client_id = None
+
+        # Default Device Arguments
+        self.apikey = None
+
+        if self.mode == LametricMode.CLOUD:
+            # Client ID
+            self.client_id = validate_regex(
+                client_id, *self.template_tokens['client_id']['regex'])
+            if not self.client_id:
+                msg = 'An invalid LaMetric Client OAuth2 ID ' \
+                      '({}) was specified.'.format(client_id)
+                self.logger.warning(msg)
+                raise TypeError(msg)
+
+            # Client Secret
+            self.secret = validate_regex(secret)
+            if not self.secret:
+                msg = 'An invalid LaMetric Client OAuth2 Secret ' \
+                      '({}) was specified.'.format(secret)
+                self.logger.warning(msg)
+                raise TypeError(msg)
+
+        else:  # LametricMode.DEVICE
+
+            # API Key
+            self.apikey = validate_regex(apikey)
+            if not self.apikey:
+                msg = 'An invalid LaMetric Device API Key ' \
+                      '({}) was specified.'.format(apikey)
+                self.logger.warning(msg)
+                raise TypeError(msg)
 
         if priority not in LAMETRIC_PRIORITIES:
             self.priority = self.template_args['priority']['default']
@@ -440,9 +490,9 @@ class NotifyLametric(NotifyBase):
         # No match was found
         return None
 
-    def _app_notification_payload(self, body, notify_type, headers):
+    def _cloud_notification_payload(self, body, notify_type, headers):
         """
-        Return URL and Payload for Application directed requests
+        Return URL and payload for cloud directed requests
         """
 
         # Update header entries
@@ -453,22 +503,35 @@ class NotifyLametric(NotifyBase):
         payload = {}
         auth = None
 
-        # Prepare our App Notify URL
-        notify_url = self.app_notify_url.format(client_id=self.client_id)
+        # Prepare our Cloud Notify URL
+        notify_url = self.cloud_notify_url.format(client_id=self.client_id)
 
         # Return request parameters
         return (notify_url, auth, payload)
 
-    def _dev_notification_payload(self, body, notify_type, headers):
+    def _device_notification_payload(self, body, notify_type, headers):
         """
         Return URL and Payload for Device directed requests
         """
 
         # Our Payload
         payload = {
+            # Priority of the message
             "priority": self.priority,
+
+            # Icon Type: Represents the nature of notification
             "icon_type": self.icon_type,
+
+            # The time notification lives in queue to be displayed in
+            # milliseconds (ms). The default lifetime is 2 minutes (120000ms).
+            # If notification stayed in queue for longer than lifetime
+            # milliseconds - it will not be displayed.
+            "lifetime": 120000,
+
             "model": {
+                # cycles - the number of times message should be displayed. If
+                # cycles is set to 0, notification will stay on the screen
+                # until user dismisses it manually. By default it is set to 1.
                 "cycles": 1,
                 "frames": [
                     {
@@ -482,23 +545,31 @@ class NotifyLametric(NotifyBase):
         if self.sound:
             # Sound was set, so add it to the payload
             payload["model"]["sound"] = {
+                # The sound category
                 "category": self.sound[0],
+
                 # The first element of our tuple is always the id
                 "id": self.sound[1][0],
+
+                # repeat - defines the number of times sound must be played.
+                # If set to 0 sound will be played until notification is
+                # dismissed. By default the value is set to 1.
+                "repeat": 1,
             }
 
-        if self.password and not self.user:
+        if not self.user:
             # Use default user if there wasn't one otherwise specified
-            self.user = self.default_local_user
+            self.user = self.default_device_user
 
+        # Prepare our authentication
         auth = (self.user, self.password)
 
         # Prepare our Direct Access Notify URL
-        notify_url = self.dev_notify_url.format(
+        notify_url = self.device_notify_url.format(
             schema="https" if self.secure else "http",
             host=self.host,
             port=':{}'.format(self.port)
-            if self.port else self.default_dev_port)
+            if self.port else self.default_device_port)
 
         # Return request parameters
         return (notify_url, auth, payload)
@@ -516,8 +587,8 @@ class NotifyLametric(NotifyBase):
         }
 
         # Depending on the mode, the payload is gathered by
-        # - _dev_notification_payload()
-        # - _app_notification_payload()
+        # - _device_notification_payload()
+        # - _cloud_notification_payload()
         (notify_url, auth, payload) = getattr(
             self, '_{}_notification_payload'.format(
                 self.mode, body=body, notify_type=notify_type,
@@ -538,7 +609,15 @@ class NotifyLametric(NotifyBase):
                 headers=headers,
                 auth=auth,
                 verify=self.verify_certificate,
+                timeout=self.request_timeout,
             )
+            # An ideal response would be:
+            # {
+            #   "success": {
+            #     "id": "<notification id>"
+            #   }
+            # }
+
             if r.status_code != requests.codes.ok:
                 # We had a problem
                 status_str = \
@@ -590,7 +669,7 @@ class NotifyLametric(NotifyBase):
             # The first element of our tuple is always the id
             params['sound'] = self.sound[1][0]
 
-        if self.mode == LametricMode.APPLICATION:
+        if self.mode == LametricMode.CLOUD:
             # Upstream/LaMetric App Return
             return '{schema}://{client_id}@{secret}' \
                 '/{targets}/?{params}'.format(
@@ -637,80 +716,13 @@ class NotifyLametric(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
-        # Now make a list of all our path entries
-        # We need to read each entry back one at a time in reverse order
-        # where each email found we mark as a target. Once we run out
-        # of targets, the presume the remainder of the entries are part
-        # of the secret key (since it can contain slashes in it)
-        entries = NotifyLametric.split_path(results['fullpath'])
+        if results.get('user') and not results.get('password'):
+            # Handle URL like:
+            # schema://user@host
 
-        try:
-            # Get our client_id is the first entry on the path
-            results['client_id'] = NotifyLametric.unquote(entries.pop(0))
-
-        except IndexError:
-            # no problem, we may get the client_id another way through
-            # arguments...
-            pass
-
-        # Prepare our target listing
-        results['targets'] = list()
-        while entries:
-            # Pop the last entry
-            entry = NotifyLametric.unquote(entries.pop(-1))
-
-            if is_email(entry):
-                # Store our email and move on
-                results['targets'].append(entry)
-                continue
-
-            # If we reach here, the entry we just popped is part of the secret
-            # key, so put it back
-            entries.append(NotifyLametric.quote(entry, safe=''))
-
-            # We're done
-            break
-
-        # Initialize our tenant
-        results['tenant'] = None
-
-        # Assemble our secret key which is a combination of the host followed
-        # by all entries in the full path that follow up until the first email
-        results['secret'] = '/'.join(
-            [NotifyLametric.unquote(x) for x in entries])
-
-        # Assemble our client id from the user@hostname
-        if results['password']:
-            results['email'] = '{}@{}'.format(
-                NotifyLametric.unquote(results['password']),
-                NotifyLametric.unquote(results['host']),
-            )
-            # Update our tenant
-            results['tenant'] = NotifyLametric.unquote(results['user'])
-
-        else:
-            # No tenant specified..
-            results['email'] = '{}@{}'.format(
-                NotifyLametric.unquote(results['user']),
-                NotifyLametric.unquote(results['host']),
-            )
-
-        # OAuth2 ID
-        if 'oauth_id' in results['qsd'] and len(results['qsd']['oauth_id']):
-            # Extract the API Key from an argument
-            results['client_id'] = \
-                NotifyLametric.unquote(results['qsd']['oauth_id'])
-
-        # OAuth2 Secret
-        if 'oauth_secret' in results['qsd'] and \
-                len(results['qsd']['oauth_secret']):
-            # Extract the API Secret from an argument
-            results['secret'] = \
-                NotifyLametric.unquote(results['qsd']['oauth_secret'])
-
-        # Mode (just look 3 charaters in)
-        if 'mode' in results['qsd'] and len(results['qsd']['mode']):
-            results['mode'] = results['qsd']['mode'].strip().lower()[:3]
+            # This becomes the password
+            results['password'] = results['user']
+            results['user'] = None
 
         # Priority Handling
         if 'priority' in results['qsd'] and len(results['qsd']['priority']):
@@ -723,5 +735,48 @@ class NotifyLametric(NotifyBase):
         # Sound
         if 'sound' in results['qsd'] and len(results['qsd']['sound']):
             results['sound'] = results['qsd']['sound'].strip().lower()
+
+        # We can detect the mode based on the validity of the hostname
+        results['mode'] = LametricMode.DEVICE \
+            if (is_hostname(results['host']) or
+                is_ipaddr(results['host'])) else LametricMode.CLOUD
+
+        # Mode override
+        if 'mode' in results['qsd'] and len(results['qsd']['mode']):
+            results['mode'] = NotifyLametric.unquote(results['qsd']['mode'])
+
+        if results['mode'] == LametricMode.DEVICE:
+            # API Key (Device Mode)
+            if 'apikey' in results['qsd'] and len(results['qsd']['apikey']):
+                # Extract API Key from an argument
+                results['apikey'] = \
+                    NotifyLametric.unquote(results['qsd']['apikey'])
+            else:
+                results['apikey'] = \
+                    NotifyLametric.unquote(results['password'])
+
+        else:  # LametricMode.CLOUD
+
+            # OAuth2 ID (Cloud Mode)
+            if 'oauth_id' in results['qsd'] \
+                    and len(results['qsd']['oauth_id']):
+
+                # Extract the OAuth2 Key from an argument
+                results['oauth_id'] = \
+                    NotifyLametric.unquote(results['qsd']['oauth_id'])
+            else:
+                results['oauth_id'] = \
+                    NotifyLametric.unquote(results['password'])
+
+            # OAuth2 Secret (Cloud Mode)
+            if 'oauth_secret' in results['qsd'] and \
+                    len(results['qsd']['oauth_secret']):
+                # Extract the API Secret from an argument
+                results['secret'] = \
+                    NotifyLametric.unquote(results['qsd']['oauth_secret'])
+
+            else:
+                results['secret'] = \
+                    NotifyLametric.unquote(results['host'])
 
         return results
