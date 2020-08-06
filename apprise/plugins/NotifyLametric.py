@@ -592,8 +592,8 @@ class NotifyLametric(NotifyBase):
         notify_url = self.device_notify_url.format(
             schema="https" if self.secure else "http",
             host=self.host,
-            port=':{}'.format(self.port)
-            if self.port else self.default_device_port)
+            port=':{}'.format(self.port
+                if self.port else self.default_device_port))
 
         # Return request parameters
         return (notify_url, auth, payload)
@@ -723,7 +723,8 @@ class NotifyLametric(NotifyBase):
         return '{schema}://{auth}{hostname}{port}/?{params}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
-            hostname=NotifyLametric.quote(self.host, safe=''),
+            # never encode hostname since we're expecting it to be a valid one
+            hostname=self.host,
             port='' if self.port is None
                  or self.port == self.default_device_port
                  else ':{}'.format(self.port),
