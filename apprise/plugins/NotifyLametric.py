@@ -27,21 +27,21 @@
 # website. it can be done as follows:
 
 # Cloud Mode:
-# - Sign Up and login to the developer webpage https://developer.lametric.com
-# - Click the Create button in the upper right corner, then select
-#    Notification App and click Create again.
-# - Enter an app name, a description and a redirect URL. Give it basic, and
-#    devices_read permissions.
-# - Finally, click Save to create the application.
-# - Access your newly created entry so that you can acquire both the Client ID
-#    and the Client Secret. These are crutial components needed to assemble
-#    the Apprise API with.
+# 1. Sign Up and login to the developer webpage https://developer.lametric.com
+# 2. Create a **Notification App** if you haven't already done so from:
+#        https://developer.lametric.com/applications/sources
+# 3. Provide it an app name, a description and privacy URL (which can point to
+#     anywhere; I set mine to `http://localhost`). No permissions are
+#     required.
+# 4. Access your newly created app so that you can acquire both the
+#     **Client ID** and the **Client Secret** here:
+#       https://developer.lametric.com/applications/sources
 
 # Device Mode:
 # - Sign Up and login to the developer webpage https://developer.lametric.com
 # - Locate your Device API Key; you can find it here:
 #      https://developer.lametric.com/user/devices
-# - You just need to know your API Key for the device you plan to notify
+# - From here you can get your your API Key for the device you plan to notify.
 # - Your devices IP Address can be found in LaMetric Time app at:
 #       Settings -> Wi-Fi -> IP Address
 
@@ -411,12 +411,11 @@ class NotifyLametric(NotifyBase):
         super(NotifyLametric, self).__init__(**kwargs)
 
         self.mode = mode.strip().lower() \
-            if isinstance(sound, six.string_types) \
+            if isinstance(mode, six.string_types) \
             else self.template_args['mode']['default']
 
         if self.mode not in LAMETRIC_MODES:
-            msg = 'An invalid LaMetric Mode ' \
-                  '({}) was specified.'.format(mode)
+            msg = 'An invalid LaMetric Mode ({}) was specified.'.format(mode)
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -456,21 +455,31 @@ class NotifyLametric(NotifyBase):
                 raise TypeError(msg)
 
         if priority not in LAMETRIC_PRIORITIES:
+            self.logger.warning(
+                'An invalid LaMetric priority ({}) was specified.'.format(
+                    priority))
             self.priority = self.template_args['priority']['default']
 
         else:
             self.priority = priority
 
         if icon_type not in LAMETRIC_ICON_TYPES:
+            self.logger.warning(
+                'An invalid LaMetric icon type ({}) was specified.'.format(
+                    icon_type))
             self.icon_type = self.template_args['icon_type']['default']
 
         else:
             self.icon_type = icon_type
 
-        # If sound is set, get it's match
-        self.sound = self.sound_lookup(sound.strip().lower()) \
-            if isinstance(sound, six.string_types) else None
-
+        self.sound = None
+        if isinstance(sound, six.string_types):
+            # If sound is set, get it's match
+            self.sound = self.sound_lookup(sound.strip().lower())
+            if self.sound is None:
+                self.logger.warning(
+                    'An invalid LaMetric sound ({}) was specified.'.format(
+                        sound))
         return
 
     @staticmethod
@@ -498,16 +507,37 @@ class NotifyLametric(NotifyBase):
         # Update header entries
         headers.update({
             'X-Access-Token': self.secret,
+            'Cache-Control': 'no-cache',
         })
 
-        payload = {}
-        auth = None
+        if self.sound:
+            self.logger.warning(
+                'LaMetric sound settings are unavailable in Cloud mode')
+
+        if self.priority != LametricPriority.INFO:
+            self.logger.warning(
+                'LaMetric priority settings are unavailable in Cloud mode')
+
+        if self.icon_type != LametricIconType.NONE:
+            self.logger.warning(
+                'LaMetric icon_type settings are unavailable in Cloud mode')
+
+        # Cloud Notifications don't have as much functionality
+        # You can not set priority and/or sound
+        payload = {
+            "frames": [
+                {
+                    "icon": self.lametric_icon_id_mapping[notify_type],
+                    "text": body,
+                }
+            ]
+        }
 
         # Prepare our Cloud Notify URL
         notify_url = self.cloud_notify_url.format(client_id=self.client_id)
 
         # Return request parameters
-        return (notify_url, auth, payload)
+        return (notify_url, None, payload)
 
     def _device_notification_payload(self, body, notify_type, headers):
         """
@@ -590,9 +620,8 @@ class NotifyLametric(NotifyBase):
         # - _device_notification_payload()
         # - _cloud_notification_payload()
         (notify_url, auth, payload) = getattr(
-            self, '_{}_notification_payload'.format(
-                self.mode, body=body, notify_type=notify_type,
-                headers=headers))
+            self, '_{}_notification_payload'.format(self.mode))(
+                body=body, notify_type=notify_type, headers=headers)
 
         self.logger.debug('LaMetric POST URL: %s (cert_verify=%r)' % (
             notify_url, self.verify_certificate,
@@ -656,41 +685,44 @@ class NotifyLametric(NotifyBase):
 
         # Define any URL parameters
         params = {
-            'priority': self.priority,
-            'icon_type': self.icon_type,
             'mode': self.mode,
         }
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
+        if self.mode == LametricMode.CLOUD:
+            # Upstream/LaMetric App Return
+            return '{schema}://{client_id}@{secret}/?{params}'.format(
+                schema=self.protocol,
+                client_id=self.pprint(self.client_id, privacy, safe=''),
+                secret=self.pprint(
+                    self.secret, privacy, mode=PrivacyMode.Secret, safe=''),
+                params=NotifyLametric.urlencode(params))
+
+        #
+        # If we reach here then we're dealing with LametricMode.DEVICE
+        #
+        if self.priority != LametricPriority.INFO:
+            params['priority'] = self.priority
+
+        if self.icon_type != LametricIconType.NONE:
+            params['icon_type'] = self.icon_type
+
         if self.sound:
             # Store our sound entry
             # The first element of our tuple is always the id
             params['sound'] = self.sound[1][0]
 
-        if self.mode == LametricMode.CLOUD:
-            # Upstream/LaMetric App Return
-            return '{schema}://{client_id}@{secret}' \
-                '/{targets}/?{params}'.format(
-                    schema=self.secure_protocol,
-                    client_id=self.pprint(self.client_id, privacy, safe=''),
-                    secret=self.pprint(
-                        self.secret, privacy, mode=PrivacyMode.Secret,
-                        safe=''),
-                    params=NotifyLametric.urlencode(params))
-
-        # If we reach here then we're dealing with LametricMode.DEVICE
         auth = ''
         if self.user and self.password:
-            auth = '{user}:{password}@'.format(
+            auth = '{user}:{apikey}@'.format(
                 user=NotifyLametric.quote(self.user, safe=''),
-                password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
+                apikey=self.pprint(self.apikey, privacy, safe=''),
             )
-        else:  # self.password is set
-            auth = '{password}@'.format(
-                user=NotifyLametric.quote(self.password, safe=''),
+        else:  # self.apikey is set
+            auth = '{apikey}@'.format(
+                apikey=self.pprint(self.apikey, privacy, safe=''),
             )
 
         # Local Return
@@ -698,7 +730,8 @@ class NotifyLametric(NotifyBase):
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
             hostname=NotifyLametric.quote(self.host, safe=''),
-            port='' if self.port is None or self.port == self.default_dev_port
+            port='' if self.port is None
+                 or self.port == self.default_device_port
                  else ':{}'.format(self.port),
             params=NotifyLametric.urlencode(params),
         )
@@ -745,27 +778,28 @@ class NotifyLametric(NotifyBase):
         if 'mode' in results['qsd'] and len(results['qsd']['mode']):
             results['mode'] = NotifyLametric.unquote(results['qsd']['mode'])
 
+        # API Key (Device Mode)
         if results['mode'] == LametricMode.DEVICE:
-            # API Key (Device Mode)
             if 'apikey' in results['qsd'] and len(results['qsd']['apikey']):
                 # Extract API Key from an argument
                 results['apikey'] = \
                     NotifyLametric.unquote(results['qsd']['apikey'])
+
             else:
                 results['apikey'] = \
                     NotifyLametric.unquote(results['password'])
 
-        else:  # LametricMode.CLOUD
-
+        elif results['mode'] == LametricMode.CLOUD:
             # OAuth2 ID (Cloud Mode)
             if 'oauth_id' in results['qsd'] \
                     and len(results['qsd']['oauth_id']):
 
                 # Extract the OAuth2 Key from an argument
-                results['oauth_id'] = \
+                results['client_id'] = \
                     NotifyLametric.unquote(results['qsd']['oauth_id'])
+
             else:
-                results['oauth_id'] = \
+                results['client_id'] = \
                     NotifyLametric.unquote(results['password'])
 
             # OAuth2 Secret (Cloud Mode)
