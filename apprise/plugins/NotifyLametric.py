@@ -455,18 +455,12 @@ class NotifyLametric(NotifyBase):
                 raise TypeError(msg)
 
         if priority not in LAMETRIC_PRIORITIES:
-            self.logger.warning(
-                'An invalid LaMetric priority ({}) was specified.'.format(
-                    priority))
             self.priority = self.template_args['priority']['default']
 
         else:
             self.priority = priority
 
         if icon_type not in LAMETRIC_ICON_TYPES:
-            self.logger.warning(
-                'An invalid LaMetric icon type ({}) was specified.'.format(
-                    icon_type))
             self.icon_type = self.template_args['icon_type']['default']
 
         else:
