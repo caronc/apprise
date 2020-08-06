@@ -592,8 +592,8 @@ class NotifyLametric(NotifyBase):
         notify_url = self.device_notify_url.format(
             schema="https" if self.secure else "http",
             host=self.host,
-            port=':{}'.format(self.port
-                if self.port else self.default_device_port))
+            port=':{}'.format(
+                self.port if self.port else self.default_device_port))
 
         # Return request parameters
         return (notify_url, auth, payload)
@@ -641,7 +641,8 @@ class NotifyLametric(NotifyBase):
             #   }
             # }
 
-            if r.status_code != requests.codes.ok:
+            if r.status_code not in (
+                    requests.codes.created, requests.codes.ok):
                 # We had a problem
                 status_str = \
                     NotifyLametric.http_response_code_lookup(r.status_code)
