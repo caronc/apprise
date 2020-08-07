@@ -688,7 +688,7 @@ class NotifyTelegram(NotifyBase):
     def parse_url(url):
         """
         Parses the URL and returns enough arguments that can allow
-        us to substantiate this object.
+        us to re-instantiate this object.
 
         """
         # This is a dirty hack; but it's the only work around to tgram://
@@ -721,17 +721,14 @@ class NotifyTelegram(NotifyBase):
                 tgram.group('protocol'),
                 tgram.group('prefix'),
                 tgram.group('btoken_a'),
-                tgram.group('remaining')))
+                tgram.group('remaining')), verify_host=False)
 
         else:
             # Try again
-            results = NotifyBase.parse_url(
-                '%s%s/%s' % (
-                    tgram.group('protocol'),
-                    tgram.group('btoken_a'),
-                    tgram.group('remaining'),
-                ),
-            )
+            results = NotifyBase.parse_url('%s%s/%s' % (
+                tgram.group('protocol'),
+                tgram.group('btoken_a'),
+                tgram.group('remaining')), verify_host=False)
 
         # The first token is stored in the hostname
         bot_token_a = NotifyTelegram.unquote(results['host'])

@@ -163,9 +163,6 @@ def test_dbus_plugin(mock_mainloop, mock_byte, mock_bytearray,
     with pytest.raises(TypeError):
         apprise.plugins.NotifyDBus(**{'schema': 'invalid'})
 
-    # Invalid URLs
-    assert apprise.plugins.NotifyDBus.parse_url('') is None
-
     # Set our X and Y coordinate and try the notification
     assert apprise.plugins.NotifyDBus(
         x_axis=0, y_axis=0, **{'schema': 'dbus'})\

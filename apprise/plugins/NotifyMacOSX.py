@@ -69,7 +69,7 @@ class NotifyMacOSX(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://_/',
+        '{schema}://',
     )
 
     # Define our template arguments
@@ -206,19 +206,7 @@ class NotifyMacOSX(NotifyBase):
 
         """
 
-        results = NotifyBase.parse_url(url)
-        if not results:
-            results = {
-                'schema': NotifyMacOSX.protocol,
-                'user': None,
-                'password': None,
-                'port': None,
-                'host': '_',
-                'fullpath': None,
-                'path': None,
-                'url': url,
-                'qsd': {},
-            }
+        results = NotifyBase.parse_url(url, verify_host=False)
 
         # Include images with our message
         results['include_image'] = \

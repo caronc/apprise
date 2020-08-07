@@ -92,16 +92,38 @@ def test_parse_url():
     assert result['qsd-'] == {}
     assert result['qsd+'] == {}
 
-    result = utils.parse_url('hostname')
+    # colon after hostname without port number is no good
+    assert utils.parse_url('http://hostname:') is None
+
+    # However if we don't verify the host, it is okay
+    result = utils.parse_url('http://hostname:', verify_host=False)
     assert result['schema'] == 'http'
-    assert result['host'] == 'hostname'
+    assert result['host'] == 'hostname:'
     assert result['port'] is None
     assert result['user'] is None
     assert result['password'] is None
     assert result['fullpath'] is None
     assert result['path'] is None
     assert result['query'] is None
-    assert result['url'] == 'http://hostname'
+    assert result['url'] == 'http://hostname:'
+    assert result['qsd'] == {}
+    assert result['qsd-'] == {}
+    assert result['qsd+'] == {}
+
+    # A port of Zero is not valid
+    assert utils.parse_url('http://hostname:0') is None
+
+    # Port set to zero; port is not stored
+    result = utils.parse_url('http://hostname:0', verify_host=False)
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname:0'
+    assert result['port'] is None
+    assert result['user'] is None
+    assert result['password'] is None
+    assert result['fullpath'] is None
+    assert result['path'] is None
+    assert result['query'] is None
+    assert result['url'] == 'http://hostname:0'
     assert result['qsd'] == {}
     assert result['qsd-'] == {}
     assert result['qsd+'] == {}
@@ -314,22 +336,6 @@ def test_parse_url():
     assert utils.parse_url('?') is None
     assert utils.parse_url('/') is None
 
-    # A default port of zero is still considered valid, but
-    # is removed in the response.
-    result = utils.parse_url('http://nuxref.com:0')
-    assert result['schema'] == 'http'
-    assert result['host'] == 'nuxref.com'
-    assert result['port'] is None
-    assert result['user'] is None
-    assert result['password'] is None
-    assert result['fullpath'] is None
-    assert result['path'] is None
-    assert result['query'] is None
-    assert result['url'] == 'http://nuxref.com'
-    assert result['qsd'] == {}
-    assert result['qsd-'] == {}
-    assert result['qsd+'] == {}
-
     # Test some illegal strings
     result = utils.parse_url(object, verify_host=False)
     assert result is None
@@ -475,16 +481,55 @@ def test_is_hostname():
 
     """
     # Valid Hostnames
-    assert utils.is_hostname('yahoo.ca') is True
-    assert utils.is_hostname('yahoo.ca.') is True
-    assert utils.is_hostname('valid-dashes-in-host.ca') is True
-    assert utils.is_hostname('valid-underscores_in_host.ca') is True
+    assert utils.is_hostname('yahoo.ca') == 'yahoo.ca'
+    assert utils.is_hostname('yahoo.ca.') == 'yahoo.ca'
+    assert utils.is_hostname('valid-dashes-in-host.ca') == \
+        'valid-dashes-in-host.ca'
 
     # Invalid Hostnames
+    assert utils.is_hostname('-hostname.that.starts.with.a.dash') is False
     assert utils.is_hostname('invalid-characters_#^.ca') is False
     assert utils.is_hostname('    spaces   ') is False
     assert utils.is_hostname('       ') is False
     assert utils.is_hostname('') is False
+    assert utils.is_hostname('valid-underscores_in_host.ca') is False
+
+    # Valid IPv4 Addresses
+    assert utils.is_hostname('127.0.0.1') == '127.0.0.1'
+    assert utils.is_hostname('0.0.0.0') == '0.0.0.0'
+    assert utils.is_hostname('255.255.255.255') == '255.255.255.255'
+
+    # But not if we're not checking for this:
+    assert utils.is_hostname('127.0.0.1', ipv4=False) is False
+    assert utils.is_hostname('0.0.0.0', ipv4=False) is False
+    assert utils.is_hostname('255.255.255.255', ipv4=False) is False
+
+    # Invalid IPv4 Addresses
+    assert utils.is_hostname('1.2.3') is False
+    assert utils.is_hostname('256.256.256.256') is False
+    assert utils.is_hostname('999.0.0.0') is False
+    assert utils.is_hostname('1.2.3.4.5') is False
+    assert utils.is_hostname('    127.0.0.1   ') is False
+    assert utils.is_hostname('       ') is False
+    assert utils.is_hostname('') is False
+
+    # Valid IPv6 Addresses (square brakets supported for URL construction)
+    assert utils.is_hostname('[2001:0db8:85a3:0000:0000:8a2e:0370:7334]') == \
+        '[2001:0db8:85a3:0000:0000:8a2e:0370:7334]'
+    assert utils.is_hostname('2001:0db8:85a3:0000:0000:8a2e:0370:7334') == \
+        '[2001:0db8:85a3:0000:0000:8a2e:0370:7334]'
+    assert utils.is_hostname('[2001:db8:002a:3256:adfe:05c0:0003:0006]') == \
+        '[2001:db8:002a:3256:adfe:05c0:0003:0006]'
+
+    # localhost
+    assert utils.is_hostname('::1') == '[::1]'
+    assert utils.is_hostname('0:0:0:0:0:0:0:1') == '[0:0:0:0:0:0:0:1]'
+
+    # But not if we're not checking for this:
+    assert utils.is_hostname(
+        '[2001:0db8:85a3:0000:0000:8a2e:0370:7334]', ipv6=False) is False
+    assert utils.is_hostname(
+        '2001:0db8:85a3:0000:0000:8a2e:0370:7334', ipv6=False) is False
 
 
 def test_is_ipaddr():
@@ -493,9 +538,9 @@ def test_is_ipaddr():
 
     """
     # Valid IPv4 Addresses
-    assert utils.is_ipaddr('127.0.0.1') is True
-    assert utils.is_ipaddr('0.0.0.0') is True
-    assert utils.is_ipaddr('255.255.255.255') is True
+    assert utils.is_ipaddr('127.0.0.1') == '127.0.0.1'
+    assert utils.is_ipaddr('0.0.0.0') == '0.0.0.0'
+    assert utils.is_ipaddr('255.255.255.255') == '255.255.255.255'
 
     # Invalid IPv4 Addresses
     assert utils.is_ipaddr('1.2.3') is False
@@ -506,8 +551,17 @@ def test_is_ipaddr():
     assert utils.is_ipaddr('       ') is False
     assert utils.is_ipaddr('') is False
 
-    # Valid IPv6 Addresses
-    assert utils.is_ipaddr('2001:0db8:85a3:0000:0000:8a2e:0370:7334') is True
+    # Valid IPv6 Addresses (square brakets supported for URL construction)
+    assert utils.is_ipaddr('[2001:0db8:85a3:0000:0000:8a2e:0370:7334]') == \
+        '[2001:0db8:85a3:0000:0000:8a2e:0370:7334]'
+    assert utils.is_ipaddr('2001:0db8:85a3:0000:0000:8a2e:0370:7334') == \
+        '[2001:0db8:85a3:0000:0000:8a2e:0370:7334]'
+    assert utils.is_ipaddr('[2001:db8:002a:3256:adfe:05c0:0003:0006]') == \
+        '[2001:db8:002a:3256:adfe:05c0:0003:0006]'
+
+    # localhost
+    assert utils.is_ipaddr('::1') == '[::1]'
+    assert utils.is_ipaddr('0:0:0:0:0:0:0:1') == '[0:0:0:0:0:0:0:1]'
 
 
 def test_is_email():

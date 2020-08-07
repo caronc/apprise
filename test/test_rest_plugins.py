@@ -261,7 +261,11 @@ TEST_URLS = (
     # NotifyDiscord
     ##################################
     ('discord://', {
-        'instance': None,
+        'instance': TypeError,
+    }),
+    # An invalid url
+    ('discord://:@/', {
+        'instance': TypeError,
     }),
     # No webhook_token specified
     ('discord://%s' % ('i' * 24), {
@@ -356,10 +360,6 @@ TEST_URLS = (
         'requests_response_code': requests.codes.no_content,
         # don't include an image by default
         'include_image': False,
-    }),
-    # An invalid url
-    ('discord://:@/', {
-        'instance': None,
     }),
     ('discord://%s/%s/' % ('a' * 24, 'b' * 64), {
         'instance': plugins.NotifyDiscord,
@@ -572,7 +572,10 @@ TEST_URLS = (
     # NotifyFaast
     ##################################
     ('faast://', {
-        'instance': None,
+        'instance': TypeError,
+    }),
+    ('faast://:@/', {
+        'instance': TypeError,
     }),
     # Auth Token specified
     ('faast://%s' % ('a' * 32), {
@@ -585,9 +588,6 @@ TEST_URLS = (
         'instance': plugins.NotifyFaast,
         # don't include an image by default
         'include_image': False,
-    }),
-    ('faast://:@/', {
-        'instance': None,
     }),
     ('faast://%s' % ('a' * 32), {
         'instance': plugins.NotifyFaast,
@@ -613,7 +613,11 @@ TEST_URLS = (
     ##################################
     # No token specified
     ('flock://', {
-        'instance': None,
+        'instance': TypeError,
+    }),
+    # An invalid url
+    ('flock://:@/', {
+        'instance': TypeError,
     }),
     # Provide a token
     ('flock://%s' % ('t' * 24), {
@@ -696,10 +700,6 @@ TEST_URLS = (
         # We will still instantiate the object
         'instance': plugins.NotifyFlock,
     }),
-    # An invalid url
-    ('flock://:@/', {
-        'instance': None,
-    }),
     # Error Testing
     ('flock://%s/g:%s/u:%s?format=text' % ('i' * 24, 'g' * 12, 'u' * 10), {
         'instance': plugins.NotifyFlock,
@@ -730,10 +730,10 @@ TEST_URLS = (
     # NotifyGitter
     ##################################
     ('gitter://', {
-        'instance': None,
+        'instance': TypeError,
     }),
     ('gitter://:@/', {
-        'instance': None,
+        'instance': TypeError,
     }),
     # Invalid Token Length
     ('gitter://%s' % ('a' * 12), {
@@ -853,14 +853,14 @@ TEST_URLS = (
     # NotifyIFTTT - If This Than That
     ##################################
     ('ifttt://', {
-        'instance': None,
+        'instance': TypeError,
+    }),
+    ('ifttt://:@/', {
+        'instance': TypeError,
     }),
     # No User
     ('ifttt://EventID/', {
         'instance': TypeError,
-    }),
-    ('ifttt://:@/', {
-        'instance': None,
     }),
     # A nicely formed ifttt url with 1 event and a new key/value store
     ('ifttt://WebHookID@EventID/?+TemplateKey=TemplateVal', {
@@ -917,7 +917,11 @@ TEST_URLS = (
     # NotifyJoin
     ##################################
     ('join://', {
-        'instance': None,
+        'instance': TypeError,
+    }),
+    # API Key + bad url
+    ('join://:@/', {
+        'instance': TypeError,
     }),
     # APIkey; no device
     ('join://%s' % ('a' * 32), {
@@ -969,10 +973,6 @@ TEST_URLS = (
     # API Key + 1 device and 1 group
     ('join://%s/%s/%s' % ('a' * 32, 'd' * 32, 'group.chrome'), {
         'instance': plugins.NotifyJoin,
-    }),
-    # API Key + bad url
-    ('join://:@/', {
-        'instance': None,
     }),
     ('join://%s' % ('a' * 32), {
         'instance': plugins.NotifyJoin,
@@ -1134,6 +1134,14 @@ TEST_URLS = (
     ('kodi://localhost', {
         'instance': plugins.NotifyXBMC,
     }),
+    ('kodi://192.168.4.1', {
+        # Support IPv4 Addresses
+        'instance': plugins.NotifyXBMC,
+    }),
+    ('kodi://[2001:db8:002a:3256:adfe:05c0:0003:0006]', {
+        # Support IPv6 Addresses
+        'instance': plugins.NotifyXBMC,
+    }),
     ('kodi://user:pass@localhost', {
         'instance': plugins.NotifyXBMC,
 
@@ -1203,14 +1211,14 @@ TEST_URLS = (
     ##################################
     ('kumulos://', {
         # No API or Server Key specified
-        'instance': None,
+        'instance': TypeError,
     }),
     ('kumulos://:@/', {
         # No API or Server Key specified
         # We don't have strict host checking on for kumulos, so this URL
         # actually becomes parseable and :@ becomes a hostname.
         # The below errors because a second token wasn't found
-        'instance': None,
+        'instance': TypeError,
     }),
     ('kumulos://{}/'.format(UUID4), {
         # No server key was specified
@@ -1410,10 +1418,10 @@ TEST_URLS = (
     # NotifyMailgun
     ##################################
     ('mailgun://', {
-        'instance': None,
+        'instance': TypeError,
     }),
     ('mailgun://:@/', {
-        'instance': None,
+        'instance': TypeError,
     }),
     # No Token specified
     ('mailgun://user@localhost.localdomain', {
@@ -1672,7 +1680,7 @@ TEST_URLS = (
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'mmost://localhost:8080/3...4/',
     }),
-    ('mmost://localhost:0/3ccdd113474722377935511fc85d3dd4', {
+    ('mmost://localhost:8080/3ccdd113474722377935511fc85d3dd4', {
         'instance': plugins.NotifyMatterMost,
     }),
     ('mmost://localhost:invalid-port/3ccdd113474722377935511fc85d3dd4', {
@@ -1946,10 +1954,10 @@ TEST_URLS = (
     # NotifyNotifico
     ##################################
     ('notifico://', {
-        'instance': None,
+        'instance': TypeError,
     }),
     ('notifico://:@/', {
-        'instance': None,
+        'instance': TypeError,
     }),
     ('notifico://1234', {
         # Just a project id provided (no message token)
@@ -2219,7 +2227,11 @@ TEST_URLS = (
     # NotifyProwl
     ##################################
     ('prowl://', {
-        'instance': None,
+        'instance': TypeError,
+    }),
+    # bad url
+    ('prowl://:@/', {
+        'instance': TypeError,
     }),
     # Invalid API Key
     ('prowl://%s' % ('a' * 20), {
@@ -2273,10 +2285,6 @@ TEST_URLS = (
     ('prowl://%s' % ('a' * 40), {
         'instance': plugins.NotifyProwl,
     }),
-    # bad url
-    ('prowl://:@/', {
-        'instance': None,
-    }),
     ('prowl://%s' % ('a' * 40), {
         'instance': plugins.NotifyProwl,
         # force a failure
@@ -2300,10 +2308,10 @@ TEST_URLS = (
     # NotifyPushBullet
     ##################################
     ('pbul://', {
-        'instance': None,
+        'instance': TypeError,
     }),
     ('pbul://:@/', {
-        'instance': None,
+        'instance': TypeError,
     }),
     # APIkey
     ('pbul://%s' % ('a' * 32), {
@@ -2439,13 +2447,13 @@ TEST_URLS = (
     # NotifyPushSafer
     ##################################
     ('psafer://:@/', {
-        'instance': None,
+        'instance': TypeError,
     }),
     ('psafer://', {
-        'instance': None,
+        'instance': TypeError,
     }),
     ('psafers://', {
-        'instance': None,
+        'instance': TypeError,
     }),
     ('psafer://{}'.format('a' * 20), {
         'instance': plugins.NotifyPushSafer,
@@ -2648,10 +2656,14 @@ TEST_URLS = (
     # NotifyPushed
     ##################################
     ('pushed://', {
-        'instance': None,
+        'instance': TypeError,
     }),
     # Application Key Only
     ('pushed://%s' % ('a' * 32), {
+        'instance': TypeError,
+    }),
+    # Invalid URL
+    ('pushed://:@/', {
         'instance': TypeError,
     }),
     # Application Key+Secret
@@ -2707,9 +2719,6 @@ TEST_URLS = (
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
-    }),
-    ('pushed://:@/', {
-        'instance': None,
     }),
     ('pushed://%s/%s' % ('a' * 32, 'a' * 64), {
         'instance': plugins.NotifyPushed,
@@ -2810,7 +2819,11 @@ TEST_URLS = (
     # NotifyPushover
     ##################################
     ('pover://', {
-        'instance': None,
+        'instance': TypeError,
+    }),
+    # bad url
+    ('pover://:@/', {
+        'instance': TypeError,
     }),
     # APIkey; no user
     ('pover://%s' % ('a' * 30), {
@@ -2905,10 +2918,6 @@ TEST_URLS = (
     # API Key + priority setting (empty)
     ('pover://%s@%s?priority=' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
-    }),
-    # bad url
-    ('pover://:@/', {
-        'instance': None,
     }),
     ('pover://%s@%s' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
@@ -3115,10 +3124,10 @@ TEST_URLS = (
     # NotifyRyver
     ##################################
     ('ryver://', {
-        'instance': None,
+        'instance': TypeError,
     }),
     ('ryver://:@/', {
-        'instance': None,
+        'instance': TypeError,
     }),
     ('ryver://apprise', {
         # Just org provided (no token)
@@ -3435,7 +3444,7 @@ TEST_URLS = (
     ##################################
     ('spush://', {
         # No api key
-        'instance': None,
+        'instance': TypeError,
     }),
     ('spush://{}'.format('A' * 14), {
         # API Key specified however expected server response
@@ -3658,10 +3667,10 @@ TEST_URLS = (
     # NotifySNS (AWS)
     ##################################
     ('sns://', {
-        'instance': None,
+        'instance': TypeError,
     }),
     ('sns://:@/', {
-        'instance': None,
+        'instance': TypeError,
     }),
     ('sns://T1JJ3T3L2', {
         # Just Token 1 provided
@@ -4132,11 +4141,11 @@ TEST_URLS = (
     ##################################
     ('msg91://', {
         # No hostname/authkey specified
-        'instance': None,
+        'instance': TypeError,
     }),
     ('msg91://-', {
         # Invalid AuthKey
-        'instance': None,
+        'instance': TypeError,
     }),
     ('msg91://{}'.format('a' * 23), {
         # No number specified
@@ -4204,7 +4213,7 @@ TEST_URLS = (
     ##################################
     ('msgbird://', {
         # No hostname/apikey specified
-        'instance': None,
+        'instance': TypeError,
     }),
     ('msgbird://{}/abcd'.format('a' * 25), {
         # invalid characters in source phone number
@@ -4256,7 +4265,7 @@ TEST_URLS = (
     ##################################
     ('popcorn://', {
         # No hostname/apikey specified
-        'instance': None,
+        'instance': TypeError,
     }),
     ('popcorn://{}/18001231234'.format('_' * 9), {
         # invalid apikey
@@ -4490,10 +4499,10 @@ TEST_URLS = (
     # NotifyZulip
     ##################################
     ('zulip://', {
-        'instance': None,
+        'instance': TypeError,
     }),
     ('zulip://:@/', {
-        'instance': None,
+        'instance': TypeError,
     }),
     ('zulip://apprise', {
         # Just org provided (no token or botname)
@@ -5010,12 +5019,10 @@ def test_notify_emby_plugin_login(mock_post, mock_get):
     mock_post.return_value.status_code = requests.codes.ok
     mock_get.return_value.status_code = requests.codes.ok
 
-    obj = Apprise.instantiate('emby://l2g:l2gpass@localhost:%d' % (
-        # Increment our port so it will always be something different than
-        # the default
-        plugins.NotifyEmby.emby_default_port + 1))
+    obj = Apprise.instantiate('emby://l2g:l2gpass@localhost:1234')
+    # Set a different port (outside of default)
     assert isinstance(obj, plugins.NotifyEmby)
-    assert obj.port == (plugins.NotifyEmby.emby_default_port + 1)
+    assert obj.port == 1234
 
     # The login will fail because '' is not a parseable JSON response
     assert obj.login() is False
@@ -5024,10 +5031,10 @@ def test_notify_emby_plugin_login(mock_post, mock_get):
     obj.port = None
     assert obj.login() is False
 
-    # Default port assigments
+    # Default port assignments
     obj = Apprise.instantiate('emby://l2g:l2gpass@localhost')
     assert isinstance(obj, plugins.NotifyEmby)
-    assert obj.port == plugins.NotifyEmby.emby_default_port
+    assert obj.port == 8096
 
     # The login will (still) fail because '' is not a parseable JSON response
     assert obj.login() is False
