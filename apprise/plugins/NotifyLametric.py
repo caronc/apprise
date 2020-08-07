@@ -401,10 +401,17 @@ class NotifyLametric(NotifyBase):
             'name': _('Sound'),
             'type': 'string',
         },
+        # Lifetime is in seconds
+        'cycles': {
+            'name': _('Cycles'),
+            'type': 'int',
+            'min': 0,
+            'default': 1,
+        },
     })
 
     def __init__(self, apikey=None, client_id=None, secret=None, priority=None,
-                 icon_type=None, sound=None, mode=None, **kwargs):
+                 icon_type=None, sound=None, mode=None, cycles=None, **kwargs):
         """
         Initialize LaMetric Object
         """
@@ -466,6 +473,11 @@ class NotifyLametric(NotifyBase):
         else:
             self.icon_type = icon_type
 
+        # The number of times the message should be displayed
+        self.cycles = self.template_args['cycles']['default'] \
+            if not (isinstance(cycles, int) and
+                    cycles > self.template_args['cycles']['min']) else cycles
+
         self.sound = None
         if isinstance(sound, six.string_types):
             # If sound is set, get it's match
@@ -506,15 +518,19 @@ class NotifyLametric(NotifyBase):
 
         if self.sound:
             self.logger.warning(
-                'LaMetric sound settings are unavailable in Cloud mode')
+                'LaMetric sound setting is unavailable in Cloud mode')
 
-        if self.priority != LametricPriority.INFO:
+        if self.priority != self.template_args['priority']['default']:
             self.logger.warning(
-                'LaMetric priority settings are unavailable in Cloud mode')
+                'LaMetric priority setting is unavailable in Cloud mode')
 
-        if self.icon_type != LametricIconType.NONE:
+        if self.icon_type != self.template_args['icon_type']['default']:
             self.logger.warning(
-                'LaMetric icon_type settings are unavailable in Cloud mode')
+                'LaMetric icon_type setting is unavailable in Cloud mode')
+
+        if self.cycles != self.template_args['cycles']['default']:
+            self.logger.warning(
+                'LaMetric cycle settings is unavailable in Cloud mode')
 
         # Cloud Notifications don't have as much functionality
         # You can not set priority and/or sound
@@ -556,7 +572,7 @@ class NotifyLametric(NotifyBase):
                 # cycles - the number of times message should be displayed. If
                 # cycles is set to 0, notification will stay on the screen
                 # until user dismisses it manually. By default it is set to 1.
-                "cycles": 1,
+                "cycles": self.cycles,
                 "frames": [
                     {
                         "icon": self.lametric_icon_id_mapping[notify_type],
@@ -698,11 +714,14 @@ class NotifyLametric(NotifyBase):
         #
         # If we reach here then we're dealing with LametricMode.DEVICE
         #
-        if self.priority != LametricPriority.INFO:
+        if self.priority != self.template_args['priority']['default']:
             params['priority'] = self.priority
 
-        if self.icon_type != LametricIconType.NONE:
+        if self.icon_type != self.template_args['icon_type']['default']:
             params['icon_type'] = self.icon_type
+
+        if self.cycles != self.template_args['cycles']['default']:
+            params['cycles'] = self.cycles
 
         if self.sound:
             # Store our sound entry
@@ -808,5 +827,13 @@ class NotifyLametric(NotifyBase):
             else:
                 results['secret'] = \
                     NotifyLametric.unquote(results['host'])
+
+        # Set cycles
+        try:
+            results['cycles'] = abs(int(results['qsd'].get('cycles')))
+
+        except (TypeError, ValueError):
+            # Not a valid integer; ignore entry
+            pass
 
         return results

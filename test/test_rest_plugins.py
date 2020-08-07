@@ -23,6 +23,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import re
 import os
 import six
 import pytest
@@ -1306,7 +1307,7 @@ TEST_URLS = (
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'lametric://8...2@****/',
     }),
-    ('lametric://_/?mode=cloud&oauth_id=abcd&oauth_secret=1234', {
+    ('lametric://_/?mode=cloud&oauth_id=abcd&oauth_secret=1234&cycles=3', {
         # Everything is okay; Cloud mode forced
         # arguments used on URL path
         'instance': plugins.NotifyLametric,
@@ -1334,6 +1335,8 @@ TEST_URLS = (
     ('lametrics://{}@192.168.0.7/?sound=bike'.format(UUID4), {
         # Device mode with sound set to bicycle using alias
         'instance': plugins.NotifyLametric,
+        # Bike is an alias,
+        'url_matches': r'sound=bicycle',
     }),
     ('lametrics://{}@192.168.0.8/?sound=invalid!'.format(UUID4), {
         # Invalid sounds just produce warnings... object still loads
@@ -1342,6 +1345,8 @@ TEST_URLS = (
     ('lametrics://{}@192.168.0.9/?icon_type=alert'.format(UUID4), {
         # Icon Type Changed
         'instance': plugins.NotifyLametric,
+        # icon=alert exists somewhere on our generated URL
+        'url_matches': r'icon_type=alert',
     }),
     ('lametrics://{}@192.168.0.10/?icon_type=invalid'.format(UUID4), {
         # Invalid icon types just produce warnings... object still loads
@@ -1352,6 +1357,18 @@ TEST_URLS = (
         'instance': plugins.NotifyLametric,
     }),
     ('lametrics://{}@192.168.1.2/?priority=invalid'.format(UUID4), {
+        # Invalid priority just produce warnings... object still loads
+        'instance': plugins.NotifyLametric,
+    }),
+    ('lametric://{}@192.168.1.3/?cycles=2'.format(UUID4), {
+        # Cycles changed
+        'instance': plugins.NotifyLametric,
+    }),
+    ('lametric://{}@192.168.1.4/?cycles=-1'.format(UUID4), {
+        # Cycles changed (out of range)
+        'instance': plugins.NotifyLametric,
+    }),
+    ('lametrics://{}@192.168.1.5/?cycles=invalid'.format(UUID4), {
         # Invalid priority just produce warnings... object still loads
         'instance': plugins.NotifyLametric,
     }),
@@ -4589,6 +4606,9 @@ def test_rest_plugins(mock_post, mock_get):
         # Don't set this if don't need to check it's value
         privacy_url = meta.get('privacy_url')
 
+        # Our regular expression
+        url_matches = meta.get('url_matches')
+
         # Test attachments
         # Don't set this if don't need to check it's value
         check_attachments = meta.get('check_attachments', True)
@@ -4685,6 +4705,10 @@ def test_rest_plugins(mock_post, mock_get):
                 if privacy_url:
                     # Assess that our privacy url is as expected
                     assert obj.url(privacy=True).startswith(privacy_url)
+
+                if url_matches:
+                    # Assess that our URL matches a set regex
+                    assert re.search(url_matches, obj.url())
 
                 # Instantiate the exact same object again using the URL from
                 # the one that was already created properly
