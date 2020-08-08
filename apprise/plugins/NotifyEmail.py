@@ -29,6 +29,9 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
+from email.utils import formataddr
+from email.header import Header
+from email import charset
 
 from socket import error as SocketError
 from datetime import datetime
@@ -41,6 +44,9 @@ from ..utils import is_email
 from ..utils import parse_list
 from ..utils import GET_EMAIL_RE
 from ..AppriseLocale import gettext_lazy as _
+
+# Globally Default encoding mode set to Quoted Printable.
+charset.add_charset('utf-8', charset.QP, charset.QP, 'utf-8')
 
 
 class WebBaseLogin(object):
@@ -544,9 +550,8 @@ class NotifyEmail(NotifyBase):
         Perform Email Notification
         """
 
-        from_name = self.from_name
-        if not from_name:
-            from_name = self.app_desc
+        # Initialize our default from name
+        from_name = self.from_name if self.from_name else self.app_desc
 
         # error tracking (used for function return)
         has_error = False
@@ -581,15 +586,25 @@ class NotifyEmail(NotifyBase):
 
             # Prepare Email Message
             if self.notify_format == NotifyFormat.HTML:
-                content = MIMEText(body, 'html')
+                content = MIMEText(body, 'html', 'utf-8')
 
             else:
-                content = MIMEText(body, 'plain')
+                content = MIMEText(body, 'plain', 'utf-8')
 
             base = MIMEMultipart() if attach else content
-            base['Subject'] = title
-            base['From'] = '{} <{}>'.format(from_name, self.from_addr)
-            base['To'] = to_addr
+            base['Subject'] = Header(title, 'utf-8')
+            try:
+                base['From'] = formataddr(
+                    (from_name if from_name else False, self.from_addr),
+                    charset='utf-8')
+                base['To'] = formataddr((False, to_addr), charset='utf-8')
+
+            except TypeError:
+                # Python v2.x Support (no charset keyword)
+                base['From'] = formataddr(
+                    (from_name if from_name else False, self.from_addr))
+                base['To'] = formataddr((False, to_addr))
+
             base['Cc'] = ','.join(cc)
             base['Date'] = \
                 datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S +0000")
@@ -623,7 +638,8 @@ class NotifyEmail(NotifyBase):
                         app.add_header(
                             'Content-Disposition',
                             'attachment; filename="{}"'.format(
-                                attachment.name))
+                                Header(attachment.name, 'utf-8')),
+                        )
 
                         base.attach(app)
 
