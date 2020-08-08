@@ -91,7 +91,7 @@ class NotifyWindows(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://_/',
+        '{schema}://',
     )
 
     # Define our template arguments
@@ -232,7 +232,7 @@ class NotifyWindows(NotifyBase):
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        return '{schema}://_/?{params}'.format(
+        return '{schema}://?{params}'.format(
             schema=self.protocol,
             params=NotifyWindows.urlencode(params),
         )
@@ -246,19 +246,7 @@ class NotifyWindows(NotifyBase):
 
         """
 
-        results = NotifyBase.parse_url(url)
-        if not results:
-            results = {
-                'schema': NotifyWindows.protocol,
-                'user': None,
-                'password': None,
-                'port': None,
-                'host': '_',
-                'fullpath': None,
-                'path': None,
-                'url': url,
-                'qsd': {},
-            }
+        results = NotifyBase.parse_url(url, verify_host=False)
 
         # Include images with our message
         results['include_image'] = \

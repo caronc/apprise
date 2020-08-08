@@ -346,7 +346,6 @@ class NotifyBoxcar(NotifyBase):
 
         """
         results = NotifyBase.parse_url(url, verify_host=False)
-
         if not results:
             # We're done early
             return None

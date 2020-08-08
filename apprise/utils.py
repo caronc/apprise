@@ -127,52 +127,92 @@ URL_DETECTION_RE = re.compile(
 REGEX_VALIDATE_LOOKUP = {}
 
 
-def is_hostname(hostname):
-    """
-    Validate hostname
-    """
-    if len(hostname) > 255 or len(hostname) == 0:
-        return False
-
-    if hostname[-1] == ".":
-        hostname = hostname[:-1]
-
-    allowed = re.compile(r'(?!-)[A-Z\d_-]{1,63}(?<!-)$', re.IGNORECASE)
-    return all(allowed.match(x) for x in hostname.split("."))
-
-
-def is_ipaddr(addr):
+def is_ipaddr(addr, ipv4=True, ipv6=True):
     """
     Validates against IPV4 and IPV6 IP Addresses
     """
 
-    # Based on https://stackoverflow.com/questions/5284147/\
-    #       validating-ipv4-addresses-with-regexp
-    re_ipv4 = re.compile(
-        r'^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}'
-        r'(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$'
+    if ipv4:
+        # Based on https://stackoverflow.com/questions/5284147/\
+        #       validating-ipv4-addresses-with-regexp
+        re_ipv4 = re.compile(
+            r'^(?P<ip>((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}'
+            r'(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$'
+        )
+        match = re_ipv4.match(addr)
+        if match is not None:
+            # Return our matched IP
+            return match.group('ip')
+
+    if ipv6:
+        # Based on https://stackoverflow.com/questions/53497/\
+        #              regular-expression-that-matches-valid-ipv6-addresses
+        #
+        # IPV6 URLs should be enclosed in square brackets when placed on a URL
+        #   Source: https://tools.ietf.org/html/rfc2732
+        #   - For this reason, they are additionally checked for existance
+        re_ipv6 = re.compile(
+            r'\[?(?P<ip>(([0-9a-f]{1,4}:){7,7}[0-9a-f]{1,4}|([0-9a-f]{1,4}:)'
+            r'{1,7}:|([0-9a-f]{1,4}:){1,6}:[0-9a-f]{1,4}|([0-9a-f]{1,4}:){1,5}'
+            r'(:[0-9a-f]{1,4}){1,2}|([0-9a-f]{1,4}:){1,4}'
+            r'(:[0-9a-f]{1,4}){1,3}|([0-9a-f]{1,4}:){1,3}'
+            r'(:[0-9a-f]{1,4}){1,4}|([0-9a-f]{1,4}:){1,2}'
+            r'(:[0-9a-f]{1,4}){1,5}|[0-9a-f]{1,4}:'
+            r'((:[0-9a-f]{1,4}){1,6})|:((:[0-9a-f]{1,4}){1,7}|:)|'
+            r'fe80:(:[0-9a-f]{0,4}){0,4}%[0-9a-z]{1,}|::'
+            r'(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]'
+            r'|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|'
+            r'1{0,1}[0-9]){0,1}[0-9])|([0-9a-f]{1,4}:){1,4}:((25[0-5]|'
+            r'(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|'
+            r'1{0,1}[0-9]){0,1}[0-9])))\]?', re.I,
+        )
+
+        match = re_ipv6.match(addr)
+        if match is not None:
+            # Return our matched IP between square brackets since that is
+            # required for URL formatting as per RFC 2732.
+            return '[{}]'.format(match.group('ip'))
+
+    # There was no match
+    return False
+
+
+def is_hostname(hostname, ipv4=True, ipv6=True):
+    """
+    Validate hostname
+    """
+    # The entire hostname, including the delimiting dots, has a maximum of 253
+    # ASCII characters.
+    if len(hostname) > 253 or len(hostname) == 0:
+        return False
+
+    # Strip trailling period on hostname (if one exists)
+    if hostname[-1] == ".":
+        hostname = hostname[:-1]
+
+    # Split our hostname up
+    labels = hostname.split(".")
+
+    # ipv4 check
+    if len(labels) == 4 and re.match(r'[0-9.]+', hostname):
+        return is_ipaddr(hostname, ipv4=ipv4, ipv6=False)
+
+    # - RFC 1123 permits hostname labels to start with digits
+    #     - digit must be followed by alpha/numeric so we don't end up
+    #       processing IP addresses here
+    # - Hostnames can ony be comprised of alpha-numeric characters and the
+    #   hyphen (-) character.
+    # - Hostnames can not start with the hyphen (-) character.
+    # - labels can not exceed 63 characters
+    allowed = re.compile(
+        r'(?!-)[a-z0-9][a-z0-9-]{1,62}(?<!-)$',
+        re.IGNORECASE,
     )
 
-    # Based on https://stackoverflow.com/questions/53497/\
-    #              regular-expression-that-matches-valid-ipv6-addresses
-    re_ipv6 = re.compile(
-        r'(([0-9a-f]{1,4}:){7,7}[0-9a-f]{1,4}|([0-9a-f]{1,4}:){1,7}:'
-        r'|([0-9a-f]{1,4}:){1,6}:[0-9a-f]{1,4}|([0-9a-f]{1,4}:){1,5}'
-        r'(:[0-9a-f]{1,4}){1,2}|([0-9a-f]{1,4}:){1,4}'
-        r'(:[0-9a-f]{1,4}){1,3}|([0-9a-f]{1,4}:){1,3}'
-        r'(:[0-9a-f]{1,4}){1,4}|([0-9a-f]{1,4}:){1,2}'
-        r'(:[0-9a-f]{1,4}){1,5}|[0-9a-f]{1,4}:'
-        r'((:[0-9a-f]{1,4}){1,6})|:((:[0-9a-f]{1,4}){1,7}|:)|'
-        r'fe80:(:[0-9a-f]{0,4}){0,4}%[0-9a-z]{1,}|::'
-        r'(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]'
-        r'|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|'
-        r'1{0,1}[0-9]){0,1}[0-9])|([0-9a-f]{1,4}:){1,4}:((25[0-5]|'
-        r'(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|'
-        r'1{0,1}[0-9]){0,1}[0-9]))', re.I,
-    )
+    if not all(allowed.match(x) for x in labels):
+        return is_ipaddr(hostname, ipv4=ipv4, ipv6=ipv6)
 
-    # Returns true if we match an IP and/or
-    return (re_ipv4.match(addr) is not None or re_ipv6.match(addr) is not None)
+    return hostname
 
 
 def is_email(address):
@@ -419,29 +459,21 @@ def parse_url(url, default_schema='http', verify_host=True):
             # and it's already assigned
             pass
 
-    try:
-        (result['host'], result['port']) = \
-            re.split(r'[:]+', result['host'])[:2]
+    # Max port is 65535 so (1,5 digits)
+    match = re.search(
+        r'^(?P<host>.+):(?P<port>[1-9][0-9]{0,4})$', result['host'])
+    if match:
+        # Separate our port from our hostname (if port is detected)
+        result['host'] = match.group('host')
+        result['port'] = int(match.group('port'))
 
-    except ValueError:
-        # no problem then, user only exists
-        # and it's already assigned
-        pass
-
-    if result['port']:
-        try:
-            result['port'] = int(result['port'])
-
-        except (ValueError, TypeError):
-            # Invalid Port Specified
+    if verify_host:
+        # Verify and Validate our hostname
+        result['host'] = is_hostname(result['host'])
+        if not result['host']:
+            # Nothing more we can do without a hostname; give the user
+            # some indication as to what went wrong
             return None
-
-        if result['port'] == 0:
-            result['port'] = None
-
-    if verify_host and not is_hostname(result['host']):
-        # Nothing more we can do without a hostname
-        return None
 
     # Re-assemble cleaned up version of the url
     result['url'] = '%s://' % result['schema']

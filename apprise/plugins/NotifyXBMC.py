@@ -73,9 +73,6 @@ class NotifyXBMC(NotifyBase):
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_128
 
-    # The number of seconds to display the popup for
-    default_popup_duration_sec = 12
-
     # XBMC default protocol version (v2)
     xbmc_remote_protocol = 2
 
@@ -137,8 +134,9 @@ class NotifyXBMC(NotifyBase):
         super(NotifyXBMC, self).__init__(**kwargs)
 
         # Number of seconds to display notification for
-        self.duration = self.default_popup_duration_sec \
-            if not (isinstance(duration, int) and duration > 0) else duration
+        self.duration = self.template_args['duration']['default'] \
+            if not (isinstance(duration, int) and
+                    self.template_args['duration']['min'] > 0) else duration
 
         # Build our schema
         self.schema = 'https' if self.secure else 'http'
@@ -335,7 +333,8 @@ class NotifyXBMC(NotifyBase):
         return '{schema}://{auth}{hostname}{port}/?{params}'.format(
             schema=default_schema,
             auth=auth,
-            hostname=NotifyXBMC.quote(self.host, safe=''),
+            # never encode hostname since we're expecting it to be a valid one
+            hostname=self.host,
             port='' if not self.port or self.port == default_port
                  else ':{}'.format(self.port),
             params=NotifyXBMC.urlencode(params),
@@ -345,7 +344,7 @@ class NotifyXBMC(NotifyBase):
     def parse_url(url):
         """
         Parses the URL and returns enough arguments that can allow
-        us to substantiate this object.
+        us to re-instantiate this object.
 
         """
         results = NotifyBase.parse_url(url)

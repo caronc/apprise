@@ -253,7 +253,9 @@ class NotifyNextcloud(NotifyBase):
                    schema=self.secure_protocol
                    if self.secure else self.protocol,
                    auth=auth,
-                   hostname=NotifyNextcloud.quote(self.host, safe=''),
+                   # never encode hostname since we're expecting it to be a
+                   # valid one
+                   hostname=self.host,
                    port='' if self.port is None or self.port == default_port
                         else ':{}'.format(self.port),
                    targets='/'.join([NotifyNextcloud.quote(x)
@@ -265,7 +267,7 @@ class NotifyNextcloud(NotifyBase):
     def parse_url(url):
         """
         Parses the URL and returns enough arguments that can allow
-        us to substantiate this object.
+        us to re-instantiate this object.
 
         """
 

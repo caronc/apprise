@@ -313,7 +313,8 @@ class NotifyRocketChat(NotifyBase):
         return '{schema}://{auth}{hostname}{port}/{targets}/?{params}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
-            hostname=NotifyRocketChat.quote(self.host, safe=''),
+            # never encode hostname since we're expecting it to be a valid one
+            hostname=self.host,
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
             targets='/'.join(
@@ -636,7 +637,7 @@ class NotifyRocketChat(NotifyBase):
     def parse_url(url):
         """
         Parses the URL and returns enough arguments that can allow
-        us to substantiate this object.
+        us to re-instantiate this object.
 
         """
 
@@ -668,7 +669,6 @@ class NotifyRocketChat(NotifyBase):
             )
 
         results = NotifyBase.parse_url(url)
-
         if not results:
             # We're done early as we couldn't load the results
             return results

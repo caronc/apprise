@@ -272,7 +272,8 @@ class NotifySendGrid(NotifyBase):
         return '{schema}://{apikey}:{from_email}/{targets}?{params}'.format(
             schema=self.secure_protocol,
             apikey=self.pprint(self.apikey, privacy, safe=''),
-            from_email=self.quote(self.from_email, safe='@'),
+            # never encode email since it plays a huge role in our hostname
+            from_email=self.from_email,
             targets='' if not has_targets else '/'.join(
                 [NotifySendGrid.quote(x, safe='') for x in self.targets]),
             params=NotifySendGrid.urlencode(params),
@@ -401,7 +402,7 @@ class NotifySendGrid(NotifyBase):
     def parse_url(url):
         """
         Parses the URL and returns enough arguments that can allow
-        us to substantiate this object.
+        us to re-instantiate this object.
 
         """
 

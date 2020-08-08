@@ -29,6 +29,7 @@ from ..common import NotifyImageSize
 from ..common import NotifyType
 from ..utils import parse_bool
 from ..AppriseLocale import gettext_lazy as _
+from ..utils import validate_regex
 
 
 class NotifyFaast(NotifyBase):
@@ -86,7 +87,12 @@ class NotifyFaast(NotifyBase):
         super(NotifyFaast, self).__init__(**kwargs)
 
         # Store the Authentication Token
-        self.authtoken = authtoken
+        self.authtoken = validate_regex(authtoken)
+        if not self.authtoken:
+            msg = 'An invalid Faast Authentication Token ' \
+                  '({}) was specified.'.format(authtoken)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         # Associate an image with our post
         self.include_image = include_image
@@ -187,11 +193,10 @@ class NotifyFaast(NotifyBase):
     def parse_url(url):
         """
         Parses the URL and returns enough arguments that can allow
-        us to substantiate this object.
+        us to re-instantiate this object.
 
         """
-        results = NotifyBase.parse_url(url)
-
+        results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results

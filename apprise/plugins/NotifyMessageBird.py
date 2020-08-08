@@ -329,12 +329,11 @@ class NotifyMessageBird(NotifyBase):
     def parse_url(url):
         """
         Parses the URL and returns enough arguments that can allow
-        us to substantiate this object.
+        us to re-instantiate this object.
 
         """
 
-        results = NotifyBase.parse_url(url)
-
+        results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
@@ -349,7 +348,7 @@ class NotifyMessageBird(NotifyBase):
         except IndexError:
             # No path specified... this URL is potentially un-parseable; we can
             # hope for a from= entry
-            pass
+            results['source'] = None
 
         # The hostname is our authentication key
         results['apikey'] = NotifyMessageBird.unquote(results['host'])

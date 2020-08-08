@@ -298,9 +298,6 @@ class NotifyLametric(NotifyBase):
     # URL used for local notifications directly to the device
     device_notify_url = '{schema}://{host}{port}/api/v2/device/notifications'
 
-    # LaMetric Default port
-    default_device_port = 8080
-
     # The Device User ID
     default_device_user = 'dev'
 
@@ -350,6 +347,7 @@ class NotifyLametric(NotifyBase):
             'type': 'int',
             'min': 1,
             'max': 65535,
+            'default': 8080,
         },
         'user': {
             'name': _('Username'),
@@ -609,7 +607,8 @@ class NotifyLametric(NotifyBase):
             schema="https" if self.secure else "http",
             host=self.host,
             port=':{}'.format(
-                self.port if self.port else self.default_device_port))
+                self.port if self.port
+                else self.template_tokens['port']['default']))
 
         # Return request parameters
         return (notify_url, auth, payload)
@@ -746,7 +745,7 @@ class NotifyLametric(NotifyBase):
             # never encode hostname since we're expecting it to be a valid one
             hostname=self.host,
             port='' if self.port is None
-                 or self.port == self.default_device_port
+                 or self.port == self.template_tokens['port']['default']
                  else ':{}'.format(self.port),
             params=NotifyLametric.urlencode(params),
         )
@@ -755,7 +754,7 @@ class NotifyLametric(NotifyBase):
     def parse_url(url):
         """
         Parses the URL and returns enough arguments that can allow
-        us to substantiate this object.
+        us to re-instantiate this object.
 
         """
 

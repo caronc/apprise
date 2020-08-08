@@ -29,7 +29,6 @@ from __future__ import print_function
 from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
 from ..common import NotifyType
-from ..utils import GET_SCHEMA_RE
 from ..utils import parse_bool
 from ..AppriseLocale import gettext_lazy as _
 
@@ -141,7 +140,6 @@ class NotifyDBus(NotifyBase):
     # object if we were to reference, we wouldn't be backwards compatible with
     # Python v2.  So converting the result set back into a list makes us
     # compatible
-
     protocol = list(MAINLOOP_MAP.keys())
 
     # A URL that takes you to the setup/help of the specific protocol
@@ -153,7 +151,7 @@ class NotifyDBus(NotifyBase):
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_128
 
-    # The number of seconds to keep the message present for
+    # The number of milliseconds to keep the message present for
     message_timeout_ms = 13000
 
     # Limit results to just the first 10 line otherwise there is just to much
@@ -171,7 +169,7 @@ class NotifyDBus(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://_/',
+        '{schema}://',
     )
 
     # Define our template arguments
@@ -386,24 +384,8 @@ class NotifyDBus(NotifyBase):
         is in place.
 
         """
-        schema = GET_SCHEMA_RE.match(url)
-        if schema is None:
-            # Content is simply not parseable
-            return None
 
-        results = NotifyBase.parse_url(url)
-        if not results:
-            results = {
-                'schema': schema.group('schema').lower(),
-                'user': None,
-                'password': None,
-                'port': None,
-                'host': '_',
-                'fullpath': None,
-                'path': None,
-                'url': url,
-                'qsd': {},
-            }
+        results = NotifyBase.parse_url(url, verify_host=False)
 
         # Include images with our message
         results['include_image'] = \
