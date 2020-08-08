@@ -527,20 +527,37 @@ def test_smtplib_internationalization(mock_smtp):
 
     class SMTPMock(object):
         def sendmail(self, *args, **kwargs):
-            match = re.search(
-                r'^(?P<line>From: (?P<name>[^ ]+) <(?P<email>[^>]+)>)',
+            """
+            over-ride sendmail calls so we can check our our
+            internationalization formatting went
+            """
+
+            match_subject = re.search(
+                r'\n?(?P<line>Subject: (?P<subject>(.+?)))\n(?:[a-z0-9-]+:)',
+                args[2], re.I | re.M | re.S)
+            assert match_subject is not None
+
+            match_from = re.search(
+                r'^(?P<line>From: (?P<name>.+) <(?P<email>[^>]+)>)$',
                 args[2], re.I | re.M)
-            assert match is not None
+            assert match_from is not None
 
             # Verify our output was correctly stored
-            assert match.group('email') == 'user@gmail.com'
-            assert decode_header(
-                match.group('name'))[0][0].decode('utf-8') == 'Например так'
+            assert match_from.group('email') == 'user@gmail.com'
 
-            match = re.search(
-                r'^(?P<line>Subject: (?P<subject>.*))', args[2], re.I | re.M)
-            assert decode_header(match.group('subject'))[0][0]\
-                .decode('utf-8') == 'دعونا نجعل العالم مكانا أفضل.'
+            if six.PY2:  # Python 2.x (backwards compatible)
+                assert decode_header(match_from.group('name'))[0][0]\
+                    .decode('utf-8') == u'Например так'
+
+                assert decode_header(match_subject.group('subject'))[0][0]\
+                    .decode('utf-8') == u'دعونا نجعل العالم مكانا أفضل.'
+
+            else:  # Python 3+
+                assert decode_header(match_from.group('name'))[0][0]\
+                    .decode('utf-8') == 'Например так'
+
+                assert decode_header(match_subject.group('subject'))[0][0]\
+                    .decode('utf-8') == 'دعونا نجعل العالم مكانا أفضل.'
 
         # Dummy Function
         def quit(self, *args, **kwargs):
