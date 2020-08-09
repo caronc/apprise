@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2019 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2020 Chris Caron <lead2gold@gmail.com>
 # All rights reserved.
 #
 # This code is licensed under the MIT License.
@@ -28,6 +28,7 @@ import re
 import six
 import mock
 import smtplib
+from email.header import decode_header
 
 from apprise import plugins
 from apprise import NotifyType
@@ -509,6 +510,79 @@ def test_smtplib_send_okay(mock_smtplib):
     AttachBase.max_file_size = max_file_size
 
 
+@mock.patch('smtplib.SMTP')
+def test_smtplib_internationalization(mock_smtp):
+    """
+    API: Test email handling using internationalization
+
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.request_rate_per_sec = 0
+
+    # Defaults to HTML
+    obj = Apprise.instantiate(
+        'mailto://user:pass@gmail.com?name=Например%20так',
+        suppress_exceptions=False)
+    assert isinstance(obj, plugins.NotifyEmail)
+
+    class SMTPMock(object):
+        def sendmail(self, *args, **kwargs):
+            """
+            over-ride sendmail calls so we can check our our
+            internationalization formatting went
+            """
+
+            match_subject = re.search(
+                r'\n?(?P<line>Subject: (?P<subject>(.+?)))\n(?:[a-z0-9-]+:)',
+                args[2], re.I | re.M | re.S)
+            assert match_subject is not None
+
+            match_from = re.search(
+                r'^(?P<line>From: (?P<name>.+) <(?P<email>[^>]+)>)$',
+                args[2], re.I | re.M)
+            assert match_from is not None
+
+            # Verify our output was correctly stored
+            assert match_from.group('email') == 'user@gmail.com'
+
+            if six.PY2:  # Python 2.x (backwards compatible)
+                assert decode_header(match_from.group('name'))[0][0]\
+                    .decode('utf-8') == u'Например так'
+
+                assert decode_header(match_subject.group('subject'))[0][0]\
+                    .decode('utf-8') == u'دعونا نجعل العالم مكانا أفضل.'
+
+            else:  # Python 3+
+                assert decode_header(match_from.group('name'))[0][0]\
+                    .decode('utf-8') == 'Например так'
+
+                assert decode_header(match_subject.group('subject'))[0][0]\
+                    .decode('utf-8') == 'دعونا نجعل العالم مكانا أفضل.'
+
+        # Dummy Function
+        def quit(self, *args, **kwargs):
+            return True
+
+        # Dummy Function
+        def starttls(self, *args, **kwargs):
+            return True
+
+        # Dummy Function
+        def login(self, *args, **kwargs):
+            return True
+
+    # Prepare our object we will test our generated email against
+    mock_smtp.return_value = SMTPMock()
+
+    # Further test encoding through the message content as well
+    assert obj.notify(
+        # Google Translated to Arabic: "Let's make the world a better place."
+        title='دعونا نجعل العالم مكانا أفضل.',
+        # Google Translated to Hungarian: "One line of code at a time.'
+        body='Egy sor kódot egyszerre.',
+        notify_type=NotifyType.INFO) is True
+
+
 def test_email_url_escaping():
     """
     API: Test that user/passwords are properly escaped from URL
@@ -536,7 +610,7 @@ def test_email_url_escaping():
         suppress_exceptions=False)
     assert isinstance(obj, plugins.NotifyEmail) is True
 
-    # The password is escapped 'once' at this point
+    # The password is escaped only 'once'
     assert obj.password == ' %20'
 
 
