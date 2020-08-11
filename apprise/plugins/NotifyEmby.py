@@ -682,7 +682,7 @@ class NotifyEmby(NotifyBase):
         try:
             self.logout()
 
-        except LookupError:
+        except LookupError:  # pragma: no cover
             # Python v3.5 call to requests can sometimes throw the exception
             #   "/usr/lib64/python3.7/socket.py", line 748, in getaddrinfo
             #   LookupError: unknown encoding: idna
