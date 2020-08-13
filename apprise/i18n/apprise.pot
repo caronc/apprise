@@ -6,9 +6,9 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: apprise 0.8.6\n"
+"Project-Id-Version: apprise 0.8.7\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2020-06-13 10:55-0400\n"
+"POT-Creation-Date: 2020-08-13 17:07-0400\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -104,7 +104,13 @@ msgstr ""
 msgid "Country"
 msgstr ""
 
+msgid "Cycles"
+msgstr ""
+
 msgid "Detect Bot Owner"
+msgstr ""
+
+msgid "Device API Key"
 msgstr ""
 
 msgid "Device ID"
@@ -173,6 +179,9 @@ msgstr ""
 msgid "IRC Colors"
 msgstr ""
 
+msgid "Icon Type"
+msgstr ""
+
 msgid "Include Footer"
 msgstr ""
 
@@ -198,6 +207,9 @@ msgid "Message Mode"
 msgstr ""
 
 msgid "Modal"
+msgstr ""
+
+msgid "Mode"
 msgstr ""
 
 msgid "Notify Format"
@@ -281,6 +293,12 @@ msgstr ""
 msgid "Server Timeout"
 msgstr ""
 
+msgid "Socket Connect Timeout"
+msgstr ""
+
+msgid "Socket Read Timeout"
+msgstr ""
+
 msgid "Sound"
 msgstr ""
 
@@ -291,6 +309,12 @@ msgid "Source JID"
 msgstr ""
 
 msgid "Source Phone No"
+msgstr ""
+
+msgid "Sticky"
+msgstr ""
+
+msgid "Subtitle"
 msgstr ""
 
 msgid "Target Channel"
@@ -381,6 +405,9 @@ msgid "Urgency"
 msgstr ""
 
 msgid "Use Avatar"
+msgstr ""
+
+msgid "User ID"
 msgstr ""
 
 msgid "User Key"

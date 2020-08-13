@@ -56,7 +56,7 @@ Sinch, Slack, Spontit, Super Toasty, Stride, Syslog, Techulus Push, Telegram,
 Twilio, Twitter, Twist, XBMC, XMPP, Webex Teams}
 
 Name:           python-%{pypi_name}
-Version:        0.8.6
+Version:        0.8.7
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        MIT
@@ -84,12 +84,10 @@ BuildRequires: python-markdown
 %if 0%{?rhel} && 0%{?rhel} <= 7
 BuildRequires: python-cryptography
 BuildRequires: python-babel
-BuildRequires: python-gntp
 BuildRequires: python-yaml
 %else
 BuildRequires: python2-cryptography
 BuildRequires: python2-babel
-BuildRequires: python2-gntp
 BuildRequires: python2-yaml
 %endif
 
@@ -98,10 +96,8 @@ Requires: python2-requests-oauthlib
 Requires: python-six
 Requires: python-markdown
 %if 0%{?rhel} && 0%{?rhel} <= 7
-Requires: python-gntp
 Requires: python-yaml
 %else
-Requires: python2-gntp
 Requires: python2-yaml
 %endif
 
@@ -144,7 +140,12 @@ BuildRequires: python%{python3_pkgversion}-requests-oauthlib
 BuildRequires: python%{python3_pkgversion}-six
 BuildRequires: python%{python3_pkgversion}-click >= 5.0
 BuildRequires: python%{python3_pkgversion}-markdown
+%if 0%{?rhel} && 0%{?rhel} >= 8
+# gntp isn't available from EPEL for RHEL/CentOS 8
+%else
+# For all other distributions, include gntp
 BuildRequires: python%{python3_pkgversion}-gntp
+%endif
 BuildRequires: python%{python3_pkgversion}-yaml
 BuildRequires: python%{python3_pkgversion}-babel
 BuildRequires: python%{python3_pkgversion}-cryptography
@@ -152,7 +153,12 @@ Requires: python%{python3_pkgversion}-requests
 Requires: python%{python3_pkgversion}-requests-oauthlib
 Requires: python%{python3_pkgversion}-six
 Requires: python%{python3_pkgversion}-markdown
+%if 0%{?rhel} && 0%{?rhel} >= 8
+# gntp isn't available from EPEL for RHEL/CentOS 8
+%else
+# For all other distributions, include gntp
 Requires: python%{python3_pkgversion}-gntp
+%endif
 Requires: python%{python3_pkgversion}-yaml
 
 %if %{with tests}
@@ -231,8 +237,24 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 %endif
 
 %changelog
+* Thu Aug 13 2020 Chris Caron <lead2gold@gmail.com> - 0.8.7-1
+- Updated to v0.8.7
+
+* Mon Aug 03 2020 Chris Caron <lead2gold@gmail.com> - 0.8.6-4
+- Updated SPEC so Fedora 33 Mass Rebuild would pass
+
+* Sat Aug 01 2020 Fedora Release Engineering <releng@fedoraproject.org> - 0.8.6-3
+- Second attempt - Rebuilt for
+  https://fedoraproject.org/wiki/Fedora_33_Mass_Rebuild
+
+* Tue Jul 28 2020 Fedora Release Engineering <releng@fedoraproject.org> - 0.8.6-2
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_33_Mass_Rebuild
+
 * Sat Jun 13 2020 Chris Caron <lead2gold@gmail.com> - 0.8.6-1
 - Updated to v0.8.6
+
+* Tue May 26 2020 Miro Hrončok <mhroncok@redhat.com> - 0.8.5-2
+- Rebuilt for Python 3.9
 
 * Mon Mar 30 2020 Chris Caron <lead2gold@gmail.com> - 0.8.5-1
 - Updated to v0.8.5
