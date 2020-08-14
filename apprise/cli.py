@@ -204,7 +204,8 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
     # identified on the command line
     a.add(AppriseConfig(
         paths=[f for f in DEFAULT_SEARCH_PATHS if isfile(expanduser(f))]
-        if not (config or urls) else config), asset=asset)
+        if not (config or urls) else config,
+        asset=asset))
 
     # Load our inventory up
     for url in urls:
