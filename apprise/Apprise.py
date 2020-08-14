@@ -46,6 +46,15 @@ from .plugins.NotifyBase import NotifyBase
 from . import plugins
 from . import __version__
 
+try:
+    # asyncio wrapper for Python 3
+    import asyncio
+    ASYNCIO_SUPPORT = True
+
+except SyntaxError:
+    # Python v2.7
+    ASYNCIO_SUPPORT = False
+
 
 class Apprise(object):
     """
@@ -326,6 +335,10 @@ class Apprise(object):
         body_format = self.asset.body_format \
             if body_format is None else body_format
 
+        # for asyncio support; we track a list of our servers to notify
+        # sequentially
+        async_servers = []
+
         # Iterate over our loaded plugins
         for server in self.find(tag):
             if status is None:
@@ -383,6 +396,18 @@ class Apprise(object):
                     # Store entry directly
                     conversion_map[server.notify_format] = body
 
+            if ASYNCIO_SUPPORT and server.asset.async_mode:
+                # Build a list of servers requiring notification
+                # that will be triggered asynchronously afterwards
+                async_servers.append(server.async_notify(
+                    body=conversion_map[server.notify_format],
+                    title=title,
+                    notify_type=notify_type,
+                    attach=attach))
+
+                # We gather at this point and notify at the end
+                continue
+
             try:
                 # Send notification
                 if not server.notify(
@@ -403,6 +428,35 @@ class Apprise(object):
                 # just because one of our plugins has a bug in it.
                 logger.exception("Notification Exception")
                 status = False
+
+        if ASYNCIO_SUPPORT and async_servers:
+            async def main(results, *async_servers):
+                """
+                Task: Notify all servers specified and return our result set
+                      in a mutable object.
+                """
+                results['response'] = await asyncio.gather(*async_servers)
+
+            # Create a mutable object we can get our results from
+            results = {}
+
+            # Notify all of our servers
+            # export PYTHONASYNCIODEBUG=1 to enable debugging mode
+            logger.info('Notifying {} services asynchronous.'
+                        .format(len(async_servers)))
+            asyncio.run(main(results, *async_servers))
+
+            # The below iterates over all of our responses and keys in
+            # on False returns. Then it considers that we may only be
+            # running asynchronous for some of the notification services
+            # (while others have already returned there value).
+            #
+            # The below considers that one failed service outside of
+            # the asynchronous notification trumps a True state where
+            # all other services were successful
+            status = next(
+                (s for s in results['response'] if s is False),
+                status if status is False else True)
 
         return status
 

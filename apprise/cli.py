@@ -123,6 +123,8 @@ def print_version_msg():
               'which services to notify. Use multiple --tag (-g) entries to '
               '"OR" the tags together and comma separated to "AND" them. '
               'If no tags are specified then all services are notified.')
+@click.option('--disable-async', '-Da', is_flag=True,
+              help='Send all notifications sequentially')
 @click.option('--dry-run', '-d', is_flag=True,
               help='Perform a trial run but only prints the notification '
               'services to-be triggered to stdout. Notifications are never '
@@ -135,7 +137,7 @@ def print_version_msg():
 @click.argument('urls', nargs=-1,
                 metavar='SERVER_URL [SERVER_URL2 [SERVER_URL3]]',)
 def main(body, title, config, attach, urls, notification_type, theme, tag,
-         input_format, dry_run, verbose, version):
+         input_format, dry_run, verbose, disable_async, version):
     """
     Send a notification to all of the specified servers identified by their
     URLs the content provided within the title, body and notification-type.
@@ -195,7 +197,15 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
         sys.exit(1)
 
     # Prepare our asset
-    asset = AppriseAsset(body_format=input_format, theme=theme)
+    asset = AppriseAsset(
+        body_format=input_format,
+        theme=theme,
+        # Async mode is only used for Python v3+ and allows a user to send
+        # all of their notifications asyncronously.  This was made an option
+        # incase there are problems in the future where it's better that
+        # everything run sequentially/syncronously instead.
+        async_mode=disable_async is not True,
+    )
 
     # Create our object
     a = Apprise(asset=asset)

@@ -24,6 +24,7 @@
 # THE SOFTWARE.
 
 import re
+import six
 
 from ..URLBase import URLBase
 from ..common import NotifyType
@@ -36,7 +37,17 @@ from ..AppriseLocale import gettext_lazy as _
 from ..AppriseAttachment import AppriseAttachment
 
 
-class NotifyBase(URLBase):
+if six.PY3:
+    # Wrap our base with the asyncio wrapper
+    from .AsyncNotifyBase import AsyncNotifyBase
+    BASE_OBJECT = AsyncNotifyBase
+
+else:
+    # Python v2.7 (backwards compatibility)
+    BASE_OBJECT = URLBase
+
+
+class NotifyBase(BASE_OBJECT):
     """
     This is the base class for all notification services
     """

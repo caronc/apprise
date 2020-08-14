@@ -99,6 +99,12 @@ class AppriseAsset(object):
     # will be the default.
     body_format = None
 
+    # Always attempt to send notifications asynchronous (as the same time
+    # if possible)
+    # This is a Python 3 supported option only. If set to False, then
+    # notifications are sent sequentially (one after another)
+    async_mode = True
+
     def __init__(self, **kwargs):
         """
         Asset Initialization
