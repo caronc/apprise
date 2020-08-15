@@ -57,7 +57,8 @@ class Apprise(object):
     Our Notification Manager
 
     """
-    def __init__(self, servers=None, asset=None):
+
+    def __init__(self, servers=None, asset=None, debug=False):
         """
         Loads a set of server urls while applying the Asset() module to each
         if specified.
@@ -82,6 +83,9 @@ class Apprise(object):
 
         # Initialize our locale object
         self.locale = AppriseLocale()
+
+        # Set our debug flag
+        self.debug = debug
 
     @staticmethod
     def instantiate(url, asset=None, tag=None, suppress_exceptions=True):
@@ -427,7 +431,7 @@ class Apprise(object):
 
         if coroutines:
             # perform our async notification(s)
-            if not py3compat.asyncio.notify(coroutines):
+            if not py3compat.asyncio.notify(coroutines, debug=self.debug):
                 # Toggle our status only if we had a failure
                 status = False
 

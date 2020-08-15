@@ -110,9 +110,44 @@ def test_apprise_cli_nux_env(tmpdir):
     ])
     assert result.exit_code == 0
 
+    # Run in synchronous mode
+    result = runner.invoke(cli.main, [
+        '-t', 'test title',
+        '-b', 'test body',
+        'good://localhost',
+        '--disable-async',
+    ])
+    assert result.exit_code == 0
+
+    # Test Debug Mode (--debug)
+    result = runner.invoke(cli.main, [
+        '-t', 'test title',
+        '-b', 'test body',
+        'good://localhost',
+        '--debug',
+    ])
+    assert result.exit_code == 0
+
+    # Test Debug Mode (-D)
+    result = runner.invoke(cli.main, [
+        '-t', 'test title',
+        '-b', 'test body',
+        'good://localhost',
+        '-D',
+    ])
+    assert result.exit_code == 0
+
     result = runner.invoke(cli.main, [
         '-t', 'test title',
         'good://localhost',
+    ], input='test stdin body\n')
+    assert result.exit_code == 0
+
+    # Run in synchronous mode
+    result = runner.invoke(cli.main, [
+        '-t', 'test title',
+        'good://localhost',
+        '--disable-async',
     ], input='test stdin body\n')
     assert result.exit_code == 0
 
@@ -120,6 +155,15 @@ def test_apprise_cli_nux_env(tmpdir):
         '-t', 'test title',
         '-b', 'test body',
         'bad://localhost',
+    ])
+    assert result.exit_code == 1
+
+    # Run in synchronous mode
+    result = runner.invoke(cli.main, [
+        '-t', 'test title',
+        '-b', 'test body',
+        'bad://localhost',
+        '-Da',
     ])
     assert result.exit_code == 1
 

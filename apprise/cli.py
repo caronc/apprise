@@ -132,12 +132,13 @@ def print_version_msg():
 @click.option('--verbose', '-v', count=True,
               help='Makes the operation more talkative. Use multiple v to '
               'increase the verbosity. I.e.: -vvvv')
+@click.option('--debug', '-D', is_flag=True, help='Debug mode')
 @click.option('--version', '-V', is_flag=True,
               help='Display the apprise version and exit.')
 @click.argument('urls', nargs=-1,
                 metavar='SERVER_URL [SERVER_URL2 [SERVER_URL3]]',)
 def main(body, title, config, attach, urls, notification_type, theme, tag,
-         input_format, dry_run, verbose, disable_async, version):
+         input_format, dry_run, verbose, disable_async, debug, version):
     """
     Send a notification to all of the specified servers identified by their
     URLs the content provided within the title, body and notification-type.
@@ -148,6 +149,11 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
     # Note: Click ignores the return values of functions it wraps, If you
     #       want to return a specific error code, you must call sys.exit()
     #       as you will see below.
+
+    debug = True if debug else False
+    if debug:
+        # Verbosity must be a minimum of 3
+        verbose = 3 if verbose < 3 else verbose
 
     # Logging
     ch = logging.StreamHandler(sys.stdout)
@@ -176,6 +182,12 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     ch.setFormatter(formatter)
     logger.addHandler(ch)
+
+    # Update our asyncio logger
+    asyncio_logger = logging.getLogger('asyncio')
+    for handler in logger.handlers:
+        asyncio_logger.addHandler(handler)
+    asyncio_logger.setLevel(logger.level)
 
     if version:
         print_version_msg()
@@ -207,8 +219,8 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
         async_mode=disable_async is not True,
     )
 
-    # Create our object
-    a = Apprise(asset=asset)
+    # Create our Apprise object
+    a = Apprise(asset=asset, debug=debug)
 
     # Load our configuration if no URLs or specified configuration was
     # identified on the command line
