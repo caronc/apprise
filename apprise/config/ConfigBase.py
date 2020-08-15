@@ -154,6 +154,9 @@ class ConfigBase(URLBase):
         # Dynamically load our parse_ function based on our config format
         fn = getattr(ConfigBase, 'config_parse_{}'.format(config_format))
 
+        # Initialize our asset object
+        asset = asset if isinstance(asset, AppriseAsset) else self.asset
+
         # Execute our config parse function which always returns a list
         self._cached_servers.extend(fn(content=content, asset=asset))
 
