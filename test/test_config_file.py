@@ -27,6 +27,7 @@ import six
 import mock
 from apprise.config.ConfigFile import ConfigFile
 from apprise.plugins.NotifyBase import NotifyBase
+from apprise.AppriseAsset import AppriseAsset
 
 # Disable logging for a cleaner testing output
 import logging
@@ -47,13 +48,19 @@ def test_config_file(tmpdir):
 
     assert ConfigFile.parse_url('file://?') is None
 
+    # Create an Apprise asset we can reference
+    asset = AppriseAsset()
+
     # Initialize our object
-    cf = ConfigFile(path=str(t), format='text')
+    cf = ConfigFile(path=str(t), format='text', asset=asset)
 
     # one entry added
     assert len(cf) == 1
 
     assert isinstance(cf.url(), six.string_types) is True
+
+    # Verify that we're using the same asset
+    assert cf[0].asset is asset
 
     # Testing of pop
     cf = ConfigFile(path=str(t), format='text')
