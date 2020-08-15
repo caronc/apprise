@@ -48,9 +48,9 @@ import logging
 logging.disable(logging.CRITICAL)
 
 
-def test_apprise_cli(tmpdir):
+def test_apprise_cli_nux_env(tmpdir):
     """
-    API: Apprise() CLI
+    CLI: Nux Environment
 
     """
 
@@ -302,7 +302,7 @@ def test_apprise_cli(tmpdir):
 @mock.patch('platform.system')
 def test_apprise_cli_windows_env(mock_system):
     """
-    API: Apprise() CLI Windows Environment
+    CLI: Windows Environment
 
     """
     # Force a windows environment

@@ -39,7 +39,7 @@ from ..AppriseAttachment import AppriseAttachment
 
 if six.PY3:
     # Wrap our base with the asyncio wrapper
-    from .AsyncNotifyBase import AsyncNotifyBase
+    from ..py3compat.asyncio import AsyncNotifyBase
     BASE_OBJECT = AsyncNotifyBase
 
 else:

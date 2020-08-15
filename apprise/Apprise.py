@@ -46,14 +46,10 @@ from .plugins.NotifyBase import NotifyBase
 from . import plugins
 from . import __version__
 
-try:
-    # asyncio wrapper for Python 3
-    import asyncio
-    ASYNCIO_SUPPORT = True
-
-except SyntaxError:
-    # Python v2.7
-    ASYNCIO_SUPPORT = False
+# Python v3+ support code made importable so it can remain backwards
+# compatible with Python v2
+from . import py3compat
+ASYNCIO_SUPPORT = not six.PY2
 
 
 class Apprise(object):
@@ -337,7 +333,7 @@ class Apprise(object):
 
         # for asyncio support; we track a list of our servers to notify
         # sequentially
-        async_servers = []
+        coroutines = []
 
         # Iterate over our loaded plugins
         for server in self.find(tag):
@@ -399,7 +395,7 @@ class Apprise(object):
             if ASYNCIO_SUPPORT and server.asset.async_mode:
                 # Build a list of servers requiring notification
                 # that will be triggered asynchronously afterwards
-                async_servers.append(server.async_notify(
+                coroutines.append(server.async_notify(
                     body=conversion_map[server.notify_format],
                     title=title,
                     notify_type=notify_type,
@@ -429,55 +425,11 @@ class Apprise(object):
                 logger.exception("Notification Exception")
                 status = False
 
-        if ASYNCIO_SUPPORT and async_servers:
-            async def main(results, *async_servers):
-                """
-                Task: Notify all servers specified and return our result set
-                      in a mutable object.
-                """
-                try:
-                    results['response'] = await asyncio.gather(*async_servers)
-
-                except AttributeError:
-                    # AttributeError: module 'asyncio' has no attribute
-                    #                 'gather'
-                    # Error is thrown for Python < v3.7
-                    results['response'] = await asyncio.wait(async_servers)
-
-            # Create a mutable object we can get our results from
-            results = {}
-
-            # Notify all of our servers
-            # export PYTHONASYNCIODEBUG=1 to enable debugging mode
-            logger.info('Notifying {} services asynchronous.'
-                        .format(len(async_servers)))
-
-            try:
-
-                # send our notifications
-                asyncio.run(main(results, *async_servers))
-
-            except AttributeError:
-                # AttributeError: module 'asyncio' has no attribute 'run'
-                # Error is thrown for Python < v3.7
-                loop = asyncio.get_event_loop()
-
-                loop.run_until_complete(
-                    asyncio.wait(main(results, *async_servers)))
-
-                loop.close()
-
-            # The below iterates over all of our responses and keys in
-            # on False returns. Then it considers that we may only be
-            # running asynchronous for some of the notification services
-            # (while others have already returned there value).
-            #
-            # The below considers that one failed service outside of
-            # the asynchronous notification trumps a True state where
-            # all other services were successful
-            status = next(
-                (s for s in results['response'] if s is False),
-                status if status is False else True)
+        if coroutines:
+            # perform our async notification(s)
+            if not py3compat.asyncio.notify(coroutines):
+                # Toggle our status only if we had a failure
+                status = False
 
         return status
 
