@@ -56,6 +56,13 @@ The Apprise options are as follows:
   * `-v`, `--verbose`:
     The more of these you specify, the more verbose the output is.
 
+  * `-Da`, `--disable-async`:
+    Send notifications synchronously (one after the other) instead of
+    all at once.
+
+  * `-D`, `--debug`:
+    A debug mode; useful for troubleshooting.
+
   * `-V`, `--version`:
     Display the apprise version and exit.
 
