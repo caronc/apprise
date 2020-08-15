@@ -435,7 +435,14 @@ class Apprise(object):
                 Task: Notify all servers specified and return our result set
                       in a mutable object.
                 """
-                results['response'] = await asyncio.gather(*async_servers)
+                try:
+                    results['response'] = await asyncio.gather(*async_servers)
+
+                except AttributeError:
+                    # AttributeError: module 'asyncio' has no attribute
+                    #                 'gather'
+                    # Error is thrown for Python < v3.7
+                    results['response'] = await asyncio.wait(async_servers)
 
             # Create a mutable object we can get our results from
             results = {}
@@ -444,7 +451,21 @@ class Apprise(object):
             # export PYTHONASYNCIODEBUG=1 to enable debugging mode
             logger.info('Notifying {} services asynchronous.'
                         .format(len(async_servers)))
-            asyncio.run(main(results, *async_servers))
+
+            try:
+
+                # send our notifications
+                asyncio.run(main(results, *async_servers))
+
+            except AttributeError:
+                # AttributeError: module 'asyncio' has no attribute 'run'
+                # Error is thrown for Python < v3.7
+                loop = asyncio.get_event_loop()
+
+                loop.run_until_complete(
+                    asyncio.wait(main(results, *async_servers)))
+
+                loop.close()
 
             # The below iterates over all of our responses and keys in
             # on False returns. Then it considers that we may only be
