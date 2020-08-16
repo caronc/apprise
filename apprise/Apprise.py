@@ -46,13 +46,19 @@ from .plugins.NotifyBase import NotifyBase
 from . import plugins
 from . import __version__
 
+# Python v3+ support code made importable so it can remain backwards
+# compatible with Python v2
+from . import py3compat
+ASYNCIO_SUPPORT = not six.PY2
+
 
 class Apprise(object):
     """
     Our Notification Manager
 
     """
-    def __init__(self, servers=None, asset=None):
+
+    def __init__(self, servers=None, asset=None, debug=False):
         """
         Loads a set of server urls while applying the Asset() module to each
         if specified.
@@ -77,6 +83,9 @@ class Apprise(object):
 
         # Initialize our locale object
         self.locale = AppriseLocale()
+
+        # Set our debug flag
+        self.debug = debug
 
     @staticmethod
     def instantiate(url, asset=None, tag=None, suppress_exceptions=True):
@@ -326,6 +335,10 @@ class Apprise(object):
         body_format = self.asset.body_format \
             if body_format is None else body_format
 
+        # for asyncio support; we track a list of our servers to notify
+        # sequentially
+        coroutines = []
+
         # Iterate over our loaded plugins
         for server in self.find(tag):
             if status is None:
@@ -383,6 +396,18 @@ class Apprise(object):
                     # Store entry directly
                     conversion_map[server.notify_format] = body
 
+            if ASYNCIO_SUPPORT and server.asset.async_mode:
+                # Build a list of servers requiring notification
+                # that will be triggered asynchronously afterwards
+                coroutines.append(server.async_notify(
+                    body=conversion_map[server.notify_format],
+                    title=title,
+                    notify_type=notify_type,
+                    attach=attach))
+
+                # We gather at this point and notify at the end
+                continue
+
             try:
                 # Send notification
                 if not server.notify(
@@ -402,6 +427,12 @@ class Apprise(object):
                 # A catch all so we don't have to abort early
                 # just because one of our plugins has a bug in it.
                 logger.exception("Notification Exception")
+                status = False
+
+        if coroutines:
+            # perform our async notification(s)
+            if not py3compat.asyncio.notify(coroutines, debug=self.debug):
+                # Toggle our status only if we had a failure
                 status = False
 
         return status

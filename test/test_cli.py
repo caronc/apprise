@@ -48,9 +48,9 @@ import logging
 logging.disable(logging.CRITICAL)
 
 
-def test_apprise_cli(tmpdir):
+def test_apprise_cli_nux_env(tmpdir):
     """
-    API: Apprise() CLI
+    CLI: Nux Environment
 
     """
 
@@ -110,9 +110,44 @@ def test_apprise_cli(tmpdir):
     ])
     assert result.exit_code == 0
 
+    # Run in synchronous mode
+    result = runner.invoke(cli.main, [
+        '-t', 'test title',
+        '-b', 'test body',
+        'good://localhost',
+        '--disable-async',
+    ])
+    assert result.exit_code == 0
+
+    # Test Debug Mode (--debug)
+    result = runner.invoke(cli.main, [
+        '-t', 'test title',
+        '-b', 'test body',
+        'good://localhost',
+        '--debug',
+    ])
+    assert result.exit_code == 0
+
+    # Test Debug Mode (-D)
+    result = runner.invoke(cli.main, [
+        '-t', 'test title',
+        '-b', 'test body',
+        'good://localhost',
+        '-D',
+    ])
+    assert result.exit_code == 0
+
     result = runner.invoke(cli.main, [
         '-t', 'test title',
         'good://localhost',
+    ], input='test stdin body\n')
+    assert result.exit_code == 0
+
+    # Run in synchronous mode
+    result = runner.invoke(cli.main, [
+        '-t', 'test title',
+        'good://localhost',
+        '--disable-async',
     ], input='test stdin body\n')
     assert result.exit_code == 0
 
@@ -120,6 +155,15 @@ def test_apprise_cli(tmpdir):
         '-t', 'test title',
         '-b', 'test body',
         'bad://localhost',
+    ])
+    assert result.exit_code == 1
+
+    # Run in synchronous mode
+    result = runner.invoke(cli.main, [
+        '-t', 'test title',
+        '-b', 'test body',
+        'bad://localhost',
+        '-Da',
     ])
     assert result.exit_code == 1
 
@@ -302,7 +346,7 @@ def test_apprise_cli(tmpdir):
 @mock.patch('platform.system')
 def test_apprise_cli_windows_env(mock_system):
     """
-    API: Apprise() CLI Windows Environment
+    CLI: Windows Environment
 
     """
     # Force a windows environment
