@@ -229,22 +229,18 @@ class NotifyTelegram(NotifyBase):
         # Parse our list
         self.targets = parse_list(targets)
 
+        # if detect_owner is set to True, we will attempt to determine who
+        # the bot owner is based on the first person who messaged it.  This
+        # is not a fool proof way of doing things as over time Telegram removes
+        # the message history for the bot.  So what appears (later on) to be
+        # the first message to it, maybe another user who sent it a message
+        # much later.  Users who set this flag should update their Apprise
+        # URL later to directly include the user that we should message.
         self.detect_owner = detect_owner
 
         if self.user:
             # Treat this as a channel too
             self.targets.append(self.user)
-
-        if len(self.targets) == 0 and self.detect_owner:
-            _id = self.detect_bot_owner()
-            if _id:
-                # Store our id
-                self.targets.append(str(_id))
-
-        if len(self.targets) == 0:
-            err = 'No chat_id(s) were specified.'
-            self.logger.warning(err)
-            raise TypeError(err)
 
         # Track whether or not we want to send an image with our notification
         # or not.
@@ -474,7 +470,7 @@ class NotifyTelegram(NotifyBase):
             entry = response['result'][0]
             _id = entry['message']['from'].get('id', 0)
             _user = entry['message']['from'].get('first_name')
-            self.logger.info('Detected telegram user %s (userid=%d)' % (
+            self.logger.info('Detected Telegram user %s (userid=%d)' % (
                 _user, _id))
             # Return our detected userid
             return _id
@@ -489,6 +485,19 @@ class NotifyTelegram(NotifyBase):
         """
         Perform Telegram Notification
         """
+
+        if len(self.targets) == 0 and self.detect_owner:
+            _id = self.detect_bot_owner()
+            if _id:
+                # Permanently store our id in our target list for next time
+                self.targets.append(str(_id))
+                self.logger.info(
+                    'Update your Telegram Apprise URL to read: '
+                    '{}'.format(self.url(privacy=True)))
+
+        if len(self.targets) == 0:
+            self.logger.warning('There were not Telegram chat_ids to notify.')
+            return False
 
         headers = {
             'User-Agent': self.app_id,

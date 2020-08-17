@@ -73,14 +73,14 @@ def test_notify_telegram_plugin(mock_post, mock_get):
     # Invalid JSON while trying to detect bot owner
     mock_get.return_value.content = '{'
     mock_post.return_value.content = '}'
-    with pytest.raises(TypeError):
-        plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+    obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+    obj.notify(title='hello', body='world')
 
     # Invalid JSON while trying to detect bot owner + 400 error
     mock_get.return_value.status_code = requests.codes.internal_server_error
     mock_post.return_value.status_code = requests.codes.internal_server_error
-    with pytest.raises(TypeError):
-        plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+    obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+    obj.notify(title='hello', body='world')
 
     # Return status back to how they were
     mock_post.return_value.status_code = requests.codes.ok
@@ -218,6 +218,10 @@ def test_notify_telegram_plugin(mock_post, mock_get):
         attach=path) is False
 
     obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+    # No user detected; this happens after our firsst notification
+    assert len(obj.targets) == 0
+
+    assert obj.notify(title='hello', body='world') is True
     assert len(obj.targets) == 1
     assert obj.targets[0] == '532389719'
 
@@ -227,9 +231,12 @@ def test_notify_telegram_plugin(mock_post, mock_get):
         "result": [],
     })
 
-    # Exception should be thrown about the fact no bot token was specified
-    with pytest.raises(TypeError):
-        plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+    # No user will be detected now
+    obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+    # No user detected; this happens after our firsst notification
+    assert len(obj.targets) == 0
+    assert obj.notify(title='hello', body='world') is False
+    assert len(obj.targets) == 0
 
     # Detect the bot with a bad response
     mock_post.return_value.content = dumps({})
@@ -238,22 +245,25 @@ def test_notify_telegram_plugin(mock_post, mock_get):
     # Test our bot detection with a internal server error
     mock_post.return_value.status_code = requests.codes.internal_server_error
 
-    # Exception should be thrown over internal server error caused
-    with pytest.raises(TypeError):
-        plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+    # internal server error prevents notification from being sent
+    obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+    assert len(obj.targets) == 0
+    assert obj.notify(title='hello', body='world') is False
+    assert len(obj.targets) == 0
 
     # Test our bot detection with an unmappable html error
     mock_post.return_value.status_code = 999
-    # Exception should be thrown over invali internal error no
-    with pytest.raises(TypeError):
-        plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+    plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+    assert len(obj.targets) == 0
+    assert obj.notify(title='hello', body='world') is False
+    assert len(obj.targets) == 0
 
     # Do it again but this time provide a failure message
     mock_post.return_value.content = dumps({'description': 'Failure Message'})
-
-    # Exception should be thrown about the fact no bot token was specified
-    with pytest.raises(TypeError):
-        plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+    plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+    assert len(obj.targets) == 0
+    assert obj.notify(title='hello', body='world') is False
+    assert len(obj.targets) == 0
 
     # Do it again but this time provide a failure message and perform a
     # notification without a bot detection by providing at least 1 chat id
@@ -265,5 +275,7 @@ def test_notify_telegram_plugin(mock_post, mock_get):
     mock_post.side_effect = requests.HTTPError
 
     # No chat_ids specified
-    with pytest.raises(TypeError):
-        obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+    obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+    assert len(obj.targets) == 0
+    assert obj.notify(title='hello', body='world') is False
+    assert len(obj.targets) == 0
