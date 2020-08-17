@@ -356,8 +356,8 @@ class NotifyBase(BASE_OBJECT):
 
         params.update(super(NotifyBase, self).url_parameters(*args, **kwargs))
 
-        # return default arguments
-        return kwargs
+        # return default parameters
+        return params
 
     @staticmethod
     def parse_url(url, verify_host=True):
