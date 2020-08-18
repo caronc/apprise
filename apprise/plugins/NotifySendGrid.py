@@ -50,7 +50,7 @@ from .NotifyBase import NotifyBase
 from ..common import NotifyFormat
 from ..common import NotifyType
 from ..utils import parse_list
-from ..utils import GET_EMAIL_RE
+from ..utils import is_email
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
@@ -170,17 +170,14 @@ class NotifySendGrid(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        self.from_email = from_email
-        try:
-            result = GET_EMAIL_RE.match(self.from_email)
-            if not result:
-                # let outer exception handle this
-                raise TypeError
-
-        except (TypeError, AttributeError):
-            msg = 'Invalid ~From~ email specified: {}'.format(self.from_email)
+        result = is_email(from_email)
+        if not result:
+            msg = 'Invalid ~From~ email specified: {}'.format(from_email)
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        # Store email address
+        self.from_email = result['full_email']
 
         # Acquire Targets (To Emails)
         self.targets = list()
@@ -201,8 +198,9 @@ class NotifySendGrid(NotifyBase):
         # Validate recipients (to:) and drop bad ones:
         for recipient in parse_list(targets):
 
-            if GET_EMAIL_RE.match(recipient):
-                self.targets.append(recipient)
+            result = is_email(recipient)
+            if result:
+                self.targets.append(result['full_email'])
                 continue
 
             self.logger.warning(
@@ -213,8 +211,9 @@ class NotifySendGrid(NotifyBase):
         # Validate recipients (cc:) and drop bad ones:
         for recipient in parse_list(cc):
 
-            if GET_EMAIL_RE.match(recipient):
-                self.cc.add(recipient)
+            result = is_email(recipient)
+            if result:
+                self.cc.add(result['full_email'])
                 continue
 
             self.logger.warning(
@@ -225,8 +224,9 @@ class NotifySendGrid(NotifyBase):
         # Validate recipients (bcc:) and drop bad ones:
         for recipient in parse_list(bcc):
 
-            if GET_EMAIL_RE.match(recipient):
-                self.bcc.add(recipient)
+            result = is_email(recipient)
+            if result:
+                self.bcc.add(result['full_email'])
                 continue
 
             self.logger.warning(

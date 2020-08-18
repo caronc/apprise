@@ -28,7 +28,7 @@ import requests
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
-from ..utils import GET_EMAIL_RE
+from ..utils import is_email
 from ..utils import parse_list
 from ..utils import parse_bool
 from ..utils import validate_regex
@@ -142,10 +142,10 @@ class NotifyPopcornNotify(NotifyBase):
                 self.targets.append(result)
                 continue
 
-            result = GET_EMAIL_RE.match(target)
+            result = is_email(target)
             if result:
                 # store valid email
-                self.targets.append(target)
+                self.targets.append(result['full_email'])
                 continue
 
             self.logger.warning(

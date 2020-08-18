@@ -108,6 +108,12 @@ def test_apprise():
                  '3ccdd113474722377935511fc85d3dd4') is True
     assert len(a) == 3
 
+    # Try adding nothing but delimiters
+    assert a.add(',, ,, , , , ,') is False
+
+    # The number of servers added doesn't change
+    assert len(a) == 3
+
     # We can pop an object off of our stack by it's indexed value:
     obj = a.pop(0)
     assert isinstance(obj, NotifyBase) is True

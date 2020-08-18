@@ -28,7 +28,7 @@ from json import dumps
 from json import loads
 
 from .NotifyBase import NotifyBase
-from ..utils import GET_EMAIL_RE
+from ..utils import is_email
 from ..common import NotifyType
 from ..utils import parse_list
 from ..utils import validate_regex
@@ -230,22 +230,29 @@ class NotifyPushBullet(NotifyBase):
                 'body': body,
             }
 
-            if recipient is PUSHBULLET_SEND_TO_ALL:
+            # Check if an email was defined
+            match = is_email(recipient)
+            if match:
+                payload['email'] = match['full_email']
+                self.logger.debug(
+                    "PushBullet recipient {} parsed as an email address"
+                    .format(recipient))
+
+            elif recipient is PUSHBULLET_SEND_TO_ALL:
                 # Send to all
                 pass
 
-            elif GET_EMAIL_RE.match(recipient):
-                payload['email'] = recipient
-                self.logger.debug(
-                    "Recipient '%s' is an email address" % recipient)
-
             elif recipient[0] == '#':
                 payload['channel_tag'] = recipient[1:]
-                self.logger.debug("Recipient '%s' is a channel" % recipient)
+                self.logger.debug(
+                    "PushBullet recipient {} parsed as a channel"
+                    .format(recipient))
 
             else:
                 payload['device_iden'] = recipient
-                self.logger.debug("Recipient '%s' is a device" % recipient)
+                self.logger.debug(
+                    "PushBullet recipient {} parsed as a device"
+                    .format(recipient))
 
             okay, response = self._send(
                 self.notify_url.format('pushes'), payload)

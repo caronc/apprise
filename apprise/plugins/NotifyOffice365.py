@@ -66,7 +66,7 @@ from ..URLBase import PrivacyMode
 from ..common import NotifyFormat
 from ..common import NotifyType
 from ..utils import is_email
-from ..utils import parse_list
+from ..utils import parse_emails
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
@@ -152,6 +152,14 @@ class NotifyOffice365(NotifyBase):
         'to': {
             'alias_of': 'targets',
         },
+        'cc': {
+            'name': _('Carbon Copy'),
+            'type': 'list:string',
+        },
+        'bcc': {
+            'name': _('Blind Carbon Copy'),
+            'type': 'list:string',
+        },
         'oauth_id': {
             'alias_of': 'client_id',
         },
@@ -161,7 +169,7 @@ class NotifyOffice365(NotifyBase):
     })
 
     def __init__(self, tenant, email, client_id, secret,
-                 targets=None, **kwargs):
+                 targets=None, cc=None, bcc=None, **kwargs):
         """
         Initialize Office 365 Object
         """
@@ -176,12 +184,15 @@ class NotifyOffice365(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        if not is_email(email):
+        result = is_email(email)
+        if not result:
             msg = 'An invalid Office 365 Email Account ID' \
                   '({}) was specified.'.format(email)
             self.logger.warning(msg)
             raise TypeError(msg)
-        self.email = email
+
+        # Otherwise store our the email address
+        self.email = result['full_email']
 
         # Client Key (associated with generated OAuth2 Login)
         self.client_id = validate_regex(
@@ -200,23 +211,68 @@ class NotifyOffice365(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
+        # For tracking our email -> name lookups
+        self.names = {}
+
+        # Acquire Carbon Copies
+        self.cc = set()
+
+        # Acquire Blind Carbon Copies
+        self.bcc = set()
+
         # Parse our targets
         self.targets = list()
 
-        targets = parse_list(targets)
         if targets:
-            for target in targets:
-                # Validate targets and drop bad ones:
-                if not is_email(target):
-                    self.logger.warning(
-                        'Dropped invalid email specified: {}'.format(target))
+            for recipient in parse_emails(targets):
+                # Validate recipients (to:) and drop bad ones:
+                result = is_email(recipient)
+                if result:
+                    # Add our email to our target list
+                    self.targets.append(
+                        (result['name'] if result['name'] else False,
+                            result['full_email']))
                     continue
 
-                # Add our email to our target list
-                self.targets.append(target)
+                self.logger.warning(
+                    'Dropped invalid To email ({}) specified.'
+                    .format(recipient))
+
         else:
-            # Default to adding ourselves
-            self.targets.append(self.email)
+            # If our target email list is empty we want to add ourselves to it
+            self.targets.append((False, self.email))
+
+        # Validate recipients (cc:) and drop bad ones:
+        for recipient in parse_emails(cc):
+            email = is_email(recipient)
+            if email:
+                self.cc.add(email['full_email'])
+
+                # Index our name (if one exists)
+                self.names[email['full_email']] = \
+                    email['name'] if email['name'] else False
+                continue
+
+            self.logger.warning(
+                'Dropped invalid Carbon Copy email '
+                '({}) specified.'.format(recipient),
+            )
+
+        # Validate recipients (bcc:) and drop bad ones:
+        for recipient in parse_emails(bcc):
+            email = is_email(recipient)
+            if email:
+                self.bcc.add(email['full_email'])
+
+                # Index our name (if one exists)
+                self.names[email['full_email']] = \
+                    email['name'] if email['name'] else False
+                continue
+
+            self.logger.warning(
+                'Dropped invalid Blind Carbon Copy email '
+                '({}) specified.'.format(recipient),
+            )
 
         # Our token is acquired upon a successful login
         self.token = None
@@ -237,7 +293,7 @@ class NotifyOffice365(NotifyBase):
         if not self.targets:
             # There is no one to email; we're done
             self.logger.warning(
-                'There are no Office 365 recipients to notify')
+                'There are no Email recipients to notify')
             return False
 
         # Setup our Content Type
@@ -256,8 +312,8 @@ class NotifyOffice365(NotifyBase):
             'SaveToSentItems': 'false'
         }
 
-        # Create a copy of the targets list
-        targets = list(self.targets)
+        # Create a copy of the email list
+        emails = list(self.targets)
 
         # Define our URL to post to
         url = '{graph_url}/v1.0/users/{email}/sendmail'.format(
@@ -265,17 +321,7 @@ class NotifyOffice365(NotifyBase):
             graph_url=self.graph_url,
         )
 
-        while len(targets):
-            # Get our target to notify
-            target = targets.pop(0)
-
-            # Prepare our email
-            payload['Message']['ToRecipients'] = [{
-                'EmailAddress': {
-                    'Address': target
-                }
-            }]
-
+        while len(emails):
             # authenticate ourselves if we aren't already; but this function
             # also tracks if our token we have is still valid and will
             # re-authenticate ourselves if nessisary.
@@ -283,9 +329,68 @@ class NotifyOffice365(NotifyBase):
                 # We could not authenticate ourselves; we're done
                 return False
 
+            # Get our email to notify
+            to_name, to_addr = emails.pop(0)
+
+            # Strip target out of cc list if in To or Bcc
+            cc = (self.cc - self.bcc - set([to_addr]))
+
+            # Strip target out of bcc list if in To
+            bcc = (self.bcc - set([to_addr]))
+
+            # Prepare our email
+            payload['Message']['ToRecipients'] = [{
+                'EmailAddress': {
+                    'Address': to_addr
+                }
+            }]
+            if to_name:
+                # Apply our To Name
+                payload['Message']['ToRecipients'][0]['EmailAddress']['Name'] \
+                    = to_name
+
+            self.logger.debug('Email To: {}'.format(to_addr))
+
+            if cc:
+                # Prepare our CC list
+                payload['Message']['CcRecipients'] = []
+                for addr in cc:
+                    _payload = {'Address': addr}
+                    if self.names.get(addr):
+                        _payload['Name'] = self.names[addr]
+
+                    # Store our address in our payload
+                    payload['Message']['CcRecipients']\
+                        .append({'EmailAddress': _payload})
+
+                self.logger.debug('Email Cc: {}'.format(', '.join(
+                    ['{}{}'.format(
+                        '' if self.names.get(e)
+                        else '{}: '.format(self.names[e]), e) for e in cc])))
+
+            if bcc:
+                # Prepare our CC list
+                payload['Message']['BccRecipients'] = []
+                for addr in bcc:
+                    _payload = {'Address': addr}
+                    if self.names.get(addr):
+                        _payload['Name'] = self.names[addr]
+
+                    # Store our address in our payload
+                    payload['Message']['BccRecipients']\
+                        .append({'EmailAddress': _payload})
+
+                self.logger.debug('Email Bcc: {}'.format(', '.join(
+                    ['{}{}'.format(
+                        '' if self.names.get(e)
+                        else '{}: '.format(self.names[e]), e) for e in bcc])))
+
+            # Perform upstream fetch
             postokay, response = self._fetch(
                 url=url, payload=dumps(payload),
                 content_type='application/json')
+
+            # Test if we were okay
             if not postokay:
                 has_error = True
 
@@ -453,6 +558,20 @@ class NotifyOffice365(NotifyBase):
         # Our URL parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
+        if self.cc:
+            # Handle our Carbon Copy Addresses
+            params['cc'] = ','.join(
+                ['{}{}'.format(
+                    '' if not self.names.get(e)
+                    else '{}:'.format(self.names[e]), e) for e in self.cc])
+
+        if self.bcc:
+            # Handle our Blind Carbon Copy Addresses
+            params['bcc'] = ','.join(
+                ['{}{}'.format(
+                    '' if not self.names.get(e)
+                    else '{}:'.format(self.names[e]), e) for e in self.bcc])
+
         return '{schema}://{tenant}:{email}/{client_id}/{secret}' \
             '/{targets}/?{params}'.format(
                 schema=self.secure_protocol,
@@ -465,7 +584,9 @@ class NotifyOffice365(NotifyBase):
                     self.secret, privacy, mode=PrivacyMode.Secret,
                     safe=''),
                 targets='/'.join(
-                    [NotifyOffice365.quote(x, safe='') for x in self.targets]),
+                    [NotifyOffice365.quote('{}{}'.format(
+                        '' if not e[0] else '{}:'.format(e[0]), e[1]),
+                        safe='') for e in self.targets]),
                 params=NotifyOffice365.urlencode(params))
 
     @staticmethod
@@ -571,5 +692,13 @@ class NotifyOffice365(NotifyBase):
         if 'to' in results['qsd'] and len(results['qsd']['to']):
             results['targets'] += \
                 NotifyOffice365.parse_list(results['qsd']['to'])
+
+        # Handle Carbon Copy Addresses
+        if 'cc' in results['qsd'] and len(results['qsd']['cc']):
+            results['cc'] = results['qsd']['cc']
+
+        # Handle Blind Carbon Copy Addresses
+        if 'bcc' in results['qsd'] and len(results['qsd']['bcc']):
+            results['bcc'] = results['qsd']['bcc']
 
         return results

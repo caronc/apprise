@@ -41,8 +41,7 @@ from ..URLBase import PrivacyMode
 from ..common import NotifyFormat
 from ..common import NotifyType
 from ..utils import is_email
-from ..utils import parse_list
-from ..utils import GET_EMAIL_RE
+from ..utils import parse_emails
 from ..AppriseLocale import gettext_lazy as _
 
 # Globally Default encoding mode set to Quoted Printable.
@@ -401,8 +400,8 @@ class NotifyEmail(NotifyBase):
         except (ValueError, TypeError):
             self.timeout = self.connect_timeout
 
-        # Acquire targets
-        self.targets = parse_list(targets)
+        # Acquire Email 'To'
+        self.targets = list()
 
         # Acquire Carbon Copies
         self.cc = set()
@@ -410,9 +409,11 @@ class NotifyEmail(NotifyBase):
         # Acquire Blind Carbon Copies
         self.bcc = set()
 
+        # For tracking our email -> name lookups
+        self.names = {}
+
         # Now we want to construct the To and From email
         # addresses from the URL provided
-        self.from_name = from_name
         self.from_addr = from_addr
 
         if self.user and not self.from_addr:
@@ -422,15 +423,18 @@ class NotifyEmail(NotifyBase):
                 self.host,
             )
 
-        if not is_email(self.from_addr):
+        result = is_email(self.from_addr)
+        if not result:
             # Parse Source domain based on from_addr
             msg = 'Invalid ~From~ email specified: {}'.format(self.from_addr)
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # If our target email list is empty we want to add ourselves to it
-        if len(self.targets) == 0:
-            self.targets.append(self.from_addr)
+        # Store our email address
+        self.from_addr = result['full_email']
+
+        # Set our from name
+        self.from_name = from_name if from_name else result['name']
 
         # Now detect the SMTP Server
         self.smtp_host = \
@@ -446,11 +450,35 @@ class NotifyEmail(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # Validate recipients (cc:) and drop bad ones:
-        for recipient in parse_list(cc):
+        if targets:
+            # Validate recipients (to:) and drop bad ones:
+            for recipient in parse_emails(targets):
+                result = is_email(recipient)
+                if result:
+                    self.targets.append(
+                        (result['name'] if result['name'] else False,
+                            result['full_email']))
+                    continue
 
-            if GET_EMAIL_RE.match(recipient):
-                self.cc.add(recipient)
+                self.logger.warning(
+                    'Dropped invalid To email '
+                    '({}) specified.'.format(recipient),
+                )
+
+        else:
+            # If our target email list is empty we want to add ourselves to it
+            self.targets.append(
+                (self.from_name if self.from_name else False, self.from_addr))
+
+        # Validate recipients (cc:) and drop bad ones:
+        for recipient in parse_emails(cc):
+            email = is_email(recipient)
+            if email:
+                self.cc.add(email['full_email'])
+
+                # Index our name (if one exists)
+                self.names[email['full_email']] = \
+                    email['name'] if email['name'] else False
                 continue
 
             self.logger.warning(
@@ -459,10 +487,14 @@ class NotifyEmail(NotifyBase):
             )
 
         # Validate recipients (bcc:) and drop bad ones:
-        for recipient in parse_list(bcc):
+        for recipient in parse_emails(bcc):
+            email = is_email(recipient)
+            if email:
+                self.bcc.add(email['full_email'])
 
-            if GET_EMAIL_RE.match(recipient):
-                self.bcc.add(recipient)
+                # Index our name (if one exists)
+                self.names[email['full_email']] = \
+                    email['name'] if email['name'] else False
                 continue
 
             self.logger.warning(
@@ -556,29 +588,51 @@ class NotifyEmail(NotifyBase):
         # error tracking (used for function return)
         has_error = False
 
+        if not self.targets:
+            # There is no one to email; we're done
+            self.logger.warning(
+                'There are no Email recipients to notify')
+            return False
+
         # Create a copy of the targets list
         emails = list(self.targets)
         while len(emails):
             # Get our email to notify
-            to_addr = emails.pop(0)
-
-            if not is_email(to_addr):
-                self.logger.warning(
-                    'Invalid ~To~ email specified: {}'.format(to_addr))
-                has_error = True
-                continue
+            to_name, to_addr = emails.pop(0)
 
             # Strip target out of cc list if in To or Bcc
             cc = (self.cc - self.bcc - set([to_addr]))
+
             # Strip target out of bcc list if in To
             bcc = (self.bcc - set([to_addr]))
+
+            try:
+                # Format our cc addresses to support the Name field
+                cc = [formataddr(
+                    (self.names.get(addr, False), addr), charset='utf-8')
+                    for addr in cc]
+
+                # Format our bcc addresses to support the Name field
+                bcc = [formataddr(
+                    (self.names.get(addr, False), addr), charset='utf-8')
+                    for addr in bcc]
+
+            except TypeError:
+                # Python v2.x Support (no charset keyword)
+                # Format our cc addresses to support the Name field
+                cc = [formataddr(
+                    (self.names.get(addr, False), addr)) for addr in cc]
+
+                # Format our bcc addresses to support the Name field
+                bcc = [formataddr(
+                    (self.names.get(addr, False), addr)) for addr in bcc]
 
             self.logger.debug(
                 'Email From: {} <{}>'.format(from_name, self.from_addr))
             self.logger.debug('Email To: {}'.format(to_addr))
-            if len(cc):
+            if cc:
                 self.logger.debug('Email Cc: {}'.format(', '.join(cc)))
-            if len(bcc):
+            if bcc:
                 self.logger.debug('Email Bcc: {}'.format(', '.join(bcc)))
             self.logger.debug('Login ID: {}'.format(self.user))
             self.logger.debug(
@@ -597,13 +651,13 @@ class NotifyEmail(NotifyBase):
                 base['From'] = formataddr(
                     (from_name if from_name else False, self.from_addr),
                     charset='utf-8')
-                base['To'] = formataddr((False, to_addr), charset='utf-8')
+                base['To'] = formataddr((to_name, to_addr), charset='utf-8')
 
             except TypeError:
                 # Python v2.x Support (no charset keyword)
                 base['From'] = formataddr(
                     (from_name if from_name else False, self.from_addr))
-                base['To'] = formataddr((False, to_addr))
+                base['To'] = formataddr((to_name, to_addr))
 
             base['Cc'] = ','.join(cc)
             base['Date'] = \
@@ -706,7 +760,6 @@ class NotifyEmail(NotifyBase):
         # Define an URL parameters
         params = {
             'from': self.from_addr,
-            'name': self.from_name,
             'mode': self.secure_mode,
             'smtp': self.smtp_host,
             'timeout': self.timeout,
@@ -716,13 +769,22 @@ class NotifyEmail(NotifyBase):
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
+        if self.from_name:
+            params['name'] = self.from_name
+
         if len(self.cc) > 0:
             # Handle our Carbon Copy Addresses
-            params['cc'] = ','.join(self.cc)
+            params['cc'] = ','.join(
+                ['{}{}'.format(
+                    '' if not e not in self.names
+                    else '{}:'.format(self.names[e]), e) for e in self.cc])
 
         if len(self.bcc) > 0:
             # Handle our Blind Carbon Copy Addresses
-            params['bcc'] = ','.join(self.bcc)
+            params['bcc'] = ','.join(
+                ['{}{}'.format(
+                    '' if not e not in self.names
+                    else '{}:'.format(self.names[e]), e) for e in self.bcc])
 
         # pull email suffix from username (if present)
         user = None if not self.user else self.user.split('@')[0]
@@ -748,7 +810,8 @@ class NotifyEmail(NotifyBase):
         # a simple boolean check as to whether we display our target emails
         # or not
         has_targets = \
-            not (len(self.targets) == 1 and self.targets[0] == self.from_addr)
+            not (len(self.targets) == 1
+                 and self.targets[0][1] == self.from_addr)
 
         return '{schema}://{auth}{hostname}{port}/{targets}?{params}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
@@ -758,7 +821,9 @@ class NotifyEmail(NotifyBase):
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
             targets='' if not has_targets else '/'.join(
-                [NotifyEmail.quote(x, safe='') for x in self.targets]),
+                [NotifyEmail.quote('{}{}'.format(
+                    '' if not e[0] else '{}:'.format(e[0]), e[1]),
+                    safe='') for e in self.targets]),
             params=NotifyEmail.urlencode(params),
         )
 
@@ -792,8 +857,7 @@ class NotifyEmail(NotifyBase):
 
         # Attempt to detect 'to' email address
         if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'] += \
-                NotifyEmail.parse_list(results['qsd']['to'])
+            results['targets'].append(results['qsd']['to'])
 
         if 'name' in results['qsd'] and len(results['qsd']['name']):
             # Extract from name to associate with from address
@@ -814,13 +878,11 @@ class NotifyEmail(NotifyBase):
 
         # Handle Carbon Copy Addresses
         if 'cc' in results['qsd'] and len(results['qsd']['cc']):
-            results['cc'] = \
-                NotifyEmail.parse_list(results['qsd']['cc'])
+            results['cc'] = results['qsd']['cc']
 
         # Handle Blind Carbon Copy Addresses
         if 'bcc' in results['qsd'] and len(results['qsd']['bcc']):
-            results['bcc'] = \
-                NotifyEmail.parse_list(results['qsd']['bcc'])
+            results['bcc'] = results['qsd']['bcc']
 
         results['from_addr'] = from_addr
         results['smtp_host'] = smtp_host

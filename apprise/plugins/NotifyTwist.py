@@ -36,7 +36,7 @@ from ..URLBase import PrivacyMode
 from ..common import NotifyFormat
 from ..common import NotifyType
 from ..utils import parse_list
-from ..utils import GET_EMAIL_RE
+from ..utils import is_email
 from ..AppriseLocale import gettext_lazy as _
 
 
@@ -140,12 +140,6 @@ class NotifyTwist(NotifyBase):
         #   <workspace_id>:<channel_id>
         self.channel_ids = set()
 
-        # Initialize our Email Object
-        self.email = email if email else '{}@{}'.format(
-            self.user,
-            self.host,
-        )
-
         # The token is None if we're not logged in and False if we
         # failed to log in.  Otherwise it is set to the actual token
         self.token = None
@@ -171,25 +165,30 @@ class NotifyTwist(NotifyBase):
         #  }
         self._cached_channels = dict()
 
-        try:
-            result = GET_EMAIL_RE.match(self.email)
-            if not result:
-                # let outer exception handle this
-                raise TypeError
+        # Initialize our Email Object
+        self.email = email if email else '{}@{}'.format(
+            self.user,
+            self.host,
+        )
 
-            if email:
-                # Force user/host to be that of the defined email for
-                # consistency. This is very important for those initializing
-                # this object with the the email object would could potentially
-                # cause inconsistency to contents in the NotifyBase() object
-                self.user = result.group('fulluser')
-                self.host = result.group('domain')
-
-        except (TypeError, AttributeError):
+        # Check if it is valid
+        result = is_email(self.email)
+        if not result:
+            # let outer exception handle this
             msg = 'The Twist Auth email specified ({}) is invalid.'\
                 .format(self.email)
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        # Re-assign email based on what was parsed
+        self.email = result['full_email']
+        if email:
+            # Force user/host to be that of the defined email for
+            # consistency. This is very important for those initializing
+            # this object with the the email object would could potentially
+            # cause inconsistency to contents in the NotifyBase() object
+            self.user = result['user']
+            self.host = result['domain']
 
         if not self.password:
             msg = 'No Twist password was specified with account: {}'\
