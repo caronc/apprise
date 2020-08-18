@@ -166,9 +166,11 @@ TEST_URLS = (
     ('mailtos://nuxref.com?user=&pass=.', {
         'instance': TypeError,
     }),
-    # Invalid To Address
+    # Invalid To Address is accepted, but we won't be able to properly email
+    # using the notify() call
     ('mailtos://user:pass@nuxref.com?to=@', {
-        'instance': TypeError,
+        'instance': plugins.NotifyEmail,
+        'response': False,
     }),
     # Valid URL, but can't structure a proper email
     ('mailtos://nuxref.com?user=%20!&pass=.', {

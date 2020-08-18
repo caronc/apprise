@@ -682,6 +682,11 @@ def test_parse_emails():
 
     results = utils.parse_emails('this is not a parseable email at all')
     assert isinstance(results, list)
+    assert len(results) == 8
+    # Now we do it again with the store_unparsable flag set to False
+    results = utils.parse_emails(
+        'this is not a parseable email at all', store_unparseable=False)
+    assert isinstance(results, list)
     assert len(results) == 0
 
     # Now test valid URLs
@@ -742,6 +747,15 @@ def test_parse_emails():
     for email in emails:
         assert email in results
 
+    # Pass in some unparseables
+    results = utils.parse_emails('garbage')
+    assert isinstance(results, list)
+    assert len(results) == 1
+
+    results = utils.parse_emails('garbage', store_unparseable=False)
+    assert isinstance(results, list)
+    assert len(results) == 0
+
     # Pass in garbage
     results = utils.parse_emails(object)
     assert isinstance(results, list)
@@ -781,6 +795,12 @@ def test_parse_urls():
     assert len(results) == 0
 
     results = utils.parse_urls('this is not a parseable url at all')
+    assert isinstance(results, list)
+    # we still end up returning this
+    assert len(results) == 8
+
+    results = utils.parse_urls(
+        'this is not a parseable url at all', store_unparseable=False)
     assert isinstance(results, list)
     assert len(results) == 0
 

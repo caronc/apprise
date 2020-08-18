@@ -465,11 +465,6 @@ class NotifyEmail(NotifyBase):
                     '({}) specified.'.format(recipient),
                 )
 
-            if not self.targets:
-                msg = 'There were no valid target emails to send to.'
-                self.logger.warning(msg)
-                raise TypeError(msg)
-
         else:
             # If our target email list is empty we want to add ourselves to it
             self.targets.append(
@@ -592,6 +587,12 @@ class NotifyEmail(NotifyBase):
 
         # error tracking (used for function return)
         has_error = False
+
+        if not self.targets:
+            # There is no one to email; we're done
+            self.logger.warning(
+                'There are no Email recipients to notify')
+            return False
 
         # Create a copy of the targets list
         emails = list(self.targets)

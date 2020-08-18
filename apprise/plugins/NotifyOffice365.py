@@ -238,11 +238,6 @@ class NotifyOffice365(NotifyBase):
                     'Dropped invalid To email ({}) specified.'
                     .format(recipient))
 
-            if not self.targets:
-                msg = 'There were no valid target emails to send to.'
-                self.logger.warning(msg)
-                raise TypeError(msg)
-
         else:
             # If our target email list is empty we want to add ourselves to it
             self.targets.append((False, self.email))
@@ -298,7 +293,7 @@ class NotifyOffice365(NotifyBase):
         if not self.targets:
             # There is no one to email; we're done
             self.logger.warning(
-                'There are no Office 365 recipients to notify')
+                'There are no Email recipients to notify')
             return False
 
         # Setup our Content Type

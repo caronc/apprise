@@ -77,6 +77,9 @@ def test_office365_general(mock_post):
 
     assert isinstance(obj, plugins.NotifyOffice365)
 
+    # Test our URL generation
+    assert isinstance(obj.url(), six.string_types)
+
     # Test our notification
     assert obj.notify(title='title', body='test') is True
 
@@ -89,8 +92,8 @@ def test_office365_general(mock_post):
             secret=secret,
             targets=targets,
             # Test the cc and bcc list (use good and bad email)
-            cc='Chuck Norris cnorris@yahoo.ca, invalid@!',
-            bcc='Bruce Willis bwillis@hotmail.com, invalid@!',
+            cc='Chuck Norris cnorris@yahoo.ca, Sauron@lotr.me, invalid@!',
+            bcc='Bruce Willis bwillis@hotmail.com, Frodo@lotr.me invalid@!',
         ))
 
     assert isinstance(obj, plugins.NotifyOffice365)
@@ -132,23 +135,27 @@ def test_office365_general(mock_post):
         )
 
     # One of the targets are invalid
-    plugins.NotifyOffice365(
+    obj = plugins.NotifyOffice365(
         email=email,
         client_id=client_id,
         tenant=tenant,
         secret=secret,
-        targets=('abc@gmail.com', 'garbage'),
+        targets=('Management abc@gmail.com', 'garbage'),
     )
+    # Test our notification (this will work and only notify abc@gmail.com)
+    assert obj.notify(title='title', body='test') is True
 
     # all of the targets are invalid
-    with pytest.raises(TypeError):
-        plugins.NotifyOffice365(
-            email=email,
-            client_id=client_id,
-            tenant=tenant,
-            secret=secret,
-            targets=('invalid', 'garbage'),
-        )
+    obj = plugins.NotifyOffice365(
+        email=email,
+        client_id=client_id,
+        tenant=tenant,
+        secret=secret,
+        targets=('invalid', 'garbage'),
+    )
+
+    # Test our notification (which will fail because of no entries)
+    assert obj.notify(title='title', body='test') is False
 
 
 @mock.patch('requests.post')

@@ -572,7 +572,7 @@ def parse_bool(arg, default=False):
     return bool(arg)
 
 
-def parse_emails(*args):
+def parse_emails(*args, store_unparseable=True):
     """
     Takes a string containing URLs separated by comma's and/or spaces and
     returns a list.
@@ -580,16 +580,30 @@ def parse_emails(*args):
 
     result = []
     for arg in args:
-        if isinstance(arg, six.string_types):
-            result += EMAIL_DETECTION_RE.findall(arg)
+        if isinstance(arg, six.string_types) and arg:
+            _result = EMAIL_DETECTION_RE.findall(arg)
+            if _result:
+                result += _result
+
+            elif not _result and store_unparseable:
+                # we had content passed into us that was lost because it was
+                # so poorly formatted that it didn't even come close to
+                # meeting the regular expression we defined. We intentially
+                # keep it as part of our result set so that parsing done
+                # at a higher level can at least report this to the end user
+                # and hopefully give them some indication as to what they
+                # may have done wrong.
+                result += \
+                    [x for x in filter(bool, re.split(STRING_DELIMITERS, arg))]
 
         elif isinstance(arg, (set, list, tuple)):
-            result += parse_emails(*arg)
+            # Use recursion to handle the list of Emails
+            result += parse_emails(*arg, store_unparseable=store_unparseable)
 
     return result
 
 
-def parse_urls(*args):
+def parse_urls(*args, store_unparseable=True):
     """
     Takes a string containing URLs separated by comma's and/or spaces and
     returns a list.
@@ -597,11 +611,25 @@ def parse_urls(*args):
 
     result = []
     for arg in args:
-        if isinstance(arg, six.string_types):
-            result += URL_DETECTION_RE.findall(arg)
+        if isinstance(arg, six.string_types) and arg:
+            _result = URL_DETECTION_RE.findall(arg)
+            if _result:
+                result += _result
+
+            elif not _result and store_unparseable:
+                # we had content passed into us that was lost because it was
+                # so poorly formatted that it didn't even come close to
+                # meeting the regular expression we defined. We intentially
+                # keep it as part of our result set so that parsing done
+                # at a higher level can at least report this to the end user
+                # and hopefully give them some indication as to what they
+                # may have done wrong.
+                result += \
+                    [x for x in filter(bool, re.split(STRING_DELIMITERS, arg))]
 
         elif isinstance(arg, (set, list, tuple)):
-            result += parse_urls(*arg)
+            # Use recursion to handle the list of URLs
+            result += parse_urls(*arg, store_unparseable=store_unparseable)
 
     return result
 
