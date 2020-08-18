@@ -449,7 +449,7 @@ def url_to_dict(url):
     schema = GET_SCHEMA_RE.match(_url)
     if schema is None:
         # Not a valid URL; take an early exit
-        logger.error('Unsupported URL {}'.format(url))
+        logger.error('Unsupported URL: {}'.format(url))
         return None
 
     # Ensure our schema is always in lower case
