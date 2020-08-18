@@ -23,6 +23,7 @@
 # THE SOFTWARE.
 
 import os
+import six
 import mock
 import pytest
 import requests
@@ -79,6 +80,27 @@ def test_office365_general(mock_post):
     # Test our notification
     assert obj.notify(title='title', body='test') is True
 
+    # Instantiate our object
+    obj = Apprise.instantiate(
+        'o365://{tenant}:{email}/{tenant}/{secret}/{targets}'
+        '?bcc={bcc}&cc={cc}'.format(
+            tenant=tenant,
+            email=email,
+            secret=secret,
+            targets=targets,
+            # Test the cc and bcc list (use good and bad email)
+            cc='Chuck Norris cnorris@yahoo.ca, invalid@!',
+            bcc='Bruce Willis bwillis@hotmail.com, invalid@!',
+        ))
+
+    assert isinstance(obj, plugins.NotifyOffice365)
+
+    # Test our URL generation
+    assert isinstance(obj.url(), six.string_types)
+
+    # Test our notification
+    assert obj.notify(title='title', body='test') is True
+
     with pytest.raises(TypeError):
         # No secret
         plugins.NotifyOffice365(
@@ -119,13 +141,14 @@ def test_office365_general(mock_post):
     )
 
     # all of the targets are invalid
-    assert plugins.NotifyOffice365(
-        email=email,
-        client_id=client_id,
-        tenant=tenant,
-        secret=secret,
-        targets=('invalid', 'garbage'),
-    ).notify(body="test") is False
+    with pytest.raises(TypeError):
+        plugins.NotifyOffice365(
+            email=email,
+            client_id=client_id,
+            tenant=tenant,
+            secret=secret,
+            targets=('invalid', 'garbage'),
+        )
 
 
 @mock.patch('requests.post')

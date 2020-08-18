@@ -409,7 +409,7 @@ class NotifyEmail(NotifyBase):
         # Acquire Blind Carbon Copies
         self.bcc = set()
 
-        # For tracking our name lookups
+        # For tracking our email -> name lookups
         self.names = {}
 
         # Now we want to construct the To and From email
@@ -629,9 +629,9 @@ class NotifyEmail(NotifyBase):
             self.logger.debug(
                 'Email From: {} <{}>'.format(from_name, self.from_addr))
             self.logger.debug('Email To: {}'.format(to_addr))
-            if len(cc):
+            if cc:
                 self.logger.debug('Email Cc: {}'.format(', '.join(cc)))
-            if len(bcc):
+            if bcc:
                 self.logger.debug('Email Bcc: {}'.format(', '.join(bcc)))
             self.logger.debug('Login ID: {}'.format(self.user))
             self.logger.debug(
