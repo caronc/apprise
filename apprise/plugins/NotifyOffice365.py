@@ -176,12 +176,13 @@ class NotifyOffice365(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        if not is_email(email):
+        match = is_email(email)
+        if not match:
             msg = 'An invalid Office 365 Email Account ID' \
                   '({}) was specified.'.format(email)
             self.logger.warning(msg)
             raise TypeError(msg)
-        self.email = email
+        self.email = match['email']
 
         # Client Key (associated with generated OAuth2 Login)
         self.client_id = validate_regex(
@@ -207,13 +208,14 @@ class NotifyOffice365(NotifyBase):
         if targets:
             for target in targets:
                 # Validate targets and drop bad ones:
-                if not is_email(target):
+                match = is_email(target)
+                if not match:
                     self.logger.warning(
                         'Dropped invalid email specified: {}'.format(target))
                     continue
 
                 # Add our email to our target list
-                self.targets.append(target)
+                self.targets.append(match['email'])
         else:
             # Default to adding ourselves
             self.targets.append(self.email)

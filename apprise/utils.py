@@ -104,16 +104,24 @@ GET_SCHEMA_RE = re.compile(r'\s*(?P<schema>[a-z0-9]{2,9})://.*$', re.I)
 
 # Regular expression based and expanded from:
 # http://www.regular-expressions.info/email.html
+# Extended to support colon (:) delimiter for parsing names from the URL
+# such as:
+#   - 'Optional Name':user@example.com
+#   - 'Optional Name' <user@example.com>
+#
+# The expression also parses the general email as well such as:
+#   - user@example.com
+#   - label+user@example.com
 GET_EMAIL_RE = re.compile(
-    r"(?P<fulluser>((?P<label>[^+]+)\+)?"
-    r"(?P<userid>[a-z0-9$%=_~-]+"
-    r"(?:\.[a-z0-9$%+=_~-]+)"
-    r"*))@(?P<domain>("
-    r"(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+"
-    r"[a-z0-9](?:[a-z0-9-]*[a-z0-9]))|"
-    r"[a-z0-9][a-z0-9-]{5,})",
-    re.IGNORECASE,
-)
+    r'((?P<name>[^:<]+)?[:<\s]+)?'
+    r'(?P<full_email>((?P<label>[^+]+)\+)?'
+    r'(?P<email>(?P<userid>[a-z0-9$%=_~-]+'
+    r'(?:\.[a-z0-9$%+=_~-]+)'
+    r'*)@(?P<domain>('
+    r'(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+'
+    r'[a-z0-9](?:[a-z0-9-]*[a-z0-9]))|'
+    r'[a-z0-9][a-z0-9-]{5,})))'
+    r'\s*>?', re.IGNORECASE)
 
 # Regular expression used to extract a phone number
 GET_PHONE_NO_RE = re.compile(r'^\+?(?P<phone>[0-9\s)(+-]+)\s*$')
@@ -121,6 +129,12 @@ GET_PHONE_NO_RE = re.compile(r'^\+?(?P<phone>[0-9\s)(+-]+)\s*$')
 # Regular expression used to destinguish between multiple URLs
 URL_DETECTION_RE = re.compile(
     r'([a-z0-9]+?:\/\/.*?)(?=$|[\s,]+[a-z0-9]{2,9}?:\/\/)', re.I)
+
+EMAIL_DETECTION_RE = re.compile(
+    r'[\s,]*([^@]+@.*?)(?=$|[\s,]+'
+    + r'(?:[^:<]+?[:<\s]+?)?'
+    r'[^@\s,]+@[^\s,]+)',
+    re.IGNORECASE)
 
 # validate_regex() utilizes this mapping to track and re-use pre-complied
 # regular expressions
@@ -227,10 +241,32 @@ def is_email(address):
     """
 
     try:
-        return GET_EMAIL_RE.match(address) is not None
+        match = GET_EMAIL_RE.match(address)
+
     except TypeError:
-        # invalid syntax
+        # not parseable content
         return False
+
+    if match:
+        return {
+            # The name parsed from the URL (if one exists)
+            'name': '' if match.group('name') is None
+            else match.group('name').strip(),
+            # The email address
+            'email': match.group('email'),
+            # The full email address (includes label if specified)
+            'full_email': match.group('full_email'),
+            # The label (if specified) e.g: label+user@example.com
+            'label': '' if match.group('label') is None
+            else match.group('label').strip(),
+            # The user (which does not include the label) from the email
+            # parsed.
+            'user': match.group('userid'),
+            # The domain associated with the email address
+            'domain': match.group('domain'),
+        }
+
+    return False
 
 
 def tidy_path(path):
@@ -536,19 +572,46 @@ def parse_bool(arg, default=False):
     return bool(arg)
 
 
-def split_urls(urls):
+def parse_emails(*args):
     """
     Takes a string containing URLs separated by comma's and/or spaces and
     returns a list.
     """
 
-    try:
-        results = URL_DETECTION_RE.findall(urls)
+    result = []
+    for arg in args:
+        if isinstance(arg, six.string_types):
+            try:
+                result += EMAIL_DETECTION_RE.findall(arg)
+            except TypeError:
+                # Unparseable
+                pass
 
-    except TypeError:
-        results = []
+        elif isinstance(arg, (set, list, tuple)):
+            result += parse_emails(*arg)
 
-    return results
+    return result
+
+
+def parse_urls(*args):
+    """
+    Takes a string containing URLs separated by comma's and/or spaces and
+    returns a list.
+    """
+
+    result = []
+    for arg in args:
+        if isinstance(arg, six.string_types):
+            try:
+                result += URL_DETECTION_RE.findall(arg)
+            except TypeError:
+                # Unparseable
+                pass
+
+        elif isinstance(arg, (set, list, tuple)):
+            result += parse_urls(*arg)
+
+    return result
 
 
 def parse_list(*args):

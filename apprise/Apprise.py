@@ -33,7 +33,7 @@ from .common import NotifyFormat
 from .common import MATCH_ALL_TAG
 from .utils import is_exclusive_match
 from .utils import parse_list
-from .utils import split_urls
+from .utils import parse_urls
 from .logger import logger
 
 from .AppriseAsset import AppriseAsset
@@ -197,7 +197,7 @@ class Apprise(object):
 
         if isinstance(servers, six.string_types):
             # build our server list
-            servers = split_urls(servers)
+            servers = parse_urls(servers)
             if len(servers) == 0:
                 return False
 

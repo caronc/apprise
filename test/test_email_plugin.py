@@ -166,11 +166,9 @@ TEST_URLS = (
     ('mailtos://nuxref.com?user=&pass=.', {
         'instance': TypeError,
     }),
-    # Invalid To Address is accepted, but we won't be able to properly email
-    # using the notify() call
+    # Invalid To Address
     ('mailtos://user:pass@nuxref.com?to=@', {
-        'instance': plugins.NotifyEmail,
-        'response': False,
+        'instance': TypeError,
     }),
     # Valid URL, but can't structure a proper email
     ('mailtos://nuxref.com?user=%20!&pass=.', {
@@ -210,6 +208,17 @@ TEST_URLS = (
     ('mailto://localhost?from=test@example.com&to=test@example.com', {
         'instance': plugins.NotifyEmail,
         'privacy_url': 'mailto://localhost',
+    }),
+    # Test multi-emails where some are bad
+    ('mailto://user:pass@localhost/test@example.com/test2@/$@!/', {
+        'instance': plugins.NotifyEmail,
+        'privacy_url': 'mailto://user:****@localhost/'
+    }),
+    ('mailto://user:pass@localhost/?bcc=test2@,$@!/', {
+        'instance': plugins.NotifyEmail,
+    }),
+    ('mailto://user:pass@localhost/?cc=test2@,$@!/', {
+        'instance': plugins.NotifyEmail,
     }),
 )
 
@@ -402,7 +411,7 @@ def test_webbase_lookup(mock_smtp, mock_smtpssl):
 
     assert isinstance(obj, plugins.NotifyEmail)
     assert len(obj.targets) == 1
-    assert 'user@l2g.com' in obj.targets
+    assert (False, 'user@l2g.com') in obj.targets
     assert obj.from_addr == 'user@l2g.com'
     assert obj.password == 'pass'
     assert obj.user == 'user'
@@ -655,8 +664,8 @@ def test_email_url_variations():
     assert obj.password == 'abcd123'
     assert obj.user == 'apprise@example21.ca'
     assert len(obj.targets) == 1
-    assert 'apprise@example.com' in obj.targets
-    assert obj.targets[0] == obj.from_addr
+    assert (False, 'apprise@example.com') in obj.targets
+    assert obj.targets[0][1] == obj.from_addr
 
     # test user and password specified in the url body (as an argument)
     # this always over-rides the entries at the front of the url
@@ -672,8 +681,8 @@ def test_email_url_variations():
     assert obj.password == 'abcd123'
     assert obj.user == 'apprise@example21.ca'
     assert len(obj.targets) == 1
-    assert 'apprise@example.com' in obj.targets
-    assert obj.targets[0] == obj.from_addr
+    assert (False, 'apprise@example.com') in obj.targets
+    assert obj.targets[0][1] == obj.from_addr
     assert obj.smtp_host == 'example.com'
 
     # test a complicated example
@@ -696,7 +705,7 @@ def test_email_url_variations():
     assert obj.port == 1234
     assert obj.smtp_host == 'smtp.example.edu'
     assert len(obj.targets) == 1
-    assert 'to@example.jp' in obj.targets
+    assert (False, 'to@example.jp') in obj.targets
     assert obj.from_addr == 'from@example.jp'
 
 

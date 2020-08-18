@@ -570,57 +570,234 @@ def test_is_email():
 
     """
     # Valid Emails
-    assert utils.is_email('test@gmail.com') is True
-    assert utils.is_email('tag+test@gmail.com') is True
+    results = utils.is_email('test@gmail.com')
+    assert '' == results['name']
+    assert 'test@gmail.com' == results['email']
+    assert 'test@gmail.com' == results['full_email']
+    assert 'gmail.com' == results['domain']
+    assert 'test' == results['user']
+    assert '' == results['label']
+
+    results = utils.is_email('tag+test@gmail.com')
+    assert '' == results['name']
+    assert 'test@gmail.com' == results['email']
+    assert 'tag+test@gmail.com' == results['full_email']
+    assert 'gmail.com' == results['domain']
+    assert 'test' == results['user']
+    assert 'tag' == results['label']
+
+    # Support Full Names as well
+    results = utils.is_email('Bill Gates: bgates@microsoft.com')
+    assert 'Bill Gates' == results['name']
+    assert 'bgates@microsoft.com' == results['email']
+    assert 'bgates@microsoft.com' == results['full_email']
+    assert 'microsoft.com' == results['domain']
+    assert 'bgates' == results['user']
+    assert '' == results['label']
+
+    results = utils.is_email('Bill Gates <bgates@microsoft.com>')
+    assert 'Bill Gates' == results['name']
+    assert 'bgates@microsoft.com' == results['email']
+    assert 'bgates@microsoft.com' == results['full_email']
+    assert 'microsoft.com' == results['domain']
+    assert 'bgates' == results['user']
+    assert '' == results['label']
+
+    results = utils.is_email('Bill Gates: <bgates@microsoft.com>')
+    assert 'Bill Gates' == results['name']
+    assert 'bgates@microsoft.com' == results['email']
+    assert 'bgates@microsoft.com' == results['full_email']
+    assert 'microsoft.com' == results['domain']
+    assert 'bgates' == results['user']
+    assert '' == results['label']
+
+    results = utils.is_email('Sundar Pichai <ceo+spichai@gmail.com>')
+    assert 'Sundar Pichai' == results['name']
+    assert 'spichai@gmail.com' == results['email']
+    assert 'ceo+spichai@gmail.com' == results['full_email']
+    assert 'gmail.com' == results['domain']
+    assert 'spichai' == results['user']
+    assert 'ceo' == results['label']
+
+    # An email without name, but contains delimiters
+    results = utils.is_email('      <spichai@gmail.com>')
+    assert '' == results['name']
+    assert 'spichai@gmail.com' == results['email']
+    assert 'spichai@gmail.com' == results['full_email']
+    assert 'gmail.com' == results['domain']
+    assert 'spichai' == results['user']
+    assert '' == results['label']
+
+    # a valid email not properly delimited with a colon or angle bracket
+    # We do a best guess and still parse it correctly
+    results = utils.is_email("Name valid@example.com")
+    assert 'Name' == results['name']
+    assert 'valid@example.com' == results['email']
+    assert 'valid@example.com' == results['full_email']
+    assert 'example.com' == results['domain']
+    assert 'valid' == results['user']
+    assert '' == results['label']
+
+    # a valid email not properly delimited with a colon or angle bracket
+    # We do a best guess and still parse it correctly
+    results = utils.is_email("Руслан Эра russian+russia@example.ru")
+    assert 'Руслан Эра' == results['name']
+    assert 'russia@example.ru' == results['email']
+    assert 'russian+russia@example.ru' == results['full_email']
+    assert 'example.ru' == results['domain']
+    assert 'russia' == results['user']
+    assert 'russian' == results['label']
 
     # Invalid Emails
     assert utils.is_email('invalid.com') is False
     assert utils.is_email(object()) is False
     assert utils.is_email(None) is False
+    assert utils.is_email("Just A Name") is False
+    assert utils.is_email("Name <bademail>") is False
 
 
-def test_split_urls():
-    """utils: split_urls() testing """
+def test_parse_emails():
+    """utils: parse_emails() testing """
     # A simple single array entry (As str)
-    results = utils.split_urls('')
+    results = utils.parse_emails('')
     assert isinstance(results, list)
     assert len(results) == 0
 
     # just delimeters
-    results = utils.split_urls(',  ,, , ,,, ')
+    results = utils.parse_emails(',  ,, , ,,, ')
     assert isinstance(results, list)
     assert len(results) == 0
 
-    results = utils.split_urls(',')
+    results = utils.parse_emails(',')
     assert isinstance(results, list)
     assert len(results) == 0
 
-    results = utils.split_urls(None)
+    results = utils.parse_emails(None)
     assert isinstance(results, list)
     assert len(results) == 0
 
-    results = utils.split_urls(42)
+    results = utils.parse_emails(42)
     assert isinstance(results, list)
     assert len(results) == 0
 
-    results = utils.split_urls('this is not a parseable url at all')
+    results = utils.parse_emails('this is not a parseable email at all')
     assert isinstance(results, list)
     assert len(results) == 0
 
     # Now test valid URLs
-    results = utils.split_urls('windows://')
+    results = utils.parse_emails('user@example.com')
+    assert isinstance(results, list)
+    assert len(results) == 1
+    assert 'user@example.com' in results
+
+    results = utils.parse_emails('a@')
+    assert isinstance(results, list)
+    assert len(results) == 1
+    assert 'a@' in results
+
+    results = utils.parse_emails('user1@example.com user2@example.com')
+    assert isinstance(results, list)
+    assert len(results) == 2
+    assert 'user1@example.com' in results
+    assert 'user2@example.com' in results
+
+    # Commas and spaces found inside URLs are ignored
+    emails = [
+        'user1@example.com,',
+        'test1@example.com,,, abcd@example.com',
+        'Chuck Norris roundhouse@kick.com',
+        'David Spade dspade@example.com, Yours Truly yours@truly.com',
+    ]
+
+    results = utils.parse_emails(', '.join(emails))
+    assert isinstance(results, list)
+    assert len(results) == 6
+    assert 'user1@example.com' in results
+    assert 'test1@example.com' in results
+    assert 'abcd@example.com' in results
+    assert 'Chuck Norris roundhouse@kick.com' in results
+    assert 'David Spade dspade@example.com' in results
+    assert 'Yours Truly yours@truly.com' in results
+
+    # Test triangle bracket parsing
+    # Commas and spaces found inside URLs are ignored
+    emails = [
+        'User1 user1@example.com',
+        'User 2 user2@example.com',
+        'User Three <user3@example.com>',
+        'The Forth User: <user4@example.com>',
+        '5th User: user4@example.com',
+    ]
+
+    results = utils.parse_emails(', '.join(emails))
+    assert isinstance(results, list)
+    assert len(results) == len(emails)
+    for email in emails:
+        assert email in results
+
+    # pass the entries in as a list
+    results = utils.parse_emails(emails)
+    assert isinstance(results, list)
+    assert len(results) == len(emails)
+    for email in emails:
+        assert email in results
+
+    # Pass in garbage
+    results = utils.parse_emails(object)
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    results = utils.parse_emails(42)
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    results = utils.parse_emails([None, object, 42])
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+
+def test_parse_urls():
+    """utils: parse_urls() testing """
+    # A simple single array entry (As str)
+    results = utils.parse_urls('')
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    # just delimeters
+    results = utils.parse_urls(',  ,, , ,,, ')
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    results = utils.parse_urls(',')
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    results = utils.parse_urls(None)
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    results = utils.parse_urls(42)
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    results = utils.parse_urls('this is not a parseable url at all')
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    # Now test valid URLs
+    results = utils.parse_urls('windows://')
     assert isinstance(results, list)
     assert len(results) == 1
     assert 'windows://' in results
 
-    results = utils.split_urls('windows:// gnome://')
+    results = utils.parse_urls('windows:// gnome://')
     assert isinstance(results, list)
     assert len(results) == 2
     assert 'windows://' in results
     assert 'gnome://' in results
 
     # We don't want to parse out URLs that are part of another URL's arguments
-    results = utils.split_urls('discord://host?url=https://localhost')
+    results = utils.parse_urls('discord://host?url=https://localhost')
     assert isinstance(results, list)
     assert len(results) == 1
     assert 'discord://host?url=https://localhost' in results
@@ -644,7 +821,7 @@ def test_split_urls():
     # comma exists as part of the URL and is therefore lost if it was found
     # at the end of it.
 
-    results = utils.split_urls(', '.join(urls))
+    results = utils.parse_urls(', '.join(urls))
     assert isinstance(results, list)
     assert len(results) == len(urls)
     for url in urls:
@@ -656,7 +833,7 @@ def test_split_urls():
     # The comma at the end of the password will not be lost if we're
     # dealing with a single entry:
     url = 'http://hostname?password=,abcd,'
-    results = utils.split_urls(url)
+    results = utils.parse_urls(url)
     assert isinstance(results, list)
     assert len(results) == 1
     assert url in results
@@ -667,7 +844,7 @@ def test_split_urls():
         'schema1://hostname?password=,abcd,',
         'schema2://hostname?password=,abcd,',
     ]
-    results = utils.split_urls(', '.join(urls))
+    results = utils.parse_urls(', '.join(urls))
     assert isinstance(results, list)
     assert len(results) == len(urls)
 
@@ -679,6 +856,24 @@ def test_split_urls():
     # However we wouldn't have lost the comma in the second one:
     # schema2://hostname?password=,abcd,
     assert urls[1] in results
+
+    # Pass the list in (as a list); results are the same
+    results = utils.parse_urls(urls)
+    assert isinstance(results, list)
+    assert len(results) == len(urls)
+
+    # Pass in garbage
+    results = utils.parse_urls(object)
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    results = utils.parse_urls(42)
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    results = utils.parse_urls([None, object, 42])
+    assert isinstance(results, list)
+    assert len(results) == 0
 
 
 def test_parse_list():

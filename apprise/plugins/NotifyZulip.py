@@ -62,7 +62,7 @@ from .NotifyBase import NotifyBase
 from ..common import NotifyType
 from ..utils import parse_list
 from ..utils import validate_regex
-from ..utils import GET_EMAIL_RE
+from ..utils import is_email
 from ..AppriseLocale import gettext_lazy as _
 
 # A Valid Bot Name
@@ -260,7 +260,8 @@ class NotifyZulip(NotifyBase):
         targets = list(self.targets)
         while len(targets):
             target = targets.pop(0)
-            if GET_EMAIL_RE.match(target):
+            result = is_email(target)
+            if result:
                 # Send a private message
                 payload['type'] = 'private'
             else:
@@ -268,7 +269,7 @@ class NotifyZulip(NotifyBase):
                 payload['type'] = 'stream'
 
             # Set our target
-            payload['to'] = target
+            payload['to'] = target if not result else result['full_email']
 
             self.logger.debug('Zulip POST URL: %s (cert_verify=%r)' % (
                 url, self.verify_certificate,
