@@ -572,11 +572,16 @@ def parse_bool(arg, default=False):
     return bool(arg)
 
 
-def parse_emails(*args, store_unparseable=True):
+def parse_emails(*args, **kwargs):
     """
     Takes a string containing URLs separated by comma's and/or spaces and
     returns a list.
     """
+
+    # for Python 2.7 support, store_unparsable is not in the url above
+    # as just parse_emails(*args, store_unparseable=True) since it is
+    # an invalid syntax.  This is the workaround to be backards compatible:
+    store_unparseable = kwargs.get('store_unparseable', True)
 
     result = []
     for arg in args:
@@ -603,11 +608,16 @@ def parse_emails(*args, store_unparseable=True):
     return result
 
 
-def parse_urls(*args, store_unparseable=True):
+def parse_urls(*args, **kwargs):
     """
     Takes a string containing URLs separated by comma's and/or spaces and
     returns a list.
     """
+
+    # for Python 2.7 support, store_unparsable is not in the url above
+    # as just parse_urls(*args, store_unparseable=True) since it is
+    # an invalid syntax.  This is the workaround to be backards compatible:
+    store_unparseable = kwargs.get('store_unparseable', True)
 
     result = []
     for arg in args:
