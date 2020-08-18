@@ -581,11 +581,7 @@ def parse_emails(*args):
     result = []
     for arg in args:
         if isinstance(arg, six.string_types):
-            try:
-                result += EMAIL_DETECTION_RE.findall(arg)
-            except TypeError:
-                # Unparseable
-                pass
+            result += EMAIL_DETECTION_RE.findall(arg)
 
         elif isinstance(arg, (set, list, tuple)):
             result += parse_emails(*arg)
@@ -602,11 +598,7 @@ def parse_urls(*args):
     result = []
     for arg in args:
         if isinstance(arg, six.string_types):
-            try:
-                result += URL_DETECTION_RE.findall(arg)
-            except TypeError:
-                # Unparseable
-                pass
+            result += URL_DETECTION_RE.findall(arg)
 
         elif isinstance(arg, (set, list, tuple)):
             result += parse_urls(*arg)
