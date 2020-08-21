@@ -46,7 +46,8 @@ class AppriseConfig(object):
 
     """
 
-    def __init__(self, paths=None, asset=None, cache=True, **kwargs):
+    def __init__(self, paths=None, asset=None, cache=True, recursion=0,
+                 **kwargs):
         """
         Loads all of the paths specified (if any).
 
@@ -69,6 +70,14 @@ class AppriseConfig(object):
 
         It's also worth nothing that the cache value is only set to elements
         that are not already of subclass ConfigBase()
+
+        recursion defines how deep we recursively handle entries that use the
+        `import` keyword. This keyword requires us to fetch more configuration
+        from another source and add it to our existing compilation. If the
+        file we remotely retrieve also has an `import` reference, we will only
+        advance through it if recursion is set to 2 deep.  If set to zero
+        it is off.  There is no limit to how high you set this value. It would
+        be recommended to keep it low if you do intend to use it.
         """
 
         # Initialize a server list of URLs
@@ -81,13 +90,16 @@ class AppriseConfig(object):
         # Set our cache flag
         self.cache = cache
 
+        # Initialize our recursion value
+        self.recursion = recursion
+
         if paths is not None:
             # Store our path(s)
             self.add(paths)
 
         return
 
-    def add(self, configs, asset=None, tag=None, cache=True):
+    def add(self, configs, asset=None, tag=None, cache=True, recursion=None):
         """
         Adds one or more config URLs into our list.
 
@@ -114,6 +126,9 @@ class AppriseConfig(object):
 
         # Initialize our default cache value
         cache = cache if cache is not None else self.cache
+
+        # Initialize our default recursion value
+        recursion = recursion if recursion is not None else self.recursion
 
         if asset is None:
             # prepare default asset
@@ -154,7 +169,8 @@ class AppriseConfig(object):
             # Instantiate ourselves an object, this function throws or
             # returns None if it fails
             instance = AppriseConfig.instantiate(
-                _config, asset=asset, tag=tag, cache=cache)
+                _config, asset=asset, tag=tag, cache=cache,
+                recursion=recursion)
             if not isinstance(instance, ConfigBase):
                 return_status = False
                 continue
@@ -190,7 +206,8 @@ class AppriseConfig(object):
 
         # Create ourselves a ConfigMemory Object to store our configuration
         instance = config.ConfigMemory(
-            content=content, format=format, asset=asset, tag=tag)
+            content=content, format=format, asset=asset, tag=tag,
+            recursion=self.recursion)
 
         # Add our initialized plugin to our server listings
         self.configs.append(instance)
@@ -235,7 +252,7 @@ class AppriseConfig(object):
 
     @staticmethod
     def instantiate(url, asset=None, tag=None, cache=None,
-                    suppress_exceptions=True):
+                    recursion=0, suppress_exceptions=True):
         """
         Returns the instance of a instantiated configuration plugin based on
         the provided Config URL.  If the url fails to be parsed, then None
@@ -278,6 +295,9 @@ class AppriseConfig(object):
         if cache is not None:
             # Force an over-ride of the cache value to what we have specified
             results['cache'] = cache
+
+        # Recursion can never be parsed from the URL
+        results['recursion'] = recursion
 
         if suppress_exceptions:
             try:

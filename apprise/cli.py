@@ -129,6 +129,10 @@ def print_version_msg():
               help='Perform a trial run but only prints the notification '
               'services to-be triggered to stdout. Notifications are never '
               'sent using this mode.')
+@click.option('--recursion-level', '-r', default=1, type=int,
+              help='Specify the number of recursive import entries that can '
+              'loaded from the loaded specified configuration. By default '
+              'this is set to 1.')
 @click.option('--verbose', '-v', count=True,
               help='Makes the operation more talkative. Use multiple v to '
               'increase the verbosity. I.e.: -vvvv')
@@ -138,7 +142,8 @@ def print_version_msg():
 @click.argument('urls', nargs=-1,
                 metavar='SERVER_URL [SERVER_URL2 [SERVER_URL3]]',)
 def main(body, title, config, attach, urls, notification_type, theme, tag,
-         input_format, dry_run, verbose, disable_async, debug, version):
+         input_format, dry_run, recursion_level, verbose, disable_async,
+         debug, version):
     """
     Send a notification to all of the specified servers identified by their
     URLs the content provided within the title, body and notification-type.
@@ -227,7 +232,7 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
     a.add(AppriseConfig(
         paths=[f for f in DEFAULT_SEARCH_PATHS if isfile(expanduser(f))]
         if not (config or urls) else config,
-        asset=asset))
+        asset=asset, recursion=recursion_level))
 
     # Load our inventory up
     for url in urls:

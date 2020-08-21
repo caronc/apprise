@@ -37,6 +37,7 @@ from ..common import CONFIG_FORMATS
 from ..utils import GET_SCHEMA_RE
 from ..utils import parse_list
 from ..utils import parse_bool
+from . import SCHEMA_MAP
 
 
 class ConfigBase(URLBase):
@@ -60,7 +61,7 @@ class ConfigBase(URLBase):
     # anything else. 128KB (131072B)
     max_buffer_size = 131072
 
-    def __init__(self, cache=True, **kwargs):
+    def __init__(self, cache=True, recursion=0, **kwargs):
         """
         Initialize some general logging and common server arguments that will
         keep things consistent when working with the configurations that
@@ -76,6 +77,14 @@ class ConfigBase(URLBase):
         You can alternatively set the cache value to an int identifying the
         number of seconds the previously retrieved can exist for before it
         should be considered expired.
+
+        recursion defines how deep we recursively handle entries that use the
+        `import` keyword. This keyword requires us to fetch more configuration
+        from another source and add it to our existing compilation. If the
+        file we remotely retrieve also has an `import` reference, we will only
+        advance through it if recursion is set to 2 deep.  If set to zero
+        it is off.  There is no limit to how high you set this value. It would
+        be recommended to keep it low if you do intend to use it.
         """
 
         super(ConfigBase, self).__init__(**kwargs)
@@ -87,6 +96,9 @@ class ConfigBase(URLBase):
 
         # Tracks previously loaded content for speed
         self._cached_servers = None
+
+        # Initialize our recursion value
+        self.recursion = recursion
 
         if 'encoding' in kwargs:
             # Store the encoding
@@ -157,15 +169,86 @@ class ConfigBase(URLBase):
         # Initialize our asset object
         asset = asset if isinstance(asset, AppriseAsset) else self.asset
 
-        # Execute our config parse function which always returns a list
-        self._cached_servers.extend(fn(content=content, asset=asset))
+        # Execute our config parse function which always returns a tuple
+        # of our servers and our configuration
+        servers, configs = fn(content=content, asset=asset)
+        self._cached_servers.extend(servers)
 
-        if len(self._cached_servers):
+        # Configuration files were detected; recursively populate them
+        # If we have been configured to do so
+        for url in configs:
+            if self.recursion > 0:
+
+                # Attempt to acquire the schema at the very least to allow
+                # our configuration based urls.
+                schema = GET_SCHEMA_RE.match(url)
+                if schema is None:
+                    # Plan B is to assume we're dealing with a file
+                    schema = 'file'
+                    url = '{}://{}'.format(schema, URLBase.quote(url))
+                else:
+                    # Ensure our schema is always in lower case
+                    schema = schema.group('schema').lower()
+
+                    # Some basic validation
+                    if schema not in SCHEMA_MAP:
+                        ConfigBase.logger.warning(
+                            'Unsupported import schema {}.'.format(schema))
+                        continue
+
+                # Parse our url details of the server object as dictionary
+                # containing all of the information parsed from our URL
+                results = SCHEMA_MAP[schema].parse_url(url)
+
+                if not results:
+                    # Failed to parse the server URL
+                    self.logger.warning(
+                        'Unparseable imported URL {}.'.format(url))
+                    continue
+
+                # Prepare our Asset Object
+                results['asset'] = asset
+
+                if self.cache is not None:
+                    # Force an over-ride of the cache value to what we have
+                    # specified
+                    results['cache'] = self.cache
+
+                # Recursion can never be parsed from the URL; we decrement
+                # it one level
+                results['recursion'] = self.recursion - 1
+
+                try:
+                    # Attempt to create an instance of our plugin using the
+                    # parsed URL information
+                    cfg_plugin = SCHEMA_MAP[results['schema']](**results)
+
+                except Exception as e:
+                    # the arguments are invalid or can not be used.
+                    self.logger.warning(
+                        'Could not load imported URL: %s' % url)
+                    self.logger.debug('Loading Exception: %s' % str(e))
+                    continue
+
+                # if we reach here, we can now add this servers found
+                # in this configuration file to our list
+                self._cached_servers.extend(
+                    cfg_plugin.servers(asset=asset))
+
+                # We no longer need our configuration object
+                del cfg_plugin
+
+            else:
+                self.logger.debug(
+                    'Recursion limit reached; ignoring Import URL: %s' % url)
+
+        if self._cached_servers:
             self.logger.info('Loaded {} entries from {}'.format(
                 len(self._cached_servers), self.url()))
         else:
-            self.logger.warning('Failed to load configuration from {}'.format(
-                self.url()))
+            self.logger.warning(
+                'Failed to load Apprise configuration from {}'.format(
+                    self.url()))
 
         # Set the time our content was cached at
         self._cached_time = time.time()
@@ -285,7 +368,8 @@ class ConfigBase(URLBase):
 
         except TypeError:
             # content was not expected string type
-            ConfigBase.logger.error('Invalid apprise config specified')
+            ConfigBase.logger.error(
+                'Invalid Apprise configuration specified.')
             return None
 
         # By default set our return value to None since we don't know
@@ -300,7 +384,7 @@ class ConfigBase(URLBase):
             if not result:
                 # Invalid syntax
                 ConfigBase.logger.error(
-                    'Undetectable apprise configuration found '
+                    'Undetectable Apprise configuration found '
                     'based on line {}.'.format(line))
                 # Take an early exit
                 return None
@@ -360,9 +444,14 @@ class ConfigBase(URLBase):
     def config_parse_text(content, asset=None):
         """
         Parse the specified content as though it were a simple text file only
-        containing a list of URLs. Return a list of loaded notification plugins
+        containing a list of URLs.
 
-        Optionally associate an asset with the notification.
+        Return a tuple that looks like (servers, configs) where:
+          - servers contains a list of loaded notification plugins
+          - configs contains a list of additional configuration files
+            referenced.
+
+        You may also optionally associate an asset with the notification.
 
         The file syntax is:
 
@@ -376,14 +465,25 @@ class ConfigBase(URLBase):
             # Or you can use this format (no tags associated)
             <URL>
 
+            # you can also use the keyword 'import' and identify a
+            # configuration location (like this file) which will be included
+            # as additional configuration entries when loaded.
+            import <ConfigURL>
+
         """
-        response = list()
+        # A list of loaded Notification Services
+        servers = list()
+
+        # A list of additional configuration files referenced using
+        # the import keyword
+        configs = list()
 
         # Define what a valid line should look like
         valid_line_re = re.compile(
             r'^\s*(?P<line>([;#]+(?P<comment>.*))|'
             r'(\s*(?P<tags>[^=]+)=|=)?\s*'
-            r'(?P<url>[a-z0-9]{2,9}://.*))?$', re.I)
+            r'(?P<url>[a-z0-9]{2,9}://.*)|'
+            r'import\s+(?P<config>.+))?\s*$', re.I)
 
         try:
             # split our content up to read line by line
@@ -391,26 +491,34 @@ class ConfigBase(URLBase):
 
         except TypeError:
             # content was not expected string type
-            ConfigBase.logger.error('Invalid apprise text data specified')
-            return list()
+            ConfigBase.logger.error(
+                'Invalid Apprise TEXT based configuration specified.')
+            return (list(), list())
 
         for line, entry in enumerate(content, start=1):
             result = valid_line_re.match(entry)
             if not result:
                 # Invalid syntax
                 ConfigBase.logger.error(
-                    'Invalid apprise text format found '
+                    'Invalid Apprise TEXT configuration format found '
                     '{} on line {}.'.format(entry, line))
 
                 # Assume this is a file we shouldn't be parsing. It's owner
                 # can read the error printed to screen and take action
                 # otherwise.
-                return list()
+                return (list(), list())
 
-            # Store our url read in
-            url = result.group('url')
-            if not url:
+            url, config = result.group('url'), result.group('config')
+            if not (url or config):
                 # Comment/empty line; do nothing
+                continue
+
+            if config:
+                # Create log entry of loaded URL
+                ConfigBase.logger.debug('Import URL: {}'.format(config))
+
+                # Store our import line
+                configs.append(config)
                 continue
 
             # Acquire our url tokens
@@ -446,23 +554,32 @@ class ConfigBase(URLBase):
                 continue
 
             # if we reach here, we successfully loaded our data
-            response.append(plugin)
+            servers.append(plugin)
 
         # Return what was loaded
-        return response
+        return (servers, configs)
 
     @staticmethod
     def config_parse_yaml(content, asset=None):
         """
         Parse the specified content as though it were a yaml file
-        specifically formatted for apprise. Return a list of loaded
-        notification plugins.
+        specifically formatted for Apprise.
 
-        Optionally associate an asset with the notification.
+        Return a tuple that looks like (servers, configs) where:
+          - servers contains a list of loaded notification plugins
+          - configs contains a list of additional configuration files
+            referenced.
+
+        You may optionally associate an asset with the notification.
 
         """
 
-        response = list()
+        # A list of loaded Notification Services
+        servers = list()
+
+        # A list of additional configuration files referenced using
+        # the import keyword
+        configs = list()
 
         try:
             # Load our data (safely)
@@ -471,14 +588,15 @@ class ConfigBase(URLBase):
         except (AttributeError, yaml.error.MarkedYAMLError) as e:
             # Invalid content
             ConfigBase.logger.error(
-                'Invalid apprise yaml data specified.')
+                'Invalid Apprise YAML data specified.')
             ConfigBase.logger.debug(
                 'YAML Exception:{}{}'.format(os.linesep, e))
             return list()
 
         if not isinstance(result, dict):
             # Invalid content
-            ConfigBase.logger.error('Invalid apprise yaml structure specified')
+            ConfigBase.logger.error(
+                'Invalid Apprise YAML based configuration specified.')
             return list()
 
         # YAML Version
@@ -486,7 +604,7 @@ class ConfigBase(URLBase):
         if version != 1:
             # Invalid syntax
             ConfigBase.logger.error(
-                'Invalid apprise yaml version specified {}.'.format(version))
+                'Invalid Apprise YAML version specified {}.'.format(version))
             return list()
 
         #
@@ -534,6 +652,15 @@ class ConfigBase(URLBase):
             # Store any preset tags
             global_tags = set(parse_list(tags))
 
+
+        #
+        # import root directive
+        #
+        configs = result.get('imports', None)
+        if not isinstance(urls, (list, tuple)):
+            # Not a problem; we simply have no imports
+            configs = list()
+
         #
         # urls root directive
         #
@@ -541,7 +668,7 @@ class ConfigBase(URLBase):
         if not isinstance(urls, (list, tuple)):
             # Unsupported
             ConfigBase.logger.error(
-                'Missing "urls" directive in apprise yaml.')
+                'Missing "urls" directive in Apprise YAML configuration.')
             return list()
 
         # Iterate over each URL
@@ -654,7 +781,7 @@ class ConfigBase(URLBase):
             else:
                 # Unsupported
                 ConfigBase.logger.warning(
-                    'Unsupported apprise yaml entry #{}'.format(no + 1))
+                    'Unsupported Apprise YAML entry #{}'.format(no + 1))
                 continue
 
             # Track our entries
@@ -667,7 +794,7 @@ class ConfigBase(URLBase):
                 # Grab our first item
                 _results = results.pop(0)
 
-                # tag is a special keyword that is managed by apprise object.
+                # tag is a special keyword that is managed by Apprise object.
                 # The below ensures our tags are set correctly
                 if 'tag' in _results:
                     # Tidy our list up
@@ -696,17 +823,19 @@ class ConfigBase(URLBase):
                     ConfigBase.logger.debug(
                         'Loaded URL: {}'.format(plugin.url()))
 
-                except Exception:
+                except Exception as e:
                     # the arguments are invalid or can not be used.
                     ConfigBase.logger.warning(
-                        'Could not load apprise yaml entry #{}, item #{}'
+                        'Could not load Apprise YAML configuration '
+                        'entry #{}, item #{}'
                         .format(no + 1, entry))
+                    ConfigBase.logger.debug('Loading Exception: %s' % str(e))
                     continue
 
                 # if we reach here, we successfully loaded our data
-                response.append(plugin)
+                servers.append(plugin)
 
-        return response
+        return (servers, configs)
 
     def pop(self, index=-1):
         """
