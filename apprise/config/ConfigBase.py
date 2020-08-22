@@ -34,6 +34,7 @@ from ..AppriseAsset import AppriseAsset
 from ..URLBase import URLBase
 from ..common import ConfigFormat
 from ..common import CONFIG_FORMATS
+from ..common import ConfigImportMode
 from ..utils import GET_SCHEMA_RE
 from ..utils import parse_list
 from ..utils import parse_bool
@@ -61,7 +62,12 @@ class ConfigBase(URLBase):
     # anything else. 128KB (131072B)
     max_buffer_size = 131072
 
-    def __init__(self, cache=True, recursion=0, **kwargs):
+    # By default all configuration is not importable using the 'import'
+    # line found in configuration files.
+    cross_import_mode = ConfigImportMode.NEVER
+
+    def __init__(self, cache=True, recursion=0, insecure_imports=False,
+                 **kwargs):
         """
         Initialize some general logging and common server arguments that will
         keep things consistent when working with the configurations that
@@ -85,6 +91,21 @@ class ConfigBase(URLBase):
         advance through it if recursion is set to 2 deep.  If set to zero
         it is off.  There is no limit to how high you set this value. It would
         be recommended to keep it low if you do intend to use it.
+
+        insecure imports by default are disabled. When set to True, all
+        Apprise Config files marked to be in STRICT mode are treated as being
+        in ALWAYS mode.
+
+        Take a file:// based configuration for example, only a file:// based
+        configuration can import another file:// based one. because it is set
+        to STRICT mode. If an http:// based configuration file attempted to
+        import a file:// one it woul fail. However this import would be
+        possible if insecure_imports is set to True.
+
+        There are cases where a self hosting apprise developer may wish to load
+        configuration from memory (in a string format) that contains import
+        entries (even file:// based ones).  In these circumstances if you want
+        these imports to be honored, this value must be set to True.
         """
 
         super(ConfigBase, self).__init__(**kwargs)
@@ -99,6 +120,9 @@ class ConfigBase(URLBase):
 
         # Initialize our recursion value
         self.recursion = recursion
+
+        # Initialize our insecure_imports flag
+        self.insecure_imports = insecure_imports
 
         if 'encoding' in kwargs:
             # Store the encoding
@@ -199,11 +223,24 @@ class ConfigBase(URLBase):
                 # Parse our url details of the server object as dictionary
                 # containing all of the information parsed from our URL
                 results = SCHEMA_MAP[schema].parse_url(url)
-
                 if not results:
                     # Failed to parse the server URL
                     self.logger.warning(
-                        'Unparseable imported URL {}.'.format(url))
+                        'Unparseable import URL {}'.format(url))
+                    continue
+
+                # Handle cross importing based on allow_cross_import rules
+                if not (SCHEMA_MAP[schema].allow_cross_import ==
+                        ConfigImportMode.STRICT
+                        and (schema in self.schemas()
+                        or self.insecure_imports)) or \
+                        SCHEMA_MAP[schema].allow_cross_import == \
+                        ConfigImportMode.NEVER:
+
+                    # Prevent the loading if insecure base protocols
+                    ConfigBase.logger.warning(
+                        'Importing {}:// based configuration is prohibited. '
+                        'Ignoring URL {}'.format(schema, url))
                     continue
 
                 # Prepare our Asset Object
@@ -218,6 +255,9 @@ class ConfigBase(URLBase):
                 # it one level
                 results['recursion'] = self.recursion - 1
 
+                # Insecure Imports flag can never be parsed from the URL
+                results['insecure_imports'] = self.insecure_imports
+
                 try:
                     # Attempt to create an instance of our plugin using the
                     # parsed URL information
@@ -226,8 +266,8 @@ class ConfigBase(URLBase):
                 except Exception as e:
                     # the arguments are invalid or can not be used.
                     self.logger.warning(
-                        'Could not load imported URL: %s' % url)
-                    self.logger.debug('Loading Exception: %s' % str(e))
+                        'Could not load import URL: {}'.format(url))
+                    self.logger.debug('Loading Exception: {}'.format(str(e)))
                     continue
 
                 # if we reach here, we can now add this servers found
@@ -425,14 +465,14 @@ class ConfigBase(URLBase):
             if not config_format:
                 # We couldn't detect configuration
                 ConfigBase.logger.error('Could not detect configuration')
-                return list()
+                return (list(), list())
 
         if config_format not in CONFIG_FORMATS:
             # Invalid configuration type specified
             ConfigBase.logger.error(
                 'An invalid configuration format ({}) was specified'.format(
                     config_format))
-            return list()
+            return (list(), list())
 
         # Dynamically load our parse_ function based on our config format
         fn = getattr(ConfigBase, 'config_parse_{}'.format(config_format))
@@ -514,7 +554,6 @@ class ConfigBase(URLBase):
                 continue
 
             if config:
-                # Create log entry of loaded URL
                 ConfigBase.logger.debug('Import URL: {}'.format(config))
 
                 # Store our import line
@@ -591,13 +630,13 @@ class ConfigBase(URLBase):
                 'Invalid Apprise YAML data specified.')
             ConfigBase.logger.debug(
                 'YAML Exception:{}{}'.format(os.linesep, e))
-            return list()
+            return (list(), list())
 
         if not isinstance(result, dict):
             # Invalid content
             ConfigBase.logger.error(
                 'Invalid Apprise YAML based configuration specified.')
-            return list()
+            return (list(), list())
 
         # YAML Version
         version = result.get('version', 1)
@@ -605,7 +644,7 @@ class ConfigBase(URLBase):
             # Invalid syntax
             ConfigBase.logger.error(
                 'Invalid Apprise YAML version specified {}.'.format(version))
-            return list()
+            return (list(), list())
 
         #
         # global asset object
@@ -652,12 +691,11 @@ class ConfigBase(URLBase):
             # Store any preset tags
             global_tags = set(parse_list(tags))
 
-
         #
         # import root directive
         #
         configs = result.get('imports', None)
-        if not isinstance(urls, (list, tuple)):
+        if not isinstance(configs, (list, tuple)):
             # Not a problem; we simply have no imports
             configs = list()
 
@@ -669,7 +707,7 @@ class ConfigBase(URLBase):
             # Unsupported
             ConfigBase.logger.error(
                 'Missing "urls" directive in Apprise YAML configuration.')
-            return list()
+            return (list(), list())
 
         # Iterate over each URL
         for no, url in enumerate(urls):

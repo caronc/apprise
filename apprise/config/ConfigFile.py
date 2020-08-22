@@ -28,6 +28,7 @@ import io
 import os
 from .ConfigBase import ConfigBase
 from ..common import ConfigFormat
+from ..common import ConfigImportMode
 from ..AppriseLocale import gettext_lazy as _
 
 
@@ -41,6 +42,9 @@ class ConfigFile(ConfigBase):
 
     # The default protocol
     protocol = 'file'
+
+    # File imports can only import the same type
+    allow_cross_import = ConfigImportMode.STRICT
 
     def __init__(self, path, **kwargs):
         """

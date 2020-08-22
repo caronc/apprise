@@ -129,6 +129,29 @@ CONFIG_FORMATS = (
     ConfigFormat.YAML,
 )
 
+
+class ConfigImportMode(object):
+    """
+    The different mode categories of configuration importing
+    """
+    # Importing of same type only; hence a file:// can import a file://
+    # Cross importing is not allowed unless insecure_imports (a flag)
+    # is set to True on the configuration file making the import itself.
+    STRICT = 'strict'
+
+    # This configuration type can never be imported
+    NEVER = 'never'
+
+    # Importing the specified configuration is always allowed
+    ALWAYS = 'always'
+
+
+CONFIG_IMPORT_MODES = (
+    ConfigImportMode.STRICT,
+    ConfigImportMode.NEVER,
+    ConfigImportMode.ALWAYS,
+)
+
 # This is a reserved tag that is automatically assigned to every
 # Notification Plugin
 MATCH_ALL_TAG = 'all'

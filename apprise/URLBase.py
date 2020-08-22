@@ -674,3 +674,24 @@ class URLBase(object):
             response = ''
 
         return response
+
+    def schemas(self):
+        """A simple function that returns a set of all schemas associated
+        with this object based on the object.protocol and
+        object.secure_protocol
+        """
+
+        schemas = set([])
+
+        for key in ('protocol', 'secure_protocol'):
+            # Load protocol(s) if defined
+            proto = getattr(self, key, None)
+            if isinstance(proto, six.string_types):
+                schemas.add(proto)
+
+            elif isinstance(self, (set, list, tuple)):
+                # Support iterables list types
+                for p in proto:
+                    schemas.add(p)
+
+        return schemas

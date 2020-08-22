@@ -143,10 +143,22 @@ def test_config_base_config_parse():
     """
 
     # Garbage Handling
-    assert isinstance(ConfigBase.config_parse(object()), list)
-    assert isinstance(ConfigBase.config_parse(None), list)
-    assert isinstance(ConfigBase.config_parse(''), list)
-    assert isinstance(ConfigBase.config_parse(12), list)
+    result = ConfigBase.config_parse(object())
+    assert isinstance(result, tuple)
+    assert len(result) == 2
+    assert result == (list(), list())
+    result = ConfigBase.config_parse(None)
+    assert isinstance(result, tuple)
+    assert len(result) == 2
+    assert result == (list(), list())
+    result = ConfigBase.config_parse('')
+    assert isinstance(result, tuple)
+    assert len(result) == 2
+    assert result == (list(), list())
+    result = ConfigBase.config_parse(12)
+    assert isinstance(result, tuple)
+    assert len(result) == 2
+    assert result == (list(), list())
 
     # Valid Text Configuration
     result = ConfigBase.config_parse("""
@@ -154,9 +166,16 @@ def test_config_base_config_parse():
     mailto://userb:pass@gmail.com
     """, asset=AppriseAsset())
     # We expect to parse 1 entry from the above
-    assert isinstance(result, list)
-    assert len(result) == 1
-    assert len(result[0].tags) == 0
+    assert isinstance(result, tuple)
+    assert len(result) == 2
+    # The first element is the number of notification services processed
+    assert len(result[0]) == 1
+    # If we index into the item, we can check to see the tags associate
+    # with it
+    assert len(result[0][0].tags) == 0
+
+    # The second is the number of configuration import lines parsed
+    assert len(result[1]) == 0
 
     # Valid Configuration
     result = ConfigBase.config_parse("""
@@ -174,11 +193,13 @@ urls:
     """, asset=AppriseAsset())
 
     # We expect to parse 3 entries from the above
-    assert isinstance(result, list)
-    assert len(result) == 3
-    assert len(result[0].tags) == 0
-    assert len(result[1].tags) == 0
-    assert len(result[2].tags) == 2
+    assert isinstance(result, tuple)
+    assert len(result) == 2
+    assert isinstance(result[0], list)
+    assert len(result[0]) == 3
+    assert len(result[0][0].tags) == 0
+    assert len(result[0][1].tags) == 0
+    assert len(result[0][2].tags) == 2
 
     # Test case where we pass in a bad format
     result = ConfigBase.config_parse("""
@@ -187,10 +208,11 @@ urls:
     """, config_format='invalid-format')
 
     # This is not parseable despite the valid text
-    assert isinstance(result, list)
-    assert len(result) == 0
+    assert isinstance(result, tuple)
+    assert isinstance(result[0], list)
+    assert len(result[0]) == 0
 
-    result = ConfigBase.config_parse("""
+    result, _ = ConfigBase.config_parse("""
     ; A comment line over top of a URL
     mailto://userb:pass@gmail.com
     """, config_format=ConfigFormat.TEXT)
@@ -210,6 +232,7 @@ def test_config_base_config_parse_text():
     assert isinstance(ConfigBase.config_parse_text(object()), list)
     assert isinstance(ConfigBase.config_parse_text(None), list)
     assert isinstance(ConfigBase.config_parse_text(''), list)
+    assert isinstance(ConfigBase.config_parse_text(12), list)
 
     # Valid Configuration
     result = ConfigBase.config_parse_text("""

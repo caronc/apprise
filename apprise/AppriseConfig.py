@@ -47,7 +47,7 @@ class AppriseConfig(object):
     """
 
     def __init__(self, paths=None, asset=None, cache=True, recursion=0,
-                 **kwargs):
+                 insecure_imports=False, **kwargs):
         """
         Loads all of the paths specified (if any).
 
@@ -78,6 +78,21 @@ class AppriseConfig(object):
         advance through it if recursion is set to 2 deep.  If set to zero
         it is off.  There is no limit to how high you set this value. It would
         be recommended to keep it low if you do intend to use it.
+
+        insecure imports by default are disabled. When set to True, all
+        Apprise Config files marked to be in STRICT mode are treated as being
+        in ALWAYS mode.
+
+        Take a file:// based configuration for example, only a file:// based
+        configuration can import another file:// based one. because it is set
+        to STRICT mode. If an http:// based configuration file attempted to
+        import a file:// one it woul fail. However this import would be
+        possible if insecure_imports is set to True.
+
+        There are cases where a self hosting apprise developer may wish to load
+        configuration from memory (in a string format) that contains import
+        entries (even file:// based ones).  In these circumstances if you want
+        these imports to be honored, this value must be set to True.
         """
 
         # Initialize a server list of URLs
@@ -93,13 +108,17 @@ class AppriseConfig(object):
         # Initialize our recursion value
         self.recursion = recursion
 
+        # Initialize our insecure_imports flag
+        self.insecure_imports = insecure_imports
+
         if paths is not None:
             # Store our path(s)
             self.add(paths)
 
         return
 
-    def add(self, configs, asset=None, tag=None, cache=True, recursion=None):
+    def add(self, configs, asset=None, tag=None, cache=True, recursion=None,
+            insecure_imports=None):
         """
         Adds one or more config URLs into our list.
 
@@ -119,6 +138,12 @@ class AppriseConfig(object):
 
         It's also worth nothing that the cache value is only set to elements
         that are not already of subclass ConfigBase()
+
+        Optionally override the default recursion value.
+
+        Optionally override the insecure_imports flag.
+        if insecure_imports is set to True then all plugins that are
+        set to a STRICT mode will be a treated as ALWAYS.
         """
 
         # Initialize our return status
@@ -129,6 +154,11 @@ class AppriseConfig(object):
 
         # Initialize our default recursion value
         recursion = recursion if recursion is not None else self.recursion
+
+        # Initialize our default insecure_imports value
+        insecure_imports = \
+            insecure_imports if insecure_imports is not None \
+            else self.insecure_imports
 
         if asset is None:
             # prepare default asset
@@ -170,7 +200,7 @@ class AppriseConfig(object):
             # returns None if it fails
             instance = AppriseConfig.instantiate(
                 _config, asset=asset, tag=tag, cache=cache,
-                recursion=recursion)
+                recursion=recursion, insecure_imports=insecure_imports)
             if not isinstance(instance, ConfigBase):
                 return_status = False
                 continue
@@ -181,7 +211,8 @@ class AppriseConfig(object):
         # Return our status
         return return_status
 
-    def add_config(self, content, asset=None, tag=None, format=None):
+    def add_config(self, content, asset=None, tag=None, format=None,
+                   recursion=None, insecure_imports=None):
         """
         Adds one configuration file in it's raw format. Content gets loaded as
         a memory based object and only exists for the life of this
@@ -190,7 +221,21 @@ class AppriseConfig(object):
         If you know the format ('yaml' or 'text') you can specify
         it for slightly less overhead during this call.  Otherwise the
         configuration is auto-detected.
+
+        Optionally override the default recursion value.
+
+        Optionally override the insecure_imports flag.
+        if insecure_imports is set to True then all plugins that are
+        set to a STRICT mode will be a treated as ALWAYS.
         """
+
+        # Initialize our default recursion value
+        recursion = recursion if recursion is not None else self.recursion
+
+        # Initialize our default insecure_imports value
+        insecure_imports = \
+            insecure_imports if insecure_imports is not None \
+            else self.insecure_imports
 
         if asset is None:
             # prepare default asset
@@ -207,7 +252,7 @@ class AppriseConfig(object):
         # Create ourselves a ConfigMemory Object to store our configuration
         instance = config.ConfigMemory(
             content=content, format=format, asset=asset, tag=tag,
-            recursion=self.recursion)
+            recursion=self.recursion, insecure_imports=insecure_imports)
 
         # Add our initialized plugin to our server listings
         self.configs.append(instance)
@@ -252,7 +297,8 @@ class AppriseConfig(object):
 
     @staticmethod
     def instantiate(url, asset=None, tag=None, cache=None,
-                    recursion=0, suppress_exceptions=True):
+                    recursion=0, insecure_imports=False,
+                    suppress_exceptions=True):
         """
         Returns the instance of a instantiated configuration plugin based on
         the provided Config URL.  If the url fails to be parsed, then None
@@ -298,6 +344,9 @@ class AppriseConfig(object):
 
         # Recursion can never be parsed from the URL
         results['recursion'] = recursion
+
+        # Insecure Imports flag can never be parsed from the URL
+        results['insecure_imports'] = insecure_imports
 
         if suppress_exceptions:
             try:
