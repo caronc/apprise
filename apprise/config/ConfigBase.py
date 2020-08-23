@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2019 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2020 Chris Caron <lead2gold@gmail.com>
 # All rights reserved.
 #
 # This code is licensed under the MIT License.
@@ -65,6 +65,9 @@ class ConfigBase(URLBase):
     # By default all configuration is not importable using the 'import'
     # line found in configuration files.
     cross_import_mode = ConfigImportMode.NEVER
+
+    # the config path manages the handling of relative imports
+    config_path = os.getcwd()
 
     def __init__(self, cache=True, recursion=0, insecure_imports=False,
                  **kwargs):
@@ -209,6 +212,11 @@ class ConfigBase(URLBase):
                 if schema is None:
                     # Plan B is to assume we're dealing with a file
                     schema = 'file'
+                    if not os.path.isabs(url):
+                        # We're dealing with a relative path; prepend
+                        # our current config path
+                        url = os.path.join(self.config_path, url)
+
                     url = '{}://{}'.format(schema, URLBase.quote(url))
                 else:
                     # Ensure our schema is always in lower case
@@ -230,10 +238,10 @@ class ConfigBase(URLBase):
                     continue
 
                 # Handle cross importing based on allow_cross_import rules
-                if not (SCHEMA_MAP[schema].allow_cross_import ==
+                if (SCHEMA_MAP[schema].allow_cross_import ==
                         ConfigImportMode.STRICT
-                        and (schema in self.schemas()
-                        or self.insecure_imports)) or \
+                        and schema not in self.schemas()
+                        and not self.insecure_imports) or \
                         SCHEMA_MAP[schema].allow_cross_import == \
                         ConfigImportMode.NEVER:
 
@@ -557,7 +565,7 @@ class ConfigBase(URLBase):
                 ConfigBase.logger.debug('Import URL: {}'.format(config))
 
                 # Store our import line
-                configs.append(config)
+                configs.append(config.strip())
                 continue
 
             # Acquire our url tokens

@@ -128,29 +128,20 @@ def __load_matrix(path=abspath(dirname(__file__)), name='apprise.plugins'):
         # Load our module into memory so it's accessible to all
         globals()[plugin_name] = plugin
 
-        # Load protocol(s) if defined
-        proto = getattr(plugin, 'protocol', None)
-        if isinstance(proto, six.string_types):
-            if proto not in SCHEMA_MAP:
-                SCHEMA_MAP[proto] = plugin
+        fn = getattr(plugin, 'schemas', None)
+        schemas = set([]) if not callable(fn) else fn(plugin)
 
-        elif isinstance(proto, (set, list, tuple)):
-            # Support iterables list types
-            for p in proto:
-                if p not in SCHEMA_MAP:
-                    SCHEMA_MAP[p] = plugin
+        # map our schema to our plugin
+        for schema in schemas:
+            if schema in SCHEMA_MAP:
+                if SCHEMA_MAP[schema] != plugin:
+                    logger.error(
+                        "Config schema duplicate ({}) detected; {} != {}"
+                        .format(schema, SCHEMA_MAP[schema], plugin))
+                continue
 
-        # Load secure protocol(s) if defined
-        protos = getattr(plugin, 'secure_protocol', None)
-        if isinstance(protos, six.string_types):
-            if protos not in SCHEMA_MAP:
-                SCHEMA_MAP[protos] = plugin
-
-        if isinstance(protos, (set, list, tuple)):
-            # Support iterables list types
-            for p in protos:
-                if p not in SCHEMA_MAP:
-                    SCHEMA_MAP[p] = plugin
+            # Assign plugin
+            SCHEMA_MAP[schema] = plugin
 
     return SCHEMA_MAP
 

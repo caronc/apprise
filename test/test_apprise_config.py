@@ -23,11 +23,13 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import sys
 import six
 import io
 import mock
 import pytest
 from apprise import NotifyFormat
+from apprise import ConfigImportMode
 from apprise.Apprise import Apprise
 from apprise.AppriseConfig import AppriseConfig
 from apprise.AppriseAsset import AppriseAsset
@@ -578,6 +580,197 @@ def test_apprise_config_with_apprise_obj(tmpdir):
         assert isinstance(a.pop(len(a) - 1), NotifyBase) is True
 
 
+def test_config_recursive_importing(tmpdir):
+    """
+    API: Apprise() Config Recursive Importing
+
+    """
+
+    # To test our config classes, we make three dummy configs
+    class ConfigCrossPostAlways(ConfigFile):
+        """
+        A dummy config that is set to always allow importing
+        """
+
+        service_name = 'always'
+
+        # protocol
+        protocol = 'always'
+
+        # Always type
+        allow_cross_import = ConfigImportMode.ALWAYS
+
+    class ConfigCrossPostStrict(ConfigFile):
+        """
+        A dummy config that is set to strict importing
+        """
+
+        service_name = 'strict'
+
+        # protocol
+        protocol = 'strict'
+
+        # Always type
+        allow_cross_import = ConfigImportMode.STRICT
+
+    class ConfigCrossPostNever(ConfigFile):
+        """
+        A dummy config that is set to never allow importing
+        """
+
+        service_name = 'never'
+
+        # protocol
+        protocol = 'never'
+
+        # Always type
+        allow_cross_import = ConfigImportMode.NEVER
+
+    # store our entries
+    CONFIG_SCHEMA_MAP['never'] = ConfigCrossPostNever
+    CONFIG_SCHEMA_MAP['strict'] = ConfigCrossPostStrict
+    CONFIG_SCHEMA_MAP['always'] = ConfigCrossPostAlways
+
+    # Make our new path valid
+    suite = tmpdir.mkdir("apprise_config_recursion")
+
+    cfg01 = suite.join("cfg01.cfg")
+    cfg02 = suite.mkdir("dir1").join("cfg02.cfg")
+    cfg03 = suite.mkdir("dir2").join("cfg03.cfg")
+    cfg04 = suite.mkdir("dir3").join("cfg04.cfg")
+
+    # Populate our files with valid configuration import lines
+    cfg01.write("""
+# json entry
+json://localhost:8080
+
+# absolute path inclusion to ourselves
+import {}""".format(str(cfg01)))
+
+    cfg02.write("""
+# syslog entry
+syslog://
+
+# recursively include ourselves
+import cfg02.cfg""")
+
+    cfg03.write("""
+# xml entry
+xml://localhost:8080
+
+# relative path inclusion
+import ../dir1/cfg02.cfg
+
+# test that we can't import invalid entries
+import invalid://entry
+
+# Include non includable type
+import memory://""")
+
+    cfg04.write("""
+# xml entry
+xml://localhost:8080
+
+# always import of our file
+import always://{}
+
+# never import of our file
+import never://{}
+
+# strict import of our file
+import strict://{}""".format(str(cfg04), str(cfg04), str(cfg04)))
+
+    # Create ourselves a config object
+    ac = AppriseConfig()
+
+    # There are no servers loaded
+    assert len(ac) == 0
+
+    # load our configuration
+    assert ac.add(configs=str(cfg01)) is True
+
+    # verify it loaded
+    assert len(ac) == 1
+
+    # 1 service will be loaded as there is no recursion at this point
+    assert len(ac.servers()) == 1
+
+    # Create ourselves a config object
+    ac = AppriseConfig(recursion=1)
+
+    # load our configuration
+    assert ac.add(configs=str(cfg01)) is True
+
+    # verify one configuration file loaded however since it recursively
+    # loaded itself 1 more time, it still doesn't impact the load count:
+    assert len(ac) == 1
+
+    # 2 services loaded now that we loaded the same file twice
+    assert len(ac.servers()) == 2
+
+    #
+    # Now we test relative importing
+    #
+
+    # Create ourselves a config object
+    ac = AppriseConfig(recursion=10)
+
+    # There are no servers loaded
+    assert len(ac) == 0
+
+    # load our configuration
+    assert ac.add(configs=str(cfg02)) is True
+
+    # verify it loaded
+    assert len(ac) == 1
+
+    # 11 services loaded because we reloaded ourselves 10 times
+    # after loading the first entry
+    assert len(ac.servers()) == 11
+
+    # Test our import modes (strict, always, and never)
+
+    # Create ourselves a config object
+    ac = AppriseConfig(recursion=1)
+
+    # There are no servers loaded
+    assert len(ac) == 0
+
+    # load our configuration
+    assert ac.add(configs=str(cfg04)) is True
+
+    # verify it loaded
+    assert len(ac) == 1
+
+    # 2 servers loaded
+    # 1 - from the file read (which is set at mode STRICT
+    # 1 - from the always://
+    #
+    # The never:// can ever be imported, and the strict:// is ot of type
+    #  file:// (the one doing the import) so it is also ignored.
+    #
+    # By turning on the insecure_imports, we can import the strict files too
+    assert len(ac.servers()) == 2
+
+    # Create ourselves a config object
+    ac = AppriseConfig(recursion=1, insecure_imports=True)
+
+    # There are no servers loaded
+    assert len(ac) == 0
+
+    # load our configuration
+    assert ac.add(configs=str(cfg04)) is True
+
+    # verify it loaded
+    assert len(ac) == 1
+
+    # 3 servers loaded
+    # 1 - from the file read (which is set at mode STRICT
+    # 1 - from the always://
+    # 1 - from the strict:// (due to insecure_imports set)
+    assert len(ac.servers()) == 3
+
+
 def test_apprise_config_matrix_load():
     """
     API: AppriseConfig() matrix initialization
@@ -647,6 +840,71 @@ def test_apprise_config_matrix_load():
 
     # Call it again so we detect our entries already loaded
     __load_matrix()
+
+
+def test_configmatrix_dynamic_importing(tmpdir):
+    """
+    API: Apprise() Config Matrix Importing
+
+    """
+
+    # Make our new path valid
+    suite = tmpdir.mkdir("apprise_config_test_suite")
+    suite.join("__init__.py").write('')
+
+    module_name = 'badconfig'
+
+    # Update our path to point to our new test suite
+    sys.path.insert(0, str(suite))
+
+    # Create a base area to work within
+    base = suite.mkdir(module_name)
+    base.join("__init__.py").write('')
+
+    # Test no app_id
+    base.join('ConfigBadFile1.py').write(
+        """
+class ConfigBadFile1(object):
+    pass""")
+
+    # No class of the same name
+    base.join('ConfigBadFile2.py').write(
+        """
+class BadClassName(object):
+    pass""")
+
+    # Exception thrown
+    base.join('ConfigBadFile3.py').write("""raise ImportError()""")
+
+    # Utilizes a schema:// already occupied (as string)
+    base.join('ConfigGoober.py').write(
+        """
+from apprise.config import ConfigBase
+class ConfigGoober(ConfigBase):
+    # This class tests the fact we have a new class name, but we're
+    # trying to over-ride items previously used
+
+    # The default simple (insecure) protocol (used by ConfigHTTP)
+    protocol = 'http'
+
+    # The default secure protocol (used by ConfigHTTP)
+    secure_protocol = 'https'""")
+
+    # Utilizes a schema:// already occupied (as tuple)
+    base.join('ConfigBugger.py').write("""
+from apprise.config import ConfigBase
+class ConfigBugger(ConfigBase):
+    # This class tests the fact we have a new class name, but we're
+    # trying to over-ride items previously used
+
+    # The default simple (insecure) protocol (used by ConfigHTTP), the other
+    # isn't
+    protocol = ('http', 'bugger-test' )
+
+    # The default secure protocol (used by ConfigHTTP), the other isn't
+    secure_protocol = ('https', 'bugger-tests')""")
+
+    __load_matrix(path=str(base), name=module_name)
 
 
 @mock.patch('os.path.getsize')

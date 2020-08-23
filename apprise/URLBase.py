@@ -684,14 +684,14 @@ class URLBase(object):
         schemas = set([])
 
         for key in ('protocol', 'secure_protocol'):
-            # Load protocol(s) if defined
-            proto = getattr(self, key, None)
-            if isinstance(proto, six.string_types):
-                schemas.add(proto)
+            schema = getattr(self, key, None)
+            if isinstance(schema, six.string_types):
+                schemas.add(schema)
 
-            elif isinstance(self, (set, list, tuple)):
+            elif isinstance(schema, (set, list, tuple)):
                 # Support iterables list types
-                for p in proto:
-                    schemas.add(p)
+                for s in schema:
+                    if isinstance(s, six.string_types):
+                        schemas.add(s)
 
         return schemas

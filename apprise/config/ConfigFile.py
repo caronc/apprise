@@ -57,7 +57,10 @@ class ConfigFile(ConfigBase):
         super(ConfigFile, self).__init__(**kwargs)
 
         # Store our file path as it was set
-        self.path = os.path.expanduser(path)
+        self.path = os.path.abspath(os.path.expanduser(path))
+
+        # Update the config path to be relative to our file we just loaded
+        self.config_path = os.path.dirname(self.path)
 
         return
 
@@ -95,10 +98,9 @@ class ConfigFile(ConfigBase):
 
         response = None
 
-        path = os.path.expanduser(self.path)
         try:
             if self.max_buffer_size > 0 and \
-                    os.path.getsize(path) > self.max_buffer_size:
+                    os.path.getsize(self.path) > self.max_buffer_size:
 
                 # Content exceeds maximum buffer size
                 self.logger.error(
@@ -110,7 +112,7 @@ class ConfigFile(ConfigBase):
             # getsize() can throw this acception if the file is missing
             # and or simply isn't accessible
             self.logger.error(
-                'File is not accessible: {}'.format(path))
+                'File is not accessible: {}'.format(self.path))
             return None
 
         # Always call throttle before any server i/o is made
@@ -119,7 +121,7 @@ class ConfigFile(ConfigBase):
         try:
             # Python 3 just supports open(), however to remain compatible with
             # Python 2, we use the io module
-            with io.open(path, "rt", encoding=self.encoding) as f:
+            with io.open(self.path, "rt", encoding=self.encoding) as f:
                 # Store our content for parsing
                 response = f.read()
 
@@ -130,7 +132,7 @@ class ConfigFile(ConfigBase):
 
             self.logger.error(
                 'File not using expected encoding ({}) : {}'.format(
-                    self.encoding, path))
+                    self.encoding, self.path))
             return None
 
         except (IOError, OSError):
@@ -140,13 +142,13 @@ class ConfigFile(ConfigBase):
             # Could not open and/or read the file; this is not a problem since
             # we scan a lot of default paths.
             self.logger.error(
-                'File can not be opened for read: {}'.format(path))
+                'File can not be opened for read: {}'.format(self.path))
             return None
 
         # Detect config format based on file extension if it isn't already
         # enforced
         if self.config_format is None and \
-                re.match(r'^.*\.ya?ml\s*$', path, re.I) is not None:
+                re.match(r'^.*\.ya?ml\s*$', self.path, re.I) is not None:
 
             # YAML Filename Detected
             self.default_config_format = ConfigFormat.YAML
@@ -167,7 +169,7 @@ class ConfigFile(ConfigBase):
             # We're done early; it's not a good URL
             return results
 
-        match = re.match(r'file://(?P<path>[^?]+)(\?.*)?', url, re.I)
+        match = re.match(r'[a-z0-9]+://(?P<path>[^?]+)(\?.*)?', url, re.I)
         if not match:
             return None
 

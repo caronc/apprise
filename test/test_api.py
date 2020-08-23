@@ -588,9 +588,70 @@ def test_apprise_tagging(mock_post, mock_get):
         tag=[(object, ), ]) is None
 
 
+def test_apprise_schemas(tmpdir):
+    """
+    API: Apprise().schema() tests
+
+    """
+    # Caling load matix a second time which is an internal function causes it
+    # to skip over content already loaded into our matrix and thefore accesses
+    # other if/else parts of the code that aren't otherwise called
+    __load_matrix()
+
+    a = Apprise()
+
+    # no items
+    assert len(a) == 0
+
+    class TextNotification(NotifyBase):
+        # set our default notification format
+        notify_format = NotifyFormat.TEXT
+
+        # Garbage Protocol Entries
+        protocol = None
+
+        secure_protocol = (None, object)
+
+    class HtmlNotification(NotifyBase):
+
+        protocol = ('html', 'htm')
+
+        secure_protocol = ('htmls', 'htms')
+
+    class MarkDownNotification(NotifyBase):
+
+        protocol = 'markdown'
+
+        secure_protocol = 'markdowns'
+
+    # Store our notifications into our schema map
+    SCHEMA_MAP['text'] = TextNotification
+    SCHEMA_MAP['html'] = HtmlNotification
+    SCHEMA_MAP['markdown'] = MarkDownNotification
+
+    schemas = URLBase.schemas(TextNotification)
+    assert isinstance(schemas, set) is True
+    # We didn't define a protocol or secure protocol
+    assert len(schemas) == 0
+
+    schemas = URLBase.schemas(HtmlNotification)
+    assert isinstance(schemas, set) is True
+    assert len(schemas) == 4
+    assert 'html' in schemas
+    assert 'htm' in schemas
+    assert 'htmls' in schemas
+    assert 'htms' in schemas
+
+    # Invalid entries do not disrupt schema calls
+    for garbage in (object(), None, 42):
+        schemas = URLBase.schemas(garbage)
+        assert isinstance(schemas, set) is True
+        assert len(schemas) == 0
+
+
 def test_apprise_notify_formats(tmpdir):
     """
-    API: Apprise() TextFormat tests
+    API: Apprise() Input Formats tests
 
     """
     # Caling load matix a second time which is an internal function causes it
