@@ -588,6 +588,7 @@ def test_apprise_tagging(mock_post, mock_get):
         tag=[(object, ), ]) is None
 
 
+@pytest.mark.skipif(sys.version_info.major <= 2, reason="Requires Python 3.x+")
 def test_apprise_schemas(tmpdir):
     """
     API: Apprise().schema() tests
