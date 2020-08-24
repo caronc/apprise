@@ -702,20 +702,41 @@ class ConfigBase(URLBase):
         #
         # import root directive
         #
-        configs = result.get('imports', None)
-        if not isinstance(configs, (list, tuple)):
+        imports = result.get('import', None)
+        if isinstance(imports, six.string_types):
+            # Support a single inline string
+            imports = list([imports])
+
+        elif not isinstance(imports, (list, tuple)):
             # Not a problem; we simply have no imports
-            configs = list()
+            imports = list()
+
+        # Iterate over each config URL
+        for no, url in enumerate(imports):
+
+            # Our results object is what we use to instantiate our object if
+            # we can. Reset it to None on each iteration
+            results = list()
+
+            if isinstance(url, six.string_types):
+                # We're just a simple URL string...
+                configs.append(url)
+
+            elif isinstance(url, dict):
+                # Store the url and ignore arguments associated
+                configs.extend(u for u in url.keys())
+
+            elif isinstance(url, (list, tuple)):
+                # Lists are fine
+                configs.extend(u for u in url)
 
         #
         # urls root directive
         #
         urls = result.get('urls', None)
         if not isinstance(urls, (list, tuple)):
-            # Unsupported
-            ConfigBase.logger.error(
-                'Missing "urls" directive in Apprise YAML configuration.')
-            return (list(), list())
+            # Not a problem; we simply have no urls
+            urls = list()
 
         # Iterate over each URL
         for no, url in enumerate(urls):

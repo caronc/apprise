@@ -24,7 +24,7 @@
 # THE SOFTWARE.
 
 import re
-
+import six
 from os import listdir
 from os.path import dirname
 from os.path import abspath
@@ -89,7 +89,27 @@ def __load_matrix(path=abspath(dirname(__file__)), name='apprise.config'):
         globals()[plugin_name] = plugin
 
         fn = getattr(plugin, 'schemas', None)
-        schemas = set([]) if not callable(fn) else fn(plugin)
+        try:
+            schemas = set([]) if not callable(fn) else fn(plugin)
+
+        except TypeError:
+            # Python v2.x support where functions associated with classes
+            # were considered bound to them and could not be called prior
+            # to the classes initialization.  This code can be dropped
+            # once Python v2.x support is dropped. The below code introduces
+            # replication as it already exists and is tested in
+            # URLBase.schemas()
+            schemas = set([])
+            for key in ('protocol', 'secure_protocol'):
+                schema = getattr(plugin, key, None)
+                if isinstance(schema, six.string_types):
+                    schemas.add(schema)
+
+                elif isinstance(schema, (set, list, tuple)):
+                    # Support iterables list types
+                    for s in schema:
+                        if isinstance(s, six.string_types):
+                            schemas.add(s)
 
         # map our schema to our plugin
         for schema in schemas:

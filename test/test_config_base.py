@@ -248,7 +248,7 @@ def test_config_base_config_parse_text():
     taga,tagb=kde://
 
     # An import statement to Apprise API with trailing spaces:
-    import http://localhost:8080/notify/apprise   
+    import http://localhost:8080/notify/apprise
 
     # A relative import statement (with trailing spaces)
     import apprise.cfg     """, asset=AppriseAsset())
@@ -264,7 +264,6 @@ def test_config_base_config_parse_text():
     assert 'taga' in result[-1].tags
     assert 'tagb' in result[-1].tags
 
-    # There are two import lines
     assert len(config) == 2
     assert 'http://localhost:8080/notify/apprise' in config
     assert 'apprise.cfg' in config
@@ -460,6 +459,9 @@ urls:
 
     # Invalid url/schema
     result, config = ConfigBase.config_parse_yaml("""
+# Import entry with nothing associated with it
+import:
+
 urls:
   - just some free text that isn't valid:
     - a garbage entry to go with it
@@ -495,14 +497,20 @@ urls:
 # no lists... just no
 urls: [milk, pumpkin pie, eggs, juice]
 
+# Importing by list is okay
+import: [file:///absolute/path/, relative/path, http://test.com]
+
 """, asset=asset)
 
     # Invalid data gets us an empty result set
     assert isinstance(result, list)
     assert len(result) == 0
 
-    # There were no import entries defined
-    assert len(config) == 0
+    # There were 3 import entries
+    assert len(config) == 3
+    assert 'file:///absolute/path/' in config
+    assert 'relative/path' in config
+    assert 'http://test.com' in config
 
     # Invalid url/schema
     result, config = ConfigBase.config_parse_yaml("""
@@ -533,6 +541,14 @@ urls:
 # if no version is specified then version 1 is presumed
 version: 1
 
+# Importing by dict
+import:
+  # File imports
+  - file:///absolute/path/
+  - relative/path
+  # Trailing colon shouldn't disrupt import
+  - http://test.com:
+
 #
 # Define your notification urls:
 #
@@ -549,11 +565,17 @@ urls:
     assert len(result) == 3
     assert len(result[0].tags) == 0
 
-    # There were no import entries defined
-    assert len(config) == 0
+    # There were 3 import entries
+    assert len(config) == 3
+    assert 'file:///absolute/path/' in config
+    assert 'relative/path' in config
+    assert 'http://test.com' in config
 
     # Valid Configuration
     result, config = ConfigBase.config_parse_yaml("""
+# A single line import is supported
+import: http://localhost:8080/notify/apprise
+
 urls:
   - json://localhost:
     - tag: my-custom-tag, my-other-tag
@@ -587,8 +609,9 @@ urls:
     assert len(result) == 5
     assert len(result[0].tags) == 2
 
-    # There were no import entries defined
-    assert len(config) == 0
+    # Our single line import
+    assert len(config) == 1
+    assert 'http://localhost:8080/notify/apprise' in config
 
     # Global Tags
     result, config = ConfigBase.config_parse_yaml("""
