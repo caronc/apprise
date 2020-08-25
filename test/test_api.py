@@ -168,6 +168,11 @@ def test_apprise():
             # Support URL
             return ''
 
+        @staticmethod
+        def parse_url(url, *args, **kwargs):
+            # always parseable
+            return NotifyBase.parse_url(url, verify_host=False)
+
     class GoodNotification(NotifyBase):
         def __init__(self, **kwargs):
             super(GoodNotification, self).__init__(
@@ -180,6 +185,11 @@ def test_apprise():
         def send(self, **kwargs):
             # Pretend everything is okay
             return True
+
+        @staticmethod
+        def parse_url(url, *args, **kwargs):
+            # always parseable
+            return NotifyBase.parse_url(url, verify_host=False)
 
     # Store our bad notification in our schema map
     SCHEMA_MAP['bad'] = BadNotification
@@ -588,9 +598,71 @@ def test_apprise_tagging(mock_post, mock_get):
         tag=[(object, ), ]) is None
 
 
+@pytest.mark.skipif(sys.version_info.major <= 2, reason="Requires Python 3.x+")
+def test_apprise_schemas(tmpdir):
+    """
+    API: Apprise().schema() tests
+
+    """
+    # Caling load matix a second time which is an internal function causes it
+    # to skip over content already loaded into our matrix and thefore accesses
+    # other if/else parts of the code that aren't otherwise called
+    __load_matrix()
+
+    a = Apprise()
+
+    # no items
+    assert len(a) == 0
+
+    class TextNotification(NotifyBase):
+        # set our default notification format
+        notify_format = NotifyFormat.TEXT
+
+        # Garbage Protocol Entries
+        protocol = None
+
+        secure_protocol = (None, object)
+
+    class HtmlNotification(NotifyBase):
+
+        protocol = ('html', 'htm')
+
+        secure_protocol = ('htmls', 'htms')
+
+    class MarkDownNotification(NotifyBase):
+
+        protocol = 'markdown'
+
+        secure_protocol = 'markdowns'
+
+    # Store our notifications into our schema map
+    SCHEMA_MAP['text'] = TextNotification
+    SCHEMA_MAP['html'] = HtmlNotification
+    SCHEMA_MAP['markdown'] = MarkDownNotification
+
+    schemas = URLBase.schemas(TextNotification)
+    assert isinstance(schemas, set) is True
+    # We didn't define a protocol or secure protocol
+    assert len(schemas) == 0
+
+    schemas = URLBase.schemas(HtmlNotification)
+    assert isinstance(schemas, set) is True
+    assert len(schemas) == 4
+    assert 'html' in schemas
+    assert 'htm' in schemas
+    assert 'htmls' in schemas
+    assert 'htms' in schemas
+
+    # Invalid entries do not disrupt schema calls
+    for garbage in (object(), None, 42):
+        schemas = URLBase.schemas(garbage)
+        assert isinstance(schemas, set) is True
+        assert len(schemas) == 0
+
+
 def test_apprise_notify_formats(tmpdir):
     """
-    API: Apprise() TextFormat tests
+    API: Apprise() Input Formats tests
 
     """
     # Caling load matix a second time which is an internal function causes it
@@ -1371,10 +1443,15 @@ class NotifyGoober(NotifyBase):
     # trying to over-ride items previously used
 
     # The default simple (insecure) protocol (used by NotifyMail)
-    protocol = 'mailto'
+    protocol = ('mailto', 'goober')
 
     # The default secure protocol (used by NotifyMail)
-    secure_protocol = 'mailtos'""")
+    secure_protocol = 'mailtos'
+
+    @staticmethod
+    def parse_url(url, *args, **kwargs):
+        # always parseable
+        return ConfigBase.parse_url(url, verify_host=False)""")
 
     # Utilizes a schema:// already occupied (as tuple)
     base.join('NotifyBugger.py').write("""
@@ -1388,6 +1465,11 @@ class NotifyBugger(NotifyBase):
     protocol = ('mailto', 'bugger-test' )
 
     # The default secure protocol (used by NotifyMail), the other isn't
-    secure_protocol = ('mailtos', 'bugger-tests')""")
+    secure_protocol = ('mailtos', ['garbage'])
+
+    @staticmethod
+    def parse_url(url, *args, **kwargs):
+        # always parseable
+        return ConfigBase.parse_url(url, verify_host=False)""")
 
     __load_matrix(path=str(base), name=module_name)

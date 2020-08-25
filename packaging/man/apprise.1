@@ -73,6 +73,10 @@ The more of these you specify, the more verbose the output is\.
 Send notifications synchronously (one after the other) instead of all at once\.
 .
 .TP
+\fB\-R\fR, \fB\-\-recursion\-depth\fR
+he number of recursive import entries that can be loaded from within Apprise configuration\. By default this is set to 1\. If this is set to zero, then import statements found in any configuration is ignored\.
+.
+.TP
 \fB\-D\fR, \fB\-\-debug\fR
 A debug mode; useful for troubleshooting\.
 .
@@ -85,10 +89,10 @@ Display the apprise version and exit\.
 Show this message and exit\.
 .
 .SH "EXIT STATUS"
-\fBapprise\fR exits with a status 0 if all notifications were sent successfully otherwise \fBapprise\fR returns a value of 1\.
+\fBapprise\fR exits with a status 0 if all notifications were sent successfully otherwise \fBapprise\fR returns a value of 1\. \fBapprise\fR returns a value of 2 if there was an error specified on the command line (such as not providing an valid argument)\.
 .
 .P
-\fBapprise\fR exits with a status of 2 if there were no notifcations sent due (as a result of end user actions)\. This occurs in the case where you have assigned one or more tags to all of the Apprise URLs being notified and did not match any when actually executing the \fBapprise\fR tool\. This can also occur if you specified a tag that has not been assigned to anything defined in your configuration\.
+\fBapprise\fR exits with a status of 3 if there were no notifcations sent due (as a result of end user actions)\. This occurs in the case where you have assigned one or more tags to all of the Apprise URLs being notified and did not match any when actually executing the \fBapprise\fR tool\. This can also occur if you specified a tag that has not been assigned to anything defined in your configuration\.
 .
 .SH "SERVICE URLS"
 There are to many service URL and combinations to list here\. It\'s best to visit the Apprise GitHub page \fIhttps://github\.com/caronc/apprise/wiki#notification\-services\fR and see what\'s available\.
@@ -100,7 +104,7 @@ Send a notification to as many servers as you want to specify as you can easily 
 .
 .nf
 
-$ apprise \-t \'my title\' \-b \'my notification body\' \e
+$ apprise \-vv \-t \'my title\' \-b \'my notification body\' \e
    \'mailto://myemail:mypass@gmail\.com\' \e
    \'pbul://o\.gn5kj6nfhv736I7jC3cj3QLRiyhgl98b\'
 .
@@ -115,7 +119,7 @@ If you don\'t specify a \fB\-\-body\fR (\fB\-b\fR) then stdin is used allowing y
 .
 .nf
 
-$ cat /proc/cpuinfo | apprise \-t \'cpu info\' \e
+$ cat /proc/cpuinfo | apprise \-vv \-t \'cpu info\' \e
     \'mailto://myemail:mypass@gmail\.com\'
 .
 .fi
@@ -129,7 +133,7 @@ Load in a configuration file which identifies all of your notification service U
 .
 .nf
 
-$ apprise \-t \'my title\' \-b \'my notification body\' \e
+$ apprise \-vv \-t \'my title\' \-b \'my notification body\' \e
    \-\-config=~/apprise\.yml
 .
 .fi
@@ -143,7 +147,7 @@ Load in a configuration file from a remote server that identifies all of your no
 .
 .nf
 
-$ apprise \-t \'my title\' \-b \'my notification body\' \e
+$ apprise \-vv \-t \'my title\' \-b \'my notification body\' \e
    \-\-config=https://localhost/my/apprise/config \e
    \-t devops
 .
@@ -158,7 +162,7 @@ Include an attachment:
 .
 .nf
 
-$ apprise \-t \'School Assignment\' \-b \'See attached\' \e
+$ apprise \-vv \-t \'School Assignment\' \-b \'See attached\' \e
    \-\-attach=Documents/FinalReport\.docx
 .
 .fi

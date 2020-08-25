@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2019 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2020 Chris Caron <lead2gold@gmail.com>
 # All rights reserved.
 #
 # This code is licensed under the MIT License.
@@ -23,12 +23,10 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import sys
 import six
 import pytest
 from apprise.AppriseAsset import AppriseAsset
 from apprise.config.ConfigBase import ConfigBase
-from apprise.config import __load_matrix
 from apprise import ConfigFormat
 
 # Disable logging for a cleaner testing output
@@ -103,9 +101,9 @@ def test_config_base_detect_config_format():
     """
 
     # Garbage Handling
-    assert ConfigBase.detect_config_format(object()) is None
-    assert ConfigBase.detect_config_format(None) is None
-    assert ConfigBase.detect_config_format(12) is None
+    for garbage in (object(), None, 42):
+        # A response is always correctly returned
+        assert ConfigBase.detect_config_format(garbage) is None
 
     # Empty files are valid
     assert ConfigBase.detect_config_format('') is ConfigFormat.TEXT
@@ -143,10 +141,15 @@ def test_config_base_config_parse():
     """
 
     # Garbage Handling
-    assert isinstance(ConfigBase.config_parse(object()), list)
-    assert isinstance(ConfigBase.config_parse(None), list)
-    assert isinstance(ConfigBase.config_parse(''), list)
-    assert isinstance(ConfigBase.config_parse(12), list)
+    for garbage in (object(), None, 42):
+        # A response is always correctly returned
+        result = ConfigBase.config_parse(garbage)
+        # response is a tuple...
+        assert isinstance(result, tuple)
+        # containing 2 items (plugins, config)
+        assert len(result) == 2
+        # In the case of garbage in, we get garbage out; both lists are empty
+        assert result == (list(), list())
 
     # Valid Text Configuration
     result = ConfigBase.config_parse("""
@@ -154,9 +157,16 @@ def test_config_base_config_parse():
     mailto://userb:pass@gmail.com
     """, asset=AppriseAsset())
     # We expect to parse 1 entry from the above
-    assert isinstance(result, list)
-    assert len(result) == 1
-    assert len(result[0].tags) == 0
+    assert isinstance(result, tuple)
+    assert len(result) == 2
+    # The first element is the number of notification services processed
+    assert len(result[0]) == 1
+    # If we index into the item, we can check to see the tags associate
+    # with it
+    assert len(result[0][0].tags) == 0
+
+    # The second is the number of configuration include lines parsed
+    assert len(result[1]) == 0
 
     # Valid Configuration
     result = ConfigBase.config_parse("""
@@ -174,11 +184,13 @@ urls:
     """, asset=AppriseAsset())
 
     # We expect to parse 3 entries from the above
-    assert isinstance(result, list)
-    assert len(result) == 3
-    assert len(result[0].tags) == 0
-    assert len(result[1].tags) == 0
-    assert len(result[2].tags) == 2
+    assert isinstance(result, tuple)
+    assert len(result) == 2
+    assert isinstance(result[0], list)
+    assert len(result[0]) == 3
+    assert len(result[0][0].tags) == 0
+    assert len(result[0][1].tags) == 0
+    assert len(result[0][2].tags) == 2
 
     # Test case where we pass in a bad format
     result = ConfigBase.config_parse("""
@@ -187,10 +199,11 @@ urls:
     """, config_format='invalid-format')
 
     # This is not parseable despite the valid text
-    assert isinstance(result, list)
-    assert len(result) == 0
+    assert isinstance(result, tuple)
+    assert isinstance(result[0], list)
+    assert len(result[0]) == 0
 
-    result = ConfigBase.config_parse("""
+    result, _ = ConfigBase.config_parse("""
     ; A comment line over top of a URL
     mailto://userb:pass@gmail.com
     """, config_format=ConfigFormat.TEXT)
@@ -207,12 +220,18 @@ def test_config_base_config_parse_text():
     """
 
     # Garbage Handling
-    assert isinstance(ConfigBase.config_parse_text(object()), list)
-    assert isinstance(ConfigBase.config_parse_text(None), list)
-    assert isinstance(ConfigBase.config_parse_text(''), list)
+    for garbage in (object(), None, 42):
+        # A response is always correctly returned
+        result = ConfigBase.config_parse_text(garbage)
+        # response is a tuple...
+        assert isinstance(result, tuple)
+        # containing 2 items (plugins, config)
+        assert len(result) == 2
+        # In the case of garbage in, we get garbage out; both lists are empty
+        assert result == (list(), list())
 
     # Valid Configuration
-    result = ConfigBase.config_parse_text("""
+    result, config = ConfigBase.config_parse_text("""
     # A comment line over top of a URL
     mailto://userb:pass@gmail.com
 
@@ -225,10 +244,16 @@ def test_config_base_config_parse_text():
 
     # A line with mulitiple tag assignments to it
     taga,tagb=kde://
-    """, asset=AppriseAsset())
+
+    # An include statement to Apprise API with trailing spaces:
+    include http://localhost:8080/notify/apprise
+
+    # A relative include statement (with trailing spaces)
+    include apprise.cfg     """, asset=AppriseAsset())
 
     # We expect to parse 3 entries from the above
     assert isinstance(result, list)
+    assert isinstance(config, list)
     assert len(result) == 3
     assert len(result[0].tags) == 0
 
@@ -237,9 +262,13 @@ def test_config_base_config_parse_text():
     assert 'taga' in result[-1].tags
     assert 'tagb' in result[-1].tags
 
+    assert len(config) == 2
+    assert 'http://localhost:8080/notify/apprise' in config
+    assert 'apprise.cfg' in config
+
     # Here is a similar result set however this one has an invalid line
     # in it which invalidates the entire file
-    result = ConfigBase.config_parse_text("""
+    result, config = ConfigBase.config_parse_text("""
     # A comment line over top of a URL
     mailto://userc:pass@gmail.com
 
@@ -249,12 +278,18 @@ def test_config_base_config_parse_text():
     I am an invalid line that does not follow any of the Apprise file rules!
     """)
 
-    # We expect to parse 0 entries from the above
+    # We expect to parse 0 entries from the above because the invalid line
+    # invalidates the entire configuration file. This is for security reasons;
+    # we don't want to point at files load content in them just because they
+    # resemble an Apprise configuration.
     assert isinstance(result, list)
     assert len(result) == 0
 
+    # There were no include entries defined
+    assert len(config) == 0
+
     # More invalid data
-    result = ConfigBase.config_parse_text("""
+    result, config = ConfigBase.config_parse_text("""
     # An invalid URL
     invalid://user:pass@gmail.com
 
@@ -266,30 +301,33 @@ def test_config_base_config_parse_text():
 
     # Just 1 token provided
     sns://T1JJ3T3L2/
+
+    # Even with the above invalid entries, we can still
+    # have valid include lines
+    include file:///etc/apprise.cfg
+
+    # An invalid include (nothing specified afterwards)
+    include
+
+    # An include of a config type we don't support
+    include invalid://
     """)
 
     # We expect to parse 0 entries from the above
     assert isinstance(result, list)
     assert len(result) == 0
 
-    # Here is an empty file
-    result = ConfigBase.config_parse_text('')
-
-    # We expect to parse 0 entries from the above
-    assert isinstance(result, list)
-    assert len(result) == 0
+    # There was 1 valid entry
+    assert len(config) == 0
 
     # Test case where a comment is on it's own line with nothing else
-    result = ConfigBase.config_parse_text("#")
+    result, config = ConfigBase.config_parse_text("#")
     # We expect to parse 0 entries from the above
     assert isinstance(result, list)
     assert len(result) == 0
 
-    # Test case of empty file
-    result = ConfigBase.config_parse_text("")
-    # We expect to parse 0 entries from the above
-    assert isinstance(result, list)
-    assert len(result) == 0
+    # There were no include entries defined
+    assert len(config) == 0
 
 
 def test_config_base_config_parse_yaml():
@@ -302,19 +340,28 @@ def test_config_base_config_parse_yaml():
     asset = AppriseAsset()
 
     # Garbage Handling
-    assert isinstance(ConfigBase.config_parse_yaml(object()), list)
-    assert isinstance(ConfigBase.config_parse_yaml(None), list)
-    assert isinstance(ConfigBase.config_parse_yaml(''), list)
+    for garbage in (object(), None, '', 42):
+        # A response is always correctly returned
+        result = ConfigBase.config_parse_yaml(garbage)
+        # response is a tuple...
+        assert isinstance(result, tuple)
+        # containing 2 items (plugins, config)
+        assert len(result) == 2
+        # In the case of garbage in, we get garbage out; both lists are empty
+        assert result == (list(), list())
 
     # Invalid Version
-    result = ConfigBase.config_parse_yaml("version: 2a", asset=asset)
+    result, config = ConfigBase.config_parse_yaml("version: 2a", asset=asset)
 
     # Invalid data gets us an empty result set
     assert isinstance(result, list)
     assert len(result) == 0
 
+    # There were no include entries defined
+    assert len(config) == 0
+
     # Invalid Syntax (throws a ScannerError)
-    result = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml("""
 # if no version is specified then version 1 is presumed
 version: 1
 
@@ -325,8 +372,11 @@ urls
     assert isinstance(result, list)
     assert len(result) == 0
 
+    # There were no include entries defined
+    assert len(config) == 0
+
     # Missing url token
-    result = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml("""
 # if no version is specified then version 1 is presumed
 version: 1
 
@@ -336,8 +386,11 @@ version: 1
     assert isinstance(result, list)
     assert len(result) == 0
 
+    # There were no include entries defined
+    assert len(config) == 0
+
     # No urls defined
-    result = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml("""
 # if no version is specified then version 1 is presumed
 version: 1
 
@@ -348,8 +401,11 @@ urls:
     assert isinstance(result, list)
     assert len(result) == 0
 
+    # There were no include entries defined
+    assert len(config) == 0
+
     # Invalid url defined
-    result = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml("""
 # if no version is specified then version 1 is presumed
 version: 1
 
@@ -361,8 +417,11 @@ urls: 43
     assert isinstance(result, list)
     assert len(result) == 0
 
+    # There were no include entries defined
+    assert len(config) == 0
+
     # Invalid url/schema
-    result = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml("""
 # if no version is specified then version 1 is presumed
 version: 1
 
@@ -375,8 +434,11 @@ urls:
     assert isinstance(result, list)
     assert len(result) == 0
 
+    # There were no include entries defined
+    assert len(config) == 0
+
     # Invalid url/schema
-    result = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml("""
 # if no version is specified then version 1 is presumed
 version: 1
 
@@ -390,8 +452,14 @@ urls:
     assert isinstance(result, list)
     assert len(result) == 0
 
+    # There were no include entries defined
+    assert len(config) == 0
+
     # Invalid url/schema
-    result = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml("""
+# Include entry with nothing associated with it
+include:
+
 urls:
   - just some free text that isn't valid:
     - a garbage entry to go with it
@@ -402,8 +470,11 @@ urls:
     assert isinstance(result, list)
     assert len(result) == 0
 
+    # There were no include entries defined
+    assert len(config) == 0
+
     # Invalid url/schema
-    result = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml("""
 # if no version is specified then version 1 is presumed
 version: 1
 
@@ -416,10 +487,16 @@ urls:
     assert isinstance(result, list)
     assert len(result) == 0
 
+    # There were no include entries defined
+    assert len(config) == 0
+
     # Invalid url/schema
-    result = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml("""
 # no lists... just no
 urls: [milk, pumpkin pie, eggs, juice]
+
+# Including by list is okay
+include: [file:///absolute/path/, relative/path, http://test.com]
 
 """, asset=asset)
 
@@ -427,8 +504,14 @@ urls: [milk, pumpkin pie, eggs, juice]
     assert isinstance(result, list)
     assert len(result) == 0
 
+    # There were 3 include entries
+    assert len(config) == 3
+    assert 'file:///absolute/path/' in config
+    assert 'relative/path' in config
+    assert 'http://test.com' in config
+
     # Invalid url/schema
-    result = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml("""
 urls:
   # a very invalid sns entry
   - sns://T1JJ3T3L2/
@@ -437,7 +520,7 @@ urls:
   - sns://T1JJ3T3L2/:
     - invalid: test
 
-  # some strangness
+  # some strangeness
   -
     -
       - test
@@ -448,10 +531,29 @@ urls:
     assert isinstance(result, list)
     assert len(result) == 0
 
+    # There were no include entries defined
+    assert len(config) == 0
+
     # Valid Configuration
-    result = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml("""
 # if no version is specified then version 1 is presumed
 version: 1
+
+# Including by dict
+include:
+  # File includes
+  - file:///absolute/path/
+  - relative/path
+  # Trailing colon shouldn't disrupt include
+  - http://test.com:
+
+  # invalid (numeric)
+  - 4
+
+  # some strangeness
+  -
+    -
+      - test
 
 #
 # Define your notification urls:
@@ -469,8 +571,17 @@ urls:
     assert len(result) == 3
     assert len(result[0].tags) == 0
 
+    # There were 3 include entries
+    assert len(config) == 3
+    assert 'file:///absolute/path/' in config
+    assert 'relative/path' in config
+    assert 'http://test.com' in config
+
     # Valid Configuration
-    result = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml("""
+# A single line include is supported
+include: http://localhost:8080/notify/apprise
+
 urls:
   - json://localhost:
     - tag: my-custom-tag, my-other-tag
@@ -504,8 +615,12 @@ urls:
     assert len(result) == 5
     assert len(result[0].tags) == 2
 
+    # Our single line included
+    assert len(config) == 1
+    assert 'http://localhost:8080/notify/apprise' in config
+
     # Global Tags
-    result = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml("""
 # Global Tags stacked as a list
 tag:
   - admin
@@ -520,13 +635,16 @@ urls:
     assert isinstance(result, list)
     assert len(result) == 2
 
+    # There were no include entries defined
+    assert len(config) == 0
+
     # all entries will have our global tags defined in them
     for entry in result:
         assert 'admin' in entry.tags
         assert 'devops' in entry.tags
 
     # Global Tags
-    result = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml("""
 # Global Tags
 tag: admin, devops
 
@@ -559,8 +677,11 @@ urls:
     assert len(result[1].tags) == 4
     assert 'list-tag' in result[1].tags
 
+    # There were no include entries defined
+    assert len(config) == 0
+
     # An invalid set of entries
-    result = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml("""
 urls:
   # The following tags will get added to the global set
   - json://localhost:
@@ -573,11 +694,14 @@ urls:
     assert isinstance(result, list)
     assert len(result) == 0
 
+    # There were no include entries defined
+    assert len(config) == 0
+
     # An asset we'll manipulate
     asset = AppriseAsset()
 
     # Global Tags
-    result = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml("""
 # Test the creation of our apprise asset object
 asset:
   app_id: AppriseTest
@@ -610,6 +734,10 @@ urls:
     # We expect to parse 3 entries from the above
     assert isinstance(result, list)
     assert len(result) == 1
+
+    # There were no include entries defined
+    assert len(config) == 0
+
     assert asset.app_id == "AppriseTest"
     assert asset.app_desc == "Apprise Test Notifications"
     assert asset.app_url == "http://nuxref.com"
@@ -626,7 +754,7 @@ urls:
     # For on-lookers looking through this file; here is a perfectly formatted
     # YAML configuration file for your reference so you can see it without
     # all of the errors like the ones identified above
-    result = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml("""
 # if no version is specified then version 1 is presumed. Thus this is a
 # completely optional field. It's a good idea to just add this line because it
 # will help with future ambiguity (if it ever occurs).
@@ -713,66 +841,5 @@ urls:
     assert 'customer' in result[5].tags
     assert 'chris' in result[5].tags
 
-
-def test_config_matrix_dynamic_importing(tmpdir):
-    """
-    API: Apprise() Config Matrix Importing
-
-    """
-
-    # Make our new path valid
-    suite = tmpdir.mkdir("apprise_config_test_suite")
-    suite.join("__init__.py").write('')
-
-    module_name = 'badconfig'
-
-    # Update our path to point to our new test suite
-    sys.path.insert(0, str(suite))
-
-    # Create a base area to work within
-    base = suite.mkdir(module_name)
-    base.join("__init__.py").write('')
-
-    # Test no app_id
-    base.join('ConfigBadFile1.py').write(
-        """
-class ConfigBadFile1(object):
-    pass""")
-
-    # No class of the same name
-    base.join('ConfigBadFile2.py').write(
-        """
-class BadClassName(object):
-    pass""")
-
-    # Exception thrown
-    base.join('ConfigBadFile3.py').write("""raise ImportError()""")
-
-    # Utilizes a schema:// already occupied (as string)
-    base.join('ConfigGoober.py').write(
-        """
-from apprise import ConfigBase
-class ConfigGoober(ConfigBase):
-    # This class tests the fact we have a new class name, but we're
-    # trying to over-ride items previously used
-
-    # The default simple (insecure) protocol
-    protocol = 'http'
-
-    # The default secure protocol
-    secure_protocol = 'https'""")
-
-    # Utilizes a schema:// already occupied (as tuple)
-    base.join('ConfigBugger.py').write("""
-from apprise import ConfigBase
-class ConfigBugger(ConfigBase):
-    # This class tests the fact we have a new class name, but we're
-    # trying to over-ride items previously used
-
-    # The default simple (insecure) protocol
-    protocol = ('http', 'bugger-test' )
-
-    # The default secure protocol
-    secure_protocol = ('https', 'bugger-tests')""")
-
-    __load_matrix(path=str(base), name=module_name)
+    # There were no include entries defined
+    assert len(config) == 0

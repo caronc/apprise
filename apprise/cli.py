@@ -46,6 +46,10 @@ from . import __version__
 from . import __license__
 from . import __copywrite__
 
+# By default we allow looking 1 level down recursivly in Apprise configuration
+# files.
+DEFAULT_RECURSION_DEPTH = 1
+
 # Defines our click context settings adding -h to the additional options that
 # can be specified to get the help menu to come up
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
@@ -129,6 +133,11 @@ def print_version_msg():
               help='Perform a trial run but only prints the notification '
               'services to-be triggered to stdout. Notifications are never '
               'sent using this mode.')
+@click.option('--recursion-depth', '-R', default=DEFAULT_RECURSION_DEPTH,
+              type=int,
+              help='The number of recursive import entries that can be '
+              'loaded from within Apprise configuration. By default '
+              'this is set to {}.'.format(DEFAULT_RECURSION_DEPTH))
 @click.option('--verbose', '-v', count=True,
               help='Makes the operation more talkative. Use multiple v to '
               'increase the verbosity. I.e.: -vvvv')
@@ -138,7 +147,8 @@ def print_version_msg():
 @click.argument('urls', nargs=-1,
                 metavar='SERVER_URL [SERVER_URL2 [SERVER_URL3]]',)
 def main(body, title, config, attach, urls, notification_type, theme, tag,
-         input_format, dry_run, verbose, disable_async, debug, version):
+         input_format, dry_run, recursion_depth, verbose, disable_async,
+         debug, version):
     """
     Send a notification to all of the specified servers identified by their
     URLs the content provided within the title, body and notification-type.
@@ -199,14 +209,18 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
         logger.error(
             'The --notification-type (-n) value of {} is not supported.'
             .format(notification_type))
-        sys.exit(1)
+        # 2 is the same exit code returned by Click if there is a parameter
+        # issue.  For consistency, we also return a 2
+        sys.exit(2)
 
     input_format = input_format.strip().lower()
     if input_format not in NOTIFY_FORMATS:
         logger.error(
             'The --input-format (-i) value of {} is not supported.'
             .format(input_format))
-        sys.exit(1)
+        # 2 is the same exit code returned by Click if there is a parameter
+        # issue.  For consistency, we also return a 2
+        sys.exit(2)
 
     # Prepare our asset
     asset = AppriseAsset(
@@ -227,7 +241,7 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
     a.add(AppriseConfig(
         paths=[f for f in DEFAULT_SEARCH_PATHS if isfile(expanduser(f))]
         if not (config or urls) else config,
-        asset=asset))
+        asset=asset, recursion=recursion_depth))
 
     # Load our inventory up
     for url in urls:
@@ -281,7 +295,10 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
         # There were no notifications set.  This is a result of just having
         # empty configuration files and/or being to restrictive when filtering
         # by specific tag(s)
-        sys.exit(2)
+
+        # Exit code 3 is used since Click uses exit code 2 if there is an
+        # error with the parameters specified
+        sys.exit(3)
 
     elif result is False:
         # At least 1 notification service failed to send

@@ -180,19 +180,27 @@ def test_apprise_cli_nux_env(tmpdir):
     # Write a simple text based configuration file
     t = tmpdir.mkdir("apprise-obj").join("apprise")
     buf = """
+    # Include ourselves
+    include {}
+
     taga,tagb=good://localhost
     tagc=good://nuxref.com
-    """
+    """.format(str(t))
     t.write(buf)
 
     # This will read our configuration and not send any notices at all
     # because we assigned tags to all of our urls and didn't identify
     # a specific match below.
+
+    # 'include' reference in configuration file would have included the file a
+    # second time (since recursion default is 1).
     result = runner.invoke(cli.main, [
         '-b', 'test config',
         '--config', str(t),
     ])
-    assert result.exit_code == 2
+    # Even when recursion take place, tags are all honored
+    # so 2 is returned because nothing was notified
+    assert result.exit_code == 3
 
     # This will send out 1 notification because our tag matches
     # one of the entries above
@@ -201,6 +209,48 @@ def test_apprise_cli_nux_env(tmpdir):
         '-b', 'has taga',
         '--config', str(t),
         '--tag', 'taga',
+    ])
+    assert result.exit_code == 0
+
+    # Test recursion
+    result = runner.invoke(cli.main, [
+        '-t', 'test title',
+        '-b', 'test body',
+        '--config', str(t),
+        '--tag', 'tagc',
+        # Invalid entry specified for recursion
+        '-R', 'invalid',
+    ])
+    assert result.exit_code == 2
+
+    result = runner.invoke(cli.main, [
+        '-t', 'test title',
+        '-b', 'test body',
+        '--config', str(t),
+        '--tag', 'tagc',
+        # missing entry specified for recursion
+        '--recursive-depth',
+    ])
+    assert result.exit_code == 2
+
+    result = runner.invoke(cli.main, [
+        '-t', 'test title',
+        '-b', 'test body',
+        '--config', str(t),
+        '--tag', 'tagc',
+        # Disable recursion (thus inclusion will be ignored)
+        '-R', '0',
+    ])
+    assert result.exit_code == 0
+
+    # Test recursion
+    result = runner.invoke(cli.main, [
+        '-t', 'test title',
+        '-b', 'test body',
+        '--config', str(t),
+        '--tag', 'tagc',
+        # Recurse up to 5 times
+        '--recursion-depth', '5',
     ])
     assert result.exit_code == 0
 
@@ -252,7 +302,9 @@ def test_apprise_cli_nux_env(tmpdir):
         '--config', str(t),
         '--notification-type', 'invalid',
     ])
-    assert result.exit_code == 1
+    # An error code of 2 is returned if invalid input is specified on the
+    # command line
+    assert result.exit_code == 2
 
     # The notification type switch is case-insensitive
     result = runner.invoke(cli.main, [
@@ -277,7 +329,9 @@ def test_apprise_cli_nux_env(tmpdir):
         '--config', str(t),
         '--input-format', 'invalid',
     ])
-    assert result.exit_code == 1
+    # An error code of 2 is returned if invalid input is specified on the
+    # command line
+    assert result.exit_code == 2
 
     # The formatting switch is not case sensitive
     result = runner.invoke(cli.main, [
@@ -309,7 +363,7 @@ def test_apprise_cli_nux_env(tmpdir):
         '--config', str(t),
         '--tag', 'mytag',
     ])
-    assert result.exit_code == 2
+    assert result.exit_code == 3
 
     # Same command as the one identified above except we set the --dry-run
     # flag. This causes our list of matched results to be printed only.
@@ -321,7 +375,7 @@ def test_apprise_cli_nux_env(tmpdir):
         '--tag', 'mytag',
         '--dry-run'
     ])
-    assert result.exit_code == 2
+    assert result.exit_code == 3
 
     # Here is a case where we get what was expected; we also attach a file
     result = runner.invoke(cli.main, [
