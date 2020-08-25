@@ -254,10 +254,10 @@ class ConfigBase(URLBase):
                 # Prepare our Asset Object
                 results['asset'] = asset
 
-                if self.cache is not None:
-                    # Force an over-ride of the cache value to what we have
-                    # specified
-                    results['cache'] = self.cache
+                # No cache is required because we're just lumping this in
+                # and associating it with the cache value we've already
+                # declared (prior to our recursion)
+                results['cache'] = False
 
                 # Recursion can never be parsed from the URL; we decrement
                 # it one level

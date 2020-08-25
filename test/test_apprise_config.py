@@ -497,7 +497,7 @@ def test_apprise_config_with_apprise_obj(tmpdir):
     NOTIFY_SCHEMA_MAP['good'] = GoodNotification
 
     # Create ourselves a config object
-    ac = AppriseConfig(cache=None)
+    ac = AppriseConfig(cache=False)
 
     # Nothing loaded yet
     assert len(ac) == 0
