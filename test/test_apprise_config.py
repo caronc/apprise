@@ -29,7 +29,7 @@ import io
 import mock
 import pytest
 from apprise import NotifyFormat
-from apprise import ConfigImportMode
+from apprise import ConfigIncludeMode
 from apprise.Apprise import Apprise
 from apprise.AppriseConfig import AppriseConfig
 from apprise.AppriseAsset import AppriseAsset
@@ -381,8 +381,8 @@ def test_apprise_config_instantiate():
         'invalid://?', suppress_exceptions=True) is None
 
     class BadConfig(ConfigBase):
-        # always allow importing
-        allow_cross_import = ConfigImportMode.ALWAYS
+        # always allow incusion
+        allow_cross_includes = ConfigIncludeMode.ALWAYS
 
         def __init__(self, **kwargs):
             super(BadConfig, self).__init__(**kwargs)
@@ -409,13 +409,13 @@ def test_apprise_config_instantiate():
 
 def test_invalid_apprise_config(tmpdir):
     """
-    Parse invalid configuration imports
+    Parse invalid configuration includes
 
     """
 
     class BadConfig(ConfigBase):
-        # always allow importing
-        allow_cross_import = ConfigImportMode.ALWAYS
+        # always allow incusion
+        allow_cross_includes = ConfigIncludeMode.ALWAYS
 
         def __init__(self, **kwargs):
             super(BadConfig, self).__init__(**kwargs)
@@ -434,23 +434,23 @@ def test_invalid_apprise_config(tmpdir):
     # temporary file to work with
     t = tmpdir.mkdir("apprise-bad-obj").join("invalid")
     buf = """
-    # An import an invalid schema
-    import invalid://
+    # Include an invalid schema
+    include invalid://
 
     # An unparsable valid schema
-    import https://
+    include https://
 
     # A valid configuration that will throw an exception
-    import bad://
+    include bad://
 
-    # Import ourselves (So our recursive import fails as well)
-    import {}
+    # Include ourselves (So our recursive includes fails as well)
+    include {}
 
     """.format(str(t))
     t.write(buf)
 
     # Create ourselves a config object with caching disbled
-    ac = AppriseConfig(recursion=2, insecure_imports=True, cache=False)
+    ac = AppriseConfig(recursion=2, insecure_includes=True, cache=False)
 
     # Nothing loaded yet
     assert len(ac) == 0
@@ -646,16 +646,16 @@ def test_apprise_config_with_apprise_obj(tmpdir):
         assert isinstance(a.pop(len(a) - 1), NotifyBase) is True
 
 
-def test_config_recursive_importing(tmpdir):
+def test_recursive_config_inclusion(tmpdir):
     """
-    API: Apprise() Config Recursive Importing
+    API: Apprise() Recursive Config Inclusion
 
     """
 
     # To test our config classes, we make three dummy configs
     class ConfigCrossPostAlways(ConfigFile):
         """
-        A dummy config that is set to always allow importing
+        A dummy config that is set to always allow inclusion
         """
 
         service_name = 'always'
@@ -664,11 +664,11 @@ def test_config_recursive_importing(tmpdir):
         protocol = 'always'
 
         # Always type
-        allow_cross_import = ConfigImportMode.ALWAYS
+        allow_cross_includes = ConfigIncludeMode.ALWAYS
 
     class ConfigCrossPostStrict(ConfigFile):
         """
-        A dummy config that is set to strict importing
+        A dummy config that is set to strict inclusion
         """
 
         service_name = 'strict'
@@ -677,11 +677,11 @@ def test_config_recursive_importing(tmpdir):
         protocol = 'strict'
 
         # Always type
-        allow_cross_import = ConfigImportMode.STRICT
+        allow_cross_includes = ConfigIncludeMode.STRICT
 
     class ConfigCrossPostNever(ConfigFile):
         """
-        A dummy config that is set to never allow importing
+        A dummy config that is set to never allow inclusion
         """
 
         service_name = 'never'
@@ -690,7 +690,7 @@ def test_config_recursive_importing(tmpdir):
         protocol = 'never'
 
         # Always type
-        allow_cross_import = ConfigImportMode.NEVER
+        allow_cross_includes = ConfigIncludeMode.NEVER
 
     # store our entries
     CONFIG_SCHEMA_MAP['never'] = ConfigCrossPostNever
@@ -705,46 +705,46 @@ def test_config_recursive_importing(tmpdir):
     cfg03 = suite.mkdir("dir2").join("cfg03.cfg")
     cfg04 = suite.mkdir("dir3").join("cfg04.cfg")
 
-    # Populate our files with valid configuration import lines
+    # Populate our files with valid configuration include lines
     cfg01.write("""
 # json entry
 json://localhost:8080
 
 # absolute path inclusion to ourselves
-import {}""".format(str(cfg01)))
+include {}""".format(str(cfg01)))
 
     cfg02.write("""
 # syslog entry
 syslog://
 
 # recursively include ourselves
-import cfg02.cfg""")
+include cfg02.cfg""")
 
     cfg03.write("""
 # xml entry
 xml://localhost:8080
 
 # relative path inclusion
-import ../dir1/cfg02.cfg
+include ../dir1/cfg02.cfg
 
-# test that we can't import invalid entries
-import invalid://entry
+# test that we can't include invalid entries
+include invalid://entry
 
 # Include non includable type
-import memory://""")
+include memory://""")
 
     cfg04.write("""
 # xml entry
 xml://localhost:8080
 
-# always import of our file
-import always://{}
+# always include of our file
+include always://{}
 
-# never import of our file
-import never://{}
+# never include of our file
+include never://{}
 
-# strict import of our file
-import strict://{}""".format(str(cfg04), str(cfg04), str(cfg04)))
+# strict include of our file
+include strict://{}""".format(str(cfg04), str(cfg04), str(cfg04)))
 
     # Create ourselves a config object
     ac = AppriseConfig()
@@ -775,7 +775,7 @@ import strict://{}""".format(str(cfg04), str(cfg04), str(cfg04)))
     assert len(ac.servers()) == 2
 
     #
-    # Now we test relative importing
+    # Now we test relative file inclusion
     #
 
     # Create ourselves a config object
@@ -794,7 +794,7 @@ import strict://{}""".format(str(cfg04), str(cfg04), str(cfg04)))
     # after loading the first entry
     assert len(ac.servers()) == 11
 
-    # Test our import modes (strict, always, and never)
+    # Test our include modes (strict, always, and never)
 
     # Create ourselves a config object
     ac = AppriseConfig(recursion=1)
@@ -812,14 +812,14 @@ import strict://{}""".format(str(cfg04), str(cfg04), str(cfg04)))
     # 1 - from the file read (which is set at mode STRICT
     # 1 - from the always://
     #
-    # The never:// can ever be imported, and the strict:// is ot of type
-    #  file:// (the one doing the import) so it is also ignored.
+    # The never:// can ever be includeed, and the strict:// is ot of type
+    #  file:// (the one doing the include) so it is also ignored.
     #
-    # By turning on the insecure_imports, we can import the strict files too
+    # By turning on the insecure_includes, we can include the strict files too
     assert len(ac.servers()) == 2
 
     # Create ourselves a config object
-    ac = AppriseConfig(recursion=1, insecure_imports=True)
+    ac = AppriseConfig(recursion=1, insecure_includes=True)
 
     # There are no servers loaded
     assert len(ac) == 0
@@ -833,7 +833,7 @@ import strict://{}""".format(str(cfg04), str(cfg04), str(cfg04)))
     # 3 servers loaded
     # 1 - from the file read (which is set at mode STRICT
     # 1 - from the always://
-    # 1 - from the strict:// (due to insecure_imports set)
+    # 1 - from the strict:// (due to insecure_includes set)
     assert len(ac.servers()) == 3
 
 

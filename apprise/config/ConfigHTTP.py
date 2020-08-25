@@ -28,7 +28,7 @@ import six
 import requests
 from .ConfigBase import ConfigBase
 from ..common import ConfigFormat
-from ..common import ConfigImportMode
+from ..common import ConfigIncludeMode
 from ..URLBase import PrivacyMode
 from ..AppriseLocale import gettext_lazy as _
 
@@ -65,9 +65,8 @@ class ConfigHTTP(ConfigBase):
     # from queries to services that may be untrusted.
     max_error_buffer_size = 2048
 
-    # We allow configuration entries to import us from their configuration
-    # files
-    allow_cross_import = ConfigImportMode.ALWAYS
+    # Configuration file inclusion can always include this type
+    allow_cross_includes = ConfigIncludeMode.ALWAYS
 
     def __init__(self, headers=None, **kwargs):
         """

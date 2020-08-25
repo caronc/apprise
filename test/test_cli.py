@@ -180,8 +180,8 @@ def test_apprise_cli_nux_env(tmpdir):
     # Write a simple text based configuration file
     t = tmpdir.mkdir("apprise-obj").join("apprise")
     buf = """
-    # Import ourselves
-    import {}
+    # Include ourselves
+    include {}
 
     taga,tagb=good://localhost
     tagc=good://nuxref.com
@@ -192,8 +192,8 @@ def test_apprise_cli_nux_env(tmpdir):
     # because we assigned tags to all of our urls and didn't identify
     # a specific match below.
 
-    # Import would have imported the file a second time (since recursion
-    # default is 1).
+    # 'include' reference in configuration file would have included the file a
+    # second time (since recursion default is 1).
     result = runner.invoke(cli.main, [
         '-b', 'test config',
         '--config', str(t),
@@ -238,7 +238,7 @@ def test_apprise_cli_nux_env(tmpdir):
         '-b', 'test body',
         '--config', str(t),
         '--tag', 'tagc',
-        # Disable recursion (thus import will be ignored)
+        # Disable recursion (thus inclusion will be ignored)
         '-R', '0',
     ])
     assert result.exit_code == 0

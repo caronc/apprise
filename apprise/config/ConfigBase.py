@@ -34,7 +34,7 @@ from ..AppriseAsset import AppriseAsset
 from ..URLBase import URLBase
 from ..common import ConfigFormat
 from ..common import CONFIG_FORMATS
-from ..common import ConfigImportMode
+from ..common import ConfigIncludeMode
 from ..utils import GET_SCHEMA_RE
 from ..utils import parse_list
 from ..utils import parse_bool
@@ -62,14 +62,14 @@ class ConfigBase(URLBase):
     # anything else. 128KB (131072B)
     max_buffer_size = 131072
 
-    # By default all configuration is not importable using the 'import'
+    # By default all configuration is not includable using the 'include'
     # line found in configuration files.
-    cross_import_mode = ConfigImportMode.NEVER
+    allow_cross_includes = ConfigIncludeMode.NEVER
 
-    # the config path manages the handling of relative imports
+    # the config path manages the handling of relative include
     config_path = os.getcwd()
 
-    def __init__(self, cache=True, recursion=0, insecure_imports=False,
+    def __init__(self, cache=True, recursion=0, insecure_includes=False,
                  **kwargs):
         """
         Initialize some general logging and common server arguments that will
@@ -88,27 +88,27 @@ class ConfigBase(URLBase):
         should be considered expired.
 
         recursion defines how deep we recursively handle entries that use the
-        `import` keyword. This keyword requires us to fetch more configuration
+        `include` keyword. This keyword requires us to fetch more configuration
         from another source and add it to our existing compilation. If the
-        file we remotely retrieve also has an `import` reference, we will only
+        file we remotely retrieve also has an `include` reference, we will only
         advance through it if recursion is set to 2 deep.  If set to zero
         it is off.  There is no limit to how high you set this value. It would
         be recommended to keep it low if you do intend to use it.
 
-        insecure imports by default are disabled. When set to True, all
+        insecure_include by default are disabled. When set to True, all
         Apprise Config files marked to be in STRICT mode are treated as being
         in ALWAYS mode.
 
         Take a file:// based configuration for example, only a file:// based
-        configuration can import another file:// based one. because it is set
+        configuration can include another file:// based one. because it is set
         to STRICT mode. If an http:// based configuration file attempted to
-        import a file:// one it woul fail. However this import would be
-        possible if insecure_imports is set to True.
+        include a file:// one it woul fail. However this include would be
+        possible if insecure_includes is set to True.
 
         There are cases where a self hosting apprise developer may wish to load
-        configuration from memory (in a string format) that contains import
+        configuration from memory (in a string format) that contains 'include'
         entries (even file:// based ones).  In these circumstances if you want
-        these imports to be honored, this value must be set to True.
+        these 'include' entries to be honored, this value must be set to True.
         """
 
         super(ConfigBase, self).__init__(**kwargs)
@@ -124,8 +124,8 @@ class ConfigBase(URLBase):
         # Initialize our recursion value
         self.recursion = recursion
 
-        # Initialize our insecure_imports flag
-        self.insecure_imports = insecure_imports
+        # Initialize our insecure_includes flag
+        self.insecure_includes = insecure_includes
 
         if 'encoding' in kwargs:
             # Store the encoding
@@ -225,7 +225,7 @@ class ConfigBase(URLBase):
                     # Some basic validation
                     if schema not in SCHEMA_MAP:
                         ConfigBase.logger.warning(
-                            'Unsupported import schema {}.'.format(schema))
+                            'Unsupported include schema {}.'.format(schema))
                         continue
 
                 # Parse our url details of the server object as dictionary
@@ -234,20 +234,20 @@ class ConfigBase(URLBase):
                 if not results:
                     # Failed to parse the server URL
                     self.logger.warning(
-                        'Unparseable import URL {}'.format(url))
+                        'Unparseable include URL {}'.format(url))
                     continue
 
-                # Handle cross importing based on allow_cross_import rules
-                if (SCHEMA_MAP[schema].allow_cross_import ==
-                        ConfigImportMode.STRICT
+                # Handle cross inclusion based on allow_cross_includes rules
+                if (SCHEMA_MAP[schema].allow_cross_includes ==
+                        ConfigIncludeMode.STRICT
                         and schema not in self.schemas()
-                        and not self.insecure_imports) or \
-                        SCHEMA_MAP[schema].allow_cross_import == \
-                        ConfigImportMode.NEVER:
+                        and not self.insecure_includes) or \
+                        SCHEMA_MAP[schema].allow_cross_includes == \
+                        ConfigIncludeMode.NEVER:
 
                     # Prevent the loading if insecure base protocols
                     ConfigBase.logger.warning(
-                        'Importing {}:// based configuration is prohibited. '
+                        'Including {}:// based configuration is prohibited. '
                         'Ignoring URL {}'.format(schema, url))
                     continue
 
@@ -263,8 +263,8 @@ class ConfigBase(URLBase):
                 # it one level
                 results['recursion'] = self.recursion - 1
 
-                # Insecure Imports flag can never be parsed from the URL
-                results['insecure_imports'] = self.insecure_imports
+                # Insecure Includes flag can never be parsed from the URL
+                results['insecure_includes'] = self.insecure_includes
 
                 try:
                     # Attempt to create an instance of our plugin using the
@@ -274,7 +274,7 @@ class ConfigBase(URLBase):
                 except Exception as e:
                     # the arguments are invalid or can not be used.
                     self.logger.warning(
-                        'Could not load import URL: {}'.format(url))
+                        'Could not load include URL: {}'.format(url))
                     self.logger.debug('Loading Exception: {}'.format(str(e)))
                     continue
 
@@ -288,7 +288,7 @@ class ConfigBase(URLBase):
 
             else:
                 self.logger.debug(
-                    'Recursion limit reached; ignoring Import URL: %s' % url)
+                    'Recursion limit reached; ignoring Include URL: %s' % url)
 
         if self._cached_servers:
             self.logger.info('Loaded {} entries from {}'.format(
@@ -513,17 +513,17 @@ class ConfigBase(URLBase):
             # Or you can use this format (no tags associated)
             <URL>
 
-            # you can also use the keyword 'import' and identify a
+            # you can also use the keyword 'include' and identify a
             # configuration location (like this file) which will be included
             # as additional configuration entries when loaded.
-            import <ConfigURL>
+            include <ConfigURL>
 
         """
         # A list of loaded Notification Services
         servers = list()
 
         # A list of additional configuration files referenced using
-        # the import keyword
+        # the include keyword
         configs = list()
 
         # Define what a valid line should look like
@@ -531,7 +531,7 @@ class ConfigBase(URLBase):
             r'^\s*(?P<line>([;#]+(?P<comment>.*))|'
             r'(\s*(?P<tags>[^=]+)=|=)?\s*'
             r'(?P<url>[a-z0-9]{2,9}://.*)|'
-            r'import\s+(?P<config>.+))?\s*$', re.I)
+            r'include\s+(?P<config>.+))?\s*$', re.I)
 
         try:
             # split our content up to read line by line
@@ -562,9 +562,9 @@ class ConfigBase(URLBase):
                 continue
 
             if config:
-                ConfigBase.logger.debug('Import URL: {}'.format(config))
+                ConfigBase.logger.debug('Include URL: {}'.format(config))
 
-                # Store our import line
+                # Store our include line
                 configs.append(config.strip())
                 continue
 
@@ -625,7 +625,7 @@ class ConfigBase(URLBase):
         servers = list()
 
         # A list of additional configuration files referenced using
-        # the import keyword
+        # the include keyword
         configs = list()
 
         try:
@@ -700,19 +700,19 @@ class ConfigBase(URLBase):
             global_tags = set(parse_list(tags))
 
         #
-        # import root directive
+        # include root directive
         #
-        imports = result.get('import', None)
-        if isinstance(imports, six.string_types):
+        includes = result.get('include', None)
+        if isinstance(includes, six.string_types):
             # Support a single inline string
-            imports = list([imports])
+            includes = list([includes])
 
-        elif not isinstance(imports, (list, tuple)):
-            # Not a problem; we simply have no imports
-            imports = list()
+        elif not isinstance(includes, (list, tuple)):
+            # Not a problem; we simply have no includes
+            includes = list()
 
         # Iterate over each config URL
-        for no, url in enumerate(imports):
+        for no, url in enumerate(includes):
 
             if isinstance(url, six.string_types):
                 # We're just a simple URL string...

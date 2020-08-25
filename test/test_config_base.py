@@ -165,7 +165,7 @@ def test_config_base_config_parse():
     # with it
     assert len(result[0][0].tags) == 0
 
-    # The second is the number of configuration import lines parsed
+    # The second is the number of configuration include lines parsed
     assert len(result[1]) == 0
 
     # Valid Configuration
@@ -245,11 +245,11 @@ def test_config_base_config_parse_text():
     # A line with mulitiple tag assignments to it
     taga,tagb=kde://
 
-    # An import statement to Apprise API with trailing spaces:
-    import http://localhost:8080/notify/apprise
+    # An include statement to Apprise API with trailing spaces:
+    include http://localhost:8080/notify/apprise
 
-    # A relative import statement (with trailing spaces)
-    import apprise.cfg     """, asset=AppriseAsset())
+    # A relative include statement (with trailing spaces)
+    include apprise.cfg     """, asset=AppriseAsset())
 
     # We expect to parse 3 entries from the above
     assert isinstance(result, list)
@@ -285,7 +285,7 @@ def test_config_base_config_parse_text():
     assert isinstance(result, list)
     assert len(result) == 0
 
-    # There were no import entries defined
+    # There were no include entries defined
     assert len(config) == 0
 
     # More invalid data
@@ -303,14 +303,14 @@ def test_config_base_config_parse_text():
     sns://T1JJ3T3L2/
 
     # Even with the above invalid entries, we can still
-    # have valid import lines
-    import file:///etc/apprise.cfg
+    # have valid include lines
+    include file:///etc/apprise.cfg
 
-    # An invalid import (nothing specified afterwards)
-    import
+    # An invalid include (nothing specified afterwards)
+    include
 
-    # An import of a config type we don't support
-    import invalid://
+    # An include of a config type we don't support
+    include invalid://
     """)
 
     # We expect to parse 0 entries from the above
@@ -326,7 +326,7 @@ def test_config_base_config_parse_text():
     assert isinstance(result, list)
     assert len(result) == 0
 
-    # There were no import entries defined
+    # There were no include entries defined
     assert len(config) == 0
 
 
@@ -357,7 +357,7 @@ def test_config_base_config_parse_yaml():
     assert isinstance(result, list)
     assert len(result) == 0
 
-    # There were no import entries defined
+    # There were no include entries defined
     assert len(config) == 0
 
     # Invalid Syntax (throws a ScannerError)
@@ -372,7 +372,7 @@ urls
     assert isinstance(result, list)
     assert len(result) == 0
 
-    # There were no import entries defined
+    # There were no include entries defined
     assert len(config) == 0
 
     # Missing url token
@@ -386,7 +386,7 @@ version: 1
     assert isinstance(result, list)
     assert len(result) == 0
 
-    # There were no import entries defined
+    # There were no include entries defined
     assert len(config) == 0
 
     # No urls defined
@@ -401,7 +401,7 @@ urls:
     assert isinstance(result, list)
     assert len(result) == 0
 
-    # There were no import entries defined
+    # There were no include entries defined
     assert len(config) == 0
 
     # Invalid url defined
@@ -417,7 +417,7 @@ urls: 43
     assert isinstance(result, list)
     assert len(result) == 0
 
-    # There were no import entries defined
+    # There were no include entries defined
     assert len(config) == 0
 
     # Invalid url/schema
@@ -434,7 +434,7 @@ urls:
     assert isinstance(result, list)
     assert len(result) == 0
 
-    # There were no import entries defined
+    # There were no include entries defined
     assert len(config) == 0
 
     # Invalid url/schema
@@ -452,13 +452,13 @@ urls:
     assert isinstance(result, list)
     assert len(result) == 0
 
-    # There were no import entries defined
+    # There were no include entries defined
     assert len(config) == 0
 
     # Invalid url/schema
     result, config = ConfigBase.config_parse_yaml("""
-# Import entry with nothing associated with it
-import:
+# Include entry with nothing associated with it
+include:
 
 urls:
   - just some free text that isn't valid:
@@ -470,7 +470,7 @@ urls:
     assert isinstance(result, list)
     assert len(result) == 0
 
-    # There were no import entries defined
+    # There were no include entries defined
     assert len(config) == 0
 
     # Invalid url/schema
@@ -487,7 +487,7 @@ urls:
     assert isinstance(result, list)
     assert len(result) == 0
 
-    # There were no import entries defined
+    # There were no include entries defined
     assert len(config) == 0
 
     # Invalid url/schema
@@ -495,8 +495,8 @@ urls:
 # no lists... just no
 urls: [milk, pumpkin pie, eggs, juice]
 
-# Importing by list is okay
-import: [file:///absolute/path/, relative/path, http://test.com]
+# Including by list is okay
+include: [file:///absolute/path/, relative/path, http://test.com]
 
 """, asset=asset)
 
@@ -504,7 +504,7 @@ import: [file:///absolute/path/, relative/path, http://test.com]
     assert isinstance(result, list)
     assert len(result) == 0
 
-    # There were 3 import entries
+    # There were 3 include entries
     assert len(config) == 3
     assert 'file:///absolute/path/' in config
     assert 'relative/path' in config
@@ -531,7 +531,7 @@ urls:
     assert isinstance(result, list)
     assert len(result) == 0
 
-    # There were no import entries defined
+    # There were no include entries defined
     assert len(config) == 0
 
     # Valid Configuration
@@ -539,12 +539,12 @@ urls:
 # if no version is specified then version 1 is presumed
 version: 1
 
-# Importing by dict
-import:
-  # File imports
+# Including by dict
+include:
+  # File includes
   - file:///absolute/path/
   - relative/path
-  # Trailing colon shouldn't disrupt import
+  # Trailing colon shouldn't disrupt include
   - http://test.com:
 
   # invalid (numeric)
@@ -571,7 +571,7 @@ urls:
     assert len(result) == 3
     assert len(result[0].tags) == 0
 
-    # There were 3 import entries
+    # There were 3 include entries
     assert len(config) == 3
     assert 'file:///absolute/path/' in config
     assert 'relative/path' in config
@@ -579,8 +579,8 @@ urls:
 
     # Valid Configuration
     result, config = ConfigBase.config_parse_yaml("""
-# A single line import is supported
-import: http://localhost:8080/notify/apprise
+# A single line include is supported
+include: http://localhost:8080/notify/apprise
 
 urls:
   - json://localhost:
@@ -615,7 +615,7 @@ urls:
     assert len(result) == 5
     assert len(result[0].tags) == 2
 
-    # Our single line import
+    # Our single line included
     assert len(config) == 1
     assert 'http://localhost:8080/notify/apprise' in config
 
@@ -635,7 +635,7 @@ urls:
     assert isinstance(result, list)
     assert len(result) == 2
 
-    # There were no import entries defined
+    # There were no include entries defined
     assert len(config) == 0
 
     # all entries will have our global tags defined in them
@@ -677,7 +677,7 @@ urls:
     assert len(result[1].tags) == 4
     assert 'list-tag' in result[1].tags
 
-    # There were no import entries defined
+    # There were no include entries defined
     assert len(config) == 0
 
     # An invalid set of entries
@@ -694,7 +694,7 @@ urls:
     assert isinstance(result, list)
     assert len(result) == 0
 
-    # There were no import entries defined
+    # There were no include entries defined
     assert len(config) == 0
 
     # An asset we'll manipulate
@@ -735,7 +735,7 @@ urls:
     assert isinstance(result, list)
     assert len(result) == 1
 
-    # There were no import entries defined
+    # There were no include entries defined
     assert len(config) == 0
 
     assert asset.app_id == "AppriseTest"
@@ -841,5 +841,5 @@ urls:
     assert 'customer' in result[5].tags
     assert 'chris' in result[5].tags
 
-    # There were no import entries defined
+    # There were no include entries defined
     assert len(config) == 0
