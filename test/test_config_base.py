@@ -23,12 +23,10 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import sys
 import six
 import pytest
 from apprise.AppriseAsset import AppriseAsset
 from apprise.config.ConfigBase import ConfigBase
-from apprise.config import __load_matrix
 from apprise import ConfigFormat
 
 # Disable logging for a cleaner testing output
@@ -522,7 +520,7 @@ urls:
   - sns://T1JJ3T3L2/:
     - invalid: test
 
-  # some strangness
+  # some strangeness
   -
     -
       - test
@@ -548,6 +546,14 @@ import:
   - relative/path
   # Trailing colon shouldn't disrupt import
   - http://test.com:
+
+  # invalid (numeric)
+  - 4
+
+  # some strangeness
+  -
+    -
+      - test
 
 #
 # Define your notification urls:
@@ -837,67 +843,3 @@ urls:
 
     # There were no import entries defined
     assert len(config) == 0
-
-
-def test_config_matrix_dynamic_importing(tmpdir):
-    """
-    API: Apprise() Config Matrix Importing
-
-    """
-
-    # Make our new path valid
-    suite = tmpdir.mkdir("apprise_config_test_suite")
-    suite.join("__init__.py").write('')
-
-    module_name = 'badconfig'
-
-    # Update our path to point to our new test suite
-    sys.path.insert(0, str(suite))
-
-    # Create a base area to work within
-    base = suite.mkdir(module_name)
-    base.join("__init__.py").write('')
-
-    # Test no app_id
-    base.join('ConfigBadFile1.py').write(
-        """
-class ConfigBadFile1(object):
-    pass""")
-
-    # No class of the same name
-    base.join('ConfigBadFile2.py').write(
-        """
-class BadClassName(object):
-    pass""")
-
-    # Exception thrown
-    base.join('ConfigBadFile3.py').write("""raise ImportError()""")
-
-    # Utilizes a schema:// already occupied (as string)
-    base.join('ConfigGoober.py').write(
-        """
-from apprise import ConfigBase
-class ConfigGoober(ConfigBase):
-    # This class tests the fact we have a new class name, but we're
-    # trying to over-ride items previously used
-
-    # The default simple (insecure) protocol
-    protocol = 'http'
-
-    # The default secure protocol
-    secure_protocol = 'https'""")
-
-    # Utilizes a schema:// already occupied (as tuple)
-    base.join('ConfigBugger.py').write("""
-from apprise import ConfigBase
-class ConfigBugger(ConfigBase):
-    # This class tests the fact we have a new class name, but we're
-    # trying to over-ride items previously used
-
-    # The default simple (insecure) protocol
-    protocol = ('http', 'bugger-test' )
-
-    # The default secure protocol
-    secure_protocol = ('https', 'bugger-tests')""")
-
-    __load_matrix(path=str(base), name=module_name)

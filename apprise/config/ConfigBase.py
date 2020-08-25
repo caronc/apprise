@@ -714,10 +714,6 @@ class ConfigBase(URLBase):
         # Iterate over each config URL
         for no, url in enumerate(imports):
 
-            # Our results object is what we use to instantiate our object if
-            # we can. Reset it to None on each iteration
-            results = list()
-
             if isinstance(url, six.string_types):
                 # We're just a simple URL string...
                 configs.append(url)
@@ -725,10 +721,6 @@ class ConfigBase(URLBase):
             elif isinstance(url, dict):
                 # Store the url and ignore arguments associated
                 configs.extend(u for u in url.keys())
-
-            elif isinstance(url, (list, tuple)):
-                # Lists are fine
-                configs.extend(u for u in url)
 
         #
         # urls root directive

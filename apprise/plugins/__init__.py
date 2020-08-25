@@ -154,10 +154,9 @@ def __load_matrix(path=abspath(dirname(__file__)), name='apprise.plugins'):
         # map our schema to our plugin
         for schema in schemas:
             if schema in SCHEMA_MAP:
-                if SCHEMA_MAP[schema] != plugin:
-                    logger.error(
-                        "Config schema duplicate ({}) detected; {} != {}"
-                        .format(schema, SCHEMA_MAP[schema], plugin))
+                logger.error(
+                    "Notification schema ({}) mismatch detected - {} to {}"
+                    .format(schema, SCHEMA_MAP[schema], plugin))
                 continue
 
             # Assign plugin

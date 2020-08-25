@@ -168,6 +168,11 @@ def test_apprise():
             # Support URL
             return ''
 
+        @staticmethod
+        def parse_url(url, *args, **kwargs):
+            # always parseable
+            return NotifyBase.parse_url(url, verify_host=False)
+
     class GoodNotification(NotifyBase):
         def __init__(self, **kwargs):
             super(GoodNotification, self).__init__(
@@ -180,6 +185,11 @@ def test_apprise():
         def send(self, **kwargs):
             # Pretend everything is okay
             return True
+
+        @staticmethod
+        def parse_url(url, *args, **kwargs):
+            # always parseable
+            return NotifyBase.parse_url(url, verify_host=False)
 
     # Store our bad notification in our schema map
     SCHEMA_MAP['bad'] = BadNotification
@@ -1433,10 +1443,15 @@ class NotifyGoober(NotifyBase):
     # trying to over-ride items previously used
 
     # The default simple (insecure) protocol (used by NotifyMail)
-    protocol = 'mailto'
+    protocol = ('mailto', 'goober')
 
     # The default secure protocol (used by NotifyMail)
-    secure_protocol = 'mailtos'""")
+    secure_protocol = 'mailtos'
+
+    @staticmethod
+    def parse_url(url, *args, **kwargs):
+        # always parseable
+        return ConfigBase.parse_url(url, verify_host=False)""")
 
     # Utilizes a schema:// already occupied (as tuple)
     base.join('NotifyBugger.py').write("""
@@ -1450,6 +1465,11 @@ class NotifyBugger(NotifyBase):
     protocol = ('mailto', 'bugger-test' )
 
     # The default secure protocol (used by NotifyMail), the other isn't
-    secure_protocol = ('mailtos', 'bugger-tests')""")
+    secure_protocol = ('mailtos', ['garbage'])
+
+    @staticmethod
+    def parse_url(url, *args, **kwargs):
+        # always parseable
+        return ConfigBase.parse_url(url, verify_host=False)""")
 
     __load_matrix(path=str(base), name=module_name)

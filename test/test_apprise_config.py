@@ -381,11 +381,19 @@ def test_apprise_config_instantiate():
         'invalid://?', suppress_exceptions=True) is None
 
     class BadConfig(ConfigBase):
+        # always allow importing
+        allow_cross_import = ConfigImportMode.ALWAYS
+
         def __init__(self, **kwargs):
             super(BadConfig, self).__init__(**kwargs)
 
             # We fail whenever we're initialized
             raise TypeError()
+
+        @staticmethod
+        def parse_url(url, *args, **kwargs):
+            # always parseable
+            return ConfigBase.parse_url(url, verify_host=False)
 
     # Store our bad configuration in our schema map
     CONFIG_SCHEMA_MAP['bad'] = BadConfig
@@ -399,9 +407,67 @@ def test_apprise_config_instantiate():
         'bad://path', suppress_exceptions=True) is None
 
 
+def test_invalid_apprise_config(tmpdir):
+    """
+    Parse invalid configuration imports
+
+    """
+
+    class BadConfig(ConfigBase):
+        # always allow importing
+        allow_cross_import = ConfigImportMode.ALWAYS
+
+        def __init__(self, **kwargs):
+            super(BadConfig, self).__init__(**kwargs)
+
+            # We intentionally fail whenever we're initialized
+            raise TypeError()
+
+        @staticmethod
+        def parse_url(url, *args, **kwargs):
+            # always parseable
+            return ConfigBase.parse_url(url, verify_host=False)
+
+    # Store our bad configuration in our schema map
+    CONFIG_SCHEMA_MAP['bad'] = BadConfig
+
+    # temporary file to work with
+    t = tmpdir.mkdir("apprise-bad-obj").join("invalid")
+    buf = """
+    # An import an invalid schema
+    import invalid://
+
+    # An unparsable valid schema
+    import https://
+
+    # A valid configuration that will throw an exception
+    import bad://
+
+    # Import ourselves (So our recursive import fails as well)
+    import {}
+
+    """.format(str(t))
+    t.write(buf)
+
+    # Create ourselves a config object with caching disbled
+    ac = AppriseConfig(recursion=2, insecure_imports=True, cache=False)
+
+    # Nothing loaded yet
+    assert len(ac) == 0
+
+    # Add our config
+    assert ac.add(configs=str(t), asset=AppriseAsset()) is True
+
+    # One configuration file
+    assert len(ac) == 1
+
+    # All of the servers were invalid and would not load
+    assert len(ac.servers()) == 0
+
+
 def test_apprise_config_with_apprise_obj(tmpdir):
     """
-    API: ConfigBase.parse_inaccessible_text_file
+    API: ConfigBase - parse valid config
 
     """
 
@@ -430,8 +496,8 @@ def test_apprise_config_with_apprise_obj(tmpdir):
     # Store our good notification in our schema map
     NOTIFY_SCHEMA_MAP['good'] = GoodNotification
 
-    # Create ourselves a config object with caching disbled
-    ac = AppriseConfig(cache=False)
+    # Create ourselves a config object
+    ac = AppriseConfig(cache=None)
 
     # Nothing loaded yet
     assert len(ac) == 0
@@ -885,10 +951,15 @@ class ConfigGoober(ConfigBase):
     # trying to over-ride items previously used
 
     # The default simple (insecure) protocol (used by ConfigHTTP)
-    protocol = 'http'
+    protocol = ('http', 'goober')
 
     # The default secure protocol (used by ConfigHTTP)
-    secure_protocol = 'https'""")
+    secure_protocol = 'https'
+
+    @staticmethod
+    def parse_url(url, *args, **kwargs):
+        # always parseable
+        return ConfigBase.parse_url(url, verify_host=False)""")
 
     # Utilizes a schema:// already occupied (as tuple)
     base.join('ConfigBugger.py').write("""
@@ -902,7 +973,12 @@ class ConfigBugger(ConfigBase):
     protocol = ('http', 'bugger-test' )
 
     # The default secure protocol (used by ConfigHTTP), the other isn't
-    secure_protocol = ('https', 'bugger-tests')""")
+    secure_protocol = ('https', ['garbage'])
+
+    @staticmethod
+    def parse_url(url, *args, **kwargs):
+        # always parseable
+        return ConfigBase.parse_url(url, verify_host=False)""")
 
     __load_matrix(path=str(base), name=module_name)
 
