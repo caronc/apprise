@@ -29,6 +29,7 @@ import io
 import mock
 import pytest
 from apprise import NotifyFormat
+from apprise import ConfigFormat
 from apprise import ConfigIncludeMode
 from apprise.Apprise import Apprise
 from apprise.AppriseConfig import AppriseConfig
@@ -304,10 +305,11 @@ def test_apprise_add_config():
     """
     # Create ourselves a config object
     ac = AppriseConfig()
-    assert ac.add_config(content=content)
+    assert ac.add_config(content=content) is True
 
     # One configuration file should have been found
     assert len(ac) == 1
+    assert ac[0].config_format is ConfigFormat.TEXT
 
     # Object can be directly checked as a boolean; response is True
     # when there is at least one entry
@@ -336,6 +338,39 @@ def test_apprise_add_config():
 
     # and 6 urls.. (as we've doubled up)
     assert len(ac.servers()) == 6
+
+    content = """
+    # A YAML File
+    urls:
+       - mailto://usera:pass@gmail.com
+       - gnome://:
+          tag: taga,tagb
+    """
+
+    # Create ourselves a config object
+    ac = AppriseConfig()
+    assert ac.add_config(content=content) is True
+
+    # One configuration file should have been found
+    assert len(ac) == 1
+    assert ac[0].config_format is ConfigFormat.YAML
+
+    # Object can be directly checked as a boolean; response is True
+    # when there is at least one entry
+    assert ac
+
+    # We should be able to read our 2 servers from that
+    assert len(ac.servers()) == 2
+
+    # Now an invalid configuration file
+    content = "invalid"
+
+    # Create ourselves a config object
+    ac = AppriseConfig()
+    assert ac.add_config(content=content) is False
+
+    # Nothing is loaded
+    assert len(ac.servers()) == 0
 
 
 def test_apprise_config_tagging(tmpdir):
