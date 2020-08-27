@@ -27,6 +27,7 @@ import six
 
 from . import config
 from . import ConfigBase
+from . import CONFIG_FORMATS
 from . import URLBase
 from .AppriseAsset import AppriseAsset
 
@@ -252,7 +253,12 @@ class AppriseConfig(object):
         # Create ourselves a ConfigMemory Object to store our configuration
         instance = config.ConfigMemory(
             content=content, format=format, asset=asset, tag=tag,
-            recursion=self.recursion, insecure_includes=insecure_includes)
+            recursion=recursion, insecure_includes=insecure_includes)
+
+        if instance.config_format not in CONFIG_FORMATS:
+            logger.warning(
+                "The format of the configuration could not be deteced.")
+            return False
 
         # Add our initialized plugin to our server listings
         self.configs.append(instance)
