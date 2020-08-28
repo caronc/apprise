@@ -60,10 +60,6 @@ class NotifyPushjet(NotifyBase):
         '{schema}://{host}/{secret_key}',
         '{schema}://{user}:{password}@{host}:{port}/{secret_key}',
         '{schema}://{user}:{password}@{host}/{secret_key}',
-
-        # Kept for backwards compatibility; will be depricated eventually
-        '{schema}://{secret_key}@{host}',
-        '{schema}://{secret_key}@{host}:{port}',
     )
 
     # Define our tokens
@@ -244,13 +240,6 @@ class NotifyPushjet(NotifyBase):
            pjets://hostname:port/secret_key
            pjets://user:pass@hostname/secret_key
            pjets://user:pass@hostname:port/secret_key
-
-        Legacy (Depricated) Syntax:
-           pjet://secret_key@hostname
-           pjet://secret_key@hostname:port
-           pjets://secret_key@hostname
-           pjets://secret_key@hostname:port
-
         """
         results = NotifyBase.parse_url(url)
         if not results:
@@ -272,23 +261,5 @@ class NotifyPushjet(NotifyBase):
         if 'secret' in results['qsd'] and len(results['qsd']['secret']):
             results['secret_key'] = \
                 NotifyPushjet.unquote(results['qsd']['secret'])
-
-        if results.get('secret_key') is None:
-            # Deprication Notice issued for v0.7.9
-            NotifyPushjet.logger.deprecate(
-                'The Pushjet URL contains secret_key in the user field'
-                ' which will be deprecated in an upcoming '
-                'release. Please place this in the path of the URL instead.'
-            )
-
-            # Store it as it's value based on the user field
-            results['secret_key'] = \
-                NotifyPushjet.unquote(results.get('user'))
-
-            # there is no way http-auth is enabled, be sure to unset the
-            # current defined user (if present). This is done due to some
-            # logic that takes place in the send() since we support http-auth.
-            results['user'] = None
-            results['password'] = None
 
         return results

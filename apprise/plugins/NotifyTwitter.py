@@ -73,9 +73,8 @@ class NotifyTwitter(NotifyBase):
     # The services URL
     service_url = 'https://twitter.com/'
 
-    # The default secure protocol is twitter.  'tweet' is left behind
-    # for backwards compatibility of older apprise usage
-    secure_protocol = ('twitter', 'tweet')
+    # The default secure protocol is twitter.
+    secure_protocol = 'twitter'
 
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_twitter'
@@ -593,7 +592,7 @@ class NotifyTwitter(NotifyBase):
 
         return '{schema}://{ckey}/{csecret}/{akey}/{asecret}' \
             '/{targets}/?{params}'.format(
-                schema=self.secure_protocol[0],
+                schema=self.secure_protocol,
                 ckey=self.pprint(self.ckey, privacy, safe=''),
                 csecret=self.pprint(
                     self.csecret, privacy, mode=PrivacyMode.Secret, safe=''),
@@ -662,10 +661,5 @@ class NotifyTwitter(NotifyBase):
         if 'to' in results['qsd'] and len(results['qsd']['to']):
             results['targets'] += \
                 NotifyTwitter.parse_list(results['qsd']['to'])
-
-        if results.get('schema', 'twitter').lower() == 'tweet':
-            # Deprication Notice issued for v0.7.9
-            NotifyTwitter.logger.deprecate(
-                'tweet:// has been replaced by twitter://')
 
         return results

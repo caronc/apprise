@@ -469,20 +469,9 @@ class NotifyDiscord(NotifyBase):
         # Update Avatar Icon
         results['avatar'] = parse_bool(results['qsd'].get('avatar', True))
 
-        # Use Thumbnail
-        if 'thumbnail' in results['qsd']:
-            # Deprication Notice issued for v0.7.5
-            NotifyDiscord.logger.deprecate(
-                'The Discord URL contains the parameter '
-                '"thumbnail=" which will be deprecated in an upcoming '
-                'release. Please use "image=" instead.'
-            )
-
-        # use image= for consistency with the other plugins but we also
-        # support thumbnail= for backwards compatibility.
-        results['include_image'] = \
-            parse_bool(results['qsd'].get(
-                'image', results['qsd'].get('thumbnail', False)))
+        # Boolean to include an image or not
+        results['include_image'] = parse_bool(results['qsd'].get(
+            'image', NotifyDiscord.template_args['image']['default']))
 
         # Extract avatar url if it was specified
         if 'avatar_url' in results['qsd']:
