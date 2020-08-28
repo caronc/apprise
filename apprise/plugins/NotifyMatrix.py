@@ -1069,34 +1069,12 @@ class NotifyMatrix(NotifyBase):
         if 'to' in results['qsd'] and len(results['qsd']['to']):
             results['targets'] += NotifyMatrix.parse_list(results['qsd']['to'])
 
-        # Thumbnail (old way)
-        if 'thumbnail' in results['qsd']:
-            # Deprication Notice issued for v0.7.5
-            NotifyMatrix.logger.deprecate(
-                'The Matrix URL contains the parameter '
-                '"thumbnail=" which will be deprecated in an upcoming '
-                'release. Please use "image=" instead.'
-            )
+        # Boolean to include an image or not
+        results['include_image'] = parse_bool(results['qsd'].get(
+            'image', NotifyMatrix.template_args['image']['default']))
 
-        # use image= for consistency with the other plugins but we also
-        # support thumbnail= for backwards compatibility.
-        results['include_image'] = \
-            parse_bool(results['qsd'].get(
-                'image', results['qsd'].get('thumbnail', False)))
-
-        # Webhook (old way)
-        if 'webhook' in results['qsd']:
-            # Deprication Notice issued for v0.7.5
-            NotifyMatrix.logger.deprecate(
-                'The Matrix URL contains the parameter '
-                '"webhook=" which will be deprecated in an upcoming '
-                'release. Please use "mode=" instead.'
-            )
-
-        # use mode= for consistency with the other plugins but we also
-        # support webhook= for backwards compatibility.
-        results['mode'] = results['qsd'].get(
-            'mode', results['qsd'].get('webhook'))
+        # Get our mode
+        results['mode'] = results['qsd'].get('mode')
 
         # t2bot detection... look for just a hostname, and/or just a user/host
         # if we match this; we can go ahead and set the mode (but only if

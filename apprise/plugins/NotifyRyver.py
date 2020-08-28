@@ -323,19 +323,8 @@ class NotifyRyver(NotifyBase):
             # no token
             results['token'] = None
 
-        if 'webhook' in results['qsd']:
-            # Deprication Notice issued for v0.7.5
-            NotifyRyver.logger.deprecate(
-                'The Ryver URL contains the parameter '
-                '"webhook=" which will be deprecated in an upcoming '
-                'release. Please use "mode=" instead.'
-            )
-
-        # use mode= for consistency with the other plugins but we also
-        # support webhook= for backwards compatibility.
-        results['mode'] = results['qsd'].get(
-            'mode', results['qsd'].get(
-                'webhook', RyverWebhookMode.RYVER))
+        # Retrieve the mode
+        results['mode'] = results['qsd'].get('mode', RyverWebhookMode.RYVER)
 
         # use image= for consistency with the other plugins
         results['include_image'] = \

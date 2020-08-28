@@ -281,25 +281,7 @@ TEST_URLS = (
         'instance': plugins.NotifyDiscord,
         'requests_response_code': requests.codes.no_content,
     }),
-
-    # Enable other options
-
-    # DEPRICATED reference to Thumbnail
-    ('discord://%s/%s?format=markdown&footer=Yes&thumbnail=Yes' % (
-        'i' * 24, 't' * 64), {
-            'instance': plugins.NotifyDiscord,
-            'requests_response_code': requests.codes.no_content,
-
-            # Our expected url(privacy=True) startswith() response:
-            'privacy_url': 'discord://i...i/t...t/',
-    }),
-    ('discord://%s/%s?format=markdown&footer=Yes&thumbnail=No' % (
-        'i' * 24, 't' * 64), {
-            'instance': plugins.NotifyDiscord,
-            'requests_response_code': requests.codes.no_content,
-    }),
-
-    # thumbnail= is depricated and image= is the proper entry
+    # test image= field
     ('discord://%s/%s?format=markdown&footer=Yes&image=Yes' % (
         'i' * 24, 't' * 64), {
             'instance': plugins.NotifyDiscord,
@@ -311,8 +293,11 @@ TEST_URLS = (
         'i' * 24, 't' * 64), {
             'instance': plugins.NotifyDiscord,
             'requests_response_code': requests.codes.no_content,
-            # don't include an image by default
-            'include_image': True,
+    }),
+    ('discord://%s/%s?format=markdown&footer=Yes&image=Yes' % (
+        'i' * 24, 't' * 64), {
+            'instance': plugins.NotifyDiscord,
+            'requests_response_code': requests.codes.no_content,
     }),
     ('https://discord.com/api/webhooks/{}/{}'.format(
         '0' * 10, 'B' * 40), {
@@ -1549,20 +1534,6 @@ TEST_URLS = (
         # user and token correctly specified with webhook
         'instance': plugins.NotifyMatrix,
     }),
-    # Legacy (depricated) webhook reference
-    ('matrix://user:token@localhost?webhook=matrix&format=text', {
-        # user and token correctly specified with webhook
-        'instance': plugins.NotifyMatrix,
-        'response': False,
-    }),
-    ('matrix://user:token@localhost?webhook=matrix&format=html', {
-        # user and token correctly specified with webhook
-        'instance': plugins.NotifyMatrix,
-    }),
-    ('matrix://user:token@localhost?webhook=slack&format=text', {
-        # user and token correctly specified with webhook
-        'instance': plugins.NotifyMatrix,
-    }),
     ('matrixs://user:token@localhost?mode=SLACK&format=markdown', {
         # user and token specified; slack webhook still detected
         # despite uppercase characters
@@ -1595,15 +1566,6 @@ TEST_URLS = (
     }),
     # Test Native URL
     ('https://webhooks.t2bot.io/api/v1/matrix/hook/{}/'.format('d' * 64), {
-        # user and token specified; image set to True
-        'instance': plugins.NotifyMatrix,
-    }),
-    # Legacy (Depricated) image reference
-    ('matrixs://user:token@localhost?mode=slack&thumbnail=False', {
-        # user and token specified; image set to True
-        'instance': plugins.NotifyMatrix,
-    }),
-    ('matrixs://user:token@localhost?mode=slack&thumbnail=True', {
         # user and token specified; image set to True
         'instance': plugins.NotifyMatrix,
     }),
@@ -2767,10 +2729,6 @@ TEST_URLS = (
     ('pjet://%s' % ('a' * 32), {
         'instance': TypeError,
     }),
-    # Legacy method of logging in (soon to be depricated)
-    ('pjet://%s@localhost' % ('a' * 32), {
-        'instance': plugins.NotifyPushjet,
-    }),
     # The proper way to log in
     ('pjet://user:pass@localhost/%s' % ('a' * 32), {
         'instance': plugins.NotifyPushjet,
@@ -2785,12 +2743,6 @@ TEST_URLS = (
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'pjet://user:****@localhost',
-    }),
-    # Specify your own server with login (no secret = fail normally)
-    # however this will work since we're providing depricated support
-    # at this time so the 'user' get's picked up as being the secret_key
-    ('pjet://user:pass@localhost', {
-        'instance': plugins.NotifyPushjet,
     }),
     # Specify your own server with port
     ('pjets://localhost:8080/%s' % ('a' * 32), {
@@ -3133,8 +3085,8 @@ TEST_URLS = (
         # Just org provided (no token)
         'instance': TypeError,
     }),
-    ('ryver://apprise/ckhrjW8w672m6HG?webhook=invalid', {
-        # Invalid webhook provided
+    ('ryver://apprise/ckhrjW8w672m6HG?mode=invalid', {
+        # invalid mode provided
         'instance': TypeError,
     }),
     ('ryver://x/ckhrjW8w672m6HG?mode=slack', {
@@ -4090,12 +4042,6 @@ TEST_URLS = (
     }),
     ('twitter://ckey/csecret/access_token/access_secret?mode=tweet', {
         # A Public Tweet
-        'instance': plugins.NotifyTwitter,
-    }),
-    ('tweet://consumer_key/consumer_secret/access_token/access_secret', {
-        # tweet:// is to be depricated; but we will support for purposes of
-        # generating a warning to the user; the above matches an above
-        # twitter:// reference so that it can use what was cached
         'instance': plugins.NotifyTwitter,
     }),
     ('twitter://user@ckey/csecret/access_token/access_secret?mode=invalid', {

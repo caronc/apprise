@@ -28,6 +28,7 @@ import pytest
 import mock
 import requests
 from json import dumps
+from apprise import Apprise
 from apprise import AppriseAttachment
 from apprise import AppriseAsset
 from apprise import NotifyType
@@ -279,3 +280,10 @@ def test_notify_telegram_plugin(mock_post, mock_get):
     assert len(obj.targets) == 0
     assert obj.notify(title='hello', body='world') is False
     assert len(obj.targets) == 0
+
+    # Test Telegram Group
+    obj = Apprise.instantiate(
+        'tgram://123456789:ABCdefghijkl123456789opqyz/-123456789525')
+    assert isinstance(obj, plugins.NotifyTelegram)
+    assert len(obj.targets) == 1
+    assert '-123456789525' in obj.targets
