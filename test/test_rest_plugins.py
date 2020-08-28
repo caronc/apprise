@@ -293,8 +293,11 @@ TEST_URLS = (
         'i' * 24, 't' * 64), {
             'instance': plugins.NotifyDiscord,
             'requests_response_code': requests.codes.no_content,
-            # don't include an image by default
-            'include_image': True,
+    }),
+    ('discord://%s/%s?format=markdown&footer=Yes&image=Yes' % (
+        'i' * 24, 't' * 64), {
+            'instance': plugins.NotifyDiscord,
+            'requests_response_code': requests.codes.no_content,
     }),
     ('https://discord.com/api/webhooks/{}/{}'.format(
         '0' * 10, 'B' * 40), {
