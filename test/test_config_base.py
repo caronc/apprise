@@ -843,3 +843,66 @@ urls:
 
     # There were no include entries defined
     assert len(config) == 0
+
+    # Valid Configuration (multi inline configuration entries)
+    result, config = ConfigBase.config_parse_yaml("""
+# A configuration file that contains 2 includes separated by a comma and/or
+# space:
+include: http://localhost:8080/notify/apprise, http://localhost/apprise/cfg
+
+""", asset=asset)
+
+    # We will have loaded no results
+    assert isinstance(result, list)
+    assert len(result) == 0
+
+    # But our two configuration files will be present:
+    assert len(config) == 2
+    assert 'http://localhost:8080/notify/apprise' in config
+    assert 'http://localhost/apprise/cfg' in config
+
+    # Valid Configuration (another way of specifying more then one include)
+    result, config = ConfigBase.config_parse_yaml("""
+# A configuration file that contains 4 includes on their own
+# lines beneath the keyword `include`:
+include:
+   http://localhost:8080/notify/apprise
+   http://localhost/apprise/cfg01
+   http://localhost/apprise/cfg02
+   http://localhost/apprise/cfg03
+
+""", asset=asset)
+
+    # We will have loaded no results
+    assert isinstance(result, list)
+    assert len(result) == 0
+
+    # But our 4 configuration files will be present:
+    assert len(config) == 4
+    assert 'http://localhost:8080/notify/apprise' in config
+    assert 'http://localhost/apprise/cfg01' in config
+    assert 'http://localhost/apprise/cfg02' in config
+    assert 'http://localhost/apprise/cfg03' in config
+
+    # Valid Configuration (we allow comma separated entries for
+    # each defined bullet)
+    result, config = ConfigBase.config_parse_yaml("""
+# A configuration file that contains 4 includes on their own
+# lines beneath the keyword `include`:
+include:
+   - http://localhost:8080/notify/apprise, http://localhost/apprise/cfg01
+     http://localhost/apprise/cfg02
+   - http://localhost/apprise/cfg03
+
+""", asset=asset)
+
+    # We will have loaded no results
+    assert isinstance(result, list)
+    assert len(result) == 0
+
+    # But our 4 configuration files will be present:
+    assert len(config) == 4
+    assert 'http://localhost:8080/notify/apprise' in config
+    assert 'http://localhost/apprise/cfg01' in config
+    assert 'http://localhost/apprise/cfg02' in config
+    assert 'http://localhost/apprise/cfg03' in config

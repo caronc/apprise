@@ -38,6 +38,7 @@ from ..common import ConfigIncludeMode
 from ..utils import GET_SCHEMA_RE
 from ..utils import parse_list
 from ..utils import parse_bool
+from ..utils import parse_urls
 from . import SCHEMA_MAP
 
 
@@ -704,8 +705,9 @@ class ConfigBase(URLBase):
         #
         includes = result.get('include', None)
         if isinstance(includes, six.string_types):
-            # Support a single inline string
-            includes = list([includes])
+            # Support a single inline string or multiple ones separated by a
+            # comma and/or space
+            includes = parse_urls(includes)
 
         elif not isinstance(includes, (list, tuple)):
             # Not a problem; we simply have no includes
@@ -715,8 +717,9 @@ class ConfigBase(URLBase):
         for no, url in enumerate(includes):
 
             if isinstance(url, six.string_types):
-                # We're just a simple URL string...
-                configs.append(url)
+                # Support a single inline string or multiple ones separated by
+                # a comma and/or space
+                configs.extend(parse_urls(url))
 
             elif isinstance(url, dict):
                 # Store the url and ignore arguments associated
