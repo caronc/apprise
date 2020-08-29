@@ -1,0 +1,71 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+#
+# Copyright (C) 2020 Chris Caron <lead2gold@gmail.com>
+# All rights reserved.
+#
+# This code is licensed under the MIT License.
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files(the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and / or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions :
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+
+"""
+This is a debug tool that allows one to test the apprise source code just
+checked out. The script works out of the ./devel directory and will also work
+if you just copy it back on directory and run it from the root.
+"""
+import sys
+from os.path import join
+from os.path import abspath
+from os.path import dirname
+
+#
+# Update path
+#
+
+# First assume we might be in the ./devel directory
+sys.path.insert(
+    0, join(dirname(dirname(abspath(__file__))), 'apprise'))  # noqa
+
+# The user might have copied the apprise script back one directory
+# so support this too..
+sys.path.insert(
+    0, join(dirname(abspath(__file__)), 'apprise'))  # noqa
+
+# We can also use the current directory we're standing in as a last
+# resort
+sys.path.insert(0, join(os. getcwd(), 'apprise'))  # noqa
+
+# Apprise tool now importable
+from apprise.cli import main
+import logging
+
+
+if __name__ == "__main__":
+    # Logging
+    ch = logging.StreamHandler(sys.stdout)
+    logger = logging.getLogger(__name__)
+
+    formatter = logging.Formatter(
+        '%(asctime)s - %(levelname)s - %(message)s')
+    ch.setFormatter(formatter)
+    logger.addHandler(ch)
+    logging.getLogger('apprise').setLevel(logger.getEffectiveLevel())
+
+    main()
+    exit(0)
