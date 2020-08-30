@@ -30,15 +30,19 @@ PYTEST=$(which py.test)
 # to key in on a specific test type:
 #     ./devel/test.sh <keyword>
 
-PWD=$(pwd)
+# Absolute path to this script, e.g. /home/user/bin/foo.sh
+SCRIPT=$(readlink -f "$0")
+
+# Absolute path this script is in, thus /home/user/bin
+SCRIPTPATH=$(dirname "$SCRIPT")
 
 PYTHONPATH=""
 
-if [ -f "$PWD/setup.cfg" ]; then
-   PYTHONPATH="$PWD"
+if [ -f "$(dirname $SCRIPTPATH)/setup.cfg" ]; then
+   PYTHONPATH="$(dirname $SCRIPTPATH)"
 
-elif [ -f "$(dirname $PWD)/setup.cfg" ]; then
-   PYTHONPATH="$(dirname $PWD)"
+elif [ -f "$SCRIPTPATH/setup.cfg" ]; then
+   PYTHONPATH="$SCRIPTPATH"
 
 else
    echo "Error: Could not locate apprise setup.cfg file."

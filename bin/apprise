@@ -30,6 +30,7 @@ checked out. The script works out of the ./devel directory and will also work
 if you just copy it back on directory and run it from the root.
 """
 import sys
+from os import getcwd
 from os.path import join
 from os.path import abspath
 from os.path import dirname
@@ -49,7 +50,7 @@ sys.path.insert(
 
 # We can also use the current directory we're standing in as a last
 # resort
-sys.path.insert(0, join(os. getcwd(), 'apprise'))  # noqa
+sys.path.insert(0, join(getcwd(), 'apprise'))  # noqa
 
 # Apprise tool now importable
 from apprise.cli import main

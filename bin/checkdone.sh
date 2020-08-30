@@ -22,6 +22,28 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+# Absolute path to this script, e.g. /home/user/bin/foo.sh
+SCRIPT=$(readlink -f "$0")
+
+# Absolute path this script is in, thus /home/user/bin
+SCRIPTPATH=$(dirname "$SCRIPT")
+
+FOUNDROOT=1
+if [ -f "$(dirname $SCRIPTPATH)/setup.cfg" ]; then
+   pushd "$(dirname $SCRIPTPATH)" &>/dev/null
+   FOUNDROOT=$?
+
+elif [ -f "$SCRIPTPATH/setup.cfg" ]; then
+   pushd "$SCRIPTPATH" &>/dev/null
+   FOUNDROOT=$?
+
+fi
+
+if [ $FOUNDROOT -ne 0 ]; then
+   echo "Error: Could not locate apprise setup.cfg file."
+   exit 1
+fi
+
 # This is a useful tool for checking for any lint errors and additionally
 # checking the overall coverage.
 which flake8 &>/dev/null
@@ -36,13 +58,17 @@ which coverage &>/dev/null
    echo "  >  pip install pytest-cov coverage" && \
    exit 1
 
+echo "Performing PEP8 check..."
 flake8 . --show-source --statistics
 if [ $? -ne 0 ]; then
    echo "PEP8 check failed"
    exit 1
 fi
+echo "PEP8 check succeeded; no errors found! :)"
+echo
 
 # Run our unit test coverage check
+echo "Running test coverage check..."
 coverage run -m pytest -vv
 if [ $? -ne 0 ]; then
    echo "Tests failed."

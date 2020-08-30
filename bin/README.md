@@ -1,4 +1,4 @@
-# Apprise Development
+# Apprise Development Tools
 
 This directory just contains some tools that are useful when developing with Apprise.  The tools are as follows:
 
@@ -31,3 +31,12 @@ This directory just contains some tools that are useful when developing with App
    # actually done with your code commit or not. :)
    ./bin/checkdone.sh
    ```
+
+You can optionally just update your path to include this `./bin` directory and call the scripts that way as well. Hence:
+```bash
+# Update the path to include the bin directory:
+export PATH="$(pwd)/bin:$PATH"
+
+# Now you can call the scripts identified above from anywhere...
+```
+
