@@ -23,7 +23,7 @@ matrix:
       env: TOXENV=py39
     - python: "pypy2.7-6.0"
       env: TOXENV=pypy
-    - python: "pypy3.5-6.0"
+    - python: "pypy3.5-7.0"
       env: TOXENV=pypy3
 
 install:
