@@ -55,6 +55,8 @@
 
 # A great source for the icon reference:
 # - https://developer.lametric.com/icons
+
+import re
 import six
 import requests
 from json import dumps
@@ -383,6 +385,10 @@ class NotifyLametric(NotifyBase):
             'values': LAMETRIC_PRIORITIES,
             'default': LametricPriority.INFO,
         },
+        'icon': {
+            'name': _('Custom Icon'),
+            'type': 'string',
+        },
         'icon_type': {
             'name': _('Icon Type'),
             'type': 'choice:string',
@@ -409,7 +415,8 @@ class NotifyLametric(NotifyBase):
     })
 
     def __init__(self, apikey=None, client_id=None, secret=None, priority=None,
-                 icon_type=None, sound=None, mode=None, cycles=None, **kwargs):
+                 icon=None, icon_type=None, sound=None, mode=None,
+                 cycles=None, **kwargs):
         """
         Initialize LaMetric Object
         """
@@ -464,6 +471,11 @@ class NotifyLametric(NotifyBase):
 
         else:
             self.priority = priority
+
+        # assign our icon (if it was defined); we also eliminate
+        # any hashtag (#) entries that might be present
+        self.icon = re.search(r'[#\s]*(?P<value>.+?)\s*$', icon) \
+            .group('value') if isinstance(icon, six.string_types) else None
 
         if icon_type not in LAMETRIC_ICON_TYPES:
             self.icon_type = self.template_args['icon_type']['default']
@@ -530,12 +542,18 @@ class NotifyLametric(NotifyBase):
             self.logger.warning(
                 'LaMetric cycle settings is unavailable in Cloud mode')
 
+        # Assign our icon if the user specified a custom one, otherwise
+        # choose from our pre-set list (based on notify_type)
+        icon = self.icon if self.icon \
+            else self.lametric_icon_id_mapping[notify_type]
+
+        # Our Payload
         # Cloud Notifications don't have as much functionality
         # You can not set priority and/or sound
         payload = {
             "frames": [
                 {
-                    "icon": self.lametric_icon_id_mapping[notify_type],
+                    "icon": icon,
                     "text": body,
                 }
             ]
@@ -551,6 +569,11 @@ class NotifyLametric(NotifyBase):
         """
         Return URL and Payload for Device directed requests
         """
+
+        # Assign our icon if the user specified a custom one, otherwise
+        # choose from our pre-set list (based on notify_type)
+        icon = self.icon if self.icon \
+            else self.lametric_icon_id_mapping[notify_type]
 
         # Our Payload
         payload = {
@@ -573,7 +596,7 @@ class NotifyLametric(NotifyBase):
                 "cycles": self.cycles,
                 "frames": [
                     {
-                        "icon": self.lametric_icon_id_mapping[notify_type],
+                        "icon": icon,
                         "text": body,
                     }
                 ]
@@ -701,6 +724,10 @@ class NotifyLametric(NotifyBase):
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
+        if self.icon:
+            # Assign our icon IF one was specified
+            params['icon'] = self.icon
+
         if self.mode == LametricMode.CLOUD:
             # Upstream/LaMetric App Return
             return '{schema}://{client_id}@{secret}/?{params}'.format(
@@ -774,6 +801,10 @@ class NotifyLametric(NotifyBase):
         # Priority Handling
         if 'priority' in results['qsd'] and len(results['qsd']['priority']):
             results['priority'] = results['qsd']['priority'].strip().lower()
+
+        # Icon Type
+        if 'icon' in results['qsd'] and len(results['qsd']['icon']):
+            results['icon'] = results['qsd']['icon'].strip().lower()
 
         # Icon Type
         if 'icon_type' in results['qsd'] and len(results['qsd']['icon_type']):
