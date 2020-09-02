@@ -28,6 +28,7 @@ import pytest
 from apprise.AppriseAsset import AppriseAsset
 from apprise.config.ConfigBase import ConfigBase
 from apprise import ConfigFormat
+import yaml
 
 # Disable logging for a cleaner testing output
 import logging
@@ -492,26 +493,6 @@ urls:
 
     # Invalid url/schema
     result, config = ConfigBase.config_parse_yaml("""
-# no lists... just no
-urls: [milk, pumpkin pie, eggs, juice]
-
-# Including by list is okay
-include: [file:///absolute/path/, relative/path, http://test.com]
-
-""", asset=asset)
-
-    # Invalid data gets us an empty result set
-    assert isinstance(result, list)
-    assert len(result) == 0
-
-    # There were 3 include entries
-    assert len(config) == 3
-    assert 'file:///absolute/path/' in config
-    assert 'relative/path' in config
-    assert 'http://test.com' in config
-
-    # Invalid url/schema
-    result, config = ConfigBase.config_parse_yaml("""
 urls:
   # a very invalid sns entry
   - sns://T1JJ3T3L2/
@@ -906,3 +887,39 @@ include:
     assert 'http://localhost/apprise/cfg01' in config
     assert 'http://localhost/apprise/cfg02' in config
     assert 'http://localhost/apprise/cfg03' in config
+
+
+# This test fails on CentOS 8.x so it was moved into it's own function
+# so it could be bypassed. The ability to use lists in YAML files didn't
+# appear to happen until later on; it's certainly not available in v3.12
+# which was what shipped with CentOS v8 at the time.
+@pytest.mark.skipif(int(yaml.__version__.split('.')[0]) <= 3,
+                    reason="requires pyaml v4.x or higher.")
+def test_config_base_config_parse_yaml_list():
+    """
+    API: ConfigBase.config_parse_yaml list parsing
+
+    """
+
+    # general reference used below
+    asset = AppriseAsset()
+
+    # Invalid url/schema
+    result, config = ConfigBase.config_parse_yaml("""
+# no lists... just no
+urls: [milk, pumpkin pie, eggs, juice]
+
+# Including by list is okay
+include: [file:///absolute/path/, relative/path, http://test.com]
+
+""", asset=asset)
+
+    # Invalid data gets us an empty result set
+    assert isinstance(result, list)
+    assert len(result) == 0
+
+    # There were 3 include entries
+    assert len(config) == 3
+    assert 'file:///absolute/path/' in config
+    assert 'relative/path' in config
+    assert 'http://test.com' in config

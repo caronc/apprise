@@ -56,7 +56,7 @@ Sinch, Slack, Spontit, Super Toasty, Stride, Syslog, Techulus Push, Telegram,
 Twilio, Twitter, Twist, XBMC, XMPP, Webex Teams}
 
 Name:           python-%{pypi_name}
-Version:        0.8.7
+Version:        0.8.8
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        MIT
@@ -175,6 +175,8 @@ BuildRequires: python%{python3_pkgversion}-pytest-runner
 %if 0%{?rhel} && 0%{?rhel} <= 7
 # rhel7 older package work-arounds
 %patch0 -p1
+# rhel7 doesn't like the new asyncio syntax
+rm -f apprise/py3compat/asyncio.py
 %endif
 
 %build
@@ -237,6 +239,9 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 %endif
 
 %changelog
+* Wed Sep  2 2020 Chris Caron <lead2gold@gmail.com> - 0.8.8-1
+- Updated to v0.8.8
+
 * Thu Aug 13 2020 Chris Caron <lead2gold@gmail.com> - 0.8.7-1
 - Updated to v0.8.7
 
