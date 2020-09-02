@@ -1,6 +1,13 @@
 # Apprise Development Tools
 
-This directory just contains some tools that are useful when developing with Apprise.  The tools are as follows:
+This directory just contains some tools that are useful when developing with Apprise.  It is presumed that you've set yourself up with a working development environment before using the tools identified here:
+
+```bash
+# Using pip, setup a working development environment:
+pip install -r dev-requirements.txt
+```
+
+The tools are as follows:
 
 - :gear: `apprise`: This effectively acts as the `apprise` tool would once Apprise has been installed into your environment.  However `apprise` uses the branch you're working in.  So if you added a new Notification service, you can test with it as you would easily.  `apprise` takes all the same parameters as the `apprise` tool does.
 
