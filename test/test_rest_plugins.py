@@ -1353,6 +1353,26 @@ TEST_URLS = (
         # Invalid priority just produce warnings... object still loads
         'instance': plugins.NotifyLametric,
     }),
+    ('lametric://{}@192.168.1.2/?icon=230'.format(UUID4), {
+        # Our custom icon by it's ID
+        'instance': plugins.NotifyLametric,
+    }),
+    ('lametrics://{}@192.168.1.2/?icon=#230'.format(UUID4), {
+        # Our custom icon by it's ID; the hashtag at the front is ignored
+        'instance': plugins.NotifyLametric,
+    }),
+    ('lametric://{}@192.168.1.2/?icon=Heart'.format(UUID4), {
+        # Our custom icon; the hashtag at the front is ignored
+        'instance': plugins.NotifyLametric,
+    }),
+    ('lametric://{}@192.168.1.2/?icon=#'.format(UUID4), {
+        # a hashtag and nothing else
+        'instance': plugins.NotifyLametric,
+    }),
+    ('lametric://{}@192.168.1.2/?icon=#%20%20%20'.format(UUID4), {
+        # a hashtag and some spaces
+        'instance': plugins.NotifyLametric,
+    }),
     ('lametric://{}@192.168.1.3/?cycles=2'.format(UUID4), {
         # Cycles changed
         'instance': plugins.NotifyLametric,
@@ -1373,6 +1393,12 @@ TEST_URLS = (
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'lametric://8...2@****/',
+    }),
+    ('lametric://{}@{}/'.format(
+        UUID4, 'YWosnkdnoYREsdogfoSDff734kjsfbweo7r434597FYODIoicosdonnreiuhvd'
+               'ciuhouerhohcd8sds89fdRw==?icon=Heart'), {
+        # Cloude mode with the icon over-ride
+        'instance': plugins.NotifyLametric,
     }),
     ('lametric://{}@example.com/'.format(UUID4), {
         'instance': plugins.NotifyLametric,
