@@ -836,6 +836,17 @@ class ConfigBase(URLBase):
                             # add our results to our global set
                             results.append(r)
 
+                elif isinstance(tokens, dict):
+                    # Copy ourselves a template of our parsed URL as a base to
+                    # work with
+                    r = _results.copy()
+
+                    # add our result set
+                    r.update(tokens)
+
+                    # add our results to our global set
+                    results.append(r)
+
                 else:
                     # add our results to our global set
                     results.append(_results)

@@ -28,6 +28,7 @@ import pytest
 from apprise.AppriseAsset import AppriseAsset
 from apprise.config.ConfigBase import ConfigBase
 from apprise import ConfigFormat
+from apprise import plugins
 import yaml
 
 # Disable logging for a cleaner testing output
@@ -564,10 +565,15 @@ urls:
 include: http://localhost:8080/notify/apprise
 
 urls:
+  # The following generates 1 service
+  - json://localhost:
+       tag: my-custom-tag, my-other-tag
+
+  # The following also generates 1 service
   - json://localhost:
     - tag: my-custom-tag, my-other-tag
 
-  # How to stack multiple entries:
+  # How to stack multiple entries (this generates 2):
   - mailto://user:123abc@yahoo.ca:
     - to: test@examle.com
     - to: test2@examle.com
@@ -593,7 +599,7 @@ urls:
     # We expect to parse 4 entries from the above because the tgram:// entry
     # would have failed to be loaded
     assert isinstance(result, list)
-    assert len(result) == 5
+    assert len(result) == 6
     assert len(result[0].tags) == 2
 
     # Our single line included
@@ -887,6 +893,31 @@ include:
     assert 'http://localhost/apprise/cfg01' in config
     assert 'http://localhost/apprise/cfg02' in config
     assert 'http://localhost/apprise/cfg03' in config
+
+
+def test_yaml_vs_text_tagging():
+    """
+    API: ConfigBase YAML vs TEXT tagging
+    """
+
+    yaml_result, _ = ConfigBase.config_parse_yaml("""
+    urls:
+      - mailtos://lead2gold:yesqbrulvaelyxve@gmail.com:
+         tag: mytag
+    """)
+    assert yaml_result
+
+    text_result, _ = ConfigBase.config_parse_text("""
+    mytag=mailtos://lead2gold:yesqbrulvaelyxve@gmail.com
+    """)
+    assert text_result
+
+    # Now we compare our results and verify they are the same
+    assert len(yaml_result) == len(text_result)
+    assert isinstance(yaml_result[0], plugins.NotifyEmail)
+    assert isinstance(text_result[0], plugins.NotifyEmail)
+    assert 'mytag' in text_result[0]
+    assert 'mytag' in yaml_result[0]
 
 
 # This test fails on CentOS 8.x so it was moved into it's own function
