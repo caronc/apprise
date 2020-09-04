@@ -39,18 +39,18 @@ from os.path import dirname
 # Update path
 #
 
-# First assume we might be in the ./devel directory
+# First assume we might be in the ./bin directory
 sys.path.insert(
-    0, join(dirname(dirname(abspath(__file__))), 'apprise'))  # noqa
+    0, join(dirname(dirname(abspath(__file__)))))  # noqa
 
 # The user might have copied the apprise script back one directory
 # so support this too..
 sys.path.insert(
-    0, join(dirname(abspath(__file__)), 'apprise'))  # noqa
+    0, join(dirname(abspath(__file__))))  # noqa
 
 # We can also use the current directory we're standing in as a last
 # resort
-sys.path.insert(0, join(getcwd(), 'apprise'))  # noqa
+sys.path.insert(0, join(getcwd()))  # noqa
 
 # Apprise tool now importable
 from apprise.cli import main
