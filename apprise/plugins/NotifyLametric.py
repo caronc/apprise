@@ -294,7 +294,7 @@ class NotifyLametric(NotifyBase):
     title_maxlen = 0
 
     # URL used for notifying Lametric App's created in the Dev Portal
-    cloud_notify_url = 'https://developer.lametric.com/api/v1' \
+    cloud_notify_url = 'https://developer.lametric.com/api/V1' \
                        '/dev/widget/update/com.lametric.{client_id}'
 
     # URL used for local notifications directly to the device
@@ -523,7 +523,6 @@ class NotifyLametric(NotifyBase):
         # Update header entries
         headers.update({
             'X-Access-Token': self.secret,
-            'Cache-Control': 'no-cache',
         })
 
         if self.sound:
@@ -646,6 +645,7 @@ class NotifyLametric(NotifyBase):
             'User-Agent': self.app_id,
             'Content-Type': 'application/json',
             'Accept': 'application/json',
+            'Cache-Control': 'no-cache',
         }
 
         # Depending on the mode, the payload is gathered by
