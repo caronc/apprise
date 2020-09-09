@@ -32,7 +32,7 @@
 #        https://developer.lametric.com/user/devices
 # 2. Create a **Notification App** if you haven't already done so from:
 #        https://developer.lametric.com/applications/sources
-# 3. Provide it an app name, a description and privacy URL (which can point to
+# 3. Provide it an app id, a description and privacy URL (which can point to
 #     anywhere; I set mine to `http://localhost`). No permissions are
 #     required.
 
@@ -338,6 +338,12 @@ class NotifyLametric(NotifyBase):
             'private': True,
             'required': True,
         },
+        # Used for Cloud mode
+        'app_id': {
+            'name': _('App ID'),
+            'type': 'string',
+            'private': True,
+        },
         'host': {
             'name': _('Hostname'),
             'type': 'string',
@@ -353,11 +359,6 @@ class NotifyLametric(NotifyBase):
         'user': {
             'name': _('Username'),
             'type': 'string',
-        },
-        'app_id': {
-            'name': _('App ID'),
-            'type': 'string',
-            'private': True,
         },
     })
 
@@ -429,8 +430,7 @@ class NotifyLametric(NotifyBase):
 
         if self.mode == LametricMode.CLOUD:
             # Assing our App ID
-            self.lametric_app_id = validate_regex(
-                app_id, r'(com\.lametric\.)?(?P<id>[0-9a-z]{1,64})', fmt='{id}')
+            self.lametric_app_id = validate_regex(app_id)
             if not self.lametric_app_id:
                 msg = 'An invalid LaMetric Application ID ' \
                       '({}) was specified.'.format(app_id)
@@ -438,7 +438,8 @@ class NotifyLametric(NotifyBase):
                 raise TypeError(msg)
 
         # API Key
-        self.lametric_apikey = validate_regex(apikey)
+        self.lametric_apikey = validate_regex(
+            apikey, r'(com\.lametric\.)?(?P<id>[0-9a-z.-]{1,64})', fmt='{id}')
         if not self.lametric_apikey:
             msg = 'An invalid LaMetric Device API Key ' \
                   '({}) was specified.'.format(apikey)

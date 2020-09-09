@@ -1294,16 +1294,25 @@ TEST_URLS = (
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'lametric://a...3@192.168.2.8/',
     }),
-    ('lametrics://{}@com.lametric.941c51dff3135bd87aa72db9d855dd50/'
-        '?mode=cloud'.format(UUID4), {
+    ('lametrics://com.lametric.941c51dff3135bd87aa72db9d855dd50@{}/'
+        '?mode=cloud'.format('MyApp'), {
             # Everything is okay; Cloud mode forced
             'instance': plugins.NotifyLametric,
 
             # Our expected url(privacy=True) startswith() response:
-            'privacy_url': 'lametric://8...2@9...0/',
-    }),
+            'privacy_url': 'lametric://9...0@M...p/',
+        }),
+    # our lametric object initialized via argument
+    ('lametric://?apikey=com.lametric.941c51dff3135bd87aa72db9d855dd50&app={}'
+        '&mode=cloud'.format('MyApp'), {
+            # Everything is okay; Cloud mode forced
+            'instance': plugins.NotifyLametric,
+
+            # Our expected url(privacy=True) startswith() response:
+            'privacy_url': 'lametric://9...0@M...p/',
+        }),
     ('lametrics://{}@abcd/?mode=cloud&sound=knock&icon_type=info'
-     '&priority=critical'.format(UUID4), {
+     '&priority=critical&cycles=10'.format(UUID4), {
          # Cloud mode forced, sound, icon_type, and priority not supported
          # with cloud mode so warnings are created
          'instance': plugins.NotifyLametric,
