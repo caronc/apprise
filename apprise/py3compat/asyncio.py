@@ -43,7 +43,7 @@ def notify(coroutines, debug=False):
 
     # Create log entry
     logger.info(
-        'Notifying {} service(s) asynchronous.'.format(len(coroutines)))
+        'Notifying {} service(s) asynchronously.'.format(len(coroutines)))
 
     if ASYNCIO_RUN_SUPPORT:
         # async reference produces a SyntaxError (E999) in Python v2.7
