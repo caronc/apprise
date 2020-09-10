@@ -27,14 +27,33 @@
 # website. it can be done as follows:
 
 # Cloud Mode:
-# 1. Sign Up and login to the developer webpage https://developer.lametric.com
-#      Locate your Device API Key; you can find it here:
-#        https://developer.lametric.com/user/devices
-# 2. Create a **Notification App** if you haven't already done so from:
-#        https://developer.lametric.com/applications/sources
-# 3. Provide it an app id, a description and privacy URL (which can point to
-#     anywhere; I set mine to `http://localhost`). No permissions are
-#     required.
+# - Sign Up and login to the developer webpage https://developer.lametric.com
+#
+# - Create a **Indicator App** if you haven't already done so from here:
+#     https://developer.lametric.com/applications/sources
+#
+# - There is a great official tutorial on how to do this here:
+#     https://lametric-documentation.readthedocs.io/en/latest/\
+#         guides/first-steps/first-lametric-indicator-app.html
+#
+# - Make sure to set the **Communication Type** to **PUSH**
+#
+# When you've completed, the site would have provided you a **PUSH URL** that
+# looks like this:
+#    https://developer.lametric.com/api/v1/dev/widget/update/\
+#             com.lametric.{app_id}/{app_version}
+#
+# You will need to record the `{app_id}` and `{app_version}` to use the `cloud`
+# mode.
+#
+# The same page should also provide you with an **Access Token**.  It's
+# approximately 86 characters with two equal (`=`) characters at the end of it.
+# This becomes your `{app_access_token}`. Here is an example of what one might
+# look like:
+#    K2MxWI0NzU0ZmI2NjJlZYTgViMDgDRiN8YjlmZjRmNTc4NDVhJzk0RiNjNh0EyKWW==`
+#
+# The syntax for the cloud mode is:
+# * `lametric://{app_access_token}@{app_id}/{app_version}?mode=cloud`
 
 # Device Mode:
 # - Sign Up and login to the developer webpage https://developer.lametric.com
@@ -73,14 +92,6 @@ LAMETRIC_APP_ID_DETECTOR_RE = re.compile(
 
 # Tokens are huge
 LAMETRIC_IS_APP_TOKEN = re.compile(r'^[a-z0-9]{80,}==$', re.I)
-
-# A URL for detecting native URLs
-STRICT_LAMETRIC_APP_URL_RE = re.compile(
-    r'(?P<schema>https?)://[^/]+'
-    r'/api/(?P<api_ver>v[1-9]*[0-9]+)'
-    r'/dev/widget/update/'
-    r'com\.lametric\.(?P<app_id>[0-9a-z.-]{1,64})'
-    r'(/(?P<app_ver>[1-9][0-9]*))?', re.I)
 
 
 class LametricMode(object):
@@ -337,8 +348,9 @@ class NotifyLametric(NotifyBase):
 
     # Define object templates
     templates = (
-        # Cloud Mode
-        '{schema}://{apikey}@{app_id}',
+        # Cloud (App) Mode
+        '{schema}://{app_access_token}@{app_id}',
+        '{schema}://{app_access_token}@{app_id}/{app_version}',
 
         # Device Mode
         '{schema}://{apikey}@{host}',
@@ -348,11 +360,11 @@ class NotifyLametric(NotifyBase):
 
     # Define our template tokens
     template_tokens = dict(NotifyBase.template_tokens, **{
+        # Used for Local Device mode
         'apikey': {
             'name': _('Device API Key'),
             'type': 'string',
             'private': True,
-            'required': True,
         },
         # Used for Cloud mode
         'app_id': {
@@ -925,3 +937,38 @@ class NotifyLametric(NotifyBase):
             pass
 
         return results
+
+    @staticmethod
+    def parse_native_url(url):
+        """
+        Support
+           https://developer.lametric.com/api/v1/dev/\
+                   widget/update/com.lametric.{APP_ID}/1
+
+           https://developer.lametric.com/api/v1/dev/\
+                   widget/update/com.lametric.{APP_ID}/{APP_VER}
+        """
+
+        # If users do provide the Native URL they wll also want to add
+        # ?token={APP_ACCESS_TOKEN} to the parameters at the end or the
+        # URL will fail to load in later stages.
+        result = re.match(
+            r'^http(?P<secure>s)?://(?P<host>[^/]+)'
+            r'/api/(?P<api_ver>v[1-9]*[0-9]+)'
+            r'/dev/widget/update/'
+            r'com\.lametric\.(?P<app_id>[0-9a-z.-]{1,64})'
+            r'(/(?P<app_ver>[1-9][0-9]*))?/?'
+            r'(?P<params>\?.+)?$', url, re.I)
+
+        if result:
+            return NotifyLametric.parse_url(
+                '{schema}://{app_id}{app_ver}/{params}'.format(
+                    schema=NotifyLametric.secure_protocol
+                    if result.group('secure') else NotifyLametric.protocol,
+                    app_id=result.group('app_id'),
+                    app_ver='/{}'.format(result.group('app_ver'))
+                    if result.group('app_ver') else '',
+                    params='' if not result.group('params')
+                    else result.group('params')))
+
+        return None
