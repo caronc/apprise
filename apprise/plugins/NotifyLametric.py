@@ -72,7 +72,7 @@ LAMETRIC_APP_ID_DETECTOR_RE = re.compile(
     r'(/(?P<app_ver>[1-9][0-9]*))?', re.I)
 
 # Tokens are huge
-LAMETRIC_APP_TOKEN_DETECTOR_RE = re.compile(r'^[a-z0-9]{80,}==$', re.I)
+LAMETRIC_IS_APP_TOKEN = re.compile(r'^[a-z0-9]{80,}==$', re.I)
 
 # A URL for detecting native URLs
 STRICT_LAMETRIC_APP_URL_RE = re.compile(
@@ -866,9 +866,9 @@ class NotifyLametric(NotifyBase):
         # This isn't a surfire way to do things though; it's best to
         # specify the mode= flag
         results['mode'] = LametricMode.DEVICE \
-            if (is_hostname(results['host']) or
-                is_ipaddr(results['host']) or
-                LAMETRIC_APP_TOKEN_DETECTOR_RE.match(results['password'])) \
+            if ((is_hostname(results['host']) or
+                is_ipaddr(results['host'])) and
+                not LAMETRIC_IS_APP_TOKEN.match(results['password'])) \
             else LametricMode.CLOUD
 
         # Mode override
