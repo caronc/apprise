@@ -1287,6 +1287,16 @@ TEST_URLS = (
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'lametrics://8...2@192.168.0.6/',
     }),
+    # Support Native URL (with Access Token Argument)
+    ('https://developer.lametric.com/api/v1/dev/widget/update/'
+        'com.lametric.ABCD123/1?token={}=='.format('D' * 88), {
+            # Everything is okay; Device mode forced
+            'instance': plugins.NotifyLametric,
+
+            # Our expected url(privacy=True) startswith() response:
+            'privacy_url': 'lametric://D...=@A...3/1/',
+        }),
+
     ('lametric://192.168.2.8/?mode=device&apikey=abc123', {
         # Everything is okay; Device mode forced
         'instance': plugins.NotifyLametric,
@@ -1294,31 +1304,38 @@ TEST_URLS = (
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'lametric://a...3@192.168.2.8/',
     }),
-    ('lametrics://com.lametric.941c51dff3135bd87aa72db9d855dd50@{}/'
-        '?mode=cloud'.format('MyApp'), {
+    ('lametrics://{}==@com.lametric.941c51dff3135bd87aa72db9d855dd50/'
+        '?mode=cloud&app_ver=2'.format('A' * 88), {
             # Everything is okay; Cloud mode forced
+            # We gracefully strip off the com.lametric. part as well
+            # We also set an application version of 2
             'instance': plugins.NotifyLametric,
 
             # Our expected url(privacy=True) startswith() response:
-            'privacy_url': 'lametric://9...0@M...p/',
+            'privacy_url': 'lametric://A...=@9...0/',
+        }),
+    ('lametrics://{}==@com.lametric.941c51dff3135bd87aa72db9d855dd50/'
+        '?app_ver=invalid'.format('A' * 88), {
+            # We set invalid app version
+            'instance': TypeError,
         }),
     # our lametric object initialized via argument
-    ('lametric://?apikey=com.lametric.941c51dff3135bd87aa72db9d855dd50&app={}'
-        '&mode=cloud'.format('MyApp'), {
+    ('lametric://?app=com.lametric.941c51dff3135bd87aa72db9d855dd50&token={}=='
+        '&mode=cloud'.format('B' * 88), {
             # Everything is okay; Cloud mode forced
             'instance': plugins.NotifyLametric,
 
             # Our expected url(privacy=True) startswith() response:
-            'privacy_url': 'lametric://9...0@M...p/',
+            'privacy_url': 'lametric://B...=@9...0/',
         }),
-    ('lametrics://{}@abcd/?mode=cloud&sound=knock&icon_type=info'
-     '&priority=critical&cycles=10'.format(UUID4), {
+    ('lametrics://{}==@abcd/?mode=cloud&sound=knock&icon_type=info'
+     '&priority=critical&cycles=10'.format('C' * 88), {
          # Cloud mode forced, sound, icon_type, and priority not supported
          # with cloud mode so warnings are created
          'instance': plugins.NotifyLametric,
 
          # Our expected url(privacy=True) startswith() response:
-         'privacy_url': 'lametric://8...2@a...d/',
+         'privacy_url': 'lametric://C...=@a...d/',
      }),
     ('lametrics://{}@192.168.0.7/?mode=invalid'.format(UUID4), {
         # Invalid Mode

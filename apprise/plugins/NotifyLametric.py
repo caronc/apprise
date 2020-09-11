@@ -32,28 +32,34 @@
 # - Create a **Indicator App** if you haven't already done so from here:
 #     https://developer.lametric.com/applications/sources
 #
-# - There is a great official tutorial on how to do this here:
+#   There is a great official tutorial on how to do this here:
 #     https://lametric-documentation.readthedocs.io/en/latest/\
-#         guides/first-steps/first-lametric-indicator-app.html
+#           guides/first-steps/first-lametric-indicator-app.html
 #
-# - Make sure to set the **Communication Type** to **PUSH**
+# - Make sure to set the **Communication Type** to **PUSH**.
+#
+# - You will be able to **Publish** your app once you've finished setting it
+#   up.  This will allow it to be accessible from the internet using the
+#   `cloud` mode of this Apprise Plugin. The **Publish** button shows up
+#   from within the settings of your Lametric App upon clicking on the
+#   **Draft Vx** folder (where `x` is the version - usually a 1)
 #
 # When you've completed, the site would have provided you a **PUSH URL** that
 # looks like this:
 #    https://developer.lametric.com/api/v1/dev/widget/update/\
-#             com.lametric.{app_id}/{app_version}
+#             com.lametric.{app_id}/{app_ver}
 #
-# You will need to record the `{app_id}` and `{app_version}` to use the `cloud`
+# You will need to record the `{app_id}` and `{app_ver}` to use the `cloud`
 # mode.
 #
 # The same page should also provide you with an **Access Token**.  It's
 # approximately 86 characters with two equal (`=`) characters at the end of it.
-# This becomes your `{app_access_token}`. Here is an example of what one might
+# This becomes your `{app_token}`. Here is an example of what one might
 # look like:
 #    K2MxWI0NzU0ZmI2NjJlZYTgViMDgDRiN8YjlmZjRmNTc4NDVhJzk0RiNjNh0EyKWW==`
 #
 # The syntax for the cloud mode is:
-# * `lametric://{app_access_token}@{app_id}/{app_version}?mode=cloud`
+# * `lametric://{app_token}@{app_id}/{app_ver}?mode=cloud`
 
 # Device Mode:
 # - Sign Up and login to the developer webpage https://developer.lametric.com
@@ -62,17 +68,21 @@
 # - From here you can get your your API Key for the device you plan to notify.
 # - Your devices IP Address can be found in LaMetric Time app at:
 #       Settings -> Wi-Fi -> IP Address
+#
+# The syntax for the device mode is:
+#  * `lametric://{apikey}@{host}`
 
 # A great source for API examples (Device Mode):
 # - https://lametric-documentation.readthedocs.io/en/latest/reference-docs\
 #       /device-notifications.html
-
+#
 # A great source for API examples (Cloud Mode):
 # - https://lametric-documentation.readthedocs.io/en/latest/reference-docs\
 #       /lametric-cloud-reference.html
 
 # A great source for the icon reference:
 # - https://developer.lametric.com/icons
+
 
 import re
 import six
@@ -349,8 +359,8 @@ class NotifyLametric(NotifyBase):
     # Define object templates
     templates = (
         # Cloud (App) Mode
-        '{schema}://{app_access_token}@{app_id}',
-        '{schema}://{app_access_token}@{app_id}/{app_version}',
+        '{schema}://{app_token}@{app_id}',
+        '{schema}://{app_token}@{app_id}/{app_ver}',
 
         # Device Mode
         '{schema}://{apikey}@{host}',
@@ -380,7 +390,7 @@ class NotifyLametric(NotifyBase):
             'default': '1',
         },
         # Used for Cloud mode
-        'app_access_token': {
+        'app_token': {
             'name': _('App Access Token'),
             'type': 'string',
             'regex': (r'^[A-Z0-9]{80,}==$', 'i'),
@@ -414,8 +424,8 @@ class NotifyLametric(NotifyBase):
         'app_ver': {
             'alias_of': 'app_ver',
         },
-        'app_access_token': {
-            'alias_of': 'app_access_token',
+        'app_token': {
+            'alias_of': 'app_token',
         },
         'priority': {
             'name': _('Priority'),
@@ -452,7 +462,7 @@ class NotifyLametric(NotifyBase):
         },
     })
 
-    def __init__(self, apikey=None, app_access_token=None, app_id=None,
+    def __init__(self, apikey=None, app_token=None, app_id=None,
                  app_ver=None, priority=None, icon=None, icon_type=None,
                  sound=None, mode=None, cycles=None, **kwargs):
         """
@@ -488,11 +498,11 @@ class NotifyLametric(NotifyBase):
 
             # Detect our Access Token
             self.lametric_app_access_token = validate_regex(
-                app_access_token,
-                *self.template_tokens['app_access_token']['regex'])
+                app_token,
+                *self.template_tokens['app_token']['regex'])
             if not self.lametric_app_access_token:
                 msg = 'An invalid LaMetric Application Access Token ' \
-                      '({}) was specified.'.format(app_access_token)
+                      '({}) was specified.'.format(app_token)
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
@@ -516,13 +526,13 @@ class NotifyLametric(NotifyBase):
             # Store our Application ID
             self.lametric_app_id = results.group('app_id')
 
-        # API Key
-        self.lametric_apikey = validate_regex(apikey)
-        if not self.lametric_apikey:
-            msg = 'An invalid LaMetric Device API Key ' \
-                  '({}) was specified.'.format(apikey)
-            self.logger.warning(msg)
-            raise TypeError(msg)
+        if self.mode == LametricMode.DEVICE:
+            self.lametric_apikey = validate_regex(apikey)
+            if not self.lametric_apikey:
+                msg = 'An invalid LaMetric Device API Key ' \
+                      '({}) was specified.'.format(apikey)
+                self.logger.warning(msg)
+                raise TypeError(msg)
 
         if priority not in LAMETRIC_PRIORITIES:
             self.priority = self.template_args['priority']['default']
@@ -612,6 +622,7 @@ class NotifyLametric(NotifyBase):
                 {
                     "icon": icon,
                     "text": body,
+                    "index": 0,
                 }
             ]
         }
@@ -859,33 +870,24 @@ class NotifyLametric(NotifyBase):
             results['user'] = None
 
         # Priority Handling
-        if 'priority' in results['qsd'] and len(results['qsd']['priority']):
-            results['priority'] = results['qsd']['priority'].strip().lower()
+        if 'priority' in results['qsd'] and results['qsd']['priority']:
+            results['priority'] = NotifyLametric.unquote(
+                results['qsd']['priority'].strip().lower())
 
         # Icon Type
-        if 'icon' in results['qsd'] and len(results['qsd']['icon']):
-            results['icon'] = results['qsd']['icon'].strip().lower()
+        if 'icon' in results['qsd'] and results['qsd']['icon']:
+            results['icon'] = NotifyLametric.unquote(
+                results['qsd']['icon'].strip().lower())
 
         # Icon Type
-        if 'icon_type' in results['qsd'] and len(results['qsd']['icon_type']):
-            results['icon_type'] = results['qsd']['icon_type'].strip().lower()
+        if 'icon_type' in results['qsd'] and results['qsd']['icon_type']:
+            results['icon_type'] = NotifyLametric.unquote(
+                results['qsd']['icon_type'].strip().lower())
 
         # Sound
-        if 'sound' in results['qsd'] and len(results['qsd']['sound']):
-            results['sound'] = results['qsd']['sound'].strip().lower()
-
-        # We can detect the mode based on the validity of the hostname
-        # This isn't a surfire way to do things though; it's best to
-        # specify the mode= flag
-        results['mode'] = LametricMode.DEVICE \
-            if ((is_hostname(results['host']) or
-                is_ipaddr(results['host'])) and
-                not LAMETRIC_IS_APP_TOKEN.match(results['password'])) \
-            else LametricMode.CLOUD
-
-        # Mode override
-        if 'mode' in results['qsd'] and len(results['qsd']['mode']):
-            results['mode'] = NotifyLametric.unquote(results['qsd']['mode'])
+        if 'sound' in results['qsd'] and results['qsd']['sound']:
+            results['sound'] = NotifyLametric.unquote(
+                results['qsd']['sound'].strip().lower())
 
         # API Key (Device Mode)
         if 'apikey' in results['qsd'] and results['qsd']['apikey']:
@@ -893,39 +895,65 @@ class NotifyLametric(NotifyBase):
             results['apikey'] = \
                 NotifyLametric.unquote(results['qsd']['apikey'])
 
+        # App ID
+        if 'app' in results['qsd'] \
+                and results['qsd']['app']:
+
+            # Extract the App ID from an argument
+            results['app_id'] = \
+                NotifyLametric.unquote(results['qsd']['app'])
+
+        # App Version
+        if 'app_ver' in results['qsd'] \
+                and results['qsd']['app_ver']:
+
+            # Extract the App ID from an argument
+            results['app_ver'] = \
+                NotifyLametric.unquote(results['qsd']['app_ver'])
+
+        if 'token' in results['qsd'] and results['qsd']['token']:
+            # Extract Application Access Token from an argument
+            results['app_token'] = \
+                NotifyLametric.unquote(results['qsd']['token'])
+
+        # Mode override
+        if 'mode' in results['qsd'] and results['qsd']['mode']:
+            results['mode'] = NotifyLametric.unquote(
+                results['qsd']['mode'].strip().lower())
         else:
-            results['apikey'] = \
-                NotifyLametric.unquote(results['password'])
+            # We can try to detect the mode based on the validity of the
+            # hostname. We can also scan the validity of the Application
+            # Access token
+            #
+            # This isn't a surfire way to do things though; it's best to
+            # specify the mode= flag
+            results['mode'] = LametricMode.DEVICE \
+                if ((is_hostname(results['host']) or
+                    is_ipaddr(results['host'])) and
 
-        if results['mode'] == LametricMode.CLOUD:
-            # App ID
-            if 'app' in results['qsd'] \
-                    and len(results['qsd']['app']):
+                    # make sure password is not an Access Token
+                    (results['password'] and not
+                        LAMETRIC_IS_APP_TOKEN.match(results['password'])) and
 
-                # Extract the App ID from an argument
-                results['app_id'] = \
-                    NotifyLametric.unquote(results['qsd']['app'])
+                    # Scan for app_ flags
+                    next((f for f in results.keys() \
+                          if f.startswith('app_')), None) is None) \
+                else LametricMode.CLOUD
 
-            else:
-                # Otherwise use the host specified
+        # Handle defaults if not set
+        if results['mode'] == LametricMode.DEVICE:
+            # Device Mode Defaults
+            if 'apikey' not in results:
+                results['apikey'] = \
+                    NotifyLametric.unquote(results['password'])
+
+        else:
+            # CLOUD Mode Defaults
+            if 'app_id' not in results:
                 results['app_id'] = \
                     NotifyLametric.unquote(results['host'])
-
-            # App Version
-            if 'app_ver' in results['qsd'] \
-                    and len(results['qsd']['app_ver']):
-
-                # Extract the App ID from an argument
-                results['app_ver'] = \
-                    NotifyLametric.unquote(results['qsd']['app_ver'])
-
-            if 'token' in results['qsd'] and results['qsd']['token']:
-                # Extract Application Access Token from an argument
-                results['app_access_token'] = \
-                    NotifyLametric.unquote(results['qsd']['token'])
-
-            else:
-                results['app_access_token'] = \
+            if 'app_token' not in results:
+                results['app_token'] = \
                     NotifyLametric.unquote(results['password'])
 
         # Set cycles
