@@ -84,6 +84,41 @@ def test_discord_plugin(mock_post):
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO) is True
 
+    # Simple Markdown Single line of text
+    test_markdown = "body"
+    desc, results = obj.extract_markdown_sections(test_markdown)
+    assert isinstance(results, list) is True
+    assert len(results) == 0
+
+    # Test our header parsing when not lead with a header
+    test_markdown = """
+    A section of text that has no header at the top.
+    It also has a hash tag # <- in the middle of a
+    string.
+
+    ## Heading 1
+    body
+
+    # Heading 2
+
+    more content
+    on multi-lines
+    """
+
+    desc, results = obj.extract_markdown_sections(test_markdown)
+    # we have a description
+    assert isinstance(desc, six.string_types) is True
+    assert desc.startswith('A section of text that has no header at the top.')
+    assert desc.endswith('string.')
+
+    assert isinstance(results, list) is True
+    assert len(results) == 2
+    assert results[0]['name'] == 'Heading 1'
+    assert results[0]['value'] == '```md\nbody\n```'
+    assert results[1]['name'] == 'Heading 2'
+    assert results[1]['value'] == \
+        '```md\nmore content\n    on multi-lines\n```'
+
     # Test our header parsing
     test_markdown = "## Heading one\nbody body\n\n" + \
         "# Heading 2 ##\n\nTest\n\n" + \
@@ -94,8 +129,12 @@ def test_discord_plugin(mock_post):
         "# heading 4\n" + \
         "#### Heading 5"
 
-    results = obj.extract_markdown_sections(test_markdown)
+    desc, results = obj.extract_markdown_sections(test_markdown)
     assert isinstance(results, list) is True
+    # No desc details filled out
+    assert isinstance(desc, six.string_types) is True
+    assert not desc
+
     # We should have 5 sections (since there are 5 headers identified above)
     assert len(results) == 5
     assert results[0]['name'] == 'Heading one'
@@ -107,28 +146,66 @@ def test_discord_plugin(mock_post):
     assert results[2]['value'] == \
         '```md\nnormal content\n```'
     assert results[3]['name'] == 'heading 4'
-    assert results[3]['value'] == '```md\n\n```'
+    assert results[3]['value'] == '```\n```'
     assert results[4]['name'] == 'Heading 5'
-    assert results[4]['value'] == '```md\n\n```'
+    assert results[4]['value'] == '```\n```'
+
+    # Create an apprise instance
+    a = Apprise()
+
+    # Our processing is slightly different when we aren't using markdown
+    # as we do not pre-parse content during our notifications
+    assert a.add(
+        'discord://{webhook_id}/{webhook_token}/'
+        '?format=markdown&footer=Yes'.format(
+            webhook_id=webhook_id,
+            webhook_token=webhook_token)) is True
+
+    # This call includes an image with it's payload:
+    plugins.NotifyDiscord.discord_max_fields = 1
+
+    assert a.notify(body=test_markdown, title='title',
+                    notify_type=NotifyType.INFO,
+                    body_format=NotifyFormat.TEXT) is True
+
+    # Throw an exception on the forth call to requests.post()
+    # This allows to test our batch field processing
+    response = mock.Mock()
+    response.content = ''
+    response.status_code = requests.codes.ok
+    mock_post.return_value = response
+    mock_post.side_effect = [
+        response, response, response, requests.RequestException()]
 
     # Test our markdown
     obj = Apprise.instantiate(
         'discord://{}/{}/?format=markdown'.format(webhook_id, webhook_token))
     assert isinstance(obj, plugins.NotifyDiscord)
     assert obj.notify(
-        body=test_markdown, title='title', notify_type=NotifyType.INFO) is True
+        body=test_markdown, title='title',
+        notify_type=NotifyType.INFO) is False
+    mock_post.side_effect = None
 
     # Empty String
-    results = obj.extract_markdown_sections("")
+    desc, results = obj.extract_markdown_sections("")
     assert isinstance(results, list) is True
     assert len(results) == 0
+
+    # No desc details filled out
+    assert isinstance(desc, six.string_types) is True
+    assert not desc
 
     # String without Heading
     test_markdown = "Just a string without any header entries.\n" + \
         "A second line"
-    results = obj.extract_markdown_sections(test_markdown)
+    desc, results = obj.extract_markdown_sections(test_markdown)
     assert isinstance(results, list) is True
     assert len(results) == 0
+
+    # No desc details filled out
+    assert isinstance(desc, six.string_types) is True
+    assert desc == 'Just a string without any header entries.\n' + \
+        'A second line'
 
     # Use our test markdown string during a notification
     assert obj.notify(

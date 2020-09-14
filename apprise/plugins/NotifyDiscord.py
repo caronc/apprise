@@ -80,6 +80,11 @@ class NotifyDiscord(NotifyBase):
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 2000
 
+    # Discord has a limit of the number of fields you can include in an
+    # embeds message. This value allows the discord message to safely
+    # break into multiple messages to handle these cases.
+    discord_max_fields = 10
+
     # Define object templates
     templates = (
         '{schema}://{webhook_id}/{webhook_token}',
@@ -133,6 +138,11 @@ class NotifyDiscord(NotifyBase):
             'type': 'bool',
             'default': True,
         },
+        'fields': {
+            'name': _('Use Fields'),
+            'type': 'bool',
+            'default': True,
+        },
         'image': {
             'name': _('Include Image'),
             'type': 'bool',
@@ -143,7 +153,7 @@ class NotifyDiscord(NotifyBase):
 
     def __init__(self, webhook_id, webhook_token, tts=False, avatar=True,
                  footer=False, footer_logo=True, include_image=False,
-                 avatar_url=None, **kwargs):
+                 fields=True, avatar_url=None, **kwargs):
         """
         Initialize Discord Object
 
@@ -181,6 +191,9 @@ class NotifyDiscord(NotifyBase):
         # Place a thumbnail image inline with the message body
         self.include_image = include_image
 
+        # Use Fields
+        self.fields = fields
+
         # Avatar URL
         # This allows a user to provide an over-ride to the otherwise
         # dynamically generated avatar url images
@@ -206,31 +219,22 @@ class NotifyDiscord(NotifyBase):
         # Acquire image_url
         image_url = self.image_url(notify_type)
 
+        # our fields variable
+        fields = []
+
         if self.notify_format == NotifyFormat.MARKDOWN:
             # Use embeds for payload
             payload['embeds'] = [{
-                'provider': {
+                'author': {
                     'name': self.app_id,
                     'url': self.app_url,
                 },
                 'title': title,
-                'type': 'rich',
                 'description': body,
 
                 # Our color associated with our notification
                 'color': self.color(notify_type, int),
             }]
-
-            # Break titles out so that we can sort them in embeds
-            fields = self.extract_markdown_sections(body)
-
-            if len(fields) > 0:
-                # Apply our additional parsing for a better presentation
-
-                # Swap first entry for description
-                payload['embeds'][0]['description'] = \
-                    fields[0].get('name') + fields[0].get('value')
-                payload['embeds'][0]['fields'] = fields[1:]
 
             if self.footer:
                 # Acquire logo URL
@@ -251,6 +255,20 @@ class NotifyDiscord(NotifyBase):
                     'width': 256,
                 }
 
+            if self.fields:
+                # Break titles out so that we can sort them in embeds
+                description, fields = self.extract_markdown_sections(body)
+
+                # Swap first entry for description
+                payload['embeds'][0]['description'] = description
+                if fields:
+                    # Apply our additional parsing for a better presentation
+                    payload['embeds'][0]['fields'] = \
+                        fields[:self.discord_max_fields]
+
+                    # Remove entry from head of fields
+                    fields = fields[self.discord_max_fields:]
+
         else:
             # not markdown
             payload['content'] = \
@@ -267,6 +285,16 @@ class NotifyDiscord(NotifyBase):
         if not self._send(payload):
             # We failed to post our message
             return False
+
+        # Process any remaining fields IF set
+        if fields:
+            payload['embeds'][0]['description'] = ''
+            for i in range(0, len(fields), self.discord_max_fields):
+                payload['embeds'][0]['fields'] = \
+                    fields[i:i + self.discord_max_fields]
+                if not self._send(payload):
+                    # We failed to post our message
+                    return False
 
         if attach:
             # Update our payload; the idea is to preserve it's other detected
@@ -413,6 +441,7 @@ class NotifyDiscord(NotifyBase):
             'footer': 'yes' if self.footer else 'no',
             'footer_logo': 'yes' if self.footer_logo else 'no',
             'image': 'yes' if self.include_image else 'no',
+            'fields': 'yes' if self.fields else 'no',
         }
 
         # Extend our parameters
@@ -458,6 +487,11 @@ class NotifyDiscord(NotifyBase):
 
         # Text To Speech
         results['tts'] = parse_bool(results['qsd'].get('tts', False))
+
+        # Use sections
+        # effectively detect multiple fields and break them off
+        # into sections
+        results['fields'] = parse_bool(results['qsd'].get('fields', True))
 
         # Use Footer
         results['footer'] = parse_bool(results['qsd'].get('footer', False))
@@ -513,6 +547,18 @@ class NotifyDiscord(NotifyBase):
         fields that get passed as an embed entry to Discord.
 
         """
+        # Search for any header information found without it's own section
+        # identifier
+        match = re.match(
+            r'^\s*(?P<desc>[^\s#]+.*?)(?=\s*$|[\r\n]+\s*#)',
+            markdown, flags=re.S)
+
+        description = match.group('desc').strip() if match else ''
+        if description:
+            # Strip description from our string since it has been handled
+            # now.
+            markdown = re.sub(description, '', markdown, count=1)
+
         regex = re.compile(
             r'\s*#[# \t\v]*(?P<name>[^\n]+)(\n|\s*$)'
             r'\s*((?P<value>[^#].+?)(?=\s*$|[\r\n]+\s*#))?', flags=re.S)
@@ -523,9 +569,11 @@ class NotifyDiscord(NotifyBase):
             d = el.groupdict()
 
             fields.append({
-                'name': d.get('name', '').strip('# \r\n\t\v'),
-                'value': '```md\n' +
-                (d.get('value').strip() if d.get('value') else '') + '\n```'
+                'name': d.get('name', '').strip('#`* \r\n\t\v'),
+                'value': '```{}\n{}```'.format(
+                    'md' if d.get('value') else '',
+                    d.get('value').strip() + '\n' if d.get('value') else '',
+                ),
             })
 
-        return fields
+        return description, fields

@@ -289,7 +289,7 @@ TEST_URLS = (
             # don't include an image by default
             'include_image': False,
     }),
-    ('discord://%s/%s?format=markdown&footer=Yes&image=No' % (
+    ('discord://%s/%s?format=markdown&footer=Yes&image=No&fields=no' % (
         'i' * 24, 't' * 64), {
             'instance': plugins.NotifyDiscord,
             'requests_response_code': requests.codes.no_content,
