@@ -27,15 +27,39 @@
 # website. it can be done as follows:
 
 # Cloud Mode:
-# 1. Sign Up and login to the developer webpage https://developer.lametric.com
-# 2. Create a **Notification App** if you haven't already done so from:
-#        https://developer.lametric.com/applications/sources
-# 3. Provide it an app name, a description and privacy URL (which can point to
-#     anywhere; I set mine to `http://localhost`). No permissions are
-#     required.
-# 4. Access your newly created app so that you can acquire both the
-#     **Client ID** and the **Client Secret** here:
-#       https://developer.lametric.com/applications/sources
+# - Sign Up and login to the developer webpage https://developer.lametric.com
+#
+# - Create a **Indicator App** if you haven't already done so from here:
+#     https://developer.lametric.com/applications/sources
+#
+#   There is a great official tutorial on how to do this here:
+#     https://lametric-documentation.readthedocs.io/en/latest/\
+#           guides/first-steps/first-lametric-indicator-app.html
+#
+# - Make sure to set the **Communication Type** to **PUSH**.
+#
+# - You will be able to **Publish** your app once you've finished setting it
+#   up.  This will allow it to be accessible from the internet using the
+#   `cloud` mode of this Apprise Plugin. The **Publish** button shows up
+#   from within the settings of your Lametric App upon clicking on the
+#   **Draft Vx** folder (where `x` is the version - usually a 1)
+#
+# When you've completed, the site would have provided you a **PUSH URL** that
+# looks like this:
+#    https://developer.lametric.com/api/v1/dev/widget/update/\
+#             com.lametric.{app_id}/{app_ver}
+#
+# You will need to record the `{app_id}` and `{app_ver}` to use the `cloud`
+# mode.
+#
+# The same page should also provide you with an **Access Token**.  It's
+# approximately 86 characters with two equal (`=`) characters at the end of it.
+# This becomes your `{app_token}`. Here is an example of what one might
+# look like:
+#    K2MxWI0NzU0ZmI2NjJlZYTgViMDgDRiN8YjlmZjRmNTc4NDVhJzk0RiNjNh0EyKWW==`
+#
+# The syntax for the cloud mode is:
+# * `lametric://{app_token}@{app_id}/{app_ver}?mode=cloud`
 
 # Device Mode:
 # - Sign Up and login to the developer webpage https://developer.lametric.com
@@ -44,11 +68,14 @@
 # - From here you can get your your API Key for the device you plan to notify.
 # - Your devices IP Address can be found in LaMetric Time app at:
 #       Settings -> Wi-Fi -> IP Address
+#
+# The syntax for the device mode is:
+#  * `lametric://{apikey}@{host}`
 
 # A great source for API examples (Device Mode):
 # - https://lametric-documentation.readthedocs.io/en/latest/reference-docs\
 #       /device-notifications.html
-
+#
 # A great source for API examples (Cloud Mode):
 # - https://lametric-documentation.readthedocs.io/en/latest/reference-docs\
 #       /lametric-cloud-reference.html
@@ -56,17 +83,25 @@
 # A great source for the icon reference:
 # - https://developer.lametric.com/icons
 
+
 import re
 import six
 import requests
 from json import dumps
 from .NotifyBase import NotifyBase
-from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 from ..utils import is_hostname
 from ..utils import is_ipaddr
+
+# A URL Parser to detect App ID
+LAMETRIC_APP_ID_DETECTOR_RE = re.compile(
+    r'(com\.lametric\.)?(?P<app_id>[0-9a-z.-]{1,64})'
+    r'(/(?P<app_ver>[1-9][0-9]*))?', re.I)
+
+# Tokens are huge
+LAMETRIC_IS_APP_TOKEN = re.compile(r'^[a-z0-9]{80,}==$', re.I)
 
 
 class LametricMode(object):
@@ -295,7 +330,7 @@ class NotifyLametric(NotifyBase):
 
     # URL used for notifying Lametric App's created in the Dev Portal
     cloud_notify_url = 'https://developer.lametric.com/api/v1' \
-                       '/dev/widget/update/com.lametric.{client_id}'
+                       '/dev/widget/update/com.lametric.{app_id}/{app_ver}'
 
     # URL used for local notifications directly to the device
     device_notify_url = '{schema}://{host}{port}/api/v2/device/notifications'
@@ -323,8 +358,9 @@ class NotifyLametric(NotifyBase):
 
     # Define object templates
     templates = (
-        # App Mode
-        '{schema}://{client_id}@{secret}',
+        # Cloud (App) Mode
+        '{schema}://{app_token}@{app_id}',
+        '{schema}://{app_token}@{app_id}/{app_ver}',
 
         # Device Mode
         '{schema}://{apikey}@{host}',
@@ -334,10 +370,30 @@ class NotifyLametric(NotifyBase):
 
     # Define our template tokens
     template_tokens = dict(NotifyBase.template_tokens, **{
+        # Used for Local Device mode
         'apikey': {
             'name': _('Device API Key'),
             'type': 'string',
             'private': True,
+        },
+        # Used for Cloud mode
+        'app_id': {
+            'name': _('App ID'),
+            'type': 'string',
+            'private': True,
+        },
+        # Used for Cloud mode
+        'app_ver': {
+            'name': _('App Version'),
+            'type': 'string',
+            'regex': (r'^[1-9][0-9]*$', ''),
+            'default': '1',
+        },
+        # Used for Cloud mode
+        'app_token': {
+            'name': _('App Access Token'),
+            'type': 'string',
+            'regex': (r'^[A-Z0-9]{80,}==$', 'i'),
         },
         'host': {
             'name': _('Hostname'),
@@ -355,29 +411,21 @@ class NotifyLametric(NotifyBase):
             'name': _('Username'),
             'type': 'string',
         },
-        'client_id': {
-            'name': _('Client ID'),
-            'type': 'string',
-            'private': True,
-            'regex': (r'^[a-z0-9-]+$', 'i'),
-        },
-        'secret': {
-            'name': _('Client Secret'),
-            'type': 'string',
-            'private': True,
-        },
     })
 
     # Define our template arguments
     template_args = dict(NotifyBase.template_args, **{
-        'oauth_id': {
-            'alias_of': 'client_id',
-        },
-        'oauth_secret': {
-            'alias_of': 'secret',
-        },
         'apikey': {
             'alias_of': 'apikey',
+        },
+        'app_id': {
+            'alias_of': 'app_id',
+        },
+        'app_ver': {
+            'alias_of': 'app_ver',
+        },
+        'app_token': {
+            'alias_of': 'app_token',
         },
         'priority': {
             'name': _('Priority'),
@@ -414,9 +462,9 @@ class NotifyLametric(NotifyBase):
         },
     })
 
-    def __init__(self, apikey=None, client_id=None, secret=None, priority=None,
-                 icon=None, icon_type=None, sound=None, mode=None,
-                 cycles=None, **kwargs):
+    def __init__(self, apikey=None, app_token=None, app_id=None,
+                 app_ver=None, priority=None, icon=None, icon_type=None,
+                 sound=None, mode=None, cycles=None, **kwargs):
         """
         Initialize LaMetric Object
         """
@@ -426,41 +474,61 @@ class NotifyLametric(NotifyBase):
             if isinstance(mode, six.string_types) \
             else self.template_args['mode']['default']
 
+        # Default Cloud Argument
+        self.lametric_app_id = None
+        self.lametric_app_ver = None
+        self.lametric_app_access_token = None
+
+        # Default Device/Cloud Argument
+        self.lametric_apikey = None
+
         if self.mode not in LAMETRIC_MODES:
             msg = 'An invalid LaMetric Mode ({}) was specified.'.format(mode)
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # Default Cloud Arguments
-        self.secret = None
-        self.client_id = None
-
-        # Default Device Arguments
-        self.apikey = None
-
         if self.mode == LametricMode.CLOUD:
-            # Client ID
-            self.client_id = validate_regex(
-                client_id, *self.template_tokens['client_id']['regex'])
-            if not self.client_id:
-                msg = 'An invalid LaMetric Client OAuth2 ID ' \
-                      '({}) was specified.'.format(client_id)
+            try:
+                results = LAMETRIC_APP_ID_DETECTOR_RE.match(app_id)
+            except TypeError:
+                msg = 'An invalid LaMetric Application ID ' \
+                      '({}) was specified.'.format(app_id)
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
-            # Client Secret
-            self.secret = validate_regex(secret)
-            if not self.secret:
-                msg = 'An invalid LaMetric Client OAuth2 Secret ' \
-                      '({}) was specified.'.format(secret)
+            # Detect our Access Token
+            self.lametric_app_access_token = validate_regex(
+                app_token,
+                *self.template_tokens['app_token']['regex'])
+            if not self.lametric_app_access_token:
+                msg = 'An invalid LaMetric Application Access Token ' \
+                      '({}) was specified.'.format(app_token)
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
-        else:  # LametricMode.DEVICE
+            # If app_ver is specified, it over-rides all
+            if app_ver:
+                self.lametric_app_ver = validate_regex(
+                    app_ver, *self.template_tokens['app_ver']['regex'])
+                if not self.lametric_app_ver:
+                    msg = 'An invalid LaMetric Application Version ' \
+                          '({}) was specified.'.format(app_ver)
+                    self.logger.warning(msg)
+                    raise TypeError(msg)
 
-            # API Key
-            self.apikey = validate_regex(apikey)
-            if not self.apikey:
+            else:
+                # If app_ver wasn't specified, we parse it from the
+                # Application ID
+                self.lametric_app_ver = results.group('app_ver') \
+                    if results.group('app_ver') else \
+                    self.template_tokens['app_ver']['default']
+
+            # Store our Application ID
+            self.lametric_app_id = results.group('app_id')
+
+        if self.mode == LametricMode.DEVICE:
+            self.lametric_apikey = validate_regex(apikey)
+            if not self.lametric_apikey:
                 msg = 'An invalid LaMetric Device API Key ' \
                       '({}) was specified.'.format(apikey)
                 self.logger.warning(msg)
@@ -522,8 +590,7 @@ class NotifyLametric(NotifyBase):
 
         # Update header entries
         headers.update({
-            'X-Access-Token': self.secret,
-            'Cache-Control': 'no-cache',
+            'X-Access-Token': self.lametric_apikey,
         })
 
         if self.sound:
@@ -555,12 +622,14 @@ class NotifyLametric(NotifyBase):
                 {
                     "icon": icon,
                     "text": body,
+                    "index": 0,
                 }
             ]
         }
 
         # Prepare our Cloud Notify URL
-        notify_url = self.cloud_notify_url.format(client_id=self.client_id)
+        notify_url = self.cloud_notify_url.format(
+            app_id=self.lametric_app_id, app_ver=self.lametric_app_ver)
 
         # Return request parameters
         return (notify_url, None, payload)
@@ -646,6 +715,7 @@ class NotifyLametric(NotifyBase):
             'User-Agent': self.app_id,
             'Content-Type': 'application/json',
             'Accept': 'application/json',
+            'Cache-Control': 'no-cache',
         }
 
         # Depending on the mode, the payload is gathered by
@@ -730,11 +800,12 @@ class NotifyLametric(NotifyBase):
 
         if self.mode == LametricMode.CLOUD:
             # Upstream/LaMetric App Return
-            return '{schema}://{client_id}@{secret}/?{params}'.format(
+            return '{schema}://{token}@{app_id}/{app_ver}/?{params}'.format(
                 schema=self.protocol,
-                client_id=self.pprint(self.client_id, privacy, safe=''),
-                secret=self.pprint(
-                    self.secret, privacy, mode=PrivacyMode.Secret, safe=''),
+                token=self.pprint(
+                    self.lametric_app_access_token, privacy, safe=''),
+                app_id=self.pprint(self.lametric_app_id, privacy, safe=''),
+                app_ver=NotifyLametric.quote(self.lametric_app_ver, safe=''),
                 params=NotifyLametric.urlencode(params))
 
         #
@@ -758,11 +829,11 @@ class NotifyLametric(NotifyBase):
         if self.user and self.password:
             auth = '{user}:{apikey}@'.format(
                 user=NotifyLametric.quote(self.user, safe=''),
-                apikey=self.pprint(self.apikey, privacy, safe=''),
+                apikey=self.pprint(self.lametric_apikey, privacy, safe=''),
             )
         else:  # self.apikey is set
             auth = '{apikey}@'.format(
-                apikey=self.pprint(self.apikey, privacy, safe=''),
+                apikey=self.pprint(self.lametric_apikey, privacy, safe=''),
             )
 
         # Local Return
@@ -799,64 +870,91 @@ class NotifyLametric(NotifyBase):
             results['user'] = None
 
         # Priority Handling
-        if 'priority' in results['qsd'] and len(results['qsd']['priority']):
-            results['priority'] = results['qsd']['priority'].strip().lower()
+        if 'priority' in results['qsd'] and results['qsd']['priority']:
+            results['priority'] = NotifyLametric.unquote(
+                results['qsd']['priority'].strip().lower())
 
         # Icon Type
-        if 'icon' in results['qsd'] and len(results['qsd']['icon']):
-            results['icon'] = results['qsd']['icon'].strip().lower()
+        if 'icon' in results['qsd'] and results['qsd']['icon']:
+            results['icon'] = NotifyLametric.unquote(
+                results['qsd']['icon'].strip().lower())
 
         # Icon Type
-        if 'icon_type' in results['qsd'] and len(results['qsd']['icon_type']):
-            results['icon_type'] = results['qsd']['icon_type'].strip().lower()
+        if 'icon_type' in results['qsd'] and results['qsd']['icon_type']:
+            results['icon_type'] = NotifyLametric.unquote(
+                results['qsd']['icon_type'].strip().lower())
 
         # Sound
-        if 'sound' in results['qsd'] and len(results['qsd']['sound']):
-            results['sound'] = results['qsd']['sound'].strip().lower()
-
-        # We can detect the mode based on the validity of the hostname
-        results['mode'] = LametricMode.DEVICE \
-            if (is_hostname(results['host']) or
-                is_ipaddr(results['host'])) else LametricMode.CLOUD
-
-        # Mode override
-        if 'mode' in results['qsd'] and len(results['qsd']['mode']):
-            results['mode'] = NotifyLametric.unquote(results['qsd']['mode'])
+        if 'sound' in results['qsd'] and results['qsd']['sound']:
+            results['sound'] = NotifyLametric.unquote(
+                results['qsd']['sound'].strip().lower())
 
         # API Key (Device Mode)
+        if 'apikey' in results['qsd'] and results['qsd']['apikey']:
+            # Extract API Key from an argument
+            results['apikey'] = \
+                NotifyLametric.unquote(results['qsd']['apikey'])
+
+        # App ID
+        if 'app' in results['qsd'] \
+                and results['qsd']['app']:
+
+            # Extract the App ID from an argument
+            results['app_id'] = \
+                NotifyLametric.unquote(results['qsd']['app'])
+
+        # App Version
+        if 'app_ver' in results['qsd'] \
+                and results['qsd']['app_ver']:
+
+            # Extract the App ID from an argument
+            results['app_ver'] = \
+                NotifyLametric.unquote(results['qsd']['app_ver'])
+
+        if 'token' in results['qsd'] and results['qsd']['token']:
+            # Extract Application Access Token from an argument
+            results['app_token'] = \
+                NotifyLametric.unquote(results['qsd']['token'])
+
+        # Mode override
+        if 'mode' in results['qsd'] and results['qsd']['mode']:
+            results['mode'] = NotifyLametric.unquote(
+                results['qsd']['mode'].strip().lower())
+        else:
+            # We can try to detect the mode based on the validity of the
+            # hostname. We can also scan the validity of the Application
+            # Access token
+            #
+            # This isn't a surfire way to do things though; it's best to
+            # specify the mode= flag
+            results['mode'] = LametricMode.DEVICE \
+                if ((is_hostname(results['host']) or
+                    is_ipaddr(results['host'])) and
+
+                    # make sure password is not an Access Token
+                    (results['password'] and not
+                        LAMETRIC_IS_APP_TOKEN.match(results['password'])) and
+
+                    # Scan for app_ flags
+                    next((f for f in results.keys() \
+                          if f.startswith('app_')), None) is None) \
+                else LametricMode.CLOUD
+
+        # Handle defaults if not set
         if results['mode'] == LametricMode.DEVICE:
-            if 'apikey' in results['qsd'] and len(results['qsd']['apikey']):
-                # Extract API Key from an argument
-                results['apikey'] = \
-                    NotifyLametric.unquote(results['qsd']['apikey'])
-
-            else:
+            # Device Mode Defaults
+            if 'apikey' not in results:
                 results['apikey'] = \
                     NotifyLametric.unquote(results['password'])
 
-        elif results['mode'] == LametricMode.CLOUD:
-            # OAuth2 ID (Cloud Mode)
-            if 'oauth_id' in results['qsd'] \
-                    and len(results['qsd']['oauth_id']):
-
-                # Extract the OAuth2 Key from an argument
-                results['client_id'] = \
-                    NotifyLametric.unquote(results['qsd']['oauth_id'])
-
-            else:
-                results['client_id'] = \
-                    NotifyLametric.unquote(results['password'])
-
-            # OAuth2 Secret (Cloud Mode)
-            if 'oauth_secret' in results['qsd'] and \
-                    len(results['qsd']['oauth_secret']):
-                # Extract the API Secret from an argument
-                results['secret'] = \
-                    NotifyLametric.unquote(results['qsd']['oauth_secret'])
-
-            else:
-                results['secret'] = \
+        else:
+            # CLOUD Mode Defaults
+            if 'app_id' not in results:
+                results['app_id'] = \
                     NotifyLametric.unquote(results['host'])
+            if 'app_token' not in results:
+                results['app_token'] = \
+                    NotifyLametric.unquote(results['password'])
 
         # Set cycles
         try:
@@ -867,3 +965,38 @@ class NotifyLametric(NotifyBase):
             pass
 
         return results
+
+    @staticmethod
+    def parse_native_url(url):
+        """
+        Support
+           https://developer.lametric.com/api/v1/dev/\
+                   widget/update/com.lametric.{APP_ID}/1
+
+           https://developer.lametric.com/api/v1/dev/\
+                   widget/update/com.lametric.{APP_ID}/{APP_VER}
+        """
+
+        # If users do provide the Native URL they wll also want to add
+        # ?token={APP_ACCESS_TOKEN} to the parameters at the end or the
+        # URL will fail to load in later stages.
+        result = re.match(
+            r'^http(?P<secure>s)?://(?P<host>[^/]+)'
+            r'/api/(?P<api_ver>v[1-9]*[0-9]+)'
+            r'/dev/widget/update/'
+            r'com\.lametric\.(?P<app_id>[0-9a-z.-]{1,64})'
+            r'(/(?P<app_ver>[1-9][0-9]*))?/?'
+            r'(?P<params>\?.+)?$', url, re.I)
+
+        if result:
+            return NotifyLametric.parse_url(
+                '{schema}://{app_id}{app_ver}/{params}'.format(
+                    schema=NotifyLametric.secure_protocol
+                    if result.group('secure') else NotifyLametric.protocol,
+                    app_id=result.group('app_id'),
+                    app_ver='/{}'.format(result.group('app_ver'))
+                    if result.group('app_ver') else '',
+                    params='' if not result.group('params')
+                    else result.group('params')))
+
+        return None
