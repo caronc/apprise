@@ -1458,8 +1458,21 @@ def test_apprise_async_mode(mock_post, tmpdir):
     # Send Notifications Syncronously
     assert a.notify("sync") is True
 
+    # another way of looking a our false set asset configuration
+    assert a[0].asset.async_mode is False
+    assert a[1].asset.async_mode is False
+
     # Adjust 1 of the servers async_mode settings
-    a[0].asset.async_mode is True
+    a[0].asset.async_mode = True
+    assert a[0].asset.async_mode is True
+
+    # They all share the same object, so this gets toggled too
+    assert a[1].asset.async_mode is True
+
+    # We'll just change this one
+    a[1].asset = AppriseAsset(async_mode=False)
+    assert a[0].asset.async_mode is True
+    assert a[1].asset.async_mode is False
 
     # Send 1 Notification Syncronously, the other Asyncronously
     assert a.notify("a mixed batch") is True
