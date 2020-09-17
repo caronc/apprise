@@ -1402,7 +1402,8 @@ def test_apprise_details_plugin_verification():
 
 @pytest.mark.skipif(sys.version_info.major <= 2, reason="Requires Python 3.x+")
 @mock.patch('requests.post')
-def test_apprise_async_mode(mock_post, tmpdir):
+@mock.patch('apprise.py3compat.asyncio.notify')
+def test_apprise_async_mode(mock_async_notify, mock_post, tmpdir):
     """
     API: Apprise() async_mode tests
 
@@ -1435,6 +1436,10 @@ def test_apprise_async_mode(mock_post, tmpdir):
     # Send Notifications Asyncronously
     assert a.notify("async") is True
 
+    # Verify our async code got executed
+    assert mock_async_notify.call_count == 1
+    mock_async_notify.reset_mock()
+
     # Provide an over-ride now
     asset = AppriseAsset(async_mode=False)
     assert asset.async_mode is False
@@ -1457,6 +1462,9 @@ def test_apprise_async_mode(mock_post, tmpdir):
 
     # Send Notifications Syncronously
     assert a.notify("sync") is True
+    # Verify our async code never got called
+    assert mock_async_notify.call_count == 0
+    mock_async_notify.reset_mock()
 
     # another way of looking a our false set asset configuration
     assert a[0].asset.async_mode is False
@@ -1476,6 +1484,10 @@ def test_apprise_async_mode(mock_post, tmpdir):
 
     # Send 1 Notification Syncronously, the other Asyncronously
     assert a.notify("a mixed batch") is True
+
+    # Verify our async code got called
+    assert mock_async_notify.call_count == 1
+    mock_async_notify.reset_mock()
 
 
 def test_notify_matrix_dynamic_importing(tmpdir):
