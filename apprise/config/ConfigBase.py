@@ -671,7 +671,9 @@ class ConfigBase(URLBase):
                     continue
 
                 if not (hasattr(asset, k) and
-                        isinstance(getattr(asset, k), six.string_types)):
+                        isinstance(getattr(asset, k),
+                                   (bool, six.string_types))):
+
                     # We can't set a function or non-string set value
                     ConfigBase.logger.warning(
                         'Invalid asset key "{}".'.format(k))
@@ -687,8 +689,15 @@ class ConfigBase(URLBase):
                         'Invalid asset value to "{}".'.format(k))
                     continue
 
-                # Set our asset object with the new value
-                setattr(asset, k, v.strip())
+                if isinstance(getattr(asset, k), bool):
+                    # If the object in the Asset is a boolean, then
+                    # we want to convert the specified string to
+                    # match that.
+                    setattr(asset, k, parse_bool(v.strip()))
+
+                else:
+                    # Set our asset object with the new value
+                    setattr(asset, k, v.strip())
 
         #
         # global tag root directive
