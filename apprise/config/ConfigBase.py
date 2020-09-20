@@ -683,22 +683,23 @@ class ConfigBase(URLBase):
                     # Convert to an empty string
                     v = ''
 
-                if not isinstance(v, six.string_types):
+                if (isinstance(v, (bool, six.string_types))
+                        and isinstance(getattr(asset, k), bool)):
+
+                    # If the object in the Asset is a boolean, then
+                    # we want to convert the specified string to
+                    # match that.
+                    setattr(asset, k, parse_bool(v))
+
+                elif isinstance(v, six.string_types):
+                    # Set our asset object with the new value
+                    setattr(asset, k, v.strip())
+
+                else:
                     # we must set strings with a string
                     ConfigBase.logger.warning(
                         'Invalid asset value to "{}".'.format(k))
                     continue
-
-                if isinstance(getattr(asset, k), bool):
-                    # If the object in the Asset is a boolean, then
-                    # we want to convert the specified string to
-                    # match that.
-                    setattr(asset, k, parse_bool(v.strip()))
-
-                else:
-                    # Set our asset object with the new value
-                    setattr(asset, k, v.strip())
-
         #
         # global tag root directive
         #
