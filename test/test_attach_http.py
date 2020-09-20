@@ -35,6 +35,7 @@ from apprise.attachment.AttachHTTP import AttachHTTP
 from apprise import AppriseAttachment
 from apprise.plugins.NotifyBase import NotifyBase
 from apprise.plugins import SCHEMA_MAP
+from apprise.common import ContentLocation
 
 # Disable logging for a cleaner testing output
 import logging
@@ -227,6 +228,21 @@ def test_attach_http(mock_get):
     assert attachment.download()
     assert attachment
     assert len(attachment) == getsize(path)
+
+    # Test case where location is simply set to INACCESSIBLE
+    # Below is a bad example, but it proves the section of code properly works.
+    # Ideally a server admin may wish to just disable all HTTP based
+    # attachments entirely. In this case, they simply just need to change the
+    # global singleton at the start of their program like:
+    #
+    # import apprise
+    # apprise.attachment.AttachHTTP.location = \
+    #       apprise.ContentLocation.INACCESSIBLE
+    attachment = AttachHTTP(**results)
+    attachment.location = ContentLocation.INACCESSIBLE
+    assert attachment.path is None
+    # Downloads just don't work period
+    assert attachment.download() is False
 
     # No path specified
     # No Content-Disposition specified

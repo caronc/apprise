@@ -29,6 +29,7 @@ import six
 import requests
 from tempfile import NamedTemporaryFile
 from .AttachBase import AttachBase
+from ..common import ContentLocation
 from ..URLBase import PrivacyMode
 from ..AppriseLocale import gettext_lazy as _
 
@@ -49,6 +50,9 @@ class AttachHTTP(AttachBase):
 
     # The number of bytes in memory to read from the remote source at a time
     chunk_size = 8192
+
+    # Web based requests are remote/external to our current location
+    location = ContentLocation.HOSTED
 
     def __init__(self, headers=None, **kwargs):
         """
@@ -85,6 +89,10 @@ class AttachHTTP(AttachBase):
         """
         Perform retrieval of the configuration based on the specified request
         """
+
+        if self.location == ContentLocation.INACCESSIBLE:
+            # our content is inaccessible
+            return False
 
         # Ensure any existing content set has been invalidated
         self.invalidate()

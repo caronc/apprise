@@ -130,28 +130,58 @@ CONFIG_FORMATS = (
 )
 
 
-class ConfigIncludeMode(object):
+class ContentIncludeMode(object):
     """
-    The different Cofiguration inclusion modes.  All Configuration
-    plugins will have one of these associated with it.
+    The different Content inclusion modes.  All content based plugins will
+    have one of these associated with it.
     """
-    # - Configuration inclusion of same type only; hence a file:// can include
+    # - Content inclusion of same type only; hence a file:// can include
     #   a file://
     # - Cross file inclusion is not allowed unless insecure_includes (a flag)
     #   is set to True. In these cases STRICT acts as type ALWAYS
     STRICT = 'strict'
 
-    # This configuration type can never be included
+    # This content type can never be included
     NEVER = 'never'
 
-    # File configuration can always be included
+    # This content can always be included
     ALWAYS = 'always'
 
 
-CONFIG_INCLUDE_MODES = (
-    ConfigIncludeMode.STRICT,
-    ConfigIncludeMode.NEVER,
-    ConfigIncludeMode.ALWAYS,
+CONTENT_INCLUDE_MODES = (
+    ContentIncludeMode.STRICT,
+    ContentIncludeMode.NEVER,
+    ContentIncludeMode.ALWAYS,
+)
+
+
+class ContentLocation(object):
+    """
+    This is primarily used for handling file attachments.  The idea is
+    to track the source of the attachment itself.  We don't want
+    remote calls to a server to access local attachments for example.
+
+    By knowing the attachment type and cross-associating it with how
+    we plan on accessing the content, we can make a judgement call
+    (for security reasons) if we will allow it.
+
+    Obviously local uses of apprise can access both local and remote
+    type files.
+    """
+    # Content is located locally (on the same server as apprise)
+    LOCAL = 'local'
+
+    # Content is located in a remote location
+    HOSTED = 'hosted'
+
+    # Content is inaccessible
+    INACCESSIBLE = 'n/a'
+
+
+CONTENT_LOCATIONS = (
+    ContentLocation.LOCAL,
+    ContentLocation.HOSTED,
+    ContentLocation.INACCESSIBLE,
 )
 
 # This is a reserved tag that is automatically assigned to every

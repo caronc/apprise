@@ -39,6 +39,7 @@ from . import AppriseConfig
 from .utils import parse_list
 from .common import NOTIFY_TYPES
 from .common import NOTIFY_FORMATS
+from .common import ContentLocation
 from .logger import logger
 
 from . import __title__
@@ -224,8 +225,12 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
 
     # Prepare our asset
     asset = AppriseAsset(
+        # Our body format
         body_format=input_format,
+
+        # Set the theme
         theme=theme,
+
         # Async mode is only used for Python v3+ and allows a user to send
         # all of their notifications asyncronously.  This was made an option
         # incase there are problems in the future where it's better that
@@ -234,7 +239,7 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
     )
 
     # Create our Apprise object
-    a = Apprise(asset=asset, debug=debug)
+    a = Apprise(asset=asset, debug=debug, location=ContentLocation.LOCAL)
 
     # Load our configuration if no URLs or specified configuration was
     # identified on the command line

@@ -33,6 +33,7 @@ from apprise.AppriseAsset import AppriseAsset
 from apprise.attachment.AttachBase import AttachBase
 from apprise.attachment import SCHEMA_MAP as ATTACH_SCHEMA_MAP
 from apprise.attachment import __load_matrix
+from apprise.common import ContentLocation
 
 # Disable logging for a cleaner testing output
 import logging
@@ -183,11 +184,6 @@ def test_apprise_attachment():
     # Reset our object
     aa.clear()
 
-    # if instantiating attachments from the class, it will throw a TypeError
-    # if attachments couldn't be loaded
-    with pytest.raises(TypeError):
-        AppriseAttachment('garbage://')
-
     # Garbage in produces garbage out
     assert aa.add(None) is False
     assert aa.add(object()) is False
@@ -209,6 +205,39 @@ def test_apprise_attachment():
 
     # length remains unchanged
     assert len(aa) == 0
+
+    # if instantiating attachments from the class, it will throw a TypeError
+    # if attachments couldn't be loaded
+    with pytest.raises(TypeError):
+        AppriseAttachment('garbage://')
+
+    # Load our other attachment types
+    aa = AppriseAttachment(location=ContentLocation.LOCAL)
+
+    # Hosted type won't allow us to import files
+    aa = AppriseAttachment(location=ContentLocation.HOSTED)
+    assert len(aa) == 0
+
+    # Add our attachments defined a the head of this function
+    aa.add(attachments)
+
+    # Our length is still zero because we can't import files in
+    # a hosted environment
+    assert len(aa) == 0
+
+    # Inaccessible type prevents the adding of new stuff
+    aa = AppriseAttachment(location=ContentLocation.INACCESSIBLE)
+    assert len(aa) == 0
+
+    # Add our attachments defined a the head of this function
+    aa.add(attachments)
+
+    # Our length is still zero
+    assert len(aa) == 0
+
+    with pytest.raises(TypeError):
+        # Invalid location specified
+        AppriseAttachment(location="invalid")
 
     # test cases when file simply doesn't exist
     aa = AppriseAttachment('file://non-existant-file.png')

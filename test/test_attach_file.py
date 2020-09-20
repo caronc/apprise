@@ -31,6 +31,7 @@ from os.path import join
 from apprise.attachment.AttachBase import AttachBase
 from apprise.attachment.AttachFile import AttachFile
 from apprise import AppriseAttachment
+from apprise.common import ContentLocation
 
 # Disable logging for a cleaner testing output
 import logging
@@ -101,6 +102,23 @@ def test_attach_file():
     # won't show up in the generated URL
     assert re.search(r'[?&]mime=', response.url()) is None
     assert re.search(r'[?&]name=', response.url()) is None
+
+    # Test case where location is simply set to INACCESSIBLE
+    # Below is a bad example, but it proves the section of code properly works.
+    # Ideally a server admin may wish to just disable all File based
+    # attachments entirely. In this case, they simply just need to change the
+    # global singleton at the start of their program like:
+    #
+    # import apprise
+    # apprise.attachment.AttachFile.location = \
+    #       apprise.ContentLocation.INACCESSIBLE
+    #
+    response = AppriseAttachment.instantiate(path)
+    assert isinstance(response, AttachFile)
+    response.location = ContentLocation.INACCESSIBLE
+    assert response.path is None
+    # Downloads just don't work period
+    assert response.download() is False
 
     # File handling (even if image is set to maxium allowable)
     response = AppriseAttachment.instantiate(path)

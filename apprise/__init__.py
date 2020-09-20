@@ -41,8 +41,10 @@ from .common import OverflowMode
 from .common import OVERFLOW_MODES
 from .common import ConfigFormat
 from .common import CONFIG_FORMATS
-from .common import ConfigIncludeMode
-from .common import CONFIG_INCLUDE_MODES
+from .common import ContentIncludeMode
+from .common import CONTENT_INCLUDE_MODES
+from .common import ContentLocation
+from .common import CONTENT_LOCATIONS
 
 from .URLBase import URLBase
 from .URLBase import PrivacyMode
@@ -69,6 +71,7 @@ __all__ = [
     'NotifyType', 'NotifyImageSize', 'NotifyFormat', 'OverflowMode',
     'NOTIFY_TYPES', 'NOTIFY_IMAGE_SIZES', 'NOTIFY_FORMATS', 'OVERFLOW_MODES',
     'ConfigFormat', 'CONFIG_FORMATS',
-    'ConfigIncludeMode', 'CONFIG_INCLUDE_MODES',
+    'ContentIncludeMode', 'CONTENT_INCLUDE_MODES',
+    'ContentLocation', 'CONTENT_LOCATIONS',
     'PrivacyMode',
 ]
