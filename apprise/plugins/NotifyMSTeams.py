@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2019 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2020 Chris Caron <lead2gold@gmail.com>
 # All rights reserved.
 #
 # This code is licensed under the MIT License.
@@ -62,7 +62,7 @@
 #
 import re
 import requests
-from json import dumps
+import json
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
@@ -70,6 +70,9 @@ from ..common import NotifyType
 from ..common import NotifyFormat
 from ..utils import parse_bool
 from ..utils import validate_regex
+from ..utils import apply_template
+from ..utils import TemplateType
+from ..AppriseAttachment import AppriseAttachment
 from ..AppriseLocale import gettext_lazy as _
 
 # Used to prepare our UUID regex matching
@@ -105,6 +108,10 @@ class NotifyMSTeams(NotifyBase):
 
     # Default Notification Format
     notify_format = NotifyFormat.MARKDOWN
+
+    # There is no reason we should exceed 35KB when reading in a JSON file.
+    # If it is more than this, then it is not accepted
+    max_msteams_template_size = 35000
 
     # Define object templates
     templates = (
@@ -150,12 +157,30 @@ class NotifyMSTeams(NotifyBase):
             'default': False,
             'map_to': 'include_image',
         },
+        'template': {
+            'name': _('Template Path'),
+            'type': 'string',
+            'private': True,
+        },
     })
 
+    # Define our token control
+    template_kwargs = {
+        'tokens': {
+            'name': _('Template Tokens'),
+            'prefix': ':',
+        },
+    }
+
     def __init__(self, token_a, token_b, token_c, include_image=True,
-                 **kwargs):
+                 template=None, tokens=None, **kwargs):
         """
         Initialize Microsoft Teams Object
+
+        You can optional specify a template and identify arguments you
+        wish to populate your template with when posting.  Some reserved
+        template arguments that can not be over-ridden are:
+           `body`, `title`, and `type`.
         """
         super(NotifyMSTeams, self).__init__(**kwargs)
 
@@ -186,7 +211,111 @@ class NotifyMSTeams(NotifyBase):
         # Place a thumbnail image inline with the message body
         self.include_image = include_image
 
+        # Our template object is just an AppriseAttachment object
+        self.template = AppriseAttachment(asset=self.asset)
+        if template:
+            # Add our definition to our template
+            if self.template.add(template):
+                # Enforce maximum file size
+                self.template[0].max_file_size = self.max_msteams_template_size
+
+        # Template functionality
+        self.tokens = {}
+        if tokens:
+            self.tokens.update(tokens)
+
         return
+
+    def gen_payload(self, body, title='', notify_type=NotifyType.INFO,
+                    **kwargs):
+        """
+        This function generates our payload whether it be the generic one
+        Apprise generates by default, or one provided by a specified
+        external template.
+        """
+
+        # Acquire our to-be footer icon if configured to do so
+        image_url = None if not self.include_image \
+            else self.image_url(notify_type)
+
+        if not self.template:
+            # By default we use a generic working payload if there was
+            # no template specified
+            payload = {
+                "@type": "MessageCard",
+                "@context": "https://schema.org/extensions",
+                "summary": self.app_desc,
+                "themeColor": self.color(notify_type),
+                "sections": [
+                    {
+                        "activityImage": None,
+                        "activityTitle": title,
+                        "text": body,
+                    },
+                ]
+            }
+
+            if image_url:
+                payload['sections'][0]['activityImage'] = image_url
+
+            return payload
+
+        # If our code reaches here, then we generate ourselves the payload
+        template = self.template[0]
+        if not template:
+            # We could not access the attachment
+            self.logger.error(
+                'Could not access MSTeam template {}.'.format(
+                    template.url(privacy=True)))
+            return False
+
+        # Take a copy of our token dictionary
+        tokens = self.tokens.copy()
+
+        # Apply some defaults template values
+        tokens['app_body'] = body
+        tokens['app_title'] = title
+        tokens['app_type'] = notify_type
+        tokens['app_id'] = self.app_id
+        tokens['app_desc'] = self.app_desc
+        tokens['app_color'] = self.color(notify_type)
+        tokens['app_url'] = image_url
+
+        # Enforce Application mode
+        tokens['app_mode'] = TemplateType.JSON
+
+        try:
+            with open(template.path, 'r') as fp:
+                content = json.loads(apply_template(fp.read(), **tokens))
+
+        except (OSError, IOError):
+            self.logger.error(
+                'MSTeam template {} could not be read.'.format(
+                    template.url(privacy=True)))
+            return None
+
+        except json.decoder.JSONDecodeError as e:
+            self.logger.error(
+                'MSTeam template {} contains invalid JSON.'.format(
+                    template.url(privacy=True)))
+            self.logger.debug('JSONDecodeError: {}'.format(e))
+            return None
+
+        # Load our JSON data (if valid)
+        has_error = False
+        if '@type' not in content:
+            self.logger.error(
+                'MSTeam template {} is missing @type kwarg.'.format(
+                    template.url(privacy=True)))
+            has_error = True
+
+        if '@context' not in content:
+            self.logger.error(
+                'MSTeam template {} is missing @context kwarg.'.format(
+                    template.url(privacy=True)))
+            has_error = True
+
+        return content if not has_error else None
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
@@ -205,27 +334,13 @@ class NotifyMSTeams(NotifyBase):
             self.token_c,
         )
 
-        # Prepare our payload
-        payload = {
-            "@type": "MessageCard",
-            "@context": "https://schema.org/extensions",
-            "summary": self.app_desc,
-            "themeColor": self.color(notify_type),
-            "sections": [
-                {
-                    "activityImage": None,
-                    "activityTitle": title,
-                    "text": body,
-                },
-            ]
-        }
-
-        # Acquire our to-be footer icon if configured to do so
-        image_url = None if not self.include_image \
-            else self.image_url(notify_type)
-
-        if image_url:
-            payload['sections'][0]['activityImage'] = image_url
+        # Generate our payload if it's possible
+        payload = self.gen_payload(
+            body=body, title=title, notify_type=notify_type, **kwargs)
+        if not payload:
+            # No need to present a reason; that will come from the
+            # gen_payload() function itself
+            return False
 
         self.logger.debug('MSTeams POST URL: %s (cert_verify=%r)' % (
             url, self.verify_certificate,
@@ -237,7 +352,7 @@ class NotifyMSTeams(NotifyBase):
         try:
             r = requests.post(
                 url,
-                data=dumps(payload),
+                data=json.dumps(payload),
                 headers=headers,
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
@@ -283,8 +398,14 @@ class NotifyMSTeams(NotifyBase):
             'image': 'yes' if self.include_image else 'no',
         }
 
+        if self.template:
+            params['template'] = NotifyMSTeams.quote(
+                self.template[0].url(), safe='')
+
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+        # Store any template entries if specified
+        params.update({':{}'.format(k): v for k, v in self.tokens.items()})
 
         return '{schema}://{token_a}/{token_b}/{token_c}/'\
             '?{params}'.format(
@@ -340,6 +461,13 @@ class NotifyMSTeams(NotifyBase):
         # Get Image
         results['include_image'] = \
             parse_bool(results['qsd'].get('image', True))
+
+        if 'template' in results['qsd'] and results['qsd']['template']:
+            results['template'] = \
+                NotifyMSTeams.unquote(results['qsd']['template'])
+
+        # Store our tokens
+        results['tokens'] = results['qsd:']
 
         return results
 

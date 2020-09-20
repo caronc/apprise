@@ -26,6 +26,7 @@
 from __future__ import print_function
 import re
 import os
+import six
 try:
     # Python 2.7
     from urllib import unquote
@@ -46,10 +47,11 @@ def test_parse_qsd():
 
     result = utils.parse_qsd('a=1&b=&c&d=abcd')
     assert isinstance(result, dict) is True
-    assert len(result) == 3
+    assert len(result) == 4
     assert 'qsd' in result
     assert 'qsd+' in result
     assert 'qsd-' in result
+    assert 'qsd:' in result
 
     assert len(result['qsd']) == 4
     assert 'a' in result['qsd']
@@ -59,6 +61,7 @@ def test_parse_qsd():
 
     assert len(result['qsd-']) == 0
     assert len(result['qsd+']) == 0
+    assert len(result['qsd:']) == 0
 
 
 def test_parse_url():
@@ -77,6 +80,7 @@ def test_parse_url():
     assert result['qsd'] == {}
     assert result['qsd-'] == {}
     assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
 
     result = utils.parse_url('http://hostname/')
     assert result['schema'] == 'http'
@@ -91,6 +95,7 @@ def test_parse_url():
     assert result['qsd'] == {}
     assert result['qsd-'] == {}
     assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
 
     # colon after hostname without port number is no good
     assert utils.parse_url('http://hostname:') is None
@@ -109,6 +114,7 @@ def test_parse_url():
     assert result['qsd'] == {}
     assert result['qsd-'] == {}
     assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
 
     # A port of Zero is not valid
     assert utils.parse_url('http://hostname:0') is None
@@ -127,6 +133,7 @@ def test_parse_url():
     assert result['qsd'] == {}
     assert result['qsd-'] == {}
     assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
 
     result = utils.parse_url('http://hostname/?-KeY=Value')
     assert result['schema'] == 'http'
@@ -143,6 +150,7 @@ def test_parse_url():
     assert 'KeY' in result['qsd-']
     assert unquote(result['qsd-']['KeY']) == 'Value'
     assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
 
     result = utils.parse_url('http://hostname/?+KeY=Value')
     assert result['schema'] == 'http'
@@ -158,9 +166,26 @@ def test_parse_url():
     assert 'KeY' in result['qsd+']
     assert result['qsd+']['KeY'] == 'Value'
     assert result['qsd-'] == {}
+    assert result['qsd:'] == {}
+
+    result = utils.parse_url('http://hostname/?:kEy=vALUE')
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname'
+    assert result['port'] is None
+    assert result['user'] is None
+    assert result['password'] is None
+    assert result['fullpath'] == '/'
+    assert result['path'] == '/'
+    assert result['query'] is None
+    assert result['url'] == 'http://hostname/'
+    assert ':key' in result['qsd']
+    assert 'kEy' in result['qsd:']
+    assert result['qsd:']['kEy'] == 'vALUE'
+    assert result['qsd+'] == {}
+    assert result['qsd-'] == {}
 
     result = utils.parse_url(
-        'http://hostname/?+KeY=ValueA&-kEy=ValueB&KEY=Value%20+C')
+        'http://hostname/?+KeY=ValueA&-kEy=ValueB&KEY=Value%20+C&:colon=y')
     assert result['schema'] == 'http'
     assert result['host'] == 'hostname'
     assert result['port'] is None
@@ -172,6 +197,8 @@ def test_parse_url():
     assert result['url'] == 'http://hostname/'
     assert '+key' in result['qsd']
     assert '-key' in result['qsd']
+    assert ':colon' in result['qsd']
+    assert result['qsd:']['colon'] == 'y'
     assert 'key' in result['qsd']
     assert 'KeY' in result['qsd+']
     assert result['qsd+']['KeY'] == 'ValueA'
@@ -194,6 +221,7 @@ def test_parse_url():
     assert result['qsd'] == {}
     assert result['qsd-'] == {}
     assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
 
     result = utils.parse_url('http://hostname:40////')
     assert result['schema'] == 'http'
@@ -208,6 +236,7 @@ def test_parse_url():
     assert result['qsd'] == {}
     assert result['qsd-'] == {}
     assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
 
     result = utils.parse_url('HTTP://HoStNaMe:40/test.php')
     assert result['schema'] == 'http'
@@ -222,6 +251,7 @@ def test_parse_url():
     assert result['qsd'] == {}
     assert result['qsd-'] == {}
     assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
 
     result = utils.parse_url('HTTPS://user@hostname/test.py')
     assert result['schema'] == 'https'
@@ -236,6 +266,7 @@ def test_parse_url():
     assert result['qsd'] == {}
     assert result['qsd-'] == {}
     assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
 
     result = utils.parse_url('  HTTPS://///user@@@hostname///test.py  ')
     assert result['schema'] == 'https'
@@ -250,6 +281,7 @@ def test_parse_url():
     assert result['qsd'] == {}
     assert result['qsd-'] == {}
     assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
 
     result = utils.parse_url(
         'HTTPS://user:password@otherHost/full///path/name/',
@@ -266,6 +298,7 @@ def test_parse_url():
     assert result['qsd'] == {}
     assert result['qsd-'] == {}
     assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
 
     # Handle garbage
     assert utils.parse_url(None) is None
@@ -293,6 +326,7 @@ def test_parse_url():
     assert unquote(result['qsd']['format']) == 'text'
     assert result['qsd-'] == {}
     assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
 
     # Test Passwords with question marks ?; not supported
     result = utils.parse_url(
@@ -316,6 +350,7 @@ def test_parse_url():
     assert result['qsd'] == {}
     assert result['qsd-'] == {}
     assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
 
     # just host and path
     result = utils.parse_url('invalid/host')
@@ -331,6 +366,7 @@ def test_parse_url():
     assert result['qsd'] == {}
     assert result['qsd-'] == {}
     assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
 
     # just all out invalid
     assert utils.parse_url('?') is None
@@ -362,6 +398,7 @@ def test_parse_url():
     assert result['qsd'] == {}
     assert result['qsd-'] == {}
     assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
 
     result = utils.parse_url('testhostname')
     assert result['schema'] == 'http'
@@ -376,6 +413,8 @@ def test_parse_url():
     assert result['url'] == 'http://testhostname'
     assert result['qsd'] == {}
     assert result['qsd-'] == {}
+    assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
 
     result = utils.parse_url('example.com', default_schema='unknown')
     assert result['schema'] == 'unknown'
@@ -390,6 +429,8 @@ def test_parse_url():
     assert result['url'] == 'unknown://example.com'
     assert result['qsd'] == {}
     assert result['qsd-'] == {}
+    assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
 
     # An empty string without a hostame is still valid if verify_host is set
     result = utils.parse_url('', verify_host=False)
@@ -405,6 +446,8 @@ def test_parse_url():
     assert result['url'] == 'http://'
     assert result['qsd'] == {}
     assert result['qsd-'] == {}
+    assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
 
     # A messed up URL
     result = utils.parse_url('test://:@/', verify_host=False)
@@ -419,6 +462,8 @@ def test_parse_url():
     assert result['url'] == 'test://:@/'
     assert result['qsd'] == {}
     assert result['qsd-'] == {}
+    assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
 
     result = utils.parse_url('crazy://:@//_/@^&/jack.json', verify_host=False)
     assert result['schema'] == 'crazy'
@@ -432,6 +477,8 @@ def test_parse_url():
     assert unquote(result['url']) == 'crazy://:@/_/@^&/jack.json'
     assert result['qsd'] == {}
     assert result['qsd-'] == {}
+    assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
 
 
 def test_parse_bool():
@@ -1159,3 +1206,61 @@ def test_environ_temporary_change():
     # Even our temporary variables are now missing
     assert n_key not in os.environ
     assert d_key not in os.environ
+
+
+def test_apply_templating():
+    """utils: apply_template() testing
+    """
+
+    template = "Hello {{fname}}, How are you {{whence}}?"
+
+    result = utils.apply_template(
+        template, **{'fname': 'Chris', 'whence': 'this morning'})
+    assert isinstance(result, six.string_types) is True
+    assert result == "Hello Chris, How are you this morning?"
+
+    # In this example 'whence' isn't provided, so it isn't swapped
+    result = utils.apply_template(
+        template, **{'fname': 'Chris'})
+    assert isinstance(result, six.string_types) is True
+    assert result == "Hello Chris, How are you {{whence}}?"
+
+    # white space won't cause any ill affects:
+    template = "Hello {{ fname }}, How are you {{   whence}}?"
+    result = utils.apply_template(
+        template, **{'fname': 'Chris', 'whence': 'this morning'})
+    assert isinstance(result, six.string_types) is True
+    assert result == "Hello Chris, How are you this morning?"
+
+    # No arguments won't cause any problems
+    template = "Hello {{fname}}, How are you {{whence}}?"
+    result = utils.apply_template(template)
+    assert isinstance(result, six.string_types) is True
+    assert result == template
+
+    # Wrong elements are simply ignored
+    result = utils.apply_template(
+        template,
+        **{'fname': 'l2g', 'whence': 'this evening', 'ignore': 'me'})
+    assert isinstance(result, six.string_types) is True
+    assert result == "Hello l2g, How are you this evening?"
+
+    # Empty template makes things easy
+    result = utils.apply_template(
+        "", **{'fname': 'l2g', 'whence': 'this evening'})
+    assert isinstance(result, six.string_types) is True
+    assert result == ""
+
+    # Regular expressions are safely escapped and act as normal
+    # tokens:
+    template = "Hello {{.*}}, How are you {{[A-Z0-9]+}}?"
+    result = utils.apply_template(
+        template, **{'.*': 'l2g', '[A-Z0-9]+': 'this afternoon'})
+    assert result == "Hello l2g, How are you this afternoon?"
+
+    # JSON is handled too such as escaping quotes
+    template = '{value: "{{ value }}"}'
+    result = utils.apply_template(
+        template, app_mode=utils.TemplateType.JSON,
+        **{'value': '"quotes are escaped"'})
+    assert result == '{value: "\\"quotes are escaped\\""}'

@@ -25,6 +25,7 @@
 
 import re
 import six
+import json
 import contextlib
 import os
 from os.path import expanduser
@@ -95,9 +96,10 @@ TIDY_NUX_TRIM_RE = re.compile(
 
 # The handling of custom arguments passed in the URL; we treat any
 # argument (which would otherwise appear in the qsd area of our parse_url()
-# function differently if they start with a + or - value
+# function differently if they start with a +, - or : value
 NOTIFY_CUSTOM_ADD_TOKENS = re.compile(r'^( |\+)(?P<key>.*)\s*')
 NOTIFY_CUSTOM_DEL_TOKENS = re.compile(r'^-(?P<key>.*)\s*')
+NOTIFY_CUSTOM_COLON_TOKENS = re.compile(r'^:(?P<key>.*)\s*')
 
 # Used for attempting to acquire the schema if the URL can't be parsed.
 GET_SCHEMA_RE = re.compile(r'\s*(?P<schema>[a-z0-9]{2,9})://.*$', re.I)
@@ -139,6 +141,19 @@ EMAIL_DETECTION_RE = re.compile(
 # validate_regex() utilizes this mapping to track and re-use pre-complied
 # regular expressions
 REGEX_VALIDATE_LOOKUP = {}
+
+
+class TemplateType(object):
+    """
+    Defines the different template types we can perform parsing on
+    """
+    # RAW does nothing at all to the content being parsed
+    # data is taken at it's absolute value
+    RAW = 'raw'
+
+    # Data is presumed to be of type JSON and is therefore escaped
+    # if required to do so (such as single quotes)
+    JSON = 'json'
 
 
 def is_ipaddr(addr, ipv4=True, ipv6=True):
@@ -318,10 +333,11 @@ def parse_qsd(qs):
         'qsd': {},
 
         # Detected Entries that start with + or - are additionally stored in
-        # these values (un-touched).  The +/- however are stripped from their
+        # these values (un-touched).  The :,+,- however are stripped from their
         # name before they are stored here.
         'qsd+': {},
         'qsd-': {},
+        'qsd:': {},
     }
 
     pairs = [s2 for s1 in qs.split('&') for s2 in s1.split(';')]
@@ -360,6 +376,12 @@ def parse_qsd(qs):
         if k is not None:
             # Store content 'as-is'
             result['qsd-'][k.group('key')] = val
+
+        # Check for tokens that start with a colon symbol (:)
+        k = NOTIFY_CUSTOM_COLON_TOKENS.match(key)
+        if k is not None:
+            # Store content 'as-is'
+            result['qsd:'][k.group('key')] = val
 
     return result
 
@@ -418,11 +440,12 @@ def parse_url(url, default_schema='http', verify_host=True):
         # qsd = Query String Dictionary
         'qsd': {},
 
-        # Detected Entries that start with + or - are additionally stored in
-        # these values (un-touched).  The +/- however are stripped from their
-        # name before they are stored here.
+        # Detected Entries that start with +, - or : are additionally stored in
+        # these values (un-touched).  The +, -, and : however are stripped
+        # from their name before they are stored here.
         'qsd+': {},
         'qsd-': {},
+        'qsd:': {},
     }
 
     qsdata = ''
@@ -845,3 +868,45 @@ def environ(*remove, **update):
     finally:
         # Restore our snapshot
         os.environ = env_orig.copy()
+
+
+def apply_template(template, app_mode=TemplateType.RAW, **kwargs):
+    """
+    Takes a template in a str format and applies all of the keywords
+    and their values to it.
+
+    The app$mode is used to dictact any pre-processing that needs to take place
+    to the escaped string prior to it being placed.  The idea here is for
+    elements to be placed in a JSON response for example should be escaped
+    early in their string format.
+
+    The template must contain keywords wrapped in in double
+    squirly braces like {{keyword}}.  These are matched to the respected
+    kwargs passed into this function.
+
+    If there is no match found, content is not swapped.
+
+    """
+
+    def _escape_raw(content):
+        # No escaping necessary
+        return content
+
+    def _escape_json(content):
+        # remove surounding quotes
+        return json.dumps(content)[1:-1]
+
+    # Our escape function
+    fn = _escape_json if app_mode == TemplateType.JSON else _escape_raw
+
+    lookup = [re.escape(x) for x in kwargs.keys()]
+
+    # Compile this into a list
+    mask_r = re.compile(
+        re.escape('{{') + r'\s*(' + '|'.join(lookup) + r')\s*'
+        + re.escape('}}'), re.IGNORECASE)
+
+    # we index 2 characters off the head and 2 characters from the tail
+    # to drop the '{{' and '}}' surrounding our match so that we can
+    # re-index it back into our list
+    return mask_r.sub(lambda x: fn(kwargs[x.group()[2:-2].strip()]), template)

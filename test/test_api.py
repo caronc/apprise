@@ -776,18 +776,17 @@ def test_apprise_asset(tmpdir):
     )
 
     a.default_html_color = '#abcabc'
-    a.html_notify_map[NotifyType.INFO] = '#aaaaaa'
 
     assert a.color('invalid', tuple) == (171, 202, 188)
-    assert a.color(NotifyType.INFO, tuple) == (170, 170, 170)
+    assert a.color(NotifyType.INFO, tuple) == (58, 163, 227)
 
     assert a.color('invalid', int) == 11258556
-    assert a.color(NotifyType.INFO, int) == 11184810
+    assert a.color(NotifyType.INFO, int) == 3843043
 
     assert a.color('invalid', None) == '#abcabc'
-    assert a.color(NotifyType.INFO, None) == '#aaaaaa'
+    assert a.color(NotifyType.INFO, None) == '#3AA3E3'
     # None is the default
-    assert a.color(NotifyType.INFO) == '#aaaaaa'
+    assert a.color(NotifyType.INFO) == '#3AA3E3'
 
     # Invalid Type
     with pytest.raises(ValueError):
@@ -1203,7 +1202,7 @@ def test_apprise_details_plugin_verification():
                         assert isinstance(arg['prefix'], six.string_types)
                         if section == 'kwargs':
                             # The only acceptable prefix types for kwargs
-                            assert arg['prefix'] in ('+', '-')
+                            assert arg['prefix'] in (':', '+', '-')
 
                     else:
                         # kwargs requires that the 'prefix' is defined
