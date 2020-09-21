@@ -28,7 +28,7 @@ import six
 import requests
 from .ConfigBase import ConfigBase
 from ..common import ConfigFormat
-from ..common import ConfigIncludeMode
+from ..common import ContentIncludeMode
 from ..URLBase import PrivacyMode
 from ..AppriseLocale import gettext_lazy as _
 
@@ -66,7 +66,7 @@ class ConfigHTTP(ConfigBase):
     max_error_buffer_size = 2048
 
     # Configuration file inclusion can always include this type
-    allow_cross_includes = ConfigIncludeMode.ALWAYS
+    allow_cross_includes = ContentIncludeMode.ALWAYS
 
     def __init__(self, headers=None, **kwargs):
         """

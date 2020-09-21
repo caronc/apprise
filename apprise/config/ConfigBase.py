@@ -34,7 +34,7 @@ from ..AppriseAsset import AppriseAsset
 from ..URLBase import URLBase
 from ..common import ConfigFormat
 from ..common import CONFIG_FORMATS
-from ..common import ConfigIncludeMode
+from ..common import ContentIncludeMode
 from ..utils import GET_SCHEMA_RE
 from ..utils import parse_list
 from ..utils import parse_bool
@@ -65,7 +65,7 @@ class ConfigBase(URLBase):
 
     # By default all configuration is not includable using the 'include'
     # line found in configuration files.
-    allow_cross_includes = ConfigIncludeMode.NEVER
+    allow_cross_includes = ContentIncludeMode.NEVER
 
     # the config path manages the handling of relative include
     config_path = os.getcwd()
@@ -240,11 +240,11 @@ class ConfigBase(URLBase):
 
                 # Handle cross inclusion based on allow_cross_includes rules
                 if (SCHEMA_MAP[schema].allow_cross_includes ==
-                        ConfigIncludeMode.STRICT
+                        ContentIncludeMode.STRICT
                         and schema not in self.schemas()
                         and not self.insecure_includes) or \
                         SCHEMA_MAP[schema].allow_cross_includes == \
-                        ConfigIncludeMode.NEVER:
+                        ContentIncludeMode.NEVER:
 
                     # Prevent the loading if insecure base protocols
                     ConfigBase.logger.warning(

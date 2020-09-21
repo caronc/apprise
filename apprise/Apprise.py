@@ -58,13 +58,15 @@ class Apprise(object):
 
     """
 
-    def __init__(self, servers=None, asset=None, debug=False):
+    def __init__(self, servers=None, asset=None, location=None, debug=False):
         """
         Loads a set of server urls while applying the Asset() module to each
         if specified.
 
         If no asset is provided, then the default asset is used.
 
+        Optionally specify a global ContentLocation for a more strict means
+        of handling Attachments.
         """
 
         # Initialize a server list of URLs
@@ -86,6 +88,11 @@ class Apprise(object):
 
         # Set our debug flag
         self.debug = debug
+
+        # Store our hosting location for optional strict rule handling
+        # of Attachments.  Setting this to None removes any attachment
+        # restrictions.
+        self.location = location
 
     @staticmethod
     def instantiate(url, asset=None, tag=None, suppress_exceptions=True):
@@ -325,7 +332,8 @@ class Apprise(object):
         # Prepare attachments if required
         if attach is not None and not isinstance(attach, AppriseAttachment):
             try:
-                attach = AppriseAttachment(attach, asset=self.asset)
+                attach = AppriseAttachment(
+                    attach, asset=self.asset, location=self.location)
 
             except TypeError:
                 # bad attachments

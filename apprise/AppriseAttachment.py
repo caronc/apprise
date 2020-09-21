@@ -29,6 +29,8 @@ from . import attachment
 from . import URLBase
 from .AppriseAsset import AppriseAsset
 from .logger import logger
+from .common import ContentLocation
+from .common import CONTENT_LOCATIONS
 from .utils import GET_SCHEMA_RE
 
 
@@ -38,7 +40,8 @@ class AppriseAttachment(object):
 
     """
 
-    def __init__(self, paths=None, asset=None, cache=True, **kwargs):
+    def __init__(self, paths=None, asset=None, cache=True, location=None,
+                 **kwargs):
         """
         Loads all of the paths/urls specified (if any).
 
@@ -59,6 +62,25 @@ class AppriseAttachment(object):
 
         It's also worth nothing that the cache value is only set to elements
         that are not already of subclass AttachBase()
+
+        Optionally set your current ContentLocation in the location argument.
+        This is used to further handle attachments. The rules are as follows:
+          - INACCESSIBLE: You simply have disabled use of the object; no
+                          attachments will be retrieved/handled.
+          - HOSTED:       You are hosting an attachment service for others.
+                          In these circumstances all attachments that are LOCAL
+                          based (such as file://) will not be allowed.
+          - LOCAL:        The least restrictive mode as local files can be
+                          referenced in addition to hosted.
+
+        In all both HOSTED and LOCAL modes, INACCESSIBLE attachment types will
+        continue to be inaccessible.  However if you set this field (location)
+        to None (it's default value) the attachment location category will not
+        be tested in any way (all attachment types will be allowed).
+
+        The location field is also a global option that can be set when
+        initializing the Apprise object.
+
         """
 
         # Initialize our attachment listings
@@ -70,6 +92,15 @@ class AppriseAttachment(object):
         # Prepare our Asset Object
         self.asset = \
             asset if isinstance(asset, AppriseAsset) else AppriseAsset()
+
+        if location is not None and location not in CONTENT_LOCATIONS:
+            msg = "An invalid Attachment location ({}) was specified." \
+                  .format(location)
+            logger.warning(msg)
+            raise TypeError(msg)
+
+        # Store our location
+        self.location = location
 
         # Now parse any paths specified
         if paths is not None:
@@ -123,26 +154,45 @@ class AppriseAttachment(object):
 
         # Iterate over our attachments
         for _attachment in attachments:
-
-            if isinstance(_attachment, attachment.AttachBase):
-                # Go ahead and just add our attachment into our list
-                self.attachments.append(_attachment)
+            if self.location == ContentLocation.INACCESSIBLE:
+                logger.warning(
+                    "Attachments are disabled; ignoring {}"
+                    .format(_attachment))
+                return_status = False
                 continue
 
-            elif not isinstance(_attachment, six.string_types):
+            if isinstance(_attachment, six.string_types):
+                logger.debug("Loading attachment: {}".format(_attachment))
+                # Instantiate ourselves an object, this function throws or
+                # returns None if it fails
+                instance = AppriseAttachment.instantiate(
+                    _attachment, asset=asset, cache=cache)
+                if not isinstance(instance, attachment.AttachBase):
+                    return_status = False
+                    continue
+
+            elif not isinstance(_attachment, attachment.AttachBase):
                 logger.warning(
                     "An invalid attachment (type={}) was specified.".format(
                         type(_attachment)))
                 return_status = False
                 continue
 
-            logger.debug("Loading attachment: {}".format(_attachment))
+            else:
+                # our entry is of type AttachBase, so just go ahead and point
+                # our instance to it for some post processing below
+                instance = _attachment
 
-            # Instantiate ourselves an object, this function throws or
-            # returns None if it fails
-            instance = AppriseAttachment.instantiate(
-                _attachment, asset=asset, cache=cache)
-            if not isinstance(instance, attachment.AttachBase):
+            # Apply some simple logic if our location flag is set
+            if self.location and ((
+                    self.location == ContentLocation.HOSTED
+                    and instance.location != ContentLocation.HOSTED)
+                    or instance.location == ContentLocation.INACCESSIBLE):
+                logger.warning(
+                    "Attachment was disallowed due to accessibility "
+                    "restrictions ({}->{}): {}".format(
+                        self.location, instance.location,
+                        instance.url(privacy=True)))
                 return_status = False
                 continue
 

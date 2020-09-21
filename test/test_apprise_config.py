@@ -30,7 +30,7 @@ import mock
 import pytest
 from apprise import NotifyFormat
 from apprise import ConfigFormat
-from apprise import ConfigIncludeMode
+from apprise import ContentIncludeMode
 from apprise.Apprise import Apprise
 from apprise.AppriseConfig import AppriseConfig
 from apprise.AppriseAsset import AppriseAsset
@@ -417,7 +417,7 @@ def test_apprise_config_instantiate():
 
     class BadConfig(ConfigBase):
         # always allow incusion
-        allow_cross_includes = ConfigIncludeMode.ALWAYS
+        allow_cross_includes = ContentIncludeMode.ALWAYS
 
         def __init__(self, **kwargs):
             super(BadConfig, self).__init__(**kwargs)
@@ -450,7 +450,7 @@ def test_invalid_apprise_config(tmpdir):
 
     class BadConfig(ConfigBase):
         # always allow incusion
-        allow_cross_includes = ConfigIncludeMode.ALWAYS
+        allow_cross_includes = ContentIncludeMode.ALWAYS
 
         def __init__(self, **kwargs):
             super(BadConfig, self).__init__(**kwargs)
@@ -699,7 +699,7 @@ def test_recursive_config_inclusion(tmpdir):
         protocol = 'always'
 
         # Always type
-        allow_cross_includes = ConfigIncludeMode.ALWAYS
+        allow_cross_includes = ContentIncludeMode.ALWAYS
 
     class ConfigCrossPostStrict(ConfigFile):
         """
@@ -712,7 +712,7 @@ def test_recursive_config_inclusion(tmpdir):
         protocol = 'strict'
 
         # Always type
-        allow_cross_includes = ConfigIncludeMode.STRICT
+        allow_cross_includes = ContentIncludeMode.STRICT
 
     class ConfigCrossPostNever(ConfigFile):
         """
@@ -725,7 +725,7 @@ def test_recursive_config_inclusion(tmpdir):
         protocol = 'never'
 
         # Always type
-        allow_cross_includes = ConfigIncludeMode.NEVER
+        allow_cross_includes = ContentIncludeMode.NEVER
 
     # store our entries
     CONFIG_SCHEMA_MAP['never'] = ConfigCrossPostNever

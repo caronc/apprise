@@ -28,6 +28,7 @@ import time
 import mimetypes
 from ..URLBase import URLBase
 from ..utils import parse_bool
+from ..common import ContentLocation
 from ..AppriseLocale import gettext_lazy as _
 
 
@@ -61,6 +62,11 @@ class AttachBase(URLBase):
     # 1 MB = 1048576 bytes
     # 5 MB = 5242880 bytes
     max_file_size = 5242880
+
+    # By default all attachments types are inaccessible.
+    # Developers of items identified in the attachment plugin directory
+    # are requried to set a location
+    location = ContentLocation.INACCESSIBLE
 
     # Here is where we define all of the arguments we accept on the url
     # such as: schema://whatever/?overflow=upstream&format=text
