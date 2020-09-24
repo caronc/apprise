@@ -795,16 +795,16 @@ class ConfigBase(URLBase):
                             .format(key, no + 1))
                         continue
 
-                    # Store our URL and Schema Regex
-                    _url = key
-
                     # Store our schema
                     schema = _schema.group('schema').lower()
+
+                    # Store our URL and Schema Regex
+                    _url = key
 
                 if _url is None:
                     # the loop above failed to match anything
                     ConfigBase.logger.warning(
-                        'Unsupported schema in urls, entry #{}'.format(no + 1))
+                        'Unsupported URL, entry #{}'.format(no + 1))
                     continue
 
                 _results = plugins.url_to_dict(_url)
@@ -834,6 +834,11 @@ class ConfigBase(URLBase):
                             if 'schema' in entries:
                                 del entries['schema']
 
+                            # support our special tokens (if they're present)
+                            if schema in plugins.SCHEMA_MAP:
+                                entries = ConfigBase.__extract_special_tokens(
+                                    schema, entries)
+
                             # Extend our dictionary with our new entries
                             r.update(entries)
 
@@ -841,6 +846,11 @@ class ConfigBase(URLBase):
                             results.append(r)
 
                 elif isinstance(tokens, dict):
+                    # support our special tokens (if they're present)
+                    if schema in plugins.SCHEMA_MAP:
+                        tokens = ConfigBase.__extract_special_tokens(
+                            schema, tokens)
+
                     # Copy ourselves a template of our parsed URL as a base to
                     # work with
                     r = _results.copy()
@@ -938,6 +948,53 @@ class ConfigBase(URLBase):
 
         # Pop the element off of the stack
         return self._cached_servers.pop(index)
+
+    @staticmethod
+    def __extract_special_tokens(schema, tokens):
+        """
+        This function takes a list of tokens and updates them to no longer
+        include any special tokens such as +,-, and :
+
+        - schema must be a valid schema of a supported plugin type
+        - tokens must be a dictionary containing the yaml entries parsed.
+
+        The idea here is we can post process a set of tokens provided in
+        a YAML file where the user provided some of the special keywords.
+
+        We effectivley look up what these keywords map to their appropriate
+        value they're expected
+        """
+        # Create a copy of our dictionary
+        tokens = tokens.copy()
+
+        for kw, meta in plugins.SCHEMA_MAP[schema]\
+                .template_kwargs.items():
+
+            # Determine our prefix:
+            prefix = meta.get('prefix', '+')
+
+            # Detect any matches
+            matches = \
+                {k[1:]: str(v) for k, v in tokens.items()
+                 if k.startswith(prefix)}
+
+            if not matches:
+                # we're done with this entry
+                continue
+
+            if not isinstance(tokens.get(kw, None), dict):
+                # Invalid; correct it
+                tokens[kw] = dict()
+
+            # strip out processed tokens
+            tokens = {k: v for k, v in tokens.items()
+                      if not k.startswith(prefix)}
+
+            # Update our entries
+            tokens[kw].update(matches)
+
+        # Return our tokens
+        return tokens
 
     def __getitem__(self, index):
         """

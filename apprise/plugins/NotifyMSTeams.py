@@ -215,9 +215,9 @@ class NotifyMSTeams(NotifyBase):
         self.template = AppriseAttachment(asset=self.asset)
         if template:
             # Add our definition to our template
-            if self.template.add(template):
-                # Enforce maximum file size
-                self.template[0].max_file_size = self.max_msteams_template_size
+            self.template.add(template)
+            # Enforce maximum file size
+            self.template[0].max_file_size = self.max_msteams_template_size
 
         # Template functionality
         self.tokens = {}

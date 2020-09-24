@@ -605,7 +605,7 @@ urls:
 
 """, asset=asset)
 
-    # We expect to parse 4 entries from the above because the tgram:// entry
+    # We expect to parse 6 entries from the above because the tgram:// entry
     # would have failed to be loaded
     assert isinstance(result, list)
     assert len(result) == 6
