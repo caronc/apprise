@@ -75,6 +75,13 @@ from ..utils import TemplateType
 from ..AppriseAttachment import AppriseAttachment
 from ..AppriseLocale import gettext_lazy as _
 
+try:
+    from json.decoder import JSONDecodeError
+
+except ImportError:
+    # Python v2.7 Backwards Compatibility support
+    JSONDecodeError = ValueError
+
 # Used to prepare our UUID regex matching
 UUID4_RE = \
     r'[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
@@ -294,7 +301,7 @@ class NotifyMSTeams(NotifyBase):
                     template.url(privacy=True)))
             return None
 
-        except json.decoder.JSONDecodeError as e:
+        except JSONDecodeError as e:
             self.logger.error(
                 'MSTeam template {} contains invalid JSON.'.format(
                     template.url(privacy=True)))
