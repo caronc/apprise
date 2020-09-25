@@ -228,8 +228,14 @@ class NotifyMSTeams(NotifyBase):
 
         # Template functionality
         self.tokens = {}
-        if tokens:
+        if isinstance(tokens, dict):
             self.tokens.update(tokens)
+
+        elif tokens:
+            msg = 'The specified MSTeams Template Tokens ' \
+                  '({}) are not identified as a dictionary.'.format(tokens)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         return
 
@@ -286,7 +292,8 @@ class NotifyMSTeams(NotifyBase):
         tokens['app_id'] = self.app_id
         tokens['app_desc'] = self.app_desc
         tokens['app_color'] = self.color(notify_type)
-        tokens['app_url'] = image_url
+        tokens['app_image_url'] = image_url
+        tokens['app_url'] = self.app_url
 
         # Enforce Application mode
         tokens['app_mode'] = TemplateType.JSON

@@ -385,10 +385,10 @@ def test_msteams_yaml_config(mock_post, tmpdir):
       - {url}:
         - tag: 'msteams'
           template:  {template}
-          token:
-            - name: 'Testing'
-              body: 'test body'
-              title: 'test title'
+          tokens:
+            name: 'Testing'
+            body: 'test body'
+            title: 'test title'
     """.format(url=url, template=str(template)))
 
     cfg = AppriseConfig()
@@ -424,10 +424,10 @@ def test_msteams_yaml_config(mock_post, tmpdir):
       - {url}:
         tag: 'msteams'
         template:  {template}
-        token:
-          - name: 'Testing'
-            body: 'test body'
-            title: 'test title'
+        tokens:
+          name: 'Testing'
+          body: 'test body'
+          title: 'test title'
     """.format(url=url, template=str(template)))
 
     cfg = AppriseConfig()
@@ -460,10 +460,10 @@ def test_msteams_yaml_config(mock_post, tmpdir):
       - {url}:
         - tag: 'msteams'
           template:  {template}
-          :name: 'Testing'
-          token:
+          tokens:
               body: 'test body'
               title: 'test title'
+          :name: 'Testing'
     """.format(url=url, template=str(template)))
 
     cfg = AppriseConfig()
@@ -488,3 +488,22 @@ def test_msteams_yaml_config(mock_post, tmpdir):
     assert posted_json['themeColor'] == '#3AA3E3'
     assert posted_json['sections'][0]['activityTitle'] == 'test title'
     assert posted_json['sections'][0]['text'] == 'test body'
+
+    # Now let's do a combination of the two
+    config = tmpdir.join("msteams05.yml")
+    config.write("""
+    urls:
+      - {url}:
+        - tag: 'msteams'
+          template:  {template}
+          # Not a dictionary
+          tokens:
+            body
+    """.format(url=url, template=str(template)))
+
+    cfg = AppriseConfig()
+    cfg.add(str(config))
+    assert len(cfg) == 1
+
+    # It could not load because of invalid tokens
+    assert len(cfg[0]) == 0
