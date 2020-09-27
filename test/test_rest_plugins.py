@@ -5256,31 +5256,6 @@ def test_notify_msg91_plugin(mock_post):
         plugins.NotifyMSG91(authkey="    ", targets=target)
 
 
-def test_notify_msteams_plugin():
-    """
-    API: NotifyMSTeams() Extra Checks
-
-    """
-    # Initializes the plugin with an invalid token
-    with pytest.raises(TypeError):
-        plugins.NotifyMSTeams(token_a=None, token_b='abcd', token_c='abcd')
-    # Whitespace also acts as an invalid token value
-    with pytest.raises(TypeError):
-        plugins.NotifyMSTeams(token_a='  ', token_b='abcd', token_c='abcd')
-
-    with pytest.raises(TypeError):
-        plugins.NotifyMSTeams(token_a='abcd', token_b=None, token_c='abcd')
-    # Whitespace also acts as an invalid token value
-    with pytest.raises(TypeError):
-        plugins.NotifyMSTeams(token_a='abcd', token_b='  ', token_c='abcd')
-
-    with pytest.raises(TypeError):
-        plugins.NotifyMSTeams(token_a='abcd', token_b='abcd', token_c=None)
-    # Whitespace also acts as an invalid token value
-    with pytest.raises(TypeError):
-        plugins.NotifyMSTeams(token_a='abcd', token_b='abcd', token_c='  ')
-
-
 def test_notify_prowl_plugin():
     """
     API: NotifyProwl() Extra Checks

@@ -237,6 +237,7 @@ class NotifyMSTeams(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
+        # else:  NoneType - this is okay
         return
 
     def gen_payload(self, body, title='', notify_type=NotifyType.INFO,

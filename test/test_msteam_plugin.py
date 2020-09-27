@@ -26,6 +26,7 @@
 import mock
 import json
 import requests
+import pytest
 from apprise import Apprise
 from apprise import AppriseConfig
 from apprise import plugins
@@ -302,6 +303,7 @@ def test_msteams_yaml_config(mock_post, tmpdir):
     assert obj.notify(
         body="body", title='title',
         notify_type=NotifyType.INFO) is False
+    assert mock_post.called is False
 
     # Test token identifiers
     config = tmpdir.join("msteams01.yml")
@@ -341,15 +343,16 @@ def test_msteams_yaml_config(mock_post, tmpdir):
     #
     # Now again but without a bullet under the url definition
     #
+    mock_post.reset_mock()
     config = tmpdir.join("msteams02.yml")
     config.write("""
     urls:
       - {url}:
-        tag: 'msteams'
-        template:  {template}
-        :name: 'Testing'
-        :body: 'test body'
-        :title: 'test title'
+          tag: 'msteams'
+          template:  {template}
+          :name: 'Testing2'
+          :body: 'test body2'
+          :title: 'test title2'
     """.format(url=url, template=str(template)))
 
     cfg = AppriseConfig()
@@ -370,15 +373,15 @@ def test_msteams_yaml_config(mock_post, tmpdir):
     # Our Posted JSON Object
     posted_json = json.loads(mock_post.call_args_list[0][1]['data'])
     assert 'summary' in posted_json
-    assert posted_json['summary'] == 'Testing'
+    assert posted_json['summary'] == 'Testing2'
     assert posted_json['themeColor'] == '#3AA3E3'
-    assert posted_json['sections'][0]['activityTitle'] == 'test title'
-    assert posted_json['sections'][0]['text'] == 'test body'
+    assert posted_json['sections'][0]['activityTitle'] == 'test title2'
+    assert posted_json['sections'][0]['text'] == 'test body2'
 
     #
     # Try again but store the content as a dictionary in the cofiguration file
     #
-
+    mock_post.reset_mock()
     config = tmpdir.join("msteams03.yml")
     config.write("""
     urls:
@@ -386,9 +389,9 @@ def test_msteams_yaml_config(mock_post, tmpdir):
         - tag: 'msteams'
           template:  {template}
           tokens:
-            name: 'Testing'
-            body: 'test body'
-            title: 'test title'
+            name: 'Testing3'
+            body: 'test body3'
+            title: 'test title3'
     """.format(url=url, template=str(template)))
 
     cfg = AppriseConfig()
@@ -409,25 +412,25 @@ def test_msteams_yaml_config(mock_post, tmpdir):
     # Our Posted JSON Object
     posted_json = json.loads(mock_post.call_args_list[0][1]['data'])
     assert 'summary' in posted_json
-    assert posted_json['summary'] == 'Testing'
+    assert posted_json['summary'] == 'Testing3'
     assert posted_json['themeColor'] == '#3AA3E3'
-    assert posted_json['sections'][0]['activityTitle'] == 'test title'
-    assert posted_json['sections'][0]['text'] == 'test body'
+    assert posted_json['sections'][0]['activityTitle'] == 'test title3'
+    assert posted_json['sections'][0]['text'] == 'test body3'
 
     #
     # Now again but without a bullet under the url definition
     #
-
+    mock_post.reset_mock()
     config = tmpdir.join("msteams04.yml")
     config.write("""
     urls:
       - {url}:
-        tag: 'msteams'
-        template:  {template}
-        tokens:
-          name: 'Testing'
-          body: 'test body'
-          title: 'test title'
+          tag: 'msteams'
+          template:  {template}
+          tokens:
+            name: 'Testing4'
+            body: 'test body4'
+            title: 'test title4'
     """.format(url=url, template=str(template)))
 
     cfg = AppriseConfig()
@@ -448,22 +451,23 @@ def test_msteams_yaml_config(mock_post, tmpdir):
     # Our Posted JSON Object
     posted_json = json.loads(mock_post.call_args_list[0][1]['data'])
     assert 'summary' in posted_json
-    assert posted_json['summary'] == 'Testing'
+    assert posted_json['summary'] == 'Testing4'
     assert posted_json['themeColor'] == '#3AA3E3'
-    assert posted_json['sections'][0]['activityTitle'] == 'test title'
-    assert posted_json['sections'][0]['text'] == 'test body'
+    assert posted_json['sections'][0]['activityTitle'] == 'test title4'
+    assert posted_json['sections'][0]['text'] == 'test body4'
 
     # Now let's do a combination of the two
-    config = tmpdir.join("msteams04.yml")
+    mock_post.reset_mock()
+    config = tmpdir.join("msteams05.yml")
     config.write("""
     urls:
       - {url}:
         - tag: 'msteams'
           template:  {template}
           tokens:
-              body: 'test body'
-              title: 'test title'
-          :name: 'Testing'
+              body: 'test body5'
+              title: 'test title5'
+          :name: 'Testing5'
     """.format(url=url, template=str(template)))
 
     cfg = AppriseConfig()
@@ -484,13 +488,15 @@ def test_msteams_yaml_config(mock_post, tmpdir):
     # Our Posted JSON Object
     posted_json = json.loads(mock_post.call_args_list[0][1]['data'])
     assert 'summary' in posted_json
-    assert posted_json['summary'] == 'Testing'
+    assert posted_json['summary'] == 'Testing5'
     assert posted_json['themeColor'] == '#3AA3E3'
-    assert posted_json['sections'][0]['activityTitle'] == 'test title'
-    assert posted_json['sections'][0]['text'] == 'test body'
+    assert posted_json['sections'][0]['activityTitle'] == 'test title5'
+    assert posted_json['sections'][0]['text'] == 'test body5'
 
-    # Now let's do a combination of the two
-    config = tmpdir.join("msteams05.yml")
+    # Now let's do a test where our tokens is not the expected
+    # dictionary we want to see
+    mock_post.reset_mock()
+    config = tmpdir.join("msteams06.yml")
     config.write("""
     urls:
       - {url}:
@@ -507,3 +513,36 @@ def test_msteams_yaml_config(mock_post, tmpdir):
 
     # It could not load because of invalid tokens
     assert len(cfg[0]) == 0
+
+
+def test_notify_msteams_plugin():
+    """
+    API: NotifyMSTeams() Extra Checks
+
+    """
+    # Initializes the plugin with an invalid token
+    with pytest.raises(TypeError):
+        plugins.NotifyMSTeams(token_a=None, token_b='abcd', token_c='abcd')
+    # Whitespace also acts as an invalid token value
+    with pytest.raises(TypeError):
+        plugins.NotifyMSTeams(token_a='  ', token_b='abcd', token_c='abcd')
+
+    with pytest.raises(TypeError):
+        plugins.NotifyMSTeams(token_a='abcd', token_b=None, token_c='abcd')
+    # Whitespace also acts as an invalid token value
+    with pytest.raises(TypeError):
+        plugins.NotifyMSTeams(token_a='abcd', token_b='  ', token_c='abcd')
+
+    with pytest.raises(TypeError):
+        plugins.NotifyMSTeams(token_a='abcd', token_b='abcd', token_c=None)
+    # Whitespace also acts as an invalid token value
+    with pytest.raises(TypeError):
+        plugins.NotifyMSTeams(token_a='abcd', token_b='abcd', token_c='  ')
+
+    uuid4 = '8b799edf-6f98-4d3a-9be7-2862fb4e5752'
+    token_a = '{}@{}'.format(uuid4, uuid4)
+    token_b = 'A' * 32
+    # test case where no tokens are specified
+    obj = plugins.NotifyMSTeams(
+        token_a=token_a, token_b=token_b, token_c=uuid4)
+    assert isinstance(obj, plugins.NotifyMSTeams)
