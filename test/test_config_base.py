@@ -234,6 +234,10 @@ def test_config_base_config_parse_text():
 
     # Valid Configuration
     result, config = ConfigBase.config_parse_text("""
+    # A completely invalid token on json string (it gets ignored)
+    # but the URL is still valid
+    json://localhost?invalid-token=nodashes
+
     # A comment line over top of a URL
     mailto://userb:pass@gmail.com
 
@@ -256,7 +260,7 @@ def test_config_base_config_parse_text():
     # We expect to parse 3 entries from the above
     assert isinstance(result, list)
     assert isinstance(config, list)
-    assert len(result) == 3
+    assert len(result) == 4
     assert len(result[0].tags) == 0
 
     # Our last element will have 2 tags associated with it
@@ -545,12 +549,17 @@ urls:
   - mailto://test:password@gmail.com
   - https://apprise.ryver.com/application/webhook/ckhrjW8w672m6HG
   - https://not.a.native.url/
+
+    # A completely invalid token on json string (it gets ignored)
+    # but the URL is still valid
+  - json://localhost?invalid-token=nodashes
+
 """, asset=asset)
 
-    # We expect to parse 3 entries from the above
+    # We expect to parse 4 entries from the above
     # The Ryver one is in a native form and the 4th one is invalid
     assert isinstance(result, list)
-    assert len(result) == 3
+    assert len(result) == 4
     assert len(result[0].tags) == 0
 
     # There were 3 include entries

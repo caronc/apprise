@@ -41,6 +41,10 @@ from ..utils import parse_bool
 from ..utils import parse_urls
 from . import SCHEMA_MAP
 
+# Test whether token is valid or not
+VALID_TOKEN = re.compile(
+    r'(?P<token>[a-z0-9][a-z0-9_]+)', re.I)
+
 
 class ConfigBase(URLBase):
     """
@@ -877,6 +881,17 @@ class ConfigBase(URLBase):
                 else:
                     # Just use the global settings
                     _results['tag'] = global_tags
+
+                for key in list(_results.keys()):
+                    # Strip out any tokens we know that we can't accept and
+                    # warn the user
+                    match = VALID_TOKEN.match(key)
+                    if not match:
+                        ConfigBase.logger.warning(
+                            'Ignoring invalid token ({}) found in YAML '
+                            'configuration entry #{}, item #{}'
+                            .format(key, no + 1, entry))
+                        del _results[key]
 
                 ConfigBase.logger.trace(
                     'URL #{}: {} unpacked as:{}{}'

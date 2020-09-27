@@ -83,6 +83,9 @@ def test_apprise_config(tmpdir):
 
     # Just 1 token provided causes exception
     sns://T1JJ3T3L2/
+
+    # XML
+    xml://localhost/?+HeaderEntry=Test&:IgnoredEntry=Ignored
     """)
 
     # Create ourselves a config object
@@ -95,8 +98,8 @@ def test_apprise_config(tmpdir):
     # when there is at least one entry
     assert ac
 
-    # We should be able to read our 3 servers from that
-    assert len(ac.servers()) == 3
+    # We should be able to read our 4 servers from that
+    assert len(ac.servers()) == 4
 
     # Get our URL back
     assert isinstance(ac[0].url(), six.string_types)
@@ -345,6 +348,16 @@ def test_apprise_add_config():
        - mailto://usera:pass@gmail.com
        - gnome://:
           tag: taga,tagb
+
+       - json://localhost:
+          +HeaderEntry1: 'a header entry'
+          -HeaderEntryDepricated: 'a deprecated entry'
+          :HeaderEntryIgnored: 'an ignored header entry'
+
+       - xml://localhost:
+          +HeaderEntry1: 'a header entry'
+          -HeaderEntryDepricated: 'a deprecated entry'
+          :HeaderEntryIgnored: 'an ignored header entry'
     """
 
     # Create ourselves a config object
@@ -359,8 +372,8 @@ def test_apprise_add_config():
     # when there is at least one entry
     assert ac
 
-    # We should be able to read our 2 servers from that
-    assert len(ac.servers()) == 2
+    # We should be able to read our 4 servers from that
+    assert len(ac.servers()) == 4
 
     # Now an invalid configuration file
     content = "invalid"

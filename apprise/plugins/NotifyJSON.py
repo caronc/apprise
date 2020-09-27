@@ -259,8 +259,12 @@ class NotifyJSON(NotifyBase):
 
         # Add our headers that the user can potentially over-ride if they wish
         # to to our returned result set
-        results['headers'] = results['qsd-']
-        results['headers'].update(results['qsd+'])
+        results['headers'] = results['qsd+']
+        if results['qsd-']:
+            results['headers'].update(results['qsd-'])
+            NotifyBase.logger.deprecate(
+                "minus (-) based JSON header tokens are being "
+                " removed; use the plus (+) symbol instead.")
 
         # Tidy our header entries by unquoting them
         results['headers'] = {NotifyJSON.unquote(x): NotifyJSON.unquote(y)

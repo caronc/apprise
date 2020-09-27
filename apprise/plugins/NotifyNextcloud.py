@@ -287,7 +287,11 @@ class NotifyNextcloud(NotifyBase):
 
         # Add our headers that the user can potentially over-ride if they
         # wish to to our returned result set
-        results['headers'] = results['qsd-']
-        results['headers'].update(results['qsd+'])
+        results['headers'] = results['qsd+']
+        if results['qsd-']:
+            results['headers'].update(results['qsd-'])
+            NotifyBase.logger.deprecate(
+                "minus (-) based Nextcloud header tokens are being "
+                " removed; use the plus (+) symbol instead.")
 
         return results
