@@ -703,6 +703,7 @@ asset:
   app_id: AppriseTest
   app_desc: Apprise Test Notifications
   app_url: http://nuxref.com
+  async_mode: no
 
   # Support setting empty values
   image_url_mask:
@@ -737,6 +738,9 @@ urls:
     assert asset.app_id == "AppriseTest"
     assert asset.app_desc == "Apprise Test Notifications"
     assert asset.app_url == "http://nuxref.com"
+
+    # Boolean types stay boolean
+    assert asset.async_mode is False
 
     # the theme was not updated and remains the same as it was
     assert asset.theme == AppriseAsset().theme
