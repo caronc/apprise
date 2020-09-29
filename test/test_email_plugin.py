@@ -89,6 +89,17 @@ TEST_URLS = (
         'instance': plugins.NotifyEmail,
     }),
 
+    # Yandex
+    ('mailto://user:pass@yandex.com', {
+        'instance': plugins.NotifyEmail,
+    }),
+    ('mailto://user:pass@yandex.ru', {
+        'instance': plugins.NotifyEmail,
+    }),
+    ('mailto://user:pass@yandex.fr', {
+        'instance': plugins.NotifyEmail,
+    }),
+
     # Custom Emails
     ('mailtos://user:pass@nuxref.com:567', {
         'instance': plugins.NotifyEmail,
