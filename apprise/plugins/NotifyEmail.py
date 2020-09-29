@@ -106,6 +106,21 @@ EMAIL_TEMPLATES = (
         },
     ),
 
+    # Yandex
+    (
+        'Yandex',
+        re.compile(
+            r'^((?P<label>[^+]+)\+)?(?P<id>[^@]+)@'
+            r'(?P<domain>yandex\.(com|ru|ua|by|kz|uz|tr|fr))$', re.I),
+        {
+            'port': 465,
+            'smtp_host': 'smtp.yandex.ru',
+            'secure': True,
+            'secure_mode': SecureMailMode.SSL,
+            'login_type': (WebBaseLogin.USERID, )
+        },
+    ),
+
     # Microsoft Hotmail
     (
         'Microsoft Hotmail',
@@ -285,7 +300,7 @@ class NotifyEmail(NotifyBase):
     default_secure_mode = SecureMailMode.STARTTLS
 
     # Default SMTP Timeout (in seconds)
-    connect_timeout = 15
+    socket_connect_timeout = 15
 
     # Define object templates
     templates = (
@@ -366,15 +381,9 @@ class NotifyEmail(NotifyBase):
             'default': SecureMailMode.STARTTLS,
             'map_to': 'secure_mode',
         },
-        'timeout': {
-            'name': _('Server Timeout'),
-            'type': 'int',
-            'default': 15,
-            'min': 5,
-        },
     })
 
-    def __init__(self, timeout=15, smtp_host=None, from_name=None,
+    def __init__(self, smtp_host=None, from_name=None,
                  from_addr=None, secure_mode=None, targets=None, cc=None,
                  bcc=None, **kwargs):
         """
@@ -392,13 +401,6 @@ class NotifyEmail(NotifyBase):
 
             else:
                 self.port = self.default_port
-
-        # Email SMTP Server Timeout
-        try:
-            self.timeout = int(timeout)
-
-        except (ValueError, TypeError):
-            self.timeout = self.connect_timeout
 
         # Acquire Email 'To'
         self.targets = list()
@@ -714,7 +716,7 @@ class NotifyEmail(NotifyBase):
                     self.smtp_host,
                     self.port,
                     None,
-                    timeout=self.timeout,
+                    timeout=self.socket_connect_timeout,
                 )
 
                 if self.secure and self.secure_mode == SecureMailMode.STARTTLS:
@@ -762,7 +764,6 @@ class NotifyEmail(NotifyBase):
             'from': self.from_addr,
             'mode': self.secure_mode,
             'smtp': self.smtp_host,
-            'timeout': self.timeout,
             'user': self.user,
         }
 
@@ -864,8 +865,11 @@ class NotifyEmail(NotifyBase):
             results['from_name'] = NotifyEmail.unquote(results['qsd']['name'])
 
         if 'timeout' in results['qsd'] and len(results['qsd']['timeout']):
-            # Extract the timeout to associate with smtp server
-            results['timeout'] = results['qsd']['timeout']
+            # Deprecated in favor of cto= flag
+            NotifyBase.logger.deprecate(
+                "timeout= argument is deprecated; use cto= instead.")
+            results['qsd']['cto'] = results['qsd']['timeout']
+            del results['qsd']['timeout']
 
         # Store SMTP Host if specified
         if 'smtp' in results['qsd'] and len(results['qsd']['smtp']):
