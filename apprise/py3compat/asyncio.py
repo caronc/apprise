@@ -25,6 +25,8 @@
 
 import sys
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from ..URLBase import URLBase
 from ..logger import logger
 
@@ -101,7 +103,12 @@ class AsyncNotifyBase(URLBase):
         Async Notification Wrapper
         """
         try:
-            return self.notify(*args, **kwargs)
+            loop = asyncio.get_event_loop()
+            with ThreadPoolExecutor() as executor:
+                return await loop.run_in_executor(
+                    executor,
+                    partial(self.notify, *args, **kwargs),
+                )
 
         except TypeError:
             # These our our internally thrown notifications
