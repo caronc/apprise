@@ -605,7 +605,7 @@ urls:
 
 """, asset=asset)
 
-    # We expect to parse 4 entries from the above because the tgram:// entry
+    # We expect to parse 6 entries from the above because the tgram:// entry
     # would have failed to be loaded
     assert isinstance(result, list)
     assert len(result) == 6
@@ -883,6 +883,20 @@ include:
     assert 'http://localhost/apprise/cfg01' in config
     assert 'http://localhost/apprise/cfg02' in config
     assert 'http://localhost/apprise/cfg03' in config
+
+    # Test a configuration with an invalid schema with options
+    result, config = ConfigBase.config_parse_yaml("""
+    urls:
+      - invalid://:
+          tag: 'invalid'
+          :name: 'Testing2'
+          :body: 'test body2'
+          :title: 'test title2'
+""", asset=asset)
+
+    # We will have loaded no results
+    assert isinstance(result, list)
+    assert len(result) == 0
 
     # Valid Configuration (we allow comma separated entries for
     # each defined bullet)
