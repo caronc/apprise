@@ -3350,6 +3350,182 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifySparkPost
+    ##################################
+    ('sparkpost://', {
+        'instance': TypeError,
+    }),
+    ('sparkpost://:@/', {
+        'instance': TypeError,
+    }),
+    # No Token specified
+    ('sparkpost://user@localhost.localdomain', {
+        'instance': TypeError,
+    }),
+    # Token is valid, but no user name specified
+    ('sparkpost://localhost.localdomain/{}'.format('a' * 32), {
+        'instance': TypeError,
+    }),
+    # Invalid from email address
+    ('sparkpost://!@localhost.localdomain/{}'.format('b' * 32), {
+        'instance': TypeError,
+    }),
+    # No To email address, but everything else is valid
+    ('sparkpost://user@localhost.localdomain/{}'.format('c' * 32), {
+        'instance': plugins.NotifySparkPost,
+        'requests_response_text': {
+            "results": {
+                "total_rejected_recipients": 0,
+                "total_accepted_recipients": 1,
+                "id": "11668787484950529"
+            }
+        },
+    }),
+    # valid url with region specified (case insensitve)
+    ('sparkpost://user@localhost.localdomain/{}?region=uS'.format('d' * 32), {
+        'instance': plugins.NotifySparkPost,
+        'requests_response_text': {
+            "results": {
+                "total_rejected_recipients": 0,
+                "total_accepted_recipients": 1,
+                "id": "11668787484950529"
+            }
+        },
+    }),
+    # valid url with region specified (case insensitve)
+    ('sparkpost://user@localhost.localdomain/{}?region=EU'.format('e' * 32), {
+        'instance': plugins.NotifySparkPost,
+        'requests_response_text': {
+            "results": {
+                "total_rejected_recipients": 0,
+                "total_accepted_recipients": 1,
+                "id": "11668787484950529"
+            }
+        },
+    }),
+    # headers
+    ('sparkpost://user@localhost.localdomain/{}'
+        '?+X-Customer-Campaign-ID=Apprise'.format('f' * 32), {
+            'instance': plugins.NotifySparkPost,
+            'requests_response_text': {
+                "results": {
+                    "total_rejected_recipients": 0,
+                    "total_accepted_recipients": 1,
+                    "id": "11668787484950529"
+                }
+            },
+        }),
+    # template tokens
+    ('sparkpost://user@localhost.localdomain/{}'
+        '?:name=Chris&:status=admin'.format('g' * 32), {
+            'instance': plugins.NotifySparkPost,
+            'requests_response_text': {
+                "results": {
+                    "total_rejected_recipients": 0,
+                    "total_accepted_recipients": 1,
+                    "id": "11668787484950529"
+                }
+            },
+        }),
+    # bcc and cc
+    ('sparkpost://user@localhost.localdomain/{}'
+        '?bcc=user@example.com&cc=user2@example.com'.format('h' * 32), {
+            'instance': plugins.NotifySparkPost,
+            'requests_response_text': {
+                "results": {
+                    "total_rejected_recipients": 0,
+                    "total_accepted_recipients": 1,
+                    "id": "11668787484950529"
+                }
+            },
+        }),
+    # invalid url with region specified (case insensitve)
+    ('sparkpost://user@localhost.localdomain/{}?region=invalid'.format(
+        'a' * 32), {
+            'instance': TypeError,
+    }),
+    # One 'To' Email address
+    ('sparkpost://user@localhost.localdomain/{}/test@example.com'.format(
+        'a' * 32), {
+            'instance': plugins.NotifySparkPost,
+            'requests_response_text': {
+                "results": {
+                    "total_rejected_recipients": 0,
+                    "total_accepted_recipients": 1,
+                    "id": "11668787484950529"
+                }
+            },
+    }),
+    # Invalid 'To' Email address
+    ('sparkpost://user@localhost.localdomain/{}/invalid'.format(
+        'i' * 32), {
+            'instance': plugins.NotifySparkPost,
+            # Expected notify() response
+            'notify_response': False,
+    }),
+    # Multiple 'To', 'Cc', and 'Bcc' addresses (with invalid ones)
+    ('sparkpost://user@example.com/{}/{}?bcc={}&cc={}'.format(
+        'j' * 32,
+        '/'.join(('user1@example.com', 'invalid', 'User2:user2@example.com')),
+        ','.join(('user3@example.com', 'i@v', 'User1:user1@example.com')),
+        ','.join(('user4@example.com', 'g@r@b', 'Da:user5@example.com'))), {
+            'instance': plugins.NotifySparkPost,
+            'requests_response_text': {
+                "results": {
+                    "total_rejected_recipients": 0,
+                    "total_accepted_recipients": 1,
+                    "id": "11668787484950529"
+                }
+            },
+    }),
+    ('sparkpost://user@localhost.localdomain/'
+        '{}?to=test@example.com'.format('k' * 32), {
+            'instance': plugins.NotifySparkPost,
+            'requests_response_text': {
+                "results": {
+                    "total_rejected_recipients": 0,
+                    "total_accepted_recipients": 1,
+                    "id": "11668787484950529"
+                }
+            },
+        }),
+    # One To Email address, a from name specified too
+    ('sparkpost://user@localhost.localdomain/{}/'
+        'test@example.com?name="Frodo"'.format('l' * 32), {
+            'instance': plugins.NotifySparkPost,
+            'requests_response_text': {
+                "results": {
+                    "total_rejected_recipients": 0,
+                    "total_accepted_recipients": 1,
+                    "id": "11668787484950529"
+                }
+            },
+        }),
+    # Test invalid JSON response
+    ('sparkpost://user@localhost.localdomain/{}'.format('m' * 32), {
+        'instance': plugins.NotifySparkPost,
+        'requests_response_text': "{",
+    }),
+    ('sparkpost://user@localhost.localdomain/{}'.format('n' * 32), {
+        'instance': plugins.NotifySparkPost,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('sparkpost://user@localhost.localdomain/{}'.format('o' * 32), {
+        'instance': plugins.NotifySparkPost,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('sparkpost://user@localhost.localdomain/{}'.format('p' * 32), {
+        'instance': plugins.NotifySparkPost,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifySpontit
     ##################################
     ('spontit://', {
