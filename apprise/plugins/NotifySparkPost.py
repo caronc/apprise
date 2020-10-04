@@ -52,6 +52,7 @@
 # API Documentation: https://developers.sparkpost.com/api/
 # Specifically: https://developers.sparkpost.com/api/transmissions/
 import requests
+import base64
 from json import loads
 from json import dumps
 from .NotifyBase import NotifyBase
@@ -363,7 +364,23 @@ class NotifySparkPost(NotifyBase):
         # Some Debug Logging
         self.logger.debug('SparkPost POST URL: {} (cert_verify={})'.format(
             url, self.verify_certificate))
-        self.logger.debug('SparkPost Payload: {}' .format(payload))
+
+        if 'attachments' in payload['content']:
+            # Since we print our payload; attachments make it a bit too noisy
+            # we just strip out the data block to accomodate it
+            log_payload = \
+                {k: v for k, v in payload.items() if k != "content"}
+            log_payload['content'] = \
+                {k: v for k, v in payload['content'].items()
+                 if k != "attachments"}
+            log_payload['content']['attachments'] = \
+                [{k: v for k, v in x.items() if k != "data"}
+                 for x in payload['content']['attachments']]
+        else:
+            # No tidying is needed
+            log_payload = payload
+
+        self.logger.debug('SparkPost Payload: {}' .format(log_payload))
 
         wait = None
 
@@ -468,7 +485,8 @@ class NotifySparkPost(NotifyBase):
 
         # Our code will never reach here (outside of infinite while loop above)
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
+             **kwargs):
         """
         Perform SparkPost Notification
         """
@@ -508,7 +526,11 @@ class NotifySparkPost(NotifyBase):
                     if self.from_name else self.app_desc,
                     "email": self.from_addr,
                 },
-                "subject": title,
+
+                # SparkPost does not allow empty subject lines or lines that
+                # only contain whitespace; Since Apprise allows an empty title
+                # parameter we swap empty title entries with the period
+                "subject": title if title.strip() else '.',
                 "reply_to": reply_to,
             }
         }
@@ -521,6 +543,39 @@ class NotifySparkPost(NotifyBase):
 
         if self.headers:
             payload['content']['headers'] = self.headers
+
+        if attach:
+            # Prepare ourselves an attachment object
+            payload['content']['attachments'] = []
+
+            for attachment in attach:
+                # Perform some simple error checking
+                if not attachment:
+                    # We could not access the attachment
+                    self.logger.error(
+                        'Could not access attachment {}.'.format(
+                            attachment.url(privacy=True)))
+                    return False
+
+                self.logger.debug(
+                    'Preparing SparkPost attachment {}'.format(
+                        attachment.url(privacy=True)))
+
+                try:
+                    with open(attachment.path, 'rb') as fp:
+                        # Prepare API Upload Payload
+                        payload['content']['attachments'].append({
+                            'name': attachment.name,
+                            'type': attachment.mimetype,
+                            'data': base64.b64encode(fp.read()).decode("ascii")
+                        })
+
+                except (OSError, IOError) as e:
+                    self.logger.warning(
+                        'An I/O error occurred while reading {}.'.format(
+                            attachment.name if attachment else 'attachment'))
+                    self.logger.debug('I/O Exception: %s' % str(e))
+                    return False
 
         # Take a copy of our token dictionary
         tokens = self.tokens.copy()

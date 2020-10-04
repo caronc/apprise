@@ -28,10 +28,10 @@ import pytest
 import mock
 import requests
 from json import dumps
-# from apprise import AppriseAttachment
-# from apprise import NotifyType
 from apprise import plugins
 from apprise import Apprise
+from apprise import AppriseAttachment
+from apprise import NotifyType
 
 # Disable logging for a cleaner testing output
 import logging
@@ -63,6 +63,7 @@ def test_notify_sparkpost_plugin_throttling(mock_post):
     with pytest.raises(TypeError):
         plugins.NotifySparkPost(
             apikey=apikey, targets=targets, host=host)
+
     # Exception should be thrown about the fact no private key was specified
     with pytest.raises(TypeError):
         plugins.NotifySparkPost(
@@ -109,3 +110,54 @@ def test_notify_sparkpost_plugin_throttling(mock_post):
 
     # Now we are less than our expected limit check so we will fail
     assert obj.notify('test') is False
+
+
+@mock.patch('requests.post')
+def test_notify_sparkpost_plugin_attachments(mock_post):
+    """
+    API: NotifySpark() Attachments
+
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.request_rate_per_sec = 0
+    plugins.NotifySparkPost.sparkpost_retry_wait_sec = 0.1
+    plugins.NotifySparkPost.sparkpost_retry_attempts = 3
+
+    okay_response = requests.Request()
+    okay_response.status_code = requests.codes.ok
+    okay_response.content = dumps({
+        "results": {
+            "total_rejected_recipients": 0,
+            "total_accepted_recipients": 1,
+            "id": "11668787484950529"
+        }
+    })
+
+    # Assign our mock object our return value
+    mock_post.return_value = okay_response
+
+    # API Key
+    apikey = 'abc123'
+
+    obj = Apprise.instantiate(
+        'sparkpost://user@localhost.localdomain/{}'.format(apikey))
+    assert isinstance(obj, plugins.NotifySparkPost)
+
+    # Test Valid Attachment
+    path = os.path.join(TEST_VAR_DIR, 'apprise-test.gif')
+    attach = AppriseAttachment(path)
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=attach) is True
+
+    # Test invalid attachment
+    path = os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=path) is False
+
+    with mock.patch('base64.b64encode', side_effect=OSError()):
+        # We can't send the message if we fail to parse the data
+        assert obj.notify(
+            body='body', title='title', notify_type=NotifyType.INFO,
+            attach=attach) is False

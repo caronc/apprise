@@ -3381,6 +3381,39 @@ TEST_URLS = (
             }
         },
     }),
+    ('sparkpost://user@localhost.localdomain/{}?format=markdown'
+        .format('d' * 32), {
+            'instance': plugins.NotifySparkPost,
+            'requests_response_text': {
+                "results": {
+                    "total_rejected_recipients": 0,
+                    "total_accepted_recipients": 1,
+                    "id": "11668787484950529"
+                }
+            },
+        }),
+    ('sparkpost://user@localhost.localdomain/{}?format=html'
+        .format('d' * 32), {
+            'instance': plugins.NotifySparkPost,
+            'requests_response_text': {
+                "results": {
+                    "total_rejected_recipients": 0,
+                    "total_accepted_recipients": 1,
+                    "id": "11668787484950529"
+                }
+            },
+        }),
+    ('sparkpost://user@localhost.localdomain/{}?format=text'
+        .format('d' * 32), {
+            'instance': plugins.NotifySparkPost,
+            'requests_response_text': {
+                "results": {
+                    "total_rejected_recipients": 0,
+                    "total_accepted_recipients": 1,
+                    "id": "11668787484950529"
+                }
+            },
+        }),
     # valid url with region specified (case insensitve)
     ('sparkpost://user@localhost.localdomain/{}?region=uS'.format('d' * 32), {
         'instance': plugins.NotifySparkPost,
