@@ -280,7 +280,7 @@ class URLBase(object):
             self._last_io_datetime = reference
             return
 
-        if self.request_rate_per_sec <= 0.0:
+        if self.request_rate_per_sec <= 0.0 and not wait:
             # We're done if there is no throttle limit set
             return
 
