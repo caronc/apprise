@@ -52,10 +52,11 @@
 #  then it will also become the 'to' address as well.
 #
 import requests
-
+from email.utils import formataddr
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
-from ..utils import parse_list
+from ..common import NotifyFormat
+from ..utils import parse_emails
 from ..utils import is_email
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
@@ -111,6 +112,9 @@ class NotifyMailgun(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_mailgun'
 
+    # Default Notify Format
+    notify_format = NotifyFormat.HTML
+
     # The default region to use if one isn't otherwise specified
     mailgun_default_region = MailgunRegion.US
 
@@ -161,10 +165,18 @@ class NotifyMailgun(NotifyBase):
         'to': {
             'alias_of': 'targets',
         },
+        'cc': {
+            'name': _('Carbon Copy'),
+            'type': 'list:string',
+        },
+        'bcc': {
+            'name': _('Blind Carbon Copy'),
+            'type': 'list:string',
+        },
     })
 
-    def __init__(self, apikey, targets, from_name=None, region_name=None,
-                 **kwargs):
+    def __init__(self, apikey, targets, cc=None, bcc=None, from_name=None,
+                 region_name=None, **kwargs):
         """
         Initialize Mailgun Object
         """
@@ -184,8 +196,17 @@ class NotifyMailgun(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # Parse our targets
-        self.targets = parse_list(targets)
+        # Acquire Email 'To'
+        self.targets = list()
+
+        # Acquire Carbon Copies
+        self.cc = set()
+
+        # Acquire Blind Carbon Copies
+        self.bcc = set()
+
+        # For tracking our email -> name lookups
+        self.names = {}
 
         # Store our region
         try:
@@ -214,6 +235,58 @@ class NotifyMailgun(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
+        if targets:
+            # Validate recipients (to:) and drop bad ones:
+            for recipient in parse_emails(targets):
+                result = is_email(recipient)
+                if result:
+                    self.targets.append(
+                        (result['name'] if result['name'] else False,
+                            result['full_email']))
+                    continue
+
+                self.logger.warning(
+                    'Dropped invalid To email '
+                    '({}) specified.'.format(recipient),
+                )
+
+        else:
+            # If our target email list is empty we want to add ourselves to it
+            self.targets.append(
+                (self.from_name if self.from_name else False, self.from_addr))
+
+        # Validate recipients (cc:) and drop bad ones:
+        for recipient in parse_emails(cc):
+            email = is_email(recipient)
+            if email:
+                self.cc.add(email['full_email'])
+
+                # Index our name (if one exists)
+                self.names[email['full_email']] = \
+                    email['name'] if email['name'] else False
+                continue
+
+            self.logger.warning(
+                'Dropped invalid Carbon Copy email '
+                '({}) specified.'.format(recipient),
+            )
+
+        # Validate recipients (bcc:) and drop bad ones:
+        for recipient in parse_emails(bcc):
+            email = is_email(recipient)
+            if email:
+                self.bcc.add(email['full_email'])
+
+                # Index our name (if one exists)
+                self.names[email['full_email']] = \
+                    email['name'] if email['name'] else False
+                continue
+
+            self.logger.warning(
+                'Dropped invalid Blind Carbon Copy email '
+                '({}) specified.'.format(recipient),
+            )
+
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Mailgun Notification
@@ -222,20 +295,41 @@ class NotifyMailgun(NotifyBase):
         # error tracking (used for function return)
         has_error = False
 
+        if not self.targets:
+            # There is no one to email; we're done
+            self.logger.warning(
+                'There are no Email recipients to notify')
+            return False
+
         # Prepare our headers
         headers = {
             'User-Agent': self.app_id,
             'Accept': 'application/json',
         }
 
+        try:
+            from_addr = formataddr(
+                (self.from_name if self.from_name else False,
+                 self.from_addr), charset='utf-8')
+
+        except TypeError:
+            # Python v2.x Support (no charset keyword)
+            # Format our cc addresses to support the Name field
+            from_addr = formataddr(
+                (self.from_name if self.from_name else False,
+                 self.from_addr))
+
         # Prepare our payload
         payload = {
-            'from': '{name} <{addr}>'.format(
-                name=self.app_id if not self.from_name else self.from_name,
-                addr=self.from_addr),
+            'from': from_addr,
             'subject': title,
-            'text': body,
         }
+
+        if self.notify_format == NotifyFormat.HTML:
+            payload['html'] = body
+
+        else:
+            payload['text'] = body
 
         # Prepare our URL as it's based on our hostname
         url = '{}{}/messages'.format(
@@ -243,17 +337,47 @@ class NotifyMailgun(NotifyBase):
 
         # Create a copy of the targets list
         emails = list(self.targets)
-
-        if len(emails) == 0:
-            # No email specified; use the from
-            emails.append(self.from_addr)
-
         while len(emails):
             # Get our email to notify
-            email = emails.pop(0)
+            to_name, to_addr = emails.pop(0)
 
-            # Prepare our user
-            payload['to'] = '{} <{}>'.format(email, email)
+            # Strip target out of cc list if in To or Bcc
+            cc = (self.cc - self.bcc - set([to_addr]))
+
+            # Strip target out of bcc list if in To
+            bcc = (self.bcc - set([to_addr]))
+
+            try:
+                # Prepare our to
+                payload['to'] = formataddr((to_name, to_addr), charset='utf-8')
+
+                # Format our cc addresses to support the Name field
+                if cc:
+                    payload['cc'] = [formataddr(
+                        (self.names.get(addr, False), addr), charset='utf-8')
+                        for addr in cc]
+
+                # Format our bcc addresses to support the Name field
+                if bcc:
+                    payload['bcc'] = [formataddr(
+                        (self.names.get(addr, False), addr), charset='utf-8')
+                        for addr in bcc]
+
+            except TypeError:
+                # Python v2.x Support (no charset keyword)
+                # Format our cc addresses to support the Name field
+
+                # Prepare our to
+                payload['to'] = formataddr((to_name, to_addr))
+
+                if cc:
+                    payload['cc'] = [formataddr(
+                        (self.names.get(addr, False), addr)) for addr in cc]
+
+                # Format our bcc addresses to support the Name field
+                if bcc:
+                    payload['bcc'] = [formataddr(
+                        (self.names.get(addr, False), addr)) for addr in bcc]
 
             # Some Debug Logging
             self.logger.debug('Mailgun POST URL: {} (cert_verify={})'.format(
@@ -281,7 +405,7 @@ class NotifyMailgun(NotifyBase):
                     self.logger.warning(
                         'Failed to send Mailgun notification to {}: '
                         '{}{}error={}.'.format(
-                            email,
+                            to_addr,
                             status_str,
                             ', ' if status_str else '',
                             r.status_code))
@@ -295,12 +419,12 @@ class NotifyMailgun(NotifyBase):
 
                 else:
                     self.logger.info(
-                        'Sent Mailgun notification to {}.'.format(email))
+                        'Sent Mailgun notification to {}.'.format(to_addr))
 
             except requests.RequestException as e:
                 self.logger.warning(
                     'A Connection error occurred sending Mailgun:%s ' % (
-                        email) + 'notification.'
+                        to_addr) + 'notification.'
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))
 
@@ -327,13 +451,35 @@ class NotifyMailgun(NotifyBase):
             # from_name specified; pass it back on the url
             params['name'] = self.from_name
 
+        if len(self.cc) > 0:
+            # Handle our Carbon Copy Addresses
+            params['cc'] = ','.join(
+                ['{}{}'.format(
+                    '' if not e not in self.names
+                    else '{}:'.format(self.names[e]), e) for e in self.cc])
+
+        if len(self.bcc) > 0:
+            # Handle our Blind Carbon Copy Addresses
+            params['bcc'] = ','.join(
+                ['{}{}'.format(
+                    '' if not e not in self.names
+                    else '{}:'.format(self.names[e]), e) for e in self.bcc])
+
+        # a simple boolean check as to whether we display our target emails
+        # or not
+        has_targets = \
+            not (len(self.targets) == 1
+                 and self.targets[0][1] == self.from_addr)
+
         return '{schema}://{user}@{host}/{apikey}/{targets}/?{params}'.format(
             schema=self.secure_protocol,
             host=self.host,
             user=NotifyMailgun.quote(self.user, safe=''),
             apikey=self.pprint(self.apikey, privacy, safe=''),
-            targets='/'.join(
-                [NotifyMailgun.quote(x, safe='') for x in self.targets]),
+            targets='' if not has_targets else '/'.join(
+                [NotifyMailgun.quote('{}{}'.format(
+                    '' if not e[0] else '{}:'.format(e[0]), e[1]),
+                    safe='') for e in self.targets]),
             params=NotifyMailgun.urlencode(params))
 
     @staticmethod
@@ -370,10 +516,16 @@ class NotifyMailgun(NotifyBase):
             results['region_name'] = \
                 NotifyMailgun.unquote(results['qsd']['region'])
 
-        # Support the 'to' variable so that we can support targets this way too
-        # The 'to' makes it easier to use yaml configuration
+        # Handle 'to' email address
         if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'] += \
-                NotifyMailgun.parse_list(results['qsd']['to'])
+            results['targets'].append(results['qsd']['to'])
+
+        # Handle Carbon Copy Addresses
+        if 'cc' in results['qsd'] and len(results['qsd']['cc']):
+            results['cc'] = results['qsd']['cc']
+
+        # Handle Blind Carbon Copy Addresses
+        if 'bcc' in results['qsd'] and len(results['qsd']['bcc']):
+            results['bcc'] = results['qsd']['bcc']
 
         return results
