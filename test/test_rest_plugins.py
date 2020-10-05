@@ -1458,6 +1458,18 @@ TEST_URLS = (
         'a' * 32, 'b' * 8, 'c' * 8), {
         'instance': plugins.NotifyMailgun,
     }),
+    ('mailgun://user@localhost.localdomain/{}-{}-{}?format=markdown'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+        'instance': plugins.NotifyMailgun,
+    }),
+    ('mailgun://user@localhost.localdomain/{}-{}-{}?format=html'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+        'instance': plugins.NotifyMailgun,
+    }),
+    ('mailgun://user@localhost.localdomain/{}-{}-{}?format=text'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+        'instance': plugins.NotifyMailgun,
+    }),
     # valid url with region specified (case insensitve)
     ('mailgun://user@localhost.localdomain/{}-{}-{}?region=uS'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
@@ -1473,6 +1485,12 @@ TEST_URLS = (
         'a' * 32, 'b' * 8, 'c' * 8), {
             'instance': TypeError,
     }),
+    # bcc and cc
+    ('mailgun://user@localhost.localdomain/{}-{}-{}'
+        '?bcc=user@example.com&cc=user2@example.com'.format(
+            'a' * 32, 'b' * 8, 'c' * 8), {
+                'instance': plugins.NotifyMailgun,
+        }),
     # One To Email address
     ('mailgun://user@localhost.localdomain/{}-{}-{}/test@example.com'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
@@ -1482,12 +1500,26 @@ TEST_URLS = (
         '{}-{}-{}?to=test@example.com'.format(
             'a' * 32, 'b' * 8, 'c' * 8), {
                 'instance': plugins.NotifyMailgun}),
-
     # One To Email address, a from name specified too
     ('mailgun://user@localhost.localdomain/{}-{}-{}/'
         'test@example.com?name="Frodo"'.format(
             'a' * 32, 'b' * 8, 'c' * 8), {
                 'instance': plugins.NotifyMailgun}),
+    # Invalid 'To' Email address
+    ('mailgun://user@localhost.localdomain/{}-{}-{}/invalid'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+            'instance': plugins.NotifyMailgun,
+            # Expected notify() response
+            'notify_response': False,
+    }),
+    # Multiple 'To', 'Cc', and 'Bcc' addresses (with invalid ones)
+    ('mailgun://user@example.com/{}-{}-{}/{}?bcc={}&cc={}'.format(
+        'a' * 32, 'b' * 8, 'c' * 8,
+        '/'.join(('user1@example.com', 'invalid', 'User2:user2@example.com')),
+        ','.join(('user3@example.com', 'i@v', 'User1:user1@example.com')),
+        ','.join(('user4@example.com', 'g@r@b', 'Da:user5@example.com'))), {
+            'instance': plugins.NotifyMailgun,
+    }),
     ('mailgun://user@localhost.localdomain/{}-{}-{}'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
         'instance': plugins.NotifyMailgun,

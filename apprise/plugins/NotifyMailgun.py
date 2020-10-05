@@ -374,6 +374,10 @@ class NotifyMailgun(NotifyBase):
 
         # Prepare our payload
         payload = {
+            # pass skip-verification switch upstream too
+            'o:skip-verification': not self.verify_certificate,
+
+            # Base payload options
             'from': reply_to,
             'subject': title,
         }
@@ -540,12 +544,11 @@ class NotifyMailgun(NotifyBase):
                 has_error = True
                 continue
 
-            finally:
-                # Close any potential attachments that are still open
-                for entry in files.values():
-                    self.logger.trace(
-                        'Closing attachment {}'.format(entry[0]))
-                    entry[1].close()
+        # Close any potential attachments that are still open
+        for entry in files.values():
+            self.logger.trace(
+                'Closing attachment {}'.format(entry[0]))
+            entry[1].close()
 
         return not has_error
 
