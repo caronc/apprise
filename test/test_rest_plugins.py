@@ -1485,6 +1485,18 @@ TEST_URLS = (
         'a' * 32, 'b' * 8, 'c' * 8), {
             'instance': TypeError,
     }),
+    # headers
+    ('mailgun://user@localhost.localdomain/{}-{}-{}'
+        '?+X-Customer-Campaign-ID=Apprise'.format(
+            'a' * 32, 'b' * 8, 'c' * 8), {
+                'instance': plugins.NotifyMailgun,
+        }),
+    # template tokens
+    ('mailgun://user@localhost.localdomain/{}-{}-{}'
+        '?:name=Chris&:status=admin'.format(
+            'a' * 32, 'b' * 8, 'c' * 8), {
+                'instance': plugins.NotifyMailgun,
+        }),
     # bcc and cc
     ('mailgun://user@localhost.localdomain/{}-{}-{}'
         '?bcc=user@example.com&cc=user2@example.com'.format(

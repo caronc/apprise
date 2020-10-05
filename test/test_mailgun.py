@@ -24,6 +24,7 @@
 # THE SOFTWARE.
 
 import os
+import sys
 import mock
 import requests
 from apprise import plugins
@@ -82,16 +83,23 @@ def test_notify_mailgun_plugin_attachments(mock_post):
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=attach) is False
 
+    # Get a appropriate "builtin" module name for pythons 2/3.
+    if sys.version_info.major >= 3:
+        builtin_open_function = 'builtins.open'
+
+    else:
+        builtin_open_function = '__builtin__.open'
+
     # Return our good configuration
     mock_post.side_effect = None
     mock_post.return_value = okay_response
-    with mock.patch('builtins.open', side_effect=OSError()):
+    with mock.patch(builtin_open_function, side_effect=OSError()):
         # We can't send the message we can't open the attachment for reading
         assert obj.notify(
             body='body', title='title', notify_type=NotifyType.INFO,
             attach=attach) is False
 
-    with mock.patch('builtins.open') as mock_open:
+    with mock.patch(builtin_open_function) as mock_open:
         mock_fp = mock.Mock()
         mock_fp.seek.side_effect = OSError()
         mock_open.return_value = mock_fp

@@ -185,8 +185,21 @@ class NotifyMailgun(NotifyBase):
         },
     })
 
+    # Define any kwargs we're using
+    template_kwargs = {
+        'headers': {
+            'name': _('HTTP Header'),
+            'prefix': '+',
+        },
+        'tokens': {
+            'name': _('Template Tokens'),
+            'prefix': ':',
+        },
+    }
+
     def __init__(self, apikey, targets, cc=None, bcc=None, from_name=None,
-                 region_name=None, batch=False, **kwargs):
+                 region_name=None, headers=None, tokens=None, batch=False,
+                 **kwargs):
         """
         Initialize Mailgun Object
         """
@@ -217,6 +230,16 @@ class NotifyMailgun(NotifyBase):
 
         # For tracking our email -> name lookups
         self.names = {}
+
+        self.headers = {}
+        if headers:
+            # Store our extra headers
+            self.headers.update(headers)
+
+        self.tokens = {}
+        if tokens:
+            # Store our template tokens
+            self.tokens.update(tokens)
 
         # Prepare Batch Mode Flag
         self.batch = batch
@@ -472,6 +495,18 @@ class NotifyMailgun(NotifyBase):
             if bcc:
                 payload['bcc'] = ','.join(bcc)
 
+            # Store our token entries; users can reference these as %value%
+            # in their email message.
+            if self.tokens:
+                payload.update(
+                    {'v:{}'.format(k): v for k, v in self.tokens.items()})
+
+            # Store our header entries if defined into the payload
+            # in their payload
+            if self.headers:
+                payload.update(
+                    {'h:{}'.format(k): v for k, v in self.headers.items()})
+
             # Some Debug Logging
             self.logger.debug('Mailgun POST URL: {} (cert_verify={})'.format(
                 url, self.verify_certificate))
@@ -563,6 +598,12 @@ class NotifyMailgun(NotifyBase):
             'batch': 'yes' if self.batch else 'no',
         }
 
+        # Append our headers into our parameters
+        params.update({'+{}'.format(k): v for k, v in self.headers.items()})
+
+        # Append our template tokens into our parameters
+        params.update({':{}'.format(k): v for k, v in self.tokens.items()})
+
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
@@ -570,19 +611,16 @@ class NotifyMailgun(NotifyBase):
             # from_name specified; pass it back on the url
             params['name'] = self.from_name
 
-        if len(self.cc) > 0:
+        if self.cc:
             # Handle our Carbon Copy Addresses
             params['cc'] = ','.join(
                 ['{}{}'.format(
                     '' if not e not in self.names
                     else '{}:'.format(self.names[e]), e) for e in self.cc])
 
-        if len(self.bcc) > 0:
+        if self.bcc:
             # Handle our Blind Carbon Copy Addresses
-            params['bcc'] = ','.join(
-                ['{}{}'.format(
-                    '' if not e not in self.names
-                    else '{}:'.format(self.names[e]), e) for e in self.bcc])
+            params['bcc'] = ','.join(self.bcc)
 
         # a simple boolean check as to whether we display our target emails
         # or not
@@ -646,6 +684,15 @@ class NotifyMailgun(NotifyBase):
         # Handle Blind Carbon Copy Addresses
         if 'bcc' in results['qsd'] and len(results['qsd']['bcc']):
             results['bcc'] = results['qsd']['bcc']
+
+        # Add our Meta Headers that the user can provide with their outbound
+        # emails
+        results['headers'] = {NotifyBase.unquote(x): NotifyBase.unquote(y)
+                              for x, y in results['qsd+'].items()}
+
+        # Add our template tokens (if defined)
+        results['tokens'] = {NotifyBase.unquote(x): NotifyBase.unquote(y)
+                             for x, y in results['qsd:'].items()}
 
         # Get Batch Mode Flag
         results['batch'] = \
