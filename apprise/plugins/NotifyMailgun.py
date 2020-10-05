@@ -475,18 +475,16 @@ class NotifyMailgun(NotifyBase):
             # Prepare our To
             payload['to'] = ','.join(to)
 
-            try:
-                # Format our cc addresses to support the Name field
-                if cc:
+            if cc:
+                try:
+                    # Format our cc addresses to support the Name field
                     payload['cc'] = ','.join([formataddr(
                         (self.names.get(addr, False), addr), charset='utf-8')
                         for addr in cc])
 
-            except TypeError:
-                # Python v2.x Support (no charset keyword)
-                # Format our cc addresses to support the Name field
-
-                if cc:
+                except TypeError:
+                    # Python v2.x Support (no charset keyword)
+                    # Format our cc addresses to support the Name field
                     payload['cc'] = ','.join([formataddr(
                         (self.names.get(addr, False), addr))
                         for addr in cc])

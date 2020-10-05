@@ -90,11 +90,28 @@ def test_notify_mailgun_plugin_attachments(mock_post):
     else:
         builtin_open_function = '__builtin__.open'
 
+    # Test Valid Attachment (load 3)
+    path = (
+        os.path.join(TEST_VAR_DIR, 'apprise-test.gif'),
+        os.path.join(TEST_VAR_DIR, 'apprise-test.gif'),
+        os.path.join(TEST_VAR_DIR, 'apprise-test.gif'),
+    )
+    attach = AppriseAttachment(path)
+
     # Return our good configuration
     mock_post.side_effect = None
     mock_post.return_value = okay_response
     with mock.patch(builtin_open_function, side_effect=OSError()):
         # We can't send the message we can't open the attachment for reading
+        assert obj.notify(
+            body='body', title='title', notify_type=NotifyType.INFO,
+            attach=attach) is False
+
+    # Do it again, but fail on the third file
+    with mock.patch(
+            builtin_open_function,
+            side_effect=(mock.Mock(), mock.Mock(), OSError())):
+
         assert obj.notify(
             body='body', title='title', notify_type=NotifyType.INFO,
             attach=attach) is False
@@ -109,6 +126,17 @@ def test_notify_mailgun_plugin_attachments(mock_post):
             body='body', title='title', notify_type=NotifyType.INFO,
             attach=attach) is False
 
+        mock_post.reset_mock()
+        # Fail on the third file; this tests the for-loop inside the seek()
+        # section of the code that calls close() on previously opened files
+        mock_fp.seek.side_effect = (None, None, OSError())
+        mock_open.return_value = mock_fp
+        # We can't send the message we can't seek through it
+        assert obj.notify(
+            body='body', title='title', notify_type=NotifyType.INFO,
+            attach=attach) is False
+
+    # test the handling of our batch modes
     obj = Apprise.instantiate(
         'mailgun://no-reply@example.com/{}/'
         'user1@example.com/user2@example.com?batch=yes'.format(apikey))
