@@ -57,6 +57,7 @@ from .NotifyBase import NotifyBase
 from ..common import NotifyType
 from ..common import NotifyFormat
 from ..utils import parse_emails
+from ..utils import parse_bool
 from ..utils import is_email
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
@@ -118,6 +119,10 @@ class NotifyMailgun(NotifyBase):
     # The default region to use if one isn't otherwise specified
     mailgun_default_region = MailgunRegion.US
 
+    # The maximum amount of emails that can reside within a single
+    # batch transfer
+    default_batch_size = 2000
+
     # Define object templates
     templates = (
         '{schema}://{user}@{host}:{apikey}/',
@@ -173,10 +178,15 @@ class NotifyMailgun(NotifyBase):
             'name': _('Blind Carbon Copy'),
             'type': 'list:string',
         },
+        'batch': {
+            'name': _('Batch Mode'),
+            'type': 'bool',
+            'default': False,
+        },
     })
 
     def __init__(self, apikey, targets, cc=None, bcc=None, from_name=None,
-                 region_name=None, **kwargs):
+                 region_name=None, batch=False, **kwargs):
         """
         Initialize Mailgun Object
         """
@@ -207,6 +217,9 @@ class NotifyMailgun(NotifyBase):
 
         # For tracking our email -> name lookups
         self.names = {}
+
+        # Prepare Batch Mode Flag
+        self.batch = batch
 
         # Store our region
         try:
@@ -287,13 +300,11 @@ class NotifyMailgun(NotifyBase):
                 '({}) specified.'.format(recipient),
             )
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
+             **kwargs):
         """
         Perform Mailgun Notification
         """
-
-        # error tracking (used for function return)
-        has_error = False
 
         if not self.targets:
             # There is no one to email; we're done
@@ -301,27 +312,69 @@ class NotifyMailgun(NotifyBase):
                 'There are no Email recipients to notify')
             return False
 
+        # error tracking (used for function return)
+        has_error = False
+
+        # Send in batches if identified to do so
+        batch_size = 1 if not self.batch else self.default_batch_size
+
         # Prepare our headers
         headers = {
             'User-Agent': self.app_id,
             'Accept': 'application/json',
         }
 
+        # Track our potential files
+        files = {}
+
+        if attach:
+            for idx, attachment in enumerate(attach):
+                # Perform some simple error checking
+                if not attachment:
+                    # We could not access the attachment
+                    self.logger.error(
+                        'Could not access attachment {}.'.format(
+                            attachment.url(privacy=True)))
+                    return False
+
+                self.logger.debug(
+                    'Preparing Mailgun attachment {}'.format(
+                        attachment.url(privacy=True)))
+                try:
+                    files['attachment[{}]'.format(idx)] = \
+                        (attachment.name, open(attachment.path, 'rb'))
+
+                except (OSError, IOError) as e:
+                    self.logger.warning(
+                        'An I/O error occurred while opening {}.'.format(
+                            attachment.name if attachment
+                            else 'attachment'))
+                    self.logger.debug('I/O Exception: %s' % str(e))
+
+                    # tidy up any open files before we make our early
+                    # return
+                    for entry in files.values():
+                        self.logger.trace(
+                            'Closing attachment {}'.format(entry[0]))
+                        entry[1].close()
+
+                    return False
+
         try:
-            from_addr = formataddr(
+            reply_to = formataddr(
                 (self.from_name if self.from_name else False,
                  self.from_addr), charset='utf-8')
 
         except TypeError:
             # Python v2.x Support (no charset keyword)
             # Format our cc addresses to support the Name field
-            from_addr = formataddr(
+            reply_to = formataddr(
                 (self.from_name if self.from_name else False,
                  self.from_addr))
 
         # Prepare our payload
         payload = {
-            'from': from_addr,
+            'from': reply_to,
             'subject': title,
         }
 
@@ -337,52 +390,96 @@ class NotifyMailgun(NotifyBase):
 
         # Create a copy of the targets list
         emails = list(self.targets)
-        while len(emails):
-            # Get our email to notify
-            to_name, to_addr = emails.pop(0)
 
-            # Strip target out of cc list if in To or Bcc
-            cc = (self.cc - self.bcc - set([to_addr]))
+        for index in range(0, len(emails), batch_size):
+            # Initialize our cc list
+            cc = (self.cc - self.bcc)
 
-            # Strip target out of bcc list if in To
-            bcc = (self.bcc - set([to_addr]))
+            # Initialize our bcc list
+            bcc = set(self.bcc)
+
+            # Initialize our to list
+            to = list()
+
+            # Ensure we're pointed to the head of the attachment; this doesn't
+            # do much for the first iteration through this loop as we're
+            # already pointing there..., but it allows us to re-use the
+            # attachment over and over again without closing and then
+            # re-opening the same file again and again
+            for entry in files.values():
+                try:
+                    self.logger.trace(
+                        'Seeking to head of attachment {}'.format(entry[0]))
+                    entry[1].seek(0)
+
+                except (OSError, IOError) as e:
+                    self.logger.warning(
+                        'An I/O error occurred seeking to head of attachment '
+                        '{}.'.format(entry[0]))
+                    self.logger.debug('I/O Exception: %s' % str(e))
+
+                    # tidy up any open files before we make our early
+                    # return
+                    for entry in files.values():
+                        self.logger.trace(
+                            'Closing attachment {}'.format(entry[0]))
+                        entry[1].close()
+
+                    return False
+
+            for to_addr in self.targets[index:index + batch_size]:
+                # Strip target out of cc list if in To
+                cc = (cc - set([to_addr[1]]))
+
+                # Strip target out of bcc list if in To
+                bcc = (bcc - set([to_addr[1]]))
+
+                try:
+                    # Prepare our to
+                    to.append(formataddr(to_addr, charset='utf-8'))
+
+                except TypeError:
+                    # Python v2.x Support (no charset keyword)
+                    # Format our cc addresses to support the Name field
+
+                    # Prepare our to
+                    to.append(formataddr(to_addr))
+
+            # Prepare our To
+            payload['to'] = ','.join(to)
 
             try:
-                # Prepare our to
-                payload['to'] = formataddr((to_name, to_addr), charset='utf-8')
-
                 # Format our cc addresses to support the Name field
                 if cc:
-                    payload['cc'] = [formataddr(
+                    payload['cc'] = ','.join([formataddr(
                         (self.names.get(addr, False), addr), charset='utf-8')
-                        for addr in cc]
-
-                # Format our bcc addresses to support the Name field
-                if bcc:
-                    payload['bcc'] = [formataddr(
-                        (self.names.get(addr, False), addr), charset='utf-8')
-                        for addr in bcc]
+                        for addr in cc])
 
             except TypeError:
                 # Python v2.x Support (no charset keyword)
                 # Format our cc addresses to support the Name field
 
-                # Prepare our to
-                payload['to'] = formataddr((to_name, to_addr))
-
                 if cc:
-                    payload['cc'] = [formataddr(
-                        (self.names.get(addr, False), addr)) for addr in cc]
+                    payload['cc'] = ','.join([formataddr(
+                        (self.names.get(addr, False), addr))
+                        for addr in cc])
 
-                # Format our bcc addresses to support the Name field
-                if bcc:
-                    payload['bcc'] = [formataddr(
-                        (self.names.get(addr, False), addr)) for addr in bcc]
+            # Format our bcc addresses to support the Name field
+            if bcc:
+                payload['bcc'] = ','.join(bcc)
 
             # Some Debug Logging
             self.logger.debug('Mailgun POST URL: {} (cert_verify={})'.format(
                 url, self.verify_certificate))
             self.logger.debug('Mailgun Payload: {}' .format(payload))
+
+            # For logging output of success and errors; we get a head count
+            # of our outbound details:
+            verbose_dest = ', '.join(
+                [x[1] for x in self.targets[index:index + batch_size]]) \
+                if len(self.targets[index:index + batch_size]) <= 3 \
+                else '{} recipients'.format(
+                    len(self.targets[index:index + batch_size]))
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -392,6 +489,7 @@ class NotifyMailgun(NotifyBase):
                     auth=("api", self.apikey),
                     data=payload,
                     headers=headers,
+                    files=None if not files else files,
                     verify=self.verify_certificate,
                     timeout=self.request_timeout,
                 )
@@ -405,7 +503,7 @@ class NotifyMailgun(NotifyBase):
                     self.logger.warning(
                         'Failed to send Mailgun notification to {}: '
                         '{}{}error={}.'.format(
-                            to_addr,
+                            verbose_dest,
                             status_str,
                             ', ' if status_str else '',
                             r.status_code))
@@ -419,18 +517,35 @@ class NotifyMailgun(NotifyBase):
 
                 else:
                     self.logger.info(
-                        'Sent Mailgun notification to {}.'.format(to_addr))
+                        'Sent Mailgun notification to {}.'.format(
+                            verbose_dest))
 
             except requests.RequestException as e:
                 self.logger.warning(
                     'A Connection error occurred sending Mailgun:%s ' % (
-                        to_addr) + 'notification.'
+                        verbose_dest) + 'notification.'
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))
 
                 # Mark our failure
                 has_error = True
                 continue
+
+            except (OSError, IOError) as e:
+                self.logger.warning(
+                    'An I/O error occurred while reading attachments')
+                self.logger.debug('I/O Exception: %s' % str(e))
+
+                # Mark our failure
+                has_error = True
+                continue
+
+            finally:
+                # Close any potential attachments that are still open
+                for entry in files.values():
+                    self.logger.trace(
+                        'Closing attachment {}'.format(entry[0]))
+                    entry[1].close()
 
         return not has_error
 
@@ -442,6 +557,7 @@ class NotifyMailgun(NotifyBase):
         # Define any URL parameters
         params = {
             'region': self.region_name,
+            'batch': 'yes' if self.batch else 'no',
         }
 
         # Extend our parameters
@@ -527,5 +643,10 @@ class NotifyMailgun(NotifyBase):
         # Handle Blind Carbon Copy Addresses
         if 'bcc' in results['qsd'] and len(results['qsd']['bcc']):
             results['bcc'] = results['qsd']['bcc']
+
+        # Get Batch Mode Flag
+        results['batch'] = \
+            parse_bool(results['qsd'].get(
+                'batch', NotifyMailgun.template_args['batch']['default']))
 
         return results
