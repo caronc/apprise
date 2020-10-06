@@ -133,7 +133,7 @@ class NotifySparkPost(NotifyBase):
     # batch transfer based on:
     #  https://www.sparkpost.com/docs/tech-resources/\
     #       smtp-rest-api-performance/#sending-via-the-transmission-rest-api
-    default_batch_size = 10000
+    default_batch_size = 2000
 
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_sparkpost'
@@ -209,7 +209,7 @@ class NotifySparkPost(NotifyBase):
     # Define any kwargs we're using
     template_kwargs = {
         'headers': {
-            'name': _('HTTP Header'),
+            'name': _('Email Header'),
             'prefix': '+',
         },
         'tokens': {
@@ -541,9 +541,6 @@ class NotifySparkPost(NotifyBase):
         else:
             payload['content']['text'] = body
 
-        if self.headers:
-            payload['content']['headers'] = self.headers
-
         if attach:
             # Prepare ourselves an attachment object
             payload['content']['attachments'] = []
@@ -595,9 +592,6 @@ class NotifySparkPost(NotifyBase):
         # Create a copy of the targets list
         emails = list(self.targets)
 
-        # Initialize our headers
-        headers = self.headers.copy()
-
         for index in range(0, len(emails), batch_size):
             # Generate our email listing
             payload['recipients'] = list()
@@ -608,6 +602,9 @@ class NotifySparkPost(NotifyBase):
             # Initialize our bcc list
             bcc = set(self.bcc)
 
+            # Initialize our headers
+            headers = self.headers.copy()
+
             for addr in self.targets[index:index + batch_size]:
                 entry = {
                     'address': {
@@ -616,10 +613,10 @@ class NotifySparkPost(NotifyBase):
                 }
 
                 # Strip target out of cc list if in To
-                cc = (cc - set([addr]))
+                cc = (cc - set([addr[1]]))
 
                 # Strip target out of bcc list if in To
-                bcc = (bcc - set([addr]))
+                bcc = (bcc - set([addr[1]]))
 
                 if addr[0]:
                     entry['address']['name'] = addr[0]
@@ -633,7 +630,10 @@ class NotifySparkPost(NotifyBase):
                     entry = {
                         'address': {
                             'email': addr,
-                        }
+                            'header_to':
+                                # Take the first email in the To
+                                self.targets[index:index + batch_size][0][1],
+                        },
                     }
 
                     if self.names.get(addr):
@@ -644,7 +644,7 @@ class NotifySparkPost(NotifyBase):
 
                 headers['CC'] = ','.join(cc)
 
-            # Handle our bcc List
+            # Handle our bcc
             for addr in bcc:
                 # Add our recipient to our list
                 payload['recipients'].append({
@@ -657,7 +657,7 @@ class NotifySparkPost(NotifyBase):
                 })
 
             if headers:
-                payload['headers'] = headers
+                payload['content']['headers'] = headers
 
             # Send our message
             status_code, response = \
@@ -693,19 +693,16 @@ class NotifySparkPost(NotifyBase):
             # from_name specified; pass it back on the url
             params['name'] = self.from_name
 
-        if len(self.cc) > 0:
+        if self.cc:
             # Handle our Carbon Copy Addresses
             params['cc'] = ','.join(
                 ['{}{}'.format(
                     '' if not e not in self.names
                     else '{}:'.format(self.names[e]), e) for e in self.cc])
 
-        if len(self.bcc) > 0:
+        if self.bcc:
             # Handle our Blind Carbon Copy Addresses
-            params['bcc'] = ','.join(
-                ['{}{}'.format(
-                    '' if not e not in self.names
-                    else '{}:'.format(self.names[e]), e) for e in self.bcc])
+            params['bcc'] = ','.join(self.bcc)
 
         # a simple boolean check as to whether we display our target emails
         # or not
@@ -781,5 +778,7 @@ class NotifySparkPost(NotifyBase):
 
         # Get Batch Mode Flag
         results['batch'] = \
-            parse_bool(results['qsd'].get('batch', False))
+            parse_bool(results['qsd'].get(
+                'batch', NotifySparkPost.template_args['batch']['default']))
+
         return results

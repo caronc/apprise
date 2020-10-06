@@ -44,7 +44,7 @@ TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), 'var')
 @mock.patch('requests.post')
 def test_notify_sparkpost_plugin_throttling(mock_post):
     """
-    API: NotifySpark() Throttling
+    API: NotifySparkPost() Throttling
 
     """
 
@@ -115,7 +115,7 @@ def test_notify_sparkpost_plugin_throttling(mock_post):
 @mock.patch('requests.post')
 def test_notify_sparkpost_plugin_attachments(mock_post):
     """
-    API: NotifySpark() Attachments
+    API: NotifySparkPost() Attachments
 
     """
     # Disable Throttling to speed testing
@@ -161,3 +161,28 @@ def test_notify_sparkpost_plugin_attachments(mock_post):
         assert obj.notify(
             body='body', title='title', notify_type=NotifyType.INFO,
             attach=attach) is False
+
+    obj = Apprise.instantiate(
+        'sparkpost://no-reply@example.com/{}/'
+        'user1@example.com/user2@example.com?batch=yes'.format(apikey))
+    assert isinstance(obj, plugins.NotifySparkPost)
+
+    # Force our batch to break into separate messages
+    obj.default_batch_size = 1
+    # We'll send 2 messages
+    mock_post.reset_mock()
+
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=attach) is True
+    assert mock_post.call_count == 2
+
+    # single batch
+    mock_post.reset_mock()
+    # We'll send 1 message
+    obj.default_batch_size = 2
+
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=attach) is True
+    assert mock_post.call_count == 1
