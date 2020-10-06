@@ -383,9 +383,17 @@ class NotifyEmail(NotifyBase):
         },
     })
 
+    # Define any kwargs we're using
+    template_kwargs = {
+        'headers': {
+            'name': _('Email Header'),
+            'prefix': '+',
+        },
+    }
+
     def __init__(self, smtp_host=None, from_name=None,
                  from_addr=None, secure_mode=None, targets=None, cc=None,
-                 bcc=None, **kwargs):
+                 bcc=None, headers=None, **kwargs):
         """
         Initialize Email Object
 
@@ -413,6 +421,11 @@ class NotifyEmail(NotifyBase):
 
         # For tracking our email -> name lookups
         self.names = {}
+
+        self.headers = {}
+        if headers:
+            # Store our extra headers
+            self.headers.update(headers)
 
         # Now we want to construct the To and From email
         # addresses from the URL provided
@@ -648,6 +661,11 @@ class NotifyEmail(NotifyBase):
                 content = MIMEText(body, 'plain', 'utf-8')
 
             base = MIMEMultipart() if attach else content
+
+            # Apply any provided custom headers
+            for k, v in self.headers.items():
+                base[k] = Header(v, 'utf-8')
+
             base['Subject'] = Header(title, 'utf-8')
             try:
                 base['From'] = formataddr(
@@ -766,6 +784,9 @@ class NotifyEmail(NotifyBase):
             'smtp': self.smtp_host,
             'user': self.user,
         }
+
+        # Append our headers into our parameters
+        params.update({'+{}'.format(k): v for k, v in self.headers.items()})
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
@@ -890,5 +911,10 @@ class NotifyEmail(NotifyBase):
 
         results['from_addr'] = from_addr
         results['smtp_host'] = smtp_host
+
+        # Add our Meta Headers that the user can provide with their outbound
+        # emails
+        results['headers'] = {NotifyBase.unquote(x): NotifyBase.unquote(y)
+                              for x, y in results['qsd+'].items()}
 
         return results

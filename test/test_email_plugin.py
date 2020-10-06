@@ -165,6 +165,11 @@ TEST_URLS = (
             'instance': plugins.NotifyEmail,
         },
     ),
+    # headers
+    ('mailto://user:pass@localhost.localdomain'
+        '?+X-Customer-Campaign-ID=Apprise', {
+            'instance': plugins.NotifyEmail,
+        }),
     # No Password
     ('mailtos://user:@nuxref.com', {
         'instance': plugins.NotifyEmail,
