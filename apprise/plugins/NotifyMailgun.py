@@ -188,7 +188,7 @@ class NotifyMailgun(NotifyBase):
     # Define any kwargs we're using
     template_kwargs = {
         'headers': {
-            'name': _('HTTP Header'),
+            'name': _('Email Header'),
             'prefix': '+',
         },
         'tokens': {
