@@ -23,10 +23,16 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import re
+import mock
+import pytest
+from apprise import Apprise
 from apprise import URLBase
+from apprise.logger import LogCapture
 
 # Disable logging for a cleaner testing output
-import logging
+from apprise.logger import logging
+from apprise.logger import logger
 
 
 def test_apprise_logger():
@@ -55,6 +61,149 @@ def test_apprise_logger():
 
     # Verbose Debugging will activate
     URLBase.logger.trace('test')
+
+    # Disable Logging
+    logging.disable(logging.CRITICAL)
+
+
+def test_apprise_log_captures():
+    """
+    API: Apprise() Log Captures
+
+    """
+
+    # Ensure we're not running in a disabled state
+    logging.disable(logging.NOTSET)
+
+    logger.setLevel(logging.CRITICAL)
+    with LogCapture(level=logging.TRACE) as stream:
+        logger.trace("trace")
+        logger.debug("debug")
+        logger.info("info")
+        logger.warning("warning")
+        logger.error("error")
+        logger.deprecate("deprecate")
+
+        logs = re.split(r'\r*\n', stream.getvalue().rstrip())
+
+        # We have a log entry for each of the 6 logs we generated above
+        assert 'trace' in stream.getvalue()
+        assert 'debug' in stream.getvalue()
+        assert 'info' in stream.getvalue()
+        assert 'warning' in stream.getvalue()
+        assert 'error' in stream.getvalue()
+        assert 'deprecate' in stream.getvalue()
+        assert len(logs) == 6
+
+    # Verify that we did not lose our effective log level even though
+    # the above steps the level up for the duration of the capture
+    assert logger.getEffectiveLevel() == logging.CRITICAL
+
+    logger.setLevel(logging.TRACE)
+    with LogCapture(level=logging.DEBUG) as stream:
+        logger.trace("trace")
+        logger.debug("debug")
+        logger.info("info")
+        logger.warning("warning")
+        logger.error("error")
+        logger.deprecate("deprecate")
+
+        logs = re.split(r'\r*\n', stream.getvalue().rstrip())
+
+        # We have a log entry for 5 of the log entries we generated above
+        # There will be no 'trace' entry
+        assert 'trace' not in stream.getvalue()
+        assert 'debug' in stream.getvalue()
+        assert 'info' in stream.getvalue()
+        assert 'warning' in stream.getvalue()
+        assert 'error' in stream.getvalue()
+        assert 'deprecate' in stream.getvalue()
+        assert len(logs) == 5
+
+    # Verify that we did not lose our effective log level even though
+    # the above steps the level up for the duration of the capture
+    assert logger.getEffectiveLevel() == logging.TRACE
+
+    logger.setLevel(logging.ERROR)
+    with LogCapture(level=logging.WARNING) as stream:
+        logger.trace("trace")
+        logger.debug("debug")
+        logger.info("info")
+        logger.warning("warning")
+        logger.error("error")
+        logger.deprecate("deprecate")
+
+        logs = re.split(r'\r*\n', stream.getvalue().rstrip())
+
+        # We have a log entry for 3 of the log entries we generated above
+        # There will be no 'trace', 'debug', or 'info' entry
+        assert 'trace' not in stream.getvalue()
+        assert 'debug' not in stream.getvalue()
+        assert 'info' not in stream.getvalue()
+        assert 'warning' in stream.getvalue()
+        assert 'error' in stream.getvalue()
+        assert 'deprecate' in stream.getvalue()
+
+        logs = re.split(r'\r*\n', stream.getvalue().rstrip())
+        assert len(logs) == 3
+
+    # Set a global level of ERROR
+    logger.setLevel(logging.ERROR)
+
+    # Use the default level of None (by not specifying one); we then
+    # use whatever has been defined globally
+    with LogCapture() as stream:
+        logger.trace("trace")
+        logger.debug("debug")
+        logger.info("info")
+        logger.warning("warning")
+        logger.error("error")
+        logger.deprecate("deprecate")
+
+        logs = re.split(r'\r*\n', stream.getvalue().rstrip())
+        assert 'trace' not in stream.getvalue()
+        assert 'debug' not in stream.getvalue()
+        assert 'info' not in stream.getvalue()
+        assert 'warning' not in stream.getvalue()
+        assert 'error' in stream.getvalue()
+        assert 'deprecate' in stream.getvalue()
+        assert len(logs) == 2
+
+    # Verify that we did not lose our effective log level
+    assert logger.getEffectiveLevel() == logging.ERROR
+
+    with LogCapture(level=logging.TRACE) as stream:
+        logger.trace("trace")
+        logger.debug("debug")
+        logger.info("info")
+        logger.warning("warning")
+        logger.error("error")
+        logger.deprecate("deprecate")
+
+        logs = re.split(r'\r*\n', stream.getvalue().rstrip())
+
+        # We have a log entry for each of the 6 logs we generated above
+        assert 'trace' in stream.getvalue()
+        assert 'debug' in stream.getvalue()
+        assert 'info' in stream.getvalue()
+        assert 'warning' in stream.getvalue()
+        assert 'error' in stream.getvalue()
+        assert 'deprecate' in stream.getvalue()
+        assert len(logs) == 6
+
+    # Verify that we did not lose our effective log level even though
+    # the above steps the level up for the duration of the capture
+    assert logger.getEffectiveLevel() == logging.ERROR
+
+    # Test capture where our notification throws an unhandled exception
+    obj = Apprise.instantiate('json://user:password@example.com')
+    with mock.patch('requests.post', side_effect=NotImplementedError()):
+        with pytest.raises(NotImplementedError):
+            # Our exception gets caught in side our with() block
+            # and although raised, all graceful handling of the log
+            # is reverted as it was
+            with LogCapture(level=logging.TRACE) as stream:
+                obj.send("hello world")
 
     # Disable Logging
     logging.disable(logging.CRITICAL)
