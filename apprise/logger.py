@@ -23,6 +23,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import os
 import logging
 from io import StringIO
 
@@ -81,20 +82,29 @@ class LogCapture(object):
        9.      print(captured.getvalue())
 
     """
-    def __init__(self, level=None, name=LOGGER_NAME,
+    def __init__(self, path=None, level=None, name=LOGGER_NAME, delete=True,
                  fmt='%(asctime)s - %(thread)d - %(levelname)s - %(message)s'):
         """
         Instantiate a temporary log capture object
 
+        If a path is specified, then log content is sent to that file instead
+        of a StringIO object.
+
         You can optionally specify a logging level such as logging.INFO if you
         wish, otherwise by default the script uses whatever logging has been
-        set globally.
+        set globally. If you set delete to `False` then when using log files,
+        they are not automatically cleaned up afterwards.
 
         Optionally over-ride the fmt as well if you wish.
 
         """
         # Our memory buffer placeholder
-        self.__mem_buffer = StringIO()
+        self.__buffer_ptr = StringIO()
+
+        # Store our file path as it will determine whether or not we write to
+        # memory and a file
+        self.__path = path
+        self.__delete = delete
 
         # Our logging level tracking
         self.__level = level
@@ -104,7 +114,9 @@ class LogCapture(object):
         self.__logger = logging.getLogger(name)
 
         # Prepare our handler
-        self.__handler = logging.StreamHandler(self.__mem_buffer)
+        self.__handler = logging.StreamHandler(self.__buffer_ptr) \
+            if not self.__path else logging.FileHandler(
+                self.__path, mode='a', encoding='utf-8')
 
         # Use the specified level, otherwise take on the already
         # effective level of our logger
@@ -135,11 +147,20 @@ class LogCapture(object):
             # Do nothing but enforce that we have nothing to restore to
             self.__restore_level = None
 
+        if self.__path:
+            # If a path has been identified, ensure we can write to the path
+            # and that the file exists
+            with open(self.__path, 'a'):
+                os.utime(self.__path, None)
+
+            # Update our buffer pointer
+            self.__buffer_ptr = open(self.__path, 'r')
+
         # Add our handler
         self.__logger.addHandler(self.__handler)
 
         # return our memory pointer
-        return self.__mem_buffer
+        return self.__buffer_ptr
 
     def __exit__(self, exc_type, exc_value, tb):
         """
@@ -148,7 +169,7 @@ class LogCapture(object):
 
         # Flush our content
         self.__handler.flush()
-        self.__mem_buffer.flush()
+        self.__buffer_ptr.flush()
 
         # Drop our handler
         self.__logger.removeHandler(self.__handler)
@@ -156,6 +177,18 @@ class LogCapture(object):
         if self.__restore_level is not None:
             # Restore level
             self.__logger.setLevel(self.__restore_level)
+
+        if self.__path:
+            # Close our file pointer
+            self.__buffer_ptr.close()
+            if self.__delete:
+                try:
+                    # Always remove file afterwards
+                    os.unlink(self.__path)
+
+                except OSError:
+                    # It's okay if the file does not exist
+                    pass
 
         if exc_type is not None:
             # pass exception on if one was generated
