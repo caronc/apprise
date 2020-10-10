@@ -83,7 +83,7 @@ class LogCapture(object):
 
     """
     def __init__(self, path=None, level=None, name=LOGGER_NAME, delete=True,
-                 fmt='%(asctime)s - %(thread)d - %(levelname)s - %(message)s'):
+                 fmt='%(asctime)s - %(levelname)s - %(message)s'):
         """
         Instantiate a temporary log capture object
 
