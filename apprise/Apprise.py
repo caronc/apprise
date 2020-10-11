@@ -344,7 +344,6 @@ class Apprise(object):
             if body_format is None else body_format
 
         # for asyncio support; we track a list of our servers to notify
-        # sequentially
         coroutines = []
 
         # Iterate over our loaded plugins
@@ -494,11 +493,11 @@ class Apprise(object):
 
         return response
 
-    def urls(self):
+    def urls(self, privacy=False):
         """
         Returns all of the loaded URLs defined in this apprise object.
         """
-        return [x.url() for x in self.servers]
+        return [x.url(privacy=privacy) for x in self.servers]
 
     def pop(self, index):
         """
