@@ -162,14 +162,12 @@ class NotifyPushover(NotifyBase):
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'^[a-z0-9]{30}$', 'i'),
         },
         'token': {
             'name': _('Access Token'),
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'^[a-z0-9]{30}$', 'i'),
         },
         'target_device': {
             'name': _('Target Device'),
@@ -223,8 +221,7 @@ class NotifyPushover(NotifyBase):
         super(NotifyPushover, self).__init__(**kwargs)
 
         # Access Token (associated with project)
-        self.token = validate_regex(
-            token, *self.template_tokens['token']['regex'])
+        self.token = validate_regex(token)
         if not self.token:
             msg = 'An invalid Pushover Access Token ' \
                   '({}) was specified.'.format(token)
@@ -232,8 +229,7 @@ class NotifyPushover(NotifyBase):
             raise TypeError(msg)
 
         # User Key (associated with project)
-        self.user_key = validate_regex(
-            user_key, *self.template_tokens['user_key']['regex'])
+        self.user_key = validate_regex(user_key)
         if not self.user_key:
             msg = 'An invalid Pushover User Key ' \
                   '({}) was specified.'.format(user_key)
