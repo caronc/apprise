@@ -10,6 +10,9 @@ babel
 # Plugin Dependencies
 #
 
+# Used for test cases on spush://
+cryptography
+
 # Provides xmpp:// support
 sleekxmpp
 
