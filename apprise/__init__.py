@@ -57,10 +57,13 @@ from .AppriseAsset import AppriseAsset
 from .AppriseConfig import AppriseConfig
 from .AppriseAttachment import AppriseAttachment
 
+# Inherit our logging with our additional entries added to it
+from .logger import logging
+from .logger import logger
+from .logger import LogCapture
+
 # Set default logging handler to avoid "No handler found" warnings.
-import logging
-from logging import NullHandler
-logging.getLogger(__name__).addHandler(NullHandler())
+logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 __all__ = [
     # Core
@@ -74,4 +77,7 @@ __all__ = [
     'ContentIncludeMode', 'CONTENT_INCLUDE_MODES',
     'ContentLocation', 'CONTENT_LOCATIONS',
     'PrivacyMode',
+
+    # Logging
+    'logging', 'logger', 'LogCapture',
 ]

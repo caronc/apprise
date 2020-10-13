@@ -25,7 +25,7 @@
 
 import re
 import six
-import logging
+from .logger import logger
 from time import sleep
 from datetime import datetime
 from xml.sax.saxutils import escape as sax_escape
@@ -115,8 +115,8 @@ class URLBase(object):
     # Secure sites should be verified against a Certificate Authority
     verify_certificate = True
 
-    # Logging
-    logger = logging.getLogger(__name__)
+    # Logging to our global logger
+    logger = logger
 
     # Define a default set of template arguments used for dynamically building
     # details about our individual plugins for developers.
