@@ -5,8 +5,13 @@ pytest
 pytest-cov
 tox
 babel
-cryptography
 
+#
 # Plugin Dependencies
+#
+
+# Provides xmpp:// support
 sleekxmpp
+
+# Provides growl:// support
 gntp
