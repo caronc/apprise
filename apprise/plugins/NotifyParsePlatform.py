@@ -263,18 +263,18 @@ class NotifyParsePlatform(NotifyBase):
         """
 
         # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
+        params = {
             'device': self.device,
         }
+
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         default_port = 443 if self.secure else 80
 
         return \
             '{schema}://{app_id}:{master_key}@' \
-            '{hostname}{port}{fullpath}/?{args}'.format(
+            '{hostname}{port}{fullpath}/?{params}'.format(
                 schema=self.secure_protocol if self.secure else self.protocol,
                 app_id=self.pprint(self.application_id, privacy, safe=''),
                 master_key=self.pprint(self.master_key, privacy, safe=''),
@@ -282,7 +282,7 @@ class NotifyParsePlatform(NotifyBase):
                 port='' if self.port is None or self.port == default_port
                      else ':{}'.format(self.port),
                 fullpath=NotifyParsePlatform.quote(self.fullpath, safe='/'),
-                args=NotifyParsePlatform.urlencode(args))
+                params=NotifyParsePlatform.urlencode(params))
 
     @staticmethod
     def parse_url(url):
