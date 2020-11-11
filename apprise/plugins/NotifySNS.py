@@ -361,7 +361,7 @@ class NotifySNS(NotifyBase):
 
                 self.logger.debug('Response Details:\r\n{}'.format(r.content))
 
-                return (False, NotifySNS.aws_response_to_dict(r.content))
+                return (False, NotifySNS.aws_response_to_dict(r.text))
 
             else:
                 self.logger.info(
@@ -375,7 +375,7 @@ class NotifySNS(NotifyBase):
             self.logger.debug('Socket Exception: %s' % str(e))
             return (False, NotifySNS.aws_response_to_dict(None))
 
-        return (True, NotifySNS.aws_response_to_dict(r.content))
+        return (True, NotifySNS.aws_response_to_dict(r.text))
 
     def aws_prepare_request(self, payload, reference=None):
         """

@@ -288,7 +288,7 @@ def test_aws_topic_handling(mock_post):
 
         # A request
         robj = mock.Mock()
-        robj.content = ''
+        robj.text = ''
         robj.status_code = requests.codes.ok
 
         if data.find('=CreateTopic') >= 0:
@@ -323,11 +323,11 @@ def test_aws_topic_handling(mock_post):
 
         # A request
         robj = mock.Mock()
-        robj.content = ''
+        robj.text = ''
         robj.status_code = requests.codes.ok
 
         if data.find('=CreateTopic') >= 0:
-            robj.content = arn_response
+            robj.text = arn_response
 
         # Manipulate Topic Publishing only (not phone)
         elif data.find('=Publish') >= 0 and data.find('TopicArn=') >= 0:
@@ -347,7 +347,7 @@ def test_aws_topic_handling(mock_post):
 
     # Handle case where TopicArn is missing:
     robj = mock.Mock()
-    robj.content = "<CreateTopicResponse></CreateTopicResponse>"
+    robj.text = "<CreateTopicResponse></CreateTopicResponse>"
     robj.status_code = requests.codes.ok
 
     # Assign ourselves a new function
@@ -356,14 +356,14 @@ def test_aws_topic_handling(mock_post):
 
     # Handle case where we fails get a bad response
     robj = mock.Mock()
-    robj.content = ''
+    robj.text = ''
     robj.status_code = requests.codes.bad_request
     mock_post.return_value = robj
     assert a.notify(title='', body='test') is False
 
     # Handle case where we get a valid response and TopicARN
     robj = mock.Mock()
-    robj.content = arn_response
+    robj.text = arn_response
     robj.status_code = requests.codes.ok
     mock_post.return_value = robj
     # We would have failed to make Post
