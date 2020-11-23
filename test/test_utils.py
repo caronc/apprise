@@ -532,6 +532,8 @@ def test_is_hostname():
     assert utils.is_hostname('yahoo.ca.') == 'yahoo.ca'
     assert utils.is_hostname('valid-dashes-in-host.ca') == \
         'valid-dashes-in-host.ca'
+    assert utils.is_hostname('valid-underscores_in_host.ca') == \
+        'valid-underscores_in_host.ca'
 
     # Invalid Hostnames
     assert utils.is_hostname('-hostname.that.starts.with.a.dash') is False
@@ -539,7 +541,6 @@ def test_is_hostname():
     assert utils.is_hostname('    spaces   ') is False
     assert utils.is_hostname('       ') is False
     assert utils.is_hostname('') is False
-    assert utils.is_hostname('valid-underscores_in_host.ca') is False
 
     # Valid IPv4 Addresses
     assert utils.is_hostname('127.0.0.1') == '127.0.0.1'
@@ -622,6 +623,14 @@ def test_is_email():
     assert 'test@gmail.com' == results['email']
     assert 'test@gmail.com' == results['full_email']
     assert 'gmail.com' == results['domain']
+    assert 'test' == results['user']
+    assert '' == results['label']
+
+    results = utils.is_email('test@my-valid_host.com')
+    assert '' == results['name']
+    assert 'test@my-valid_host.com' == results['email']
+    assert 'test@my-valid_host.com' == results['full_email']
+    assert 'my-valid_host.com' == results['domain']
     assert 'test' == results['user']
     assert '' == results['label']
 
