@@ -120,9 +120,9 @@ GET_EMAIL_RE = re.compile(
     r'(?P<email>(?P<userid>[a-z0-9$%=_~-]+'
     r'(?:\.[a-z0-9$%+=_~-]+)'
     r'*)@(?P<domain>('
-    r'(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+'
-    r'[a-z0-9](?:[a-z0-9-]*[a-z0-9]))|'
-    r'[a-z0-9][a-z0-9-]{5,})))'
+    r'(?:[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?\.)+'
+    r'[a-z0-9](?:[a-z0-9_-]*[a-z0-9]))|'
+    r'[a-z0-9][a-z0-9_-]{5,})))'
     r'\s*>?', re.IGNORECASE)
 
 # Regular expression used to extract a phone number
@@ -232,9 +232,12 @@ def is_hostname(hostname, ipv4=True, ipv6=True):
     # - Hostnames can ony be comprised of alpha-numeric characters and the
     #   hyphen (-) character.
     # - Hostnames can not start with the hyphen (-) character.
+    # - as a workaround for https://github.com/docker/compose/issues/229 to
+    #   being able to address services in other stacks, we also allow
+    #   underscores in hostnames
     # - labels can not exceed 63 characters
     allowed = re.compile(
-        r'(?!-)[a-z0-9][a-z0-9-]{1,62}(?<!-)$',
+        r'^[a-z0-9][a-z0-9_-]{1,62}(?<!-)$',
         re.IGNORECASE,
     )
 
