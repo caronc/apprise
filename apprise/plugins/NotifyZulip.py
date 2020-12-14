@@ -77,12 +77,12 @@ ZULIP_HTTP_ERROR_MAP = {
     401: 'Unauthorized - Invalid Token.',
 }
 
-# Used to break path apart into list of channels
+# Used to break path apart into list of streams
 TARGET_LIST_DELIM = re.compile(r'[ \t\r\n,#\\/]+')
 
-# Used to detect a channel
+# Used to detect a streams
 IS_VALID_TARGET_RE = re.compile(
-    r'#?(?P<channel>[A-Z0-9_]{1,32})', re.I)
+    r'#?(?P<stream>[A-Z0-9_]{1,32})', re.I)
 
 
 class NotifyZulip(NotifyBase):
@@ -142,8 +142,8 @@ class NotifyZulip(NotifyBase):
             'type': 'string',
             'map_to': 'targets',
         },
-        'target_channel': {
-            'name': _('Target Channel'),
+        'target_stream': {
+            'name': _('Target Stream'),
             'type': 'string',
             'map_to': 'targets',
         },
@@ -164,8 +164,8 @@ class NotifyZulip(NotifyBase):
     # if one isn't defined in the apprise url
     default_hostname = 'zulipchat.com'
 
-    # The default channel to notify if no targets are specified
-    default_notification_channel = 'general'
+    # The default stream to notify if no targets are specified
+    default_notification_stream = 'general'
 
     def __init__(self, botname, organization, token, targets=None, **kwargs):
         """
@@ -218,8 +218,8 @@ class NotifyZulip(NotifyBase):
 
         self.targets = parse_list(targets)
         if len(self.targets) == 0:
-            # No channels identified, use default
-            self.targets.append(self.default_notification_channel)
+            # No streams identified, use default
+            self.targets.append(self.default_notification_stream)
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
