@@ -4825,11 +4825,11 @@ TEST_URLS = (
     ('zulip://botname@apprise.zulipchat.com/{}'.format('a' * 32), {
         'instance': plugins.NotifyZulip,
     }),
-    # Valid everything - 2 channels specified
+    # Valid everything - 2 streams specified
     ('zulip://botname@apprise/{}/channel1/channel2'.format('a' * 32), {
         'instance': plugins.NotifyZulip,
     }),
-    # Valid everything - 2 channels specified (using to=)
+    # Valid everything - 2 streams specified (using to=)
     ('zulip://botname@apprise/{}/?to=channel1/channel2'.format('a' * 32), {
         'instance': plugins.NotifyZulip,
     }),
