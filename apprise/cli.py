@@ -27,6 +27,8 @@ import click
 import logging
 import platform
 import sys
+import os
+
 from os.path import isfile
 from os.path import expanduser
 from os.path import expandvars
@@ -241,16 +243,50 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
     # Create our Apprise object
     a = Apprise(asset=asset, debug=debug, location=ContentLocation.LOCAL)
 
-    # Load our configuration if no URLs or specified configuration was
-    # identified on the command line
-    a.add(AppriseConfig(
-        paths=[f for f in DEFAULT_SEARCH_PATHS if isfile(expanduser(f))]
-        if not (config or urls) else config,
-        asset=asset, recursion=recursion_depth))
+    # The priorities of what is accepted are parsed in order below:
+    #    1. URLs by command line
+    #    2. Configuration by command line
+    #    3. URLs by environment variable: APPRISE_URLS
+    #    4. Configuration by environment variable: APPRISE_CONFIG
+    #    5. Default Configuration File(s) (if found)
+    #
+    if urls:
+        # Ignore any tags specified
+        tag = None
 
-    # Load our inventory up
-    for url in urls:
-        a.add(url)
+        # Load our URLs (if any defined)
+        for url in urls:
+            a.add(url)
+
+        if config:
+            # Provide a warning to the end user if they specified both
+            logger.warning(
+                'You defined both URLs and a --config (-c) entry; '
+                'Only the URLs will be referenced.')
+
+    elif config:
+        # We load our configuration file(s) now only if no URLs were specified
+        # Specified config entries trump all
+        a.add(AppriseConfig(
+            paths=config, asset=asset, recursion=recursion_depth))
+
+    elif os.environ.get('APPRISE_URLS', '').strip():
+        # Ignore any tags specified
+        tag = None
+
+        # Attempt to use our APPRISE_URLS environment variable (if populated)
+        a.add(os.environ['APPRISE_URLS'].strip())
+
+    elif os.environ.get('APPRISE_CONFIG', '').strip():
+        # Fall back to config environment variable (if populated)
+        a.add(AppriseConfig(
+            paths=os.environ['APPRISE_CONFIG'].strip(),
+            asset=asset, recursion=recursion_depth))
+    else:
+        # Load default configuration
+        a.add(AppriseConfig(
+            paths=[f for f in DEFAULT_SEARCH_PATHS if isfile(expanduser(f))],
+            asset=asset, recursion=recursion_depth))
 
     if len(a) == 0:
         logger.error(
