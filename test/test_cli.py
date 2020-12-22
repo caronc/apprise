@@ -420,6 +420,14 @@ def test_apprise_cli_nux_env(tmpdir):
         # variable with a valid URL
         result = runner.invoke(cli.main, [
             '-b', 'test environment',
+            # Test that we ignore our tag
+            '--tag', 'mytag',
+        ])
+        assert result.exit_code == 0
+
+        # Same action but without --tag
+        result = runner.invoke(cli.main, [
+            '-b', 'test environment',
         ])
         assert result.exit_code == 0
 

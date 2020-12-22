@@ -251,8 +251,11 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
     #    5. Default Configuration File(s) (if found)
     #
     if urls:
-        # Ignore any tags specified
-        tag = None
+        if tag:
+            # Ignore any tags specified
+            logger.warning(
+                '--tag (-g) entries are ignored when using specified URLs')
+            tag = None
 
         # Load our URLs (if any defined)
         for url in urls:
@@ -272,8 +275,11 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
 
     elif os.environ.get('APPRISE_URLS', '').strip():
         logger.debug('Loading provided APPRISE_URLS environment variable')
-        # Ignore any tags specified
-        tag = None
+        if tag:
+            # Ignore any tags specified
+            logger.warning(
+                '--tag (-g) entries are ignored when using specified URLs')
+            tag = None
 
         # Attempt to use our APPRISE_URLS environment variable (if populated)
         a.add(os.environ['APPRISE_URLS'].strip())
