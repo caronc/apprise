@@ -271,6 +271,7 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
             paths=config, asset=asset, recursion=recursion_depth))
 
     elif os.environ.get('APPRISE_URLS', '').strip():
+        logger.debug('Loading provided APPRISE_URLS environment variable')
         # Ignore any tags specified
         tag = None
 
@@ -278,6 +279,7 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
         a.add(os.environ['APPRISE_URLS'].strip())
 
     elif os.environ.get('APPRISE_CONFIG', '').strip():
+        logger.debug('Loading provided APPRISE_CONFIG environment variable')
         # Fall back to config environment variable (if populated)
         a.add(AppriseConfig(
             paths=os.environ['APPRISE_CONFIG'].strip(),
