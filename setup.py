@@ -70,8 +70,8 @@ setup(
     cmdclass=cmdclass,
     url='https://github.com/caronc/apprise',
     keywords='Push Notifications Alerts Email AWS SNS Boxcar ClickSend '
-        'Discord Dbus Emby Faast Flock Gitter Gnome Gotify Growl IFTTT Join '
-        'Kavenegar KODI Kumulos LaMetric MacOS Mailgun Matrix Mattermost '
+        'Discord Dbus Emby Faast FCM Flock Gitter Gnome Gotify Growl IFTTT '
+        'Join Kavenegar KODI Kumulos LaMetric MacOS Mailgun Matrix Mattermost '
         'MessageBird MSG91 Nexmo Nextcloud Notica Notifico Office365 '
         'ParsePlatform PopcornNotify Prowl PushBullet Pushjet Pushed Pushover '
         'PushSafer Rocket.Chat Ryver SendGrid SimplePush Sinch Slack '
