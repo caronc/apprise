@@ -220,20 +220,21 @@ EMAIL_TEMPLATES = (
         },
     ),
 
-    # Zoho Mail
+    # Zoho Mail (Free)
     (
         'Zoho Mail',
         re.compile(
             r'^((?P<label>[^+]+)\+)?(?P<id>[^@]+)@'
-            r'(?P<domain>zoho\.com)$', re.I),
+            r'(?P<domain>zoho(mail)?\.com)$', re.I),
         {
-            'port': 465,
+            'port': 587,
             'smtp_host': 'smtp.zoho.com',
             'secure': True,
-            'secure_mode': SecureMailMode.SSL,
+            'secure_mode': SecureMailMode.STARTTLS,
             'login_type': (WebBaseLogin.EMAIL, )
         },
     ),
+
 
     # SendGrid (Email Server)
     # You must specify an authenticated sender address in the from= settings
