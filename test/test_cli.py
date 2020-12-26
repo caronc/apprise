@@ -31,6 +31,8 @@ from apprise import cli
 from apprise import NotifyBase
 from click.testing import CliRunner
 from apprise.plugins import SCHEMA_MAP
+from apprise.utils import environ
+
 
 try:
     # Python v3.4+
@@ -359,7 +361,7 @@ def test_apprise_cli_nux_env(tmpdir):
     # This will fail because nothing matches mytag. It's case sensitive
     # and we would only actually match against myTag
     result = runner.invoke(cli.main, [
-        '-b', 'has taga',
+        '-b', 'has mytag',
         '--config', str(t),
         '--tag', 'mytag',
     ])
@@ -370,7 +372,7 @@ def test_apprise_cli_nux_env(tmpdir):
     # However, since we don't match anything; we still fail with a return code
     # of 2.
     result = runner.invoke(cli.main, [
-        '-b', 'has taga',
+        '-b', 'has mytag',
         '--config', str(t),
         '--tag', 'mytag',
         '--dry-run'
@@ -379,7 +381,7 @@ def test_apprise_cli_nux_env(tmpdir):
 
     # Here is a case where we get what was expected; we also attach a file
     result = runner.invoke(cli.main, [
-        '-b', 'has taga',
+        '-b', 'has myTag',
         '--config', str(t),
         '--attach', join(dirname(__file__), 'var', 'apprise-test.gif'),
         '--tag', 'myTag',
@@ -389,12 +391,141 @@ def test_apprise_cli_nux_env(tmpdir):
     # Testing with the --dry-run flag reveals the same positive results
     # because there was at least one match
     result = runner.invoke(cli.main, [
-        '-b', 'has taga',
+        '-b', 'has myTag',
         '--config', str(t),
         '--tag', 'myTag',
         '--dry-run',
     ])
     assert result.exit_code == 0
+
+    #
+    # Test environment variables
+    #
+    # Write a simple text based configuration file
+    t2 = tmpdir.mkdir("apprise-obj-env").join("apprise")
+    buf = """
+    # A general one
+    good://localhost
+
+    # A failure (if we use the fail tag)
+    fail=bad://localhost
+
+    # A normal one tied to myTag
+    myTag=good://nuxref.com
+    """
+    t2.write(buf)
+
+    with environ(APPRISE_URLS="good://localhost"):
+        # This will load okay because we defined the environment
+        # variable with a valid URL
+        result = runner.invoke(cli.main, [
+            '-b', 'test environment',
+            # Test that we ignore our tag
+            '--tag', 'mytag',
+        ])
+        assert result.exit_code == 0
+
+        # Same action but without --tag
+        result = runner.invoke(cli.main, [
+            '-b', 'test environment',
+        ])
+        assert result.exit_code == 0
+
+    with environ(APPRISE_URLS="      "):
+        # An empty string is not valid and therefore not loaded
+        # so the below fails
+        result = runner.invoke(cli.main, [
+            '-b', 'test environment',
+        ])
+        assert result.exit_code == 3
+
+    with environ(APPRISE_URLS="bad://localhost"):
+        result = runner.invoke(cli.main, [
+            '-b', 'test environment',
+        ])
+        assert result.exit_code == 1
+
+        # If we specify an inline URL, it will over-ride the environment
+        # variable
+        result = runner.invoke(cli.main, [
+            '-t', 'test title',
+            '-b', 'test body',
+            'good://localhost',
+        ])
+        assert result.exit_code == 0
+
+        # A Config file also over-rides the environment variable if
+        # specified on the command line:
+        result = runner.invoke(cli.main, [
+            '-b', 'has myTag',
+            '--config', str(t2),
+            '--tag', 'myTag',
+        ])
+        assert result.exit_code == 0
+
+    with environ(APPRISE_CONFIG=str(t2)):
+        # Our configuration file will load from our environmment variable
+        result = runner.invoke(cli.main, [
+            '-b', 'has myTag',
+            '--tag', 'myTag',
+        ])
+        assert result.exit_code == 0
+
+    with environ(APPRISE_CONFIG="      "):
+        # We will fail to send the notification as no path was
+        # specified
+        result = runner.invoke(cli.main, [
+            '-b', 'my message',
+        ])
+        assert result.exit_code == 3
+
+    with environ(APPRISE_CONFIG="garbage/file/path.yaml"):
+        # We will fail to send the notification as the path
+        # specified is not loadable
+        result = runner.invoke(cli.main, [
+            '-b', 'my message',
+        ])
+        assert result.exit_code == 1
+
+        # We can force an over-ride by specifying a config file on the
+        # command line options:
+        result = runner.invoke(cli.main, [
+            '-b', 'has myTag',
+            '--config', str(t2),
+            '--tag', 'myTag',
+        ])
+        assert result.exit_code == 0
+
+    # Just a general test; if both the --config and urls are specified
+    # then the the urls trumps all
+    result = runner.invoke(cli.main, [
+        '-b', 'has myTag',
+        '--config', str(t2),
+        'good://localhost',
+        '--tag', 'fail',
+    ])
+    # Tags are ignored, URL specified, so it trump config
+    assert result.exit_code == 0
+
+    # we just repeat the test as a proof that it only executes
+    # the urls despite the fact the --config was specified
+    result = runner.invoke(cli.main, [
+        '-b', 'reads the url entry only',
+        '--config', str(t2),
+        'good://localhost',
+        '--tag', 'fail',
+    ])
+    # Tags are ignored, URL specified, so it trump config
+    assert result.exit_code == 0
+
+    # once agian, but we call bad://
+    result = runner.invoke(cli.main, [
+        '-b', 'reads the url entry only',
+        '--config', str(t2),
+        'bad://localhost',
+        '--tag', 'myTag',
+    ])
+    assert result.exit_code == 1
 
 
 @mock.patch('platform.system')
