@@ -160,10 +160,20 @@ class NotifyOneSignal(NotifyBase):
         'template': {
             'alias_of': 'template',
         },
+        'subtitle': {
+            'name': _('Subtitle'),
+            'type': 'string',
+        },
+        'language': {
+            'name': _('Language'),
+            'type': 'string',
+            'default': 'en',
+        },
     })
 
     def __init__(self, app, apikey, targets=None, include_image=True,
-                 template=None, batch=False, **kwargs):
+                 template=None, subtitle=None, language=None, batch=False,
+                 **kwargs):
         """
         Initialize OneSignal
 
@@ -202,6 +212,20 @@ class NotifyOneSignal(NotifyBase):
 
         # Assign our template (if defined)
         self.template_id = template
+
+        # Assign our subtitle (if defined)
+        self.subtitle = subtitle
+
+        # Our Language
+        self.language = language.strip().lower()[0:2]\
+            if language \
+            else NotifyOneSignal.template_args['language']['default']
+
+        if not self.language or len(self.language) != 2:
+            msg = 'An invalid OneSignal Language ({}) was specified.'.format(
+                language)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         # Sort our targets
         for _target in parse_list(targets):
@@ -265,10 +289,10 @@ class NotifyOneSignal(NotifyBase):
             'app_id': self.app_id,
 
             'headings': {
-                'en': title if title else self.app_desc,
+                self.language: title if title else self.app_desc,
             },
             'contents': {
-                'en': body,
+                self.language: body,
             },
 
             # Sending true wakes your app from background to run custom native
@@ -278,6 +302,13 @@ class NotifyOneSignal(NotifyBase):
             #      prevent displaying a visible notification.
             'content_available': True,
         }
+
+        if self.subtitle:
+            payload.update({
+                'subtitle': {
+                    self.language: self.subtitle,
+                },
+            })
 
         if self.template_id:
             payload['template_id'] = self.template_id
@@ -444,5 +475,13 @@ class NotifyOneSignal(NotifyBase):
         if 'template' in results['qsd'] and len(results['qsd']['template']):
             results['template'] = \
                 NotifyOneSignal.unquote(results['qsd']['template'])
+
+        if 'subtitle' in results['qsd'] and len(results['qsd']['subtitle']):
+            results['subtitle'] = \
+                NotifyOneSignal.unquote(results['qsd']['subtitle'])
+
+        if 'lang' in results['qsd'] and len(results['qsd']['lang']):
+            results['language'] = \
+                NotifyOneSignal.unquote(results['qsd']['lang'])
 
         return results

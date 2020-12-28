@@ -2338,6 +2338,10 @@ TEST_URLS = (
         # invalid apikey
         'instance': TypeError,
     }),
+    ('onesignal://appid@apikey/playerid/?lang=X', {
+        # invalid language id (must be 2 characters)
+        'instance': TypeError,
+    }),
     ('onesignal://appid@apikey/', {
         # No targets specified; we will initialize but not notify anything
         'instance': plugins.NotifyOneSignal,
@@ -2369,6 +2373,10 @@ TEST_URLS = (
     }),
     ('onesignal://templateid:appid@apikey/playerid', {
         # Test Template ID
+        'instance': plugins.NotifyOneSignal,
+    }),
+    ('onesignal://appid@apikey/playerid/?lang=es&subtitle=Sub', {
+        # Test Language and Subtitle Over-ride
         'instance': plugins.NotifyOneSignal,
     }),
     ('onesignal://?apikey=abc&template=tp&app=123&to=playerid', {
