@@ -218,7 +218,7 @@ class NotifyFCM(NotifyBase):
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occurred sending Techulus Push '
+                    'A Connection error occurred sending FCM '
                     'notification.'
                 )
                 self.logger.debug('Socket Exception: %s', str(e))
