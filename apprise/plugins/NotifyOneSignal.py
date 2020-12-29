@@ -286,7 +286,7 @@ class NotifyOneSignal(NotifyBase):
         sent_count = 0
 
         payload = {
-            'app_id': self.app_id,
+            'app_id': self.app,
 
             'headings': {
                 self.language: title if title else self.app_desc,
