@@ -153,7 +153,8 @@ class NotifyBase(BASE_OBJECT):
             # Provide override
             self.overflow_mode = overflow
 
-    def image_url(self, notify_type, logo=False, extension=None):
+    def image_url(self, notify_type, logo=False, extension=None,
+                  image_size=None):
         """
         Returns Image URL if possible
         """
@@ -166,7 +167,7 @@ class NotifyBase(BASE_OBJECT):
 
         return self.asset.image_url(
             notify_type=notify_type,
-            image_size=self.image_size,
+            image_size=self.image_size if image_size is None else image_size,
             logo=logo,
             extension=extension,
         )
