@@ -82,10 +82,6 @@ except ImportError:
     # Python v2.7 Backwards Compatibility support
     JSONDecodeError = ValueError
 
-# Used to prepare our UUID regex matching
-UUID4_RE = \
-    r'[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
-
 
 class NotifyMSTeams(NotifyBase):
     """
@@ -134,7 +130,7 @@ class NotifyMSTeams(NotifyBase):
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'^{}@{}$'.format(UUID4_RE, UUID4_RE), 'i'),
+            'regex': (r'^[A-Z0-9-]+@[A-Z0-9-]+$', 'i'),
         },
         # Token required as part of the API request
         #  /................../BBBBBBBBB/..........
@@ -143,7 +139,7 @@ class NotifyMSTeams(NotifyBase):
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'^[A-Za-z0-9]{32}$', 'i'),
+            'regex': (r'^[A-Za-z0-9]+$', 'i'),
         },
         # Token required as part of the API request
         #  /........./........./CCCCCCCCCCCCCCCCCCCCCCCC
@@ -152,7 +148,7 @@ class NotifyMSTeams(NotifyBase):
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'^{}$'.format(UUID4_RE), 'i'),
+            'regex': (r'^[A-Z0-9-]+$', 'i'),
         },
     })
 
