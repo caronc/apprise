@@ -6,16 +6,16 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: apprise 0.8.8\n"
+"Project-Id-Version: apprise 0.9.0\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2020-09-02 07:46-0400\n"
+"POT-Creation-Date: 2020-12-30 16:35-0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.7.0\n"
+"Generated-By: Babel 2.8.0\n"
 
 msgid "API Key"
 msgstr ""
@@ -42,6 +42,18 @@ msgid "Account SID"
 msgstr ""
 
 msgid "Add Tokens"
+msgstr ""
+
+msgid "Alias"
+msgstr ""
+
+msgid "App Access Token"
+msgstr ""
+
+msgid "App ID"
+msgstr ""
+
+msgid "App Version"
 msgstr ""
 
 msgid "Application Key"
@@ -110,7 +122,13 @@ msgstr ""
 msgid "Cycles"
 msgstr ""
 
+msgid "Details"
+msgstr ""
+
 msgid "Detect Bot Owner"
+msgstr ""
+
+msgid "Device"
 msgstr ""
 
 msgid "Device API Key"
@@ -134,10 +152,16 @@ msgstr ""
 msgid "Email"
 msgstr ""
 
+msgid "Email Header"
+msgstr ""
+
 msgid "Encrypted Password"
 msgstr ""
 
 msgid "Encrypted Salt"
+msgstr ""
+
+msgid "Entity"
 msgstr ""
 
 msgid "Event"
@@ -191,6 +215,12 @@ msgstr ""
 msgid "Include Image"
 msgstr ""
 
+msgid "Include Segment"
+msgstr ""
+
+msgid "Language"
+msgstr ""
+
 msgid "Local File"
 msgstr ""
 
@@ -198,6 +228,9 @@ msgid "Log PID"
 msgstr ""
 
 msgid "Log to STDERR"
+msgstr ""
+
+msgid "Master Key"
 msgstr ""
 
 msgid "Memory"
@@ -320,6 +353,9 @@ msgstr ""
 msgid "Subtitle"
 msgstr ""
 
+msgid "Tags"
+msgstr ""
+
 msgid "Target Channel"
 msgstr ""
 
@@ -344,10 +380,16 @@ msgstr ""
 msgid "Target Encoded ID"
 msgstr ""
 
+msgid "Target Escalation"
+msgstr ""
+
 msgid "Target JID"
 msgstr ""
 
 msgid "Target Phone No"
+msgstr ""
+
+msgid "Target Player ID"
 msgstr ""
 
 msgid "Target Room Alias"
@@ -356,10 +398,19 @@ msgstr ""
 msgid "Target Room ID"
 msgstr ""
 
+msgid "Target Schedule"
+msgstr ""
+
 msgid "Target Short Code"
 msgstr ""
 
+msgid "Target Stream"
+msgstr ""
+
 msgid "Target Tag ID"
+msgstr ""
+
+msgid "Target Team"
 msgstr ""
 
 msgid "Target Topic"
@@ -371,10 +422,19 @@ msgstr ""
 msgid "Targets"
 msgstr ""
 
+msgid "Targets "
+msgstr ""
+
 msgid "Template"
 msgstr ""
 
 msgid "Template Data"
+msgstr ""
+
+msgid "Template Path"
+msgstr ""
+
+msgid "Template Tokens"
 msgstr ""
 
 msgid "Tenant Domain"
@@ -408,6 +468,9 @@ msgid "Urgency"
 msgstr ""
 
 msgid "Use Avatar"
+msgstr ""
+
+msgid "Use Fields"
 msgstr ""
 
 msgid "User ID"
