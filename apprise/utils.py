@@ -138,6 +138,11 @@ EMAIL_DETECTION_RE = re.compile(
     r'[^@\s,]+@[^\s,]+)',
     re.IGNORECASE)
 
+# Used to prepare our UUID regex matching
+UUID4_RE = re.compile(
+    r'[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}',
+    re.IGNORECASE)
+
 # validate_regex() utilizes this mapping to track and re-use pre-complied
 # regular expressions
 REGEX_VALIDATE_LOOKUP = {}
@@ -247,6 +252,27 @@ def is_hostname(hostname, ipv4=True, ipv6=True):
     return hostname
 
 
+def is_uuid(uuid):
+    """Determine if the specified entry is uuid v4 string
+
+    Args:
+        address (str): The string you want to check.
+
+    Returns:
+        bool: Returns False if the specified element is not a uuid otherwise
+              it returns True
+    """
+
+    try:
+        match = UUID4_RE.match(uuid)
+
+    except TypeError:
+        # not parseable content
+        return False
+
+    return True if match else False
+
+
 def is_email(address):
     """Determine if the specified entry is an email address
 
@@ -254,8 +280,17 @@ def is_email(address):
         address (str): The string you want to check.
 
     Returns:
-        bool: Returns True if the address specified is an email address
-              and False if it isn't.
+        bool: Returns False if the address specified is not an email address
+              and a dictionary of the parsed email if it is as:
+                {
+                    'name': 'Parse Name'
+                    'email': 'user@domain.com'
+                    'full_email': 'label+user@domain.com'
+                    'label': 'label'
+                    'user': 'user',
+                    'domain': 'domain.com'
+                }
+
     """
 
     try:

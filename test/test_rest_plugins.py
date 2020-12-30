@@ -2383,14 +2383,102 @@ TEST_URLS = (
         # Test Kwargs
         'instance': plugins.NotifyOneSignal,
     }),
-    ('onesignal://appid@apikey/#topic1/device/', {
+    ('onesignal://appid@apikey/#segment/playerid/', {
         'instance': plugins.NotifyOneSignal,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
-    ('onesignal://appid@apikey/#topic1/device/', {
+    ('onesignal://appid@apikey/#segment/playerid/', {
         'instance': plugins.NotifyOneSignal,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
+    # NotifyOpsgenie
+    ##################################
+    ('opsgenie://', {
+        # We failed to identify any valid authentication
+        'instance': TypeError,
+    }),
+    ('opsgenie://:@/', {
+        # We failed to identify any valid authentication
+        'instance': TypeError,
+    }),
+    ('opsgenie://%20%20/', {
+        # invalid apikey specified
+        'instance': TypeError,
+    }),
+    ('opsgenie://apikey/user/?region=xx', {
+        # invalid region id
+        'instance': TypeError,
+    }),
+    ('opsgenie://apikey/', {
+        # No targets specified; we will initialize but not notify anything
+        'instance': plugins.NotifyOpsgenie,
+        'notify_response': False,
+    }),
+    ('opsgenie://apikey/user', {
+        # Valid user
+        'instance': plugins.NotifyOpsgenie,
+        'privacy_url': 'opsgenie://a...y/%40user',
+    }),
+    ('opsgenie://apikey/@user?region=eu', {
+        # European Region
+        'instance': plugins.NotifyOpsgenie,
+    }),
+    ('opsgenie://apikey/@user?entity=A%20Entity', {
+        # Assign an entity
+        'instance': plugins.NotifyOpsgenie,
+    }),
+    ('opsgenie://apikey/@user?alias=An%20Alias', {
+        # Assign an alias
+        'instance': plugins.NotifyOpsgenie,
+    }),
+    ('opsgenie://apikey/@user?priority=p3', {
+        # Assign our priority
+        'instance': plugins.NotifyOpsgenie,
+    }),
+    ('opsgenie://apikey/@user?priority=invalid', {
+        # Invalid priority (loads using default)
+        'instance': plugins.NotifyOpsgenie,
+    }),
+    ('opsgenie://apikey/user@email.com/#team/*sche/^esc/%20/a', {
+        # Valid user (email), valid schedule, Escalated ID,
+        # an invalid entry (%20), and too short of an entry (a)
+        'instance': plugins.NotifyOpsgenie,
+    }),
+    ('opsgenie://apikey/{}/@{}/#{}/*{}/^{}/'.format(
+        UUID4, UUID4, UUID4, UUID4, UUID4), {
+        # similar to the above, except we use the UUID's
+        'instance': plugins.NotifyOpsgenie,
+    }),
+    ('opsgenie://apikey?to=#team,user&+key=value', {
+        # Test to= and details (key/value pair)
+        'instance': plugins.NotifyOpsgenie,
+    }),
+    ('opsgenie://apikey/#team/@user/?batch=yes', {
+        # Test batch=
+        'instance': plugins.NotifyOpsgenie,
+    }),
+    ('opsgenie://apikey/#team/@user/?batch=no', {
+        # Test batch=
+        'instance': plugins.NotifyOpsgenie,
+    }),
+    ('opsgenie://?apikey=abc&to=user', {
+        # Test Kwargs
+        'instance': plugins.NotifyOpsgenie,
+    }),
+    ('opsgenie://apikey/#team/user/', {
+        'instance': plugins.NotifyOpsgenie,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('opsgenie://apikey/#topic1/device/', {
+        'instance': plugins.NotifyOpsgenie,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
