@@ -2371,6 +2371,14 @@ TEST_URLS = (
         # Test to=
         'instance': plugins.NotifyOneSignal,
     }),
+    ('onesignal://appid@apikey/#segment/@user/?batch=yes', {
+        # Test batch=
+        'instance': plugins.NotifyOneSignal,
+    }),
+    ('onesignal://appid@apikey/#segment/@user/?batch=no', {
+        # Test batch=
+        'instance': plugins.NotifyOneSignal,
+    }),
     ('onesignal://templateid:appid@apikey/playerid', {
         # Test Template ID
         'instance': plugins.NotifyOneSignal,

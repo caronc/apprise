@@ -396,6 +396,7 @@ class NotifyOneSignal(NotifyBase):
         # Define any URL parameters
         params = {
             'image': 'yes' if self.include_image else 'no',
+            'batch': 'yes' if self.batch_size > 1 else 'no',
         }
 
         # Extend our parameters
@@ -453,10 +454,17 @@ class NotifyOneSignal(NotifyBase):
                     'image',
                     NotifyOneSignal.template_args['image']['default']))
 
+        # Get Batch Boolean (if set)
+        results['batch'] = \
+            parse_bool(
+                results['qsd'].get(
+                    'batch',
+                    NotifyOneSignal.template_args['batch']['default']))
+
         # The API Key is stored in the hostname
         results['apikey'] = NotifyOneSignal.unquote(results['host'])
 
-        # Get our Device IDs
+        # Get our Targets
         results['targets'] = NotifyOneSignal.split_path(results['fullpath'])
 
         # The 'to' makes it easier to use yaml configuration
