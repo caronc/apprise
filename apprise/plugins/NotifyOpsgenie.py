@@ -31,6 +31,7 @@
 # Make sure your key has 'Create' permission
 #
 # Knowing this, you can buid your opsgenie url as follows:
+#  opsgenie://{apikey}/
 #  opsgenie://{apikey}/@{user}
 #  opsgenie://{apikey}/*{schedule}
 #  opsgenie://{apikey}/^{escalation}
@@ -131,10 +132,6 @@ class NotifyOpsgenie(NotifyBase):
     # The maximum length of the body
     body_maxlen = 15000
 
-    # A title can not be used for Opsgenie Messages.  Setting this to zero will
-    # cause any title (if defined) to get placed into the message body.
-    title_maxlen = 0
-
     # If we don't have the specified min length, then we don't bother using
     # the body directive
     opsgenie_body_minlen = 130
@@ -217,6 +214,10 @@ class NotifyOpsgenie(NotifyBase):
             'name': _('Alias'),
             'type': 'string',
         },
+        'tags': {
+            'name': _('Tags'),
+            'type': 'string',
+        },
         'to': {
             'alias_of': 'targets',
         },
@@ -232,7 +233,7 @@ class NotifyOpsgenie(NotifyBase):
 
     def __init__(self, apikey, targets, region_name=None, details=None,
                  priority=None, alias=None, entity=None, batch=False,
-                 **kwargs):
+                 tags=None, **kwargs):
         """
         Initialize Opsgenie Object
         """
@@ -275,6 +276,9 @@ class NotifyOpsgenie(NotifyBase):
 
         # Prepare Batch Mode Flag
         self.batch_size = self.maximum_batch_size if batch else 1
+
+        # Assign our tags (if defined)
+        self.__tags = parse_list(tags)
 
         # Assign our entity (if defined)
         self.entity = entity
@@ -351,28 +355,37 @@ class NotifyOpsgenie(NotifyBase):
         # Initialize our has_error flag
         has_error = False
 
+        # We want to manually set the title onto the body if specified
+        title_body = body if not title else '{}: {}'.format(title, body)
+
+        # Create a copy ouf our details object
+        details = self.details.copy()
+        if 'type' not in details:
+            details['type'] = notify_type
+
         # Prepare our payload
         payload = {
             'source': self.app_desc,
-            'message': body,
+            'message': title_body,
+            'description': body,
+            'details': details,
             'priority': 'P{}'.format(self.priority),
         }
 
         # Use our body directive if we exceed the minimum message
         # limitation
-        if len(body) > self.opsgenie_body_minlen:
+        if len(payload['message']) > self.opsgenie_body_minlen:
             payload['message'] = '{}...'.format(
                 body[:self.opsgenie_body_minlen - 3])
-            payload['description'] = body
+
+        if self.__tags:
+            payload['tags'] = self.__tags
 
         if self.entity:
             payload['entity'] = self.entity
 
         if self.alias:
             payload['alias'] = self.alias
-
-        if self.details:
-            payload['details'] = self.details
 
         length = len(self.targets) if self.targets else 1
         for index in range(0, length, self.batch_size):
@@ -463,6 +476,10 @@ class NotifyOpsgenie(NotifyBase):
         # Assign our alias value (if defined)
         if self.alias:
             params['alias'] = self.alias
+
+        # Assign our tags (if specifed)
+        if self.__tags:
+            params['tags'] = ','.join(self.__tags)
 
         # Append our details into our parameters
         params.update({'+{}'.format(k): v for k, v in self.details.items()})
@@ -558,6 +575,11 @@ class NotifyOpsgenie(NotifyBase):
         if 'apikey' in results['qsd'] and len(results['qsd']['apikey']):
             results['apikey'] = \
                 NotifyOpsgenie.unquote(results['qsd']['apikey'])
+
+        if 'tags' in results['qsd'] and len(results['qsd']['tags']):
+            # Extract our tags
+            results['tags'] = \
+                parse_list(NotifyOpsgenie.unquote(results['qsd']['tags']))
 
         if 'region' in results['qsd'] and len(results['qsd']['region']):
             # Extract our region

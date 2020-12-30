@@ -2416,9 +2416,8 @@ TEST_URLS = (
         'instance': TypeError,
     }),
     ('opsgenie://apikey/', {
-        # No targets specified; we will initialize but not notify anything
+        # No targets specified; this is allowed
         'instance': plugins.NotifyOpsgenie,
-        'notify_response': False,
     }),
     ('opsgenie://apikey/user', {
         # Valid user
@@ -2441,6 +2440,11 @@ TEST_URLS = (
         # Assign our priority
         'instance': plugins.NotifyOpsgenie,
     }),
+    ('opsgenie://apikey/?tags=comma,separated', {
+        # Test our our 'tags' (tag is reserved in Apprise) but not 'tags'
+        # Also test the fact we do not need to define a target
+        'instance': plugins.NotifyOpsgenie,
+    }),
     ('opsgenie://apikey/@user?priority=invalid', {
         # Invalid priority (loads using default)
         'instance': plugins.NotifyOpsgenie,
@@ -2455,8 +2459,8 @@ TEST_URLS = (
         # similar to the above, except we use the UUID's
         'instance': plugins.NotifyOpsgenie,
     }),
-    ('opsgenie://apikey?to=#team,user&+key=value', {
-        # Test to= and details (key/value pair)
+    ('opsgenie://apikey?to=#team,user&+key=value&+type=override', {
+        # Test to= and details (key/value pair) also override 'type'
         'instance': plugins.NotifyOpsgenie,
     }),
     ('opsgenie://apikey/#team/@user/?batch=yes', {
