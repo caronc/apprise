@@ -278,15 +278,27 @@ class NotifyProwl(NotifyBase):
 
         if 'priority' in results['qsd'] and len(results['qsd']['priority']):
             _map = {
+                # Letter Assignments
                 'l': ProwlPriority.LOW,
                 'm': ProwlPriority.MODERATE,
                 'n': ProwlPriority.NORMAL,
                 'h': ProwlPriority.HIGH,
                 'e': ProwlPriority.EMERGENCY,
+                'lo': ProwlPriority.LOW,
+                'me': ProwlPriority.MODERATE,
+                'no': ProwlPriority.NORMAL,
+                'hi': ProwlPriority.HIGH,
+                'em': ProwlPriority.EMERGENCY,
+                # Support 3rd Party Documented Scale
+                '-2': ProwlPriority.LOW,
+                '-1': ProwlPriority.MODERATE,
+                '0': ProwlPriority.NORMAL,
+                '1': ProwlPriority.HIGH,
+                '2': ProwlPriority.EMERGENCY,
             }
             try:
                 results['priority'] = \
-                    _map[results['qsd']['priority'][0].lower()]
+                    _map[results['qsd']['priority'][0:2].lower()]
 
             except KeyError:
                 # No priority was set

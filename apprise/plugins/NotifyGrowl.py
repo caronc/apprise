@@ -395,15 +395,27 @@ class NotifyGrowl(NotifyBase):
 
         if 'priority' in results['qsd'] and len(results['qsd']['priority']):
             _map = {
+                # Letter Assignments
                 'l': GrowlPriority.LOW,
                 'm': GrowlPriority.MODERATE,
                 'n': GrowlPriority.NORMAL,
                 'h': GrowlPriority.HIGH,
                 'e': GrowlPriority.EMERGENCY,
+                'lo': GrowlPriority.LOW,
+                'me': GrowlPriority.MODERATE,
+                'no': GrowlPriority.NORMAL,
+                'hi': GrowlPriority.HIGH,
+                'em': GrowlPriority.EMERGENCY,
+                # Support 3rd Party Documented Scale
+                '-2': GrowlPriority.LOW,
+                '-1': GrowlPriority.MODERATE,
+                '0': GrowlPriority.NORMAL,
+                '1': GrowlPriority.HIGH,
+                '2': GrowlPriority.EMERGENCY,
             }
             try:
                 results['priority'] = \
-                    _map[results['qsd']['priority'][0].lower()]
+                    _map[results['qsd']['priority'][0:2].lower()]
 
             except KeyError:
                 # No priority was set
