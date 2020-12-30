@@ -25,12 +25,10 @@
 
 # Signup @ https://www.opsgenie.com
 #
-# Generate your API Key
+# Generate your Integration API Key
 #   https://app.opsgenie.com/settings/integration/add/API/
 
-# Make sure your key has 'Create' permission
-#
-# Knowing this, you can buid your opsgenie url as follows:
+# Knowing this, you can build your Opsgenie URL as follows:
 #  opsgenie://{apikey}/
 #  opsgenie://{apikey}/@{user}
 #  opsgenie://{apikey}/*{schedule}
