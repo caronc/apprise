@@ -431,13 +431,15 @@ def test_apprise_cli_nux_env(tmpdir):
         ])
         assert result.exit_code == 0
 
-    with environ(APPRISE_URLS="      "):
-        # An empty string is not valid and therefore not loaded
-        # so the below fails
-        result = runner.invoke(cli.main, [
-            '-b', 'test environment',
-        ])
-        assert result.exit_code == 3
+    with mock.patch('apprise.cli.DEFAULT_SEARCH_PATHS', []):
+        with environ(APPRISE_URLS="      "):
+            # An empty string is not valid and therefore not loaded so the below
+            # fails. We override the DEFAULT_SEARCH_PATHS because we don't
+            # want to detect ones loaded on the machine running the unit tests
+            result = runner.invoke(cli.main, [
+                '-b', 'test environment',
+            ])
+            assert result.exit_code == 1
 
     with environ(APPRISE_URLS="bad://localhost"):
         result = runner.invoke(cli.main, [
@@ -471,13 +473,16 @@ def test_apprise_cli_nux_env(tmpdir):
         ])
         assert result.exit_code == 0
 
-    with environ(APPRISE_CONFIG="      "):
-        # We will fail to send the notification as no path was
-        # specified
-        result = runner.invoke(cli.main, [
-            '-b', 'my message',
-        ])
-        assert result.exit_code == 3
+    with mock.patch('apprise.cli.DEFAULT_SEARCH_PATHS', []):
+        with environ(APPRISE_CONFIG="      "):
+            # We will fail to send the notification as no path was
+            # specified.
+            # We override the DEFAULT_SEARCH_PATHS because we don't
+            # want to detect ones loaded on the machine running the unit tests
+            result = runner.invoke(cli.main, [
+                '-b', 'my message',
+            ])
+            assert result.exit_code == 1
 
     with environ(APPRISE_CONFIG="garbage/file/path.yaml"):
         # We will fail to send the notification as the path
