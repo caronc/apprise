@@ -43,7 +43,7 @@
 #       to add a 'Bot User'.  Give it a name and choose 'Add Bot User'.
 #   4. Now you can choose 'Install App' to which you can choose 'Install App
 #       to Workspace'.
-#   5. You will need to authorize the app which you get promopted to do.
+#   5. You will need to authorize the app which you get prompted to do.
 #   6. Finally you'll get some important information providing you your
 #      'OAuth Access Token' and 'Bot User OAuth Access Token' such as:
 #        slack://{Oauth Access Token}
@@ -53,6 +53,21 @@
 #        ... or:
 #        slack://xoxb-1234-1234-4ddbc191d40ee098cbaae6f3523ada2d
 #
+#       You must at least give your bot the following access for it to
+#       be useful:
+#         - chat:write       - MUST be set otherwise you can not post into
+#                              a channel
+#         - users:read.email - Required if you want to be able to lookup
+#                              users by their email address.
+#
+#      The easiest way to bring a bot into a channel (so that it can send
+#      a message to it is to invite it. At this time Apprise does not support
+#      an auto-join functionality. To do this:
+#        - In the 'Details' section of your channel
+#        - Click on the 'More' [...] (elipse icon)
+#        - Click 'Add apps'
+#        - You will be able to select the Bot App you previously created
+#        - Your bot will join your channel.
 
 import re
 import requests
@@ -64,6 +79,7 @@ from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
 from ..common import NotifyType
 from ..common import NotifyFormat
+from ..utils import is_email
 from ..utils import parse_bool
 from ..utils import parse_list
 from ..utils import validate_regex
@@ -202,6 +218,11 @@ class NotifySlack(NotifyBase):
             'prefix': '+',
             'map_to': 'targets',
         },
+        'target_email': {
+            'name': _('Target Email'),
+            'type': 'string',
+            'map_to': 'targets',
+        },
         'target_user': {
             'name': _('Target User'),
             'type': 'string',
@@ -286,6 +307,11 @@ class NotifySlack(NotifyBase):
         if not self.user:
             self.logger.warning(
                 'No user was specified; using "%s".' % self.app_id)
+
+        # Look the users up by their email address and map them back to their
+        # id here for future queries (if needed). This allows people to
+        # specify a full email as a recipient via slack
+        self._lookup_users = {}
 
         # Build list of channels
         self.channels = parse_list(targets)
@@ -382,30 +408,42 @@ class NotifySlack(NotifyBase):
             channel = channels.pop(0)
 
             if channel is not None:
-                _channel = validate_regex(
-                    channel, r'[+#@]?(?P<value>[A-Z0-9_]{1,32})')
-
-                if not _channel:
+                channel = validate_regex(channel, r'[+#@]?[A-Z0-9_]{1,32}')
+                if not channel:
                     # Channel over-ride was specified
                     self.logger.warning(
                         "The specified target {} is invalid;"
-                        "skipping.".format(_channel))
+                        "skipping.".format(channel))
 
                     # Mark our failure
                     has_error = True
                     continue
 
-                if len(_channel) > 1 and _channel[0] == '+':
+                if channel[0] == '+':
                     # Treat as encoded id if prefixed with a +
-                    payload['channel'] = _channel[1:]
+                    payload['channel'] = channel[1:]
 
-                elif len(_channel) > 1 and _channel[0] == '@':
+                elif channel[0] == '@':
                     # Treat @ value 'as is'
-                    payload['channel'] = _channel
+                    payload['channel'] = channel
 
                 else:
-                    # Prefix with channel hash tag
-                    payload['channel'] = '#{}'.format(_channel)
+                    # We'll perform a user lookup if we detect an email
+                    email = is_email(channel)
+                    if email:
+                        payload['channel'] = \
+                            self.lookup_userid(email['full_email'])
+
+                        if not payload['channel']:
+                            # Move along; any notifications/logging would have
+                            # come from lookup_userid()
+                            has_error = True
+                            continue
+                    else:
+                        # Prefix with channel hash tag (if not already)
+                        payload['channel'] = \
+                            channel if channel[0] == '#' \
+                            else '#{}'.format(channel)
 
                 # Store the valid and massaged payload that is recognizable by
                 # slack. This list is used for sending attachments later.
@@ -465,6 +503,114 @@ class NotifySlack(NotifyBase):
 
         return not has_error
 
+    def lookup_userid(self, email):
+        """
+        Takes an email address and attempts to resolve/acquire it's user
+        id for notification purposes.
+        """
+        if email in self._lookup_users:
+            # We're done as entry has already been retrieved
+            return self._lookup_users[email]
+
+        if self.mode is not SlackMode.BOT:
+            # You can not look up
+            self.logger.warning(
+                'Emails can not be resolved to Slack User IDs unless you '
+                'have a bot configured.')
+            return None
+
+        lookup_url = self.api_url.format('users.lookupByEmail')
+        headers = {
+            'User-Agent': self.app_id,
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': 'Bearer {}'.format(self.access_token),
+        }
+
+        # we pass in our email address as the argument
+        params = {
+            'email': email,
+        }
+
+        self.logger.debug('Slack User Lookup POST URL: %s (cert_verify=%r)' % (
+            lookup_url, self.verify_certificate,
+        ))
+        self.logger.debug('Slack User Lookup Parameters: %s' % str(params))
+
+        # Initialize our HTTP JSON response
+        response = {'ok': False}
+
+        # Initialize our detected user id (also the response to this function)
+        user_id = None
+
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+        try:
+            r = requests.get(
+                lookup_url,
+                headers=headers,
+                params=params,
+                verify=self.verify_certificate,
+                timeout=self.request_timeout,
+            )
+
+            # Attachment posts return a JSON string
+            try:
+                response = loads(r.content)
+
+            except (AttributeError, TypeError, ValueError):
+                # ValueError = r.content is Unparsable
+                # TypeError = r.content is None
+                # AttributeError = r is None
+                pass
+
+            # We can get a 200 response, but still fail.  A failure message
+            # might look like this (missing bot permissions):
+            #    {
+            #      'ok': False,
+            #      'error': 'missing_scope',
+            #      'needed': 'users:read.email',
+            #      'provided': 'calls:write,chat:write'
+            #    }
+
+            if r.status_code != requests.codes.ok \
+                    or not (response and response.get('ok', False)):
+
+                # We had a problem
+                status_str = \
+                    NotifySlack.http_response_code_lookup(
+                        r.status_code, SLACK_HTTP_ERROR_MAP)
+
+                self.logger.warning(
+                    'Failed to send Slack User Lookup:'
+                    '{}{}error={}.'.format(
+                        status_str,
+                        ', ' if status_str else '',
+                        r.status_code))
+
+                self.logger.debug('Response Details:\r\n{}'.format(r.content))
+                # Return; we're done
+                return False
+
+            #
+            # If we reach here, then we were successful in looking up
+            # the user.
+            user_id = '@{}'.format(response['user']['id'])
+
+            # Cache it for future
+            self._lookup_users[email] = user_id
+            self.logger.info(
+                'Email %s resolves to the Slack user %s.', email, user_id)
+
+        except requests.RequestException as e:
+            self.logger.warning(
+                'A Connection error occurred looking up Slack User.',
+            )
+            self.logger.debug('Socket Exception: %s' % str(e))
+            # Return; we're done
+            return None
+
+        return user_id
+
     def _send(self, url, payload, attach=None, **kwargs):
         """
         Wrapper to the requests (post) object
@@ -477,6 +623,7 @@ class NotifySlack(NotifyBase):
 
         headers = {
             'User-Agent': self.app_id,
+            'Accept': 'application/json',
         }
 
         if not attach:
@@ -486,7 +633,7 @@ class NotifySlack(NotifyBase):
             headers['Authorization'] = 'Bearer {}'.format(self.access_token)
 
         # Our response object
-        response = None
+        response = {'ok': False}
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -508,7 +655,25 @@ class NotifySlack(NotifyBase):
                 timeout=self.request_timeout,
             )
 
-            if r.status_code != requests.codes.ok:
+            # Posts return a JSON string
+            try:
+                response = loads(r.content)
+
+            except (AttributeError, TypeError, ValueError):
+                # ValueError = r.content is Unparsable
+                # TypeError = r.content is None
+                # AttributeError = r is None
+                pass
+
+            # Another response type is:
+            # {
+            #   'ok': False,
+            #   'error': 'not_in_channel',
+            # }
+            status_okay = (response and response.get('ok', False)) \
+                    if self.mode is SlackMode.BOT else r.text == 'ok'
+
+            if r.status_code != requests.codes.ok or not status_okay:
                 # We had a problem
                 status_str = \
                     NotifySlack.http_response_code_lookup(
@@ -525,30 +690,6 @@ class NotifySlack(NotifyBase):
                 self.logger.debug(
                     'Response Details:\r\n{}'.format(r.content))
                 return False
-
-            elif attach:
-                # Attachment posts return a JSON string
-                try:
-                    response = loads(r.content)
-
-                except (AttributeError, TypeError, ValueError):
-                    # ValueError = r.content is Unparsable
-                    # TypeError = r.content is None
-                    # AttributeError = r is None
-                    pass
-
-                if not (response and response.get('ok', True)):
-                    # Bare minimum requirements not met
-                    self.logger.warning(
-                        'Failed to send {}to Slack: error={}.'.format(
-                            attach.name if attach else '',
-                            r.status_code))
-
-                    self.logger.debug(
-                        'Response Details:\r\n{}'.format(r.content))
-                    return False
-            else:
-                response = r.content
 
             # Message Post Response looks like this:
             # {

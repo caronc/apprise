@@ -148,9 +148,8 @@ def test_slack_webhook(mock_post):
     # Prepare Mock
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.ok
-    mock_post.return_value.content = dumps({
-        'ok': True,
-    })
+    mock_post.return_value.content = 'ok'
+    mock_post.return_value.text = 'ok'
 
     # Initialize some generic (but valid) tokens
     token_a = 'A' * 9
