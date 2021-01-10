@@ -4070,19 +4070,13 @@ TEST_URLS = (
         'instance': plugins.NotifySlack,
         # don't include an image by default
         'include_image': False,
-        'requests_response_text': {
-            'ok': True,
-            'message': '',
-        },
+        'requests_response_text': 'ok'
     }),
     ('slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/+id/@id/', {
         # + encoded id,
         # @ userid
         'instance': plugins.NotifySlack,
-        'requests_response_text': {
-            'ok': True,
-            'message': '',
-        },
+        'requests_response_text': 'ok',
     }),
     ('slack://username@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/'
         '?to=#nuxref', {
@@ -4090,17 +4084,35 @@ TEST_URLS = (
 
             # Our expected url(privacy=True) startswith() response:
             'privacy_url': 'slack://username@T...2/A...D/T...Q/',
-            'requests_response_text': {
-                'ok': True,
-                'message': '',
-            },
+            'requests_response_text': 'ok',
         }),
     ('slack://username@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#nuxref', {
         'instance': plugins.NotifySlack,
-        'requests_response_text': {
-            'ok': True,
-            'message': '',
-        },
+        'requests_response_text': 'ok',
+    }),
+    # You can't send to email using webhook
+    ('slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnl/user@gmail.com', {
+        'instance': plugins.NotifySlack,
+        'requests_response_text': 'ok',
+        # we'll have a notify response failure in this case
+        'notify_response': False,
+    }),
+    # Specify Token on argument string (with username)
+    ('slack://bot@_/#nuxref?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnadfdajkjkfl/', {
+        'instance': plugins.NotifySlack,
+        'requests_response_text': 'ok',
+    }),
+    # Specify Token and channels on argument string (no username)
+    ('slack://?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/&to=#chan', {
+        'instance': plugins.NotifySlack,
+        'requests_response_text': 'ok',
+    }),
+    # Test webhook that doesn't have a proper response
+    ('slack://username@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#nuxref', {
+        'instance': plugins.NotifySlack,
+        'requests_response_text': 'fail',
+        # we'll have a notify response failure in this case
+        'notify_response': False,
     }),
     # Test using a bot-token (also test footer set to no flag)
     ('slack://username@xoxb-1234-1234-abc124/#nuxref?footer=no', {
@@ -4114,7 +4126,34 @@ TEST_URLS = (
             },
         },
     }),
-
+    # Test using a bot-token as argument
+    ('slack://?token=xoxb-1234-1234-abc124&to=#nuxref&footer=no&user=test', {
+        'instance': plugins.NotifySlack,
+        'requests_response_text': {
+            'ok': True,
+            'message': '',
+            # support attachments
+            'file': {
+                'url_private': 'http://localhost/',
+            },
+        },
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'slack://test@x...4/nuxref/',
+    }),
+    # We contain 1 or more invalid channels, so we'll fail on our notify call
+    ('slack://?token=xoxb-1234-1234-abc124&to=#nuxref,#$,#-&footer=no', {
+        'instance': plugins.NotifySlack,
+        'requests_response_text': {
+            'ok': True,
+            'message': '',
+            # support attachments
+            'file': {
+                'url_private': 'http://localhost/',
+            },
+        },
+        # We fail because of the empty channel #$ and #-
+        'notify_response': False,
+    }),
     ('slack://username@xoxb-1234-1234-abc124/#nuxref', {
         'instance': plugins.NotifySlack,
         'requests_response_text': {
@@ -4129,28 +4168,19 @@ TEST_URLS = (
     ('slack://username@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ', {
         # Missing a channel, falls back to webhook channel bindings
         'instance': plugins.NotifySlack,
-        'requests_response_text': {
-            'ok': True,
-            'message': '',
-        },
+        'requests_response_text': 'ok',
     }),
     # Native URL Support, take the slack URL and still build from it
     ('https://hooks.slack.com/services/{}/{}/{}'.format(
         'A' * 9, 'B' * 9, 'c' * 24), {
         'instance': plugins.NotifySlack,
-        'requests_response_text': {
-            'ok': True,
-            'message': '',
-        },
+        'requests_response_text': 'ok',
     }),
     # Native URL Support with arguments
     ('https://hooks.slack.com/services/{}/{}/{}?format=text'.format(
         'A' * 9, 'B' * 9, 'c' * 24), {
         'instance': plugins.NotifySlack,
-        'requests_response_text': {
-            'ok': True,
-            'message': '',
-        },
+        'requests_response_text': 'ok',
     }),
     ('slack://username@-INVALID-/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#cool', {
         # invalid 1st Token
@@ -4169,30 +4199,21 @@ TEST_URLS = (
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
-        'requests_response_text': {
-            'ok': False,
-            'message': '',
-        },
+        'requests_response_text': 'ok',
     }),
     ('slack://respect@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#a', {
         'instance': plugins.NotifySlack,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
-        'requests_response_text': {
-            'ok': False,
-            'message': '',
-        },
+        'requests_response_text': 'ok',
     }),
     ('slack://notify@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#b', {
         'instance': plugins.NotifySlack,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
-        'requests_response_text': {
-            'ok': False,
-            'message': '',
-        },
+        'requests_response_text': 'ok',
     }),
 
     ##################################
@@ -5194,6 +5215,8 @@ def test_rest_plugins(mock_post, mock_get):
             # Handle our default text response
             mock_get.return_value.content = requests_response_text
             mock_post.return_value.content = requests_response_text
+            mock_get.return_value.text = requests_response_text
+            mock_post.return_value.text = requests_response_text
 
             # Ensure there is no side effect set
             mock_post.side_effect = None
