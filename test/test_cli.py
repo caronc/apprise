@@ -433,9 +433,10 @@ def test_apprise_cli_nux_env(tmpdir):
 
     with mock.patch('apprise.cli.DEFAULT_SEARCH_PATHS', []):
         with environ(APPRISE_URLS="      "):
-            # An empty string is not valid and therefore not loaded so the below
-            # fails. We override the DEFAULT_SEARCH_PATHS because we don't
-            # want to detect ones loaded on the machine running the unit tests
+            # An empty string is not valid and therefore not loaded so the
+            # below fails. We override the DEFAULT_SEARCH_PATHS because we
+            # don't want to detect ones loaded on the machine running the unit
+            # tests
             result = runner.invoke(cli.main, [
                 '-b', 'test environment',
             ])

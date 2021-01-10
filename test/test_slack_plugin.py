@@ -85,11 +85,38 @@ def test_slack_oauth_access_token(mock_post):
     assert obj.send(body="test") is True
 
     # Test Valid Attachment
+    mock_post.reset_mock()
+
     path = os.path.join(TEST_VAR_DIR, 'apprise-test.gif')
     attach = AppriseAttachment(path)
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=attach) is True
+
+    assert mock_post.call_count == 2
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://slack.com/api/chat.postMessage'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://slack.com/api/files.upload'
+
+    # Test a valid attachment that throws an Connection Error
+    mock_post.return_value = None
+    mock_post.side_effect = (request, requests.ConnectionError(
+        0, 'requests.ConnectionError() not handled'))
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=attach) is False
+
+    # Test a valid attachment that throws an OSError
+    mock_post.return_value = None
+    mock_post.side_effect = (request, OSError(0, 'OSError'))
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=attach) is False
+
+    # Reset our mock object back to how it was
+    mock_post.return_value = request
+    mock_post.side_effect = None
 
     # Test invalid attachment
     path = os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
@@ -134,6 +161,8 @@ def test_slack_oauth_access_token(mock_post):
 
     # We'll fail now because of an internal exception
     assert obj.send(body="test") is False
+
+    # Test Email Lookup
 
 
 @mock.patch('requests.post')
@@ -181,3 +210,220 @@ def test_slack_webhook(mock_post):
     # This call includes an image with it's payload:
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO) is True
+
+
+@mock.patch('requests.post')
+@mock.patch('requests.get')
+def test_slack_send_by_email(mock_get, mock_post):
+    """
+    API: NotifySlack() Send by Email Tests
+
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.request_rate_per_sec = 0
+
+    # Generate a (valid) bot token
+    token = 'xoxb-1234-1234-abc124'
+
+    request = mock.Mock()
+    request.content = dumps({
+        'ok': True,
+        'message': '',
+        'user': {
+            'id': 'ABCD1234'
+        }
+    })
+    request.status_code = requests.codes.ok
+
+    # Prepare Mock
+    mock_post.return_value = request
+    mock_get.return_value = request
+
+    # Variation Initializations
+    obj = plugins.NotifySlack(access_token=token, targets='user@gmail.com')
+    assert isinstance(obj, plugins.NotifySlack) is True
+    assert isinstance(obj.url(), six.string_types) is True
+
+    # No calls made yet
+    assert mock_post.call_count == 0
+    assert mock_get.call_count == 0
+
+    # Send our notification
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
+
+    # 2 calls were made, one to perform an email lookup, the second
+    # was the notification itself
+    assert mock_get.call_count == 1
+    assert mock_post.call_count == 1
+    assert mock_get.call_args_list[0][0][0] == \
+        'https://slack.com/api/users.lookupByEmail'
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://slack.com/api/chat.postMessage'
+
+    # Reset our mock object
+    mock_post.reset_mock()
+    mock_get.reset_mock()
+
+    # Prepare Mock
+    mock_post.return_value = request
+    mock_get.return_value = request
+
+    # Send our notification again (cached copy of user id associated with
+    # email is used)
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
+
+    assert mock_get.call_count == 0
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://slack.com/api/chat.postMessage'
+
+    #
+    # Now test a case where we can't look up the valid email
+    #
+    request.content = dumps({
+        'ok': False,
+        'message': '',
+    })
+
+    # Reset our mock object
+    mock_post.reset_mock()
+    mock_get.reset_mock()
+
+    # Prepare Mock
+    mock_post.return_value = request
+    mock_get.return_value = request
+
+    # Variation Initializations
+    obj = plugins.NotifySlack(access_token=token, targets='user@gmail.com')
+    assert isinstance(obj, plugins.NotifySlack) is True
+    assert isinstance(obj.url(), six.string_types) is True
+
+    # No calls made yet
+    assert mock_post.call_count == 0
+    assert mock_get.call_count == 0
+
+    # Send our notification; it will fail because we failed to look up
+    # the user id
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is False
+
+    # We would have failed to look up the email, therefore we wouldn't have
+    # even bothered to attempt to send the notification
+    assert mock_get.call_count == 1
+    assert mock_post.call_count == 0
+    assert mock_get.call_args_list[0][0][0] == \
+        'https://slack.com/api/users.lookupByEmail'
+
+    #
+    # Now test a case where we have a poorly formatted JSON response
+    #
+    request.content = '}'
+
+    # Reset our mock object
+    mock_post.reset_mock()
+    mock_get.reset_mock()
+
+    # Prepare Mock
+    mock_post.return_value = request
+    mock_get.return_value = request
+
+    # Variation Initializations
+    obj = plugins.NotifySlack(access_token=token, targets='user@gmail.com')
+    assert isinstance(obj, plugins.NotifySlack) is True
+    assert isinstance(obj.url(), six.string_types) is True
+
+    # No calls made yet
+    assert mock_post.call_count == 0
+    assert mock_get.call_count == 0
+
+    # Send our notification; it will fail because we failed to look up
+    # the user id
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is False
+
+    # We would have failed to look up the email, therefore we wouldn't have
+    # even bothered to attempt to send the notification
+    assert mock_get.call_count == 1
+    assert mock_post.call_count == 0
+    assert mock_get.call_args_list[0][0][0] == \
+        'https://slack.com/api/users.lookupByEmail'
+
+    #
+    # Now test a case where we have a poorly formatted JSON response
+    #
+    request.content = '}'
+
+    # Reset our mock object
+    mock_post.reset_mock()
+    mock_get.reset_mock()
+
+    # Prepare Mock
+    mock_post.return_value = request
+    mock_get.return_value = request
+
+    # Variation Initializations
+    obj = plugins.NotifySlack(access_token=token, targets='user@gmail.com')
+    assert isinstance(obj, plugins.NotifySlack) is True
+    assert isinstance(obj.url(), six.string_types) is True
+
+    # No calls made yet
+    assert mock_post.call_count == 0
+    assert mock_get.call_count == 0
+
+    # Send our notification; it will fail because we failed to look up
+    # the user id
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is False
+
+    # We would have failed to look up the email, therefore we wouldn't have
+    # even bothered to attempt to send the notification
+    assert mock_get.call_count == 1
+    assert mock_post.call_count == 0
+    assert mock_get.call_args_list[0][0][0] == \
+        'https://slack.com/api/users.lookupByEmail'
+
+    #
+    # Now test a case where we throw an exception trying to perform the lookup
+    #
+
+    request.content = dumps({
+        'ok': True,
+        'message': '',
+        'user': {
+            'id': 'ABCD1234'
+        }
+    })
+    # Create an unauthorized response
+    request.status_code = requests.codes.ok
+
+    # Reset our mock object
+    mock_post.reset_mock()
+    mock_get.reset_mock()
+
+    # Prepare Mock
+    mock_post.return_value = request
+    mock_get.side_effect = requests.ConnectionError(
+        0, 'requests.ConnectionError() not handled')
+
+    # Variation Initializations
+    obj = plugins.NotifySlack(access_token=token, targets='user@gmail.com')
+    assert isinstance(obj, plugins.NotifySlack) is True
+    assert isinstance(obj.url(), six.string_types) is True
+
+    # No calls made yet
+    assert mock_post.call_count == 0
+    assert mock_get.call_count == 0
+
+    # Send our notification; it will fail because we failed to look up
+    # the user id
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is False
+
+    # We would have failed to look up the email, therefore we wouldn't have
+    # even bothered to attempt to send the notification
+    assert mock_get.call_count == 1
+    assert mock_post.call_count == 0
+    assert mock_get.call_args_list[0][0][0] == \
+        'https://slack.com/api/users.lookupByEmail'

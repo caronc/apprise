@@ -4090,6 +4090,30 @@ TEST_URLS = (
         'instance': plugins.NotifySlack,
         'requests_response_text': 'ok',
     }),
+    # You can't send to email using webhook
+    ('slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnl/user@gmail.com', {
+        'instance': plugins.NotifySlack,
+        'requests_response_text': 'ok',
+        # we'll have a notify response failure in this case
+        'notify_response': False,
+    }),
+    # Specify Token on argument string (with username)
+    ('slack://bot@_/#nuxref?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnadfdajkjkfl/', {
+        'instance': plugins.NotifySlack,
+        'requests_response_text': 'ok',
+    }),
+    # Specify Token and channels on argument string (no username)
+    ('slack://?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/&to=#chan', {
+        'instance': plugins.NotifySlack,
+        'requests_response_text': 'ok',
+    }),
+    # Test webhook that doesn't have a proper response
+    ('slack://username@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#nuxref', {
+        'instance': plugins.NotifySlack,
+        'requests_response_text': 'fail',
+        # we'll have a notify response failure in this case
+        'notify_response': False,
+    }),
     # Test using a bot-token (also test footer set to no flag)
     ('slack://username@xoxb-1234-1234-abc124/#nuxref?footer=no', {
         'instance': plugins.NotifySlack,
@@ -4102,7 +4126,34 @@ TEST_URLS = (
             },
         },
     }),
-
+    # Test using a bot-token as argument
+    ('slack://?token=xoxb-1234-1234-abc124&to=#nuxref&footer=no&user=test', {
+        'instance': plugins.NotifySlack,
+        'requests_response_text': {
+            'ok': True,
+            'message': '',
+            # support attachments
+            'file': {
+                'url_private': 'http://localhost/',
+            },
+        },
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'slack://test@x...4/nuxref/',
+    }),
+    # We contain 1 or more invalid channels, so we'll fail on our notify call
+    ('slack://?token=xoxb-1234-1234-abc124&to=#nuxref,#$,#-&footer=no', {
+        'instance': plugins.NotifySlack,
+        'requests_response_text': {
+            'ok': True,
+            'message': '',
+            # support attachments
+            'file': {
+                'url_private': 'http://localhost/',
+            },
+        },
+        # We fail because of the empty channel #$ and #-
+        'notify_response': False,
+    }),
     ('slack://username@xoxb-1234-1234-abc124/#nuxref', {
         'instance': plugins.NotifySlack,
         'requests_response_text': {

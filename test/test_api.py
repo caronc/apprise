@@ -1270,59 +1270,90 @@ def test_apprise_details_plugin_verification():
                         assert len(arg['delim']) > 0
 
                 else:  # alias_of is in the object
-                    # must be a string
-                    assert isinstance(arg['alias_of'], six.string_types)
-                    # Track our alias_of object
-                    map_to_aliases.add(arg['alias_of'])
-
                     # Ensure we're not already in the tokens section
                     # The alias_of object has no value here
                     assert section != 'tokens'
 
-                    # We can't be an alias_of ourselves
-                    if key == arg['alias_of']:
-                        # This is acceptable as long as we exist in the tokens
-                        # table because that is truely what we map back to
-                        assert key in entry['details']['tokens']
+                    # must be a string
+                    assert isinstance(
+                        arg['alias_of'], (six.string_types, list, tuple, set))
 
-                    else:
-                        # Throw the problem into an assert tag for debugging
-                        # purposes... the mapping is not acceptable
-                        assert key != arg['alias_of']
+                    aliases = [arg['alias_of']] \
+                        if isinstance(arg['alias_of'], six.string_types) \
+                        else arg['alias_of']
 
-                    # alias_of always references back to tokens
-                    assert \
-                        arg['alias_of'] in entry['details']['tokens'] or \
-                        arg['alias_of'] in entry['details']['args']
+                    for alias_of in aliases:
+                        # Track our alias_of object
+                        map_to_aliases.add(alias_of)
 
-                    # Find a list directive in our tokens
-                    t_match = entry['details']['tokens']\
-                        .get(arg['alias_of'], {})\
-                        .get('type', '').startswith('list')
+                        # We can't be an alias_of ourselves
+                        if key == alias_of:
+                            # This is acceptable as long as we exist in the
+                            # tokens table because that is truely what we map
+                            # back to
+                            assert key in entry['details']['tokens']
 
-                    a_match = entry['details']['args']\
-                        .get(arg['alias_of'], {})\
-                        .get('type', '').startswith('list')
+                        else:
+                            # Throw the problem into an assert tag for
+                            # debugging purposes... the mapping is not
+                            # acceptable
+                            assert key != alias_of
 
-                    if not (t_match or a_match):
-                        # Ensure the only token we have is the alias_of
-                        assert len(entry['details'][section][key]) == 1
+                        # alias_of always references back to tokens
+                        assert \
+                            alias_of in entry['details']['tokens'] or \
+                            alias_of in entry['details']['args']
 
-                    else:
-                        # We're a list, we allow up to 2 variables
-                        # Obviously we have the alias_of entry; that's why
-                        # were at this part of the code.  But we can
-                        # additionally provide a 'delim' over-ride.
-                        assert len(entry['details'][section][key]) <= 2
-                        if len(entry['details'][section][key]) == 2:
-                            # Verify that it is in fact the 'delim' tag
-                            assert 'delim' in entry['details'][section][key]
-                            # If we do have a delim value set, it must be of
-                            # a list/set/tuple type
-                            assert isinstance(
-                                entry['details'][section][key]['delim'],
-                                (tuple, set, list),
-                            )
+                        # Find a list directive in our tokens
+                        t_match = entry['details']['tokens']\
+                            .get(alias_of, {})\
+                            .get('type', '').startswith('list')
+
+                        a_match = entry['details']['args']\
+                            .get(alias_of, {})\
+                            .get('type', '').startswith('list')
+
+                        if not (t_match or a_match):
+                            # Ensure the only token we have is the alias_of
+                            # hence record should look like as example):
+                            # {
+                            #    'token': {
+                            #      'alias_of': 'apitoken',
+                            #    },
+                            # }
+                            #
+                            # Or if it can represent more then one entry; in
+                            # this case, one must define a name (to define
+                            # grouping).
+                            # {
+                            #    'token': {
+                            #      'name': 'Tokens',
+                            #      'alias_of': ('apitoken', 'webtoken'),
+                            #    },
+                            # }
+                            if isinstance(arg['alias_of'], six.string_types):
+                                assert len(entry['details'][section][key]) == 1
+                            else:  # is tuple,list, or set
+                                assert len(entry['details'][section][key]) == 2
+                                # Must have a name defined to define grouping
+                                assert 'name' in entry['details'][section][key]
+
+                        else:
+                            # We're a list, we allow up to 2 variables
+                            # Obviously we have the alias_of entry; that's why
+                            # were at this part of the code.  But we can
+                            # additionally provide a 'delim' over-ride.
+                            assert len(entry['details'][section][key]) <= 2
+                            if len(entry['details'][section][key]) == 2:
+                                # Verify that it is in fact the 'delim' tag
+                                assert 'delim' in \
+                                    entry['details'][section][key]
+                                # If we do have a delim value set, it must be
+                                # of a list/set/tuple type
+                                assert isinstance(
+                                    entry['details'][section][key]['delim'],
+                                    (tuple, set, list),
+                                )
 
         if six.PY2:
             # inspect our object

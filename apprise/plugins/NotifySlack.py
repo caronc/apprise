@@ -258,6 +258,10 @@ class NotifySlack(NotifyBase):
         'to': {
             'alias_of': 'targets',
         },
+        'token': {
+            'name': _('Token'),
+            'alias_of': ('access_token', 'token_a', 'token_b', 'token_c'),
+        },
     })
 
     def __init__(self, access_token=None, token_a=None, token_b=None,
@@ -591,15 +595,63 @@ class NotifySlack(NotifyBase):
                 # Return; we're done
                 return False
 
-            #
             # If we reach here, then we were successful in looking up
-            # the user.
-            user_id = '@{}'.format(response['user']['id'])
+            # the user. A response generally looks like this:
+            # {
+            #   'ok': True,
+            #   'user': {
+            #     'id': 'J1ZQB9T9Y',
+            #     'team_id': 'K1WR6TML2',
+            #     'name': 'l2g',
+            #     'deleted': False,
+            #     'color': '9f69e7',
+            #     'real_name': 'Chris C',
+            #     'tz': 'America/New_York',
+            #     'tz_label': 'Eastern Standard Time',
+            #     'tz_offset': -18000,
+            #     'profile': {
+            #       'title': '',
+            #       'phone': '',
+            #       'skype': '',
+            #       'real_name': 'Chris C',
+            #       'real_name_normalized':
+            #       'Chris C',
+            #       'display_name': 'l2g',
+            #       'display_name_normalized': 'l2g',
+            #       'fields': None,
+            #       'status_text': '',
+            #       'status_emoji': '',
+            #       'status_expiration': 0,
+            #       'avatar_hash': 'g785e9c0ddf6',
+            #       'email': 'lead2gold@gmail.com',
+            #       'first_name': 'Chris',
+            #       'last_name': 'C',
+            #       'image_24': 'https://secure.gravatar.com/...',
+            #       'image_32': 'https://secure.gravatar.com/...',
+            #       'image_48': 'https://secure.gravatar.com/...',
+            #       'image_72': 'https://secure.gravatar.com/...',
+            #       'image_192': 'https://secure.gravatar.com/...',
+            #       'image_512': 'https://secure.gravatar.com/...',
+            #       'status_text_canonical': '',
+            #       'team': 'K1WR6TML2'
+            #     },
+            #     'is_admin': True,
+            #     'is_owner': True,
+            #     'is_primary_owner': True,
+            #     'is_restricted': False,
+            #     'is_ultra_restricted': False,
+            #     'is_bot': False,
+            #     'is_app_user': False,
+            #     'updated': 1603904274
+            #   }
+            # }
+            # We're only interested in the id
+            user_id = response['user']['id']
 
             # Cache it for future
             self._lookup_users[email] = user_id
             self.logger.info(
-                'Email %s resolves to the Slack user %s.', email, user_id)
+                'Email %s resolves to the Slack User ID: %s.', email, user_id)
 
         except requests.RequestException as e:
             self.logger.warning(
@@ -670,8 +722,11 @@ class NotifySlack(NotifyBase):
             #   'ok': False,
             #   'error': 'not_in_channel',
             # }
+            #
+            # The text 'ok' is returned if this is a Webhook request
+            # So the below captures that as well.
             status_okay = (response and response.get('ok', False)) \
-                    if self.mode is SlackMode.BOT else r.text == 'ok'
+                if self.mode is SlackMode.BOT else r.text == 'ok'
 
             if r.status_code != requests.codes.ok or not status_okay:
                 # We had a problem
@@ -799,14 +854,14 @@ class NotifySlack(NotifyBase):
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        if self.mode == SlackMode.WEBHOOK:
-            # Determine if there is a botname present
-            botname = ''
-            if self.user:
-                botname = '{botname}@'.format(
-                    botname=NotifySlack.quote(self.user, safe=''),
-                )
+        # Determine if there is a botname present
+        botname = ''
+        if self.user:
+            botname = '{botname}@'.format(
+                botname=NotifySlack.quote(self.user, safe=''),
+            )
 
+        if self.mode == SlackMode.WEBHOOK:
             return '{schema}://{botname}{token_a}/{token_b}/{token_c}/'\
                 '{targets}/?{params}'.format(
                     schema=self.secure_protocol,
@@ -820,9 +875,10 @@ class NotifySlack(NotifyBase):
                     params=NotifySlack.urlencode(params),
                 )
         # else -> self.mode == SlackMode.BOT:
-        return '{schema}://{access_token}/{targets}/'\
+        return '{schema}://{botname}{access_token}/{targets}/'\
             '?{params}'.format(
                 schema=self.secure_protocol,
+                botname=botname,
                 access_token=self.pprint(self.access_token, privacy, safe=''),
                 targets='/'.join(
                     [NotifySlack.quote(x, safe='') for x in self.channels]),
@@ -855,24 +911,35 @@ class NotifySlack(NotifyBase):
         else:
             # We're dealing with a webhook
             results['token_a'] = token
-
-            # Now fetch the remaining tokens
-            try:
-                results['token_b'] = entries.pop(0)
-
-            except IndexError:
-                # We're done
-                results['token_b'] = None
-
-            try:
-                results['token_c'] = entries.pop(0)
-
-            except IndexError:
-                # We're done
-                results['token_c'] = None
+            results['token_b'] = entries.pop(0) if entries else None
+            results['token_c'] = entries.pop(0) if entries else None
 
         # assign remaining entries to the channels we wish to notify
         results['targets'] = entries
+
+        # Support the token flag where you can set it to the bot token
+        # or the webhook token (with slash delimiters)
+        if 'token' in results['qsd'] and len(results['qsd']['token']):
+            # Break our entries up into a list; we can ue the Channel
+            # list delimiter above since it doesn't contain any characters
+            # we don't otherwise accept anyway in our token
+            entries = [x for x in filter(
+                bool, CHANNEL_LIST_DELIM.split(
+                    NotifySlack.unquote(results['qsd']['token'])))]
+
+            # check to see if we're dealing with a bot/user token
+            if entries and entries[0].startswith('xo'):
+                # We're dealing with a bot
+                results['access_token'] = entries[0]
+                results['token_a'] = None
+                results['token_b'] = None
+                results['token_c'] = None
+
+            else:  # Webhook
+                results['access_token'] = None
+                results['token_a'] = entries.pop(0) if entries else None
+                results['token_b'] = entries.pop(0) if entries else None
+                results['token_c'] = entries.pop(0) if entries else None
 
         # Support the 'to' variable so that we can support rooms this way too
         # The 'to' makes it easier to use yaml configuration
