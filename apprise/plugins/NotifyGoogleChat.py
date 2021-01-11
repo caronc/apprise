@@ -34,12 +34,12 @@
 #  - Copy the URL listed next to your new webhook in the Webhook URL column.
 #  - Click outside the dialog box to close.
 #
-#  When you've completed, you'll get a URL that looks a little like this:
+# When you've completed, you'll get a URL that looks a little like this:
 #  https://chat.googleapis.com/v1/spaces/AAAAk6lGXyM/\
 #       messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&\
 #       token=O7b1nyri_waOpLMSzbFILAGRzgtQofPW71fEEXKcyFk%3D
 #
-#  Simplified, it looks like this:
+# Simplified, it looks like this:
 #     https://chat.googleapis.com/v1/spaces/WORKSPACE/messages?\
 #       key=WEBHOOK_KEY&token=WEBHOOK_TOKEN
 #
