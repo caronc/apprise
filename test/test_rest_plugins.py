@@ -828,6 +828,58 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifyGoogleChat
+    ##################################
+    ('gchat://', {
+        'instance': TypeError,
+    }),
+    ('gchat://:@/', {
+        'instance': TypeError,
+    }),
+    # Workspace, but not Key or Token
+    ('gchat://workspace', {
+        'instance': TypeError,
+    }),
+    # Workspace and key, but no Token
+    ('gchat://workspace/key/', {
+        'instance': TypeError,
+    }),
+    # Credentials are good
+    ('gchat://workspace/key/token', {
+        'instance': plugins.NotifyGoogleChat,
+        'privacy_url': 'gchat://w...e/k...y/t...n',
+    }),
+    # Test arguments
+    ('gchat://?workspace=ws&key=mykey&token=mytoken', {
+        'instance': plugins.NotifyGoogleChat,
+        'privacy_url': 'gchat://w...s/m...y/m...n',
+    }),
+    # Google Native Webhohok URL
+    ('https://chat.googleapis.com/v1/spaces/myworkspace/messages'
+     '?key=mykey&token=mytoken', {
+         'instance': plugins.NotifyGoogleChat,
+         'privacy_url': 'gchat://m...e/m...y/m...n'}),
+
+    ('gchat://workspace/key/token', {
+        'instance': plugins.NotifyGoogleChat,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('gchat://workspace/key/token', {
+        'instance': plugins.NotifyGoogleChat,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('gchat://workspace/key/token', {
+        'instance': plugins.NotifyGoogleChat,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifyGotify
     ##################################
     ('gotify://', {
