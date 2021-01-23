@@ -52,11 +52,19 @@ def test_pushover_attachments(mock_post, tmpdir):
     user_key = 'u' * 30
     api_token = 'a' * 30
 
-    # Prepare Mock return object
+    # Prepare a good response
     response = mock.Mock()
     response.content = dumps(
         {"status": 1, "request": "647d2300-702c-4b38-8b2f-d56326ae460b"})
     response.status_code = requests.codes.ok
+
+    # Prepare a bad response
+    bad_response = mock.Mock()
+    response.content = dumps(
+        {"status": 1, "request": "647d2300-702c-4b38-8b2f-d56326ae460b"})
+    bad_response.status_code = requests.codes.internal_server_error
+
+    # Assign our good response
     mock_post.return_value = response
 
     # prepare our attachment
@@ -69,6 +77,11 @@ def test_pushover_attachments(mock_post, tmpdir):
 
     # Test our attachment
     assert obj.notify(body="test", attach=attach) is True
+
+    # Test our call count
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.pushover.net/1/messages.json'
 
     # Test multiple attachments
     assert attach.add(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
@@ -101,8 +114,12 @@ def test_pushover_attachments(mock_post, tmpdir):
     # Content is silently ignored
     assert obj.notify(body="test", attach=attach) is True
 
-    # Throw an exception on the second call to requests.post()
-    mock_post.side_effect = OSError()
     # prepare our attachment
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
-    assert obj.notify(body="test", attach=attach) is False
+
+    # Throw an exception on the first call to requests.post()
+    for side_effect in (requests.RequestException(), OSError(), bad_response):
+        mock_post.side_effect = [side_effect]
+
+        # We'll fail now because of our error handling
+        assert obj.send(body="test", attach=attach) is False

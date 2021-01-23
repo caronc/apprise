@@ -30,8 +30,6 @@ import six
 import pytest
 import requests
 import mock
-from os import chmod
-from os import getuid
 from os.path import dirname
 from os.path import join
 
@@ -846,48 +844,21 @@ def test_apprise_asset(tmpdir):
         NotifyImageSize.XY_256,
         must_exist=True) is not None
 
-    # If we make the file un-readable however, we won't be able to read it
-    # This test is just showing that we won't throw an exception
-    if getuid() == 0:
-        # Root always over-rides 0x000 permission settings making the below
-        # tests futile
-        pytest.skip('The Root user can not run file permission tests.')
+    # Test case where we can't access the image file
+    if sys.version_info.major <= 2:
+        # Python v2.x
+        with mock.patch('__builtin__.open', side_effect=OSError()):
+            assert a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is None
 
-    chmod(dirname(sub.strpath), 0o000)
-    assert a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is None
+        # Our content is retrivable again
+        assert a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is not None
+    else:
+        # Python >= v3.x
+        with mock.patch('builtins.open', side_effect=OSError()):
+            assert a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is None
 
-    # Our path doesn't exist anymore using this logic
-    assert a.image_path(
-        NotifyType.INFO,
-        NotifyImageSize.XY_256,
-        must_exist=True) is None
-
-    # Return our permission so we don't have any problems with our cleanup
-    chmod(dirname(sub.strpath), 0o700)
-
-    # Our content is retrivable again
-    assert a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is not None
-
-    # our file path is accessible again too
-    assert a.image_path(
-        NotifyType.INFO,
-        NotifyImageSize.XY_256,
-        must_exist=True) is not None
-
-    # We do the same test, but set the permission on the file
-    chmod(a.image_path(NotifyType.INFO, NotifyImageSize.XY_256), 0o000)
-
-    # our path will still exist in this case
-    assert a.image_path(
-        NotifyType.INFO,
-        NotifyImageSize.XY_256,
-        must_exist=True) is not None
-
-    # but we will not be able to open it
-    assert a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is None
-
-    # Restore our permissions
-    chmod(a.image_path(NotifyType.INFO, NotifyImageSize.XY_256), 0o640)
+        # Our content is retrivable again
+        assert a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is not None
 
     # Disable all image references
     a = AppriseAsset(image_path_mask=False, image_url_mask=False)

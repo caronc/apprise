@@ -72,6 +72,23 @@ def test_pushbullet_attachments(mock_post):
     # Send a good attachment
     assert obj.notify(body="test", attach=attach) is True
 
+    # Test our call count
+    assert mock_post.call_count == 4
+    # Image Prep
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.pushbullet.com/v2/upload-request'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://upload.pushbullet.com/abcd123'
+    # Message
+    assert mock_post.call_args_list[2][0][0] == \
+        'https://api.pushbullet.com/v2/pushes'
+    # Image Send
+    assert mock_post.call_args_list[3][0][0] == \
+        'https://api.pushbullet.com/v2/pushes'
+
+    # Reset our mock object
+    mock_post.reset_mock()
+
     # Add another attachment so we drop into the area of the PushBullet code
     # that sends remaining attachments (if more detected)
     attach.add(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
@@ -79,85 +96,86 @@ def test_pushbullet_attachments(mock_post):
     # Send our attachments
     assert obj.notify(body="test", attach=attach) is True
 
+    # Test our call count
+    assert mock_post.call_count == 7
+    # Image Prep
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.pushbullet.com/v2/upload-request'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://upload.pushbullet.com/abcd123'
+    assert mock_post.call_args_list[2][0][0] == \
+        'https://api.pushbullet.com/v2/upload-request'
+    assert mock_post.call_args_list[3][0][0] == \
+        'https://upload.pushbullet.com/abcd123'
+    # Message
+    assert mock_post.call_args_list[4][0][0] == \
+        'https://api.pushbullet.com/v2/pushes'
+    # Image Send
+    assert mock_post.call_args_list[5][0][0] == \
+        'https://api.pushbullet.com/v2/pushes'
+    assert mock_post.call_args_list[6][0][0] == \
+        'https://api.pushbullet.com/v2/pushes'
+
+    # Reset our mock object
+    mock_post.reset_mock()
+
     # An invalid attachment will cause a failure
     path = os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
     attach = AppriseAttachment(path)
     assert obj.notify(body="test", attach=attach) is False
 
-    # Throw an exception on the first call to requests.post()
-    mock_post.return_value = None
-    mock_post.side_effect = requests.RequestException()
+    # Test our call count
+    assert mock_post.call_count == 0
 
-    # We'll fail now because of an internal exception
-    assert obj.send(body="test", attach=attach) is False
-
-    # Throw an exception on the second call to requests.post()
-    mock_post.side_effect = [response, OSError()]
-
-    # We'll fail now because of an internal exception
-    assert obj.send(body="test", attach=attach) is False
-
-    # Throw an exception on the third call to requests.post()
-    mock_post.side_effect = [
-        response, response, requests.RequestException()]
-
-    # We'll fail now because of an internal exception
-    assert obj.send(body="test", attach=attach) is False
-
-    # Throw an exception on the forth call to requests.post()
-    mock_post.side_effect = [
-        response, response, response, requests.RequestException()]
-
-    # We'll fail now because of an internal exception
-    assert obj.send(body="test", attach=attach) is False
-
-    # Test case where we don't get a valid response back
-    response.content = '}'
-    mock_post.side_effect = response
-
-    # We'll fail because of an invalid json object
-    assert obj.send(body="test", attach=attach) is False
-
-    #
-    # Test bad responses
-    #
+    # prepare our attachment
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
 
     # Prepare a bad response
-    response.content = dumps({
+    bad_response = mock.Mock()
+    bad_response.content = dumps({
         "file_name": "cat.jpg",
         "file_type": "image/jpeg",
         "file_url": "https://dl.pushb.com/abc/cat.jpg",
         "upload_url": "https://upload.pushbullet.com/abcd123",
     })
-    bad_response = mock.Mock()
-    bad_response.content = response.content
-    bad_response.status_code = 400
+    bad_response.status_code = requests.codes.internal_server_error
+
+    # Prepare a bad response
+    bad_json_response = mock.Mock()
+    bad_json_response.content = '}'
+    bad_json_response.status_code = requests.codes.ok
+
+    # Throw an exception on the first call to requests.post()
+    mock_post.return_value = None
+    for side_effect in (requests.RequestException(), OSError(), bad_response):
+        mock_post.side_effect = side_effect
+
+        # We'll fail now because of our error handling
+        assert obj.send(body="test", attach=attach) is False
+
+    # Throw an exception on the second call to requests.post()
+    for side_effect in (requests.RequestException(), OSError(), bad_response):
+        mock_post.side_effect = [response, side_effect]
+
+        # We'll fail now because of our error handling
+        assert obj.send(body="test", attach=attach) is False
 
     # Throw an exception on the third call to requests.post()
-    mock_post.return_value = bad_response
+    for side_effect in (requests.RequestException(), OSError(), bad_response):
+        mock_post.side_effect = [response, response, side_effect]
 
-    # prepare our attachment
-    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
+        # We'll fail now because of our error handling
+        assert obj.send(body="test", attach=attach) is False
 
-    # We'll fail now because we were unable to send the attachment
+    # Throw an exception on the forth call to requests.post()
+    for side_effect in (requests.RequestException(), OSError(), bad_response):
+        mock_post.side_effect = [response, response, response, side_effect]
+
+        # We'll fail now because of our error handling
+        assert obj.send(body="test", attach=attach) is False
+
+    # Test case where we don't get a valid response back
+    mock_post.side_effect = bad_json_response
+
+    # We'll fail because of an invalid json object
     assert obj.send(body="test", attach=attach) is False
-
-    # Throw an exception on the second call
-    mock_post.side_effect = [response, bad_response, response]
-    assert obj.send(body="test", attach=attach) is False
-
-    # Throw an OSError
-    mock_post.side_effect = [response, OSError()]
-    assert obj.send(body="test", attach=attach) is False
-
-    # Throw an exception on the third call
-    mock_post.side_effect = [response, response, bad_response]
-    assert obj.send(body="test", attach=attach) is False
-
-    # Throw an exception on the fourth call
-    mock_post.side_effect = [response, response, response, bad_response]
-    assert obj.send(body="test", attach=attach) is False
-
-    # A good message
-    mock_post.side_effect = [response, response, response, response]
-    assert obj.send(body="test", attach=attach) is True

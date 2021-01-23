@@ -636,11 +636,11 @@ class NotifyEmail(NotifyBase):
             except TypeError:
                 # Python v2.x Support (no charset keyword)
                 # Format our cc addresses to support the Name field
-                cc = [formataddr(
+                cc = [formataddr(  # pragma: no branch
                     (self.names.get(addr, False), addr)) for addr in cc]
 
                 # Format our bcc addresses to support the Name field
-                bcc = [formataddr(
+                bcc = [formataddr(  # pragma: no branch
                     (self.names.get(addr, False), addr)) for addr in bcc]
 
             self.logger.debug(

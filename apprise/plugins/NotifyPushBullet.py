@@ -367,8 +367,9 @@ class NotifyPushBullet(NotifyBase):
 
         except (OSError, IOError) as e:
             self.logger.warning(
-                'An I/O error occurred while reading {}.'.format(
-                    payload.name if payload else 'attachment'))
+                'An I/O error occurred while handling {}.'.format(
+                    payload.name if isinstance(payload, AttachBase)
+                    else payload))
             self.logger.debug('I/O Exception: %s' % str(e))
             return False, response
 

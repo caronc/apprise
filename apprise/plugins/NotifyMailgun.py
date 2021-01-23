@@ -485,7 +485,7 @@ class NotifyMailgun(NotifyBase):
                 except TypeError:
                     # Python v2.x Support (no charset keyword)
                     # Format our cc addresses to support the Name field
-                    payload['cc'] = ','.join([formataddr(
+                    payload['cc'] = ','.join([formataddr(  # pragma: no branch
                         (self.names.get(addr, False), addr))
                         for addr in cc])
 

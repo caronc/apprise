@@ -522,6 +522,25 @@ def test_parse_bool():
     assert utils.parse_bool('OhYeah', True) is True
 
 
+def test_is_uuid():
+    """
+    API: is_uuid() function
+    """
+    # Invalid Entries
+    assert utils.is_uuid('invalid') is False
+    assert utils.is_uuid(None) is False
+    assert utils.is_uuid(5) is False
+    assert utils.is_uuid(object) is False
+
+    # A slightly invalid uuid4 entry
+    assert utils.is_uuid('591ed387-fa65-ac97-9712-b9d2a15e42a9') is False
+    assert utils.is_uuid('591ed387-fa65-Jc97-9712-b9d2a15e42a9') is False
+
+    # Valid UUID4 Entries
+    assert utils.is_uuid('591ed387-fa65-4c97-9712-b9d2a15e42a9') is True
+    assert utils.is_uuid('32b0b447-fe84-4df1-8368-81925e729265') is True
+
+
 def test_is_hostname():
     """
     API: is_hostname() function
