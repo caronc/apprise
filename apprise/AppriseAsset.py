@@ -105,6 +105,11 @@ class AppriseAsset(object):
     # notifications are sent sequentially (one after another)
     async_mode = True
 
+    # Whether or not to interpret escapes found within the input text prior
+    # to passing it upstream. Such as converting \t to an actual tab and \n
+    # to a new line.
+    interpret_escapes = False
+
     def __init__(self, **kwargs):
         """
         Asset Initialization

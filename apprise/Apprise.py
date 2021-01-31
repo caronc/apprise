@@ -293,7 +293,8 @@ class Apprise(object):
         return
 
     def notify(self, body, title='', notify_type=NotifyType.INFO,
-               body_format=None, tag=MATCH_ALL_TAG, attach=None):
+               body_format=None, tag=MATCH_ALL_TAG, attach=None,
+               interpret_escapes=None):
         """
         Send a notification to all of the plugins previously loaded.
 
@@ -313,6 +314,9 @@ class Apprise(object):
         Attach can contain a list of attachment URLs.  attach can also be
         represented by a an AttachBase() (or list of) object(s). This
         identifies the products you wish to notify
+
+        Set interpret_escapes to True if you want to pre-escape a string
+        such as turning a \n into an actual new line, etc.
         """
 
         if len(self) == 0:
@@ -342,6 +346,10 @@ class Apprise(object):
         # Allow Asset default value
         body_format = self.asset.body_format \
             if body_format is None else body_format
+
+        # Allow Asset default value
+        interpret_escapes = self.asset.interpret_escapes \
+            if interpret_escapes is None else interpret_escapes
 
         # for asyncio support; we track a list of our servers to notify
         coroutines = []
@@ -402,6 +410,36 @@ class Apprise(object):
                 else:
                     # Store entry directly
                     conversion_map[server.notify_format] = body
+
+            if interpret_escapes:
+                #
+                # Escape our content
+                #
+
+                try:
+                    # Added overhead requrired due to Python 3 Encoding Bug
+                    # idenified here: https://bugs.python.org/issue21331
+                    conversion_map[server.notify_format] = \
+                        conversion_map[server.notify_format]\
+                        .encode('ascii', 'backslashreplace')\
+                        .decode('unicode-escape')
+
+                except AttributeError:
+                    # Must be of string type
+                    logger.error('Failed to escape message body')
+                    return False
+
+                try:
+                    # Added overhead requrired due to Python 3 Encoding Bug
+                    # idenified here: https://bugs.python.org/issue21331
+                    title = title\
+                        .encode('ascii', 'backslashreplace')\
+                        .decode('unicode-escape')
+
+                except AttributeError:
+                    # Must be of string type
+                    logger.error('Failed to escape message title')
+                    return False
 
             if ASYNCIO_SUPPORT and server.asset.async_mode:
                 # Build a list of servers requiring notification
