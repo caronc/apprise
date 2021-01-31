@@ -201,6 +201,13 @@ def test_apprise():
     assert a.add('bad://localhost') is False
     assert len(a) == 0
 
+    # We'll fail because we've got nothing to notify
+    assert a.notify(
+        title="my title", body="my body") is False
+
+    # Clear our server listings again
+    a.clear()
+
     assert a.add('good://localhost') is True
     assert len(a) == 1
 
@@ -252,9 +259,6 @@ def test_apprise():
         body='body', title='test', notify_type=NotifyType.INFO,
         attach='invalid://') is False
 
-    # Clear our server listings again
-    a.clear()
-
     class ThrowNotification(NotifyBase):
         def notify(self, **kwargs):
             # Pretend everything is okay
@@ -292,14 +296,21 @@ def test_apprise():
     # Store our good notification in our schema map
     SCHEMA_MAP['runtime'] = RuntimeNotification
 
-    assert a.add('runtime://localhost') is True
-    assert a.add('throw://localhost') is True
-    assert a.add('fail://localhost') is True
-    assert len(a) == 3
+    for async_mode in (True, False):
+        # Create an Asset object
+        asset = AppriseAsset(theme='default', async_mode=async_mode)
 
-    # Test when our notify both throws an exception and or just
-    # simply returns False
-    assert a.notify(title="present", body="present") is False
+        # We can load the device using our asset
+        a = Apprise(asset=asset)
+
+        assert a.add('runtime://localhost') is True
+        assert a.add('throw://localhost') is True
+        assert a.add('fail://localhost') is True
+        assert len(a) == 3
+
+        # Test when our notify both throws an exception and or just
+        # simply returns False
+        assert a.notify(title="present", body="present") is False
 
     # Create a Notification that throws an unexected exception
     class ThrowInstantiateNotification(NotifyBase):

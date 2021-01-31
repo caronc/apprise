@@ -25,6 +25,8 @@
 from __future__ import print_function
 import re
 import mock
+import requests
+import json
 from os.path import dirname
 from os.path import join
 from apprise import cli
@@ -111,6 +113,47 @@ def test_apprise_cli_nux_env(tmpdir):
         'good://localhost',
     ])
     assert result.exit_code == 0
+
+    with mock.patch('requests.post') as mock_post:
+        # Prepare Mock
+        mock_post.return_value = requests.Request()
+        mock_post.return_value.status_code = requests.codes.ok
+
+        result = runner.invoke(cli.main, [
+            '-t', 'test title',
+            '-b', 'test body\\nsNewLine',
+            # Test using interpret escapes
+            '-e',
+            # Use our JSON query
+            'json://localhost',
+        ])
+        assert result.exit_code == 0
+
+        # Test our call count
+        assert mock_post.call_count == 1
+
+        # Our string is now escaped correctly
+        json.loads(mock_post.call_args_list[0][1]['data'])\
+            .get('message', '') == 'test body\nsNewLine'
+
+        # Reset
+        mock_post.reset_mock()
+
+        result = runner.invoke(cli.main, [
+            '-t', 'test title',
+            '-b', 'test body\\nsNewLine',
+            # No -e switch at all (so we don't escape the above)
+            # Use our JSON query
+            'json://localhost',
+        ])
+        assert result.exit_code == 0
+
+        # Test our call count
+        assert mock_post.call_count == 1
+
+        # Our string is now escaped correctly
+        json.loads(mock_post.call_args_list[0][1]['data'])\
+            .get('message', '') == 'test body\\nsNewLine'
 
     # Run in synchronous mode
     result = runner.invoke(cli.main, [

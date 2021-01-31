@@ -144,6 +144,8 @@ def print_version_msg():
 @click.option('--verbose', '-v', count=True,
               help='Makes the operation more talkative. Use multiple v to '
               'increase the verbosity. I.e.: -vvvv')
+@click.option('--interpret-escapes', '-e', is_flag=True,
+              help='Enable interpretation of backslash escapes')
 @click.option('--debug', '-D', is_flag=True, help='Debug mode')
 @click.option('--version', '-V', is_flag=True,
               help='Display the apprise version and exit.')
@@ -151,7 +153,7 @@ def print_version_msg():
                 metavar='SERVER_URL [SERVER_URL2 [SERVER_URL3]]',)
 def main(body, title, config, attach, urls, notification_type, theme, tag,
          input_format, dry_run, recursion_depth, verbose, disable_async,
-         debug, version):
+         interpret_escapes, debug, version):
     """
     Send a notification to all of the specified servers identified by their
     URLs the content provided within the title, body and notification-type.
@@ -229,6 +231,9 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
     asset = AppriseAsset(
         # Our body format
         body_format=input_format,
+
+        # Interpret Escapes
+        interpret_escapes=interpret_escapes,
 
         # Set the theme
         theme=theme,

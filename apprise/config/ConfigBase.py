@@ -637,7 +637,9 @@ class ConfigBase(URLBase):
             # Load our data (safely)
             result = yaml.load(content, Loader=yaml.SafeLoader)
 
-        except (AttributeError, yaml.error.MarkedYAMLError) as e:
+        except (AttributeError,
+                yaml.parser.ParserError,
+                yaml.error.MarkedYAMLError) as e:
             # Invalid content
             ConfigBase.logger.error(
                 'Invalid Apprise YAML data specified.')
