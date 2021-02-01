@@ -27,8 +27,25 @@
 # for remote connections.
 
 # Firebase Cloud Messaging
+# Visit your console page: https://console.firebase.google.com
+# 1. Create a project if you haven't already.  If you did the
+#    {project} ID will be listed as name-XXXXX.
+# 2. Click on your project from here to open it up.
+# 3. Access your Web API Key by clicking on:
+#     - The (gear-next-to-project-name) > Project Settings > Cloud Messaging
+
+# Visit the following site to get you're Project information:
+#    - https://console.cloud.google.com/project/_/settings/general/
+#
 # Docs: https://firebase.google.com/docs/cloud-messaging/send-message
 
+# Legacy Docs:
+# https://firebase.google.com/docs/cloud-messaging/http-server-ref\
+#       #send-downstream
+#
+# If you Generate a new private key, it will provide a .json file
+# You will need this in order to send an apprise messag
+import six
 import requests
 from json import dumps
 
@@ -37,6 +54,33 @@ from ..common import NotifyType
 from ..utils import validate_regex
 from ..utils import parse_list
 from ..AppriseLocale import gettext_lazy as _
+
+# Our lookup map
+FCM_HTTP_ERROR_MAP = {
+    400: 'A bad request was made to the server.',
+    401: 'The provided API Key was not valid.',
+    404: 'The token could not be registered.',
+}
+
+
+class FCMMode(object):
+    """
+    Define the Firebase Cloud Messaging Modes
+    """
+    # The legacy way of sending a message
+    Legacy = "legacy"
+
+    # The new API
+    OAuth2 = "oauth2"
+
+
+# FCM Modes
+FCM_MODES = (
+    # Legacy API
+    FCMMode.Legacy,
+    # HTTP v1 URL
+    FCMMode.OAuth2,
+)
 
 
 class NotifyFCM(NotifyBase):
@@ -57,8 +101,10 @@ class NotifyFCM(NotifyBase):
 
     # Project Notification
     # https://firebase.google.com/docs/cloud-messaging/send-message
-    notify_url = \
+    notify_oauth2_url = \
         "https://fcm.googleapis.com/v1/projects/{project}/messages:send"
+
+    notify_legacy_url = "https://fcm.googleapis.com/fcm/send"
 
     # The maximum length of the body
     body_maxlen = 160
@@ -69,7 +115,10 @@ class NotifyFCM(NotifyBase):
 
     # Define object templates
     templates = (
+        # Can be either Legacy or OAuth2
         '{schema}://{project}@{apikey}/{targets}',
+        # Forced Legacy Mode
+        '{schema}://{apikey}/{targets}',
     )
 
     # Define our template
@@ -79,6 +128,12 @@ class NotifyFCM(NotifyBase):
             'type': 'string',
             'private': True,
             'required': True,
+        },
+        'mode': {
+            'name': _('Mode'),
+            'type': 'choice:string',
+            'values': FCM_MODES,
+            'default': FCMMode.Legacy,
         },
         'project': {
             'name': _('Project ID'),
@@ -108,7 +163,7 @@ class NotifyFCM(NotifyBase):
         },
     })
 
-    def __init__(self, project, apikey, targets=None, **kwargs):
+    def __init__(self, project, apikey, targets=None, mode=None, **kwargs):
         """
         Initialize Firebase Cloud Messaging
 
@@ -123,13 +178,28 @@ class NotifyFCM(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # The project ID associated with the account
-        self.project = validate_regex(project)
-        if not self.project:
-            msg = 'An invalid FCM Project ID ' \
-                  '({}) was specified.'.format(project)
-            self.logger.warning(msg)
-            raise TypeError(msg)
+        if mode is None:
+            # Detect our mode
+            self.mode = FCMMode.OAuth2 if project else FCMMode.Legacy
+
+        else:
+            # Setup our mode
+            self.mode = NotifyFCM.template_tokens['mode']['default'] \
+                if not isinstance(mode, six.string_types) else mode.lower()
+            if self.mode and self.mode not in FCM_MODES:
+                msg = 'The mode specified ({}) is invalid.'.format(mode)
+                self.logger.warning(msg)
+                raise TypeError(msg)
+
+        self.project = None
+        if self.mode == FCMMode.OAuth2:
+            # The project ID associated with the account
+            self.project = validate_regex(project)
+            if not self.project:
+                msg = 'An invalid FCM Project ID ' \
+                      '({}) was specified.'.format(project)
+                self.logger.warning(msg)
+                raise TypeError(msg)
 
         # Acquire Device IDs to notify
         self.targets = parse_list(targets)
@@ -145,11 +215,25 @@ class NotifyFCM(NotifyBase):
             self.logger.warning('There are no devices or topics to notify')
             return False
 
-        headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/json',
-            "Authorization": "Bearer {}".format(self.apikey),
-        }
+        if self.mode == FCMMode.OAuth2:
+            headers = {
+                'User-Agent': self.app_id,
+                'Content-Type': 'application/json',
+                "Authorization": "Bearer {}".format(self.apikey),
+            }
+
+            # Prepare our notify URL
+            notify_url = self.notify_oauth2_url
+
+        else:  # FCMMode.Legacy
+            headers = {
+                'User-Agent': self.app_id,
+                'Content-Type': 'application/json',
+                "Authorization": "key={}".format(self.apikey),
+            }
+
+            # Prepare our notify URL
+            notify_url = self.notify_legacy_url
 
         has_error = False
         # Create a copy of the targets list
@@ -157,38 +241,61 @@ class NotifyFCM(NotifyBase):
         while len(targets):
             recipient = targets.pop(0)
 
-            payload = {
-                'message': {
-                    'token': None,
-                    'notification': {
-                        'title': title,
-                        'body': body,
+            if self.mode == FCMMode.OAuth2:
+                payload = {
+                    'message': {
+                        'token': None,
+                        'notification': {
+                            'title': title,
+                            'body': body,
+                        }
                     }
                 }
-            }
 
-            if recipient[0] == '#':
-                payload['message']['topic'] = recipient[1:]
-                self.logger.debug(
-                    "FCM recipient %s parsed as a topic",
-                    recipient[1:])
+                if recipient[0] == '#':
+                    payload['message']['topic'] = recipient[1:]
+                    self.logger.debug(
+                        "FCM recipient %s parsed as a topic",
+                        recipient[1:])
 
-            else:
-                payload['message']['token'] = recipient
-                self.logger.debug(
-                    "FCM recipient %s parsed as a device token",
-                    recipient)
+                else:
+                    payload['message']['token'] = recipient
+                    self.logger.debug(
+                        "FCM recipient %s parsed as a device token",
+                        recipient)
 
-            self.logger.debug('FCM POST URL: %s (cert_verify=%r)' % (
-                self.notify_url, self.verify_certificate,
-            ))
-            self.logger.debug('FCM Payload: %s' % str(payload))
+            else:  # FCMMode.Legacy
+                payload = {
+                    'notification': {
+                        'notification': {
+                            'title': title,
+                            'body': body,
+                        }
+                    }
+                }
+                if recipient[0] == '#':
+                    payload['to'] = '/topics/{}'.format(recipient)
+                    self.logger.debug(
+                        "FCM recipient %s parsed as a topic",
+                        recipient[1:])
+
+                else:
+                    payload['to'] = recipient
+                    self.logger.debug(
+                        "FCM recipient %s parsed as a device token",
+                        recipient)
+
+            self.logger.debug(
+                'FCM %s POST URL: %s (cert_verify=%r)',
+                self.mode, notify_url, self.verify_certificate,
+            )
+            self.logger.debug('FCM %s Payload: %s', self.mode, str(payload))
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
             try:
                 r = requests.post(
-                    self.notify_url.format(project=self.project),
+                    notify_url.format(project=self.project),
                     data=dumps(payload),
                     headers=headers,
                     verify=self.verify_certificate,
@@ -198,12 +305,13 @@ class NotifyFCM(NotifyBase):
                         requests.codes.ok, requests.codes.no_content):
                     # We had a problem
                     status_str = \
-                        NotifyFCM.http_response_code_lookup(
-                            r.status_code)
+                        NotifyBase.http_response_code_lookup(
+                            r.status_code, FCM_HTTP_ERROR_MAP)
 
                     self.logger.warning(
-                        'Failed to send FCM notification: '
+                        'Failed to send {} FCM notification: '
                         '{}{}error={}.'.format(
+                            self.mode,
                             status_str,
                             ', ' if status_str else '',
                             r.status_code))
@@ -214,7 +322,7 @@ class NotifyFCM(NotifyBase):
                     has_error = True
 
                 else:
-                    self.logger.info('Sent FCM notification.')
+                    self.logger.info('Sent %s FCM notification.', self.mode)
 
             except requests.RequestException as e:
                 self.logger.warning(
@@ -232,12 +340,18 @@ class NotifyFCM(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Our URL parameters
-        params = self.url_parameters(privacy=privacy, *args, **kwargs)
+        # Define any URL parameters
+        params = {
+            'mode': self.mode,
+        }
 
-        return '{schema}://{project}@{apikey}/{targets}?{params}'.format(
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+
+        return '{schema}://{project}{apikey}/{targets}?{params}'.format(
             schema=self.secure_protocol,
-            project=NotifyFCM.quote(self.project),
+            project='{}@'.format(NotifyFCM.quote(self.project))
+            if self.project else '',
             apikey=self.pprint(self.apikey, privacy, safe=''),
             targets='/'.join(
                 [NotifyFCM.quote(x) for x in self.targets]),
@@ -264,6 +378,9 @@ class NotifyFCM(NotifyBase):
 
         # Get our Device IDs
         results['targets'] = NotifyFCM.split_path(results['fullpath'])
+
+        # Get our mode
+        results['mode'] = results['qsd'].get('mode')
 
         # The 'to' makes it easier to use yaml configuration
         if 'to' in results['qsd'] and len(results['qsd']['to']):

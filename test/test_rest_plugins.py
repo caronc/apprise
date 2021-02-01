@@ -604,13 +604,15 @@ TEST_URLS = (
         # We failed to identify any valid authentication
         'instance': TypeError,
     }),
-    ('fcm://apikey/', {
-        # no project id specified
-        'instance': TypeError,
-    }),
     ('fcm://project@%20%20/', {
         # invalid apikey
         'instance': TypeError,
+    }),
+    ('fcm://apikey/', {
+        # no project id specified so we operate in legacy mode
+        'instance': plugins.NotifyFCM,
+        # but there are no targets specified so we return False
+        'notify_response': False,
     }),
     ('fcm://project@apikey/', {
         # No targets specified; we will initialize but not notify anything
