@@ -535,7 +535,7 @@ class NotifyMailgun(NotifyBase):
                     # We had a problem
                     status_str = \
                         NotifyBase.http_response_code_lookup(
-                            r.status_code, MAILGUN_API_LOOKUP)
+                            r.status_code, MAILGUN_HTTP_ERROR_MAP)
 
                     self.logger.warning(
                         'Failed to send Mailgun notification to {}: '
