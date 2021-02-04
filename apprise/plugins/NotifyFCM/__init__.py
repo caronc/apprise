@@ -112,7 +112,7 @@ class NotifyFCM(NotifyBase):
     max_fcm_keyfile_size = 5000
 
     # The maximum length of the body
-    body_maxlen = 160
+    body_maxlen = 1024
 
     # A title can not be used for SMS Messages.  Setting this to zero will
     # cause any title (if defined) to get placed into the message body.
