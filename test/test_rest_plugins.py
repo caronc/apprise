@@ -614,42 +614,54 @@ TEST_URLS = (
         # but there are no targets specified so we return False
         'notify_response': False,
     }),
-    ('fcm://project@apikey/', {
-        # No targets specified; we will initialize but not notify anything
-        'instance': plugins.NotifyFCM,
-        'notify_response': False,
-    }),
-    ('fcm://project@apikey/device', {
+    ('fcm://apikey/device', {
         # Valid device
         'instance': plugins.NotifyFCM,
-        'privacy_url': 'fcm://project@a...y/device',
+        'privacy_url': 'fcm://a...y/device',
     }),
-    ('fcm://project@apikey/#topic', {
+    ('fcm://apikey/#topic', {
         # Valid topic
         'instance': plugins.NotifyFCM,
-        'privacy_url': 'fcm://project@a...y/%23topic',
+        'privacy_url': 'fcm://a...y/%23topic',
     }),
-    ('fcm://project@apikey/#topic1/device/%20/', {
+    ('fcm://apikey/#topic1/device/%20/', {
         # Valid topic, valid device, and invalid entry
         'instance': plugins.NotifyFCM,
     }),
-    ('fcm://project@apikey?to=#topic1,device', {
+    ('fcm://apikey?to=#topic1,device', {
         # Test to=
         'instance': plugins.NotifyFCM,
     }),
-    ('fcm://project@apikey/#topic1/device/', {
+    ('fcm://apikey/#topic1/device/?mode=legacy', {
         'instance': plugins.NotifyFCM,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
-    ('fcm://project@apikey/#topic1/device/', {
+    ('fcm://apikey/#topic1/device/?mode=legacy', {
         'instance': plugins.NotifyFCM,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
     }),
-
+    ('fcm://project/#topic1/device/?mode=oauth2&keyfile=file://{}'.format(
+        os.path.join(
+            os.path.dirname(__file__), 'var', 'fcm',
+            'service_account.json')), {
+                'instance': plugins.NotifyFCM,
+                # throw a bizzare code forcing us to fail to look it up
+                'response': False,
+                'requests_response_code': 999,
+    }),
+    ('fcm://projectid/#topic1/device/?mode=oauth2&keyfile=file://{}'.format(
+        os.path.join(
+            os.path.dirname(__file__), 'var', 'fcm',
+            'service_account.json')), {
+                'instance': plugins.NotifyFCM,
+                # Throws a series of connection and transfer exceptions when
+                # this flag is set and tests that we gracfully handle them
+                'test_requests_exceptions': True,
+    }),
     ##################################
     # NotifyFlock
     ##################################

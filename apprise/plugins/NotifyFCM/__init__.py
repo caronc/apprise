@@ -48,12 +48,13 @@
 import six
 import requests
 from json import dumps
-
-from .NotifyBase import NotifyBase
-from ..common import NotifyType
-from ..utils import validate_regex
-from ..utils import parse_list
-from ..AppriseLocale import gettext_lazy as _
+from .oauth import GoogleOAuth
+from ..NotifyBase import NotifyBase
+from ...common import NotifyType
+from ...utils import validate_regex
+from ...utils import parse_list
+from ...AppriseAttachment import AppriseAttachment
+from ...AppriseLocale import gettext_lazy as _
 
 # Our lookup map
 FCM_HTTP_ERROR_MAP = {
@@ -106,6 +107,10 @@ class NotifyFCM(NotifyBase):
 
     notify_legacy_url = "https://fcm.googleapis.com/fcm/send"
 
+    # There is no reason we should exceed 5KB when reading in a JSON file.
+    # If it is more than this, then it is not accepted.
+    max_fcm_keyfile_size = 5000
+
     # The maximum length of the body
     body_maxlen = 160
 
@@ -115,9 +120,9 @@ class NotifyFCM(NotifyBase):
 
     # Define object templates
     templates = (
-        # Can be either Legacy or OAuth2
-        '{schema}://{project}@{apikey}/{targets}',
-        # Forced Legacy Mode
+        # OAuth2
+        '{schema}://{project}/{targets}?keyfile={keyfile}',
+        # Legacy Mode
         '{schema}://{apikey}/{targets}',
     )
 
@@ -127,7 +132,11 @@ class NotifyFCM(NotifyBase):
             'name': _('API Key'),
             'type': 'string',
             'private': True,
-            'required': True,
+        },
+        'keyfile': {
+            'name': _('OAuth2 KeyFile'),
+            'type': 'string',
+            'private': True,
         },
         'mode': {
             'name': _('Mode'),
@@ -163,7 +172,8 @@ class NotifyFCM(NotifyBase):
         },
     })
 
-    def __init__(self, project, apikey, targets=None, mode=None, **kwargs):
+    def __init__(self, project, apikey, targets=None, mode=None, keyfile=None,
+                 **kwargs):
         """
         Initialize Firebase Cloud Messaging
 
@@ -180,7 +190,7 @@ class NotifyFCM(NotifyBase):
 
         if mode is None:
             # Detect our mode
-            self.mode = FCMMode.OAuth2 if project else FCMMode.Legacy
+            self.mode = FCMMode.OAuth2 if keyfile else FCMMode.Legacy
 
         else:
             # Setup our mode
@@ -191,7 +201,18 @@ class NotifyFCM(NotifyBase):
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
+        # Path to our Keyfile
+        self.keyfile = None
+
+        # Our Project ID is required to verify against the keyfile
+        # specified
         self.project = None
+
+        # Initialize our Google OAuth module we can work with
+        self.oauth = GoogleOAuth(
+            user_agent=self.app_id, timeout=self.request_timeout,
+            verify_certificate=self.verify_certificate)
+
         if self.mode == FCMMode.OAuth2:
             # The project ID associated with the account
             self.project = validate_regex(project)
@@ -201,9 +222,50 @@ class NotifyFCM(NotifyBase):
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
+            if not keyfile:
+                msg = 'No FCM JSON KeyFile was specified.'
+                self.logger.warning(msg)
+                raise TypeError(msg)
+
+            # Our keyfile object is just an AppriseAttachment object
+            self.keyfile = AppriseAttachment(asset=self.asset)
+            # Add our definition to our template
+            self.keyfile.add(keyfile)
+            # Enforce maximum file size
+            self.keyfile[0].max_file_size = self.max_fcm_keyfile_size
+
         # Acquire Device IDs to notify
         self.targets = parse_list(targets)
         return
+
+    @property
+    def access_token(self):
+        """
+        Generates a access_token based on the keyfile provided
+        """
+        keyfile = self.keyfile[0]
+        if not keyfile:
+            # We could not access the keyfile
+            self.logger.error(
+                'Could not access FCM keyfile {}.'.format(
+                    keyfile.url(privacy=True)))
+            return None
+
+        if not self.oauth.load(keyfile.path):
+            self.logger.error(
+                'FCM keyfile {} could not be loaded.'.format(
+                    keyfile.url(privacy=True)))
+            return None
+
+        # Verify our project id against the one provided in our keyfile
+        if self.project != self.oauth.project_id:
+            self.logger.error(
+                'FCM keyfile {} identifies itself for a different project'
+                .format(keyfile.url(privacy=True)))
+            return None
+
+        # Return our generated key
+        return self.oauth.access_token
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
@@ -216,10 +278,16 @@ class NotifyFCM(NotifyBase):
             return False
 
         if self.mode == FCMMode.OAuth2:
+            access_token = self.access_token
+            if not access_token:
+                # Error message is generated in access_tokengen() so no reason
+                # to additionally write anything here
+                return False
+
             headers = {
                 'User-Agent': self.app_id,
                 'Content-Type': 'application/json',
-                "Authorization": "Bearer {}".format(self.apikey),
+                "Authorization": "Bearer {}".format(access_token),
             }
 
             # Prepare our notify URL
@@ -345,14 +413,21 @@ class NotifyFCM(NotifyBase):
             'mode': self.mode,
         }
 
+        if self.keyfile:
+            # Include our keyfile if specified
+            params['keyfile'] = NotifyFCM.quote(
+                self.keyfile[0].url(privacy=privacy), safe='')
+
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        return '{schema}://{project}{apikey}/{targets}?{params}'.format(
+        reference = NotifyFCM.quote(self.project) \
+            if self.mode == FCMMode.OAuth2 \
+            else self.pprint(self.apikey, privacy, safe='')
+
+        return '{schema}://{reference}/{targets}?{params}'.format(
             schema=self.secure_protocol,
-            project='{}@'.format(NotifyFCM.quote(self.project))
-            if self.project else '',
-            apikey=self.pprint(self.apikey, privacy, safe=''),
+            reference=reference,
             targets='/'.join(
                 [NotifyFCM.quote(x) for x in self.targets]),
             params=NotifyFCM.urlencode(params),
@@ -370,11 +445,9 @@ class NotifyFCM(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
-        # The project identifier associated with the account
-        results['project'] = NotifyFCM.unquote(results['user'])
-
-        # The apikey is stored in the hostname
+        # The apikey/project is stored in the hostname
         results['apikey'] = NotifyFCM.unquote(results['host'])
+        results['project'] = results['apikey']
 
         # Get our Device IDs
         results['targets'] = NotifyFCM.split_path(results['fullpath'])
@@ -386,5 +459,25 @@ class NotifyFCM(NotifyBase):
         if 'to' in results['qsd'] and len(results['qsd']['to']):
             results['targets'] += \
                 NotifyFCM.parse_list(results['qsd']['to'])
+
+        # Our Project ID
+        if 'project' in results['qsd'] and results['qsd']['project']:
+            results['project'] = \
+                NotifyFCM.unquote(results['qsd']['project'])
+
+        # Our Web API Key
+        if 'apikey' in results['qsd'] and results['qsd']['apikey']:
+            results['apikey'] = \
+                NotifyFCM.unquote(results['qsd']['apikey'])
+
+        # Our Keyfile (JSON)
+        if 'keyfile' in results['qsd'] and results['qsd']['keyfile']:
+            results['keyfile'] = \
+                NotifyFCM.unquote(results['qsd']['keyfile'])
+
+        # Our Project
+        if 'project' in results['qsd'] and results['qsd']['project']:
+            results['project'] = \
+                NotifyFCM.unquote(results['qsd']['project'])
 
         return results
