@@ -49,7 +49,7 @@ it easy to access:
 
 Boxcar, ClickSend, Discord, E-Mail, Emby, Faast, FCM, Flock, Gitter, Google
 Chat, Gotify, Growl, IFTTT, Join, Kavenegar, KODI, Kumulos, LaMetric, MacOSX,
-Mailgun, MatterMost, Matrix, Microsoft Windows, Microsoft Teams, MessageBird,
+Mailgun, Mattermost, Matrix, Microsoft Windows, Microsoft Teams, MessageBird,
 MSG91, MyAndroid, Nexmo, Nextcloud, Notica, Notifico, Office365, OneSignal,
 Opsgenie, ParsePlatform, PopcornNotify, Prowl, Pushalot, PushBullet, Pushjet,
 Pushover, PushSafer, Rocket.Chat, SendGrid, SimplePush, Sinch, Slack, Spontit,

@@ -50,13 +50,13 @@ from ..AppriseLocale import gettext_lazy as _
 # - https://docs.mattermost.com/administration/config-settings.html
 
 
-class NotifyMatterMost(NotifyBase):
+class NotifyMattermost(NotifyBase):
     """
-    A wrapper for MatterMost Notifications
+    A wrapper for Mattermost Notifications
     """
 
     # The default descriptive name associated with the Notification
-    service_name = 'MatterMost'
+    service_name = 'Mattermost'
 
     # The services URL
     service_url = 'https://mattermost.com/'
@@ -144,9 +144,9 @@ class NotifyMatterMost(NotifyBase):
     def __init__(self, token, fullpath=None, channels=None,
                  include_image=False, **kwargs):
         """
-        Initialize MatterMost Object
+        Initialize Mattermost Object
         """
-        super(NotifyMatterMost, self).__init__(**kwargs)
+        super(NotifyMattermost, self).__init__(**kwargs)
 
         if self.secure:
             self.schema = 'https'
@@ -161,13 +161,13 @@ class NotifyMatterMost(NotifyBase):
         # Authorization Token (associated with project)
         self.token = validate_regex(token)
         if not self.token:
-            msg = 'An invalid MatterMost Authorization Token ' \
+            msg = 'An invalid Mattermost Authorization Token ' \
                   '({}) was specified.'.format(token)
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # Optional Channels
-        self.channels = parse_list(channels)
+        # Optional Channels (strip off any channel prefix entries if present)
+        self.channels = [x.lstrip('#') for x in parse_list(channels)]
 
         if not self.port:
             self.port = self.default_port
@@ -179,7 +179,7 @@ class NotifyMatterMost(NotifyBase):
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
-        Perform MatterMost Notification
+        Perform Mattermost Notification
         """
 
         # Create a copy of our channels, otherwise place a dummy entry
@@ -221,10 +221,10 @@ class NotifyMatterMost(NotifyBase):
                 self.schema, self.host, self.port, self.fullpath,
                 self.token)
 
-            self.logger.debug('MatterMost POST URL: %s (cert_verify=%r)' % (
+            self.logger.debug('Mattermost POST URL: %s (cert_verify=%r)' % (
                 url, self.verify_certificate,
             ))
-            self.logger.debug('MatterMost Payload: %s' % str(payload))
+            self.logger.debug('Mattermost Payload: %s' % str(payload))
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -241,11 +241,11 @@ class NotifyMatterMost(NotifyBase):
                 if r.status_code != requests.codes.ok:
                     # We had a problem
                     status_str = \
-                        NotifyMatterMost.http_response_code_lookup(
+                        NotifyMattermost.http_response_code_lookup(
                             r.status_code)
 
                     self.logger.warning(
-                        'Failed to send MatterMost notification{}: '
+                        'Failed to send Mattermost notification{}: '
                         '{}{}error={}.'.format(
                             '' if not channel
                             else ' to channel {}'.format(channel),
@@ -262,13 +262,13 @@ class NotifyMatterMost(NotifyBase):
 
                 else:
                     self.logger.info(
-                        'Sent MatterMost notification{}.'.format(
+                        'Sent Mattermost notification{}.'.format(
                             '' if not channel
                             else ' to channel {}'.format(channel)))
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occurred sending MatterMost '
+                    'A Connection error occurred sending Mattermost '
                     'notification{}.'.format(
                         '' if not channel
                         else ' to channel {}'.format(channel)))
@@ -298,7 +298,8 @@ class NotifyMatterMost(NotifyBase):
             # historically the value only accepted one channel and is
             # therefore identified as 'channel'. Channels have always been
             # optional, so that is why this setting is nested in an if block
-            params['channel'] = ','.join(self.channels)
+            params['channel'] = ','.join(
+                [NotifyMattermost.quote(x, safe='') for x in self.channels])
 
         default_port = 443 if self.secure else self.default_port
         default_schema = self.secure_protocol if self.secure else self.protocol
@@ -307,7 +308,7 @@ class NotifyMatterMost(NotifyBase):
         botname = ''
         if self.user:
             botname = '{botname}@'.format(
-                botname=NotifyMatterMost.quote(self.user, safe=''),
+                botname=NotifyMattermost.quote(self.user, safe=''),
             )
 
         return \
@@ -321,9 +322,9 @@ class NotifyMatterMost(NotifyBase):
                 port='' if not self.port or self.port == default_port
                      else ':{}'.format(self.port),
                 fullpath='/' if not self.fullpath else '{}/'.format(
-                    NotifyMatterMost.quote(self.fullpath, safe='/')),
+                    NotifyMattermost.quote(self.fullpath, safe='/')),
                 token=self.pprint(self.token, privacy, safe=''),
-                params=NotifyMatterMost.urlencode(params),
+                params=NotifyMattermost.urlencode(params),
             )
 
     @staticmethod
@@ -340,7 +341,7 @@ class NotifyMatterMost(NotifyBase):
 
         # Acquire our tokens; the last one will always be our token
         # all entries before it will be our path
-        tokens = NotifyMatterMost.split_path(results['fullpath'])
+        tokens = NotifyMattermost.split_path(results['fullpath'])
 
         results['token'] = None if not tokens else tokens.pop()
 
@@ -355,12 +356,12 @@ class NotifyMatterMost(NotifyBase):
         if 'to' in results['qsd'] and len(results['qsd']['to']):
             # Allow the user to specify the channel to post to
             results['channels'].append(
-                NotifyMatterMost.parse_list(results['qsd']['to']))
+                NotifyMattermost.parse_list(results['qsd']['to']))
 
         if 'channel' in results['qsd'] and len(results['qsd']['channel']):
             # Allow the user to specify the channel to post to
             results['channels'].append(
-                NotifyMatterMost.parse_list(results['qsd']['channel']))
+                NotifyMattermost.parse_list(results['qsd']['channel']))
 
         # Image manipulation
         results['include_image'] = \
