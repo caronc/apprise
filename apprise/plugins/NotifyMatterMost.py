@@ -84,14 +84,14 @@ class NotifyMatterMost(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{host}/{authtoken}',
-        '{schema}://{host}/{authtoken}:{port}',
-        '{schema}://{botname}@{host}/{authtoken}',
-        '{schema}://{botname}@{host}:{port}/{authtoken}',
-        '{schema}://{host}/{fullpath}/{authtoken}',
-        '{schema}://{host}/{fullpath}{authtoken}:{port}',
-        '{schema}://{botname}@{host}/{fullpath}/{authtoken}',
-        '{schema}://{botname}@{host}:{port}/{fullpath}/{authtoken}',
+        '{schema}://{host}/{token}',
+        '{schema}://{host}/{token}:{port}',
+        '{schema}://{botname}@{host}/{token}',
+        '{schema}://{botname}@{host}:{port}/{token}',
+        '{schema}://{host}/{fullpath}/{token}',
+        '{schema}://{host}/{fullpath}{token}:{port}',
+        '{schema}://{botname}@{host}/{fullpath}/{token}',
+        '{schema}://{botname}@{host}:{port}/{fullpath}/{token}',
     )
 
     # Define our template tokens
@@ -101,8 +101,8 @@ class NotifyMatterMost(NotifyBase):
             'type': 'string',
             'required': True,
         },
-        'authtoken': {
-            'name': _('Access Key'),
+        'token': {
+            'name': _('Webhook Token'),
             'type': 'string',
             'private': True,
             'required': True,
@@ -141,7 +141,7 @@ class NotifyMatterMost(NotifyBase):
         },
     })
 
-    def __init__(self, authtoken, fullpath=None, channels=None,
+    def __init__(self, token, fullpath=None, channels=None,
                  include_image=False, **kwargs):
         """
         Initialize MatterMost Object
@@ -159,10 +159,10 @@ class NotifyMatterMost(NotifyBase):
             fullpath, six.string_types) else fullpath.strip()
 
         # Authorization Token (associated with project)
-        self.authtoken = validate_regex(authtoken)
-        if not self.authtoken:
+        self.token = validate_regex(token)
+        if not self.token:
             msg = 'An invalid MatterMost Authorization Token ' \
-                  '({}) was specified.'.format(authtoken)
+                  '({}) was specified.'.format(token)
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -219,7 +219,7 @@ class NotifyMatterMost(NotifyBase):
 
             url = '{}://{}:{}{}/hooks/{}'.format(
                 self.schema, self.host, self.port, self.fullpath,
-                self.authtoken)
+                self.token)
 
             self.logger.debug('MatterMost POST URL: %s (cert_verify=%r)' % (
                 url, self.verify_certificate,
@@ -311,7 +311,7 @@ class NotifyMatterMost(NotifyBase):
             )
 
         return \
-            '{schema}://{botname}{hostname}{port}{fullpath}{authtoken}' \
+            '{schema}://{botname}{hostname}{port}{fullpath}{token}' \
             '/?{params}'.format(
                 schema=default_schema,
                 botname=botname,
@@ -322,7 +322,7 @@ class NotifyMatterMost(NotifyBase):
                      else ':{}'.format(self.port),
                 fullpath='/' if not self.fullpath else '{}/'.format(
                     NotifyMatterMost.quote(self.fullpath, safe='/')),
-                authtoken=self.pprint(self.authtoken, privacy, safe=''),
+                token=self.pprint(self.token, privacy, safe=''),
                 params=NotifyMatterMost.urlencode(params),
             )
 
@@ -338,11 +338,11 @@ class NotifyMatterMost(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
-        # Acquire our tokens; the last one will always be our authtoken
+        # Acquire our tokens; the last one will always be our token
         # all entries before it will be our path
         tokens = NotifyMatterMost.split_path(results['fullpath'])
 
-        results['authtoken'] = None if not tokens else tokens.pop()
+        results['token'] = None if not tokens else tokens.pop()
 
         # Store our path
         results['fullpath'] = '' if not tokens \
