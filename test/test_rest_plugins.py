@@ -1780,7 +1780,7 @@ TEST_URLS = (
     }),
 
     ##################################
-    # NotifyMatterMost
+    # NotifyMattermost
     ##################################
     ('mmost://', {
         'instance': None,
@@ -1796,64 +1796,64 @@ TEST_URLS = (
         'instance': TypeError,
     }),
     ('mmost://localhost/3ccdd113474722377935511fc85d3dd4', {
-        'instance': plugins.NotifyMatterMost,
+        'instance': plugins.NotifyMattermost,
     }),
     ('mmost://user@localhost/3ccdd113474722377935511fc85d3dd4?channel=test', {
-        'instance': plugins.NotifyMatterMost,
+        'instance': plugins.NotifyMattermost,
     }),
     ('mmost://user@localhost/3ccdd113474722377935511fc85d3dd4?to=test', {
-        'instance': plugins.NotifyMatterMost,
+        'instance': plugins.NotifyMattermost,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'mmost://user@localhost/3...4/',
     }),
     ('mmost://localhost/3ccdd113474722377935511fc85d3dd4'
      '?to=test&image=True', {
-         'instance': plugins.NotifyMatterMost}),
+         'instance': plugins.NotifyMattermost}),
     ('mmost://localhost/3ccdd113474722377935511fc85d3dd4' \
      '?to=test&image=False', {
-         'instance': plugins.NotifyMatterMost}),
+         'instance': plugins.NotifyMattermost}),
     ('mmost://localhost/3ccdd113474722377935511fc85d3dd4' \
      '?to=test&image=True', {
-         'instance': plugins.NotifyMatterMost,
+         'instance': plugins.NotifyMattermost,
          # don't include an image by default
          'include_image': False}),
     ('mmost://localhost:8080/3ccdd113474722377935511fc85d3dd4', {
-        'instance': plugins.NotifyMatterMost,
+        'instance': plugins.NotifyMattermost,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'mmost://localhost:8080/3...4/',
     }),
     ('mmost://localhost:8080/3ccdd113474722377935511fc85d3dd4', {
-        'instance': plugins.NotifyMatterMost,
+        'instance': plugins.NotifyMattermost,
     }),
     ('mmost://localhost:invalid-port/3ccdd113474722377935511fc85d3dd4', {
         'instance': None,
     }),
     ('mmosts://localhost/3ccdd113474722377935511fc85d3dd4', {
-        'instance': plugins.NotifyMatterMost,
+        'instance': plugins.NotifyMattermost,
     }),
     # Test our paths
     ('mmosts://localhost/a/path/3ccdd113474722377935511fc85d3dd4', {
-        'instance': plugins.NotifyMatterMost,
+        'instance': plugins.NotifyMattermost,
     }),
     ('mmosts://localhost/////3ccdd113474722377935511fc85d3dd4///', {
-        'instance': plugins.NotifyMatterMost,
+        'instance': plugins.NotifyMattermost,
     }),
     ('mmost://localhost/3ccdd113474722377935511fc85d3dd4', {
-        'instance': plugins.NotifyMatterMost,
+        'instance': plugins.NotifyMattermost,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('mmost://localhost/3ccdd113474722377935511fc85d3dd4', {
-        'instance': plugins.NotifyMatterMost,
+        'instance': plugins.NotifyMattermost,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('mmost://localhost/3ccdd113474722377935511fc85d3dd4', {
-        'instance': plugins.NotifyMatterMost,
+        'instance': plugins.NotifyMattermost,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -6362,7 +6362,7 @@ def test_notify_kumulos_plugin():
 
 def test_notify_mattermost_plugin():
     """
-    API: NotifyMatterMost() Extra Checks
+    API: NotifyMattermost() Extra Checks
 
     """
     # Disable Throttling to speed testing
@@ -6370,9 +6370,9 @@ def test_notify_mattermost_plugin():
 
     # Invalid Authorization Token
     with pytest.raises(TypeError):
-        plugins.NotifyMatterMost(None)
+        plugins.NotifyMattermost(None)
     with pytest.raises(TypeError):
-        plugins.NotifyMatterMost("     ")
+        plugins.NotifyMattermost("     ")
 
 
 @mock.patch('requests.post')
