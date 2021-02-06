@@ -365,7 +365,8 @@ class NotifySpontit(NotifyBase):
 
         # Support MacOS subtitle option
         if 'subtitle' in results['qsd'] and len(results['qsd']['subtitle']):
-            results['subtitle'] = results['qsd']['subtitle']
+            results['subtitle'] = \
+                NotifySpontit.unquote(results['qsd']['subtitle'])
 
         # Support the 'to' variable so that we can support targets this way too
         # The 'to' makes it easier to use yaml configuration
