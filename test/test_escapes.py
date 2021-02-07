@@ -263,9 +263,6 @@ def test_apprise_escaping_py2(mock_post):
         title=object(), body=False, interpret_escapes=True) is False
     assert a.notify(
         title=False, body=object(), interpret_escapes=True) is False
-    assert a.notify(
-        title=u'unicode title', body=u'unicode body',
-        interpret_escapes=True) is False
 
     # The body is proessed first, so the errors thrown above get tested on
     # the body only.  Now we run similar tests but only make the title
@@ -278,5 +275,3 @@ def test_apprise_escaping_py2(mock_post):
         title=object(), body="valid", interpret_escapes=True) is False
     assert a.notify(
         title=False, body="valid", interpret_escapes=True) is False
-    assert a.notify(
-        title=u'unicode title', body="valid", interpret_escapes=True) is False
