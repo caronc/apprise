@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2020 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2021 Chris Caron <lead2gold@gmail.com>
 # All rights reserved.
 #
 # This code is licensed under the MIT License.
@@ -146,13 +146,9 @@ class GoogleOAuth(object):
             return False
 
         # Verify we've got the correct tokens in our content to work with
-        is_valid = next((k for k in self.content.keys()
-                         if k in (
-                             'client_email',
-                             'private_key_id', 'private_key',
-                             'service_account', 'project_id')
-                         and isinstance(self.content[k], str)),
-                        True)
+        is_valid = next((False for k in (
+            'client_email', 'private_key_id', 'private_key',
+            'type', 'project_id') if not self.content.get(k)), True)
 
         if not is_valid:
             logger.debug(
@@ -299,7 +295,7 @@ class GoogleOAuth(object):
                 'Access Token.'
             )
             logger.debug('Socket Exception: %s', str(e))
-            return False
+            return None
 
         # If we get here, we made our request successfully, now we need
         # to parse out the data

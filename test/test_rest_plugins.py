@@ -624,6 +624,10 @@ TEST_URLS = (
         'instance': plugins.NotifyFCM,
         'privacy_url': 'fcm://a...y/%23topic',
     }),
+    ('fcm://apikey/device?mode=invalid', {
+        # Valid device, invalid mode
+        'instance': TypeError,
+    }),
     ('fcm://apikey/#topic1/device/%20/', {
         # Valid topic, valid device, and invalid entry
         'instance': plugins.NotifyFCM,
@@ -631,6 +635,37 @@ TEST_URLS = (
     ('fcm://apikey?to=#topic1,device', {
         # Test to=
         'instance': plugins.NotifyFCM,
+    }),
+    ('fcm://?apikey=abc123&to=device', {
+        # Test apikey= to=
+        'instance': plugins.NotifyFCM,
+    }),
+    ('fcm://%20?to=device&keyfile=/invalid/path', {
+        # invalid Project ID
+        'instance': TypeError,
+    }),
+    ('fcm://project_id?to=device&keyfile=/invalid/path', {
+        # Test to= and auto detection of oauth mode
+        'instance': plugins.NotifyFCM,
+        # we'll fail to send our notification as a result
+        'response': False,
+    }),
+    ('fcm://?to=device&project=project_id&keyfile=/invalid/path', {
+        # Test project= & to= and auto detection of oauth mode
+        'instance': plugins.NotifyFCM,
+        # we'll fail to send our notification as a result
+        'response': False,
+    }),
+    ('fcm://project_id?to=device&mode=oauth2', {
+        # no keyfile was specified
+        'instance': TypeError,
+    }),
+    ('fcm://project_id?to=device&mode=oauth2&keyfile=/invalid/path', {
+        # Same test as above except we explicitly set our oauth2 mode
+        # Test to= and auto detection of oauth mode
+        'instance': plugins.NotifyFCM,
+        # we'll fail to send our notification as a result
+        'response': False,
     }),
     ('fcm://apikey/#topic1/device/?mode=legacy', {
         'instance': plugins.NotifyFCM,

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2020 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2021 Chris Caron <lead2gold@gmail.com>
 # All rights reserved.
 #
 # This code is licensed under the MIT License.
@@ -180,14 +180,6 @@ class NotifyFCM(NotifyBase):
         """
         super(NotifyFCM, self).__init__(**kwargs)
 
-        # The apikey associated with the account
-        self.apikey = validate_regex(apikey)
-        if not self.apikey:
-            msg = 'An invalid FCM API key ' \
-                  '({}) was specified.'.format(apikey)
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
         if mode is None:
             # Detect our mode
             self.mode = FCMMode.OAuth2 if keyfile else FCMMode.Legacy
@@ -200,6 +192,10 @@ class NotifyFCM(NotifyBase):
                 msg = 'The mode specified ({}) is invalid.'.format(mode)
                 self.logger.warning(msg)
                 raise TypeError(msg)
+
+        # Used for Legacy Mode; this is the Web API Key retrieved from the
+        # User Panel
+        self.apikey = None
 
         # Path to our Keyfile
         self.keyfile = None
@@ -234,6 +230,16 @@ class NotifyFCM(NotifyBase):
             # Enforce maximum file size
             self.keyfile[0].max_file_size = self.max_fcm_keyfile_size
 
+        else:  # Legacy Mode
+
+            # The apikey associated with the account
+            self.apikey = validate_regex(apikey)
+            if not self.apikey:
+                msg = 'An invalid FCM API key ' \
+                      '({}) was specified.'.format(apikey)
+                self.logger.warning(msg)
+                raise TypeError(msg)
+
         # Acquire Device IDs to notify
         self.targets = parse_list(targets)
         return
@@ -264,7 +270,8 @@ class NotifyFCM(NotifyBase):
                 .format(keyfile.url(privacy=True)))
             return None
 
-        # Return our generated key
+        # Return our generated key; the below returns None if a token could
+        # not be acquired
         return self.oauth.access_token
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
@@ -274,7 +281,7 @@ class NotifyFCM(NotifyBase):
 
         if not self.targets:
             # There is no one to email; we're done
-            self.logger.warning('There are no devices or topics to notify')
+            self.logger.warning('There are no FCM devices or topics to notify')
             return False
 
         if self.mode == FCMMode.OAuth2:
@@ -474,10 +481,5 @@ class NotifyFCM(NotifyBase):
         if 'keyfile' in results['qsd'] and results['qsd']['keyfile']:
             results['keyfile'] = \
                 NotifyFCM.unquote(results['qsd']['keyfile'])
-
-        # Our Project
-        if 'project' in results['qsd'] and results['qsd']['project']:
-            results['project'] = \
-                NotifyFCM.unquote(results['qsd']['project'])
 
         return results
