@@ -35,7 +35,7 @@ import requests
 from json import dumps
 
 from .NotifyBase import NotifyBase
-from ..common import NotifyType
+from ..common import NotifyType, NotifyFormat
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
@@ -181,6 +181,13 @@ class NotifyGotify(NotifyBase):
             'title': title,
             'message': body,
         }
+
+        if self.notify_format == NotifyFormat.MARKDOWN:
+            payload["extras"] = {
+                "client::display": {
+                    "contentType": "text/markdown"
+                }
+            }
 
         # Our headers
         headers = {
