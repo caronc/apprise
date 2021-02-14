@@ -1,3 +1,4 @@
+cryptography
 requests
 requests-oauthlib
 six
