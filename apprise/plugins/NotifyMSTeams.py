@@ -539,7 +539,7 @@ class NotifyMSTeams(NotifyBase):
 
         if result:
             return NotifyMSTeams.parse_url(
-                '{schema}://{team}@{token_a}/{token_b}/{token_c}'
+                '{schema}://{team}/{token_a}/{token_b}/{token_c}'
                 '/{params}'.format(
                     schema=NotifyMSTeams.secure_protocol,
                     team=result.group('team'),
