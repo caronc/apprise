@@ -952,6 +952,10 @@ TEST_URLS = (
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'gotify://hostname/a/path/ending/in/a/slash/u...u/',
     }),
+    # Markdown test
+    ('gotify://hostname/%s?format=markdown' % ('t' * 16), {
+        'instance': plugins.NotifyGotify,
+    }),
     # Provide a hostname, path, and token
     ('gotify://hostname/a/path/not/ending/in/a/slash/%s' % ('v' * 16), {
         'instance': plugins.NotifyGotify,

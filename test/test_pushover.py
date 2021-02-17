@@ -83,9 +83,22 @@ def test_pushover_attachments(mock_post, tmpdir):
     assert mock_post.call_args_list[0][0][0] == \
         'https://api.pushover.net/1/messages.json'
 
+    # Reset our mock object for multiple tests
+    mock_post.reset_mock()
+
     # Test multiple attachments
     assert attach.add(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
     assert obj.notify(body="test", attach=attach) is True
+
+    # Test our call count
+    assert mock_post.call_count == 2
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.pushover.net/1/messages.json'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://api.pushover.net/1/messages.json'
+
+    # Reset our mock object for multiple tests
+    mock_post.reset_mock()
 
     image = tmpdir.mkdir("pover_image").join("test.jpg")
     image.write('a' * plugins.NotifyPushover.attach_max_size_bytes)
@@ -93,11 +106,22 @@ def test_pushover_attachments(mock_post, tmpdir):
     attach = AppriseAttachment.instantiate(str(image))
     assert obj.notify(body="test", attach=attach) is True
 
+    # Test our call count
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.pushover.net/1/messages.json'
+
+    # Reset our mock object for multiple tests
+    mock_post.reset_mock()
+
     # Add 1 more byte to the file (putting it over the limit)
     image.write('a' * (plugins.NotifyPushover.attach_max_size_bytes + 1))
 
     attach = AppriseAttachment.instantiate(str(image))
     assert obj.notify(body="test", attach=attach) is False
+
+    # Test our call count
+    assert mock_post.call_count == 0
 
     # Test case when file is missing
     attach = AppriseAttachment.instantiate(
@@ -105,6 +129,9 @@ def test_pushover_attachments(mock_post, tmpdir):
     os.unlink(str(image))
     assert obj.notify(
         body='body', title='title', attach=attach) is False
+
+    # Test our call count
+    assert mock_post.call_count == 0
 
     # Test unsuported files:
     image = tmpdir.mkdir("pover_unsupported").join("test.doc")
@@ -119,7 +146,10 @@ def test_pushover_attachments(mock_post, tmpdir):
 
     # Throw an exception on the first call to requests.post()
     for side_effect in (requests.RequestException(), OSError(), bad_response):
-        mock_post.side_effect = [side_effect]
+        mock_post.side_effect = [side_effect, side_effect]
 
         # We'll fail now because of our error handling
         assert obj.send(body="test", attach=attach) is False
+
+        # Same case without an attachment
+        assert obj.send(body="test") is False
