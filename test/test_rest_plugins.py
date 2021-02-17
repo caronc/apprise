@@ -2025,18 +2025,38 @@ TEST_URLS = (
          # All tokens provided - we're good
          'instance': plugins.NotifyMSTeams}),
 
+    # Legacy URL Formatting
     ('msteams://{}@{}/{}/{}?t2'.format(UUID4, UUID4, 'a' * 32, UUID4), {
         # All tokens provided - we're good
         'instance': plugins.NotifyMSTeams,
         # don't include an image by default
         'include_image': False,
     }),
+    # Legacy URL Formatting
     ('msteams://{}@{}/{}/{}?image=No'.format(UUID4, UUID4, 'a' * 32, UUID4), {
         # All tokens provided - we're good  no image
         'instance': plugins.NotifyMSTeams,
 
         # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'msteams://8...2/a...a/8...2/',
+        'privacy_url': 'msteams://outlook/8...2/a...a/8...2/',
+    }),
+    # New 2021 URL formatting
+    ('msteams://apprise/{}@{}/{}/{}'.format(
+        UUID4, UUID4, 'a' * 32, UUID4), {
+            # All tokens provided - we're good  no image
+            'instance': plugins.NotifyMSTeams,
+
+            # Our expected url(privacy=True) startswith() response:
+            'privacy_url': 'msteams://apprise/8...2/a...a/8...2/',
+    }),
+    # New 2021 URL formatting; support team= argument
+    ('msteams://{}@{}/{}/{}?team=teamname'.format(
+        UUID4, UUID4, 'a' * 32, UUID4), {
+            # All tokens provided - we're good  no image
+            'instance': plugins.NotifyMSTeams,
+
+            # Our expected url(privacy=True) startswith() response:
+            'privacy_url': 'msteams://teamname/8...2/a...a/8...2/',
     }),
     ('msteams://{}@{}/{}/{}?tx'.format(UUID4, UUID4, 'a' * 32, UUID4), {
         'instance': plugins.NotifyMSTeams,
