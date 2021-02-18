@@ -421,6 +421,9 @@ class Apprise(object):
                     # idenified here: https://bugs.python.org/issue21331
                     conversion_map[server.notify_format] = \
                         conversion_map[server.notify_format]\
+                        .decode('string_escape') \
+                        if six.PY2 else \
+                        conversion_map[server.notify_format]\
                         .encode('ascii', 'backslashreplace')\
                         .decode('unicode-escape')
 
@@ -432,7 +435,9 @@ class Apprise(object):
                 try:
                     # Added overhead requrired due to Python 3 Encoding Bug
                     # idenified here: https://bugs.python.org/issue21331
-                    title = title\
+                    title = title.decode('string_escape')\
+                        if six.PY2 else \
+                        title\
                         .encode('ascii', 'backslashreplace')\
                         .decode('unicode-escape')
 
