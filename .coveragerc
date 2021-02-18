@@ -8,8 +8,6 @@ source =
 [paths]
 source =
    apprise
-   .tox/*/lib/python*/site-packages/apprise
-   .tox/pypy/site-packages/apprise
 
 [report]
 show_missing = True
