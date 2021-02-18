@@ -1,0 +1,13 @@
+# Base
+FROM python:3.6-buster
+RUN apt-get update && apt-get install -y libdbus-1-dev build-essential musl-dev
+RUN pip install dbus-python
+
+# Apprise Setup
+COPY . /apprise
+ENV PYTHONPATH /apprise
+WORKDIR /apprise
+RUN pip install -r requirements.txt -r dev-requirements.txt
+
+# Catalog Construction and Wheel Building
+RUN python setup.py compile_catalog bdist_wheel
