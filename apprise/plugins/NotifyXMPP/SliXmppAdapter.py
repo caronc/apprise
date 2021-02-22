@@ -11,6 +11,7 @@ SLIXMPP_SUPPORT_AVAILABLE = False
 try:
     # Import slixmpp if available
     import slixmpp
+    import asyncio
 
     SLIXMPP_SUPPORT_AVAILABLE = True
 
@@ -100,6 +101,15 @@ class SliXmppAdapter(object):
             raise ValueError("Invalid XMPP Configuration")
 
     def load(self):
+
+        try:
+            asyncio.get_event_loop()
+
+        except RuntimeError:
+            # slixmpp can not handle not having an event_loop
+            # see: https://lab.louiz.org/poezio/slixmpp/-/issues/3456
+            # This is a work-around to this problem
+            asyncio.set_event_loop(asyncio.new_event_loop())
 
         # Prepare our object
         self.xmpp = slixmpp.ClientXMPP(self.jid, self.password)
