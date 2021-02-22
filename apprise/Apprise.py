@@ -330,6 +330,15 @@ class Apprise(object):
         if not (title or body):
             return False
 
+        if six.PY2:
+            # Python 2.7.x Unicode Character Handling
+            # Ensure we're working with utf-8
+            if isinstance(title, unicode):  # noqa: F821
+                title = title.encode('utf-8')
+
+            if isinstance(body, unicode):  # noqa: F821
+                body = body.encode('utf-8')
+
         # Tracks conversions
         conversion_map = dict()
 
@@ -417,12 +426,19 @@ class Apprise(object):
                 #
 
                 try:
-                    # Added overhead requrired due to Python 3 Encoding Bug
-                    # idenified here: https://bugs.python.org/issue21331
+                    # Added overhead required due to Python 3 Encoding Bug
+                    # identified here: https://bugs.python.org/issue21331
                     conversion_map[server.notify_format] = \
                         conversion_map[server.notify_format]\
                         .encode('ascii', 'backslashreplace')\
                         .decode('unicode-escape')
+
+                except UnicodeDecodeError:  # pragma: no cover
+                    # This occurs using a very old verion of Python 2.7 such
+                    # as the one that ships with CentOS/RedHat 7.x (v2.7.5).
+                    conversion_map[server.notify_format] = \
+                        conversion_map[server.notify_format] \
+                        .decode('string_escape')
 
                 except AttributeError:
                     # Must be of string type
@@ -430,11 +446,16 @@ class Apprise(object):
                     return False
 
                 try:
-                    # Added overhead requrired due to Python 3 Encoding Bug
-                    # idenified here: https://bugs.python.org/issue21331
+                    # Added overhead required due to Python 3 Encoding Bug
+                    # identified here: https://bugs.python.org/issue21331
                     title = title\
                         .encode('ascii', 'backslashreplace')\
                         .decode('unicode-escape')
+
+                except UnicodeDecodeError:  # pragma: no cover
+                    # This occurs using a very old verion of Python 2.7 such
+                    # as the one that ships with CentOS/RedHat 7.x (v2.7.5).
+                    title = title.decode('string_escape')
 
                 except AttributeError:
                     # Must be of string type

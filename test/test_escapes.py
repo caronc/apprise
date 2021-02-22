@@ -249,8 +249,60 @@ def test_apprise_escaping_py2(mock_post):
     # Verify our content was escaped correctly
     assert mock_post.call_count == 1
     result = loads(mock_post.call_args_list[0][1]['data'])
-    assert result['title'] == 'دعونا نجعل العالم مكانا أفضل.'
-    assert result['message'] == 'Egy sor kódot egyszerre.'
+
+    expected = 'دعونا نجعل العالم مكانا أفضل.'
+    assert result['title'] in (
+        expected,
+        # Older versions of Python (such as 2.7.5) provide this value as
+        # a type unicode. This specifically happens when building RPMs
+        # for RedHat/CentOS 7. The internal RPM unit tests fail without this:
+        expected.decode('utf-8'),
+    )
+
+    expected = 'Egy sor kódot egyszerre.'
+    assert result['message'] in (
+        expected,
+        # Older versions of Python (such as 2.7.5) provide this value as
+        # a type unicode. This specifically happens when building RPMs
+        # for RedHat/CentOS 7. The internal RPM unit tests fail without this:
+        expected.decode('utf-8'),
+    )
+
+    # Reset our status
+    mock_post.reset_mock()
+
+    # Use unicode characters
+    assert a.notify(
+        # Google Translated to Arabic: "Let's make the world a better place."
+        title='دعونا نجعل العالم مكانا أفضل.\\r\\t\\t\\n\\r\\n'.decode(
+            'utf-8'),
+        # Google Translated to Hungarian: "One line of code at a time.'
+        body='Egy sor kódot egyszerre.\\r\\n\\r\\r\\n'.decode(
+            'utf-8'),
+        # Our Escape Flag
+        interpret_escapes=True)
+
+    # Verify our content was escaped correctly
+    assert mock_post.call_count == 1
+    result = loads(mock_post.call_args_list[0][1]['data'])
+
+    expected = 'دعونا نجعل العالم مكانا أفضل.'
+    assert result['title'] in (
+        expected,
+        # Older versions of Python (such as 2.7.5) provide this value as
+        # a type unicode. This specifically happens when building RPMs
+        # for RedHat/CentOS 7. The internal RPM unit tests fail without this:
+        expected.decode('utf-8'),
+    )
+
+    expected = 'Egy sor kódot egyszerre.'
+    assert result['message'] in (
+        expected,
+        # Older versions of Python (such as 2.7.5) provide this value as
+        # a type unicode. This specifically happens when building RPMs
+        # for RedHat/CentOS 7. The internal RPM unit tests fail without this:
+        expected.decode('utf-8'),
+    )
 
     # Error handling
     #

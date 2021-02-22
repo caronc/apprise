@@ -20,68 +20,76 @@ Telegram, Pushbullet, Slack, Twitter, etc.
 
 The Apprise options are as follows:
 
-  * `-b`, `--body=`<TEXT>:
-    Specify the message body. If no body is specified then content is read from
-    <stdin>.
+  `-b`, `--body=`<TEXT>:
+  Specify the message body. If no body is specified then content is read from
+  <stdin>.
 
-  * `-t`, `--title=`<TEXT>:
-    Specify the message title. This field is complete optional.
+  `-t`, `--title=`<TEXT>:
+  Specify the message title. This field is complete optional.
 
-  * `-c`, `--config=`<CONFIG-URL>:
-    Specify one or more configuration locations.
+  `-c`, `--config=`<CONFIG-URL>:
+  Specify one or more configuration locations.
 
-  * `-a`, `--attach=`<ATTACH-URL>:
-    Specify one or more file attachment locations.
+  `-a`, `--attach=`<ATTACH-URL>:
+  Specify one or more file attachment locations.
 
-  * `-n`, `--notification-type=`<TYPE>:
-    Specify the message type (default=info). Possible values are "info",
-    "success", "failure", and "warning".
+  `-n`, `--notification-type=`<TYPE>:
+  Specify the message type (default=info). Possible values are "info",
+  "success", "failure", and "warning".
 
-  * `-i`, `--input-format=`<FORMAT>:
-    Specify the input message format (default=text). Possible values are "text",
-    "html", and "markdown".
+  `-i`, `--input-format=`<FORMAT>:
+  Specify the input message format (default=text). Possible values are "text",
+  "html", and "markdown".
 
-  * `-T`, `--theme=`THEME:
-    Specify the default theme.
+  `-T`, `--theme=`THEME:
+  Specify the default theme.
 
-  * `-g`, `--tag=`TAG:
-    Specify one or more tags to filter which services to notify. Use multiple
-    **--tag** (**-g**) entries to `OR` the tags together and comma separated
-    to `AND` them. If no tags are specified then all services are notified.
+  `-g`, `--tag=`TAG:
+  Specify one or more tags to filter which services to notify. Use multiple
+  **--tag** (**-g**) entries to `OR` the tags together and comma separated
+  to `AND` them. If no tags are specified then all services are notified.
 
-  * `-d`, `--dry-run`:
-    Perform a trial run but only prints the notification services to-be
-    triggered to **stdout**. Notifications are never sent using this mode.
+  `-Da`, `--disable-async`:
+  Send notifications synchronously (one after the other) instead of
+  all at once.
 
-  * `-v`, `--verbose`:
-    The more of these you specify, the more verbose the output is.
+  `-R`, `--recursion-depth`:
+  he number of recursive import entries that can be loaded from within
+  Apprise configuration. By default this is set to 1. If this is set to
+  zero, then import statements found in any configuration is ignored.
 
-  * `-Da`, `--disable-async`:
-    Send notifications synchronously (one after the other) instead of
-    all at once.
+  `-e`, `--interpret-escapes`
+  Enable interpretation of backslash escapes. For example, this would convert
+  sequences such as \n and \r to their respected ascii new-line and carriage
 
-  * `-R`, `--recursion-depth`:
-    he number of recursive import entries that can be loaded from within
-    Apprise configuration. By default this is set to 1. If this is set to
-    zero, then import statements found in any configuration is ignored.
+  `-d`, `--dry-run`:
+  Perform a trial run but only prints the notification services to-be
+  triggered to **stdout**. Notifications are never sent using this mode.
 
-  * `-D`, `--debug`:
-    A debug mode; useful for troubleshooting.
+  return characters prior to the delivery of the notification.
 
-  * `-V`, `--version`:
-    Display the apprise version and exit.
+  `-v`, `--verbose`:
+  The more of these you specify, the more verbose the output is. e.g: -vvvv
 
-  * `--help`:
-    Show this message and exit.
+  `-D`, `--debug`:
+  A debug mode; useful for troubleshooting.
+
+  `-V`, `--version`:
+  Display the apprise version and exit.
+
+  `-h`, `--help`:
+  Show this message and exit.
 
 ## EXIT STATUS
 
-**apprise** exits with a status 0 if all notifications were sent successfully otherwise **apprise** returns a value of 1. **apprise** returns a value of 2 if
-there was an error specified on the command line (such as not providing an valid
-argument).
+**apprise** exits with a status of:
 
-**apprise** exits with a status of 3 if there were no notifcations sent due (as a result of end user actions).  This occurs in the case where you have assigned one or more tags to all of the Apprise URLs being notified and did not match any when actually executing the **apprise** tool.  This can also occur if you specified a tag that has not been assigned to anything defined in your configuration.
-
+* **0** if all of the notifications were sent successfully.
+* **1** if one or more notifications could not be sent.
+* **2** if there was an error specified on the command line such as not
+  providing an valid argument.
+* **3** if there was one or more Apprise Service URLs successfully
+  loaded but none could be notified due to user filtering (via tags).
 
 ## SERVICE URLS
 
@@ -95,33 +103,69 @@ visit the [Apprise GitHub page][serviceurls] and see what's available.
 Send a notification to as many servers as you want to specify as you can
 easily chain them together:
 
-    $ apprise -vv -t 'my title' -b 'my notification body' \
-       'mailto://myemail:mypass@gmail.com' \
-       'pbul://o.gn5kj6nfhv736I7jC3cj3QLRiyhgl98b'
+    $ apprise -vv -t "my title" -b "my notification body" \
+       "mailto://myemail:mypass@gmail.com" \
+       "pbul://o.gn5kj6nfhv736I7jC3cj3QLRiyhgl98b"
 
 If you don't specify a **--body** (**-b**) then stdin is used allowing you to
 use the tool as part of your every day administration:
 
-    $ cat /proc/cpuinfo | apprise -vv -t 'cpu info' \
-        'mailto://myemail:mypass@gmail.com'
+    $ cat /proc/cpuinfo | apprise -vv -t "cpu info" \
+        "mailto://myemail:mypass@gmail.com"
 
 Load in a configuration file which identifies all of your notification service
 URLs and notify them all:
 
-    $ apprise -vv -t 'my title' -b 'my notification body' \
+    $ apprise -vv -t "my title" -b "my notification body" \
        --config=~/apprise.yml
 
 Load in a configuration file from a remote server that identifies all of your
 notification service URLs and only notify the ones tagged as _devops_.
 
-    $ apprise -vv -t 'my title' -b 'my notification body' \
+    $ apprise -vv -t "my title" -b "my notification body" \
        --config=https://localhost/my/apprise/config \
        -t devops
 
 Include an attachment:
 
-    $ apprise -vv -t 'School Assignment' -b 'See attached' \
+    $ apprise -vv -t "School Assignment" -b "See attached" \
        --attach=Documents/FinalReport.docx
+
+## CONFIGURATION
+
+A configuration file can be in the format of either **TEXT** or **YAML** where
+[TEXT][textconfig] is the easiest and most ideal solution for most users.  However
+[YAML][yamlconfig] configuration files grants the user a bit more leverage and access
+to some of the internal features of Apprise. Reguardless of which format you choose,
+both provide the users the ability to leverage **tagging** which adds a more rich and
+powerful notification environment.
+
+Configuration files can be directly referenced via **apprise** when referencing
+the `--config=` (`-c`) CLI directive.  You can identify as many as you like on the
+command line and all of them will be loaded.  You can also point your configuration to
+a cloud location (by referencing `http://` or `https://`. By default **apprise** looks
+in the following local locations for configuration files and loads them:
+
+    $ ~/.apprise
+    $ ~/.apprise.yml
+    $ ~/.config/apprise
+    $ ~/.config/apprise.yml
+
+If a default configuration file is referenced in any way by the **apprise**
+tool, you no longer need to provide it a Service URL.  Usage of the **apprise**
+tool simplifies to:
+
+    $ apprise -vv -t "my title" -b "my notification body"
+
+If you leveraged [tagging][tagging], you can define all of Apprise Service URLs in your
+configuration that you want and only specifically notify a subset of them:
+
+    $ apprise -vv -t "Will Be Late" -b "Go ahead and make dinner without me" \
+              --tag=family
+
+[yamlconfig]: https://github.com/caronc/apprise/wiki/config_yaml
+[tagging]: https://github.com/caronc/apprise/wiki/CLI_Usage#label-leverage-tagging
+
 
 ## BUGS
 
@@ -130,4 +174,4 @@ If you find any bugs, please make them known at:
 
 ## COPYRIGHT
 
-Apprise is Copyright (C) 2020 Chris Caron <lead2gold@gmail.com>
+Apprise is Copyright (C) 2021 Chris Caron <lead2gold@gmail.com>
