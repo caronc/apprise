@@ -43,22 +43,35 @@
 #
 # When you've completed this, it will generate you a (webhook) URL that
 # looks like:
-#   https://outlook.office.com/webhook/ \
+#   https://team-name.office.com/webhook/ \
 #       abcdefgf8-2f4b-4eca-8f61-225c83db1967@abcdefg2-5a99-4849-8efc-\
 #        c9e78d28e57d/IncomingWebhook/291289f63a8abd3593e834af4d79f9fe/\
 #          a2329f43-0ffb-46ab-948b-c9abdad9d643
 #
 # Yes... The URL is that big... But it looks like this (greatly simplified):
+# https://TEAM-NAME.office.com/webhook/ABCD/IncomingWebhook/DEFG/HIJK
+#             ^                         ^                    ^    ^
+#             |                         |                    |    |
+#  These are important <----------------^--------------------^----^
+#
+
+# The Legacy format didn't have the team name identified and reads 'outlook'
+# While this still works, consider that Microsoft will be dropping support
+# for this soon, so you may need to update your IncomingWebhook. Here is
+# what a legacy URL looked like:
 # https://outlook.office.com/webhook/ABCD/IncomingWebhook/DEFG/HIJK
-#                                     ^                    ^    ^
+#           ^                         ^                    ^    ^
+#           |                         |                    |    |
+#   legacy team reference: 'outlook'  |                    |    |
 #                                     |                    |    |
 #  These are important <--------------^--------------------^----^
 #
+
 # You'll notice that the first token is actually 2 separated by an @ symbol
 # But lets just ignore that and assume it's one great big token instead.
 #
-# These 3 tokens is what you'll need to build your URL with:
-#   msteams://ABCD/DEFG/HIJK
+# These 3 tokens need to be placed in the URL after the Team
+#   msteams://TEAM/ABCD/DEFG/HIJK
 #
 import re
 import requests
@@ -101,7 +114,8 @@ class NotifyMSTeams(NotifyBase):
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_msteams'
 
     # MSTeams uses the http protocol with JSON requests
-    notify_url = 'https://outlook.office.com/webhook'
+    notify_url = 'https://{team}.office.com/webhook/' \
+        '{token_a}/IncomingWebhook/{token_b}/{token_c}'
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_72
@@ -118,11 +132,22 @@ class NotifyMSTeams(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{token_a}/{token_b}{token_c}',
+        # New required format
+        '{schema}://{team}/{token_a}/{token_b}/{token_c}',
+
+        # Deprecated
+        '{schema}://{token_a}/{token_b}/{token_c}',
     )
 
     # Define our template tokens
     template_tokens = dict(NotifyBase.template_tokens, **{
+        # The Microsoft Team Name
+        'team': {
+            'name': _('Team Name'),
+            'type': 'string',
+            'required': True,
+            'regex': (r'^[A-Z0-9_-]+$', 'i'),
+        },
         # Token required as part of the API request
         #  /AAAAAAAAA@AAAAAAAAA/........./.........
         'token_a': {
@@ -175,8 +200,8 @@ class NotifyMSTeams(NotifyBase):
         },
     }
 
-    def __init__(self, token_a, token_b, token_c, include_image=True,
-                 template=None, tokens=None, **kwargs):
+    def __init__(self, token_a, token_b, token_c, team=None,
+                 include_image=True, template=None, tokens=None, **kwargs):
         """
         Initialize Microsoft Teams Object
 
@@ -186,6 +211,16 @@ class NotifyMSTeams(NotifyBase):
            `body`, `title`, and `type`.
         """
         super(NotifyMSTeams, self).__init__(**kwargs)
+
+        self.team = validate_regex(team)
+        if not self.team:
+            NotifyBase.logger.deprecate(
+                "Apprise requires you to identify your Microsoft Team name as "
+                "part of the URL. e.g.: "
+                "msteams://TEAM-NAME/{token_a}/{token_b}/{token_c}")
+
+            # Fallback
+            self.team = 'outlook'
 
         self.token_a = validate_regex(
             token_a, *self.template_tokens['token_a']['regex'])
@@ -338,11 +373,11 @@ class NotifyMSTeams(NotifyBase):
             'Content-Type': 'application/json',
         }
 
-        url = '%s/%s/IncomingWebhook/%s/%s' % (
-            self.notify_url,
-            self.token_a,
-            self.token_b,
-            self.token_c,
+        notify_url = self.notify_url.format(
+            team=self.team,
+            token_a=self.token_a,
+            token_b=self.token_b,
+            token_c=self.token_c,
         )
 
         # Generate our payload if it's possible
@@ -354,7 +389,7 @@ class NotifyMSTeams(NotifyBase):
             return False
 
         self.logger.debug('MSTeams POST URL: %s (cert_verify=%r)' % (
-            url, self.verify_certificate,
+            notify_url, self.verify_certificate,
         ))
         self.logger.debug('MSTeams Payload: %s' % str(payload))
 
@@ -362,7 +397,7 @@ class NotifyMSTeams(NotifyBase):
         self.throttle()
         try:
             r = requests.post(
-                url,
+                notify_url,
                 data=json.dumps(payload),
                 headers=headers,
                 verify=self.verify_certificate,
@@ -418,9 +453,10 @@ class NotifyMSTeams(NotifyBase):
         # Store any template entries if specified
         params.update({':{}'.format(k): v for k, v in self.tokens.items()})
 
-        return '{schema}://{token_a}/{token_b}/{token_c}/'\
+        return '{schema}://{team}/{token_a}/{token_b}/{token_c}/'\
             '?{params}'.format(
                 schema=self.secure_protocol,
+                team=NotifyMSTeams.quote(self.team, safe=''),
                 token_a=self.pprint(self.token_a, privacy, safe=''),
                 token_b=self.pprint(self.token_b, privacy, safe=''),
                 token_c=self.pprint(self.token_c, privacy, safe=''),
@@ -442,6 +478,7 @@ class NotifyMSTeams(NotifyBase):
         # Get unquoted entries
         entries = NotifyMSTeams.split_path(results['fullpath'])
 
+        # Deprecated mode (backwards compatibility)
         if results.get('user'):
             # If a user was found, it's because it's still part of the first
             # token, so we concatinate them
@@ -451,28 +488,25 @@ class NotifyMSTeams(NotifyBase):
             )
 
         else:
-            # The first token is stored in the hostname
-            results['token_a'] = NotifyMSTeams.unquote(results['host'])
+            # Get the Team from the hostname
+            results['team'] = NotifyMSTeams.unquote(results['host'])
 
-        # Now fetch the remaining tokens
-        try:
-            results['token_b'] = entries.pop(0)
+            # Get the token from the path
+            results['token_a'] = None if not entries else entries.pop(0)
 
-        except IndexError:
-            # We're done
-            results['token_b'] = None
-
-        try:
-            results['token_c'] = entries.pop(0)
-
-        except IndexError:
-            # We're done
-            results['token_c'] = None
+        results['token_b'] = None if not entries else entries.pop(0)
+        results['token_c'] = None if not entries else entries.pop(0)
 
         # Get Image
         results['include_image'] = \
             parse_bool(results['qsd'].get('image', True))
 
+        # Get Team name if defined
+        if 'team' in results['qsd'] and results['qsd']['team']:
+            results['team'] = \
+                NotifyMSTeams.unquote(results['qsd']['team'])
+
+        # Template Handling
         if 'template' in results['qsd'] and results['qsd']['template']:
             results['template'] = \
                 NotifyMSTeams.unquote(results['qsd']['template'])
@@ -485,15 +519,18 @@ class NotifyMSTeams(NotifyBase):
     @staticmethod
     def parse_native_url(url):
         """
-        Support:
+        Legacy Support:
             https://outlook.office.com/webhook/ABCD/IncomingWebhook/DEFG/HIJK
+
+        New Hook Support:
+            https://team-name.office.com/webhook/ABCD/IncomingWebhook/DEFG/HIJK
         """
 
         # We don't need to do incredibly details token matching as the purpose
         # of this is just to detect that were dealing with an msteams url
         # token parsing will occur once we initialize the function
         result = re.match(
-            r'^https?://outlook\.office\.com/webhook/'
+            r'^https?://(?P<team>[^.]+)\.office\.com/webhook/'
             r'(?P<token_a>[A-Z0-9-]+@[A-Z0-9-]+)/'
             r'IncomingWebhook/'
             r'(?P<token_b>[A-Z0-9]+)/'
@@ -502,8 +539,10 @@ class NotifyMSTeams(NotifyBase):
 
         if result:
             return NotifyMSTeams.parse_url(
-                '{schema}://{token_a}/{token_b}/{token_c}/{params}'.format(
+                '{schema}://{team}/{token_a}/{token_b}/{token_c}'
+                '/{params}'.format(
                     schema=NotifyMSTeams.secure_protocol,
+                    team=result.group('team'),
                     token_a=result.group('token_a'),
                     token_b=result.group('token_b'),
                     token_c=result.group('token_c'),

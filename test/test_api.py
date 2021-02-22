@@ -1339,7 +1339,7 @@ def test_apprise_details_plugin_verification():
 
         if six.PY2:
             # inspect our object
-            # getargspec() is depricated in Python v3
+            # getargspec() is deprecated in Python v3
             spec = inspect.getargspec(SCHEMA_MAP[protocols[0]].__init__)
 
             function_args = \
