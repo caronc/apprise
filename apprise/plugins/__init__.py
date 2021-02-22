@@ -34,6 +34,7 @@ from os.path import abspath
 # Used for testing
 from . import NotifyEmail as NotifyEmailBase
 from .NotifyXMPP import SleekXmppAdapter
+from .NotifyXMPP import SliXmppAdapter
 
 # NotifyBase object is passed in as a module not class
 from . import NotifyBase
@@ -64,6 +65,9 @@ __all__ = [
 
     # sleekxmpp access points (used for NotifyXMPP Testing)
     'SleekXmppAdapter',
+
+    # slixmpp access points (used for NotifyXMPP Testing)
+    'SliXmppAdapter',
 ]
 
 # we mirror our base purely for the ability to reset everything; this
