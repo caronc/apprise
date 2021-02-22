@@ -72,11 +72,20 @@ def notify(coroutines, debug=False):
 
     else:
         #
-        # The depricated way
+        # The Deprecated Way (<= Python v3.6)
         #
 
-        # acquire access to our event loop
-        loop = asyncio.get_event_loop()
+        try:
+            # acquire access to our event loop
+            loop = asyncio.get_event_loop()
+
+        except RuntimeError:
+            # This happens if we're inside a thread of another application
+            # where there is no running event_loop().  Pythong v3.7 and higher
+            # automatically take care of this case for us.  But for the lower
+            # versions we need to do the following:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
 
         if debug:
             # Enable debug mode
