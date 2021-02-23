@@ -178,6 +178,9 @@ BuildRequires: python%{python3_pkgversion}-pytest-runner
 %patch0 -p1
 # rhel7 doesn't like the new asyncio syntax
 rm -f apprise/py3compat/asyncio.py
+# rhel7 doesn't support slixmpp and formatting in place
+# within the dev-requirements.txt file to reference it
+sed -i -e '/^slixmpp.*/d' dev-requirements.txt
 %endif
 
 %build
