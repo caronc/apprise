@@ -58,7 +58,7 @@ Telegram, Twilio, Twitter, Twist, XBMC, XMPP, Webex Teams}
 
 Name:           python-%{pypi_name}
 Version:        0.9.1
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        MIT
 URL:            https://github.com/caronc/%{pypi_name}
@@ -97,8 +97,10 @@ Requires: python2-requests-oauthlib
 Requires: python-six
 Requires: python-markdown
 %if 0%{?rhel} && 0%{?rhel} <= 7
+Requires: python-cryptography
 Requires: python-yaml
 %else
+Requires: python2-cryptography
 Requires: python2-yaml
 %endif
 
@@ -154,6 +156,7 @@ Requires: python%{python3_pkgversion}-requests
 Requires: python%{python3_pkgversion}-requests-oauthlib
 Requires: python%{python3_pkgversion}-six
 Requires: python%{python3_pkgversion}-markdown
+Requires: python%{python3_pkgversion}-cryptography
 %if 0%{?rhel} && 0%{?rhel} >= 8
 # gntp isn't available from EPEL for RHEL/CentOS 8
 %else
@@ -243,6 +246,9 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 %endif
 
 %changelog
+* Tue Feb 23 2021 Chris Caron <lead2gold@gmail.com> - 0.9.1-2
+- Added missing cryptography dependency
+
 * Tue Feb 23 2021 Chris Caron <lead2gold@gmail.com> - 0.9.1-1
 - Updated to v0.9.1
 
