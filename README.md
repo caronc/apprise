@@ -12,7 +12,7 @@ To inform or tell (someone). To make one aware of something.
 * A common and intuitive notification syntax.
 * Supports the handling of images and attachments (_to the notification services that will accept them_).
 * It's incredibly lightweight.
-* Amazing response times because all messages sent asyncronously.
+* Amazing response times because all messages sent asynchronously.
 
 Developers who wish to provide a notification service no longer need to research each and every one out there. They no longer need to try to adapt to the new ones that comeout thereafter. They just need to include this one library and then they can immediately gain access to almost all of the notifications services available to us today.
 
