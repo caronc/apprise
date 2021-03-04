@@ -3465,6 +3465,183 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifyReddit
+    ##################################
+    ('reddit://', {
+        # Missing all credentials
+        'instance': TypeError,
+    }),
+    ('reddit://:@/', {
+        'instance': TypeError,
+    }),
+    ('reddit://user@app_id/app_secret/', {
+        # No password
+        'instance': TypeError,
+    }),
+    ('reddit://user:password@app_id/', {
+        # No app secret
+        'instance': TypeError,
+    }),
+    ('reddit://user:password@app_id/appsecret/apprise', {
+        # No invalid app_id (has underscore)
+        'instance': TypeError,
+    }),
+    ('reddit://user:password@app-id/app_secret/apprise', {
+        # No invalid app_secret (has underscore)
+        'instance': TypeError,
+    }),
+    ('reddit://user:password@app-id/app-secret/apprise?kind=invalid', {
+        # An Invalid Kind
+        'instance': TypeError,
+    }),
+    ('reddit://user:password@app-id/app-secret/apprise', {
+        # Login failed
+        'instance': plugins.NotifyReddit,
+        # Expected notify() response is False because internally we would
+        # have failed to login
+        'notify_response': False,
+    }),
+    ('reddit://user:password@app-id/app-secret', {
+        # Login successful, but there was no subreddit to notify
+        'instance': plugins.NotifyReddit,
+        'requests_response_text': {
+            "access_token": 'abc123',
+            "token_type": "bearer",
+            "expires_in": 100000,
+            "scope": '*',
+            "refresh_token": 'def456',
+            # The below is used in the response:
+            "json": {
+                # No errors during post
+                "errors": [],
+            },
+        },
+        # Expected notify() response is False
+        'notify_response': False,
+    }),
+    ('reddit://user:password@app-id/app-secret/apprise', {
+        'instance': plugins.NotifyReddit,
+        'requests_response_text': {
+            "access_token": 'abc123',
+            "token_type": "bearer",
+            "expires_in": 100000,
+            "scope": '*',
+            "refresh_token": 'def456',
+            # The below is used in the response:
+            "json": {
+                # Identify an error
+                "errors": [('KEY', 'DESC', 'INFO'), ],
+            },
+        },
+        # Expected notify() response is False because the
+        # reddit server provided us errors
+        'notify_response': False,
+    }),
+
+    ('reddit://user:password@app-id/app-secret/apprise', {
+        'instance': plugins.NotifyReddit,
+        'requests_response_text': {
+            "access_token": 'abc123',
+            "token_type": "bearer",
+            # Test case where 'expires_in' entry is missing
+            "scope": '*',
+            "refresh_token": 'def456',
+            # The below is used in the response:
+            "json": {
+                # No errors during post
+                "errors": [],
+            },
+        },
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'reddit://user:****@****/****/apprise',
+    }),
+    ('reddit://user:password@app-id/app-secret/apprise/subreddit2', {
+        # password:login acceptable
+        'instance': plugins.NotifyReddit,
+        'requests_response_text': {
+            "access_token": 'abc123',
+            "token_type": "bearer",
+            "expires_in": 100000,
+            "scope": '*',
+            "refresh_token": 'def456',
+            # The below is used in the response:
+            "json": {
+                # No errors during post
+                "errors": [],
+            },
+        },
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url':
+            'reddit://user:****@****/****/apprise/subreddit2',
+    }),
+    # Pass in some arguments to over-ride defaults
+    ('reddit://user:pass@id/secret/sub/'
+     '?ad=yes&nsfw=yes&replies=no&resubmit=yes&spoiler=yes&kind=self', {
+         'instance': plugins.NotifyReddit,
+         'requests_response_text': {
+             "access_token": 'abc123',
+             "token_type": "bearer",
+             "expires_in": 100000,
+             "scope": '*',
+             "refresh_token": 'def456',
+             # The below is used in the response:
+             "json": {
+                 # No errors during post
+                 "errors": [],
+             },
+         },
+         # Our expected url(privacy=True) startswith() response:
+         'privacy_url': 'reddit://user:****@****/****/sub'}),
+    # Pass in more arguments
+    ('reddit://'
+     '?user=l2g&pass=pass&app_secret=abc123&app_id=54321&to=sub1,sub2', {
+         'instance': plugins.NotifyReddit,
+         'requests_response_text': {
+             "access_token": 'abc123',
+             "token_type": "bearer",
+             "expires_in": 100000,
+             "scope": '*',
+             "refresh_token": 'def456',
+             # The below is used in the response:
+             "json": {
+                 # No errors during post
+                 "errors": [],
+             },
+         },
+         # Our expected url(privacy=True) startswith() response:
+         'privacy_url': 'reddit://l2g:****@****/****/sub1/sub2'}),
+    # More arguments ...
+    ('reddit://user:pass@id/secret/sub7/sub6/sub5/'
+     '?flair_id=wonder&flair_text=not%20for%20you', {
+         'instance': plugins.NotifyReddit,
+         'requests_response_text': {
+             "access_token": 'abc123',
+             "token_type": "bearer",
+             "expires_in": 100000,
+             "scope": '*',
+             "refresh_token": 'def456',
+             # The below is used in the response:
+             "json": {
+                 # No errors during post
+                 "errors": [],
+             },
+         },
+         # Our expected url(privacy=True) startswith() response:
+         'privacy_url': 'reddit://user:****@****/****/sub'}),
+    ('reddit://user:password@app-id/app-secret/apprise', {
+        'instance': plugins.NotifyReddit,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('reddit://user:password@app-id/app-secret/apprise', {
+        'instance': plugins.NotifyReddit,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifyRocketChat
     ##################################
     ('rocket://', {
@@ -4741,6 +4918,7 @@ TEST_URLS = (
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
     }),
+
     ##################################
     # NotifyTwitter
     ##################################

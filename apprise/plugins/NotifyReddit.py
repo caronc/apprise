@@ -43,7 +43,7 @@
 # here:
 #   - https://www.reddit.com/dev/api/
 #   - https://www.reddit.com/dev/api/#POST_api_submit
-
+#   - https://github.com/reddit-archive/reddit/wiki/API
 import six
 import requests
 from json import loads
@@ -62,7 +62,7 @@ from .. import __title__, __version__
 
 # Extend HTTP Error Messages
 REDDIT_HTTP_ERROR_MAP = {
-    401: 'Unauthorized - Invalid Token.',
+    401: 'Unauthorized - Invalid Token',
 }
 
 
@@ -140,7 +140,7 @@ class NotifyReddit(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{user}:{password}@{app_id}/{app_secret}/{subreddits}',
+        '{schema}://{user}:{password}@{app_id}/{app_secret}/{targets}',
     )
 
     # Define our template arguments
@@ -161,7 +161,7 @@ class NotifyReddit(NotifyBase):
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'^[a-z0-9]+$', 'i'),
+            'regex': (r'^[a-z0-9-]+$', 'i'),
         },
         'app_secret': {
             'name': _('Application Secret'),
@@ -192,11 +192,27 @@ class NotifyReddit(NotifyBase):
             'values': REDDIT_MESSAGE_KINDS,
             'default': RedditMessageKind.AUTO,
         },
+        'flair_id': {
+            'name': _('Flair ID'),
+            'type': 'string',
+            'map_to': 'flair_id',
+        },
+        'flair_text': {
+            'name': _('Flair Text'),
+            'type': 'string',
+            'map_to': 'flair_text',
+        },
         'nsfw': {
             'name': _('NSFW'),
             'type': 'bool',
             'default': False,
             'map_to': 'nsfw',
+        },
+        'ad': {
+            'name': _('Is Ad?'),
+            'type': 'bool',
+            'default': False,
+            'map_to': 'advertisement',
         },
         'replies': {
             'name': _('Send Replies'),
@@ -220,7 +236,8 @@ class NotifyReddit(NotifyBase):
 
     def __init__(self, app_id=None, app_secret=None, targets=None,
                  kind=None, nsfw=False, sendreplies=True, resubmit=False,
-                 spoiler=False, **kwargs):
+                 spoiler=False, advertisement=False,
+                 flair_id=None, flair_text=None, **kwargs):
         """
         Initialize Notify Reddit Object
         """
@@ -241,6 +258,13 @@ class NotifyReddit(NotifyBase):
         # Resubmit Flag
         self.resubmit = resubmit
 
+        # Is Ad?
+        self.advertisement = advertisement
+
+        # Flair details
+        self.flair_id = flair_id
+        self.flair_text = flair_text
+
         # Our keys we build using the provided content
         self.__refresh_token = None
         self.__access_token = None
@@ -251,7 +275,7 @@ class NotifyReddit(NotifyBase):
             else self.template_args['kind']['default']
 
         if self.kind not in REDDIT_MESSAGE_KINDS:
-            msg = 'An invalid Reddit message kind ({}) was specified.'.format(
+            msg = 'An invalid Reddit message kind ({}) was specified'.format(
                 kind)
             self.logger.warning(msg)
             raise TypeError(msg)
@@ -259,14 +283,14 @@ class NotifyReddit(NotifyBase):
         self.user = validate_regex(self.user)
         if not self.user:
             msg = 'An invalid Reddit User ID ' \
-                  '({}) was specified.'.format(self.user)
+                  '({}) was specified'.format(self.user)
             self.logger.warning(msg)
             raise TypeError(msg)
 
         self.password = validate_regex(self.password)
         if not self.password:
             msg = 'An invalid Reddit Password ' \
-                  '({}) was specified.'.format(self.password)
+                  '({}) was specified'.format(self.password)
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -274,7 +298,7 @@ class NotifyReddit(NotifyBase):
             app_id, *self.template_tokens['app_id']['regex'])
         if not self.client_id:
             msg = 'An invalid Reddit App ID ' \
-                  '({}) was specified.'.format(app_id)
+                  '({}) was specified'.format(app_id)
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -282,7 +306,7 @@ class NotifyReddit(NotifyBase):
             app_secret, *self.template_tokens['app_secret']['regex'])
         if not self.client_secret:
             msg = 'An invalid Reddit App Secret ' \
-                  '({}) was specified.'.format(app_secret)
+                  '({}) was specified'.format(app_secret)
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -292,7 +316,7 @@ class NotifyReddit(NotifyBase):
 
         if not self.subreddits:
             self.logger.warning(
-                'No subreddits were identified to be notified.')
+                'No subreddits were identified to be notified')
         return
 
     def url(self, privacy=False, *args, **kwargs):
@@ -303,11 +327,19 @@ class NotifyReddit(NotifyBase):
         # Define any URL parameters
         params = {
             'kind': self.kind,
+            'ad': 'yes' if self.advertisement else 'no',
             'nsfw': 'yes' if self.nsfw else 'no',
             'resubmit': 'yes' if self.resubmit else 'no',
             'replies': 'yes' if self.sendreplies else 'no',
             'spoiler': 'yes' if self.spoiler else 'no',
         }
+
+        # Flair support
+        if self.flair_id:
+            params['flair_id'] = self.flair_id
+
+        if self.flair_text:
+            params['flair_text'] = self.flair_text
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
@@ -340,11 +372,13 @@ class NotifyReddit(NotifyBase):
             'password': self.password,
         }
 
+        # Enforce a False flag setting before calling _fetch()
+        self.__access_token = False
+
         # Send Login Information
         postokay, response = self._fetch(
+            self.auth_url,
             payload=payload,
-            # We set this boolean so internal recursion doesn't take place.
-            login=True,
         )
 
         if not postokay or not response:
@@ -365,6 +399,8 @@ class NotifyReddit(NotifyBase):
 
         # Acquire our token
         self.__access_token = response.get('access_token')
+
+        # Handle other optional arguments we can use
         if 'expires_in' in response:
             delta = timedelta(seconds=int(response['expires_in']))
             self.__access_token_expiry = \
@@ -373,11 +409,19 @@ class NotifyReddit(NotifyBase):
             self.__access_token_expiry = self.access_token_lifetime_sec + \
                 datetime.utcnow() - self.clock_skew
 
+        # The Refresh Token
         self.__refresh_token = response.get(
             'refresh_token', self.__refresh_token)
 
-        self.logger.info('Authenticated to Reddit as {}'.format(self.user))
-        return True
+        if self.__access_token:
+            self.logger.info('Authenticated to Reddit as {}'.format(self.user))
+            return True
+
+        self.logger.warning(
+            'Failed to authenticate to Reddit as {}'.format(self.user))
+
+        # Mark our failure
+        return False
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
@@ -417,7 +461,7 @@ class NotifyReddit(NotifyBase):
 
             # Prepare our payload
             payload = {
-                'ad': False,
+                'ad': True if self.advertisement else False,
                 'api_type': 'json',
                 'extension': 'json',
                 'sr': subreddit,
@@ -429,6 +473,12 @@ class NotifyReddit(NotifyBase):
                 'spoiler': True if self.spoiler else False,
             }
 
+            if self.flair_id:
+                payload['flair_id'] = self.flair_id
+
+            if self.flair_text:
+                payload['flair_text'] = self.flair_text
+
             if kind == RedditMessageKind.LINK:
                 payload.update({
                     'url': body,
@@ -438,7 +488,7 @@ class NotifyReddit(NotifyBase):
                     'text': body,
                 })
 
-            postokay, response = self._fetch(payload=payload)
+            postokay, response = self._fetch(self.submit_url, payload=payload)
             # only toggle has_error flag if we had an error
             if not postokay:
                 # Mark our failure
@@ -447,12 +497,12 @@ class NotifyReddit(NotifyBase):
 
             # If we reach here, we were successful
             self.logger.info(
-                'Sent Reddit notification to {}.'.format(
+                'Sent Reddit notification to {}'.format(
                     subreddit))
 
         return not has_error
 
-    def _fetch(self, payload=None, login=False):
+    def _fetch(self, url, payload=None):
         """
         Wrapper to Reddit API requests object
         """
@@ -487,8 +537,9 @@ class NotifyReddit(NotifyBase):
             now = datetime.utcnow()
             if now < self.ratelimit_reset:
                 # We need to throttle for the difference in seconds
-                wait = (self.ratelimit_reset - now).total_seconds() + \
-                    self.clock_skew
+                wait = abs(
+                    (self.ratelimit_reset - now + self.clock_skew)
+                    .total_seconds())
 
         # Always call throttle before any remote server i/o is made;
         self.throttle(wait=wait)
@@ -508,6 +559,40 @@ class NotifyReddit(NotifyBase):
                 timeout=self.request_timeout,
             )
 
+            #  We attempt to login again and retry the original request
+            #  if we aren't in the process of handling a login already
+            if r.status_code != requests.codes.ok \
+                    and self.__access_token and url != self.auth_url:
+
+                # We had a problem
+                status_str = \
+                    NotifyReddit.http_response_code_lookup(
+                        r.status_code, REDDIT_HTTP_ERROR_MAP)
+
+                self.logger.debug(
+                    'Taking countermeasures after failed to send to Reddit '
+                    '{}: {}error={}'.format(
+                        url,
+                        ', ' if status_str else '',
+                        r.status_code))
+
+                self.logger.debug(
+                    'Response Details:\r\n{}'.format(r.content))
+
+                # We failed to authenticate with our token; login one more
+                # time and retry this original request
+                if not self.login():
+                    return (False, {})
+
+                # Try again
+                r = requests.post(
+                    url,
+                    data=payload,
+                    headers=headers,
+                    verify=self.verify_certificate,
+                    timeout=self.request_timeout
+                )
+
             # Get our JSON content if it's possible
             try:
                 content = loads(r.content)
@@ -516,31 +601,23 @@ class NotifyReddit(NotifyBase):
                 # TypeError = r.content is not a String
                 # ValueError = r.content is Unparsable
                 # AttributeError = r.content is None
-                content = {}
 
-            #  We attempt to login again and retry the original request
-            #  if we aren't in the process of handling a login already
-            if r.status_code == 401 and self.__access_token and login is False:
-                # We failed to authenticate with our token; login one more
-                # time and retry this original request
-                if self.login():
-                    r = requests.post(
+                # We had a problem
+                status_str = \
+                    NotifyReddit.http_response_code_lookup(
+                        r.status_code, REDDIT_HTTP_ERROR_MAP)
+
+                # Reddit always returns a JSON response
+                self.logger.warning(
+                    'Failed to send to Reddit after countermeasures {}: '
+                    '{}error={}'.format(
                         url,
-                        data=payload,
-                        headers=headers,
-                        verify=self.verify_certificate,
-                        timeout=self.request_timeout
-                    )
+                        ', ' if status_str else '',
+                        r.status_code))
 
-                    # Get our JSON content if it's possible
-                    try:
-                        content = loads(r.content)
-
-                    except (TypeError, ValueError, AttributeError):
-                        # TypeError = r.content is not a String
-                        # ValueError = r.content is Unparsable
-                        # AttributeError = r.content is None
-                        content = {}
+                self.logger.debug(
+                    'Response Details:\r\n{}'.format(r.content))
+                return (False, {})
 
             if r.status_code != requests.codes.ok:
                 # We had a problem
@@ -550,7 +627,7 @@ class NotifyReddit(NotifyBase):
 
                 self.logger.warning(
                     'Failed to send to Reddit {}: '
-                    '{}error={}.'.format(
+                    '{}error={}'.format(
                         url,
                         ', ' if status_str else '',
                         r.status_code))
@@ -561,12 +638,14 @@ class NotifyReddit(NotifyBase):
                 # Mark our failure
                 return (False, content)
 
-            if content.get('json', {}).get('errors', []):
+            errors = [] if not content else \
+                content.get('json', {}).get('errors', [])
+            if errors:
                 self.logger.warning(
                     'Failed to send to Reddit {}: '
-                    '{}.'.format(
+                    '{}'.format(
                         url,
-                        str(content['json'].get('errors'))))
+                        str(errors)))
 
                 self.logger.debug(
                     'Response Details:\r\n{}'.format(r.content))
@@ -605,20 +684,13 @@ class NotifyReddit(NotifyBase):
         us to re-instantiate this object.
 
         """
-        results = NotifyBase.parse_url(url)
+        results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
 
-        # The App/Bot ID is the hostname
-        results['app_id'] = NotifyReddit.unquote(results['host'])
-
         # Acquire our targets
         results['targets'] = NotifyReddit.split_path(results['fullpath'])
-
-        # The first target identified is the App secret
-        results['app_secret'] = \
-            None if not results['targets'] else results['targets'].pop(0)
 
         # Kind override
         if 'kind' in results['qsd'] and results['qsd']['kind']:
@@ -626,6 +698,10 @@ class NotifyReddit(NotifyBase):
                 results['qsd']['kind'].strip().lower())
         else:
             results['kind'] = RedditMessageKind.AUTO
+
+        # Is an Ad?
+        results['ad'] = \
+            parse_bool(results['qsd'].get('ad', False))
 
         # Get Not Safe For Work (NSFW) Flag
         results['nsfw'] = \
@@ -643,18 +719,32 @@ class NotifyReddit(NotifyBase):
         results['spoiler'] = \
             parse_bool(results['qsd'].get('spoiler', False))
 
+        if 'flair_text' in results['qsd']:
+            results['flair_text'] = \
+                NotifyReddit.unquote(results['qsd']['flair_text'])
+
+        if 'flair_id' in results['qsd']:
+            results['flair_id'] = \
+                NotifyReddit.unquote(results['qsd']['flair_id'])
+
         # The 'to' makes it easier to use yaml configuration
         if 'to' in results['qsd'] and len(results['qsd']['to']):
             results['targets'] += \
                 NotifyReddit.parse_list(results['qsd']['to'])
 
-        if 'app_id' in results['qsd'] and len(results['qsd']['app_id']):
-            results['app_id'] += \
-                NotifyReddit.parse_list(results['qsd']['app_id'])
+        if 'app_id' in results['qsd']:
+            results['app_id'] = \
+                NotifyReddit.unquote(results['qsd']['app_id'])
+        else:
+            # The App/Bot ID is the hostname
+            results['app_id'] = NotifyReddit.unquote(results['host'])
 
-        if 'app_secret' in results['qsd'] and \
-                len(results['qsd']['app_secret']):
-            results['app_secret'] += \
-                NotifyReddit.parse_list(results['qsd']['app_secret'])
+        if 'app_secret' in results['qsd']:
+            results['app_secret'] = \
+                NotifyReddit.unquote(results['qsd']['app_secret'])
+        else:
+            # The first target identified is the App secret
+            results['app_secret'] = \
+                None if not results['targets'] else results['targets'].pop(0)
 
         return results

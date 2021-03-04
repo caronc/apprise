@@ -75,9 +75,9 @@ setup(
         'MacOS Mailgun Matrix Mattermost MessageBird MSG91 Nexmo Nextcloud '
         'Notica Notifico Office365 OneSignal Opsgenie ParsePlatform '
         'PopcornNotify Prowl PushBullet Pushjet Pushed Pushover PushSafer '
-        'Rocket.Chat Ryver SendGrid SimplePush Sinch Slack SparkPost Spontit '
-        'Stride Syslog Techulus Telegram Twilio Twist Twitter XBMC MSTeams '
-        'Microsoft Windows Webex CLI API',
+        'Reddit Rocket.Chat Ryver SendGrid SimplePush Sinch Slack SparkPost '
+        'Spontit Stride Syslog Techulus Telegram Twilio Twist Twitter XBMC '
+        'MSTeams Microsoft Windows Webex CLI API',
     author='Chris Caron',
     author_email='lead2gold@gmail.com',
     packages=find_packages(),
