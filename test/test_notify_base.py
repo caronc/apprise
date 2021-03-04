@@ -282,6 +282,19 @@ def test_notify_base_urls():
     assert 'password' in results
     assert results['password'] == "newpassword"
 
+    # password keyword can also optionally be used
+    results = NotifyBase.parse_url(
+        'https://user:pass@localhost?password=passwd')
+    assert 'password' in results
+    assert results['password'] == "passwd"
+
+    # pass= override password=
+    # password keyword can also optionally be used
+    results = NotifyBase.parse_url(
+        'https://user:pass@localhost?pass=pw1&password=pw2')
+    assert 'password' in results
+    assert results['password'] == "pw1"
+
     # Options
     results = NotifyBase.parse_url('https://localhost?format=invalid')
     assert 'format' not in results

@@ -636,6 +636,8 @@ class URLBase(object):
                 results['qsd'].get('verify', True))
 
         # Password overrides
+        if 'password' in results['qsd']:
+            results['password'] = results['qsd']['password']
         if 'pass' in results['qsd']:
             results['password'] = results['qsd']['pass']
 

@@ -284,7 +284,7 @@ class NotifyGitter(NotifyBase):
         # By default set wait to None
         wait = None
 
-        if self.ratelimit_remaining == 0:
+        if self.ratelimit_remaining <= 0:
             # Determine how long we should wait for or if we should wait at
             # all. This isn't fool-proof because we can't be sure the client
             # time (calling this script) is completely synced up with the

@@ -23,7 +23,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-__title__ = 'apprise'
+__title__ = 'Apprise'
 __version__ = '0.9.1'
 __author__ = 'Chris Caron'
 __license__ = 'MIT'

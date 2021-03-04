@@ -562,6 +562,7 @@ class NotifyTwist(NotifyBase):
 
         if not len(self.channel_ids):
             # We have nothing to notify
+            self.logger.warning('There are no Twist targets to notify')
             return False
 
         # Notify all of our identified channels
