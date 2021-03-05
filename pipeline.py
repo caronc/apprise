@@ -6,7 +6,7 @@ import conducto as co
 from inspect import cleandoc
 
 
-def pipeline() -> co.Serial:
+def all_checks() -> co.Serial:
     """
     Define our Full Conducto Pipeline
     """
@@ -15,6 +15,9 @@ def pipeline() -> co.Serial:
 
     # Shared Pipeline Directory
     share = '/conducto/data/pipeline/apprise'
+
+    # The directory the project can be found in within the containers
+    repo = '/apprise'
 
     # Unit Testing
     dockerfiles = (
@@ -36,6 +39,8 @@ def pipeline() -> co.Serial:
 
     # find generated coverage filename and store it in the pipeline
     coverage_template = cleandoc('''
+        pip install -r requirements.txt -r dev-requirements.txt || exit 1
+
         mkdir --verbose -p {share} && \\
            coverage run --parallel -m pytest && \\
              find . -mindepth 1 -maxdepth 1 -type f \\
@@ -45,27 +50,96 @@ def pipeline() -> co.Serial:
     # pull generated file from the pipeline and place it back into
     # our working directory
     coverage_report_template = cleandoc('''
+        pip install coverage || exit 1
+
         find {share} -mindepth 1 -maxdepth 1 -type f \\
             -name '.coverage.*' \\
             -exec mv --verbose -- {{}} . \;
 
         coverage combine . && \\
-            coverage report --ignore-errors --skip-covered --show-missing''')
+            coverage report --ignore-errors --skip-covered --show-missing
 
-    # Package Templates
+        # Push our coverage report to codecov.io
+        retry=3
+        iter=0
+        while [ $iter -lt $retry ]; do
+           bash <(curl -s https://codecov.io/bash) -Z
+           [ $? -eq 0 ] && break
+           sleep 1s
+           # loop to try again
+           let iter+=1
+        done
+    ''')
+
+    # RPM Packaging Templates (assumes we're building as the user 'builder')
     rpm_pkg_template = cleandoc('''
+        # copy our environment over
+        rsync -a ./ /home/builder/
+
+        # Permissions
+        chmod ug+rw -R /home/builder
+        chown -R builder /home/builder
+
+        # Advance to our build directory
+        cd /home/builder
+
+        # Prepare Virtual Environment
+        VENV_CMD="python3 -m venv"
+        [ "$DIST" == "el7" ] && VENV_CMD=virtualenv
+
         sudo -u builder \\
-            rpmbuild -bb packaging/redhat/python-apprise.spec''')
+            $VENV_CMD . && . bin/activate && \\
+                pip install coverage babel wheel markdown && \\
+                   python3 setup.py extract_messages && \\
+                   python3 setup.py sdist
+
+        # Build Man Page
+        sudo -u builder \\
+            ronn --roff packaging/man/apprise.md
+
+        # Prepare RPM Package
+        sudo -u builder \\
+            find dist -type f -name '*.gz' \\
+                -exec mv --verbose {{}} packaging/redhat/ \\;
+        sudo -u builder \\
+            find packaging/man -type f -name '*.1' \\
+                -exec mv --verbose {{}} packaging/redhat/ \\;
+
+        # Build Source RPM Package
+        sudo -u builder \\
+            rpmbuild -bs packaging/redhat/python-apprise.spec || exit 1
+
+        # Install Missing RPM Dependencies
+        if [ -x /usr/bin/dnf ]; then
+            # EL8 and Newer
+            dnf builddep -y rpm/*.rpm || exit 1
+        else
+            # EL7 Backwards Compatibility
+            yum-builddep -y rpm/*.rpm || exit 1
+        fi
+
+        # Build our RPM using the environment we prepared
+        sudo -u builder \\
+            rpmbuild -bb packaging/redhat/python-apprise.spec''') \
+        .format(repo=repo)
+
+    # Define our default image keyword argument defaults
+    image_kwargs = {
+        'copy_repo': True,
+        'path_map': {'.': repo},
+    }
 
     # Our base image is always the first entry defined in our dockerfiles
-    base_image = co.Image(dockerfile=dockerfiles[0][1], context=context)
-    base_pkg_image = \
-        co.Image(dockerfile=pkg_dockerfiles[0][1], context=context)
+    base_image = co.Image(
+        dockerfile=dockerfiles[0][1], context=context, **image_kwargs)
+    base_pkg_image = co.Image(
+        dockerfile=pkg_dockerfiles[0][1], context=context, **image_kwargs)
 
     with co.Serial() as pipeline:
         with co.Parallel(name="Presentation"):
             # Code Styles
             co.Exec(
+                'pip install flake8 && '
                 'flake8 . --count --show-source --statistics',
                 name="Style Guidelines", image=base_image)
 
@@ -78,7 +152,11 @@ def pipeline() -> co.Serial:
         with co.Parallel(name="Tests"):
             for entry in dockerfiles:
                 name, dockerfile = entry
-                image = co.Image(dockerfile=dockerfile, context=context)
+
+                # Prepare our Image
+                image = co.Image(
+                    dockerfile=dockerfile, context=context, **image_kwargs)
+
                 # Unit Tests
                 # These produce files that look like:
                 # .coverage.{userid}.{hostname}.NNNNNN.NNNNNN where:
@@ -100,7 +178,8 @@ def pipeline() -> co.Serial:
         with co.Parallel(name="Packaging"):
             for entry in pkg_dockerfiles:
                 name, dockerfile = entry
-                image = co.Image(dockerfile=dockerfile, context=context)
+                image = co.Image(
+                    dockerfile=dockerfile, context=context, **image_kwargs)
 
                 # Build our packages
                 co.Exec(rpm_pkg_template, name=name, image=image)
@@ -112,4 +191,4 @@ if __name__ == "__main__":
     """
     Execute our pipeline
     """
-    exit(co.main(default=pipeline))
+    exit(co.main(default=all_checks))
