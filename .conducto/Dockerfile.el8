@@ -15,48 +15,18 @@ RUN ( \
    dnf install -y epel-release; \
    dnf install -y rpm-build rpmlint python3-pip python3-virtualenv rubygem-ronn \
                   dnf-plugins-core 'dnf-command(config-manager)' \
-                 'dnf-command(builddep)' sudo; \
+                 'dnf-command(builddep)' sudo rsync; \
    dnf config-manager --set-enabled powertools;
-
-# Apprise Setup
-COPY . /home/builder/apprise
-WORKDIR /home/builder/apprise
 
 # RPM Build Structure Setup
 ENV FLAVOR=rpmbuild OS=centos DIST=el8
 RUN useradd builder -u 1000 -m -G users,wheel &>/dev/null && \
     echo "builder ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers && \
-    echo "# macros"                                        >  /home/builder/.rpmmacros && \
-    echo "%_topdir    /home/builder"                       >> /home/builder/.rpmmacros && \
-    echo "%_sourcedir %{_topdir}/apprise/packaging/redhat" >> /home/builder/.rpmmacros && \
-    echo "%_builddir  %{_topdir}/apprise/packaging/redhat" >> /home/builder/.rpmmacros && \
-    echo "%_specdir   %{_topdir}/apprise/packaging/redhat" >> /home/builder/.rpmmacros && \
-    echo "%_rpmdir    %{_topdir}/apprise/rpm"              >> /home/builder/.rpmmacros && \
-    echo "%_srcrpmdir %{_topdir}/apprise/rpm"              >> /home/builder/.rpmmacros && \
-    mkdir /home/builder/rpm && \
-    chmod ug+rw -R /home/builder && \
-    chown -R builder /home/builder
-
-# Switch to our Builder
-USER 1000
-
-# Prepare Virtual Environment
-RUN python3 -m venv . && . bin/activate && \
-     pip install coverage babel wheel markdown && \
-       python3 setup.py extract_messages && \
-       python3 setup.py sdist && \
-	\
-     ronn --roff packaging/man/apprise.md && \
-   \
-    find dist -type f -name '*.gz' \
-      -exec mv --verbose {} packaging/redhat/ \; && \
-    find packaging/man -type f -name '*.1' \
-      -exec mv --verbose {} packaging/redhat/ \; && \
-   \
-   rpmbuild -bs packaging/redhat/python-apprise.spec
-
-# Switch back
-USER 0
-
-# Install Dependencies
-RUN dnf builddep -y rpm/*.rpm
+    echo "# macros"                                >  /home/builder/.rpmmacros && \
+    echo "%_topdir    /home/builder"               >> /home/builder/.rpmmacros && \
+    echo "%_sourcedir %{_topdir}/packaging/redhat" >> /home/builder/.rpmmacros && \
+    echo "%_builddir  %{_topdir}/packaging/redhat" >> /home/builder/.rpmmacros && \
+    echo "%_specdir   %{_topdir}/packaging/redhat" >> /home/builder/.rpmmacros && \
+    echo "%_rpmdir    %{_topdir}/rpm"              >> /home/builder/.rpmmacros && \
+    echo "%_srcrpmdir %{_topdir}/rpm"              >> /home/builder/.rpmmacros && \
+    mkdir /home/builder/rpm
