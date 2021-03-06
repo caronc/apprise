@@ -191,4 +191,4 @@ if __name__ == "__main__":
     """
     Execute our pipeline
     """
-    exit(co.main(default=all_checks))
+    co.main(default=all_checks)
