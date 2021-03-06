@@ -340,3 +340,5 @@ If you're interested in reading more about this and other methods on how to cust
 Want to help Apprise get better?
 * 💡 [Contribute to the Apprise Code Base](https://github.com/caronc/apprise/wiki/Development_Contribution)
 * ❤️ [Sponsorship and Donations](https://github.com/caronc/apprise/wiki/Sponsors)
+
+bump
