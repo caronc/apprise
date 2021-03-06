@@ -6,7 +6,7 @@ import conducto as co
 from inspect import cleandoc
 
 
-def all_checks() -> co.Serial:
+def all_checks(release=None) -> co.Serial:
     """
     Define our Full Conducto Pipeline
     """
@@ -41,18 +41,18 @@ def all_checks() -> co.Serial:
     coverage_template = cleandoc('''
         pip install -r requirements.txt -r dev-requirements.txt || exit 1
 
-        mkdir --verbose -p {share} && \\
+        mkdir --verbose -p {share}/coverage && \\
            coverage run --parallel -m pytest && \\
              find . -mindepth 1 -maxdepth 1 -type f \\
                  -name '.coverage.*' \\
-                 -exec mv --verbose -- {{}} {share} \;''')
+                 -exec mv --verbose -- {{}} {share}/coverage \;''')
 
     # pull generated file from the pipeline and place it back into
     # our working directory
     coverage_report_template = cleandoc('''
         pip install coverage || exit 1
 
-        find {share} -mindepth 1 -maxdepth 1 -type f \\
+        find {share}/coverage -mindepth 1 -maxdepth 1 -type f \\
             -name '.coverage.*' \\
             -exec mv --verbose -- {{}} . \;
 
@@ -131,6 +131,10 @@ def all_checks() -> co.Serial:
         'copy_repo': True,
         'path_map': {'.': repo},
     }
+
+    if release:
+        # Prepare release details into environment
+        image_kwargs.update({'env': {'PRODUCT_RELEASE': release}})
 
     # Our base image is always the first entry defined in our dockerfiles
     base_image = co.Image(
