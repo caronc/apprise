@@ -84,26 +84,29 @@ def all_checks() -> co.Serial:
         cd /home/builder
 
         # Prepare Virtual Environment
-        VENV_CMD="python3 -m venv"
-        [ "$DIST" == "el7" ] && VENV_CMD=virtualenv
+        PYTHON=python3
+        VENV_CMD="$PYTHON -m venv"
+
+        # Enterprise Linux 7 (Python v2.7.5) Support
+        [ "$DIST" == "el7" ] && \\
+            VENV_CMD=virtualenv && \\
+            PYTHON=python2
 
         sudo -u builder \\
             $VENV_CMD . && . bin/activate && \\
                 pip install coverage babel wheel markdown && \\
-                   python3 setup.py extract_messages && \\
-                   python3 setup.py sdist
+                   $PYTHON setup.py extract_messages && \\
+                   $PYTHON setup.py sdist
 
         # Build Man Page
         sudo -u builder \\
             ronn --roff packaging/man/apprise.md
 
         # Prepare RPM Package
-        sudo -u builder \\
-            find dist -type f -name '*.gz' \\
-                -exec mv --verbose {{}} packaging/redhat/ \\;
-        sudo -u builder \\
-            find packaging/man -type f -name '*.1' \\
-                -exec mv --verbose {{}} packaging/redhat/ \\;
+        find dist -type f -name '*.gz' \\
+            -exec mv --verbose {{}} packaging/redhat/ \\;
+        find packaging/man -type f -name '*.1' \\
+            -exec mv --verbose {{}} packaging/redhat/ \\;
 
         # Build Source RPM Package
         sudo -u builder \\
