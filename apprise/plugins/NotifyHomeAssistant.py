@@ -176,7 +176,7 @@ class NotifyHomeAssistant(NotifyBase):
         if isinstance(self.port, int):
             url += ':%d' % self.port
 
-        url += '/' + self.fullpath.strip('/')
+        url += '' if not self.fullpath else '/' + self.fullpath.strip('/')
         url += '/api/services/persistent_notification/create'
 
         self.logger.debug('Home Assistant POST URL: %s (cert_verify=%r)' % (
