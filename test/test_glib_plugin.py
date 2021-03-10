@@ -78,8 +78,7 @@ def test_dbus_plugin(mock_mainloop, mock_byte, mock_bytearray,
         del sys.modules[gi_name]
         reload(sys.modules['apprise.plugins.NotifyDBus'])
 
-    # We need to fake our dbus environment for testing purposes since
-    # the gi library isn't available in Travis CI
+    # Fake our dbus environment for testing purposes
     gi = types.ModuleType(gi_name)
     gi.repository = types.ModuleType(gi_name + '.repository')
 

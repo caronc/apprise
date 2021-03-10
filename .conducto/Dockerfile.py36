@@ -1,0 +1,4 @@
+# Base
+FROM python:3.6-buster
+RUN apt-get update && apt-get install -y libdbus-1-dev build-essential musl-dev
+RUN pip install dbus-python

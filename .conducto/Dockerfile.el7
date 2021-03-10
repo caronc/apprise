@@ -1,0 +1,34 @@
+# Base
+FROM centos:7
+ENV container docker
+RUN ( \
+	cd /lib/systemd/system/sysinit.target.wants/; for i in *; do [ $i == \
+	systemd-tmpfiles-setup.service ] || rm -f $i; done); \
+	rm -f /lib/systemd/system/multi-user.target.wants/*;\
+	rm -f /etc/systemd/system/*.wants/*;\
+	rm -f /lib/systemd/system/local-fs.target.wants/*; \
+	rm -f /lib/systemd/system/sockets.target.wants/*udev*; \
+	rm -f /lib/systemd/system/sockets.target.wants/*initctl*; \
+	rm -f /lib/systemd/system/basic.target.wants/*;\
+	rm -f /lib/systemd/system/anaconda.target.wants/*; \
+   echo "assumeyes=1" >> /etc/yum.conf; \
+   yum install -y epel-release; \
+   yum install -y rpm-build rpmlint python-pip python-virtualenv sudo rsync;
+
+# RPM Build Structure Setup
+ENV FLAVOR=rpmbuild OS=centos DIST=el7
+RUN useradd builder -u 1000 -m -G users,wheel &>/dev/null && \
+    echo "builder ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers && \
+    echo "# macros"                                >  /home/builder/.rpmmacros && \
+    echo "%_topdir    /home/builder"               >> /home/builder/.rpmmacros && \
+    echo "%_sourcedir %{_topdir}/packaging/redhat" >> /home/builder/.rpmmacros && \
+    echo "%_builddir  %{_topdir}/packaging/redhat" >> /home/builder/.rpmmacros && \
+    echo "%_specdir   %{_topdir}/packaging/redhat" >> /home/builder/.rpmmacros && \
+    echo "%_rpmdir    %{_topdir}/rpm"              >> /home/builder/.rpmmacros && \
+    echo "%_srcrpmdir %{_topdir}/rpm"              >> /home/builder/.rpmmacros && \
+    mkdir /home/builder/rpm
+
+# The ronn package isn't easily available without connecting to custom
+# repositories.  Since EL7 runs Python v2.7 (soon to be no longer supported)
+# we will emulate the ronn binary being present and not worry about it
+RUN ln -snf /usr/bin/true /usr/bin/ronn

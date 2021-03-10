@@ -1,0 +1,32 @@
+# Base
+FROM centos:8
+ENV container docker
+RUN ( \
+	cd /lib/systemd/system/sysinit.target.wants/; for i in *; do [ $i == \
+	systemd-tmpfiles-setup.service ] || rm -f $i; done); \
+	rm -f /lib/systemd/system/multi-user.target.wants/*;\
+	rm -f /etc/systemd/system/*.wants/*;\
+	rm -f /lib/systemd/system/local-fs.target.wants/*; \
+	rm -f /lib/systemd/system/sockets.target.wants/*udev*; \
+	rm -f /lib/systemd/system/sockets.target.wants/*initctl*; \
+	rm -f /lib/systemd/system/basic.target.wants/*;\
+	rm -f /lib/systemd/system/anaconda.target.wants/*; \
+   echo "assumeyes=1" >> /etc/yum.conf; \
+   dnf install -y epel-release; \
+   dnf install -y rpm-build rpmlint python3-pip python3-virtualenv rubygem-ronn \
+                  dnf-plugins-core 'dnf-command(config-manager)' \
+                 'dnf-command(builddep)' sudo rsync; \
+   dnf config-manager --set-enabled powertools;
+
+# RPM Build Structure Setup
+ENV FLAVOR=rpmbuild OS=centos DIST=el8
+RUN useradd builder -u 1000 -m -G users,wheel &>/dev/null && \
+    echo "builder ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers && \
+    echo "# macros"                                >  /home/builder/.rpmmacros && \
+    echo "%_topdir    /home/builder"               >> /home/builder/.rpmmacros && \
+    echo "%_sourcedir %{_topdir}/packaging/redhat" >> /home/builder/.rpmmacros && \
+    echo "%_builddir  %{_topdir}/packaging/redhat" >> /home/builder/.rpmmacros && \
+    echo "%_specdir   %{_topdir}/packaging/redhat" >> /home/builder/.rpmmacros && \
+    echo "%_rpmdir    %{_topdir}/rpm"              >> /home/builder/.rpmmacros && \
+    echo "%_srcrpmdir %{_topdir}/rpm"              >> /home/builder/.rpmmacros && \
+    mkdir /home/builder/rpm
