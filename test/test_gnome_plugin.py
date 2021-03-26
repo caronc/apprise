@@ -65,7 +65,8 @@ def test_gnome_plugin():
         del sys.modules[gi_name]
         reload(sys.modules['apprise.plugins.NotifyGnome'])
 
-    # Fake our Gnome environment for testing purposes
+    # We need to fake our gnome environment for testing purposes since
+    # the gi library isn't available in Travis CI
     gi = types.ModuleType(gi_name)
     gi.repository = types.ModuleType(gi_name + '.repository')
     gi.module = types.ModuleType(gi_name + '.module')
