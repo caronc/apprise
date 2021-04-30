@@ -118,7 +118,7 @@ class NotifyMSTeams(NotifyBase):
         '{token_a}/IncomingWebhook/{token_b}/{token_c}'
 
     # New MSTeams webhook (as of April 11th, 2021)
-    notify_url_v2 = 'https://{team}.office.com/webhookb2/' \
+    notify_url_v2 = 'https://{team}.webhook.office.com/webhookb2/' \
         '{token_a}/IncomingWebhook/{token_b}/{token_c}'
 
     # Allows the user to specify the NotifyImageSize object
