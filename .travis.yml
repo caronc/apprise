@@ -28,7 +28,9 @@ matrix:
 
 install:
   - pip install babel
-  - pip install .
+  # upgrade tox, pip, and virtualenv so Python 3.6 will build crytography:
+  # https://travis-ci.community/t/pip-install-cryptography-fails-on-py36/11233
+  - pip install -U tox pip virtualenv
   - pip install codecov
   - pip install -r dev-requirements.txt
   - pip install -r requirements.txt
