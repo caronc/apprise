@@ -106,6 +106,5 @@ setup(
     ),
     entry_points={'console_scripts': console_scripts},
     python_requires='>=2.7',
-    setup_requires=['pytest-runner', 'babel', ],
-    tests_require=open('dev-requirements.txt').readlines(),
+    setup_requires=['babel', ],
 )
