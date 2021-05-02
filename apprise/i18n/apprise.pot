@@ -6,9 +6,9 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: apprise 0.9.1\n"
+"Project-Id-Version: apprise 0.9.2\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2021-02-23 11:07-0500\n"
+"POT-Creation-Date: 2021-05-02 11:48-0400\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -54,6 +54,9 @@ msgid "App ID"
 msgstr ""
 
 msgid "App Version"
+msgstr ""
+
+msgid "Application ID"
 msgstr ""
 
 msgid "Application Key"
@@ -176,6 +179,12 @@ msgstr ""
 msgid "Facility"
 msgstr ""
 
+msgid "Flair ID"
+msgstr ""
+
+msgid "Flair Text"
+msgstr ""
+
 msgid "Footer Logo"
 msgstr ""
 
@@ -218,6 +227,15 @@ msgstr ""
 msgid "Include Segment"
 msgstr ""
 
+msgid "Is Ad?"
+msgstr ""
+
+msgid "Is Spoiler"
+msgstr ""
+
+msgid "Kind"
+msgstr ""
+
 msgid "Language"
 msgstr ""
 
@@ -249,6 +267,9 @@ msgid "Modal"
 msgstr ""
 
 msgid "Mode"
+msgstr ""
+
+msgid "NSFW"
 msgstr ""
 
 msgid "Notification ID"
@@ -305,6 +326,9 @@ msgstr ""
 msgid "Remove Tokens"
 msgstr ""
 
+msgid "Resubmit Flag"
+msgstr ""
+
 msgid "Retry"
 msgstr ""
 
@@ -327,6 +351,9 @@ msgid "Secret Key"
 msgstr ""
 
 msgid "Secure Mode"
+msgstr ""
+
+msgid "Send Replies"
 msgstr ""
 
 msgid "Sender ID"
@@ -414,6 +441,9 @@ msgid "Target Short Code"
 msgstr ""
 
 msgid "Target Stream"
+msgstr ""
+
+msgid "Target Subreddit"
 msgstr ""
 
 msgid "Target Tag ID"

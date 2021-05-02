@@ -57,8 +57,8 @@ SimplePush, Sinch, Slack, Spontit, SparkPost, Super Toasty, Stride, Syslog,
 Techulus Push, Telegram, Twilio, Twitter, Twist, XBMC, XMPP, Webex Teams}
 
 Name:           python-%{pypi_name}
-Version:        0.9.1
-Release:        2%{?dist}
+Version:        0.9.2
+Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        MIT
 URL:            https://github.com/caronc/%{pypi_name}
@@ -247,6 +247,9 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 %endif
 
 %changelog
+* Sun May  2 2021 Chris Caron <lead2gold@gmail.com> - 0.9.2-1
+- Updated to v0.9.2
+
 * Tue Feb 23 2021 Chris Caron <lead2gold@gmail.com> - 0.9.1-2
 - Added missing cryptography dependency
 
