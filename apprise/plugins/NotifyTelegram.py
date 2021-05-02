@@ -549,11 +549,6 @@ class NotifyTelegram(NotifyBase):
 
         else:  # TEXT
             payload['parse_mode'] = 'HTML'
-
-            # Escape content
-            title = NotifyTelegram.escape_html(title, whitespace=False)
-            body = NotifyTelegram.escape_html(body, whitespace=False)
-
             payload['text'] = '{}{}'.format(
                 '<b>{}</b>\r\n'.format(title) if title else '',
                 body,
