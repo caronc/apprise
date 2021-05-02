@@ -19,8 +19,10 @@ matrix:
       env: TOXENV=py37
     - python: "3.8"
       env: TOXENV=py38
-    - python: "3.9-dev"
+    - python: "3.9"
       env: TOXENV=py39
+    - python: "3.9-dev"
+      env: TOXENV=py39-dev
     - python: "pypy2.7-6.0"
       env: TOXENV=pypy
     - python: "pypy3.5-7.0"
