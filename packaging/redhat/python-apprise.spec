@@ -138,6 +138,7 @@ Summary: A simple wrapper to many popular notification services used today
 %{?python_provide:%python_provide python%{python3_pkgversion}-%{pypi_name}}
 
 BuildRequires: python%{python3_pkgversion}-devel
+BuildRequires: python%{python3_pkgversion}-setuptools
 BuildRequires: python%{python3_pkgversion}-requests
 BuildRequires: python%{python3_pkgversion}-requests-oauthlib
 BuildRequires: python%{python3_pkgversion}-six
