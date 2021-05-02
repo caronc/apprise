@@ -2015,62 +2015,94 @@ TEST_URLS = (
         # Just 2 tokens provided
         'instance': TypeError,
     }),
-    ('msteams://{}@{}/{}/{}?t1'.format(UUID4, UUID4, 'a' * 32, UUID4), {
+    ('msteams://{}@{}/{}/{}?t1'.format(UUID4, UUID4, 'b' * 32, UUID4), {
         # All tokens provided - we're good
         'instance': plugins.NotifyMSTeams,
     }),
     # Support native URLs
     ('https://outlook.office.com/webhook/{}@{}/IncomingWebhook/{}/{}'
-     .format(UUID4, UUID4, 'a' * 32, UUID4), {
+     .format(UUID4, UUID4, 'k' * 32, UUID4), {
          # All tokens provided - we're good
-         'instance': plugins.NotifyMSTeams}),
+         'instance': plugins.NotifyMSTeams,
+
+         # Our expected url(privacy=True) startswith() response (v1 format)
+         'privacy_url': 'msteams://8...2/k...k/8...2/'}),
+
+    # Support New Native URLs
+    ('https://myteam.webhook.office.com/webhookb2/{}@{}/IncomingWebhook/{}/{}'
+     .format(UUID4, UUID4, 'm' * 32, UUID4), {
+         # All tokens provided - we're good
+         'instance': plugins.NotifyMSTeams,
+
+         # Our expected url(privacy=True) startswith() response (v2 format):
+         'privacy_url': 'msteams://myteam/8...2/m...m/8...2/'}),
 
     # Legacy URL Formatting
-    ('msteams://{}@{}/{}/{}?t2'.format(UUID4, UUID4, 'a' * 32, UUID4), {
+    ('msteams://{}@{}/{}/{}?t2'.format(UUID4, UUID4, 'c' * 32, UUID4), {
         # All tokens provided - we're good
         'instance': plugins.NotifyMSTeams,
         # don't include an image by default
         'include_image': False,
     }),
     # Legacy URL Formatting
-    ('msteams://{}@{}/{}/{}?image=No'.format(UUID4, UUID4, 'a' * 32, UUID4), {
+    ('msteams://{}@{}/{}/{}?image=No'.format(UUID4, UUID4, 'd' * 32, UUID4), {
         # All tokens provided - we're good  no image
         'instance': plugins.NotifyMSTeams,
 
         # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'msteams://outlook/8...2/a...a/8...2/',
+        'privacy_url': 'msteams://8...2/d...d/8...2/',
     }),
     # New 2021 URL formatting
     ('msteams://apprise/{}@{}/{}/{}'.format(
-        UUID4, UUID4, 'a' * 32, UUID4), {
+        UUID4, UUID4, 'e' * 32, UUID4), {
             # All tokens provided - we're good  no image
             'instance': plugins.NotifyMSTeams,
 
             # Our expected url(privacy=True) startswith() response:
-            'privacy_url': 'msteams://apprise/8...2/a...a/8...2/',
+            'privacy_url': 'msteams://apprise/8...2/e...e/8...2/',
     }),
     # New 2021 URL formatting; support team= argument
     ('msteams://{}@{}/{}/{}?team=teamname'.format(
-        UUID4, UUID4, 'a' * 32, UUID4), {
+        UUID4, UUID4, 'f' * 32, UUID4), {
             # All tokens provided - we're good  no image
             'instance': plugins.NotifyMSTeams,
 
             # Our expected url(privacy=True) startswith() response:
-            'privacy_url': 'msteams://teamname/8...2/a...a/8...2/',
+            'privacy_url': 'msteams://teamname/8...2/f...f/8...2/',
     }),
-    ('msteams://{}@{}/{}/{}?tx'.format(UUID4, UUID4, 'a' * 32, UUID4), {
+    # New 2021 URL formatting (forcing v1)
+    ('msteams://apprise/{}@{}/{}/{}?version=1'.format(
+        UUID4, UUID4, 'e' * 32, UUID4), {
+            # All tokens provided - we're good
+            'instance': plugins.NotifyMSTeams,
+
+            # Our expected url(privacy=True) startswith() response:
+            'privacy_url': 'msteams://8...2/e...e/8...2/',
+    }),
+    # Invalid versioning
+    ('msteams://apprise/{}@{}/{}/{}?version=999'.format(
+        UUID4, UUID4, 'e' * 32, UUID4), {
+            # invalid version
+            'instance': TypeError,
+    }),
+    ('msteams://apprise/{}@{}/{}/{}?version=invalid'.format(
+        UUID4, UUID4, 'e' * 32, UUID4), {
+            # invalid version
+            'instance': TypeError,
+    }),
+    ('msteams://{}@{}/{}/{}?tx'.format(UUID4, UUID4, 'x' * 32, UUID4), {
         'instance': plugins.NotifyMSTeams,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
-    ('msteams://{}@{}/{}/{}?ty'.format(UUID4, UUID4, 'a' * 32, UUID4), {
+    ('msteams://{}@{}/{}/{}?ty'.format(UUID4, UUID4, 'y' * 32, UUID4), {
         'instance': plugins.NotifyMSTeams,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
-    ('msteams://{}@{}/{}/{}?tz'.format(UUID4, UUID4, 'a' * 32, UUID4), {
+    ('msteams://{}@{}/{}/{}?tz'.format(UUID4, UUID4, 'z' * 32, UUID4), {
         'instance': plugins.NotifyMSTeams,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
