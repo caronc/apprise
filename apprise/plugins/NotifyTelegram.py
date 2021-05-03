@@ -547,8 +547,17 @@ class NotifyTelegram(NotifyBase):
                 body,
             )
 
-        else:  # TEXT
+        else:  # pass directly as is...
             payload['parse_mode'] = 'HTML'
+
+            # Telegram strangely escapes all HTML characters for us already
+            # but to avoid causing issues with HTML, we escape the < and >
+            # characters
+            title = re.sub('>', '&gt;', title, re.I)
+            title = re.sub('<', '&lt;', title, re.I)
+            body = re.sub('>', '&gt;', body, re.I)
+            body = re.sub('<', '&lt;', body, re.I)
+
             payload['text'] = '{}{}'.format(
                 '<b>{}</b>\r\n'.format(title) if title else '',
                 body,
