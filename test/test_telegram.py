@@ -29,6 +29,7 @@ import pytest
 import mock
 import requests
 from json import dumps
+from json import loads
 from apprise import Apprise
 from apprise import AppriseAttachment
 from apprise import AppriseAsset
@@ -202,11 +203,26 @@ def test_notify_telegram_plugin(mock_post, mock_get):
     })
     mock_post.return_value.status_code = requests.codes.ok
 
-    # Test sending attachments
     obj = plugins.NotifyTelegram(bot_token=bot_token, targets='12345')
     assert len(obj.targets) == 1
     assert obj.targets[0] == '12345'
 
+    # Test the escaping of characters since Telegram escapes stuff for us to
+    # which we need to consider
+    mock_post.reset_mock()
+    body = "<p>\'\"This can't\t\r\nfail&nbsp;us\"\'</p>"
+    assert obj.notify(
+        body=body, title='special characters', notify_type=NotifyType.INFO,
+        ) is True
+    assert mock_post.call_count == 1
+    payload = loads(mock_post.call_args_list[0][1]['data'])
+
+    # Our special characters are escaped properly
+    assert payload['text'] == \
+        '<b>special characters</b>\r\n&lt;p&gt;'\
+        '\'"This can\'t\t\r\nfail us"\'&lt;/p&gt;'
+
+    # Test sending attachments
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
