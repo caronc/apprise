@@ -212,8 +212,8 @@ def test_notify_telegram_plugin(mock_post, mock_get):
     mock_post.reset_mock()
     body = "<p>\'\"This can't\t\r\nfail&nbsp;us\"\'</p>"
     assert obj.notify(
-        body=body, title='special characters', notify_type=NotifyType.INFO,
-        ) is True
+        body=body, title='special characters',
+        notify_type=NotifyType.INFO) is True
     assert mock_post.call_count == 1
     payload = loads(mock_post.call_args_list[0][1]['data'])
 
