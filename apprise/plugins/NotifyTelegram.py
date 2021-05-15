@@ -524,39 +524,73 @@ class NotifyTelegram(NotifyBase):
                 body,
             )
 
-        elif self.notify_format == NotifyFormat.HTML:
+        else:  # HTML or TEXT
+
+            # Use Telegram's HTML mode
             payload['parse_mode'] = 'HTML'
 
-            # HTML Spaces (&nbsp;) and tabs (&emsp;) aren't supported
-            # See https://core.telegram.org/bots/api#html-style
-            body = re.sub('&nbsp;?', ' ', body, re.I)
-
-            # Tabs become 3 spaces
-            body = re.sub('&emsp;?', '   ', body, re.I)
-
-            if title:
+            # Telegram's HTML support doesn't like having HTML escaped
+            # characters passed into it.  to handle this situation, we need to
+            # search the body for these sequences and convert them to the
+            # output the user expected
+            telegram_escape_html_dict = {
                 # HTML Spaces (&nbsp;) and tabs (&emsp;) aren't supported
                 # See https://core.telegram.org/bots/api#html-style
-                title = re.sub('&nbsp;?', ' ', title, re.I)
+                r'nbsp': ' ',
 
                 # Tabs become 3 spaces
-                title = re.sub('&emsp;?', '   ', title, re.I)
+                r'emsp': '   ',
 
-            payload['text'] = '{}{}'.format(
-                '<b>{}</b>\r\n'.format(title) if title else '',
-                body,
-            )
+                # Some characters get re-escaped by the Telegram upstream
+                # service so we need to convert these back,
+                r'apos': '\'',
+                r'quot': '"',
+            }
 
-        else:  # pass directly as is...
-            payload['parse_mode'] = 'HTML'
+            # Create a regular expression from the dictionary keys
+            html_regex = re.compile("&(%s);?" % "|".join(
+                map(re.escape, telegram_escape_html_dict.keys())).lower(),
+                re.I)
 
-            # Telegram strangely escapes all HTML characters for us already
-            # but to avoid causing issues with HTML, we escape the < and >
-            # characters
-            title = re.sub('>', '&gt;', title, re.I)
-            title = re.sub('<', '&lt;', title, re.I)
-            body = re.sub('>', '&gt;', body, re.I)
-            body = re.sub('<', '&lt;', body, re.I)
+            # For each match, look-up corresponding value in dictionary
+            # we look +1 to ignore the & that does not appear in the index
+            # we only look at the first 4 characters because we don't want to
+            # fail on &apos; as it's accepted (along with &apos - no
+            # semi-colon)
+            body = html_regex.sub(  # pragma: no branch
+                lambda mo: telegram_escape_html_dict[
+                    mo.string[mo.start():mo.end()][1:5]], body)
+
+            if title:
+                # For each match, look-up corresponding value in dictionary
+                # Indexing is explained above (for how the body is parsed)
+                title = html_regex.sub(  # pragma: no branch
+                    lambda mo: telegram_escape_html_dict[
+                        mo.string[mo.start():mo.end()][1:5]], title)
+
+            if self.notify_format == NotifyFormat.TEXT:
+                telegram_escape_text_dict = {
+                    # We need to escape characters that conflict with html
+                    # entity blocks (< and >) when displaying text
+                    r'>': '&gt;',
+                    r'<': '&lt;',
+                }
+
+                # Create a regular expression from the dictionary keys
+                text_regex = re.compile("(%s)" % "|".join(
+                    map(re.escape, telegram_escape_text_dict.keys())).lower(),
+                    re.I)
+
+                # For each match, look-up corresponding value in dictionary
+                body = text_regex.sub(  # pragma: no branch
+                    lambda mo: telegram_escape_text_dict[
+                        mo.string[mo.start():mo.end()]], body)
+
+                if title:
+                    # For each match, look-up corresponding value in dictionary
+                    title = text_regex.sub(  # pragma: no branch
+                        lambda mo: telegram_escape_text_dict[
+                            mo.string[mo.start():mo.end()]], title)
 
             payload['text'] = '{}{}'.format(
                 '<b>{}</b>\r\n'.format(title) if title else '',
