@@ -42,7 +42,6 @@
 #  the email will be transmitted from.  If no email address is specified
 #  then it will also become the 'to' address as well.
 #
-import io
 import base64
 import requests
 from json import dumps
@@ -299,7 +298,7 @@ class NotifySMTP2Go(NotifyBase):
                     return False
 
                 try:
-                    with io.open(attachment.path, 'rb') as f:
+                    with open(attachment.path, 'rb') as f:
                         # Output must be in a DataURL format (that's what
                         # PushSafer calls it):
                         attachments.append({
@@ -400,8 +399,9 @@ class NotifySMTP2Go(NotifyBase):
 
             # Format our bcc addresses to support the Name field
             if bcc:
-                # set our bcc variable
-                payload['bcc'] = bcc
+                # set our bcc variable (convert to list first so it's
+                # JSON serializable)
+                payload['bcc'] = list(bcc)
 
             # Store our header entries if defined into the payload
             # in their payload
@@ -423,8 +423,6 @@ class NotifySMTP2Go(NotifyBase):
                 else '{} recipients'.format(
                     len(self.targets[index:index + batch_size]))
 
-            import pdb
-            pdb.set_trace()
             # Always call throttle before any remote server i/o is made
             self.throttle()
             try:

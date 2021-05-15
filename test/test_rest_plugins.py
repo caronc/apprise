@@ -4629,6 +4629,109 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifySMTP2Go
+    ##################################
+    ('smtp2go://', {
+        'instance': TypeError,
+    }),
+    ('smtp2go://:@/', {
+        'instance': TypeError,
+    }),
+    # No Token specified
+    ('smtp2go://user@localhost.localdomain', {
+        'instance': TypeError,
+    }),
+    # Token is valid, but no user name specified
+    ('smtp2go://localhost.localdomain/{}-{}-{}'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+        'instance': TypeError,
+    }),
+    # Invalid from email address
+    ('smtp2go://!@localhost.localdomain/{}-{}-{}'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+        'instance': TypeError,
+    }),
+    # No To email address, but everything else is valid
+    ('smtp2go://user@localhost.localdomain/{}-{}-{}'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+        'instance': plugins.NotifySMTP2Go,
+    }),
+    ('smtp2go://user@localhost.localdomain/{}-{}-{}?format=markdown'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+        'instance': plugins.NotifySMTP2Go,
+    }),
+    ('smtp2go://user@localhost.localdomain/{}-{}-{}?format=html'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+        'instance': plugins.NotifySMTP2Go,
+    }),
+    ('smtp2go://user@localhost.localdomain/{}-{}-{}?format=text'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+        'instance': plugins.NotifySMTP2Go,
+    }),
+    # headers
+    ('smtp2go://user@localhost.localdomain/{}-{}-{}'
+        '?+X-Customer-Campaign-ID=Apprise'.format(
+            'a' * 32, 'b' * 8, 'c' * 8), {
+                'instance': plugins.NotifySMTP2Go,
+        }),
+    # bcc and cc
+    ('smtp2go://user@localhost.localdomain/{}-{}-{}'
+        '?bcc=user@example.com&cc=user2@example.com'.format(
+            'a' * 32, 'b' * 8, 'c' * 8), {
+                'instance': plugins.NotifySMTP2Go,
+        }),
+    # One To Email address
+    ('smtp2go://user@localhost.localdomain/{}-{}-{}/test@example.com'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+            'instance': plugins.NotifySMTP2Go,
+    }),
+    ('smtp2go://user@localhost.localdomain/'
+        '{}-{}-{}?to=test@example.com'.format(
+            'a' * 32, 'b' * 8, 'c' * 8), {
+                'instance': plugins.NotifySMTP2Go}),
+    # One To Email address, a from name specified too
+    ('smtp2go://user@localhost.localdomain/{}-{}-{}/'
+        'test@example.com?name="Frodo"'.format(
+            'a' * 32, 'b' * 8, 'c' * 8), {
+                'instance': plugins.NotifySMTP2Go}),
+    # Invalid 'To' Email address
+    ('smtp2go://user@localhost.localdomain/{}-{}-{}/invalid'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+            'instance': plugins.NotifySMTP2Go,
+            # Expected notify() response
+            'notify_response': False,
+    }),
+    # Multiple 'To', 'Cc', and 'Bcc' addresses (with invalid ones)
+    ('smtp2go://user@example.com/{}-{}-{}/{}?bcc={}&cc={}'.format(
+        'a' * 32, 'b' * 8, 'c' * 8,
+        '/'.join(('user1@example.com', 'invalid', 'User2:user2@example.com')),
+        ','.join(('user3@example.com', 'i@v', 'User1:user1@example.com')),
+        ','.join(('user4@example.com', 'g@r@b', 'Da:user5@example.com'))), {
+            'instance': plugins.NotifySMTP2Go,
+    }),
+    ('smtp2go://user@localhost.localdomain/{}-{}-{}'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+        'instance': plugins.NotifySMTP2Go,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('smtp2go://user@localhost.localdomain/{}-{}-{}'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+        'instance': plugins.NotifySMTP2Go,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('smtp2go://user@localhost.localdomain/{}-{}-{}'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+        'instance': plugins.NotifySMTP2Go,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifySNS (AWS)
     ##################################
     ('sns://', {
