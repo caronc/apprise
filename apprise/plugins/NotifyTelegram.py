@@ -557,14 +557,14 @@ class NotifyTelegram(NotifyBase):
             # we only look at the first 4 characters because we don't want to
             # fail on &apos; as it's accepted (along with &apos - no
             # semi-colon)
-            body = html_regex.sub(
+            body = html_regex.sub(  # pragma: no branch
                 lambda mo: telegram_escape_html_dict[
                     mo.string[mo.start():mo.end()][1:5]], body)
 
             if title:
                 # For each match, look-up corresponding value in dictionary
                 # Indexing is explained above (for how the body is parsed)
-                title = html_regex.sub(
+                title = html_regex.sub(  # pragma: no branch
                     lambda mo: telegram_escape_html_dict[
                         mo.string[mo.start():mo.end()][1:5]], title)
 
@@ -582,13 +582,13 @@ class NotifyTelegram(NotifyBase):
                     re.I)
 
                 # For each match, look-up corresponding value in dictionary
-                body = text_regex.sub(
+                body = text_regex.sub(  # pragma: no branch
                     lambda mo: telegram_escape_text_dict[
                         mo.string[mo.start():mo.end()]], body)
 
                 if title:
                     # For each match, look-up corresponding value in dictionary
-                    title = text_regex.sub(
+                    title = text_regex.sub(  # pragma: no branch
                         lambda mo: telegram_escape_text_dict[
                             mo.string[mo.start():mo.end()]], title)
 
