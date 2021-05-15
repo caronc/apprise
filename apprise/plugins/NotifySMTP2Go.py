@@ -57,10 +57,6 @@ from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
 SMTP2GO_HTTP_ERROR_MAP = {
-    400: 'A bad request was made to the server.',
-    401: 'The provided API Key was not valid.',
-    402: 'The request failed for a reason out of your control.',
-    404: 'The requested API query is not valid.',
     429: 'To many requests.',
 }
 
