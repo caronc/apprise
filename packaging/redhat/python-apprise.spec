@@ -58,7 +58,7 @@ Syslog, Techulus Push, Telegram, Twilio, Twitter, Twist, XBMC, XMPP,
 Webex Teams}
 
 Name:           python-%{pypi_name}
-Version:        0.9.2
+Version:        0.9.3
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        MIT
@@ -248,6 +248,9 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 %endif
 
 %changelog
+* Sun May 16 2021 Chris Caron <lead2gold@gmail.com> - 0.9.3-1
+- Updated to v0.9.3
+
 * Sun May  2 2021 Chris Caron <lead2gold@gmail.com> - 0.9.2-1
 - Updated to v0.9.2
 
@@ -256,6 +259,9 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 
 * Tue Feb 23 2021 Chris Caron <lead2gold@gmail.com> - 0.9.1-1
 - Updated to v0.9.1
+
+-* Wed Jan 27 2021 Fedora Release Engineering <releng@fedoraproject.org> - 0.9.0-3
+-- Rebuilt for https://fedoraproject.org/wiki/Fedora_34_Mass_Rebuild
 
 * Thu Jan 14 2021 Chris Caron <lead2gold@gmail.com> - 0.9.0-2
 - Fixed unit tests
