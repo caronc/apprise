@@ -53,8 +53,9 @@ LaMetric, MacOSX, Mailgun, Mattermost, Matrix, Microsoft Windows, Microsoft
 Teams, MessageBird, MSG91, MyAndroid, Nexmo, Nextcloud, Notica, Notifico,
 Office365, OneSignal, Opsgenie, ParsePlatform, PopcornNotify, Prowl, Pushalot,
 PushBullet, Pushjet, Pushover, PushSafer, Reddit, Rocket.Chat, SendGrid,
-SimplePush, Sinch, Slack, Spontit, SparkPost, Super Toasty, Stride, Syslog,
-Techulus Push, Telegram, Twilio, Twitter, Twist, XBMC, XMPP, Webex Teams}
+SimplePush, Sinch, Slack, SMTP2Go, Spontit, SparkPost, Super Toasty, Stride,
+Syslog, Techulus Push, Telegram, Twilio, Twitter, Twist, XBMC, XMPP,
+Webex Teams}
 
 Name:           python-%{pypi_name}
 Version:        0.9.2
