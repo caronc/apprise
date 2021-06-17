@@ -121,7 +121,9 @@ class AsyncNotifyBase(URLBase):
         """
         Async Notification Wrapper
         """
+
         loop = asyncio.get_event_loop()
+
         try:
             return await loop.run_in_executor(
                 None, partial(self.notify, *args, **kwargs))
