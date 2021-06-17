@@ -47,6 +47,7 @@ from apprise import PrivacyMode
 from apprise.plugins import SCHEMA_MAP
 from apprise.plugins import __load_matrix
 from apprise.plugins import __reset_matrix
+from apprise.py3compat.asyncio import notify
 from apprise.utils import parse_list
 import inspect
 
@@ -1414,7 +1415,7 @@ def test_apprise_details_plugin_verification():
 
 @pytest.mark.skipif(sys.version_info.major <= 2, reason="Requires Python 3.x+")
 @mock.patch('requests.post')
-@mock.patch('apprise.py3compat.asyncio.notify')
+@mock.patch('apprise.py3compat.asyncio.notify', wraps=notify)
 def test_apprise_async_mode(mock_async_notify, mock_post, tmpdir):
     """
     API: Apprise() async_mode tests
@@ -1474,8 +1475,8 @@ def test_apprise_async_mode(mock_async_notify, mock_post, tmpdir):
 
     # Send Notifications Syncronously
     assert a.notify("sync") is True
-    # Verify our async code never got called
-    assert mock_async_notify.call_count == 0
+    # Verify our async code got called
+    assert mock_async_notify.call_count == 1
     mock_async_notify.reset_mock()
 
     # another way of looking a our false set asset configuration

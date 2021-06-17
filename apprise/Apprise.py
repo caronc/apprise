@@ -28,6 +28,7 @@ import os
 import six
 from markdown import markdown
 from itertools import chain
+from more_itertools import peekable
 from .common import NotifyType
 from .common import NotifyFormat
 from .common import MATCH_ALL_TAG
@@ -319,16 +320,100 @@ class Apprise(object):
         such as turning a \n into an actual new line, etc.
         """
 
+        try:
+            if ASYNCIO_SUPPORT:
+                coroutines = peekable(
+                    self._notifyall(
+                        Apprise._async_notifyhandler,
+                        body, title, notify_type, body_format,
+                        tag, attach, interpret_escapes
+                    )
+                )
+
+                assigned = coroutines.peek(None) is not None
+                if not assigned:
+                    return None
+
+                else:
+                    # perform our async notification(s)
+                    return py3compat.asyncio.notify(
+                        list(coroutines), debug=self.debug)
+
+            else:
+                results = peekable(
+                    self._notifyall(
+                        Apprise._notifyhandler,
+                        body, title, notify_type, body_format,
+                        tag, attach, interpret_escapes
+                    )
+                )
+
+                assigned = results.peek(None) is not None
+                if not assigned:
+                    return None
+
+                else:
+                    # Return False if any notification fails.
+                    return all(results)
+
+        except TypeError:
+            # These our our internally thrown notifications
+            return False
+
+    @staticmethod
+    def _notifyhandler(server, **kwargs):
+        """
+        The synchronous notification sender. Returns True if the notification
+        sent successfully.
+        """
+
+        try:
+            # Send notification
+            return server.notify(**kwargs)
+
+        except TypeError:
+            # These our our internally thrown notifications
+            return False
+
+        except Exception:
+            # A catch all so we don't have to abort early
+            # just because one of our plugins has a bug in it.
+            logger.exception("Notification Exception")
+            return False
+
+    @staticmethod
+    def _async_notifyhandler(server, **kwargs):
+        """
+        The asynchronous notification sender. Returns a coroutine that yields
+        True if the notification sent successfully.
+        """
+
+        if server.asset.async_mode:
+            return server.async_notify(**kwargs)
+
+        else:
+            # Wrap the synchronous handler in a coroutine.
+            async def cor_handler():  # noqa: E999
+                return Apprise._notifyhandler(server, **kwargs)
+
+            return cor_handler()
+
+    def _notifyall(self, handler, body, title, notify_type, body_format, tag,
+                   attach, interpret_escapes):
+        """
+        Creates notifications for all of the plugins loaded.
+
+        Returns a generator that calls handler for each notification. The first
+        and only argument supplied to handler is the server, and the keyword
+        arguments are exactly as they would be passed to server.notify().
+        """
+
         if len(self) == 0:
             # Nothing to notify
-            return False
-
-        # Initialize our return result which only turns to True if we send
-        # at least one valid notification
-        status = None
+            raise TypeError
 
         if not (title or body):
-            return False
+            raise TypeError
 
         if six.PY2:
             # Python 2.7.x Unicode Character Handling
@@ -344,13 +429,8 @@ class Apprise(object):
 
         # Prepare attachments if required
         if attach is not None and not isinstance(attach, AppriseAttachment):
-            try:
-                attach = AppriseAttachment(
-                    attach, asset=self.asset, location=self.location)
-
-            except TypeError:
-                # bad attachments
-                return False
+            attach = AppriseAttachment(
+                attach, asset=self.asset, location=self.location)
 
         # Allow Asset default value
         body_format = self.asset.body_format \
@@ -360,17 +440,8 @@ class Apprise(object):
         interpret_escapes = self.asset.interpret_escapes \
             if interpret_escapes is None else interpret_escapes
 
-        # for asyncio support; we track a list of our servers to notify
-        coroutines = []
-
         # Iterate over our loaded plugins
         for server in self.find(tag):
-            if status is None:
-                # We have at least one server to notify; change status
-                # to be a default value of True from now (purely an
-                # initialiation at this point)
-                status = True
-
             # If our code reaches here, we either did not define a tag (it
             # was set to None), or we did define a tag and the logic above
             # determined we need to notify the service it's associated with
@@ -443,7 +514,7 @@ class Apprise(object):
                 except AttributeError:
                     # Must be of string type
                     logger.error('Failed to escape message body')
-                    return False
+                    raise TypeError
 
                 try:
                     # Added overhead required due to Python 3 Encoding Bug
@@ -460,48 +531,15 @@ class Apprise(object):
                 except AttributeError:
                     # Must be of string type
                     logger.error('Failed to escape message title')
-                    return False
+                    raise TypeError
 
-            if ASYNCIO_SUPPORT and server.asset.async_mode:
-                # Build a list of servers requiring notification
-                # that will be triggered asynchronously afterwards
-                coroutines.append(server.async_notify(
-                    body=conversion_map[server.notify_format],
-                    title=title,
-                    notify_type=notify_type,
-                    attach=attach))
-
-                # We gather at this point and notify at the end
-                continue
-
-            try:
-                # Send notification
-                if not server.notify(
-                        body=conversion_map[server.notify_format],
-                        title=title,
-                        notify_type=notify_type,
-                        attach=attach):
-
-                    # Toggle our return status flag
-                    status = False
-
-            except TypeError:
-                # These our our internally thrown notifications
-                status = False
-
-            except Exception:
-                # A catch all so we don't have to abort early
-                # just because one of our plugins has a bug in it.
-                logger.exception("Notification Exception")
-                status = False
-
-        if coroutines:
-            # perform our async notification(s)
-            if not py3compat.asyncio.notify(coroutines, debug=self.debug):
-                # Toggle our status only if we had a failure
-                status = False
-
-        return status
+            yield handler(
+                server,
+                body=conversion_map[server.notify_format],
+                title=title,
+                notify_type=notify_type,
+                attach=attach
+            )
 
     def details(self, lang=None):
         """
