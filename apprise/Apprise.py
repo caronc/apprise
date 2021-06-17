@@ -322,7 +322,7 @@ class Apprise(object):
 
         try:
             if ASYNCIO_SUPPORT:
-                coroutines = peekable(
+                coroutines = list(
                     self._notifyall(
                         Apprise._async_notifyhandler,
                         body, title, notify_type, body_format,
@@ -330,14 +330,14 @@ class Apprise(object):
                     )
                 )
 
-                assigned = coroutines.peek(None) is not None
+                assigned = len(coroutines) > 0
                 if not assigned:
                     return None
 
                 else:
                     # perform our async notification(s)
                     return py3compat.asyncio.notify(
-                        list(coroutines), debug=self.debug)
+                        coroutines, debug=self.debug)
 
             else:
                 results = peekable(
