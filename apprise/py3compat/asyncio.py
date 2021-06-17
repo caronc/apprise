@@ -111,13 +111,10 @@ class AsyncNotifyBase(URLBase):
         """
         Async Notification Wrapper
         """
+        loop = asyncio.get_event_loop()
         try:
-            loop = asyncio.get_event_loop()
-            with ThreadPoolExecutor() as executor:
-                return await loop.run_in_executor(
-                    executor,
-                    partial(self.notify, *args, **kwargs),
-                )
+            return await loop.run_in_executor(
+                None, partial(self.notify, *args, **kwargs))
 
         except TypeError:
             # These our our internally thrown notifications
