@@ -25,7 +25,6 @@
 
 import sys
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from ..URLBase import URLBase
 from ..logger import logger
