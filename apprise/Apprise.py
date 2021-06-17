@@ -28,6 +28,7 @@ import os
 import six
 from markdown import markdown
 from itertools import chain
+from functools import partial
 from more_itertools import peekable
 from .common import NotifyType
 from .common import NotifyFormat
@@ -392,11 +393,8 @@ class Apprise(object):
             return server.async_notify(**kwargs)
 
         else:
-            # Wrap the synchronous handler in a coroutine.
-            async def cor_handler():  # noqa: E999
-                return Apprise._notifyhandler(server, **kwargs)
-
-            return cor_handler()
+            return py3compat.asyncio.runsync(
+                partial(Apprise._notifyhandler, server, **kwargs))
 
     def _notifyall(self, handler, body, title, notify_type, body_format, tag,
                    attach, interpret_escapes):

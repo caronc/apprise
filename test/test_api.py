@@ -47,9 +47,16 @@ from apprise import PrivacyMode
 from apprise.plugins import SCHEMA_MAP
 from apprise.plugins import __load_matrix
 from apprise.plugins import __reset_matrix
-from apprise.py3compat.asyncio import notify
 from apprise.utils import parse_list
 import inspect
+
+# Sending notifications requires the coroutines to be awaited, so we need to
+# wrap the original function when mocking it. But don't import for Python 2.
+if six.PY2:
+    def notify():
+        pass
+else:
+    from apprise.py3compat.asyncio import notify
 
 # Disable logging for a cleaner testing output
 import logging

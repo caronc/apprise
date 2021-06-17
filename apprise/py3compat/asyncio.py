@@ -101,6 +101,17 @@ def notify(coroutines, debug=False):
     return status
 
 
+def runsync(fn):
+    """
+    Run a synchronous function in a coroutine without using an executor. This
+    blocks the event loop.
+    """
+
+    async def run():  # noqa: E999
+        return fn()
+    return run()
+
+
 class AsyncNotifyBase(URLBase):
     """
     asyncio wrapper for the NotifyBase object
