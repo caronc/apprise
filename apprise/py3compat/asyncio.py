@@ -106,7 +106,7 @@ async def async_notify(coroutines, debug=False):  # noqa: E999
     An asynchronous wrapper to AsyncNotifyBase.async_notify().
     """
 
-    results = await asyncio.gather(*coroutines, return_Exceptions=True)
+    results = await asyncio.gather(*coroutines, return_exceptions=True)
     failed = any(not status or isinstance(status, Exception)
                  for status in results)
     return not failed
