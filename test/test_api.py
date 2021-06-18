@@ -50,6 +50,10 @@ from apprise.plugins import __reset_matrix
 from apprise.utils import parse_list
 import inspect
 
+# Disable logging for a cleaner testing output
+import logging
+logging.disable(logging.CRITICAL)
+
 # Sending notifications requires the coroutines to be awaited, so we need to
 # wrap the original function when mocking it. But don't import for Python 2.
 if six.PY2:
@@ -58,12 +62,45 @@ if six.PY2:
 else:
     from apprise.py3compat.asyncio import notify as asyncio_notify
 
-# Disable logging for a cleaner testing output
-import logging
-logging.disable(logging.CRITICAL)
+# Import asyncio for Python 3 tests that use it.
+if not six.PY2:
+    import asyncio
+
+# A global flag that tracks if we are Python v3.7 or higher
+ASYNCIO_RUN_SUPPORT = \
+    sys.version_info.major > 3 or \
+    (sys.version_info.major == 3 and sys.version_info.minor >= 7)
 
 # Attachment Directory
 TEST_VAR_DIR = join(dirname(__file__), 'var')
+
+
+def async_run(cor):
+    """
+    Await a coroutine in a way that is syntactically compatible with Python 2.
+    """
+
+    if ASYNCIO_RUN_SUPPORT:
+        return asyncio.run(cor, debug=True)
+
+    else:
+        # The Deprecated Way (<= Python v3.6)
+        try:
+            # acquire access to our event loop
+            loop = asyncio.get_event_loop()
+
+        except RuntimeError:
+            # This happens if we're inside a thread of another application
+            # where there is no running event_loop().  Pythong v3.7 and
+            # higher automatically take care of this case for us.  But for
+            # the lower versions we need to do the following:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        # Enable debug mode
+        loop.set_debug(1)
+
+        return loop.run_until_complete(cor)
 
 
 def test_apprise():
@@ -71,6 +108,25 @@ def test_apprise():
     API: Apprise() object
 
     """
+    def do_notify(server, *args, **kwargs):
+        return server.notify(*args, **kwargs)
+
+    apprise_test(do_notify)
+
+
+@pytest.mark.skipif(sys.version_info.major <= 2, reason="Requires Python 3.x+")
+def test_apprise_async():
+    """
+    API: Apprise() object asynchronous methods
+
+    """
+    def do_notify(server, *args, **kwargs):
+        return async_run(server.async_notify(*args, **kwargs))
+
+    apprise_test(do_notify)
+
+
+def apprise_test(do_notify):
     # Caling load matix a second time which is an internal function causes it
     # to skip over content already loaded into our matrix and thefore accesses
     # other if/else parts of the code that aren't otherwise called
@@ -161,7 +217,7 @@ def test_apprise():
     a.clear()
 
     # No servers to notify
-    assert a.notify(title="my title", body="my body") is False
+    assert do_notify(a, title="my title", body="my body") is False
 
     class BadNotification(NotifyBase):
         def __init__(self, **kwargs):
@@ -210,8 +266,8 @@ def test_apprise():
     assert len(a) == 0
 
     # We'll fail because we've got nothing to notify
-    assert a.notify(
-        title="my title", body="my body") is False
+    assert do_notify(
+        a, title="my title", body="my body") is False
 
     # Clear our server listings again
     a.clear()
@@ -221,50 +277,50 @@ def test_apprise():
 
     # Bad Notification Type is still allowed as it is presumed the user
     # know's what their doing
-    assert a.notify(
-        title="my title", body="my body", notify_type='bad') is True
+    assert do_notify(
+        a, title="my title", body="my body", notify_type='bad') is True
 
     # No Title/Body combo's
-    assert a.notify(title=None, body=None) is False
-    assert a.notify(title='', body=None) is False
-    assert a.notify(title=None, body='') is False
+    assert do_notify(a, title=None, body=None) is False
+    assert do_notify(a, title='', body=None) is False
+    assert do_notify(a, title=None, body='') is False
 
     # As long as one is present, we're good
-    assert a.notify(title=None, body='present') is True
-    assert a.notify(title='present', body=None) is True
-    assert a.notify(title="present", body="present") is True
+    assert do_notify(a, title=None, body='present') is True
+    assert do_notify(a, title='present', body=None) is True
+    assert do_notify(a, title="present", body="present") is True
 
     # Send Attachment with success
     attach = join(TEST_VAR_DIR, 'apprise-test.gif')
-    assert a.notify(
-        body='body', title='test', notify_type=NotifyType.INFO,
+    assert do_notify(
+        a, body='body', title='test', notify_type=NotifyType.INFO,
         attach=attach) is True
 
     # Send the attachment as an AppriseAttachment object
-    assert a.notify(
-        body='body', title='test', notify_type=NotifyType.INFO,
+    assert do_notify(
+        a, body='body', title='test', notify_type=NotifyType.INFO,
         attach=AppriseAttachment(attach)) is True
 
     # test a invalid attachment
-    assert a.notify(
-        body='body', title='test', notify_type=NotifyType.INFO,
+    assert do_notify(
+        a, body='body', title='test', notify_type=NotifyType.INFO,
         attach='invalid://') is False
 
     # Repeat the same tests above...
     # however do it by directly accessing the object; this grants the similar
     # results:
-    assert a[0].notify(
-        body='body', title='test', notify_type=NotifyType.INFO,
+    assert do_notify(
+        a[0], body='body', title='test', notify_type=NotifyType.INFO,
         attach=attach) is True
 
     # Send the attachment as an AppriseAttachment object
-    assert a[0].notify(
-        body='body', title='test', notify_type=NotifyType.INFO,
+    assert do_notify(
+        a[0], body='body', title='test', notify_type=NotifyType.INFO,
         attach=AppriseAttachment(attach)) is True
 
     # test a invalid attachment
-    assert a[0].notify(
-        body='body', title='test', notify_type=NotifyType.INFO,
+    assert do_notify(
+        a[0], body='body', title='test', notify_type=NotifyType.INFO,
         attach='invalid://') is False
 
     class ThrowNotification(NotifyBase):
@@ -318,7 +374,7 @@ def test_apprise():
 
         # Test when our notify both throws an exception and or just
         # simply returns False
-        assert a.notify(title="present", body="present") is False
+        assert do_notify(a, title="present", body="present") is False
 
     # Create a Notification that throws an unexected exception
     class ThrowInstantiateNotification(NotifyBase):
