@@ -361,6 +361,34 @@ class Apprise(object):
             # These our our internally thrown notifications
             return False
 
+    def async_notify(self, *args, **kwargs):
+        """
+        Send a notification to all of the plugins previously loaded, for
+        asynchronous callers. This method is an async method that should be
+        awaited on, even if it is missing the async keyword in its signature.
+        (This is omitted to preserve syntax compatibility with Python 2.)
+
+        The arguments are identical to those of Apprise.notify(). This method
+        is not available in Python 2.
+        """
+
+        try:
+            coroutines = peekable(
+                self._notifyall(
+                    Apprise._async_notifyhandler, *args, **kwargs))
+
+            assigned = coroutines.peek(None) is not None
+            if not assigned:
+                return py3compat.asyncio.runsync(lambda: None)
+
+            else:
+                return py3compat.asyncio.async_notify(
+                    coroutines, debug=self.debug)
+
+        except TypeError:
+            # These our our internally thrown notifications
+            return py3compat.asyncio.runsync(lambda: False)
+
     @staticmethod
     def _notifyhandler(server, **kwargs):
         """
@@ -396,8 +424,9 @@ class Apprise(object):
             return py3compat.asyncio.runsync(
                 partial(Apprise._notifyhandler, server, **kwargs))
 
-    def _notifyall(self, handler, body, title, notify_type, body_format, tag,
-                   attach, interpret_escapes):
+    def _notifyall(self, handler, body, title='', notify_type=NotifyType.INFO,
+                   body_format=None, tag=MATCH_ALL_TAG, attach=None,
+                   interpret_escapes=None):
         """
         Creates notifications for all of the plugins loaded.
 
@@ -694,3 +723,7 @@ class Apprise(object):
         """
         return sum([1 if not isinstance(s, (ConfigBase, AppriseConfig))
                     else len(s.servers()) for s in self.servers])
+
+
+if six.PY2:
+    del Apprise.async_notify

@@ -101,6 +101,17 @@ def notify(coroutines, debug=False):
     return status
 
 
+async def async_notify(coroutines, debug=False):  # noqa: E999
+    """
+    An asynchronous wrapper to AsyncNotifyBase.async_notify().
+    """
+
+    results = await asyncio.gather(*coroutines, return_Exceptions=True)
+    failed = any(not status or isinstance(status, Exception)
+                 for status in results)
+    return not failed
+
+
 def runsync(fn):
     """
     Run a synchronous function in a coroutine without using an executor. This
