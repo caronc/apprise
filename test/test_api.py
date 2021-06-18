@@ -53,10 +53,10 @@ import inspect
 # Sending notifications requires the coroutines to be awaited, so we need to
 # wrap the original function when mocking it. But don't import for Python 2.
 if six.PY2:
-    def notify():
+    def asyncio_notify():
         pass
 else:
-    from apprise.py3compat.asyncio import notify
+    from apprise.py3compat.asyncio import notify as asyncio_notify
 
 # Disable logging for a cleaner testing output
 import logging
@@ -1422,7 +1422,7 @@ def test_apprise_details_plugin_verification():
 
 @pytest.mark.skipif(sys.version_info.major <= 2, reason="Requires Python 3.x+")
 @mock.patch('requests.post')
-@mock.patch('apprise.py3compat.asyncio.notify', wraps=notify)
+@mock.patch('apprise.py3compat.asyncio.notify', wraps=asyncio_notify)
 def test_apprise_async_mode(mock_async_notify, mock_post, tmpdir):
     """
     API: Apprise() async_mode tests
