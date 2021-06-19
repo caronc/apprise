@@ -28,7 +28,6 @@ import os
 import six
 from markdown import markdown
 from itertools import chain
-from functools import partial
 from more_itertools import peekable
 from .common import NotifyType
 from .common import NotifyFormat
@@ -325,7 +324,7 @@ class Apprise(object):
             if ASYNCIO_SUPPORT:
                 coroutines = list(
                     self._notifyall(
-                        Apprise._async_notifyhandler,
+                        Apprise._notifyhandlerasync,
                         body, title, notify_type, body_format,
                         tag, attach, interpret_escapes
                     )
@@ -375,7 +374,7 @@ class Apprise(object):
         try:
             coroutines = peekable(
                 self._notifyall(
-                    Apprise._async_notifyhandler, *args, **kwargs))
+                    Apprise._notifyhandlerasync, *args, **kwargs))
 
             assigned = coroutines.peek(None) is not None
             if not assigned:
@@ -411,7 +410,7 @@ class Apprise(object):
             return False
 
     @staticmethod
-    def _async_notifyhandler(server, **kwargs):
+    def _notifyhandlerasync(server, **kwargs):
         """
         The asynchronous notification sender. Returns a coroutine that yields
         True if the notification sent successfully.
@@ -421,8 +420,10 @@ class Apprise(object):
             return server.async_notify(**kwargs)
 
         else:
-            return py3compat.asyncio.toasyncblock(
-                partial(Apprise._notifyhandler, server, **kwargs))
+            # Send the notification immediately, and wrap the result in a
+            # coroutine.
+            status = Apprise._notifyhandler(server, **kwargs)
+            return py3compat.asyncio.toasyncwrap(status)
 
     def _notifyall(self, handler, body, title='', notify_type=NotifyType.INFO,
                    body_format=None, tag=MATCH_ALL_TAG, attach=None,

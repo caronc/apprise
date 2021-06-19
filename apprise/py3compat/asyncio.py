@@ -91,17 +91,6 @@ def tosync(cor, debug=False):
         return loop.run_until_complete(cor)
 
 
-def toasyncblock(fn):
-    """
-    Run a synchronous function in a coroutine without using an executor. This
-    blocks the event loop.
-    """
-
-    async def cor():  # noqa: E999
-        return fn()
-    return cor()
-
-
 def toasyncwrap(v):
     """
     Create a coroutine that, when run, returns the provided value.
