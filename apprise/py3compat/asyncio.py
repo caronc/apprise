@@ -46,59 +46,7 @@ def notify(coroutines, debug=False):
     logger.info(
         'Notifying {} service(s) asynchronously.'.format(len(coroutines)))
 
-    if ASYNCIO_RUN_SUPPORT:
-        # async reference produces a SyntaxError (E999) in Python v2.7
-        # For this reason we turn on the noqa flag
-        async def main(results, coroutines):  # noqa: E999
-            """
-            Task: Notify all servers specified and return our result set
-                  through a mutable object.
-            """
-            # send our notifications and store our result set into
-            # our results dictionary
-            results['response'] = \
-                await asyncio.gather(*coroutines, return_exceptions=True)
-
-        # Initialize a mutable object we can populate with our notification
-        # responses
-        results = {}
-
-        # Send our notifications
-        asyncio.run(main(results, coroutines), debug=debug)
-
-        # Acquire our return status
-        status = next((s for s in results['response'] if s is False), True)
-
-    else:
-        #
-        # The Deprecated Way (<= Python v3.6)
-        #
-
-        try:
-            # acquire access to our event loop
-            loop = asyncio.get_event_loop()
-
-        except RuntimeError:
-            # This happens if we're inside a thread of another application
-            # where there is no running event_loop().  Pythong v3.7 and higher
-            # automatically take care of this case for us.  But for the lower
-            # versions we need to do the following:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-        if debug:
-            # Enable debug mode
-            loop.set_debug(1)
-
-        # Send our notifications and acquire our status
-        results = loop.run_until_complete(asyncio.gather(*coroutines))
-
-        # Acquire our return status
-        status = next((r for r in results if r is False), True)
-
-    # Returns True if all notifications succeeded, otherwise False is
-    # returned.
-    return status
+    return tosync(async_notify(coroutines, debug=debug))
 
 
 async def async_notify(coroutines, debug=False):  # noqa: E999
@@ -107,20 +55,61 @@ async def async_notify(coroutines, debug=False):  # noqa: E999
     """
 
     results = await asyncio.gather(*coroutines, return_exceptions=True)
+
+    # Returns True if all notifications succeeded, otherwise False is
+    # returned.
     failed = any(not status or isinstance(status, Exception)
                  for status in results)
     return not failed
 
 
-def runsync(fn):
+def tosync(cor, debug=False):
+    """
+    Await a coroutine from non-async code.
+    """
+
+    if ASYNCIO_RUN_SUPPORT:
+        return asyncio.run(cor, debug=debug)
+
+    else:
+        # The Deprecated Way (<= Python v3.6)
+        try:
+            # acquire access to our event loop
+            loop = asyncio.get_event_loop()
+
+        except RuntimeError:
+            # This happens if we're inside a thread of another application
+            # where there is no running event_loop().  Pythong v3.7 and
+            # higher automatically take care of this case for us.  But for
+            # the lower versions we need to do the following:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        # Enable debug mode
+        loop.set_debug(debug)
+
+        return loop.run_until_complete(cor)
+
+
+def toasyncblock(fn):
     """
     Run a synchronous function in a coroutine without using an executor. This
     blocks the event loop.
     """
 
-    async def run():  # noqa: E999
+    async def cor():  # noqa: E999
         return fn()
-    return run()
+    return cor()
+
+
+def toasyncwrap(v):
+    """
+    Create a coroutine that, when run, returns the provided value.
+    """
+
+    async def cor():  # noqa: E999
+        return v
+    return cor()
 
 
 class AsyncNotifyBase(URLBase):

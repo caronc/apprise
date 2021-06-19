@@ -56,51 +56,15 @@ logging.disable(logging.CRITICAL)
 
 # Sending notifications requires the coroutines to be awaited, so we need to
 # wrap the original function when mocking it. But don't import for Python 2.
-if six.PY2:
-    def asyncio_notify():
-        pass
-else:
-    from apprise.py3compat.asyncio import notify as asyncio_notify
-
-# Import asyncio for Python 3 tests that use it.
 if not six.PY2:
-    import asyncio
-
-# A global flag that tracks if we are Python v3.7 or higher
-ASYNCIO_RUN_SUPPORT = \
-    sys.version_info.major > 3 or \
-    (sys.version_info.major == 3 and sys.version_info.minor >= 7)
+    import apprise.py3compat.asyncio as py3aio
+else:
+    class py3aio:
+        def notify():
+            pass
 
 # Attachment Directory
 TEST_VAR_DIR = join(dirname(__file__), 'var')
-
-
-def async_run(cor):
-    """
-    Await a coroutine in a way that is syntactically compatible with Python 2.
-    """
-
-    if ASYNCIO_RUN_SUPPORT:
-        return asyncio.run(cor, debug=True)
-
-    else:
-        # The Deprecated Way (<= Python v3.6)
-        try:
-            # acquire access to our event loop
-            loop = asyncio.get_event_loop()
-
-        except RuntimeError:
-            # This happens if we're inside a thread of another application
-            # where there is no running event_loop().  Pythong v3.7 and
-            # higher automatically take care of this case for us.  But for
-            # the lower versions we need to do the following:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-        # Enable debug mode
-        loop.set_debug(1)
-
-        return loop.run_until_complete(cor)
 
 
 def test_apprise():
@@ -121,7 +85,7 @@ def test_apprise_async():
 
     """
     def do_notify(server, *args, **kwargs):
-        return async_run(server.async_notify(*args, **kwargs))
+        return py3aio.tosync(server.async_notify(*args, **kwargs))
 
     apprise_test(do_notify)
 
@@ -1478,7 +1442,7 @@ def test_apprise_details_plugin_verification():
 
 @pytest.mark.skipif(sys.version_info.major <= 2, reason="Requires Python 3.x+")
 @mock.patch('requests.post')
-@mock.patch('apprise.py3compat.asyncio.notify', wraps=asyncio_notify)
+@mock.patch('apprise.py3compat.asyncio.notify', wraps=py3aio.notify)
 def test_apprise_async_mode(mock_async_notify, mock_post, tmpdir):
     """
     API: Apprise() async_mode tests

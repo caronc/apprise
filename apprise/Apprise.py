@@ -379,7 +379,7 @@ class Apprise(object):
 
             assigned = coroutines.peek(None) is not None
             if not assigned:
-                return py3compat.asyncio.runsync(lambda: None)
+                return py3compat.asyncio.toasyncwrap(None)
 
             else:
                 return py3compat.asyncio.async_notify(
@@ -387,7 +387,7 @@ class Apprise(object):
 
         except TypeError:
             # These our our internally thrown notifications
-            return py3compat.asyncio.runsync(lambda: False)
+            return py3compat.asyncio.toasyncwrap(False)
 
     @staticmethod
     def _notifyhandler(server, **kwargs):
@@ -421,7 +421,7 @@ class Apprise(object):
             return server.async_notify(**kwargs)
 
         else:
-            return py3compat.asyncio.runsync(
+            return py3compat.asyncio.toasyncblock(
                 partial(Apprise._notifyhandler, server, **kwargs))
 
     def _notifyall(self, handler, body, title='', notify_type=NotifyType.INFO,
