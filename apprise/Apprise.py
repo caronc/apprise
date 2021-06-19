@@ -28,7 +28,7 @@ import os
 import six
 from markdown import markdown
 from itertools import chain
-from more_itertools import peekable
+from more_itertools import consume, peekable
 from .common import NotifyType
 from .common import NotifyFormat
 from .common import MATCH_ALL_TAG
@@ -348,7 +348,13 @@ class Apprise(object):
 
                 else:
                     # Return False if any notification fails.
-                    return all(results)
+                    status = all(results)
+
+                    # Make sure the rest of the notifications send even if
+                    # there has been a failure.
+                    consume(results)
+
+                    return status
 
             except TypeError:
                 # These our our internally thrown notifications
