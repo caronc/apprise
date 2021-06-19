@@ -526,7 +526,27 @@ def test_apprise_tagging(mock_post, mock_get):
     API: Apprise() object tagging functionality
 
     """
+    def do_notify(server, *args, **kwargs):
+        return server.notify(*args, **kwargs)
 
+    apprise_tagging_test(mock_post, mock_get, do_notify)
+
+
+@mock.patch('requests.get')
+@mock.patch('requests.post')
+@pytest.mark.skipif(sys.version_info.major <= 2, reason="Requires Python 3.x+")
+def test_apprise_tagging_async(mock_post, mock_get):
+    """
+    API: Apprise() object tagging functionality asynchronous methods
+
+    """
+    def do_notify(server, *args, **kwargs):
+        return py3aio.tosync(server.async_notify(*args, **kwargs))
+
+    apprise_tagging_test(mock_post, mock_get, do_notify)
+
+
+def apprise_tagging_test(mock_post, mock_get, do_notify):
     # A request
     robj = mock.Mock()
     setattr(robj, 'raw', mock.Mock())
@@ -563,18 +583,19 @@ def test_apprise_tagging(mock_post, mock_get):
 
     # notify the awesome tag; this would notify both services behind the
     # scenes
-    assert a.notify(title="my title", body="my body", tag='awesome') is True
+    assert do_notify(
+        a, title="my title", body="my body", tag='awesome') is True
 
     # notify all of the tags
-    assert a.notify(
-        title="my title", body="my body", tag=['awesome', 'mmost']) is True
+    assert do_notify(
+        a, title="my title", body="my body", tag=['awesome', 'mmost']) is True
 
     # When we query against our loaded notifications for a tag that simply
     # isn't assigned to anything, we return None.  None (different then False)
     # tells us that we litterally had nothing to query.  We didn't fail...
     # but we also didn't do anything...
-    assert a.notify(
-        title="my title", body="my body", tag='missing') is None
+    assert do_notify(
+        a, title="my title", body="my body", tag='missing') is None
 
     # Now to test the ability to and and/or notifications
     a = Apprise()
@@ -599,20 +620,20 @@ def test_apprise_tagging(mock_post, mock_get):
     # Matches the following only:
     #   - json://localhost/tagCD/
     #   - json://localhost/tagCDE/
-    assert a.notify(
-        title="my title", body="my body", tag=[('TagC', 'TagD')]) is True
+    assert do_notify(
+        a, title="my title", body="my body", tag=[('TagC', 'TagD')]) is True
 
     # Expression: (TagY and TagZ) or TagX
     # Matches nothing, None is returned in this case
-    assert a.notify(
-        title="my title", body="my body",
+    assert do_notify(
+        a, title="my title", body="my body",
         tag=[('TagY', 'TagZ'), 'TagX']) is None
 
     # Expression: (TagY and TagZ) or TagA
     # Matches the following only:
     #   - json://localhost/tagAB/
-    assert a.notify(
-        title="my title", body="my body",
+    assert do_notify(
+        a, title="my title", body="my body",
         tag=[('TagY', 'TagZ'), 'TagA']) is True
 
     # Expression: (TagE and TagD) or TagB
@@ -620,8 +641,8 @@ def test_apprise_tagging(mock_post, mock_get):
     #   - json://localhost/tagCDE/
     #   - json://localhost/tagAB/
     #   - json://localhost/tagB/
-    assert a.notify(
-        title="my title", body="my body",
+    assert do_notify(
+        a, title="my title", body="my body",
         tag=[('TagE', 'TagD'), 'TagB']) is True
 
     # Garbage Entries in tag field just get stripped out. the below
@@ -630,8 +651,8 @@ def test_apprise_tagging(mock_post, mock_get):
     # we fail.  None is returned as a way of letting us know that we
     # had Notifications to notify, but since none of them matched our tag
     # none were notified.
-    assert a.notify(
-        title="my title", body="my body",
+    assert do_notify(
+        a, title="my title", body="my body",
         tag=[(object, ), ]) is None
 
 
