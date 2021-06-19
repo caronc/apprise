@@ -320,31 +320,25 @@ class Apprise(object):
         such as turning a \n into an actual new line, etc.
         """
 
-        try:
-            if ASYNCIO_SUPPORT:
-                coroutines = list(
-                    self._notifyall(
-                        Apprise._notifyhandlerasync,
-                        body, title, notify_type, body_format,
-                        tag, attach, interpret_escapes
-                    )
+        if ASYNCIO_SUPPORT:
+            return py3compat.asyncio.tosync(
+                self.async_notify(
+                    body, title,
+                    notify_type=notify_type, body_format=body_format,
+                    tag=tag, attach=attach,
+                    interpret_escapes=interpret_escapes,
                 )
+            )
 
-                assigned = len(coroutines) > 0
-                if not assigned:
-                    return None
-
-                else:
-                    # perform our async notification(s)
-                    return py3compat.asyncio.notify(
-                        coroutines, debug=self.debug)
-
-            else:
+        else:
+            try:
                 results = peekable(
                     self._notifyall(
                         Apprise._notifyhandler,
-                        body, title, notify_type, body_format,
-                        tag, attach, interpret_escapes
+                        body, title,
+                        notify_type=notify_type, body_format=body_format,
+                        tag=tag, attach=attach,
+                        interpret_escapes=interpret_escapes,
                     )
                 )
 
@@ -356,9 +350,9 @@ class Apprise(object):
                     # Return False if any notification fails.
                     return all(results)
 
-        except TypeError:
-            # These our our internally thrown notifications
-            return False
+            except TypeError:
+                # These our our internally thrown notifications
+                return False
 
     def async_notify(self, *args, **kwargs):
         """
@@ -372,16 +366,16 @@ class Apprise(object):
         """
 
         try:
-            coroutines = peekable(
+            coroutines = list(
                 self._notifyall(
                     Apprise._notifyhandlerasync, *args, **kwargs))
 
-            assigned = coroutines.peek(None) is not None
+            assigned = len(coroutines) > 0
             if not assigned:
                 return py3compat.asyncio.toasyncwrap(None)
 
             else:
-                return py3compat.asyncio.async_notify(
+                return py3compat.asyncio.notify(
                     coroutines, debug=self.debug)
 
         except TypeError:

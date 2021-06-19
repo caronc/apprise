@@ -36,23 +36,15 @@ ASYNCIO_RUN_SUPPORT = \
     (sys.version_info.major == 3 and sys.version_info.minor >= 7)
 
 
-def notify(coroutines, debug=False):
+async def notify(coroutines, debug=False):  # noqa: E999
     """
-    A Wrapper to the AsyncNotifyBase.async_notify() calls allowing us
+    An async wrapper to the AsyncNotifyBase.async_notify() calls allowing us
     to call gather() and collect the responses
     """
 
     # Create log entry
     logger.info(
         'Notifying {} service(s) asynchronously.'.format(len(coroutines)))
-
-    return tosync(async_notify(coroutines, debug=debug))
-
-
-async def async_notify(coroutines, debug=False):  # noqa: E999
-    """
-    An asynchronous wrapper to AsyncNotifyBase.async_notify().
-    """
 
     results = await asyncio.gather(*coroutines, return_exceptions=True)
 
