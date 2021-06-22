@@ -85,28 +85,24 @@ def tosync(cor, debug=False):
         return loop.run_until_complete(cor)
 
 
-def toasyncwrap(v):
+async def toasyncwrap(v):  # noqa: E999
     """
     Create a coroutine that, when run, returns the provided value.
     """
 
-    async def cor():  # noqa: E999
-        return v
-    return cor()
+    return v
 
 
-def chain(*cors):
+async def chain(*cors):  # noqa: E999
     """
     Chain multiple coroutines into a single sequential coroutine that returns
     the value returned by the last coroutine.
     """
 
-    async def cor():
-        v = None
-        for c in cors:
-            await c
-        return v
-    return cor()
+    v = None
+    for c in cors:
+        await c
+    return v
 
 
 class AsyncNotifyBase(URLBase):
