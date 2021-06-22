@@ -95,6 +95,20 @@ def toasyncwrap(v):
     return cor()
 
 
+def chain(*cors):
+    """
+    Chain multiple coroutines into a single sequential coroutine that returns
+    the value returned by the last coroutine.
+    """
+
+    async def cor():
+        v = None
+        for c in cors:
+            await c
+        return v
+    return cor()
+
+
 class AsyncNotifyBase(URLBase):
     """
     asyncio wrapper for the NotifyBase object

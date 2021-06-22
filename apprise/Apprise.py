@@ -28,7 +28,6 @@ import os
 import six
 from markdown import markdown
 from itertools import chain
-from more_itertools import consume, peekable
 from .common import NotifyType
 from .common import NotifyFormat
 from .common import MATCH_ALL_TAG
@@ -331,33 +330,31 @@ class Apprise(object):
             )
 
         else:
-            try:
-                results = peekable(
-                    self._notifyall(
-                        Apprise._notifyhandler,
-                        body, title,
-                        notify_type=notify_type, body_format=body_format,
-                        tag=tag, attach=attach,
-                        interpret_escapes=interpret_escapes,
-                    )
+            results, e = Apprise._partiallist(
+                self._notifyall(
+                    Apprise._notifyhandler,
+                    body, title,
+                    notify_type=notify_type, body_format=body_format,
+                    tag=tag, attach=attach,
+                    interpret_escapes=interpret_escapes,
                 )
+            )
 
-                assigned = results.peek(None) is not None
-                if not assigned:
-                    return None
+            if len(results) > 0:
+                if e is None:
+                    # All notifications sent, return False if any failed.
+                    return all(results)
 
                 else:
-                    # Return False if any notification fails.
-                    status = all(results)
+                    # Some notifications sent, but there was an internal error.
+                    return False
 
-                    # Make sure the rest of the notifications send even if
-                    # there has been a failure.
-                    consume(results)
+            elif e is None:
+                # No notifications sent.
+                return None
 
-                    return status
-
-            except TypeError:
-                # These our our internally thrown notifications
+            else:
+                # No notifications sent, and there was an internal error.
                 return False
 
     def async_notify(self, *args, **kwargs):
@@ -371,22 +368,50 @@ class Apprise(object):
         is not available in Python 2.
         """
 
-        try:
-            coroutines = list(
-                self._notifyall(
-                    Apprise._notifyhandlerasync, *args, **kwargs))
+        coroutines, e = Apprise._partiallist(
+            self._notifyall(
+                Apprise._notifyhandlerasync, *args, **kwargs))
 
-            assigned = len(coroutines) > 0
-            if not assigned:
-                return py3compat.asyncio.toasyncwrap(None)
+        if len(coroutines) > 0:
+            cor_result = py3compat.asyncio.notify(coroutines, debug=self.debug)
+
+            if e is None:
+                # All notifications sent, return False if any failed.
+                return cor_result
 
             else:
-                return py3compat.asyncio.notify(
-                    coroutines, debug=self.debug)
+                # Some notifications sent, but there was an internal error.
+                return py3compat.asyncio.chain(
+                    cor_result,
+                    py3compat.asyncio.toasyncwrap(False)
+                )
 
-        except TypeError:
-            # These our our internally thrown notifications
+        elif e is None:
+            # No notifications sent.
+            return py3compat.asyncio.toasyncwrap(None)
+
+        else:
+            # No notifications sent, and there was an internal error.
             return py3compat.asyncio.toasyncwrap(False)
+
+    @staticmethod
+    def _partiallist(gen):
+        """
+        Saves the items produced by a generator into a list. If the generator
+        produces a premature exception, the items produced up until that point
+        will be returned as well as the exception itself.
+        """
+
+        l = []
+        while True:
+            try:
+                x = next(gen)
+            except StopIteration:
+                return l, None
+            except Exception as e:
+                return l, e
+            else:
+                l.append(x)
 
     @staticmethod
     def _notifyhandler(server, **kwargs):
