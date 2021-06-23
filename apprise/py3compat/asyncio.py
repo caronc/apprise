@@ -38,7 +38,7 @@ ASYNCIO_RUN_SUPPORT = \
 
 # async reference produces a SyntaxError (E999) in Python v2.7
 # For this reason we turn on the noqa flag
-async def notify(coroutines, debug=False):  # noqa: E999
+async def notify(coroutines):  # noqa: E999
     """
     An async wrapper to the AsyncNotifyBase.async_notify() calls allowing us
     to call gather() and collect the responses

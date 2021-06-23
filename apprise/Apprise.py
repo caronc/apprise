@@ -326,7 +326,8 @@ class Apprise(object):
                     notify_type=notify_type, body_format=body_format,
                     tag=tag, attach=attach,
                     interpret_escapes=interpret_escapes,
-                )
+                ),
+                debug=self.debug
             )
 
         else:
@@ -377,8 +378,7 @@ class Apprise(object):
         else:
             if len(coroutines) > 0:
                 # All notifications sent, return False if any failed.
-                return py3compat.asyncio.notify(
-                    coroutines, debug=self.debug)
+                return py3compat.asyncio.notify(coroutines)
 
             else:
                 # No notifications sent.
