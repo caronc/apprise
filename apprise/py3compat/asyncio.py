@@ -93,18 +93,6 @@ async def toasyncwrap(v):  # noqa: E999
     return v
 
 
-async def chain(*cors):  # noqa: E999
-    """
-    Chain multiple coroutines into a single sequential coroutine that returns
-    the value returned by the last coroutine.
-    """
-
-    v = None
-    for c in cors:
-        await c
-    return v
-
-
 class AsyncNotifyBase(URLBase):
     """
     asyncio wrapper for the NotifyBase object

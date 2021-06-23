@@ -330,32 +330,29 @@ class Apprise(object):
             )
 
         else:
-            results, e = Apprise._partiallist(
-                self._notifyall(
-                    Apprise._notifyhandler,
-                    body, title,
-                    notify_type=notify_type, body_format=body_format,
-                    tag=tag, attach=attach,
-                    interpret_escapes=interpret_escapes,
+            try:
+                results = list(
+                    self._notifyall(
+                        Apprise._notifyhandler,
+                        body, title,
+                        notify_type=notify_type, body_format=body_format,
+                        tag=tag, attach=attach,
+                        interpret_escapes=interpret_escapes,
+                    )
                 )
-            )
 
-            if len(results) > 0:
-                if e is None:
+            except TypeError:
+                # No notifications sent, and there was an internal error.
+                return False
+
+            else:
+                if len(results) > 0:
                     # All notifications sent, return False if any failed.
                     return all(results)
 
                 else:
-                    # Some notifications sent, but there was an internal error.
-                    return False
-
-            elif e is None:
-                # No notifications sent.
-                return None
-
-            else:
-                # No notifications sent, and there was an internal error.
-                return False
+                    # No notifications sent.
+                    return None
 
     def async_notify(self, *args, **kwargs):
         """
@@ -368,50 +365,24 @@ class Apprise(object):
         is not available in Python 2.
         """
 
-        coroutines, e = Apprise._partiallist(
-            self._notifyall(
-                Apprise._notifyhandlerasync, *args, **kwargs))
+        try:
+            coroutines = list(
+                self._notifyall(
+                    Apprise._notifyhandlerasync, *args, **kwargs))
 
-        if len(coroutines) > 0:
-            cor_result = py3compat.asyncio.notify(coroutines, debug=self.debug)
-
-            if e is None:
-                # All notifications sent, return False if any failed.
-                return cor_result
-
-            else:
-                # Some notifications sent, but there was an internal error.
-                return py3compat.asyncio.chain(
-                    cor_result,
-                    py3compat.asyncio.toasyncwrap(False)
-                )
-
-        elif e is None:
-            # No notifications sent.
-            return py3compat.asyncio.toasyncwrap(None)
-
-        else:
+        except TypeError:
             # No notifications sent, and there was an internal error.
             return py3compat.asyncio.toasyncwrap(False)
 
-    @staticmethod
-    def _partiallist(gen):
-        """
-        Saves the items produced by a generator into a list. If the generator
-        produces a premature exception, the items produced up until that point
-        will be returned as well as the exception itself.
-        """
+        else:
+            if len(coroutines) > 0:
+                # All notifications sent, return False if any failed.
+                return py3compat.asyncio.notify(
+                    coroutines, debug=self.debug)
 
-        l = []
-        while True:
-            try:
-                x = next(gen)
-            except StopIteration:
-                return l, None
-            except Exception as e:
-                return l, e
             else:
-                l.append(x)
+                # No notifications sent.
+                return py3compat.asyncio.toasyncwrap(None)
 
     @staticmethod
     def _notifyhandler(server, **kwargs):
