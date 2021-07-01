@@ -25,7 +25,6 @@
 
 import sys
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from ..URLBase import URLBase
 from ..logger import logger
@@ -37,9 +36,11 @@ ASYNCIO_RUN_SUPPORT = \
     (sys.version_info.major == 3 and sys.version_info.minor >= 7)
 
 
-def notify(coroutines, debug=False):
+# async reference produces a SyntaxError (E999) in Python v2.7
+# For this reason we turn on the noqa flag
+async def notify(coroutines):  # noqa: E999
     """
-    A Wrapper to the AsyncNotifyBase.async_notify() calls allowing us
+    An async wrapper to the AsyncNotifyBase.async_notify() calls allowing us
     to call gather() and collect the responses
     """
 
@@ -47,59 +48,49 @@ def notify(coroutines, debug=False):
     logger.info(
         'Notifying {} service(s) asynchronously.'.format(len(coroutines)))
 
+    results = await asyncio.gather(*coroutines, return_exceptions=True)
+
+    # Returns True if all notifications succeeded, otherwise False is
+    # returned.
+    failed = any(not status or isinstance(status, Exception)
+                 for status in results)
+    return not failed
+
+
+def tosync(cor, debug=False):
+    """
+    Await a coroutine from non-async code.
+    """
+
     if ASYNCIO_RUN_SUPPORT:
-        # async reference produces a SyntaxError (E999) in Python v2.7
-        # For this reason we turn on the noqa flag
-        async def main(results, coroutines):  # noqa: E999
-            """
-            Task: Notify all servers specified and return our result set
-                  through a mutable object.
-            """
-            # send our notifications and store our result set into
-            # our results dictionary
-            results['response'] = \
-                await asyncio.gather(*coroutines, return_exceptions=True)
-
-        # Initialize a mutable object we can populate with our notification
-        # responses
-        results = {}
-
-        # Send our notifications
-        asyncio.run(main(results, coroutines), debug=debug)
-
-        # Acquire our return status
-        status = next((s for s in results['response'] if s is False), True)
+        return asyncio.run(cor, debug=debug)
 
     else:
-        #
         # The Deprecated Way (<= Python v3.6)
-        #
-
         try:
             # acquire access to our event loop
             loop = asyncio.get_event_loop()
 
         except RuntimeError:
             # This happens if we're inside a thread of another application
-            # where there is no running event_loop().  Pythong v3.7 and higher
-            # automatically take care of this case for us.  But for the lower
-            # versions we need to do the following:
+            # where there is no running event_loop().  Pythong v3.7 and
+            # higher automatically take care of this case for us.  But for
+            # the lower versions we need to do the following:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
 
-        if debug:
-            # Enable debug mode
-            loop.set_debug(1)
+        # Enable debug mode
+        loop.set_debug(debug)
 
-        # Send our notifications and acquire our status
-        results = loop.run_until_complete(asyncio.gather(*coroutines))
+        return loop.run_until_complete(cor)
 
-        # Acquire our return status
-        status = next((r for r in results if r is False), True)
 
-    # Returns True if all notifications succeeded, otherwise False is
-    # returned.
-    return status
+async def toasyncwrap(v):  # noqa: E999
+    """
+    Create a coroutine that, when run, returns the provided value.
+    """
+
+    return v
 
 
 class AsyncNotifyBase(URLBase):
@@ -111,13 +102,12 @@ class AsyncNotifyBase(URLBase):
         """
         Async Notification Wrapper
         """
+
+        loop = asyncio.get_event_loop()
+
         try:
-            loop = asyncio.get_event_loop()
-            with ThreadPoolExecutor() as executor:
-                return await loop.run_in_executor(
-                    executor,
-                    partial(self.notify, *args, **kwargs),
-                )
+            return await loop.run_in_executor(
+                None, partial(self.notify, *args, **kwargs))
 
         except TypeError:
             # These our our internally thrown notifications

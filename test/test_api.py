@@ -54,6 +54,15 @@ import inspect
 import logging
 logging.disable(logging.CRITICAL)
 
+# Sending notifications requires the coroutines to be awaited, so we need to
+# wrap the original function when mocking it. But don't import for Python 2.
+if not six.PY2:
+    import apprise.py3compat.asyncio as py3aio
+else:
+    class py3aio:
+        def notify():
+            pass
+
 # Attachment Directory
 TEST_VAR_DIR = join(dirname(__file__), 'var')
 
@@ -63,6 +72,25 @@ def test_apprise():
     API: Apprise() object
 
     """
+    def do_notify(server, *args, **kwargs):
+        return server.notify(*args, **kwargs)
+
+    apprise_test(do_notify)
+
+
+@pytest.mark.skipif(sys.version_info.major <= 2, reason="Requires Python 3.x+")
+def test_apprise_async():
+    """
+    API: Apprise() object asynchronous methods
+
+    """
+    def do_notify(server, *args, **kwargs):
+        return py3aio.tosync(server.async_notify(*args, **kwargs))
+
+    apprise_test(do_notify)
+
+
+def apprise_test(do_notify):
     # Caling load matix a second time which is an internal function causes it
     # to skip over content already loaded into our matrix and thefore accesses
     # other if/else parts of the code that aren't otherwise called
@@ -153,7 +181,7 @@ def test_apprise():
     a.clear()
 
     # No servers to notify
-    assert a.notify(title="my title", body="my body") is False
+    assert do_notify(a, title="my title", body="my body") is False
 
     class BadNotification(NotifyBase):
         def __init__(self, **kwargs):
@@ -202,8 +230,8 @@ def test_apprise():
     assert len(a) == 0
 
     # We'll fail because we've got nothing to notify
-    assert a.notify(
-        title="my title", body="my body") is False
+    assert do_notify(
+        a, title="my title", body="my body") is False
 
     # Clear our server listings again
     a.clear()
@@ -213,50 +241,50 @@ def test_apprise():
 
     # Bad Notification Type is still allowed as it is presumed the user
     # know's what their doing
-    assert a.notify(
-        title="my title", body="my body", notify_type='bad') is True
+    assert do_notify(
+        a, title="my title", body="my body", notify_type='bad') is True
 
     # No Title/Body combo's
-    assert a.notify(title=None, body=None) is False
-    assert a.notify(title='', body=None) is False
-    assert a.notify(title=None, body='') is False
+    assert do_notify(a, title=None, body=None) is False
+    assert do_notify(a, title='', body=None) is False
+    assert do_notify(a, title=None, body='') is False
 
     # As long as one is present, we're good
-    assert a.notify(title=None, body='present') is True
-    assert a.notify(title='present', body=None) is True
-    assert a.notify(title="present", body="present") is True
+    assert do_notify(a, title=None, body='present') is True
+    assert do_notify(a, title='present', body=None) is True
+    assert do_notify(a, title="present", body="present") is True
 
     # Send Attachment with success
     attach = join(TEST_VAR_DIR, 'apprise-test.gif')
-    assert a.notify(
-        body='body', title='test', notify_type=NotifyType.INFO,
+    assert do_notify(
+        a, body='body', title='test', notify_type=NotifyType.INFO,
         attach=attach) is True
 
     # Send the attachment as an AppriseAttachment object
-    assert a.notify(
-        body='body', title='test', notify_type=NotifyType.INFO,
+    assert do_notify(
+        a, body='body', title='test', notify_type=NotifyType.INFO,
         attach=AppriseAttachment(attach)) is True
 
     # test a invalid attachment
-    assert a.notify(
-        body='body', title='test', notify_type=NotifyType.INFO,
+    assert do_notify(
+        a, body='body', title='test', notify_type=NotifyType.INFO,
         attach='invalid://') is False
 
     # Repeat the same tests above...
     # however do it by directly accessing the object; this grants the similar
     # results:
-    assert a[0].notify(
-        body='body', title='test', notify_type=NotifyType.INFO,
+    assert do_notify(
+        a[0], body='body', title='test', notify_type=NotifyType.INFO,
         attach=attach) is True
 
     # Send the attachment as an AppriseAttachment object
-    assert a[0].notify(
-        body='body', title='test', notify_type=NotifyType.INFO,
+    assert do_notify(
+        a[0], body='body', title='test', notify_type=NotifyType.INFO,
         attach=AppriseAttachment(attach)) is True
 
     # test a invalid attachment
-    assert a[0].notify(
-        body='body', title='test', notify_type=NotifyType.INFO,
+    assert do_notify(
+        a[0], body='body', title='test', notify_type=NotifyType.INFO,
         attach='invalid://') is False
 
     class ThrowNotification(NotifyBase):
@@ -310,7 +338,7 @@ def test_apprise():
 
         # Test when our notify both throws an exception and or just
         # simply returns False
-        assert a.notify(title="present", body="present") is False
+        assert do_notify(a, title="present", body="present") is False
 
     # Create a Notification that throws an unexected exception
     class ThrowInstantiateNotification(NotifyBase):
@@ -498,7 +526,27 @@ def test_apprise_tagging(mock_post, mock_get):
     API: Apprise() object tagging functionality
 
     """
+    def do_notify(server, *args, **kwargs):
+        return server.notify(*args, **kwargs)
 
+    apprise_tagging_test(mock_post, mock_get, do_notify)
+
+
+@mock.patch('requests.get')
+@mock.patch('requests.post')
+@pytest.mark.skipif(sys.version_info.major <= 2, reason="Requires Python 3.x+")
+def test_apprise_tagging_async(mock_post, mock_get):
+    """
+    API: Apprise() object tagging functionality asynchronous methods
+
+    """
+    def do_notify(server, *args, **kwargs):
+        return py3aio.tosync(server.async_notify(*args, **kwargs))
+
+    apprise_tagging_test(mock_post, mock_get, do_notify)
+
+
+def apprise_tagging_test(mock_post, mock_get, do_notify):
     # A request
     robj = mock.Mock()
     setattr(robj, 'raw', mock.Mock())
@@ -535,18 +583,19 @@ def test_apprise_tagging(mock_post, mock_get):
 
     # notify the awesome tag; this would notify both services behind the
     # scenes
-    assert a.notify(title="my title", body="my body", tag='awesome') is True
+    assert do_notify(
+        a, title="my title", body="my body", tag='awesome') is True
 
     # notify all of the tags
-    assert a.notify(
-        title="my title", body="my body", tag=['awesome', 'mmost']) is True
+    assert do_notify(
+        a, title="my title", body="my body", tag=['awesome', 'mmost']) is True
 
     # When we query against our loaded notifications for a tag that simply
     # isn't assigned to anything, we return None.  None (different then False)
     # tells us that we litterally had nothing to query.  We didn't fail...
     # but we also didn't do anything...
-    assert a.notify(
-        title="my title", body="my body", tag='missing') is None
+    assert do_notify(
+        a, title="my title", body="my body", tag='missing') is None
 
     # Now to test the ability to and and/or notifications
     a = Apprise()
@@ -571,20 +620,20 @@ def test_apprise_tagging(mock_post, mock_get):
     # Matches the following only:
     #   - json://localhost/tagCD/
     #   - json://localhost/tagCDE/
-    assert a.notify(
-        title="my title", body="my body", tag=[('TagC', 'TagD')]) is True
+    assert do_notify(
+        a, title="my title", body="my body", tag=[('TagC', 'TagD')]) is True
 
     # Expression: (TagY and TagZ) or TagX
     # Matches nothing, None is returned in this case
-    assert a.notify(
-        title="my title", body="my body",
+    assert do_notify(
+        a, title="my title", body="my body",
         tag=[('TagY', 'TagZ'), 'TagX']) is None
 
     # Expression: (TagY and TagZ) or TagA
     # Matches the following only:
     #   - json://localhost/tagAB/
-    assert a.notify(
-        title="my title", body="my body",
+    assert do_notify(
+        a, title="my title", body="my body",
         tag=[('TagY', 'TagZ'), 'TagA']) is True
 
     # Expression: (TagE and TagD) or TagB
@@ -592,8 +641,8 @@ def test_apprise_tagging(mock_post, mock_get):
     #   - json://localhost/tagCDE/
     #   - json://localhost/tagAB/
     #   - json://localhost/tagB/
-    assert a.notify(
-        title="my title", body="my body",
+    assert do_notify(
+        a, title="my title", body="my body",
         tag=[('TagE', 'TagD'), 'TagB']) is True
 
     # Garbage Entries in tag field just get stripped out. the below
@@ -602,8 +651,8 @@ def test_apprise_tagging(mock_post, mock_get):
     # we fail.  None is returned as a way of letting us know that we
     # had Notifications to notify, but since none of them matched our tag
     # none were notified.
-    assert a.notify(
-        title="my title", body="my body",
+    assert do_notify(
+        a, title="my title", body="my body",
         tag=[(object, ), ]) is None
 
 
@@ -1414,7 +1463,7 @@ def test_apprise_details_plugin_verification():
 
 @pytest.mark.skipif(sys.version_info.major <= 2, reason="Requires Python 3.x+")
 @mock.patch('requests.post')
-@mock.patch('apprise.py3compat.asyncio.notify')
+@mock.patch('apprise.py3compat.asyncio.notify', wraps=py3aio.notify)
 def test_apprise_async_mode(mock_async_notify, mock_post, tmpdir):
     """
     API: Apprise() async_mode tests
@@ -1474,8 +1523,8 @@ def test_apprise_async_mode(mock_async_notify, mock_post, tmpdir):
 
     # Send Notifications Syncronously
     assert a.notify("sync") is True
-    # Verify our async code never got called
-    assert mock_async_notify.call_count == 0
+    # Verify our async code got called
+    assert mock_async_notify.call_count == 1
     mock_async_notify.reset_mock()
 
     # another way of looking a our false set asset configuration
