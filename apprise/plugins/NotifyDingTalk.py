@@ -24,6 +24,10 @@
 # THE SOFTWARE.
 
 import re
+import time
+import hmac
+import hashlib
+import base64
 import requests
 from json import dumps
 
@@ -40,9 +44,10 @@ from ..AppriseLocale import gettext_lazy as _
 #     be provided an access_token that Apprise will need.
 
 # Syntax:
-#  dingtalk://{access_token}/
+#  dingtalk://{secret}@{access_token}
+#  dingtalk://{access_token}
 #  dingtalk://{access_token}/{optional_phone_no}
-#  dingtalk://{access_token}/{phone_no_1}/{phone_no_2}/{phone_no_N/
+#  dingtalk://{access_token}/{phone_no_1}/{phone_no_2}/{phone_no_N}/
 
 # Some Phone Number Detection
 IS_PHONE_NO = re.compile(r'^\+?(?P<phone>[0-9\s)(+-]+)\s*$')
@@ -76,6 +81,7 @@ class NotifyDingTalk(NotifyBase):
     # Define object templates
     templates = (
         '{schema}://{token}/',
+        '{schema}://{secret}@{token}/',
         '{schema}://{token}/{targets}/',
     )
 
@@ -87,6 +93,12 @@ class NotifyDingTalk(NotifyBase):
             'private': True,
             'required': True,
             'regex': (r'^[a-z0-9]+$', 'i'),
+        },
+        'secret': {
+            'name': _('Secret'),
+            'type': 'string',
+            'private': True,
+            'regex': (r'^[A-Za-z0-9]+$', 'i'),
         },
         'targets': {
             'name': _('Target Phone No'),
@@ -115,6 +127,15 @@ class NotifyDingTalk(NotifyBase):
                   '({}) was specified.'.format(token)
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        if self.user:
+            self.user = validate_regex(
+                self.user, *self.template_tokens['secret']['regex'])
+            if not self.user:
+                msg = 'An invalid DingTalk API Secret ' \
+                    '({}) was specified.'.format(self.user)
+                self.logger.warning(msg)
+                raise TypeError(msg)
 
         # Parse our targets
         self.targets = list()
@@ -170,6 +191,11 @@ class NotifyDingTalk(NotifyBase):
         # Our Notification URL
         notify_url = self.notify_url.format(token=self.token)
 
+        # Add signature if needed
+        if self.user is not None:
+            ts, sign = self.get_signature()
+            notify_url += "&timestamp={}&sign={}".format(ts, sign)
+
         # Prepare our headers
         headers = {
             'User-Agent': self.app_id,
@@ -222,6 +248,18 @@ class NotifyDingTalk(NotifyBase):
 
         return True
 
+    def get_signature(self):
+        """
+        Calculates time-based signature so that we can send arbitrary messages.
+        """
+        timestamp = str(round(time.time() * 1000))
+        secret_enc = self.user.encode('utf-8')
+        str_to_sign_enc = "{}\n{}".format(timestamp, self.user).encode('utf-8')
+        hmac_code = hmac.new(
+            secret_enc, str_to_sign_enc, digestmod=hashlib.sha256).digest()
+        sign = NotifyDingTalk.quote(base64.b64encode(hmac_code), safe='')
+        return timestamp, sign
+
     @property
     def title_maxlen(self):
         """
@@ -242,9 +280,14 @@ class NotifyDingTalk(NotifyBase):
             'verify': 'yes' if self.verify_certificate else 'no',
         }
 
-        return '{schema}://{token}/{targets}/?{args}'.format(
+        template = '{schema}://{token}/{targets}/?{args}'
+        if self.user:
+            template = '{schema}://{secret}@{token}/{targets}/?{args}'
+
+        return template.format(
             schema=self.secure_protocol,
             token=self.pprint(self.token, privacy, safe=''),
+            secret=self.pprint(self.user, privacy, safe=''),
             targets='/'.join(
                 [NotifyDingTalk.quote(x, safe='') for x in self.targets]),
             args=NotifyDingTalk.urlencode(args))
@@ -256,7 +299,7 @@ class NotifyDingTalk(NotifyBase):
         us to substantiate this object.
 
         """
-        results = NotifyBase.parse_url(url)
+        results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
