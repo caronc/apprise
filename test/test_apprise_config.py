@@ -1171,3 +1171,68 @@ def test_config_base_parse_yaml_file03(tmpdir):
     assert sum(1 for _ in a.find('test3')) == 1
     # Match test1 or test3 entry; (only matches test3)
     assert sum(1 for _ in a.find('test1, test3')) == 1
+
+
+def test_apprise_config_template_parse(tmpdir):
+    """
+    API: AppriseConfig parsing of templates
+
+    """
+
+    # Create ourselves a config object
+    ac = AppriseConfig()
+
+    t = tmpdir.mkdir("template-testing").join("apprise.yml")
+    t.write("""
+
+    tag:
+      - company
+
+    # A comment line over top of a URL
+    urls:
+       - mailto://user:pass@example.com:
+          - to: user1@gmail.com
+            cc: test@hotmail.com
+
+          - to: user2@gmail.com
+            tag: co-worker
+    """)
+
+    # Create ourselves a config object
+    ac = AppriseConfig(paths=str(t))
+
+    # 2 emails to be sent
+    assert len(ac.servers()) == 2
+
+    # The below checks are very customized for NotifyMail but just
+    # test that the content got passed correctly
+    assert (False, 'user1@gmail.com') in ac[0][0].targets
+    assert 'test@hotmail.com' in ac[0][0].cc
+    assert 'company' in ac[0][1].tags
+
+    assert (False, 'user2@gmail.com') in ac[0][1].targets
+    assert 'company' in ac[0][1].tags
+    assert 'co-worker' in ac[0][1].tags
+
+    #
+    # Specifically test _extract_special_tokens()
+    #
+    tokens = {
+        'bcc': 'user@test.com',
+        'to': 'user1@abc.com',
+        # white space and tab is intentionally added to the end to verify we
+        # do not play/tamper with information
+        'targets': 'user2@abc.com, user3@abc.com   \t',
+    }
+
+    result = ConfigBase._extract_special_tokens('mailto', tokens)
+    assert 'to' not in result
+
+    # bcc is allowed here
+    assert 'bcc' in result
+    assert 'targets' in result
+    # We'll concatinate all of our targets together
+    assert len(result['targets']) == 2
+    assert 'user1@abc.com' in result['targets']
+    # Content is passed as is
+    assert 'user2@abc.com, user3@abc.com   \t' in result['targets']

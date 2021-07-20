@@ -848,7 +848,7 @@ class ConfigBase(URLBase):
 
                             # support our special tokens (if they're present)
                             if schema in plugins.SCHEMA_MAP:
-                                entries = ConfigBase.__extract_special_tokens(
+                                entries = ConfigBase._extract_special_tokens(
                                     schema, entries)
 
                             # Extend our dictionary with our new entries
@@ -860,7 +860,7 @@ class ConfigBase(URLBase):
                 elif isinstance(tokens, dict):
                     # support our special tokens (if they're present)
                     if schema in plugins.SCHEMA_MAP:
-                        tokens = ConfigBase.__extract_special_tokens(
+                        tokens = ConfigBase._extract_special_tokens(
                             schema, tokens)
 
                     # Copy ourselves a template of our parsed URL as a base to
@@ -962,7 +962,7 @@ class ConfigBase(URLBase):
         return self._cached_servers.pop(index)
 
     @staticmethod
-    def __extract_special_tokens(schema, tokens):
+    def _extract_special_tokens(schema, tokens):
         """
         This function takes a list of tokens and updates them to no longer
         include any special tokens such as +,-, and :
@@ -1004,6 +1004,64 @@ class ConfigBase(URLBase):
 
             # Update our entries
             tokens[kw].update(matches)
+
+        # Now map our tokens accordingly to the class templates defined by
+        # each service.
+        #
+        # This is specifically used for YAML file parsing.  It allows a user to
+        # define an entry such as:
+        #
+        # urls:
+        #   - mailto://user:pass@domain:
+        #       - to: user1@hotmail.com
+        #       - to: user2@hotmail.com
+        #
+        # Under the hood, the NotifyEmail() class does not parse the `to`
+        # argument. It's contents needs to be mapped to `targets`.  This is
+        # defined in the class via the `template_args` and template_tokens`
+        # section.
+        #
+        # This function here allows these mappings to take place within the
+        # YAML file as independant arguments.
+        class_templates = \
+            plugins.details(plugins.SCHEMA_MAP[schema])
+        for key in list(tokens.keys()):
+
+            if key not in class_templates['args']:
+                continue
+
+            if 'map_to' not in class_templates['args'][key]:
+                continue
+
+            if class_templates['args'][key]['map_to'] == key:
+                # We're already good as we are now
+                continue
+
+            # Perform a translation/mapping if our code reaches here
+            _value = tokens[key]
+            del tokens[key]
+
+            _key = class_templates['args'][key]['map_to']
+            if _key in class_templates['tokens']:
+                # Detect if we're dealign with a list or not
+                is_list = class_templates['tokens'][_key]\
+                    .get('type').startswith('list')
+
+                if _key not in tokens:
+                    tokens[_key] = [] if is_list \
+                        else class_templates['tokens'][_key].get('default')
+
+                elif is_list and not isinstance(tokens.get(_key), list):
+                    # Convert ourselves to a list if we aren't already
+                    tokens[_key] = [tokens[_key]]
+
+            if _value:
+                # Append our content only if there is something to append
+                if isinstance(tokens.get(_key), list):
+                    tokens[_key].append(_value)
+
+                else:
+                    tokens[_key] = _value
 
         # Return our tokens
         return tokens
