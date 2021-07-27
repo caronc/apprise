@@ -1215,24 +1215,136 @@ def test_apprise_config_template_parse(tmpdir):
     assert 'co-worker' in ac[0][1].tags
 
     #
-    # Specifically test _extract_special_tokens()
+    # Specifically test _special_token_handler()
     #
     tokens = {
+        # This maps to itself (bcc); no change here
         'bcc': 'user@test.com',
+        # This should get mapped to 'targets'
         'to': 'user1@abc.com',
         # white space and tab is intentionally added to the end to verify we
         # do not play/tamper with information
         'targets': 'user2@abc.com, user3@abc.com   \t',
+        # If the end user provides a configuration for data we simply don't use
+        # this isn't a proble... we simply don't touch it either; we leave it
+        # as is.
+        'ignore': 'not-used'
     }
 
-    result = ConfigBase._extract_special_tokens('mailto', tokens)
+    result = ConfigBase._special_token_handler('mailto', tokens)
+    # to gets mapped to targets
     assert 'to' not in result
 
     # bcc is allowed here
     assert 'bcc' in result
     assert 'targets' in result
+    # Not used, but also not touched; this entry should still be in our result
+    # set
+    assert 'ignore' in result
     # We'll concatinate all of our targets together
     assert len(result['targets']) == 2
     assert 'user1@abc.com' in result['targets']
     # Content is passed as is
     assert 'user2@abc.com, user3@abc.com   \t' in result['targets']
+
+    # We re-do the simmiar test above.  The very key difference is the
+    # `targets` is a list already (it's expected type) so `to` can properly be
+    # concatinated into the list vs the above (which tries to correct the
+    # situation)
+    tokens = {
+        # This maps to itself (bcc); no change here
+        'bcc': 'user@test.com',
+        # This should get mapped to 'targets'
+        'to': 'user1@abc.com',
+        # similar to the above test except targets is now a proper
+        # dictionary allowing the `to` (when translated to `targets`) to get
+        # appended to it
+        'targets': ['user2@abc.com', 'user3@abc.com'],
+        # If the end user provides a configuration for data we simply don't use
+        # this isn't a proble... we simply don't touch it either; we leave it
+        # as is.
+        'ignore': 'not-used'
+    }
+
+    result = ConfigBase._special_token_handler('mailto', tokens)
+    # to gets mapped to targets
+    assert 'to' not in result
+
+    # bcc is allowed here
+    assert 'bcc' in result
+    assert 'targets' in result
+    # Not used, but also not touched; this entry should still be in our result
+    # set
+    assert 'ignore' in result
+
+    # Now we'll see the new user added as expected (concatinated into our list)
+    assert len(result['targets']) == 3
+    assert 'user1@abc.com' in result['targets']
+    assert 'user2@abc.com' in result['targets']
+    assert 'user3@abc.com' in result['targets']
+
+    # Test providing a list
+    t.write("""
+    # A comment line over top of a URL
+    urls:
+       - mailtos://user:pass@example.com:
+          - smtp: smtp3-dev.google.gmail.com
+            to:
+              - John Smith <user1@gmail.com>
+              - Jason Tater <user2@gmail.com>
+              - user3@gmail.com
+
+          - to: Henry Fisher <user4@gmail.com>, Jason Archie <user5@gmail.com>
+            smtp_host: smtp5-dev.google.gmail.com
+            tag: drinking-buddy
+
+       # provide case where the URL includes some input too
+       # In both of these cases, the cc and targets (to) get over-ridden
+       # by values below
+       - mailtos://user:pass@example.com/arnold@imdb.com/?cc=bill@micro.com/:
+            to:
+              - override01@gmail.com
+            cc:
+              - override02@gmail.com
+
+       - sinch://:
+          - spi: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+            token: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+
+            # Test a case where we expect a string, but yaml reads it in as
+            # a number
+            from: 10005243890
+            to: +1(123)555-1234
+    """)
+
+    # Create ourselves a config object
+    ac = AppriseConfig(paths=str(t))
+
+    # 2 emails to be sent and 1 Sinch service call
+    assert len(ac.servers()) == 4
+
+    # Verify our users got placed into the to
+    assert len(ac[0][0].targets) == 3
+    assert ("John Smith", 'user1@gmail.com') in ac[0][0].targets
+    assert ("Jason Tater", 'user2@gmail.com') in ac[0][0].targets
+    assert (False, 'user3@gmail.com') in ac[0][0].targets
+    assert ac[0][0].smtp_host == 'smtp3-dev.google.gmail.com'
+
+    assert len(ac[0][1].targets) == 2
+    assert ("Henry Fisher", 'user4@gmail.com') in ac[0][1].targets
+    assert ("Jason Archie", 'user5@gmail.com') in ac[0][1].targets
+    assert 'drinking-buddy' in ac[0][1].tags
+    assert ac[0][1].smtp_host == 'smtp5-dev.google.gmail.com'
+
+    # Our third test tests cases where some variables are defined inline
+    # and additional ones are defined below that share the same token space
+    assert len(ac[0][2].targets) == 1
+    assert len(ac[0][2].cc) == 1
+    assert (False, 'override01@gmail.com') in ac[0][2].targets
+    assert 'override02@gmail.com' in ac[0][2].cc
+
+    # Test our Since configuration now:
+    assert len(ac[0][3].targets) == 1
+    assert ac[0][3].service_plan_id == 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+    assert ac[0][3].source == '+10005243890'
+    assert ac[0][3].targets[0] == '+11235551234'

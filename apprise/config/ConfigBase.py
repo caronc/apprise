@@ -848,7 +848,7 @@ class ConfigBase(URLBase):
 
                             # support our special tokens (if they're present)
                             if schema in plugins.SCHEMA_MAP:
-                                entries = ConfigBase._extract_special_tokens(
+                                entries = ConfigBase._special_token_handler(
                                     schema, entries)
 
                             # Extend our dictionary with our new entries
@@ -860,7 +860,7 @@ class ConfigBase(URLBase):
                 elif isinstance(tokens, dict):
                     # support our special tokens (if they're present)
                     if schema in plugins.SCHEMA_MAP:
-                        tokens = ConfigBase._extract_special_tokens(
+                        tokens = ConfigBase._special_token_handler(
                             schema, tokens)
 
                     # Copy ourselves a template of our parsed URL as a base to
@@ -962,7 +962,7 @@ class ConfigBase(URLBase):
         return self._cached_servers.pop(index)
 
     @staticmethod
-    def _extract_special_tokens(schema, tokens):
+    def _special_token_handler(schema, tokens):
         """
         This function takes a list of tokens and updates them to no longer
         include any special tokens such as +,-, and :
@@ -994,7 +994,7 @@ class ConfigBase(URLBase):
                 # we're done with this entry
                 continue
 
-            if not isinstance(tokens.get(kw, None), dict):
+            if not isinstance(tokens.get(kw), dict):
                 # Invalid; correct it
                 tokens[kw] = dict()
 
@@ -1025,43 +1025,67 @@ class ConfigBase(URLBase):
         # YAML file as independant arguments.
         class_templates = \
             plugins.details(plugins.SCHEMA_MAP[schema])
+
         for key in list(tokens.keys()):
 
             if key not in class_templates['args']:
+                # No need to handle non-arg entries
                 continue
 
-            if 'map_to' not in class_templates['args'][key]:
-                continue
+            # get our `map_to` and/or 'alias_of' value (if it exists)
+            map_to = class_templates['args'][key].get(
+                'alias_of', class_templates['args'][key].get('map_to', ''))
 
-            if class_templates['args'][key]['map_to'] == key:
+            if map_to == key:
                 # We're already good as we are now
                 continue
 
+            if map_to in class_templates['tokens']:
+                meta = class_templates['tokens'][map_to]
+
+            else:
+                meta = class_templates['args'].get(
+                    map_to, class_templates['args'][key])
+
             # Perform a translation/mapping if our code reaches here
-            _value = tokens[key]
+            value = tokens[key]
             del tokens[key]
 
-            _key = class_templates['args'][key]['map_to']
-            if _key in class_templates['tokens']:
-                # Detect if we're dealign with a list or not
-                is_list = class_templates['tokens'][_key]\
-                    .get('type').startswith('list')
+            # Detect if we're dealign with a list or not
+            is_list = re.search(
+                r'^(list|choice):.*',
+                meta.get('type'),
+                re.IGNORECASE)
 
-                if _key not in tokens:
-                    tokens[_key] = [] if is_list \
-                        else class_templates['tokens'][_key].get('default')
+            if map_to not in tokens:
+                tokens[map_to] = [] if is_list \
+                    else meta.get('default')
 
-                elif is_list and not isinstance(tokens.get(_key), list):
-                    # Convert ourselves to a list if we aren't already
-                    tokens[_key] = [tokens[_key]]
+            elif is_list and not isinstance(tokens.get(map_to), list):
+                # Convert ourselves to a list if we aren't already
+                tokens[map_to] = [tokens[map_to]]
 
-            if _value:
-                # Append our content only if there is something to append
-                if isinstance(tokens.get(_key), list):
-                    tokens[_key].append(_value)
+            # Type Conversion
+            if re.search(
+                    r'^(choice:)?string',
+                    meta.get('type'),
+                    re.IGNORECASE) \
+                    and not isinstance(value, six.string_types):
 
-                else:
-                    tokens[_key] = _value
+                # Ensure our format is as expected
+                value = str(value)
+
+            # Apply any further translations if required (absolute map)
+            # This is the case when an arg maps to a token which further
+            # maps to a different function arg on the class constructor
+            abs_map = meta.get('map_to', map_to)
+
+            # Set our token as how it was provided by the configuration
+            if isinstance(tokens.get(map_to), list):
+                tokens[abs_map].append(value)
+
+            else:
+                tokens[abs_map] = value
 
         # Return our tokens
         return tokens
