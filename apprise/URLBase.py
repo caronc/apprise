@@ -47,6 +47,7 @@ from .AppriseAsset import AppriseAsset
 from .utils import parse_url
 from .utils import parse_bool
 from .utils import parse_list
+from .utils import parse_phone_no
 
 # Used to break a path list into parts
 PATHSPLIT_LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
@@ -557,6 +558,39 @@ class URLBase(object):
         if unquote:
             content = \
                 [URLBase.unquote(x) for x in filter(bool, content)]
+
+        return content
+
+    @staticmethod
+    def parse_phone_no(content, unquote=True):
+        """A wrapper to utils.parse_phone_no() with unquoting support
+
+        Parses a specified set of data and breaks it into a list.
+
+        Args:
+            content (str): The path to split up into a list. If a list is
+                 provided, then it's individual entries are processed.
+
+            unquote (:obj:`bool`, optional): call unquote on each element
+                 added to the returned list.
+
+        Returns:
+            list: A unique list containing all of the elements in the path
+        """
+
+        if unquote:
+            try:
+                content = URLBase.unquote(content)
+            except TypeError:
+                # Nothing further to do
+                return []
+
+            except AttributeError:
+                # This exception ONLY gets thrown under Python v2.7 if an
+                # object() is passed in place of the content
+                return []
+
+        content = parse_phone_no(content)
 
         return content
 

@@ -29,17 +29,14 @@
 #   - https://dashboard.messagebird.com/en/user/index
 #
 
-import re
 import requests
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
-from ..utils import parse_list
+from ..utils import is_phone_no
+from ..utils import parse_phone_no
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
-
-# Some Phone Number Detection
-IS_PHONE_NO = re.compile(r'^\+?(?P<phone>[0-9\s)(+-]+)\s*$')
 
 
 class NotifyMessageBird(NotifyBase):
@@ -129,28 +126,20 @@ class NotifyMessageBird(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        result = IS_PHONE_NO.match(source)
+        result = is_phone_no(source)
         if not result:
             msg = 'The MessageBird source specified ({}) is invalid.'\
                 .format(source)
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # Further check our phone # for it's digit count
-        result = ''.join(re.findall(r'\d+', result.group('phone')))
-        if len(result) < 11 or len(result) > 14:
-            msg = 'The MessageBird source # specified ({}) is invalid.'\
-                .format(source)
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
         # Store our source
-        self.source = result
+        self.source = result['full']
 
         # Parse our targets
         self.targets = list()
 
-        targets = parse_list(targets)
+        targets = parse_phone_no(targets)
         if not targets:
             # No sources specified, use our own phone no
             self.targets.append(self.source)
@@ -159,31 +148,16 @@ class NotifyMessageBird(NotifyBase):
         # otherwise, store all of our target numbers
         for target in targets:
             # Validate targets and drop bad ones:
-            result = IS_PHONE_NO.match(target)
-            if result:
-                # Further check our phone # for it's digit count
-                result = ''.join(re.findall(r'\d+', result.group('phone')))
-                if len(result) < 11 or len(result) > 14:
-                    self.logger.warning(
-                        'Dropped invalid phone # '
-                        '({}) specified.'.format(target),
-                    )
-                    continue
-
-                # store valid phone number
-                self.targets.append(result)
+            result = is_phone_no(target)
+            if not result:
+                self.logger.warning(
+                    'Dropped invalid phone # '
+                    '({}) specified.'.format(target),
+                )
                 continue
 
-            self.logger.warning(
-                'Dropped invalid phone # '
-                '({}) specified.'.format(target),
-            )
-
-        if not self.targets:
-            # We have a bot token and no target(s) to message
-            msg = 'No MessageBird targets to notify.'
-            self.logger.warning(msg)
-            raise TypeError(msg)
+            # store valid phone number
+            self.targets.append(result['full'])
 
         return
 
@@ -191,6 +165,11 @@ class NotifyMessageBird(NotifyBase):
         """
         Perform MessageBird Notification
         """
+
+        if len(self.targets) == 0:
+            # There were no services to notify
+            self.logger.warning('There were no MessageBird targets to notify.')
+            return False
 
         # error tracking (used for function return)
         has_error = False
@@ -345,6 +324,7 @@ class NotifyMessageBird(NotifyBase):
         try:
             # The first path entry is the source/originator
             results['source'] = results['targets'].pop(0)
+
         except IndexError:
             # No path specified... this URL is potentially un-parseable; we can
             # hope for a from= entry
@@ -357,7 +337,7 @@ class NotifyMessageBird(NotifyBase):
         # The 'to' makes it easier to use yaml configuration
         if 'to' in results['qsd'] and len(results['qsd']['to']):
             results['targets'] += \
-                NotifyMessageBird.parse_list(results['qsd']['to'])
+                NotifyMessageBird.parse_phone_no(results['qsd']['to'])
 
         if 'from' in results['qsd'] and len(results['qsd']['from']):
             results['source'] = \

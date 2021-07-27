@@ -23,19 +23,16 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import re
 import requests
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
 from ..utils import is_email
+from ..utils import is_phone_no
 from ..utils import parse_list
 from ..utils import parse_bool
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
-
-# Some Phone Number Detection
-IS_PHONE_NO = re.compile(r'^\+?(?P<phone>[0-9\s)(+-]+)\s*$')
 
 
 class NotifyPopcornNotify(NotifyBase):
@@ -127,19 +124,10 @@ class NotifyPopcornNotify(NotifyBase):
 
         for target in parse_list(targets):
             # Validate targets and drop bad ones:
-            result = IS_PHONE_NO.match(target)
+            result = is_phone_no(target)
             if result:
-                # Further check our phone # for it's digit count
-                result = ''.join(re.findall(r'\d+', result.group('phone')))
-                if len(result) < 11 or len(result) > 14:
-                    self.logger.warning(
-                        'Dropped invalid phone # '
-                        '({}) specified.'.format(target),
-                    )
-                    continue
-
                 # store valid phone number
-                self.targets.append(result)
+                self.targets.append(result['full'])
                 continue
 
             result = is_email(target)

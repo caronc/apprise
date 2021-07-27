@@ -33,7 +33,6 @@
 # from). Activated phone numbers can be found on your dashboard here:
 #  - https://dashboard.sinch.com/numbers/your-numbers/numbers
 #
-import re
 import six
 import requests
 import json
@@ -41,13 +40,10 @@ import json
 from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyType
-from ..utils import parse_list
+from ..utils import is_phone_no
+from ..utils import parse_phone_no
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
-
-
-# Some Phone Number Detection
-IS_PHONE_NO = re.compile(r'^\+?(?P<phone>[0-9\s)(+-]+)\s*$')
 
 
 class SinchRegion(object):
@@ -194,15 +190,6 @@ class NotifySinch(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # The Source Phone # and/or short-code
-        self.source = source
-
-        if not IS_PHONE_NO.match(self.source):
-            msg = 'The Account (From) Phone # or Short-code specified ' \
-                  '({}) is invalid.'.format(source)
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
         # Setup our region
         self.region = self.template_args['region']['default'] \
             if not isinstance(region, six.string_types) else region.lower()
@@ -211,8 +198,16 @@ class NotifySinch(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
+        # The Source Phone # and/or short-code
+        result = is_phone_no(source, min_len=5)
+        if not result:
+            msg = 'The Account (From) Phone # or Short-code specified ' \
+                  '({}) is invalid.'.format(source)
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
         # Tidy source
-        self.source = re.sub(r'[^\d]+', '', self.source)
+        self.source = result['full']
 
         if len(self.source) < 11 or len(self.source) > 14:
             # A short code is a special 5 or 6 digit telephone number
@@ -233,37 +228,18 @@ class NotifySinch(NotifyBase):
         # Parse our targets
         self.targets = list()
 
-        for target in parse_list(targets):
-            # Validate targets and drop bad ones:
-            result = IS_PHONE_NO.match(target)
-            if result:
-                # Further check our phone # for it's digit count
-                # if it's less than 10, then we can assume it's
-                # a poorly specified phone no and spit a warning
-                result = ''.join(re.findall(r'\d+', result.group('phone')))
-                if len(result) < 11 or len(result) > 14:
-                    self.logger.warning(
-                        'Dropped invalid phone # '
-                        '({}) specified.'.format(target),
-                    )
-                    continue
-
-                # store valid phone number
-                self.targets.append('+{}'.format(result))
+        for target in parse_phone_no(targets):
+            # Parse each phone number we found
+            result = is_phone_no(target)
+            if not result:
+                self.logger.warning(
+                    'Dropped invalid phone # '
+                    '({}) specified.'.format(target),
+                )
                 continue
 
-            self.logger.warning(
-                'Dropped invalid phone # '
-                '({}) specified.'.format(target),
-            )
-
-        if not self.targets:
-            if len(self.source) in (5, 6):
-                # raise a warning since we're a short-code.  We need
-                # a number to message
-                msg = 'There are no valid Sinch targets to notify.'
-                self.logger.warning(msg)
-                raise TypeError(msg)
+            # store valid phone number
+            self.targets.append('+{}'.format(result['full']))
 
         return
 
@@ -271,6 +247,14 @@ class NotifySinch(NotifyBase):
         """
         Perform Sinch Notification
         """
+
+        if not self.targets:
+            if len(self.source) in (5, 6):
+                # Generate a warning since we're a short-code.  We need
+                # a number to message at minimum
+                self.logger.warning(
+                    'There are no valid Sinch targets to notify.')
+                return False
 
         # error tracking (used for function return)
         has_error = False
@@ -459,6 +443,7 @@ class NotifySinch(NotifyBase):
         if 'from' in results['qsd'] and len(results['qsd']['from']):
             results['source'] = \
                 NotifySinch.unquote(results['qsd']['from'])
+
         if 'source' in results['qsd'] and len(results['qsd']['source']):
             results['source'] = \
                 NotifySinch.unquote(results['qsd']['source'])
@@ -472,6 +457,6 @@ class NotifySinch(NotifyBase):
         # The 'to' makes it easier to use yaml configuration
         if 'to' in results['qsd'] and len(results['qsd']['to']):
             results['targets'] += \
-                NotifySinch.parse_list(results['qsd']['to'])
+                NotifySinch.parse_phone_no(results['qsd']['to'])
 
         return results
