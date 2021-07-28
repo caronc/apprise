@@ -30,7 +30,6 @@
 # (both user and password) from the API Details section from within your
 # account profile area:  https://d7networks.com/accounts/profile/
 
-import re
 import six
 import requests
 import base64
@@ -40,7 +39,8 @@ from json import loads
 from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyType
-from ..utils import parse_list
+from ..utils import is_phone_no
+from ..utils import parse_phone_no
 from ..utils import parse_bool
 from ..AppriseLocale import gettext_lazy as _
 
@@ -51,9 +51,6 @@ D7NETWORKS_HTTP_ERROR_MAP = {
     412: 'A Routing Error Occured',
     500: 'A Serverside Error Occured Handling the Request.',
 }
-
-# Some Phone Number Detection
-IS_PHONE_NO = re.compile(r'^\+?(?P<phone>[0-9\s)(+-]+)\s*$')
 
 
 # Priorities
@@ -197,35 +194,25 @@ class NotifyD7Networks(NotifyBase):
         self.source = None \
             if not isinstance(source, six.string_types) else source.strip()
 
-        # Parse our targets
-        self.targets = list()
-
-        for target in parse_list(targets):
-            # Validate targets and drop bad ones:
-            result = IS_PHONE_NO.match(target)
-            if result:
-                # Further check our phone # for it's digit count
-                # if it's less than 10, then we can assume it's
-                # a poorly specified phone no and spit a warning
-                result = ''.join(re.findall(r'\d+', result.group('phone')))
-                if len(result) < 11 or len(result) > 14:
-                    self.logger.warning(
-                        'Dropped invalid phone # '
-                        '({}) specified.'.format(target),
-                    )
-                    continue
-
-                # store valid phone number
-                self.targets.append(result)
-                continue
-
-            self.logger.warning(
-                'Dropped invalid phone # ({}) specified.'.format(target))
-
-        if len(self.targets) == 0:
-            msg = 'There are no valid targets identified to notify.'
+        if not (self.user and self.password):
+            msg = 'A D7 Networks user/pass was not provided.'
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        # Parse our targets
+        self.targets = list()
+        for target in parse_phone_no(targets):
+            # Validate targets and drop bad ones:
+            result = result = is_phone_no(target)
+            if not result:
+                self.logger.warning(
+                    'Dropped invalid phone # '
+                    '({}) specified.'.format(target),
+                )
+                continue
+
+            # store valid phone number
+            self.targets.append(result['full'])
 
         return
 
@@ -234,6 +221,11 @@ class NotifyD7Networks(NotifyBase):
         Depending on whether we are set to batch mode or single mode this
         redirects to the appropriate handling
         """
+
+        if len(self.targets) == 0:
+            # There were no services to notify
+            self.logger.warning('There were no D7 Networks targets to notify.')
+            return False
 
         # error tracking (used for function return)
         has_error = False
@@ -479,6 +471,6 @@ class NotifyD7Networks(NotifyBase):
         # The 'to' makes it easier to use yaml configuration
         if 'to' in results['qsd'] and len(results['qsd']['to']):
             results['targets'] += \
-                NotifyD7Networks.parse_list(results['qsd']['to'])
+                NotifyD7Networks.parse_phone_no(results['qsd']['to'])
 
         return results

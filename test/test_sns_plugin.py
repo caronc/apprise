@@ -39,7 +39,10 @@ TEST_ACCESS_KEY_SECRET = 'bu1dHSdO22pfaaVy/wmNsdljF4C07D3bndi9PQJ9'
 TEST_REGION = 'us-east-2'
 
 
-def test_object_initialization():
+# We initialize a post object just incase a test fails below
+# we don't want it sending any notifications upstream
+@mock.patch('requests.post')
+def test_object_initialization(mock_post):
     """
     API: NotifySNS Plugin() initialization
 
@@ -73,43 +76,40 @@ def test_object_initialization():
             targets='+1800555999',
         )
 
-    with pytest.raises(TypeError):
-        # No recipients
-        plugins.NotifySNS(
-            access_key_id=TEST_ACCESS_KEY_ID,
-            secret_access_key=TEST_ACCESS_KEY_SECRET,
-            region_name=TEST_REGION,
-            targets=None,
-        )
+    # No recipients
+    obj = plugins.NotifySNS(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        targets=None,
+    )
 
-    with pytest.raises(TypeError):
-        # No recipients - garbage recipients object
-        plugins.NotifySNS(
-            access_key_id=TEST_ACCESS_KEY_ID,
-            secret_access_key=TEST_ACCESS_KEY_SECRET,
-            region_name=TEST_REGION,
-            targets=object(),
-        )
+    # The object initializes properly but would not be able to send anything
+    assert obj.notify(body='test', title='test') is False
 
-    with pytest.raises(TypeError):
-        # The phone number is invalid, and without it, there is nothing
-        # to notify
-        plugins.NotifySNS(
-            access_key_id=TEST_ACCESS_KEY_ID,
-            secret_access_key=TEST_ACCESS_KEY_SECRET,
-            region_name=TEST_REGION,
-            targets='+1809',
-        )
+    # The phone number is invalid, and without it, there is nothing
+    # to notify
+    obj = plugins.NotifySNS(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        targets='+1809',
+    )
 
-    with pytest.raises(TypeError):
-        # The phone number is invalid, and without it, there is nothing
-        # to notify; we
-        plugins.NotifySNS(
-            access_key_id=TEST_ACCESS_KEY_ID,
-            secret_access_key=TEST_ACCESS_KEY_SECRET,
-            region_name=TEST_REGION,
-            targets='#(invalid-topic-because-of-the-brackets)',
-        )
+    # The object initializes properly but would not be able to send anything
+    assert obj.notify(body='test', title='test') is False
+
+    # The phone number is invalid, and without it, there is nothing
+    # to notify; we
+    obj = plugins.NotifySNS(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        targets='#(invalid-topic-because-of-the-brackets)',
+    )
+
+    # The object initializes properly but would not be able to send anything
+    assert obj.notify(body='test', title='test') is False
 
 
 def test_url_parsing():
@@ -170,16 +170,17 @@ def test_object_parsing():
     assert a.add('sns://nosecret') is False
     assert a.add('sns://nosecret/noregion/') is False
 
-    # This is valid but without valid recipients, the URL is actually useless
-    assert a.add('sns://norecipient/norecipient/us-west-2') is False
-    assert len(a) == 0
+    # This is valid but without valid recipients; while it's still a valid URL
+    # it won't do much when the user goes to send a notification
+    assert a.add('sns://norecipient/norecipient/us-west-2') is True
+    assert len(a) == 1
 
     # Parse a good one
     assert a.add('sns://oh/yeah/us-west-2/abcdtopic/+12223334444') is True
-    assert len(a) == 1
+    assert len(a) == 2
 
     assert a.add('sns://oh/yeah/us-west-2/12223334444') is True
-    assert len(a) == 2
+    assert len(a) == 3
 
 
 def test_aws_response_handling():

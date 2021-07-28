@@ -32,13 +32,13 @@
 # This provider does not accept +1 (for example) as a country code. You need
 # to specify 001 instead.
 #
-import re
 import requests
 from json import loads
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
-from ..utils import parse_list
+from ..utils import is_phone_no
+from ..utils import parse_phone_no
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
@@ -67,9 +67,6 @@ KAVENEGAR_HTTP_ERROR_MAP = {
     422: 'Data cannot be processed due to invalid characters',
     501: 'SMS can only be sent to the account holder number',
 }
-
-# Some Phone Number Detection
-IS_PHONE_NO = re.compile(r'^\+?(?P<phone>[0-9\s)(+-]+)\s*$')
 
 
 class NotifyKavenegar(NotifyBase):
@@ -165,53 +162,31 @@ class NotifyKavenegar(NotifyBase):
 
         self.source = None
         if source is not None:
-            result = IS_PHONE_NO.match(source)
+            result = is_phone_no(source)
             if not result:
                 msg = 'The Kavenegar source specified ({}) is invalid.'\
                     .format(source)
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
-            # Further check our phone # for it's digit count
-            result = ''.join(re.findall(r'\d+', result.group('phone')))
-            if len(result) < 11 or len(result) > 14:
-                msg = 'The MessageBird source # specified ({}) is invalid.'\
-                    .format(source)
-                self.logger.warning(msg)
-                raise TypeError(msg)
-
             # Store our source
-            self.source = result
+            self.source = result['full']
 
         # Parse our targets
         self.targets = list()
 
-        for target in parse_list(targets):
+        for target in parse_phone_no(targets):
             # Validate targets and drop bad ones:
-            result = IS_PHONE_NO.match(target)
-            if result:
-                # Further check our phone # for it's digit count
-                # if it's less than 10, then we can assume it's
-                # a poorly specified phone no and spit a warning
-                result = ''.join(re.findall(r'\d+', result.group('phone')))
-                if len(result) < 11 or len(result) > 14:
-                    self.logger.warning(
-                        'Dropped invalid phone # '
-                        '({}) specified.'.format(target),
-                    )
-                    continue
-
-                # store valid phone number
-                self.targets.append(result)
+            result = is_phone_no(target)
+            if not result:
+                self.logger.warning(
+                    'Dropped invalid phone # '
+                    '({}) specified.'.format(target),
+                )
                 continue
 
-            self.logger.warning(
-                'Dropped invalid phone # ({}) specified.'.format(target))
-
-        if len(self.targets) == 0:
-            msg = 'There are no valid targets identified to notify.'
-            self.logger.warning(msg)
-            raise TypeError(msg)
+            # store valid phone number
+            self.targets.append(result['full'])
 
         return
 
@@ -219,6 +194,11 @@ class NotifyKavenegar(NotifyBase):
         """
         Sends SMS Message
         """
+
+        if len(self.targets) == 0:
+            # There were no services to notify
+            self.logger.warning('There were no Kavenegar targets to notify.')
+            return False
 
         # error tracking (used for function return)
         has_error = False
@@ -364,7 +344,7 @@ class NotifyKavenegar(NotifyBase):
         # The 'to' makes it easier to use yaml configuration
         if 'to' in results['qsd'] and len(results['qsd']['to']):
             results['targets'] += \
-                NotifyKavenegar.parse_list(results['qsd']['to'])
+                NotifyKavenegar.parse_phone_no(results['qsd']['to'])
 
         if 'from' in results['qsd'] and len(results['qsd']['from']):
             results['source'] = \

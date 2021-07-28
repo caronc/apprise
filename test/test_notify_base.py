@@ -207,6 +207,7 @@ def test_notify_base():
 
     # Test invalid data
     assert NotifyBase.parse_list(None) == []
+    assert NotifyBase.parse_list(object()) == []
     assert NotifyBase.parse_list(42) == []
 
     result = NotifyBase.parse_list(
@@ -233,6 +234,26 @@ def test_notify_base():
     assert '/' in result
     assert '//' in result
     assert '///' in result
+
+    # Phone number parsing
+    assert NotifyBase.parse_phone_no(None) == []
+    assert NotifyBase.parse_phone_no(object()) == []
+    assert NotifyBase.parse_phone_no(42) == []
+
+    result = NotifyBase.parse_phone_no(
+        '+1-800-123-1234,(800) 123-4567', unquote=False)
+    assert isinstance(result, list) is True
+    assert len(result) == 2
+    assert '+1-800-123-1234' in result
+    assert '(800) 123-4567' in result
+
+    # %2B == +
+    result = NotifyBase.parse_phone_no(
+        '%2B1-800-123-1234,%2B1%20800%20123%204567', unquote=True)
+    assert isinstance(result, list) is True
+    assert len(result) == 2
+    assert '+1-800-123-1234' in result
+    assert '+1 800 123 4567' in result
 
     # Give nothing, get nothing
     assert NotifyBase.escape_html("") == ""

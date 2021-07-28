@@ -694,6 +694,15 @@ def test_is_email():
     assert 'spichai' == results['user']
     assert 'ceo' == results['label']
 
+    # Support Quotes
+    results = utils.is_email('"Chris Hemsworth" <ch@test.com>')
+    assert 'Chris Hemsworth' == results['name']
+    assert 'ch@test.com' == results['email']
+    assert 'ch@test.com' == results['full_email']
+    assert 'test.com' == results['domain']
+    assert 'ch' == results['user']
+    assert '' == results['label']
+
     # An email without name, but contains delimiters
     results = utils.is_email('      <spichai@gmail.com>')
     assert '' == results['name']
@@ -731,6 +740,198 @@ def test_is_email():
     assert utils.is_email("Name <bademail>") is False
 
 
+def test_is_phone_no():
+    """
+    API: is_phone_no() function
+
+    """
+    # Invalid numbers
+    assert utils.is_phone_no(None) is False
+    assert utils.is_phone_no(42) is False
+    assert utils.is_phone_no(object) is False
+    assert utils.is_phone_no('') is False
+    assert utils.is_phone_no('1') is False
+    assert utils.is_phone_no('12') is False
+    assert utils.is_phone_no('abc') is False
+    assert utils.is_phone_no('+()') is False
+    assert utils.is_phone_no('+') is False
+    assert utils.is_phone_no(None) is False
+    assert utils.is_phone_no(42) is False
+    assert utils.is_phone_no(object, min_len=0) is False
+    assert utils.is_phone_no('', min_len=1) is False
+    assert utils.is_phone_no('abc', min_len=0) is False
+    assert utils.is_phone_no('', min_len=0) is False
+
+    # Ambigious, but will document it here in this test as such
+    results = utils.is_phone_no('+((()))--+', min_len=0)
+    assert '' == results['country']
+    assert '' == results['area']
+    assert '' == results['line']
+    assert '' == results['pretty']
+    assert '' == results['full']
+
+    # Valid phone numbers
+    assert utils.is_phone_no('+(0)') is False
+    results = utils.is_phone_no('+(0)', min_len=1)
+    assert '' == results['country']
+    assert '' == results['area']
+    assert '0' == results['line']
+    assert '0' == results['pretty']
+    assert '0' == results['full']
+
+    assert utils.is_phone_no('1') is False
+    results = utils.is_phone_no('1', min_len=1)
+    assert '' == results['country']
+    assert '' == results['area']
+    assert '1' == results['line']
+    assert '1' == results['pretty']
+    assert '1' == results['full']
+
+    assert utils.is_phone_no('12') is False
+    results = utils.is_phone_no('12', min_len=2)
+    assert '' == results['country']
+    assert '' == results['area']
+    assert '12' == results['line']
+    assert '12' == results['pretty']
+    assert '12' == results['full']
+
+    assert utils.is_phone_no('911') is False
+    results = utils.is_phone_no('911', min_len=3)
+    assert isinstance(results, dict)
+    assert '' == results['country']
+    assert '' == results['area']
+    assert '911' == results['line']
+    assert '911' == results['pretty']
+    assert '911' == results['full']
+
+    assert utils.is_phone_no('1234') is False
+    results = utils.is_phone_no('1234', min_len=4)
+    assert isinstance(results, dict)
+    assert '' == results['country']
+    assert '' == results['area']
+    assert '1234' == results['line']
+    assert '1234' == results['pretty']
+    assert '1234' == results['full']
+
+    assert utils.is_phone_no('12345') is False
+    results = utils.is_phone_no('12345', min_len=5)
+    assert isinstance(results, dict)
+    assert '' == results['country']
+    assert '' == results['area']
+    assert '12345' == results['line']
+    assert '12345' == results['pretty']
+    assert '12345' == results['full']
+
+    assert utils.is_phone_no('123456') is False
+    results = utils.is_phone_no('123456', min_len=6)
+    assert isinstance(results, dict)
+    assert '' == results['country']
+    assert '' == results['area']
+    assert '123456' == results['line']
+    assert '123456' == results['pretty']
+    assert '123456' == results['full']
+
+    # at 7 digits, the format hyphenates in the `pretty` section
+    assert utils.is_phone_no('1234567') is False
+    results = utils.is_phone_no('1234567', min_len=7)
+    assert isinstance(results, dict)
+    assert '' == results['country']
+    assert '' == results['area']
+    assert '1234567' == results['line']
+    assert '123-4567' == results['pretty']
+    assert '1234567' == results['full']
+
+    results = utils.is_phone_no('1(800) 123-4567')
+    assert isinstance(results, dict)
+    assert '1' == results['country']
+    assert '800' == results['area']
+    assert '1234567' == results['line']
+    assert '+1 800-123-4567' == results['pretty']
+    assert '18001234567' == results['full']
+
+
+def test_parse_phone_no():
+    """utils: parse_phone_no() testing """
+    # A simple single array entry (As str)
+    results = utils.parse_phone_no('')
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    # just delimeters
+    results = utils.parse_phone_no(',  ,, , ,,, ')
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    results = utils.parse_phone_no(',')
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    results = utils.parse_phone_no(None)
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    results = utils.parse_phone_no(42)
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    results = utils.parse_phone_no('this is not a parseable phoneno at all')
+    assert isinstance(results, list)
+    assert len(results) == 8
+    # Now we do it again with the store_unparsable flag set to False
+    results = utils.parse_phone_no(
+        'this is not a parseable email at all', store_unparseable=False)
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    results = utils.parse_phone_no('+', store_unparseable=False)
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    results = utils.parse_phone_no('(', store_unparseable=False)
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    # Number is too short
+    results = utils.parse_phone_no('0', store_unparseable=False)
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    results = utils.parse_phone_no('12', store_unparseable=False)
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    # Now test valid phone numbers
+    results = utils.parse_phone_no('+1 (124) 245 2345')
+    assert isinstance(results, list)
+    assert len(results) == 1
+    assert '+1 (124) 245 2345' in results
+
+    results = utils.parse_phone_no('911', store_unparseable=False)
+    assert isinstance(results, list)
+    assert len(results) == 1
+    assert '911' in results
+
+    results = utils.parse_phone_no(
+        '911, 123-123-1234', store_unparseable=False)
+    assert isinstance(results, list)
+    assert len(results) == 2
+    assert '911' in results
+    assert '123-123-1234' in results
+
+    # Space variations
+    results = utils.parse_phone_no(' 911  , +1 (123) 123-1234')
+    assert isinstance(results, list)
+    assert len(results) == 2
+    assert '911' in results
+    assert '+1 (123) 123-1234' in results
+
+    results = utils.parse_phone_no(' 911  , + 1 ( 123 ) 123-1234')
+    assert isinstance(results, list)
+    assert len(results) == 2
+    assert '911' in results
+    assert '+ 1 ( 123 ) 123-1234' in results
+
+
 def test_parse_emails():
     """utils: parse_emails() testing """
     # A simple single array entry (As str)
@@ -764,7 +965,7 @@ def test_parse_emails():
     assert isinstance(results, list)
     assert len(results) == 0
 
-    # Now test valid URLs
+    # Now test valid emails
     results = utils.parse_emails('user@example.com')
     assert isinstance(results, list)
     assert len(results) == 1

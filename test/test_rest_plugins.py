@@ -196,7 +196,10 @@ TEST_URLS = (
     }),
     ('d7sms://user:pass@{}/{}/{}'.format('1' * 10, '2' * 15, 'a' * 13), {
         # No valid targets to notify
-        'instance': TypeError,
+        'instance': plugins.NotifyD7Networks,
+        # Since there are no targets specified we expect a False return on
+        # send()
+        'notify_response': False,
     }),
     ('d7sms://user:pass@{}?batch=yes'.format('3' * 14), {
         # valid number
@@ -1297,8 +1300,11 @@ TEST_URLS = (
         'instance': TypeError,
     }),
     ('kavenegar://{}/{}/{}'.format('1' * 10, '2' * 15, 'a' * 13), {
-        # No valid targets to notify
-        'instance': TypeError,
+        # valid api key and valid authentication
+        'instance': plugins.NotifyKavenegar,
+        # Since there are no targets specified we expect a False return on
+        # send()
+        'notify_response': False,
     }),
     ('kavenegar://{}/{}'.format('a' * 24, '3' * 14), {
         # valid api key and valid number
@@ -4034,7 +4040,9 @@ TEST_URLS = (
     ('sinch://{}:{}@{}'.format('a' * 32, 'b' * 32, '3' * 5), {
         # using short-code (5 characters) without a target
         # We can still instantiate ourselves with a valid short code
-        'instance': TypeError,
+        'instance': plugins.NotifySinch,
+        # Expected notify() response because we have no one to notify
+        'notify_response': False,
     }),
     ('sinch://{}:{}@{}'.format('a' * 32, 'b' * 32, '3' * 9), {
         # spi and token provided and from but invalid from no
@@ -4942,7 +4950,10 @@ TEST_URLS = (
     ('twilio://AC{}:{}@{}'.format('a' * 32, 'b' * 32, '3' * 5), {
         # using short-code (5 characters) without a target
         # We can still instantiate ourselves with a valid short code
-        'instance': TypeError,
+        'instance': plugins.NotifyTwilio,
+        # Since there are no targets specified we expect a False return on
+        # send()
+        'notify_response': False,
     }),
     ('twilio://AC{}:{}@{}'.format('a' * 32, 'b' * 32, '3' * 9), {
         # sid and token provided and from but invalid from no
@@ -5211,16 +5222,25 @@ TEST_URLS = (
         'instance': TypeError,
     }),
     ('msg91://{}'.format('a' * 23), {
-        # No number specified
-        'instance': TypeError,
+        # valid AuthKey
+        'instance': plugins.NotifyMSG91,
+        # Since there are no targets specified we expect a False return on
+        # send()
+        'notify_response': False,
     }),
     ('msg91://{}/123'.format('a' * 23), {
         # invalid phone number
-        'instance': TypeError,
+        'instance': plugins.NotifyMSG91,
+        # Since there are no targets specified we expect a False return on
+        # send()
+        'notify_response': False,
     }),
     ('msg91://{}/abcd'.format('a' * 23), {
         # No number to notify
-        'instance': TypeError,
+        'instance': plugins.NotifyMSG91,
+        # Since there are no targets specified we expect a False return on
+        # send()
+        'notify_response': False,
     }),
     ('msg91://{}/15551232000/?country=invalid'.format('a' * 23), {
         # invalid country
@@ -5293,12 +5313,18 @@ TEST_URLS = (
         'privacy_url': 'msgbird://a...a/15551232000',
     }),
     ('msgbird://{}/15551232000/abcd'.format('a' * 25), {
-        # invalid target phone number; we have no one to notify
-        'instance': TypeError,
+        # valid credentials
+        'instance': plugins.NotifyMessageBird,
+        # Since there are no targets specified we expect a False return on
+        # send()
+        'notify_response': False,
     }),
     ('msgbird://{}/15551232000/123'.format('a' * 25), {
-        # invalid target phone number
-        'instance': TypeError,
+        # valid credentials
+        'instance': plugins.NotifyMessageBird,
+        # Since there are no targets specified we expect a False return on
+        # send()
+        'notify_response': False,
     }),
     ('msgbird://{}/?from=15551233000&to=15551232000'.format('a' * 25), {
         # reference to to= and from=
