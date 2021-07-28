@@ -1814,9 +1814,9 @@ TEST_URLS = (
         'response': False,
     }),
     ('matrix://localhost', {
-        # response is TypeError because we'll try to initialize as
-        # a t2bot and fail (localhost is too short of a api key)
-        'instance': TypeError
+        # not a valid t2bot api key but we don't prevent the object
+        # from initializing anyhow using it
+        'instance': plugins.NotifyMatrix,
     }),
     ('matrix://user:pass@localhost/#room1/#room2/#room3', {
         'instance': plugins.NotifyMatrix,

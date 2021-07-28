@@ -244,8 +244,7 @@ class NotifyMatrix(NotifyBase):
 
         if self.mode == MatrixWebhookMode.T2BOT:
             # t2bot configuration requires that a webhook id is specified
-            self.access_token = validate_regex(
-                self.host, r'^[a-z0-9]{64}$', 'i')
+            self.access_token = validate_regex(self.host)
             if not self.access_token:
                 msg = 'An invalid T2Bot/Matrix Webhook ID ' \
                       '({}) was specified.'.format(self.host)
