@@ -363,10 +363,6 @@ class NotifyEmail(NotifyBase):
             'type': 'string',
             'map_to': 'from_name',
         },
-        'smtp_host': {
-            'name': _('SMTP Server'),
-            'type': 'string',
-        },
         'cc': {
             'name': _('Carbon Copy'),
             'type': 'list:string',
@@ -374,6 +370,11 @@ class NotifyEmail(NotifyBase):
         'bcc': {
             'name': _('Blind Carbon Copy'),
             'type': 'list:string',
+        },
+        'smtp': {
+            'name': _('SMTP Server'),
+            'type': 'string',
+            'map_to': 'smtp_host',
         },
         'mode': {
             'name': _('Secure Mode'),

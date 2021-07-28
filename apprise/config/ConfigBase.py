@@ -848,7 +848,7 @@ class ConfigBase(URLBase):
 
                             # support our special tokens (if they're present)
                             if schema in plugins.SCHEMA_MAP:
-                                entries = ConfigBase.__extract_special_tokens(
+                                entries = ConfigBase._special_token_handler(
                                     schema, entries)
 
                             # Extend our dictionary with our new entries
@@ -860,7 +860,7 @@ class ConfigBase(URLBase):
                 elif isinstance(tokens, dict):
                     # support our special tokens (if they're present)
                     if schema in plugins.SCHEMA_MAP:
-                        tokens = ConfigBase.__extract_special_tokens(
+                        tokens = ConfigBase._special_token_handler(
                             schema, tokens)
 
                     # Copy ourselves a template of our parsed URL as a base to
@@ -962,7 +962,7 @@ class ConfigBase(URLBase):
         return self._cached_servers.pop(index)
 
     @staticmethod
-    def __extract_special_tokens(schema, tokens):
+    def _special_token_handler(schema, tokens):
         """
         This function takes a list of tokens and updates them to no longer
         include any special tokens such as +,-, and :
@@ -994,7 +994,7 @@ class ConfigBase(URLBase):
                 # we're done with this entry
                 continue
 
-            if not isinstance(tokens.get(kw, None), dict):
+            if not isinstance(tokens.get(kw), dict):
                 # Invalid; correct it
                 tokens[kw] = dict()
 
@@ -1004,6 +1004,88 @@ class ConfigBase(URLBase):
 
             # Update our entries
             tokens[kw].update(matches)
+
+        # Now map our tokens accordingly to the class templates defined by
+        # each service.
+        #
+        # This is specifically used for YAML file parsing.  It allows a user to
+        # define an entry such as:
+        #
+        # urls:
+        #   - mailto://user:pass@domain:
+        #       - to: user1@hotmail.com
+        #       - to: user2@hotmail.com
+        #
+        # Under the hood, the NotifyEmail() class does not parse the `to`
+        # argument. It's contents needs to be mapped to `targets`.  This is
+        # defined in the class via the `template_args` and template_tokens`
+        # section.
+        #
+        # This function here allows these mappings to take place within the
+        # YAML file as independant arguments.
+        class_templates = \
+            plugins.details(plugins.SCHEMA_MAP[schema])
+
+        for key in list(tokens.keys()):
+
+            if key not in class_templates['args']:
+                # No need to handle non-arg entries
+                continue
+
+            # get our `map_to` and/or 'alias_of' value (if it exists)
+            map_to = class_templates['args'][key].get(
+                'alias_of', class_templates['args'][key].get('map_to', ''))
+
+            if map_to == key:
+                # We're already good as we are now
+                continue
+
+            if map_to in class_templates['tokens']:
+                meta = class_templates['tokens'][map_to]
+
+            else:
+                meta = class_templates['args'].get(
+                    map_to, class_templates['args'][key])
+
+            # Perform a translation/mapping if our code reaches here
+            value = tokens[key]
+            del tokens[key]
+
+            # Detect if we're dealign with a list or not
+            is_list = re.search(
+                r'^(list|choice):.*',
+                meta.get('type'),
+                re.IGNORECASE)
+
+            if map_to not in tokens:
+                tokens[map_to] = [] if is_list \
+                    else meta.get('default')
+
+            elif is_list and not isinstance(tokens.get(map_to), list):
+                # Convert ourselves to a list if we aren't already
+                tokens[map_to] = [tokens[map_to]]
+
+            # Type Conversion
+            if re.search(
+                    r'^(choice:)?string',
+                    meta.get('type'),
+                    re.IGNORECASE) \
+                    and not isinstance(value, six.string_types):
+
+                # Ensure our format is as expected
+                value = str(value)
+
+            # Apply any further translations if required (absolute map)
+            # This is the case when an arg maps to a token which further
+            # maps to a different function arg on the class constructor
+            abs_map = meta.get('map_to', map_to)
+
+            # Set our token as how it was provided by the configuration
+            if isinstance(tokens.get(map_to), list):
+                tokens[abs_map].append(value)
+
+            else:
+                tokens[abs_map] = value
 
         # Return our tokens
         return tokens
