@@ -1074,11 +1074,7 @@ class NotifyMatrix(NotifyBase):
             'image', NotifyMatrix.template_args['image']['default']))
 
         # Get our mode
-        if 'mode' in results['qsd']:
-            results['mode'] = results['qsd'].get('mode')
-
-        elif 'webhook' in results['qsd']:
-            results['mode'] = results['qsd'].get('webhook')
+        results['mode'] = results['qsd'].get('mode')
 
         # t2bot detection... look for just a hostname, and/or just a user/host
         # if we match this; we can go ahead and set the mode (but only if
