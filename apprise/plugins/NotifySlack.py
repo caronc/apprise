@@ -73,7 +73,6 @@ import re
 import requests
 from json import dumps
 from json import loads
-from time import time
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
