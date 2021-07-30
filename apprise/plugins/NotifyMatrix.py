@@ -283,7 +283,7 @@ class NotifyMatrix(NotifyBase):
             default_port = 443 if self.secure else 80
 
             # Prepare our URL
-            url = '{schema}://{hostname}:{port}/{webhook_path}/{token}'.format(
+            url = '{schema}://{hostname}:{port}{webhook_path}/{token}'.format(
                 schema='https' if self.secure else 'http',
                 hostname=self.host,
                 port='' if self.port is None
