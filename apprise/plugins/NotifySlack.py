@@ -370,13 +370,15 @@ class NotifySlack(NotifyBase):
             )
 
         # Prepare JSON Object (applicable to both WEBHOOK and BOT mode)
+        _slack_format = 'mrkdwn' \
+            if self.notify_format == NotifyFormat.MARKDOWN else 'plain_text'
         payload = {
             'username': self.user if self.user else self.app_id,
             'attachments': [{
                 'blocks': [{
                     'type': 'section',
                     'text': {
-                        'type': 'mrkdwn' if self.notify_format == NotifyFormat.MARKDOWN else 'plain_text',
+                        'type': _slack_format,
                         'text': body
                     }
                 }],
@@ -412,7 +414,7 @@ class NotifySlack(NotifyBase):
             _footer = {
                 'type': 'context',
                 'elements': [{
-                    'type': 'mrkdwn' if self.notify_format == NotifyFormat.MARKDOWN else 'plain_text',
+                    'type': _slack_format,
                     'text': self.app_id
                 }]
             }
