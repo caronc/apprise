@@ -73,7 +73,6 @@ import re
 import requests
 from json import dumps
 from json import loads
-from time import time
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
@@ -364,23 +363,39 @@ class NotifySlack(NotifyBase):
         title = self._re_formatting_rules.sub(  # pragma: no branch
             lambda x: self._re_formatting_map[x.group()], title,
         )
-        body = self._re_formatting_rules.sub(  # pragma: no branch
-            lambda x: self._re_formatting_map[x.group()], body,
-        )
+        # Only for NONE markdown, otherwise eg links wont work
+        if self.notify_format != NotifyFormat.MARKDOWN:
+            body = self._re_formatting_rules.sub(  # pragma: no branch
+                lambda x: self._re_formatting_map[x.group()], body,
+            )
 
         # Prepare JSON Object (applicable to both WEBHOOK and BOT mode)
+        _slack_format = 'mrkdwn' \
+            if self.notify_format == NotifyFormat.MARKDOWN else 'plain_text'
         payload = {
             'username': self.user if self.user else self.app_id,
-            # Use Markdown language
-            'mrkdwn': (self.notify_format == NotifyFormat.MARKDOWN),
             'attachments': [{
-                'title': title,
-                'text': body,
+                'blocks': [{
+                    'type': 'section',
+                    'text': {
+                        'type': _slack_format,
+                        'text': body
+                    }
+                }],
                 'color': self.color(notify_type),
-                # Time
-                'ts': time(),
-            }],
+            }]
         }
+
+        # Slack only accepts non-empty header sections
+        if title:
+            payload['attachments'][0]['blocks'].insert(0, {
+                'type': 'header',
+                'text': {
+                    'type': 'plain_text',
+                    'text': title,
+                    'emoji': True
+                }
+            })
 
         # Prepare our URL (depends on mode)
         if self.mode is SlackMode.WEBHOOK:
@@ -394,9 +409,28 @@ class NotifySlack(NotifyBase):
         else:  # SlackMode.BOT
             url = self.api_url.format('chat.postMessage')
 
+        # Include the footer only if specified to do so
         if self.include_footer:
-            # Include the footer only if specified to do so
-            payload['attachments'][0]['footer'] = self.app_id
+            _footer = {
+                'type': 'context',
+                'elements': [{
+                    'type': _slack_format,
+                    'text': self.app_id
+                }]
+            }
+
+            # Acquire our to-be footer icon if configured to do so
+            image_url = None if not self.include_image \
+                else self.image_url(notify_type)
+
+            if image_url:
+                _footer['elements'].insert(0, {
+                    'type': 'image',
+                    'image_url': image_url,
+                    'alt_text': notify_type
+                })
+
+            payload['attachments'][0]['blocks'].append(_footer)
 
         if attach and self.mode is SlackMode.WEBHOOK:
             # Be friendly; let the user know why they can't send their
@@ -452,16 +486,6 @@ class NotifySlack(NotifyBase):
                 # Store the valid and massaged payload that is recognizable by
                 # slack. This list is used for sending attachments later.
                 attach_channel_list.append(payload['channel'])
-
-            # Acquire our to-be footer icon if configured to do so
-            image_url = None if not self.include_image \
-                else self.image_url(notify_type)
-
-            if image_url:
-                payload['icon_url'] = image_url
-
-                if self.include_footer:
-                    payload['attachments'][0]['footer_icon'] = image_url
 
             response = self._send(url, payload)
             if not response:
