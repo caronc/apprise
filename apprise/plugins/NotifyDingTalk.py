@@ -24,10 +24,15 @@
 # THE SOFTWARE.
 
 import re
+import time
+import hmac
+import hashlib
+import base64
 import requests
 from json import dumps
 
 from .NotifyBase import NotifyBase
+from ..URLBase import PrivacyMode
 from ..common import NotifyFormat
 from ..common import NotifyType
 from ..utils import parse_list
@@ -77,6 +82,8 @@ class NotifyDingTalk(NotifyBase):
     templates = (
         '{schema}://{token}/',
         '{schema}://{token}/{targets}/',
+        '{schema}://{secret}@{token}/',
+        '{schema}://{secret}@{token}/{targets}/',
     )
 
     # Define our template tokens
@@ -86,6 +93,12 @@ class NotifyDingTalk(NotifyBase):
             'type': 'string',
             'private': True,
             'required': True,
+            'regex': (r'^[a-z0-9]+$', 'i'),
+        },
+        'secret': {
+            'name': _('Token'),
+            'type': 'string',
+            'private': True,
             'regex': (r'^[a-z0-9]+$', 'i'),
         },
         'targets': {
@@ -99,9 +112,15 @@ class NotifyDingTalk(NotifyBase):
         'to': {
             'alias_of': 'targets',
         },
+        'token': {
+            'alias_of': 'token',
+        },
+        'secret': {
+            'alias_of': 'secret',
+        },
     })
 
-    def __init__(self, token, targets=None, **kwargs):
+    def __init__(self, token, targets=None, secret=None, **kwargs):
         """
         Initialize DingTalk Object
         """
@@ -115,6 +134,16 @@ class NotifyDingTalk(NotifyBase):
                   '({}) was specified.'.format(token)
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        self.secret = None
+        if secret:
+            self.secret = validate_regex(
+                secret, *self.template_tokens['secret']['regex'])
+            if not self.secret:
+                msg = 'An invalid DingTalk Secret ' \
+                      '({}) was specified.'.format(token)
+                self.logger.warning(msg)
+                raise TypeError(msg)
 
         # Parse our targets
         self.targets = list()
@@ -143,6 +172,19 @@ class NotifyDingTalk(NotifyBase):
 
         return
 
+    def get_signature(self):
+        """
+        Calculates time-based signature so that we can send arbitrary messages.
+        """
+        timestamp = str(round(time.time() * 1000))
+        secret_enc = self.secret.encode('utf-8')
+        str_to_sign_enc = \
+            "{}\n{}".format(timestamp, self.secret).encode('utf-8')
+        hmac_code = hmac.new(
+            secret_enc, str_to_sign_enc, digestmod=hashlib.sha256).digest()
+        signature = NotifyDingTalk.quote(base64.b64encode(hmac_code), safe='')
+        return timestamp, signature
+
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform DingTalk Notification
@@ -170,6 +212,14 @@ class NotifyDingTalk(NotifyBase):
         # Our Notification URL
         notify_url = self.notify_url.format(token=self.token)
 
+        params = None
+        if self.secret:
+            timestamp, signature = self.get_signature()
+            params = {
+                'timestamp': timestamp,
+                'sign': signature,
+            }
+
         # Prepare our headers
         headers = {
             'User-Agent': self.app_id,
@@ -189,6 +239,7 @@ class NotifyDingTalk(NotifyBase):
                 notify_url,
                 data=dumps(payload),
                 headers=headers,
+                params=params,
                 verify=self.verify_certificate,
             )
 
@@ -242,8 +293,10 @@ class NotifyDingTalk(NotifyBase):
             'verify': 'yes' if self.verify_certificate else 'no',
         }
 
-        return '{schema}://{token}/{targets}/?{args}'.format(
+        return '{schema}://{secret}{token}/{targets}/?{args}'.format(
             schema=self.secure_protocol,
+            secret='' if not self.secret else '{}@'.format(self.pprint(
+                self.secret, privacy, mode=PrivacyMode.Secret, safe='')),
             token=self.pprint(self.token, privacy, safe=''),
             targets='/'.join(
                 [NotifyDingTalk.quote(x, safe='') for x in self.targets]),
@@ -256,16 +309,30 @@ class NotifyDingTalk(NotifyBase):
         us to substantiate this object.
 
         """
-        results = NotifyBase.parse_url(url)
+        results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
 
         results['token'] = NotifyDingTalk.unquote(results['host'])
 
+        # if a user has been defined, use it's value as the secret
+        if results.get('user'):
+            results['secret'] = results.get('user')
+
         # Get our entries; split_path() looks after unquoting content for us
         # by default
         results['targets'] = NotifyDingTalk.split_path(results['fullpath'])
+
+        # Support the use of the `token` keyword argument
+        if 'token' in results['qsd'] and len(results['qsd']['token']):
+            results['token'] = \
+                NotifyDingTalk.unquote(results['qsd']['token'])
+
+        # Support the use of the `secret` keyword argument
+        if 'secret' in results['qsd'] and len(results['qsd']['secret']):
+            results['secret'] = \
+                NotifyDingTalk.unquote(results['qsd']['secret'])
 
         # Support the 'to' variable so that we can support targets this way too
         # The 'to' makes it easier to use yaml configuration

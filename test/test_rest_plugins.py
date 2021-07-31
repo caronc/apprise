@@ -262,7 +262,7 @@ TEST_URLS = (
     ##################################
     ('dingtalk://', {
         # No Access Token specified
-        'instance': None,
+        'instance': TypeError,
     }),
     ('dingtalk://a_bd_/', {
         # invalid Access Token
@@ -286,6 +286,24 @@ TEST_URLS = (
     ('dingtalk://{}/?to={}'.format('a' * 8, '1' * 14), {
         # access token + phone number using 'to'
         'instance': plugins.NotifyDingTalk,
+    }),
+    # Test secret via user@
+    ('dingtalk://secret@{}/?to={}'.format('a' * 8, '1' * 14), {
+        # access token + phone number using 'to'
+        'instance': plugins.NotifyDingTalk,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'dingtalk://****@a...a',
+    }),
+    # Test secret via secret= and token=
+    ('dingtalk://?token={}&to={}&secret={}'.format(
+        'b' * 8, '1' * 14, 'a' * 15), {
+            # access token + phone number using 'to'
+            'instance': plugins.NotifyDingTalk,
+        'privacy_url': 'dingtalk://****@b...b',
+    }),
+    # Invalid secret
+    ('dingtalk://{}/?to={}&secret=_'.format('a' * 8, '1' * 14), {
+        'instance': TypeError,
     }),
     ('dingtalk://{}?format=markdown'.format('a' * 8), {
         # access token
