@@ -698,7 +698,7 @@ class NotifyEmby(NotifyBase):
             #   - https://github.com/kennethreitz/requests/issues/3578
             pass
 
-        except ModuleNotFoundError:  # pragma: no cover
+        except ImportError:  # pragma: no cover
             # Python code that makes early calls to sys.exit() can cause
             # the __del__() code to run. However in some newer versions of
             # Python, this causes the `sys` library to no longer be
