@@ -1003,8 +1003,49 @@ class NotifyMatrix(NotifyBase):
         """
         Ensure we relinquish our token
         """
-        if self.mode != MatrixWebhookMode.T2BOT:
+        if self.mode is MatrixWebhookMode.T2BOT:
+            # nothing to do
+            return
+
+        try:
             self._logout()
+
+        except LookupError:  # pragma: no cover
+            # Python v3.5 call to requests can sometimes throw the exception
+            #   "/usr/lib64/python3.7/socket.py", line 748, in getaddrinfo
+            #   LookupError: unknown encoding: idna
+            #
+            # This occurs every time when running unit-tests against Apprise:
+            # LANG=C.UTF-8 PYTHONPATH=$(pwd) py.test-3.7
+            #
+            # There has been an open issue on this since Jan 2017.
+            #   - https://bugs.python.org/issue29288
+            #
+            # A ~similar~ issue can be identified here in the requests
+            # ticket system as unresolved and has provided work-arounds
+            #   - https://github.com/kennethreitz/requests/issues/3578
+            pass
+
+        except ModuleNotFoundError:  # pragma: no cover
+            # Python code that makes early calls to sys.exit() can cause
+            # the __del__() code to run. However in some newer versions of
+            # Python, this causes the `sys` library to no longer be
+            # available. The stack overflow also goes on to suggest that
+            # it's not wise to use the __del__() as a deconstructor
+            # which is the case here.
+
+            # https://stackoverflow.com/questions/67218341/\
+            #       modulenotfounderror-import-of-time-halted-none-in-sys-\
+            #           modules-occured-when-obj?noredirect=1&lq=1
+            #
+            #
+            # Also see: https://stackoverflow.com/questions\
+            #       /1481488/what-is-the-del-method-and-how-do-i-call-it
+
+            # At this time it seems clean to try to log out (if we can)
+            # but not throw any unessisary exceptions (like this one) to
+            # the end user if we don't have to.
+            pass
 
     def url(self, privacy=False, *args, **kwargs):
         """
