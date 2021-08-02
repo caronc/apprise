@@ -131,13 +131,13 @@ class NotifyMatrix(NotifyBase):
         '{schema}://{token}',
         '{schema}://{user}@{token}',
 
-        # All other non-t2bot setups require targets
+        # Disabled webhook
         '{schema}://{user}:{password}@{host}/{targets}',
         '{schema}://{user}:{password}@{host}:{port}/{targets}',
-        '{schema}://{token}:{password}@{host}/{targets}',
-        '{schema}://{token}:{password}@{host}:{port}/{targets}',
-        '{schema}://{user}:{token}:{password}@{host}/{targets}',
-        '{schema}://{user}:{token}:{password}@{host}:{port}/{targets}',
+
+        # Webhook mode
+        '{schema}://{user}:{token}@{host}/{targets}',
+        '{schema}://{user}:{token}@{host}:{port}/{targets}',
     )
 
     # Define our template tokens
@@ -207,6 +207,9 @@ class NotifyMatrix(NotifyBase):
         'to': {
             'alias_of': 'targets',
         },
+        'token': {
+            'alias_of': 'token',
+        },
     })
 
     def __init__(self, targets=None, mode=None, include_image=False, **kwargs):
@@ -245,10 +248,10 @@ class NotifyMatrix(NotifyBase):
         if self.mode == MatrixWebhookMode.T2BOT:
             # t2bot configuration requires that a webhook id is specified
             self.access_token = validate_regex(
-                self.host, r'^[a-z0-9]{64}$', 'i')
+                self.password, r'^[a-z0-9]{64}$', 'i')
             if not self.access_token:
                 msg = 'An invalid T2Bot/Matrix Webhook ID ' \
-                      '({}) was specified.'.format(self.host)
+                      '({}) was specified.'.format(self.password)
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
@@ -1003,7 +1006,7 @@ class NotifyMatrix(NotifyBase):
         """
         Ensure we relinquish our token
         """
-        if self.mode is MatrixWebhookMode.T2BOT:
+        if self.mode == MatrixWebhookMode.T2BOT:
             # nothing to do
             return
 
@@ -1027,6 +1030,10 @@ class NotifyMatrix(NotifyBase):
             pass
 
         except ImportError:  # pragma: no cover
+            # The actual exception is `ModuleNotFoundError` however ImportError
+            # grants us backwards compatiblity with versions of Python older
+            # than v3.6
+
             # Python code that makes early calls to sys.exit() can cause
             # the __del__() code to run. However in some newer versions of
             # Python, this causes the `sys` library to no longer be
@@ -1061,26 +1068,30 @@ class NotifyMatrix(NotifyBase):
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        # Determine Authentication
         auth = ''
-        if self.user and self.password:
-            auth = '{user}:{password}@'.format(
-                user=NotifyMatrix.quote(self.user, safe=''),
-                password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
-            )
+        if self.mode != MatrixWebhookMode.T2BOT:
+            # Determine Authentication
+            if self.user and self.password:
+                auth = '{user}:{password}@'.format(
+                    user=NotifyMatrix.quote(self.user, safe=''),
+                    password=self.pprint(
+                        self.password, privacy, mode=PrivacyMode.Secret,
+                        safe=''),
+                )
 
-        elif self.user:
-            auth = '{user}@'.format(
-                user=NotifyMatrix.quote(self.user, safe=''),
-            )
+            elif self.user:
+                auth = '{user}@'.format(
+                    user=NotifyMatrix.quote(self.user, safe=''),
+                )
 
         default_port = 443 if self.secure else 80
 
         return '{schema}://{auth}{hostname}{port}/{rooms}?{params}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
-            hostname=NotifyMatrix.quote(self.host, safe=''),
+            hostname=NotifyMatrix.quote(self.host, safe='')
+            if self.mode != MatrixWebhookMode.T2BOT
+            else self.pprint(self.access_token, privacy, safe=''),
             port='' if self.port is None
             or self.port == default_port else ':{}'.format(self.port),
             rooms=NotifyMatrix.quote('/'.join(self.rooms)),
@@ -1126,6 +1137,15 @@ class NotifyMatrix(NotifyBase):
 
             # Default mode to t2bot
             results['mode'] = MatrixWebhookMode.T2BOT
+
+        if results['mode'] and \
+                results['mode'].lower() == MatrixWebhookMode.T2BOT:
+            # unquote our hostname and pass it in as the password/token
+            results['password'] = NotifyMatrix.unquote(results['host'])
+
+        # Support the use of the token= keyword
+        if 'token' in results['qsd'] and len(results['qsd']['token']):
+            results['password'] = NotifyMatrix.unquote(results['qsd']['token'])
 
         return results
 

@@ -807,6 +807,10 @@ class NotifyTwist(NotifyBase):
             pass
 
         except ImportError:  # pragma: no cover
+            # The actual exception is `ModuleNotFoundError` however ImportError
+            # grants us backwards compatiblity with versions of Python older
+            # than v3.6
+
             # Python code that makes early calls to sys.exit() can cause
             # the __del__() code to run. However in some newer versions of
             # Python, this causes the `sys` library to no longer be

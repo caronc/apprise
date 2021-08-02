@@ -1858,6 +1858,18 @@ TEST_URLS = (
         # despite uppercase characters
         'instance': plugins.NotifyMatrix,
     }),
+    ('matrix://user@localhost?mode=SLACK&format=markdown&token=mytoken', {
+        # user and token specified; slack webhook still detected
+        # despite uppercase characters; token also set on URL as arg
+        'instance': plugins.NotifyMatrix,
+    }),
+    ('matrix://_?mode=t2bot&token={}'.format('b' * 64), {
+        # Testing t2bot initialization and setting the password using the
+        # token directive
+        'instance': plugins.NotifyMatrix,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'matrix://b...b/',
+    }),
     # Image Reference
     ('matrixs://user:token@localhost?mode=slack&format=markdown&image=True', {
         # user and token specified; image set to True
