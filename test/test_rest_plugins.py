@@ -3748,7 +3748,7 @@ TEST_URLS = (
         },
     }),
     # Several channels
-    ('rocket://user:pass@localhost/#channel1/#channel2/?avatar=No', {
+    ('rocket://user:pass@localhost/#channel1/#channel2/?avatar=Yes', {
         'instance': plugins.NotifyRocketChat,
         # The response text is expected to be the following on a success
         'requests_response_text': {
@@ -3772,7 +3772,7 @@ TEST_URLS = (
         },
     }),
     # A room and channel
-    ('rocket://user:pass@localhost/room/#channel?mode=basic', {
+    ('rocket://user:pass@localhost/room/#channel?mode=basic&avatar=Yes', {
         'instance': plugins.NotifyRocketChat,
         # The response text is expected to be the following on a success
         'requests_response_text': {
