@@ -697,3 +697,28 @@ class NotifyEmby(NotifyBase):
             # ticket system as unresolved and has provided work-arounds
             #   - https://github.com/kennethreitz/requests/issues/3578
             pass
+
+        except ImportError:  # pragma: no cover
+            # The actual exception is `ModuleNotFoundError` however ImportError
+            # grants us backwards compatiblity with versions of Python older
+            # than v3.6
+
+            # Python code that makes early calls to sys.exit() can cause
+            # the __del__() code to run. However in some newer versions of
+            # Python, this causes the `sys` library to no longer be
+            # available. The stack overflow also goes on to suggest that
+            # it's not wise to use the __del__() as a deconstructor
+            # which is the case here.
+
+            # https://stackoverflow.com/questions/67218341/\
+            #       modulenotfounderror-import-of-time-halted-none-in-sys-\
+            #           modules-occured-when-obj?noredirect=1&lq=1
+            #
+            #
+            # Also see: https://stackoverflow.com/questions\
+            #       /1481488/what-is-the-del-method-and-how-do-i-call-it
+
+            # At this time it seems clean to try to log out (if we can)
+            # but not throw any unessisary exceptions (like this one) to
+            # the end user if we don't have to.
+            pass
