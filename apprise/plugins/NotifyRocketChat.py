@@ -174,14 +174,17 @@ class NotifyRocketChat(NotifyBase):
         'avatar': {
             'name': _('Use Avatar'),
             'type': 'bool',
-            'default': True,
+            'default': False,
+        },
+        'webhook': {
+            'alias_of': 'webhook',
         },
         'to': {
             'alias_of': 'targets',
         },
     })
 
-    def __init__(self, webhook=None, targets=None, mode=None, avatar=True,
+    def __init__(self, webhook=None, targets=None, mode=None, avatar=None,
                  **kwargs):
         """
         Initialize Notify Rocket.Chat Object
@@ -208,9 +211,6 @@ class NotifyRocketChat(NotifyBase):
 
         # Assign our webhook (if defined)
         self.webhook = webhook
-
-        # Place an avatar image to associate with our content
-        self.avatar = avatar
 
         # Used to track token headers upon authentication (if successful)
         # This is only used if not on webhook mode
@@ -277,6 +277,22 @@ class NotifyRocketChat(NotifyBase):
             msg = 'No Rocket.Chat room and/or channels specified to notify.'
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        # Prepare our avatar setting
+        # - if specified; that trumps all
+        # - if not specified and we're dealing with a basic setup, the Avatar
+        #   is disabled by default. This is because if the account doesn't
+        #   have the bot flag set on it it won't work as documented here:
+        #       https://developer.rocket.chat/api/rest-api/endpoints\
+        #             /team-collaboration-endpoints/chat/postmessage
+        # - Otherwise if we're a webhook, we enable the avatar by default
+        #   (if not otherwise specified) since it will work nicely.
+        # Place an avatar image to associate with our content
+        if self.mode == RocketChatAuthMode.BASIC:
+            self.avatar = False if avatar is None else avatar
+
+        else:  # self.mode == RocketChatAuthMode.WEBHOOK:
+            self.avatar = True if avatar is None else avatar
 
         return
 
@@ -367,11 +383,6 @@ class NotifyRocketChat(NotifyBase):
         # Initiaize our error tracking
         has_error = False
 
-        headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/json',
-        }
-
         while len(targets):
             # Retrieve our target
             target = targets.pop(0)
@@ -380,8 +391,7 @@ class NotifyRocketChat(NotifyBase):
             payload['channel'] = target
 
             if not self._send(
-                    dumps(payload), notify_type=notify_type, path=path,
-                    headers=headers, **kwargs):
+                    payload, notify_type=notify_type, path=path, **kwargs):
 
                 # toggle flag
                 has_error = True
@@ -400,21 +410,24 @@ class NotifyRocketChat(NotifyBase):
             return False
 
         # prepare JSON Object
-        payload = self._payload(body, title, notify_type)
+        _payload = self._payload(body, title, notify_type)
 
         # Initiaize our error tracking
         has_error = False
 
+        # Build our list of channels/rooms/users (if any identified)
+        channels = ['@{}'.format(u) for u in self.users]
+        channels.extend(['#{}'.format(c) for c in self.channels])
+
         # Create a copy of our channels to notify against
-        channels = list(self.channels)
-        _payload = payload.copy()
+        payload = _payload.copy()
         while len(channels) > 0:
             # Get Channel
             channel = channels.pop(0)
-            _payload['channel'] = channel
+            payload['channel'] = channel
 
             if not self._send(
-                    _payload, notify_type=notify_type, headers=self.headers,
+                    payload, notify_type=notify_type, headers=self.headers,
                     **kwargs):
 
                 # toggle flag
@@ -422,11 +435,11 @@ class NotifyRocketChat(NotifyBase):
 
         # Create a copy of our room id's to notify against
         rooms = list(self.rooms)
-        _payload = payload.copy()
+        payload = _payload.copy()
         while len(rooms):
             # Get Room
             room = rooms.pop(0)
-            _payload['roomId'] = room
+            payload['roomId'] = room
 
             if not self._send(
                     payload, notify_type=notify_type, headers=self.headers,
@@ -451,13 +464,13 @@ class NotifyRocketChat(NotifyBase):
 
         # apply our images if they're set to be displayed
         image_url = self.image_url(notify_type)
-        if self.avatar:
+        if self.avatar and image_url:
             payload['avatar'] = image_url
 
         return payload
 
     def _send(self, payload, notify_type, path='api/v1/chat.postMessage',
-              headers=None, **kwargs):
+              headers={}, **kwargs):
         """
         Perform Notify Rocket.Chat Notification
         """
@@ -468,13 +481,19 @@ class NotifyRocketChat(NotifyBase):
             api_url, self.verify_certificate))
         self.logger.debug('Rocket.Chat Payload: %s' % str(payload))
 
+        # Apply minimum headers
+        headers.update({
+            'User-Agent': self.app_id,
+            'Content-Type': 'application/json',
+        })
+
         # Always call throttle before any remote server i/o is made
         self.throttle()
 
         try:
             r = requests.post(
                 api_url,
-                data=payload,
+                data=dumps(payload),
                 headers=headers,
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
@@ -691,8 +710,8 @@ class NotifyRocketChat(NotifyBase):
                 NotifyRocketChat.unquote(results['qsd']['mode'])
 
         # avatar icon
-        results['avatar'] = \
-            parse_bool(results['qsd'].get('avatar', True))
+        if 'avatar' in results['qsd'] and len(results['qsd']['avatar']):
+            results['avatar'] = parse_bool(results['qsd'].get('avatar', True))
 
         # The 'to' makes it easier to use yaml configuration
         if 'to' in results['qsd'] and len(results['qsd']['to']):
