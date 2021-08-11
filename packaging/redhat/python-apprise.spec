@@ -143,8 +143,8 @@ BuildRequires: python%{python3_pkgversion}-requests-oauthlib
 BuildRequires: python%{python3_pkgversion}-six
 BuildRequires: python%{python3_pkgversion}-click >= 5.0
 BuildRequires: python%{python3_pkgversion}-markdown
-%if 0%{?rhel} && 0%{?rhel} >= 8
-# gntp isn't available from EPEL for RHEL/CentOS 8
+%if (0%{?rhel} && 0%{?rhel} >= 8) || (0%{?fedora} && 0%{?fedora} <= 35)
+# gntp isn't available from EPEL for RHEL/CentOS 8 or Fedora 35+
 %else
 # For all other distributions, include gntp
 BuildRequires: python%{python3_pkgversion}-gntp
@@ -157,8 +157,8 @@ Requires: python%{python3_pkgversion}-requests-oauthlib
 Requires: python%{python3_pkgversion}-six
 Requires: python%{python3_pkgversion}-markdown
 Requires: python%{python3_pkgversion}-cryptography
-%if 0%{?rhel} && 0%{?rhel} >= 8
-# gntp isn't available from EPEL for RHEL/CentOS 8
+%if (0%{?rhel} && 0%{?rhel} >= 8) || (0%{?fedora} && 0%{?fedora} <= 35)
+# gntp isn't available from EPEL for RHEL/CentOS 8 or Fedora 35+
 %else
 # For all other distributions, include gntp
 Requires: python%{python3_pkgversion}-gntp
