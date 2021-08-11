@@ -47,14 +47,14 @@ Apprise is a Python package for simplifying access to all of the different
 notification services that are out there. Apprise opens the door and makes
 it easy to access:
 
-Boxcar, ClickSend, Discord, E-Mail, Emby, Faast, FCM, Flock, Gitter, Google
-Chat, Gotify, Growl, Home Assistant, IFTTT, Join, Kavenegar, KODI, Kumulos,
-LaMetric, MacOSX, Mailgun, Mattermost, Matrix, Microsoft Windows, Microsoft
-Teams, MessageBird, MSG91, MyAndroid, Nexmo, Nextcloud, Notica, Notifico,
-Office365, OneSignal, Opsgenie, ParsePlatform, PopcornNotify, Prowl, Pushalot,
-PushBullet, Pushjet, Pushover, PushSafer, Reddit, Rocket.Chat, SendGrid,
-SimplePush, Sinch, Slack, SMTP2Go, Spontit, SparkPost, Super Toasty, Stride,
-Syslog, Techulus Push, Telegram, Twilio, Twitter, Twist, XBMC, XMPP,
+Boxcar, ClickSend, DingTalk, Discord, E-Mail, Emby, Faast, FCM, Flock, Gitter,
+Google Chat, Gotify, Growl, Home Assistant, IFTTT, Join, Kavenegar, KODI,
+Kumulos, LaMetric, MacOSX, Mailgun, Mattermost, Matrix, Microsoft Windows,
+Microsoft Teams, MessageBird, MSG91, MyAndroid, Nexmo, Nextcloud, Notica,
+Notifico, Office365, OneSignal, Opsgenie, ParsePlatform, PopcornNotify, Prowl,
+Pushalot, PushBullet, Pushjet, Pushover, PushSafer, Reddit, Rocket.Chat,
+SendGrid, SimplePush, Sinch, Slack, SMTP2Go, Spontit, SparkPost, Super Toasty,
+Stride, Syslog, Techulus Push, Telegram, Twilio, Twitter, Twist, XBMC, XMPP,
 Webex Teams}
 
 Name:           python-%{pypi_name}
@@ -84,11 +84,9 @@ BuildRequires: python-six
 BuildRequires: python2-click >= 5.0
 BuildRequires: python-markdown
 %if 0%{?rhel} && 0%{?rhel} <= 7
-BuildRequires: python-cryptography
 BuildRequires: python-babel
 BuildRequires: python-yaml
 %else
-BuildRequires: python2-cryptography
 BuildRequires: python2-babel
 BuildRequires: python2-yaml
 %endif
