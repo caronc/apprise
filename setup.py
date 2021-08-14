@@ -89,6 +89,9 @@ setup(
             'assets/themes/default/*.ico',
             'i18n/*.py',
             'i18n/*/LC_MESSAGES/*.mo',
+            'py.typed',
+            '*.pyi',
+            '*/*.pyi'
         ],
     },
     install_requires=install_requires,
