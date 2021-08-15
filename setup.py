@@ -76,7 +76,8 @@ setup(
         'Nextcloud Notica Notifico Office365 OneSignal Opsgenie '
         'ParsePlatform PopcornNotify Prowl PushBullet Pushjet Pushed '
         'Pushover PushSafer Reddit Rocket.Chat Ryver SendGrid SimplePush '
-        'Sinch Slack SMTP2Go SparkPost Spontit Streamlabs Stride Syslog Techulus '
+        'Sinch Slack SMTP2Go SparkPost Spontit Streamlabs '
+        'Stride Syslog Techulus '
         'Telegram Twilio Twist Twitter XBMC MSTeams Microsoft Windows Webex '
         'CLI API',
     author='Chris Caron',

@@ -45,6 +45,7 @@ from apprise.common import OverflowMode
 
 # Disable logging for a cleaner testing output
 import logging
+
 logging.disable(logging.CRITICAL)
 
 # a test UUID we can use
@@ -113,9 +114,9 @@ TEST_URLS = (
     # which is what we're doing here
     ('boxcar://%s/%s/@tag1/tag2///%s/?to=tag3' % (
         'a' * 64, 'b' * 64, 'd' * 64), {
-        'instance': plugins.NotifyBoxcar,
-        'requests_response_code': requests.codes.created,
-    }),
+         'instance': plugins.NotifyBoxcar,
+         'requests_response_code': requests.codes.created,
+     }),
     # An invalid tag
     ('boxcar://%s/%s/@%s' % ('a' * 64, 'b' * 64, 't' * 64), {
         'instance': plugins.NotifyBoxcar,
@@ -300,10 +301,10 @@ TEST_URLS = (
     # Test secret via secret= and token=
     ('dingtalk://?token={}&to={}&secret={}'.format(
         'b' * 8, '1' * 14, 'a' * 15), {
-            # access token + phone number using 'to'
-            'instance': plugins.NotifyDingTalk,
-        'privacy_url': 'dingtalk://****@b...b',
-    }),
+         # access token + phone number using 'to'
+         'instance': plugins.NotifyDingTalk,
+         'privacy_url': 'dingtalk://****@b...b',
+     }),
     # Invalid secret
     ('dingtalk://{}/?to={}&secret=_'.format('a' * 8, '1' * 14), {
         'instance': TypeError,
@@ -345,11 +346,11 @@ TEST_URLS = (
     }),
     # Test incorrect currency
     ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/?currency=ABCD', {
-         'instance': TypeError,
-     }),
+        'instance': TypeError,
+    }),
     # Test complete params
-    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/?name=tt&identifier=pyt'
-     '&amount=20&currency=USD', {
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/'
+     '?name=tt&identifier=pyt&amount=20&currency=USD', {
         'instance': plugins.NotifyStreamlabs,
     }),
 
@@ -779,20 +780,20 @@ TEST_URLS = (
         os.path.join(
             os.path.dirname(__file__), 'var', 'fcm',
             'service_account.json')), {
-                'instance': plugins.NotifyFCM,
-                # throw a bizzare code forcing us to fail to look it up
-                'response': False,
-                'requests_response_code': 999,
-    }),
+         'instance': plugins.NotifyFCM,
+         # throw a bizzare code forcing us to fail to look it up
+         'response': False,
+         'requests_response_code': 999,
+     }),
     ('fcm://projectid/#topic1/device/?mode=oauth2&keyfile=file://{}'.format(
         os.path.join(
             os.path.dirname(__file__), 'var', 'fcm',
             'service_account.json')), {
-                'instance': plugins.NotifyFCM,
-                # Throws a series of connection and transfer exceptions when
-                # this flag is set and tests that we gracfully handle them
-                'test_requests_exceptions': True,
-    }),
+         'instance': plugins.NotifyFCM,
+         # Throws a series of connection and transfer exceptions when
+         # this flag is set and tests that we gracfully handle them
+         'test_requests_exceptions': True,
+     }),
     ##################################
     # NotifyFlock
     ##################################
@@ -843,8 +844,8 @@ TEST_URLS = (
     # Native URL Support with arguments
     ('https://api.flock.com/hooks/sendMessage/{}/?format=markdown'.format(
         'i' * 24), {
-        'instance': plugins.NotifyFlock,
-    }),
+         'instance': plugins.NotifyFlock,
+     }),
     # Bot API presumed if one or more targets are specified
     # Provide markdown format
     ('flock://%s/u:%s?format=markdown' % ('i' * 24, 'u' * 12), {
@@ -1591,9 +1592,9 @@ TEST_URLS = (
     }),
     ('lametric://{}/'.format(
         'com.lametric.941c51dff3135bd87aa72db9d855dd50'), {
-            # No APIKey specified
-            'instance': TypeError,
-    }),
+         # No APIKey specified
+         'instance': TypeError,
+     }),
     ('lametric://root:{}@192.168.0.5:8080/'.format(UUID4), {
         # Everything is okay; this would be picked up in Device Mode
         # We're using a default port and enforcing a special user
@@ -1626,13 +1627,13 @@ TEST_URLS = (
     }),
     # Support Native URL (with Access Token Argument)
     ('https://developer.lametric.com/api/v1/dev/widget/update/'
-        'com.lametric.ABCD123/1?token={}=='.format('D' * 88), {
-            # Everything is okay; Device mode forced
-            'instance': plugins.NotifyLametric,
+     'com.lametric.ABCD123/1?token={}=='.format('D' * 88), {
+         # Everything is okay; Device mode forced
+         'instance': plugins.NotifyLametric,
 
-            # Our expected url(privacy=True) startswith() response:
-            'privacy_url': 'lametric://D...=@A...3/1/',
-        }),
+         # Our expected url(privacy=True) startswith() response:
+         'privacy_url': 'lametric://D...=@A...3/1/',
+     }),
 
     ('lametric://192.168.2.8/?mode=device&apikey=abc123', {
         # Everything is okay; Device mode forced
@@ -1642,29 +1643,29 @@ TEST_URLS = (
         'privacy_url': 'lametric://a...3@192.168.2.8/',
     }),
     ('lametrics://{}==@com.lametric.941c51dff3135bd87aa72db9d855dd50/'
-        '?mode=cloud&app_ver=2'.format('A' * 88), {
-            # Everything is okay; Cloud mode forced
-            # We gracefully strip off the com.lametric. part as well
-            # We also set an application version of 2
-            'instance': plugins.NotifyLametric,
+     '?mode=cloud&app_ver=2'.format('A' * 88), {
+         # Everything is okay; Cloud mode forced
+         # We gracefully strip off the com.lametric. part as well
+         # We also set an application version of 2
+         'instance': plugins.NotifyLametric,
 
-            # Our expected url(privacy=True) startswith() response:
-            'privacy_url': 'lametric://A...=@9...0/',
-        }),
+         # Our expected url(privacy=True) startswith() response:
+         'privacy_url': 'lametric://A...=@9...0/',
+     }),
     ('lametrics://{}==@com.lametric.941c51dff3135bd87aa72db9d855dd50/'
-        '?app_ver=invalid'.format('A' * 88), {
-            # We set invalid app version
-            'instance': TypeError,
-        }),
+     '?app_ver=invalid'.format('A' * 88), {
+         # We set invalid app version
+         'instance': TypeError,
+     }),
     # our lametric object initialized via argument
     ('lametric://?app=com.lametric.941c51dff3135bd87aa72db9d855dd50&token={}=='
-        '&mode=cloud'.format('B' * 88), {
-            # Everything is okay; Cloud mode forced
-            'instance': plugins.NotifyLametric,
+     '&mode=cloud'.format('B' * 88), {
+         # Everything is okay; Cloud mode forced
+         'instance': plugins.NotifyLametric,
 
-            # Our expected url(privacy=True) startswith() response:
-            'privacy_url': 'lametric://B...=@9...0/',
-        }),
+         # Our expected url(privacy=True) startswith() response:
+         'privacy_url': 'lametric://B...=@9...0/',
+     }),
     ('lametrics://{}==@abcd/?mode=cloud&sound=knock&icon_type=info'
      '&priority=critical&cycles=10'.format('C' * 88), {
          # Cloud mode forced, sound, icon_type, and priority not supported
@@ -1783,113 +1784,113 @@ TEST_URLS = (
     # Token is valid, but no user name specified
     ('mailgun://localhost.localdomain/{}-{}-{}'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-        'instance': TypeError,
-    }),
+         'instance': TypeError,
+     }),
     # Invalid from email address
     ('mailgun://!@localhost.localdomain/{}-{}-{}'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-        'instance': TypeError,
-    }),
+         'instance': TypeError,
+     }),
     # No To email address, but everything else is valid
     ('mailgun://user@localhost.localdomain/{}-{}-{}'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-        'instance': plugins.NotifyMailgun,
-    }),
+         'instance': plugins.NotifyMailgun,
+     }),
     ('mailgun://user@localhost.localdomain/{}-{}-{}?format=markdown'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-        'instance': plugins.NotifyMailgun,
-    }),
+         'instance': plugins.NotifyMailgun,
+     }),
     ('mailgun://user@localhost.localdomain/{}-{}-{}?format=html'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-        'instance': plugins.NotifyMailgun,
-    }),
+         'instance': plugins.NotifyMailgun,
+     }),
     ('mailgun://user@localhost.localdomain/{}-{}-{}?format=text'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-        'instance': plugins.NotifyMailgun,
-    }),
+         'instance': plugins.NotifyMailgun,
+     }),
     # valid url with region specified (case insensitve)
     ('mailgun://user@localhost.localdomain/{}-{}-{}?region=uS'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-            'instance': plugins.NotifyMailgun,
-    }),
+         'instance': plugins.NotifyMailgun,
+     }),
     # valid url with region specified (case insensitve)
     ('mailgun://user@localhost.localdomain/{}-{}-{}?region=EU'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-            'instance': plugins.NotifyMailgun,
-    }),
+         'instance': plugins.NotifyMailgun,
+     }),
     # invalid url with region specified (case insensitve)
     ('mailgun://user@localhost.localdomain/{}-{}-{}?region=invalid'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-            'instance': TypeError,
-    }),
+         'instance': TypeError,
+     }),
     # headers
     ('mailgun://user@localhost.localdomain/{}-{}-{}'
-        '?+X-Customer-Campaign-ID=Apprise'.format(
-            'a' * 32, 'b' * 8, 'c' * 8), {
-                'instance': plugins.NotifyMailgun,
-        }),
+     '?+X-Customer-Campaign-ID=Apprise'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+         'instance': plugins.NotifyMailgun,
+     }),
     # template tokens
     ('mailgun://user@localhost.localdomain/{}-{}-{}'
-        '?:name=Chris&:status=admin'.format(
-            'a' * 32, 'b' * 8, 'c' * 8), {
-                'instance': plugins.NotifyMailgun,
-        }),
+     '?:name=Chris&:status=admin'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+         'instance': plugins.NotifyMailgun,
+     }),
     # bcc and cc
     ('mailgun://user@localhost.localdomain/{}-{}-{}'
-        '?bcc=user@example.com&cc=user2@example.com'.format(
-            'a' * 32, 'b' * 8, 'c' * 8), {
-                'instance': plugins.NotifyMailgun,
-        }),
+     '?bcc=user@example.com&cc=user2@example.com'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+         'instance': plugins.NotifyMailgun,
+     }),
     # One To Email address
     ('mailgun://user@localhost.localdomain/{}-{}-{}/test@example.com'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-            'instance': plugins.NotifyMailgun,
-    }),
+         'instance': plugins.NotifyMailgun,
+     }),
     ('mailgun://user@localhost.localdomain/'
-        '{}-{}-{}?to=test@example.com'.format(
-            'a' * 32, 'b' * 8, 'c' * 8), {
-                'instance': plugins.NotifyMailgun}),
+     '{}-{}-{}?to=test@example.com'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+         'instance': plugins.NotifyMailgun}),
     # One To Email address, a from name specified too
     ('mailgun://user@localhost.localdomain/{}-{}-{}/'
-        'test@example.com?name="Frodo"'.format(
-            'a' * 32, 'b' * 8, 'c' * 8), {
-                'instance': plugins.NotifyMailgun}),
+     'test@example.com?name="Frodo"'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+         'instance': plugins.NotifyMailgun}),
     # Invalid 'To' Email address
     ('mailgun://user@localhost.localdomain/{}-{}-{}/invalid'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-            'instance': plugins.NotifyMailgun,
-            # Expected notify() response
-            'notify_response': False,
-    }),
+         'instance': plugins.NotifyMailgun,
+         # Expected notify() response
+         'notify_response': False,
+     }),
     # Multiple 'To', 'Cc', and 'Bcc' addresses (with invalid ones)
     ('mailgun://user@example.com/{}-{}-{}/{}?bcc={}&cc={}'.format(
         'a' * 32, 'b' * 8, 'c' * 8,
         '/'.join(('user1@example.com', 'invalid', 'User2:user2@example.com')),
         ','.join(('user3@example.com', 'i@v', 'User1:user1@example.com')),
         ','.join(('user4@example.com', 'g@r@b', 'Da:user5@example.com'))), {
-            'instance': plugins.NotifyMailgun,
-    }),
+         'instance': plugins.NotifyMailgun,
+     }),
     ('mailgun://user@localhost.localdomain/{}-{}-{}'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-        'instance': plugins.NotifyMailgun,
-        # force a failure
-        'response': False,
-        'requests_response_code': requests.codes.internal_server_error,
-    }),
+         'instance': plugins.NotifyMailgun,
+         # force a failure
+         'response': False,
+         'requests_response_code': requests.codes.internal_server_error,
+     }),
     ('mailgun://user@localhost.localdomain/{}-{}-{}'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-        'instance': plugins.NotifyMailgun,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
+         'instance': plugins.NotifyMailgun,
+         # throw a bizzare code forcing us to fail to look it up
+         'response': False,
+         'requests_response_code': 999,
+     }),
     ('mailgun://user@localhost.localdomain/{}-{}-{}'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-        'instance': plugins.NotifyMailgun,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
+         'instance': plugins.NotifyMailgun,
+         # Throws a series of connection and transfer exceptions when this flag
+         # is set and tests that we gracfully handle them
+         'test_requests_exceptions': True,
+     }),
 
     ##################################
     # NotifyMatrix
@@ -2166,41 +2167,41 @@ TEST_URLS = (
     # New 2021 URL formatting
     ('msteams://apprise/{}@{}/{}/{}'.format(
         UUID4, UUID4, 'e' * 32, UUID4), {
-            # All tokens provided - we're good  no image
-            'instance': plugins.NotifyMSTeams,
+         # All tokens provided - we're good  no image
+         'instance': plugins.NotifyMSTeams,
 
-            # Our expected url(privacy=True) startswith() response:
-            'privacy_url': 'msteams://apprise/8...2/e...e/8...2/',
-    }),
+         # Our expected url(privacy=True) startswith() response:
+         'privacy_url': 'msteams://apprise/8...2/e...e/8...2/',
+     }),
     # New 2021 URL formatting; support team= argument
     ('msteams://{}@{}/{}/{}?team=teamname'.format(
         UUID4, UUID4, 'f' * 32, UUID4), {
-            # All tokens provided - we're good  no image
-            'instance': plugins.NotifyMSTeams,
+         # All tokens provided - we're good  no image
+         'instance': plugins.NotifyMSTeams,
 
-            # Our expected url(privacy=True) startswith() response:
-            'privacy_url': 'msteams://teamname/8...2/f...f/8...2/',
-    }),
+         # Our expected url(privacy=True) startswith() response:
+         'privacy_url': 'msteams://teamname/8...2/f...f/8...2/',
+     }),
     # New 2021 URL formatting (forcing v1)
     ('msteams://apprise/{}@{}/{}/{}?version=1'.format(
         UUID4, UUID4, 'e' * 32, UUID4), {
-            # All tokens provided - we're good
-            'instance': plugins.NotifyMSTeams,
+         # All tokens provided - we're good
+         'instance': plugins.NotifyMSTeams,
 
-            # Our expected url(privacy=True) startswith() response:
-            'privacy_url': 'msteams://8...2/e...e/8...2/',
-    }),
+         # Our expected url(privacy=True) startswith() response:
+         'privacy_url': 'msteams://8...2/e...e/8...2/',
+     }),
     # Invalid versioning
     ('msteams://apprise/{}@{}/{}/{}?version=999'.format(
         UUID4, UUID4, 'e' * 32, UUID4), {
-            # invalid version
-            'instance': TypeError,
-    }),
+         # invalid version
+         'instance': TypeError,
+     }),
     ('msteams://apprise/{}@{}/{}/{}?version=invalid'.format(
         UUID4, UUID4, 'e' * 32, UUID4), {
-            # invalid version
-            'instance': TypeError,
-    }),
+         # invalid version
+         'instance': TypeError,
+     }),
     ('msteams://{}@{}/{}/{}?tx'.format(UUID4, UUID4, 'x' * 32, UUID4), {
         'instance': plugins.NotifyMSTeams,
         # force a failure
@@ -2249,12 +2250,12 @@ TEST_URLS = (
     }),
     ('nexmo://AC{}:{}@{}/123/{}/abcd/'.format(
         'f' * 8, 'g' * 16, '3' * 11, '9' * 15), {
-        # valid everything but target numbers
-        'instance': plugins.NotifyNexmo,
+         # valid everything but target numbers
+         'instance': plugins.NotifyNexmo,
 
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'nexmo://A...f:****@',
-    }),
+         # Our expected url(privacy=True) startswith() response:
+         'privacy_url': 'nexmo://A...f:****@',
+     }),
     ('nexmo://AC{}:{}@{}'.format('h' * 8, 'i' * 16, '5' * 11), {
         # using phone no with no target - we text ourselves in
         # this case
@@ -2262,19 +2263,19 @@ TEST_URLS = (
     }),
     ('nexmo://_?key=AC{}&secret={}&from={}'.format(
         'a' * 8, 'b' * 16, '5' * 11), {
-        # use get args to acomplish the same thing
-        'instance': plugins.NotifyNexmo,
-    }),
+         # use get args to acomplish the same thing
+         'instance': plugins.NotifyNexmo,
+     }),
     ('nexmo://_?key=AC{}&secret={}&source={}'.format(
         'a' * 8, 'b' * 16, '5' * 11), {
-        # use get args to acomplish the same thing (use source instead of from)
-        'instance': plugins.NotifyNexmo,
-    }),
+         # use get args to acomplish the same thing (use source instead of from)
+         'instance': plugins.NotifyNexmo,
+     }),
     ('nexmo://_?key=AC{}&secret={}&from={}&to={}'.format(
         'a' * 8, 'b' * 16, '5' * 11, '7' * 13), {
-        # use to=
-        'instance': plugins.NotifyNexmo,
-    }),
+         # use to=
+         'instance': plugins.NotifyNexmo,
+     }),
     ('nexmo://AC{}:{}@{}'.format('a' * 8, 'b' * 16, '6' * 11), {
         'instance': plugins.NotifyNexmo,
         # throw a bizzare code forcing us to fail to look it up
@@ -2557,9 +2558,9 @@ TEST_URLS = (
         secret='abcd/123/3343/@jack/test',
         targets='/'.join(['email1@test.ca'])), {
 
-        # We're valid and good to go
-        'instance': TypeError,
-    }),
+         # We're valid and good to go
+         'instance': TypeError,
+     }),
     ('o365://{tenant}:{aid}/{cid}/{secret}/{targets}'.format(
         tenant='tenant',
         # invalid client id
@@ -2568,9 +2569,9 @@ TEST_URLS = (
         secret='abcd/123/3343/@jack/test',
         targets='/'.join(['email1@test.ca'])), {
 
-        # We're valid and good to go
-        'instance': TypeError,
-    }),
+         # We're valid and good to go
+         'instance': TypeError,
+     }),
     ('o365://{tenant}:{aid}/{cid}/{secret}/{targets}'.format(
         tenant='tenant',
         cid='ab-cd-ef-gh',
@@ -2578,39 +2579,39 @@ TEST_URLS = (
         secret='abcd/123/3343/@jack/test',
         targets='/'.join(['email1@test.ca'])), {
 
-        # We're valid and good to go
-        'instance': plugins.NotifyOffice365,
+         # We're valid and good to go
+         'instance': plugins.NotifyOffice365,
 
-        # Test what happens if a batch send fails to return a messageCount
-        'requests_response_text': {
-            'expires_in': 2000,
-            'access_token': 'abcd1234',
-        },
+         # Test what happens if a batch send fails to return a messageCount
+         'requests_response_text': {
+             'expires_in': 2000,
+             'access_token': 'abcd1234',
+         },
 
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'o365://t...t:user@example.com/a...h/' \
-                       '****/email1%40test.ca/'}),
+         # Our expected url(privacy=True) startswith() response:
+         'privacy_url': 'o365://t...t:user@example.com/a...h/' \
+                        '****/email1%40test.ca/'}),
     # test our arguments
     ('o365://_/?oauth_id={cid}&oauth_secret={secret}&tenant={tenant}'
-        '&to={targets}&from={aid}'.format(
-            tenant='tenant',
-            cid='ab-cd-ef-gh',
-            aid='user@example.com',
-            secret='abcd/123/3343/@jack/test',
-            targets='email1@test.ca'),
-        {
-            # We're valid and good to go
-            'instance': plugins.NotifyOffice365,
+     '&to={targets}&from={aid}'.format(
+        tenant='tenant',
+        cid='ab-cd-ef-gh',
+        aid='user@example.com',
+        secret='abcd/123/3343/@jack/test',
+        targets='email1@test.ca'),
+     {
+         # We're valid and good to go
+         'instance': plugins.NotifyOffice365,
 
-            # Test what happens if a batch send fails to return a messageCount
-            'requests_response_text': {
-                'expires_in': 2000,
-                'access_token': 'abcd1234',
-            },
+         # Test what happens if a batch send fails to return a messageCount
+         'requests_response_text': {
+             'expires_in': 2000,
+             'access_token': 'abcd1234',
+         },
 
-            # Our expected url(privacy=True) startswith() response:
-            'privacy_url': 'o365://t...t:user@example.com/a...h/' \
-                           '****/email1%40test.ca/'}),
+         # Our expected url(privacy=True) startswith() response:
+         'privacy_url': 'o365://t...t:user@example.com/a...h/' \
+                        '****/email1%40test.ca/'}),
     # Test invalid JSON (no tenant defaults to email domain)
     ('o365://{tenant}:{aid}/{cid}/{secret}/{targets}'.format(
         tenant='tenant',
@@ -2619,13 +2620,13 @@ TEST_URLS = (
         secret='abcd/123/3343/@jack/test',
         targets='/'.join(['email1@test.ca'])), {
 
-        # We're valid and good to go
-        'instance': plugins.NotifyOffice365,
+         # We're valid and good to go
+         'instance': plugins.NotifyOffice365,
 
-        # invalid JSON response
-        'requests_response_text': '{',
-        'notify_response': False,
-    }),
+         # invalid JSON response
+         'requests_response_text': '{',
+         'notify_response': False,
+     }),
     # No Targets specified
     ('o365://{tenant}:{aid}/{cid}/{secret}'.format(
         tenant='tenant',
@@ -2633,37 +2634,37 @@ TEST_URLS = (
         aid='user@example.com',
         secret='abcd/123/3343/@jack/test'), {
 
-        # We're valid and good to go
-        'instance': plugins.NotifyOffice365,
+         # We're valid and good to go
+         'instance': plugins.NotifyOffice365,
 
-        # There were no targets to notify; so we use our own email
-        'requests_response_text': {
-            'expires_in': 2000,
-            'access_token': 'abcd1234',
-        },
-    }),
+         # There were no targets to notify; so we use our own email
+         'requests_response_text': {
+             'expires_in': 2000,
+             'access_token': 'abcd1234',
+         },
+     }),
     ('o365://{tenant}:{aid}/{cid}/{secret}/{targets}'.format(
         tenant='tenant',
         cid='zz-zz-zz-zz',
         aid='user@example.com',
         secret='abcd/abc/dcba/@john/test',
         targets='/'.join(['email1@test.ca'])), {
-        'instance': plugins.NotifyOffice365,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
+         'instance': plugins.NotifyOffice365,
+         # throw a bizzare code forcing us to fail to look it up
+         'response': False,
+         'requests_response_code': 999,
+     }),
     ('o365://{tenant}:{aid}/{cid}/{secret}/{targets}'.format(
         tenant='tenant',
         cid='01-12-23-34',
         aid='user@example.com',
         secret='abcd/321/4321/@test/test',
         targets='/'.join(['email1@test.ca'])), {
-        'instance': plugins.NotifyOffice365,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
+         'instance': plugins.NotifyOffice365,
+         # Throws a series of connection and transfer exceptions when this flag
+         # is set and tests that we gracfully handle them
+         'test_requests_exceptions': True,
+     }),
 
     ##################################
     # NotifyOneSignal
@@ -2810,9 +2811,9 @@ TEST_URLS = (
     }),
     ('opsgenie://apikey/{}/@{}/#{}/*{}/^{}/'.format(
         UUID4, UUID4, UUID4, UUID4, UUID4), {
-        # similar to the above, except we use the UUID's
-        'instance': plugins.NotifyOpsgenie,
-    }),
+         # similar to the above, except we use the UUID's
+         'instance': plugins.NotifyOpsgenie,
+     }),
     ('opsgenie://apikey?to=#team,user&+key=value&+type=override', {
         # Test to= and details (key/value pair) also override 'type'
         'instance': plugins.NotifyOpsgenie,
@@ -3556,34 +3557,34 @@ TEST_URLS = (
                                                  'a' * 30,
                                                  'retry=30',
                                                  'expire=300'), {
-        'instance': plugins.NotifyPushover,
-    }),
+         'instance': plugins.NotifyPushover,
+     }),
     # API Key + emergency priority setting with text retry
     ('pover://%s@%s?priority=emergency&%s&%s' % ('u' * 30,
                                                  'a' * 30,
                                                  'retry=invalid',
                                                  'expire=300'), {
-        'instance': plugins.NotifyPushover,
-    }),
+         'instance': plugins.NotifyPushover,
+     }),
     # API Key + emergency priority setting with text expire
     ('pover://%s@%s?priority=emergency&%s&%s' % ('u' * 30,
                                                  'a' * 30,
                                                  'retry=30',
                                                  'expire=invalid'), {
-        'instance': plugins.NotifyPushover,
-    }),
+         'instance': plugins.NotifyPushover,
+     }),
     # API Key + emergency priority setting with invalid expire
     ('pover://%s@%s?priority=emergency&%s' % ('u' * 30,
                                               'a' * 30,
                                               'expire=100000'), {
-        'instance': TypeError,
-    }),
+         'instance': TypeError,
+     }),
     # API Key + emergency priority setting with invalid retry
     ('pover://%s@%s?priority=emergency&%s' % ('u' * 30,
                                               'a' * 30,
                                               'retry=15'), {
-        'instance': TypeError,
-    }),
+         'instance': TypeError,
+     }),
     # API Key + priority setting (empty)
     ('pover://%s@%s?priority=' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
@@ -4019,9 +4020,9 @@ TEST_URLS = (
     # Support Native URLs with arguments
     ('https://apprise.ryver.com/application/webhook/ckhrjW8w672m6HG'
      '?webhook=ryver',
-        {
-            'instance': plugins.NotifyRyver,
-        }),
+     {
+         'instance': plugins.NotifyRyver,
+     }),
     ('ryver://caronc@apprise/ckhrjW8w672m6HG', {
         'instance': plugins.NotifyRyver,
         # don't include an image by default
@@ -4155,9 +4156,9 @@ TEST_URLS = (
     }),
     ('sinch://{}:{}@{}/123/{}/abcd/'.format(
         'a' * 32, 'b' * 32, '3' * 11, '9' * 15), {
-        # valid everything but target numbers
-        'instance': plugins.NotifySinch,
-    }),
+         # valid everything but target numbers
+         'instance': plugins.NotifySinch,
+     }),
     ('sinch://{}:{}@12345/{}'.format('a' * 32, 'b' * 32, '4' * 11), {
         # using short-code (5 characters)
         'instance': plugins.NotifySinch,
@@ -4184,19 +4185,19 @@ TEST_URLS = (
     }),
     ('sinch://_?spi={}&token={}&from={}'.format(
         'a' * 32, 'b' * 32, '5' * 11), {
-        # use get args to acomplish the same thing
-        'instance': plugins.NotifySinch,
-    }),
+         # use get args to acomplish the same thing
+         'instance': plugins.NotifySinch,
+     }),
     ('sinch://_?spi={}&token={}&source={}'.format(
         'a' * 32, 'b' * 32, '5' * 11), {
-        # use get args to acomplish the same thing (use source instead of from)
-        'instance': plugins.NotifySinch,
-    }),
+         # use get args to acomplish the same thing (use source instead of from)
+         'instance': plugins.NotifySinch,
+     }),
     ('sinch://_?spi={}&token={}&from={}&to={}'.format(
         'a' * 32, 'b' * 32, '5' * 11, '7' * 13), {
-        # use to=
-        'instance': plugins.NotifySinch,
-    }),
+         # use to=
+         'instance': plugins.NotifySinch,
+     }),
     ('sinch://{}:{}@{}'.format('a' * 32, 'b' * 32, '6' * 11), {
         'instance': plugins.NotifySinch,
         # throw a bizzare code forcing us to fail to look it up
@@ -4243,38 +4244,38 @@ TEST_URLS = (
         },
     }),
     ('sparkpost://user@localhost.localdomain/{}?format=markdown'
-        .format('d' * 32), {
-            'instance': plugins.NotifySparkPost,
-            'requests_response_text': {
-                "results": {
-                    "total_rejected_recipients": 0,
-                    "total_accepted_recipients": 1,
-                    "id": "11668787484950529"
-                }
-            },
-        }),
+     .format('d' * 32), {
+         'instance': plugins.NotifySparkPost,
+         'requests_response_text': {
+             "results": {
+                 "total_rejected_recipients": 0,
+                 "total_accepted_recipients": 1,
+                 "id": "11668787484950529"
+             }
+         },
+     }),
     ('sparkpost://user@localhost.localdomain/{}?format=html'
-        .format('d' * 32), {
-            'instance': plugins.NotifySparkPost,
-            'requests_response_text': {
-                "results": {
-                    "total_rejected_recipients": 0,
-                    "total_accepted_recipients": 1,
-                    "id": "11668787484950529"
-                }
-            },
-        }),
+     .format('d' * 32), {
+         'instance': plugins.NotifySparkPost,
+         'requests_response_text': {
+             "results": {
+                 "total_rejected_recipients": 0,
+                 "total_accepted_recipients": 1,
+                 "id": "11668787484950529"
+             }
+         },
+     }),
     ('sparkpost://user@localhost.localdomain/{}?format=text'
-        .format('d' * 32), {
-            'instance': plugins.NotifySparkPost,
-            'requests_response_text': {
-                "results": {
-                    "total_rejected_recipients": 0,
-                    "total_accepted_recipients": 1,
-                    "id": "11668787484950529"
-                }
-            },
-        }),
+     .format('d' * 32), {
+         'instance': plugins.NotifySparkPost,
+         'requests_response_text': {
+             "results": {
+                 "total_rejected_recipients": 0,
+                 "total_accepted_recipients": 1,
+                 "id": "11668787484950529"
+             }
+         },
+     }),
     # valid url with region specified (case insensitve)
     ('sparkpost://user@localhost.localdomain/{}?region=uS'.format('d' * 32), {
         'instance': plugins.NotifySparkPost,
@@ -4299,102 +4300,102 @@ TEST_URLS = (
     }),
     # headers
     ('sparkpost://user@localhost.localdomain/{}'
-        '?+X-Customer-Campaign-ID=Apprise'.format('f' * 32), {
-            'instance': plugins.NotifySparkPost,
-            'requests_response_text': {
-                "results": {
-                    "total_rejected_recipients": 0,
-                    "total_accepted_recipients": 1,
-                    "id": "11668787484950529"
-                }
-            },
-        }),
+     '?+X-Customer-Campaign-ID=Apprise'.format('f' * 32), {
+         'instance': plugins.NotifySparkPost,
+         'requests_response_text': {
+             "results": {
+                 "total_rejected_recipients": 0,
+                 "total_accepted_recipients": 1,
+                 "id": "11668787484950529"
+             }
+         },
+     }),
     # template tokens
     ('sparkpost://user@localhost.localdomain/{}'
-        '?:name=Chris&:status=admin'.format('g' * 32), {
-            'instance': plugins.NotifySparkPost,
-            'requests_response_text': {
-                "results": {
-                    "total_rejected_recipients": 0,
-                    "total_accepted_recipients": 1,
-                    "id": "11668787484950529"
-                }
-            },
-        }),
+     '?:name=Chris&:status=admin'.format('g' * 32), {
+         'instance': plugins.NotifySparkPost,
+         'requests_response_text': {
+             "results": {
+                 "total_rejected_recipients": 0,
+                 "total_accepted_recipients": 1,
+                 "id": "11668787484950529"
+             }
+         },
+     }),
     # bcc and cc
     ('sparkpost://user@localhost.localdomain/{}'
-        '?bcc=user@example.com&cc=user2@example.com'.format('h' * 32), {
-            'instance': plugins.NotifySparkPost,
-            'requests_response_text': {
-                "results": {
-                    "total_rejected_recipients": 0,
-                    "total_accepted_recipients": 1,
-                    "id": "11668787484950529"
-                }
-            },
-        }),
+     '?bcc=user@example.com&cc=user2@example.com'.format('h' * 32), {
+         'instance': plugins.NotifySparkPost,
+         'requests_response_text': {
+             "results": {
+                 "total_rejected_recipients": 0,
+                 "total_accepted_recipients": 1,
+                 "id": "11668787484950529"
+             }
+         },
+     }),
     # invalid url with region specified (case insensitve)
     ('sparkpost://user@localhost.localdomain/{}?region=invalid'.format(
         'a' * 32), {
-            'instance': TypeError,
-    }),
+         'instance': TypeError,
+     }),
     # One 'To' Email address
     ('sparkpost://user@localhost.localdomain/{}/test@example.com'.format(
         'a' * 32), {
-            'instance': plugins.NotifySparkPost,
-            'requests_response_text': {
-                "results": {
-                    "total_rejected_recipients": 0,
-                    "total_accepted_recipients": 1,
-                    "id": "11668787484950529"
-                }
-            },
-    }),
+         'instance': plugins.NotifySparkPost,
+         'requests_response_text': {
+             "results": {
+                 "total_rejected_recipients": 0,
+                 "total_accepted_recipients": 1,
+                 "id": "11668787484950529"
+             }
+         },
+     }),
     # Invalid 'To' Email address
     ('sparkpost://user@localhost.localdomain/{}/invalid'.format(
         'i' * 32), {
-            'instance': plugins.NotifySparkPost,
-            # Expected notify() response
-            'notify_response': False,
-    }),
+         'instance': plugins.NotifySparkPost,
+         # Expected notify() response
+         'notify_response': False,
+     }),
     # Multiple 'To', 'Cc', and 'Bcc' addresses (with invalid ones)
     ('sparkpost://user@example.com/{}/{}?bcc={}&cc={}'.format(
         'j' * 32,
         '/'.join(('user1@example.com', 'invalid', 'User2:user2@example.com')),
         ','.join(('user3@example.com', 'i@v', 'User1:user1@example.com')),
         ','.join(('user4@example.com', 'g@r@b', 'Da:user5@example.com'))), {
-            'instance': plugins.NotifySparkPost,
-            'requests_response_text': {
-                "results": {
-                    "total_rejected_recipients": 0,
-                    "total_accepted_recipients": 1,
-                    "id": "11668787484950529"
-                }
-            },
-    }),
+         'instance': plugins.NotifySparkPost,
+         'requests_response_text': {
+             "results": {
+                 "total_rejected_recipients": 0,
+                 "total_accepted_recipients": 1,
+                 "id": "11668787484950529"
+             }
+         },
+     }),
     ('sparkpost://user@localhost.localdomain/'
-        '{}?to=test@example.com'.format('k' * 32), {
-            'instance': plugins.NotifySparkPost,
-            'requests_response_text': {
-                "results": {
-                    "total_rejected_recipients": 0,
-                    "total_accepted_recipients": 1,
-                    "id": "11668787484950529"
-                }
-            },
-        }),
+     '{}?to=test@example.com'.format('k' * 32), {
+         'instance': plugins.NotifySparkPost,
+         'requests_response_text': {
+             "results": {
+                 "total_rejected_recipients": 0,
+                 "total_accepted_recipients": 1,
+                 "id": "11668787484950529"
+             }
+         },
+     }),
     # One To Email address, a from name specified too
     ('sparkpost://user@localhost.localdomain/{}/'
-        'test@example.com?name="Frodo"'.format('l' * 32), {
-            'instance': plugins.NotifySparkPost,
-            'requests_response_text': {
-                "results": {
-                    "total_rejected_recipients": 0,
-                    "total_accepted_recipients": 1,
-                    "id": "11668787484950529"
-                }
-            },
-        }),
+     'test@example.com?name="Frodo"'.format('l' * 32), {
+         'instance': plugins.NotifySparkPost,
+         'requests_response_text': {
+             "results": {
+                 "total_rejected_recipients": 0,
+                 "total_accepted_recipients": 1,
+                 "id": "11668787484950529"
+             }
+         },
+     }),
     # Test invalid JSON response
     ('sparkpost://user@localhost.localdomain/{}'.format('m' * 32), {
         'instance': plugins.NotifySparkPost,
@@ -4604,13 +4605,13 @@ TEST_URLS = (
         'requests_response_text': 'ok',
     }),
     ('slack://username@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/'
-        '?to=#nuxref', {
-            'instance': plugins.NotifySlack,
+     '?to=#nuxref', {
+         'instance': plugins.NotifySlack,
 
-            # Our expected url(privacy=True) startswith() response:
-            'privacy_url': 'slack://username@T...2/A...D/T...Q/',
-            'requests_response_text': 'ok',
-        }),
+         # Our expected url(privacy=True) startswith() response:
+         'privacy_url': 'slack://username@T...2/A...D/T...Q/',
+         'requests_response_text': 'ok',
+     }),
     ('slack://username@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#nuxref', {
         'instance': plugins.NotifySlack,
         'requests_response_text': 'ok',
@@ -4698,15 +4699,15 @@ TEST_URLS = (
     # Native URL Support, take the slack URL and still build from it
     ('https://hooks.slack.com/services/{}/{}/{}'.format(
         'A' * 9, 'B' * 9, 'c' * 24), {
-        'instance': plugins.NotifySlack,
-        'requests_response_text': 'ok',
-    }),
+         'instance': plugins.NotifySlack,
+         'requests_response_text': 'ok',
+     }),
     # Native URL Support with arguments
     ('https://hooks.slack.com/services/{}/{}/{}?format=text'.format(
         'A' * 9, 'B' * 9, 'c' * 24), {
-        'instance': plugins.NotifySlack,
-        'requests_response_text': 'ok',
-    }),
+         'instance': plugins.NotifySlack,
+         'requests_response_text': 'ok',
+     }),
     ('slack://username@-INVALID-/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#cool', {
         # invalid 1st Token
         'instance': TypeError,
@@ -4757,92 +4758,92 @@ TEST_URLS = (
     # Token is valid, but no user name specified
     ('smtp2go://localhost.localdomain/{}-{}-{}'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-        'instance': TypeError,
-    }),
+         'instance': TypeError,
+     }),
     # Invalid from email address
     ('smtp2go://!@localhost.localdomain/{}-{}-{}'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-        'instance': TypeError,
-    }),
+         'instance': TypeError,
+     }),
     # No To email address, but everything else is valid
     ('smtp2go://user@localhost.localdomain/{}-{}-{}'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-        'instance': plugins.NotifySMTP2Go,
-    }),
+         'instance': plugins.NotifySMTP2Go,
+     }),
     ('smtp2go://user@localhost.localdomain/{}-{}-{}?format=markdown'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-        'instance': plugins.NotifySMTP2Go,
-    }),
+         'instance': plugins.NotifySMTP2Go,
+     }),
     ('smtp2go://user@localhost.localdomain/{}-{}-{}?format=html'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-        'instance': plugins.NotifySMTP2Go,
-    }),
+         'instance': plugins.NotifySMTP2Go,
+     }),
     ('smtp2go://user@localhost.localdomain/{}-{}-{}?format=text'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-        'instance': plugins.NotifySMTP2Go,
-    }),
+         'instance': plugins.NotifySMTP2Go,
+     }),
     # headers
     ('smtp2go://user@localhost.localdomain/{}-{}-{}'
-        '?+X-Customer-Campaign-ID=Apprise'.format(
-            'a' * 32, 'b' * 8, 'c' * 8), {
-                'instance': plugins.NotifySMTP2Go,
-        }),
+     '?+X-Customer-Campaign-ID=Apprise'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+         'instance': plugins.NotifySMTP2Go,
+     }),
     # bcc and cc
     ('smtp2go://user@localhost.localdomain/{}-{}-{}'
-        '?bcc=user@example.com&cc=user2@example.com'.format(
-            'a' * 32, 'b' * 8, 'c' * 8), {
-                'instance': plugins.NotifySMTP2Go,
-        }),
+     '?bcc=user@example.com&cc=user2@example.com'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+         'instance': plugins.NotifySMTP2Go,
+     }),
     # One To Email address
     ('smtp2go://user@localhost.localdomain/{}-{}-{}/test@example.com'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-            'instance': plugins.NotifySMTP2Go,
-    }),
+         'instance': plugins.NotifySMTP2Go,
+     }),
     ('smtp2go://user@localhost.localdomain/'
-        '{}-{}-{}?to=test@example.com'.format(
-            'a' * 32, 'b' * 8, 'c' * 8), {
-                'instance': plugins.NotifySMTP2Go}),
+     '{}-{}-{}?to=test@example.com'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+         'instance': plugins.NotifySMTP2Go}),
     # One To Email address, a from name specified too
     ('smtp2go://user@localhost.localdomain/{}-{}-{}/'
-        'test@example.com?name="Frodo"'.format(
-            'a' * 32, 'b' * 8, 'c' * 8), {
-                'instance': plugins.NotifySMTP2Go}),
+     'test@example.com?name="Frodo"'.format(
+        'a' * 32, 'b' * 8, 'c' * 8), {
+         'instance': plugins.NotifySMTP2Go}),
     # Invalid 'To' Email address
     ('smtp2go://user@localhost.localdomain/{}-{}-{}/invalid'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-            'instance': plugins.NotifySMTP2Go,
-            # Expected notify() response
-            'notify_response': False,
-    }),
+         'instance': plugins.NotifySMTP2Go,
+         # Expected notify() response
+         'notify_response': False,
+     }),
     # Multiple 'To', 'Cc', and 'Bcc' addresses (with invalid ones)
     ('smtp2go://user@example.com/{}-{}-{}/{}?bcc={}&cc={}'.format(
         'a' * 32, 'b' * 8, 'c' * 8,
         '/'.join(('user1@example.com', 'invalid', 'User2:user2@example.com')),
         ','.join(('user3@example.com', 'i@v', 'User1:user1@example.com')),
         ','.join(('user4@example.com', 'g@r@b', 'Da:user5@example.com'))), {
-            'instance': plugins.NotifySMTP2Go,
-    }),
+         'instance': plugins.NotifySMTP2Go,
+     }),
     ('smtp2go://user@localhost.localdomain/{}-{}-{}'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-        'instance': plugins.NotifySMTP2Go,
-        # force a failure
-        'response': False,
-        'requests_response_code': requests.codes.internal_server_error,
-    }),
+         'instance': plugins.NotifySMTP2Go,
+         # force a failure
+         'response': False,
+         'requests_response_code': requests.codes.internal_server_error,
+     }),
     ('smtp2go://user@localhost.localdomain/{}-{}-{}'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-        'instance': plugins.NotifySMTP2Go,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
+         'instance': plugins.NotifySMTP2Go,
+         # throw a bizzare code forcing us to fail to look it up
+         'response': False,
+         'requests_response_code': 999,
+     }),
     ('smtp2go://user@localhost.localdomain/{}-{}-{}'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-        'instance': plugins.NotifySMTP2Go,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
+         'instance': plugins.NotifySMTP2Go,
+         # Throws a series of connection and transfer exceptions when this flag
+         # is set and tests that we gracfully handle them
+         'test_requests_exceptions': True,
+     }),
 
     ##################################
     # NotifySNS (AWS)
@@ -4873,10 +4874,10 @@ TEST_URLS = (
         'privacy_url': 'sns://T...D/****/us-west-2',
     }),
     ('sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/us-east-1'
-        '?to=12223334444', {
-            # Missing a topic and/or phone No
-            'instance': plugins.NotifySNS,
-        }),
+     '?to=12223334444', {
+         # Missing a topic and/or phone No
+         'instance': plugins.NotifySNS,
+     }),
     ('sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcevi7FQ/us-west-2/12223334444', {
         'instance': plugins.NotifySNS,
         # throw a bizzare code forcing us to fail to look it up
@@ -5066,9 +5067,9 @@ TEST_URLS = (
     }),
     ('twilio://AC{}:{}@{}/123/{}/abcd/'.format(
         'a' * 32, 'b' * 32, '3' * 11, '9' * 15), {
-        # valid everything but target numbers
-        'instance': plugins.NotifyTwilio,
-    }),
+         # valid everything but target numbers
+         'instance': plugins.NotifyTwilio,
+     }),
     ('twilio://AC{}:{}@12345/{}'.format('a' * 32, 'b' * 32, '4' * 11), {
         # using short-code (5 characters)
         'instance': plugins.NotifyTwilio,
@@ -5087,19 +5088,19 @@ TEST_URLS = (
     }),
     ('twilio://_?sid=AC{}&token={}&from={}'.format(
         'a' * 32, 'b' * 32, '5' * 11), {
-        # use get args to acomplish the same thing
-        'instance': plugins.NotifyTwilio,
-    }),
+         # use get args to acomplish the same thing
+         'instance': plugins.NotifyTwilio,
+     }),
     ('twilio://_?sid=AC{}&token={}&source={}'.format(
         'a' * 32, 'b' * 32, '5' * 11), {
-        # use get args to acomplish the same thing (use source instead of from)
-        'instance': plugins.NotifyTwilio,
-    }),
+         # use get args to acomplish the same thing (use source instead of from)
+         'instance': plugins.NotifyTwilio,
+     }),
     ('twilio://_?sid=AC{}&token={}&from={}&to={}'.format(
         'a' * 32, 'b' * 32, '5' * 11, '7' * 13), {
-        # use to=
-        'instance': plugins.NotifyTwilio,
-    }),
+         # use to=
+         'instance': plugins.NotifyTwilio,
+     }),
     ('twilio://AC{}:{}@{}'.format('a' * 32, 'b' * 32, '6' * 11), {
         'instance': plugins.NotifyTwilio,
         # throw a bizzare code forcing us to fail to look it up
@@ -5203,15 +5204,15 @@ TEST_URLS = (
         'privacy_url': 'twitter://c...y/****/a...n/****',
     }),
     ('twitter://consumer_key/consumer_secret/access_token/access_secret'
-        '?cache=no', {
-            # No user mean's we message ourselves
-            'instance': plugins.NotifyTwitter,
-            # However we'll be okay if we return a proper response
-            'requests_response_text': {
-                'id': 12345,
-                'screen_name': 'test'
-            },
-        }),
+     '?cache=no', {
+         # No user mean's we message ourselves
+         'instance': plugins.NotifyTwitter,
+         # However we'll be okay if we return a proper response
+         'requests_response_text': {
+             'id': 12345,
+             'screen_name': 'test'
+         },
+     }),
     ('twitter://consumer_key/consumer_secret/access_token/access_secret', {
         # No user mean's we message ourselves
         'instance': plugins.NotifyTwitter,
@@ -5251,14 +5252,14 @@ TEST_URLS = (
         'notify_response': False,
     }),
     ('twitter://user@consumer_key/csecret/access_token/access_secret'
-        '?cache=No', {
-            # No Cache
-            'instance': plugins.NotifyTwitter,
-            'requests_response_text': [{
-                'id': 12345,
-                'screen_name': 'user'
-            }],
-        }),
+     '?cache=No', {
+         # No Cache
+         'instance': plugins.NotifyTwitter,
+         'requests_response_text': [{
+             'id': 12345,
+             'screen_name': 'user'
+         }],
+     }),
     ('twitter://user@consumer_key/csecret/access_token/access_secret', {
         # We're good!
         'instance': plugins.NotifyTwitter,
@@ -5282,20 +5283,20 @@ TEST_URLS = (
         'instance': TypeError,
     }),
     ('twitter://usera@consumer_key/consumer_secret/access_token/'
-        'access_secret/user/?to=userb', {
-            # We're good!
-            'instance': plugins.NotifyTwitter,
-            'requests_response_text': [{
-                'id': 12345,
-                'screen_name': 'usera'
-            }, {
-                'id': 12346,
-                'screen_name': 'userb'
-            }, {
-                # A garbage entry we can test exception handling on
-                'id': 123,
-            }],
-        }),
+     'access_secret/user/?to=userb', {
+         # We're good!
+         'instance': plugins.NotifyTwitter,
+         'requests_response_text': [{
+             'id': 12345,
+             'screen_name': 'usera'
+         }, {
+             'id': 12346,
+             'screen_name': 'userb'
+         }, {
+             # A garbage entry we can test exception handling on
+             'id': 123,
+         }],
+     }),
     ('twitter://ckey/csecret/access_token/access_secret', {
         'instance': plugins.NotifyTwitter,
         # throw a bizzare code forcing us to fail to look it up
@@ -5534,9 +5535,9 @@ TEST_URLS = (
     # Support Native URLs with arguments
     ('https://api.ciscospark.com/v1/webhooks/incoming/{}?format=text'.format(
         'a' * 80), {
-        # token provided - we're good
-        'instance': plugins.NotifyWebexTeams,
-    }),
+         # token provided - we're good
+         'instance': plugins.NotifyWebexTeams,
+     }),
     ('wxteams://{}'.format('a' * 80), {
         'instance': plugins.NotifyWebexTeams,
         # force a failure
@@ -5736,8 +5737,8 @@ TEST_URLS = (
     # Valid everything - 2 emails specified
     ('zulip://botname@apprise/{}/user@example.com/user2@example.com'.format(
         'a' * 32), {
-        'instance': plugins.NotifyZulip,
-    }),
+         'instance': plugins.NotifyZulip,
+     }),
     ('zulip://botname@apprise/{}'.format('a' * 32), {
         'instance': plugins.NotifyZulip,
         # don't include an image by default
@@ -6069,7 +6070,7 @@ def test_rest_plugins(mock_post, mock_get):
                 if test_requests_exceptions is False:
                     # check that we're as expected
                     assert obj.notify(body='body', notify_type=notify_type) \
-                        == notify_response
+                           == notify_response
 
                 else:
                     for _exception in REQUEST_EXCEPTIONS:
@@ -7449,7 +7450,6 @@ def test_notify_overflow_truncate():
     # First Test: Truncated Title
     #
     class TestNotification(NotifyBase):
-
         # Test title max length
         title_maxlen = 10
 
@@ -7483,7 +7483,6 @@ def test_notify_overflow_truncate():
     #
 
     class TestNotification(NotifyBase):
-
         # Test title max length
         title_maxlen = 5
 
@@ -7506,7 +7505,7 @@ def test_notify_overflow_truncate():
     chunks = obj._apply_overflow(body=body, title=title)
     assert len(chunks) == 1
     assert len(chunks[0].get('body').split('\n')) == \
-        TestNotification.body_max_line_count
+           TestNotification.body_max_line_count
     assert title[0:TestNotification.title_maxlen] == chunks[0].get('title')
 
     #
@@ -7514,7 +7513,6 @@ def test_notify_overflow_truncate():
     #
 
     class TestNotification(NotifyBase):
-
         # Test title max length
         title_maxlen = title_len
 
@@ -7544,7 +7542,6 @@ def test_notify_overflow_truncate():
     #
 
     class TestNotification(NotifyBase):
-
         # Enforce no title
         title_maxlen = 0
 
@@ -7672,7 +7669,7 @@ def test_notify_overflow_split():
     chunks = obj._apply_overflow(body=body, title=title)
     assert len(chunks) == 1
     assert len(chunks[0].get('body').split('\n')) == \
-        TestNotification.body_max_line_count
+           TestNotification.body_max_line_count
     assert title[0:TestNotification.title_maxlen] == chunks[0].get('title')
 
     #
@@ -7753,8 +7750,8 @@ def test_notify_overflow_split():
     assert len(chunks) == (
         # wrap division in int() so Python 3 doesn't convert it to a float on
         # us
-        int(len(bulk) / TestNotification.body_maxlen) +
-        (1 if len(bulk) % TestNotification.body_maxlen else 0))
+            int(len(bulk) / TestNotification.body_maxlen) +
+            (1 if len(bulk) % TestNotification.body_maxlen else 0))
 
     for chunk in chunks:
         # Our title is empty every time
