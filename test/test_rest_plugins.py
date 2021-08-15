@@ -326,6 +326,34 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifyStreamlabs
+    ##################################
+    ('strmlabs://', {
+        # No Access Token specified
+        'instance': TypeError,
+    }),
+    ('strmlabs://a_bd_/', {
+        # invalid Access Token
+        'instance': TypeError,
+    }),
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso', {
+        # access token
+        'instance': plugins.NotifyStreamlabs,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'strmlabs://I...o',
+    }),
+    # Test incorrect currency
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/?currency=ABCD', {
+         'instance': TypeError,
+     }),
+    # Test complete params
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/?name=t&identifier=pyt'
+     '&amount=20&currency=USD', {
+        'instance': plugins.NotifyStreamlabs,
+    }),
+
+    ##################################
     # NotifyDiscord
     ##################################
     ('discord://', {
