@@ -349,9 +349,8 @@ TEST_URLS = (
     }),
     # Test complete params
     ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/'
-     '?name=tt&identifier=pyt&amount=20&currency=USD', {
-        'instance': plugins.NotifyStreamlabs,
-    }),
+     '?name=tt&identifier=pyt&amount=20&currency=USD',
+     {'instance': plugins.NotifyStreamlabs, }),
 
     ##################################
     # NotifyDiscord
