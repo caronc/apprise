@@ -26,6 +26,7 @@
 import re
 import six
 import requests
+import base64
 
 from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
@@ -57,6 +58,11 @@ class NotifyXML(NotifyBase):
     # Disable throttle rate for JSON requests since they are normally
     # local anyway
     request_rate_per_sec = 0
+
+    # XSD Information
+    xsd_ver = '1.1'
+    xsd_url = 'https://raw.githubusercontent.com/caronc/apprise/master' \
+        '/apprise/assets/NotifyXML-{version}.xsd'
 
     # Define object templates
     templates = (
@@ -118,11 +124,12 @@ class NotifyXML(NotifyBase):
     xmlns:xsd="http://www.w3.org/2001/XMLSchema"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
     <soapenv:Body>
-        <Notification xmlns:xsi="http://nuxref.com/apprise/NotifyXML-1.0.xsd">
-            <Version>1.0</Version>
+        <Notification xmlns:xsi="{XSD_URL}">
+            <Version>{XSD_VER}</Version>
             <Subject>{SUBJECT}</Subject>
             <MessageType>{MESSAGE_TYPE}</MessageType>
             <Message>{MESSAGE}</Message>
+            {ATTACHMENTS}
        </Notification>
     </soapenv:Body>
 </soapenv:Envelope>"""
@@ -175,7 +182,8 @@ class NotifyXML(NotifyBase):
             params=NotifyXML.urlencode(params),
         )
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
+             **kwargs):
         """
         Perform XML Notification
         """
@@ -189,11 +197,55 @@ class NotifyXML(NotifyBase):
         # Apply any/all header over-rides defined
         headers.update(self.headers)
 
+        # Our XML Attachmement subsitution
+        xml_attachments = ''
+
+        # Track our potential attachments
+        attachments = []
+        if attach:
+            for attachment in attach:
+                # Perform some simple error checking
+                if not attachment:
+                    # We could not access the attachment
+                    self.logger.error(
+                        'Could not access attachment {}.'.format(
+                            attachment.url(privacy=True)))
+                    return False
+
+                try:
+                    with open(attachment.path, 'rb') as f:
+                        # Output must be in a DataURL format (that's what
+                        # PushSafer calls it):
+                        entry = \
+                            '<Attachment filename="{}" mimetype="{}">'.format(
+                                NotifyXML.escape_html(
+                                    attachment.name, whitespace=False),
+                                NotifyXML.escape_html(
+                                    attachment.mimetype, whitespace=False))
+                        entry += base64.b64encode(f.read()).decode('utf-8')
+                        entry += '</Attachment>'
+                        attachments.append(entry)
+
+                except (OSError, IOError) as e:
+                    self.logger.warning(
+                        'An I/O error occurred while reading {}.'.format(
+                            attachment.name if attachment else 'attachment'))
+                    self.logger.debug('I/O Exception: %s' % str(e))
+                    return False
+
+            # Update our xml_attachments record:
+            xml_attachments = \
+                '<Attachments format="base64">' + \
+                ''.join(attachments) + '</Attachments>'
+
         re_map = {
+            '{XSD_VER}': self.xsd_ver,
+            '{XSD_URL}': self.xsd_url.format(version=self.xsd_ver),
             '{MESSAGE_TYPE}': NotifyXML.escape_html(
                 notify_type, whitespace=False),
             '{SUBJECT}': NotifyXML.escape_html(title, whitespace=False),
             '{MESSAGE}': NotifyXML.escape_html(body, whitespace=False),
+            '{ATTACHMENTS}': xml_attachments,
         }
 
         # Iterate over above list and store content accordingly
@@ -219,6 +271,7 @@ class NotifyXML(NotifyBase):
         self.logger.debug('XML POST URL: %s (cert_verify=%r)' % (
             url, self.verify_certificate,
         ))
+
         self.logger.debug('XML Payload: %s' % str(payload))
 
         # Always call throttle before any remote server i/o is made
