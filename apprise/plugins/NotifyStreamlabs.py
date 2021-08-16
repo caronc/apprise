@@ -79,7 +79,7 @@ class NotifyStreamlabs(NotifyBase):
             'private': True,
             'required': True,
             'type': 'string',
-            'regex': (r'^[A-Za-z0-9]{40}$', 'i')
+            'regex': (r'^[a-z0-9]{40}$', 'i')
         },
     })
 
@@ -101,7 +101,7 @@ class NotifyStreamlabs(NotifyBase):
             'name': _('Name'),
             'type': 'string',
             'default': 'Anon',
-            'regex': (r'^[A-Za-z0-9]{2,25}$', 'i')
+            'regex': (r'[^\s].{1,24}$', 'i')
         },
         'identifier': {
             'name': _('Identifier'),
