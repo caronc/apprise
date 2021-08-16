@@ -351,6 +351,28 @@ TEST_URLS = (
     ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/'
      '?name=tt&identifier=pyt&amount=20&currency=USD',
      {'instance': plugins.NotifyStreamlabs, }),
+    # Test incorrect name
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/?name=t', {
+        'instance': TypeError,
+    }),
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso', {
+        'instance': plugins.NotifyStreamlabs,
+        # A failure has status set to zero
+        # Test without an 'error' flag
+        'requests_response_text': {
+            'status': 0,
+        },
+
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso', {
+        'instance': plugins.NotifyStreamlabs,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
 
     ##################################
     # NotifyDiscord
