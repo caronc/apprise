@@ -101,7 +101,7 @@ class NotifyStreamlabs(NotifyBase):
             'name': _('Name'),
             'type': 'string',
             'default': 'Anon',
-            'regex': (r'[^\s].{1,24}$', 'i')
+            'regex': (r'^[^\s].{1,24}$', 'i')
         },
         'identifier': {
             'name': _('Identifier'),
