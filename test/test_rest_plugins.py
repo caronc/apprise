@@ -353,7 +353,8 @@ TEST_URLS = (
      {'instance': plugins.NotifyStreamlabs, }),
     # Test complete params - donations
     ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/'
-     '?image_href=https://example.org/rms.jpg&sound_href=https://example.org/rms.mp3',
+     '?image_href=https://example.org/rms.jpg'
+     '&sound_href=https://example.org/rms.mp3',
      {'instance': plugins.NotifyStreamlabs, }),
     # Test complete params - alerts
     ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/'
