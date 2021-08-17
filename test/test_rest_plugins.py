@@ -351,11 +351,23 @@ TEST_URLS = (
     ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/'
      '?name=tt&identifier=pyt&amount=20&currency=USD&call=donations',
      {'instance': plugins.NotifyStreamlabs, }),
+    # Test complete params - donations
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/'
+     '?image_href=https://example.org/rms.jpg&sound_href=https://example.org/rms.mp3',
+     {'instance': plugins.NotifyStreamlabs, }),
     # Test complete params - alerts
     ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/'
      '?duration=1000&image_href=&'
      'sound_href=&alert_type=donation&special_text_color=crimson',
      {'instance': plugins.NotifyStreamlabs, }),
+    # Test incorrect call
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/'
+     '?name=tt&identifier=pyt&amount=20&currency=USD&call=rms',
+     {'instance': TypeError, }),
+    # Test incorrect alert_type
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/'
+     '?name=tt&identifier=pyt&amount=20&currency=USD&alert_type=rms',
+     {'instance': TypeError, }),
     # Test incorrect name
     ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/?name=t', {
         'instance': TypeError,
