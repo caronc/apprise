@@ -432,16 +432,16 @@ class NotifyMatrix(NotifyBase):
             payload['text'] = apply_template(body, **tokens)
 
         elif self.notify_format == NotifyFormat.MARKDOWN:
-            if title:
-                payload['text'] = \
-                    '<h4>{}</h4>'.format(
-                        NotifyMatrix.escape_html(title, whitespace=False))
+            # Add additional information to our content; use {{app_title}}
+            # to apply the title to the html body
+            tokens = {
+                'app_title': title,
+            }
+            payload['text'] = markdown(apply_template(body, **tokens))
 
-            payload['text'] += markdown(body)
-
-        else:  # TEXT
-            payload['text'] = '{}{}'.format(
-                '' if not title else '{}\r\n'.format(title), body)
+        else:  # NotifyFormat.TEXT
+            payload['text'] = \
+                body if not title else '{}\r\n{}'.format(title, body)
 
         return payload
 
@@ -538,8 +538,6 @@ class NotifyMatrix(NotifyBase):
                 'body': '{title}{body}'.format(
                     title='' if not title else '{}\r\n'.format(title),
                     body=body),
-                'format': 'org.matrix.custom.html',
-                'formatted_body': '',
             }
 
             # Update our payload advance formatting for the services that
@@ -551,20 +549,20 @@ class NotifyMatrix(NotifyBase):
                     'app_title': NotifyMatrix.escape_html(
                         title, whitespace=False),
                 }
-                payload['formatted_body'] = apply_template(body, **tokens)
 
-            else:  # TEXT or MARKDOWN
-                if title:
-                    payload['formatted_body'] = \
-                        '<h4>{}</h4>'.format(
-                            NotifyMatrix.escape_html(title, whitespace=False))
+                payload.update({
+                    'format': 'org.matrix.custom.html',
+                    'formatted_body': apply_template(body, **tokens),
+                })
 
-                if self.notify_format == NotifyFormat.TEXT:
-                    payload['formatted_body'] += \
-                        NotifyMatrix.escape_html(body, whitespace=False)
-
-                else:  # NotifyFormat.MARKDOWN
-                    payload['formatted_body'] += markdown(body)
+            elif self.notify_format == NotifyFormat.MARKDOWN:
+                tokens = {
+                    'app_title': title,
+                }
+                payload.update({
+                    'format': 'org.matrix.custom.html',
+                    'formatted_body': markdown(apply_template(body, **tokens))
+                })
 
             # Build our path
             path = '/rooms/{}/send/m.room.message'.format(
