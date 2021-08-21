@@ -29,7 +29,7 @@ from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..utils import parse_list
 from ..AppriseLocale import gettext_lazy as _
-
+import os
 
 class NotifyNextcloud(NotifyBase):
     """
@@ -52,7 +52,20 @@ class NotifyNextcloud(NotifyBase):
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_nextcloud'
 
     # Nextcloud URL
-    notify_url = '{schema}://{host}/ocs/v2.php/apps/admin_notifications/' \
+    '''The URL had to be changed when switching from Nextcloud 20 to 21:
+        - 20 and earlier: ocs/v2.php/apps/admin_notifications/api/v1/notifications/{user}
+        - 21 and later: ocs/v2.php/apps/notifications/api/v2/admin_notifications/{user}
+    '''
+    nextcloud_version = 21
+    notify_url = '{schema}://{host}/ocs/v2.php/apps/notifications/' \
+                 'api/v2/admin_notifications/{target}'
+
+    try:
+        nextcloud_version = int(os.environ.get("NEXTCLOUD_VERSION",21))
+    except ValueError:
+        pass
+    if nextcloud_version < 21:
+        notify_url = '{schema}://{host}/ocs/v2.php/apps/admin_notifications/' \
                  'api/v1/notifications/{target}'
 
     # Nextcloud does not support a title
