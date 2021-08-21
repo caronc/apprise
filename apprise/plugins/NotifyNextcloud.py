@@ -268,8 +268,11 @@ class NotifyNextcloud(NotifyBase):
         # Create URL parameters from our headers
         params = {'+{}'.format(k): v for k, v in self.headers.items()}
 
-        # Our URL parameters
-        params = self.url_parameters(privacy=privacy, *args, **kwargs)
+        # Set our version
+        params['version'] = str(self.version)
+
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Determine Authentication
         auth = ''
