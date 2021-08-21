@@ -30,6 +30,7 @@
 import re
 import six
 import requests
+from markdown import markdown
 from json import dumps
 from json import loads
 from time import time
@@ -41,6 +42,7 @@ from ..common import NotifyImageSize
 from ..common import NotifyFormat
 from ..utils import parse_bool
 from ..utils import parse_list
+from ..utils import apply_template
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
@@ -415,20 +417,31 @@ class NotifyMatrix(NotifyBase):
         payload = {
             'displayName':
                 self.user if self.user else self.app_id,
-            'format': 'html',
+            'format': 'plain' if self.notify_format == NotifyFormat.TEXT
+            else 'html',
+            'text': '',
         }
 
         if self.notify_format == NotifyFormat.HTML:
-            payload['text'] = '{}{}'.format('' if not title else title, body)
+            # Add additional information to our content; use {{app_title}}
+            # to apply the title to the html body
+            tokens = {
+                'app_title': NotifyMatrix.escape_html(
+                    title, whitespace=False),
+            }
+            payload['text'] = apply_template(body, **tokens)
 
-        else:  # TEXT or MARKDOWN
+        elif self.notify_format == NotifyFormat.MARKDOWN:
+            if title:
+                payload['text'] = \
+                    '<h4>{}</h4>'.format(
+                        NotifyMatrix.escape_html(title, whitespace=False))
 
-            # Ensure our content is escaped
-            title = NotifyMatrix.escape_html(title)
-            body = NotifyMatrix.escape_html(body)
+            payload['text'] += markdown(body)
 
+        else:  # TEXT
             payload['text'] = '{}{}'.format(
-                '' if not title else '<h4>{}</h4>'.format(title), body)
+                '' if not title else '{}\r\n'.format(title), body)
 
         return payload
 
@@ -497,11 +510,6 @@ class NotifyMatrix(NotifyBase):
                 has_error = True
                 continue
 
-            # We have our data cached at this point we can freely use it
-            msg = '{title}{body}'.format(
-                title='' if not title else '{}\r\n'.format(title),
-                body=body)
-
             # Acquire our image url if we're configured to do so
             image_url = None if not self.include_image else \
                 self.image_url(notify_type)
@@ -527,8 +535,36 @@ class NotifyMatrix(NotifyBase):
             # Define our payload
             payload = {
                 'msgtype': 'm.text',
-                'body': msg,
+                'body': '{title}{body}'.format(
+                    title='' if not title else '{}\r\n'.format(title),
+                    body=body),
+                'format': 'org.matrix.custom.html',
+                'formatted_body': '',
             }
+
+            # Update our payload advance formatting for the services that
+            # support them.
+            if self.notify_format == NotifyFormat.HTML:
+                # Add additional information to our content; use {{app_title}}
+                # to apply the title to the html body
+                tokens = {
+                    'app_title': NotifyMatrix.escape_html(
+                        title, whitespace=False),
+                }
+                payload['formatted_body'] = apply_template(body, **tokens)
+
+            else:  # TEXT or MARKDOWN
+                if title:
+                    payload['formatted_body'] = \
+                        '<h4>{}</h4>'.format(
+                            NotifyMatrix.escape_html(title, whitespace=False))
+
+                if self.notify_format == NotifyFormat.TEXT:
+                    payload['formatted_body'] += \
+                        NotifyMatrix.escape_html(body, whitespace=False)
+
+                else:  # NotifyFormat.MARKDOWN
+                    payload['formatted_body'] += markdown(body)
 
             # Build our path
             path = '/rooms/{}/send/m.room.message'.format(
@@ -697,7 +733,7 @@ class NotifyMatrix(NotifyBase):
         # Prepare our Join Payload
         payload = {}
 
-        # Not in cache, next step is to check if it's a room id...
+        # Check if it's a room id...
         result = IS_ROOM_ID.match(room)
         if result:
             # We detected ourselves the home_server
@@ -710,11 +746,23 @@ class NotifyMatrix(NotifyBase):
                 home_server,
             )
 
+            # Check our cache for speed:
+            if room_id in self._room_cache:
+                # We're done as we've already joined the channel
+                return self._room_cache[room_id]['id']
+
             # Build our URL
             path = '/join/{}'.format(NotifyMatrix.quote(room_id))
 
             # Make our query
             postokay, _ = self._fetch(path, payload=payload)
+            if postokay:
+                # Cache our entry for fast access later
+                self._room_cache[room_id] = {
+                    'id': room_id,
+                    'home_server': home_server,
+                }
+
             return room_id if postokay else None
 
         # Try to see if it's an alias then...
