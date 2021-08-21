@@ -2461,6 +2461,18 @@ TEST_URLS = (
         # No user specified
         'instance': TypeError,
     }),
+    ('ncloud://user@localhost?to=user1,user2&version=invalid', {
+        # An invalid version was specified
+        'instance': TypeError,
+    }),
+    ('ncloud://user@localhost?to=user1,user2&version=0', {
+        # An invalid version was specified
+        'instance': TypeError,
+    }),
+    ('ncloud://user@localhost?to=user1,user2&version=-23', {
+        # An invalid version was specified
+        'instance': TypeError,
+    }),
     ('ncloud://localhost/admin', {
         'instance': plugins.NotifyNextcloud,
     }),
@@ -2468,6 +2480,12 @@ TEST_URLS = (
         'instance': plugins.NotifyNextcloud,
     }),
     ('ncloud://user@localhost?to=user1,user2', {
+        'instance': plugins.NotifyNextcloud,
+    }),
+    ('ncloud://user@localhost?to=user1,user2&version=20', {
+        'instance': plugins.NotifyNextcloud,
+    }),
+    ('ncloud://user@localhost?to=user1,user2&version=21', {
         'instance': plugins.NotifyNextcloud,
     }),
     ('ncloud://user:pass@localhost/user1/user2', {

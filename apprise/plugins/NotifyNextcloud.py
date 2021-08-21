@@ -51,11 +51,7 @@ class NotifyNextcloud(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_nextcloud'
 
-    # Nextcloud URL
-    notify_url = '{schema}://{host}/ocs/v2.php/apps/admin_notifications/' \
-                 'api/v1/notifications/{target}'
-
-    # Nextcloud does not support a title
+    # Nextcloud title length
     title_maxlen = 255
 
     # Defines the maximum allowable characters per message.
@@ -101,6 +97,22 @@ class NotifyNextcloud(NotifyBase):
         },
     })
 
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        # Nextcloud uses different API end points depending on the version
+        # being used however the (API) payload remains the same.  Allow users
+        # to specify the version they are using:
+        'version': {
+            'name': _('Version'),
+            'type': 'int',
+            'min': 1,
+            'default': 21,
+        },
+        'to': {
+            'alias_of': 'targets',
+        },
+    })
+
     # Define any kwargs we're using
     template_kwargs = {
         'headers': {
@@ -109,7 +121,7 @@ class NotifyNextcloud(NotifyBase):
         },
     }
 
-    def __init__(self, targets=None, headers=None, **kwargs):
+    def __init__(self, targets=None, version=None, headers=None, **kwargs):
         """
         Initialize Nextcloud Object
         """
@@ -120,6 +132,20 @@ class NotifyNextcloud(NotifyBase):
             msg = 'At least one Nextcloud target user must be specified.'
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        self.version = self.template_args['version']['default']
+        if version is not None:
+            try:
+                self.version = int(version)
+                if self.version < self.template_args['version']['min']:
+                    # Let upper exception handle this
+                    raise ValueError()
+
+            except (ValueError, TypeError):
+                msg = 'At invalid Nextcloud version ({}) was specified.'\
+                    .format(version)
+                self.logger.warning(msg)
+                raise TypeError(msg)
 
         self.headers = {}
         if headers:
@@ -163,17 +189,28 @@ class NotifyNextcloud(NotifyBase):
             if self.user:
                 auth = (self.user, self.password)
 
-            notify_url = self.notify_url.format(
+            # Nextcloud URL based on version used
+            notify_url = '{schema}://{host}/ocs/v2.php/'\
+                'apps/admin_notifications/' \
+                'api/v1/notifications/{target}' \
+                if self.version < 21 else \
+                '{schema}://{host}/ocs/v2.php/'\
+                'apps/notifications/'\
+                'api/v2/admin_notifications/{target}'
+
+            notify_url = notify_url.format(
                 schema='https' if self.secure else 'http',
                 host=self.host if not isinstance(self.port, int)
                 else '{}:{}'.format(self.host, self.port),
                 target=target,
             )
 
-            self.logger.debug('Nextcloud POST URL: %s (cert_verify=%r)' % (
-                notify_url, self.verify_certificate,
-            ))
-            self.logger.debug('Nextcloud Payload: %s' % str(payload))
+            self.logger.debug(
+                'Nextcloud v%d POST URL: %s (cert_verify=%r)',
+                self.version, notify_url, self.verify_certificate)
+            self.logger.debug(
+                'Nextcloud v%d Payload: %s',
+                self.version, str(payload))
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -194,8 +231,9 @@ class NotifyNextcloud(NotifyBase):
                             r.status_code)
 
                     self.logger.warning(
-                        'Failed to send Nextcloud notification:'
+                        'Failed to send Nextcloud v{} notification:'
                         '{}{}error={}.'.format(
+                            self.version,
                             status_str,
                             ', ' if status_str else '',
                             r.status_code))
@@ -207,13 +245,13 @@ class NotifyNextcloud(NotifyBase):
                     continue
 
                 else:
-                    self.logger.info('Sent Nextcloud notification.')
+                    self.logger.info(
+                        'Sent Nextcloud %d notification.', self.version)
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occurred sending Nextcloud '
-                    'notification.',
-                )
+                    'A Connection error occurred sending Nextcloud v%d'
+                    'notification.', self.version)
                 self.logger.debug('Socket Exception: %s' % str(e))
 
                 # track our failure
@@ -284,6 +322,11 @@ class NotifyNextcloud(NotifyBase):
         if 'to' in results['qsd'] and len(results['qsd']['to']):
             results['targets'] += \
                 NotifyNextcloud.parse_list(results['qsd']['to'])
+
+        # Allow users to over-ride the Nextcloud version being used
+        if 'version' in results['qsd'] and len(results['qsd']['version']):
+            results['version'] = \
+                NotifyNextcloud.unquote(results['qsd']['version'])
 
         # Add our headers that the user can potentially over-ride if they
         # wish to to our returned result set
