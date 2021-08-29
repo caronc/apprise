@@ -1948,7 +1948,7 @@ TEST_URLS = (
      .format('a' * 64), {
          # user and token specified; image set to True
          'instance': plugins.NotifyMatrix}),
-    ('matrix://user@{}?mode=t2bot&format=markdown&image=False'
+    ('matrix://user@{}?mode=t2bot&format=html&image=False'
      .format('z' * 64), {
          # user and token specified; image set to True
          'instance': plugins.NotifyMatrix}),
