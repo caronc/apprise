@@ -324,6 +324,24 @@ class NotifyLunaSea(NotifyBase):
 
         return not has_error
 
+    @property
+    def url_identifier(self):
+        """
+        Returns all of the identifiers that make this URL unique from
+        another simliar one. Targets or end points should never be identified
+        here.
+        """
+        secure = self.secure_protocol[0] \
+            if self.mode == LunaSeaMode.CLOUD else (
+                self.secure_protocol[0] if self.secure else self.protocol[0])
+        return (
+            secure,
+            self.host if self.mode == LunaSeaMode.PRIVATE else None,
+            self.port if self.port else (443 if self.secure else 80),
+            self.user if self.user else None,
+            self.password if self.password else None,
+        )
+
     def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.

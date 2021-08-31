@@ -348,6 +348,9 @@ def test_plugin_email(mock_smtp, mock_smtpssl):
                 # We loaded okay; now lets make sure we can reverse this url
                 assert isinstance(obj.url(), str)
 
+                # Get our URL Identifier
+                assert isinstance(obj.url_id(), str)
+
                 # Verify we can acquire a target count as an integer
                 assert isinstance(len(obj), int)
 

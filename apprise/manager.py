@@ -36,6 +36,7 @@ import threading
 from .utils import import_module
 from .utils import Singleton
 from .utils import parse_list
+from .utils import path_decode
 from os.path import dirname
 from os.path import abspath
 from os.path import join
@@ -373,7 +374,7 @@ class PluginManager(metaclass=Singleton):
             return
 
         for _path in paths:
-            path = os.path.abspath(os.path.expanduser(_path))
+            path = path_decode(_path)
             if (cache and path in self._paths_previously_scanned) \
                     or not os.path.exists(path):
                 # We're done as we've already scanned this

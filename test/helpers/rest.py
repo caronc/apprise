@@ -201,6 +201,13 @@ class AppriseURLTester:
             # this url
             assert isinstance(obj.url(), str) is True
 
+            # Test that we support a url identifier
+            url_id = obj.url_id()
+
+            # It can be either disabled or a string; nothing else
+            assert isinstance(url_id, str) or \
+                (url_id is None and obj.url_identifier is False)
+
             # Verify we can acquire a target count as an integer
             assert isinstance(len(obj), int)
 
@@ -229,6 +236,20 @@ class AppriseURLTester:
             # Instantiate the exact same object again using the URL
             # from the one that was already created properly
             obj_cmp = Apprise.instantiate(obj.url())
+
+            # Our new object should produce the same url identifier
+            if obj.url_identifier != obj_cmp.url_identifier:
+                print('Provided %s' % url)
+                raise AssertionError(
+                    "URL Identifier: '{}' != expected '{}'".format(
+                        obj_cmp.url_identifier, obj.url_identifier))
+
+            # Back our check up
+            if obj.url_id() != obj_cmp.url_id():
+                print('Provided %s' % url)
+                raise AssertionError(
+                    "URL ID(): '{}' != expected '{}'".format(
+                        obj_cmp.url_id(), obj.url_id()))
 
             # Our object should be the same instance as what we had
             # originally expected above.

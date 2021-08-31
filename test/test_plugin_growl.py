@@ -273,6 +273,9 @@ def test_plugin_growl_general(mock_gntp):
 
             assert isinstance(obj, instance) is True
 
+            # Test our URL Identifier is generated
+            assert isinstance(obj.url_id(), str) is True
+
             if isinstance(obj, NotifyBase):
                 # We loaded okay; now lets make sure we can reverse this url
                 assert isinstance(obj.url(), str) is True

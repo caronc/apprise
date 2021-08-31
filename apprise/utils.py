@@ -32,6 +32,7 @@ import json
 import contextlib
 import os
 import locale
+import platform
 import typing
 import base64
 from itertools import chain
@@ -45,6 +46,20 @@ from urllib.parse import urlparse
 from urllib.parse import urlencode as _urlencode
 
 import importlib.util
+
+
+# A simple path decoder we can re-use which looks after
+# ensuring our file info is expanded correctly when provided
+# a path.
+__PATH_DECODER = os.path.expandvars if \
+    platform.system() == 'Windows' else os.path.expanduser
+
+
+def path_decode(path):
+    """
+    Returns the fully decoded path based on the operating system
+    """
+    return os.path.abspath(__PATH_DECODER(path))
 
 
 def import_module(path, name):

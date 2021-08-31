@@ -27,8 +27,9 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 #
-PYTEST=$(which py.test)
-
+PYTEST=$(which py.test 2>/dev/null)
+# Support different distributions
+[ -z "$PYTEST" ] && PYTEST=$(which py.test-3 2>/dev/null)
 # This script can basically be used to test individual tests that have
 # been created. Just run the to run all tests:
 #    ./devel/test.sh

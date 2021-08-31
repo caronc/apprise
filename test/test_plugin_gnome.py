@@ -136,6 +136,9 @@ def test_plugin_gnome_general_success(obj):
     # Test url() call
     assert isinstance(obj.url(), str) is True
 
+    # our URL Identifier is disabled
+    assert obj.url_id() is None
+
     # test notifications
     assert obj.notify(title='title', body='body',
                       notify_type=apprise.NotifyType.INFO) is True

@@ -234,10 +234,6 @@ def apprise_test(do_notify):
             # We fail whenever we're initialized
             raise TypeError()
 
-        def url(self, **kwargs):
-            # Support URL
-            return ''
-
         @staticmethod
         def parse_url(url, *args, **kwargs):
             # always parseable
@@ -247,10 +243,6 @@ def apprise_test(do_notify):
         def __init__(self, **kwargs):
             super().__init__(
                 notify_format=NotifyFormat.HTML, **kwargs)
-
-        def url(self, **kwargs):
-            # Support URL
-            return ''
 
         def send(self, **kwargs):
             # Pretend everything is okay
@@ -347,10 +339,6 @@ def apprise_test(do_notify):
             # Pretend everything is okay (async)
             raise TypeError()
 
-        def url(self, **kwargs):
-            # Support URL
-            return ''
-
     class RuntimeNotification(NotifyBase):
         def notify(self, **kwargs):
             # Pretend everything is okay
@@ -359,10 +347,6 @@ def apprise_test(do_notify):
         async def async_notify(self, **kwargs):
             # Pretend everything is okay (async)
             raise TypeError()
-
-        def url(self, **kwargs):
-            # Support URL
-            return ''
 
     class FailNotification(NotifyBase):
 
@@ -373,10 +357,6 @@ def apprise_test(do_notify):
         async def async_notify(self, **kwargs):
             # Pretend everything is okay (async)
             raise TypeError()
-
-        def url(self, **kwargs):
-            # Support URL
-            return ''
 
     # Store our bad notification in our schema map
     N_MGR['throw'] = ThrowNotification
@@ -409,10 +389,6 @@ def apprise_test(do_notify):
             # Pretend everything is okay
             raise TypeError()
 
-        def url(self, **kwargs):
-            # Support URL
-            return ''
-
     N_MGR.unload_modules()
     N_MGR['throw'] = ThrowInstantiateNotification
 
@@ -439,6 +415,17 @@ def apprise_test(do_notify):
     # Reset our object
     a.clear()
     assert len(a) == 0
+
+    with pytest.raises(ValueError):
+        # Encoding error
+        AppriseAsset(encoding='ascii', storage_salt="ボールト")
+
+    # Set our cache to be off
+    plugin = a.instantiate('good://localhost?store=no', asset=asset)
+    assert isinstance(plugin, NotifyBase)
+    assert plugin.url_id(lazy=False) is None
+    # Verify our cache is disabled
+    assert 'store=no' in plugin.url()
 
     # Instantiate a bad object
     plugin = a.instantiate(object, tag="bad_object")
@@ -527,7 +514,7 @@ def apprise_test(do_notify):
     assert len(a) == 0
 
 
-def test_apprise_pretty_print(tmpdir):
+def test_apprise_pretty_print():
     """
     API: Apprise() Pretty Print tests
 
@@ -724,7 +711,7 @@ def apprise_tagging_test(mock_post, mock_get, do_notify):
         tag=[(object, ), ]) is None
 
 
-def test_apprise_schemas(tmpdir):
+def test_apprise_schemas():
     """
     API: Apprise().schema() tests
 
@@ -830,8 +817,143 @@ def test_apprise_urlbase_object():
     assert base.request_url == 'http://127.0.0.1/path/'
     assert base.url().startswith('http://user@127.0.0.1/path/')
 
+    # Generic initialization
+    base = URLBase(**{'schema': ''})
+    assert base.request_timeout == (4.0, 4.0)
+    assert base.request_auth is None
+    assert base.request_url == 'http:///'
+    assert base.url().startswith('http:///')
 
-def test_apprise_notify_formats(tmpdir):
+    base = URLBase()
+    assert base.request_timeout == (4.0, 4.0)
+    assert base.request_auth is None
+    assert base.request_url == 'http:///'
+    assert base.url().startswith('http:///')
+
+
+def test_apprise_unique_id():
+    """
+    API: Apprise() Input Formats tests
+
+    """
+
+    # Default testing
+    obj1 = Apprise.instantiate('json://user@127.0.0.1/path')
+    obj2 = Apprise.instantiate('json://user@127.0.0.1/path/?arg=')
+
+    assert obj1.url_identifier == obj2.url_identifier
+    assert obj1.url_id() == obj2.url_id()
+    # Second call leverages lazy reference (so it's much faster
+    assert obj1.url_id() == obj2.url_id()
+    # Disable Lazy Setting
+    assert obj1.url_id(lazy=False) == obj2.url_id(lazy=False)
+
+    # A variation such as providing a password or altering the path makes the
+    # url_id() different:
+    obj2 = Apprise.instantiate('json://user@127.0.0.1/path2/?arg=')  # path
+    assert obj1.url_id() != obj2.url_id()
+    obj2 = Apprise.instantiate(
+        'jsons://user@127.0.0.1/path/?arg=')  # secure flag
+    assert obj1.url_id() != obj2.url_id()
+    obj2 = Apprise.instantiate(
+        'json://user2@127.0.0.1/path/?arg=')  # user
+    assert obj1.url_id() != obj2.url_id()
+    obj2 = Apprise.instantiate(
+        'json://user@127.0.0.1:8080/path/?arg=')  # port
+    assert obj1.url_id() != obj2.url_id()
+    obj2 = Apprise.instantiate(
+        'json://user:pass@127.0.0.1/path/?arg=')  # password
+    assert obj1.url_id() != obj2.url_id()
+
+    # Leverage salt setting
+    asset = AppriseAsset(storage_salt='abcd')
+
+    obj2 = Apprise.instantiate('json://user@127.0.0.1/path/', asset=asset)
+    assert obj1.url_id(lazy=False) != obj2.url_id(lazy=False)
+
+    asset = AppriseAsset(storage_salt=b'abcd')
+    # same salt value produces a match again
+    obj1 = Apprise.instantiate('json://user@127.0.0.1/path/', asset=asset)
+    assert obj1.url_id() == obj2.url_id()
+
+    # We'll add a good notification to our list
+    class TesNoURLID(NotifyBase):
+        """
+        This class is just sets a use case where we don't return a
+         url_identifier
+        """
+
+        # we'll use this as a key to make our service easier to find
+        # in the next part of the testing
+        service_name = 'nourl'
+
+        _url_identifier = False
+
+        def send(self, **kwargs):
+            # Pretend everything is okay (so we don't break other tests)
+            return True
+
+        @staticmethod
+        def parse_url(url):
+            return NotifyBase.parse_url(url, verify_host=False)
+
+        @property
+        def url_identifier(self):
+            """
+            No URL Identifier
+            """
+            return self._url_identifier
+
+    N_MGR['nourl'] = TesNoURLID
+
+    # setting URL Identifier to False disables the generator
+    url = 'nourl://'
+    obj = Apprise.instantiate(url)
+    # No generation takes place
+    assert obj.url_id() is None
+
+    #
+    # Dictionary Testing
+    #
+    obj._url_identifier = {
+        'abc': '123', 'def': b'\0', 'hij': 42, 'klm': object}
+    # call uses cached value (from above)
+    assert obj.url_id() is None
+    # Tests dictionary key generation
+    assert obj.url_id(lazy=False) is not None
+
+    # List/Set/Tuple Testing
+    #
+    obj1 = Apprise.instantiate(url)
+    obj1._url_identifier = ['123', b'\0', 42, object]
+    # Tests dictionary key generation
+    assert obj1.url_id() is not None
+
+    obj2 = Apprise.instantiate(url)
+    obj2._url_identifier = ('123', b'\0', 42, object)
+    assert obj2.url_id() is not None
+    assert obj2.url_id() == obj2.url_id()
+
+    obj3 = Apprise.instantiate(url)
+    obj3._url_identifier = set(['123', b'\0', 42, object])
+    assert obj3.url_id() is not None
+
+    obj = Apprise.instantiate(url)
+    obj._url_identifier = b'test'
+    assert obj.url_id() is not None
+
+    obj = Apprise.instantiate(url)
+    obj._url_identifier = 'test'
+    assert obj.url_id() is not None
+
+    # Testing Garbage
+    for x in (31, object, 43.1):
+        obj = Apprise.instantiate(url)
+        obj._url_identifier = x
+        assert obj.url_id() is not None
+
+
+def test_apprise_notify_formats():
     """
     API: Apprise() Input Formats tests
 
@@ -855,12 +977,7 @@ def test_apprise_notify_formats(tmpdir):
             # Pretend everything is okay
             return True
 
-        def url(self, **kwargs):
-            # Support URL
-            return ''
-
     class HtmlNotification(NotifyBase):
-
         # set our default notification format
         notify_format = NotifyFormat.HTML
 
@@ -871,12 +988,7 @@ def test_apprise_notify_formats(tmpdir):
             # Pretend everything is okay
             return True
 
-        def url(self, **kwargs):
-            # Support URL
-            return ''
-
     class MarkDownNotification(NotifyBase):
-
         # set our default notification format
         notify_format = NotifyFormat.MARKDOWN
 
@@ -886,10 +998,6 @@ def test_apprise_notify_formats(tmpdir):
         def notify(self, **kwargs):
             # Pretend everything is okay
             return True
-
-        def url(self, **kwargs):
-            # Support URL
-            return ''
 
     # Store our notifications into our schema map
     N_MGR['text'] = TextNotification
@@ -1074,6 +1182,9 @@ def test_apprise_asset(tmpdir):
         extension='.test') == \
         'http://localhost/default/info-256x256.test'
 
+    a = AppriseAsset(plugin_paths=('/tmp',))
+    assert a.plugin_paths == ('/tmp', )
+
 
 def test_apprise_disabled_plugins():
     """
@@ -1096,10 +1207,6 @@ def test_apprise_disabled_plugins():
         # in the next part of the testing
         service_name = 'na01'
 
-        def url(self, **kwargs):
-            # Support URL
-            return ''
-
         def notify(self, **kwargs):
             # Pretend everything is okay (so we don't break other tests)
             return True
@@ -1120,10 +1227,6 @@ def test_apprise_disabled_plugins():
 
             # enable state changes **AFTER** we initialize
             self.enabled = False
-
-        def url(self, **kwargs):
-            # Support URL
-            return ''
 
         def notify(self, **kwargs):
             # Pretend everything is okay (so we don't break other tests)
@@ -1178,10 +1281,6 @@ def test_apprise_disabled_plugins():
         # we'll use this as a key to make our service easier to find
         # in the next part of the testing
         service_name = 'good'
-
-        def url(self, **kwargs):
-            # Support URL
-            return ''
 
         def send(self, **kwargs):
             # Pretend everything is okay (so we don't break other tests)
@@ -1315,10 +1414,6 @@ def test_apprise_details():
             }
         })
 
-        def url(self, **kwargs):
-            # Support URL
-            return ''
-
         def send(self, **kwargs):
             # Pretend everything is okay (so we don't break other tests)
             return True
@@ -1340,10 +1435,6 @@ def test_apprise_details():
             ],
             'packages_recommended': 'django',
         }
-
-        def url(self, **kwargs):
-            # Support URL
-            return ''
 
         def send(self, **kwargs):
             # Pretend everything is okay (so we don't break other tests)
@@ -1371,10 +1462,6 @@ def test_apprise_details():
             ]
         }
 
-        def url(self, **kwargs):
-            # Support URL
-            return ''
-
         def send(self, **kwargs):
             # Pretend everything is okay (so we don't break other tests)
             return True
@@ -1397,10 +1484,6 @@ def test_apprise_details():
             'packages_recommended': 'cryptography <= 3.4'
         }
 
-        def url(self, **kwargs):
-            # Support URL
-            return ''
-
         def send(self, **kwargs):
             # Pretend everything is okay (so we don't break other tests)
             return True
@@ -1416,10 +1499,6 @@ def test_apprise_details():
 
         # This is the same as saying there are no requirements
         requirements = None
-
-        def url(self, **kwargs):
-            # Support URL
-            return ''
 
         def send(self, **kwargs):
             # Pretend everything is okay (so we don't break other tests)
@@ -1438,10 +1517,6 @@ def test_apprise_details():
             # We can set a string value as well (it does not have to be a list)
             'packages_recommended': 'cryptography <= 3.4'
         }
-
-        def url(self, **kwargs):
-            # Support URL
-            return ''
 
         def send(self, **kwargs):
             # Pretend everything is okay (so we don't break other tests)
@@ -1571,7 +1646,7 @@ def test_apprise_details_plugin_verification():
         # NotifyBase parameters:
         'format', 'overflow', 'emojis',
         # URLBase parameters:
-        'verify', 'cto', 'rto',
+        'verify', 'cto', 'rto', 'store',
     ])
 
     # Valid Schema Entries:
@@ -1877,7 +1952,7 @@ def test_apprise_details_plugin_verification():
 @mock.patch('asyncio.gather', wraps=asyncio.gather)
 @mock.patch('concurrent.futures.ThreadPoolExecutor',
             wraps=concurrent.futures.ThreadPoolExecutor)
-def test_apprise_async_mode(mock_threadpool, mock_gather, mock_post, tmpdir):
+def test_apprise_async_mode(mock_threadpool, mock_gather, mock_post):
     """
     API: Apprise() async_mode tests
 

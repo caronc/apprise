@@ -26,9 +26,11 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import sys
 import re
 from .logger import logger
 import time
+import hashlib
 from datetime import datetime
 from xml.sax.saxutils import escape as sax_escape
 
@@ -103,12 +105,24 @@ class URLBase:
     # server to send a response.
     socket_read_timeout = 4.0
 
+    # provide the information required to allow for unique id generation when
+    # calling url_id().  Over-ride this in calling classes.
+    url_identifier = None
+
+    # Tracks the last generated url_id() to prevent regeneration; initializes
+    # to False and is set thereafter.  This is an internal value for this class
+    # only and should not be set to anything other then False below...
+    __cached_url_identifier = False
+
     # Handle
     # Maintain a set of tags to associate with this specific notification
     tags = set()
 
     # Secure sites should be verified against a Certificate Authority
     verify_certificate = True
+
+    # Persistent storage default html settings
+    persistent_storage = True
 
     # Logging to our global logger
     logger = logger
@@ -166,6 +180,16 @@ class URLBase:
             # different value.
             '_lookup_default': 'socket_connect_timeout',
         },
+        'store': {
+            'name': _('Persistent Storage'),
+            # Use Persistent Storage
+            'type': 'bool',
+            # Provide a default
+            'default': persistent_storage,
+            # look up default using the following parent class value at
+            # runtime.
+            '_lookup_default': 'persistent_storage',
+        },
     }
 
     # kwargs are dynamically built because a prefix causes us to parse the
@@ -185,6 +209,8 @@ class URLBase:
 
     template_kwargs = {}
 
+    # Internal Values
+
     def __init__(self, asset=None, **kwargs):
         """
         Initialize some general logging and common server arguments that will
@@ -197,17 +223,17 @@ class URLBase:
             asset if isinstance(asset, AppriseAsset) else AppriseAsset()
 
         # Certificate Verification (for SSL calls); default to being enabled
-        self.verify_certificate = parse_bool(kwargs.get('verify', True))
+        self.verify_certificate = parse_bool(
+            kwargs.get('verify', URLBase.verify_certificate))
+
+        # Schema
+        self.schema = kwargs.get('schema', 'unknown').lower()
 
         # Secure Mode
         self.secure = kwargs.get('secure', None)
-        try:
-            if not isinstance(self.secure, bool):
-                # Attempt to detect
-                self.secure = kwargs.get('schema', '')[-1].lower() == 's'
-
-        except (TypeError, IndexError):
-            self.secure = False
+        if not isinstance(self.secure, bool):
+            # Attempt to detect
+            self.secure = self.schema[-1:] == 's'
 
         self.host = URLBase.unquote(kwargs.get('host'))
         self.port = kwargs.get('port')
@@ -253,6 +279,14 @@ class URLBase:
                 self.logger.warning(
                     'Invalid socket connect timeout (cto) was specified {}'
                     .format(kwargs.get('cto')))
+
+        # Prepare our Persistent Storage switch
+        self.persistent_storage = parse_bool(
+            kwargs.get('store', URLBase.persistent_storage))
+        if not self.persistent_storage:
+            # Enforce the disabling of cache (ortherwise defaults are use)
+            self.url_identifier = False
+            self.__cached_url_identifier = None
 
         if 'tag' in kwargs:
             # We want to associate some tags with our notification service.
@@ -334,7 +368,7 @@ class URLBase:
 
         default_port = 443 if self.secure else 80
 
-        return '{schema}://{auth}{hostname}{port}{fullpath}?{params}'.format(
+        return '{schema}://{auth}{hostname}{port}{fullpath}{params}'.format(
             schema='https' if self.secure else 'http',
             auth=auth,
             # never encode hostname since we're expecting it to be a valid one
@@ -343,8 +377,116 @@ class URLBase:
                  else ':{}'.format(self.port),
             fullpath=URLBase.quote(self.fullpath, safe='/')
             if self.fullpath else '/',
-            params=URLBase.urlencode(params),
+            params=('?' + URLBase.urlencode(params) if params else ''),
         )
+
+    def url_id(self, lazy=True, hash_engine=hashlib.sha1):
+        """
+        Returns a unique URL identifier that representing the Apprise URL
+        itself. The url_id is always a sha1 string or None if it can't
+        be generated.
+
+        The idea is to only build the ID based on the credentials or specific
+        elements relative to the URL itself. The URL ID should never factor in
+        (or else it's a bug) the following:
+          - any targets defined
+          - all GET parameters options unless they explicitly change the
+            complete function of the code.
+
+             For example: GET parameters like ?image=false&avatar=no should
+             have no bearing in the uniqueness of the Apprise URL Identifier.
+
+             Consider plugins where some get parameters completely change
+             how the entire upstream comunication works such as slack:// and
+             matrix:// which has a mode. In these circumstances, they should
+             be considered in he unique generation.
+
+        The intention of this function is to help align Apprise URLs that are
+        common with one another and therefore can share the same persistent
+        storage even when subtle changes are made to them.
+
+        Hence the following would all return the same URL Identifier:
+             json://abc/def/ghi?image=no
+             json://abc/def/ghi/?test=yes&image=yes
+
+        """
+
+        if lazy and self.__cached_url_identifier is not False:
+            return self.__cached_url_identifier \
+                if not (self.__cached_url_identifier
+                        and self.asset.storage_idlen) \
+                else self.__cached_url_identifier[:self.asset.storage_idlen]
+
+        # Python v3.9 introduces usedforsecurity argument
+        kwargs = {'usedforsecurity': False} \
+            if sys.version_info >= (3, 9) else {}
+
+        if self.url_identifier is False:
+            # Disabled
+            self.__cached_url_identifier = None
+
+        elif self.url_identifier in (None, True):
+
+            # Prepare our object
+            engine = hash_engine(
+                self.asset.storage_salt + self.schema.encode(
+                    self.asset.encoding), **kwargs)
+
+            # We want to treat `None` differently then a blank entry
+            engine.update(
+                b'\0' if self.password is None
+                else self.password.encode(self.asset.encoding))
+            engine.update(
+                b'\0' if self.user is None
+                else self.user.encode(self.asset.encoding))
+            engine.update(
+                b'\0' if not self.host
+                else self.host.encode(self.asset.encoding))
+            engine.update(
+                b'\0' if self.port is None
+                else f'{self.port}'.encode(self.asset.encoding))
+            engine.update(
+                self.fullpath.rstrip('/').encode(self.asset.encoding))
+            engine.update(b's' if self.secure else b'i')
+
+            # Save our generated content
+            self.__cached_url_identifier = engine.hexdigest()
+
+        elif isinstance(self.url_identifier, str):
+            self.__cached_url_identifier = hash_engine(
+                self.asset.storage_salt + self.url_identifier.encode(
+                    self.asset.encoding), **kwargs).hexdigest()
+
+        elif isinstance(self.url_identifier, bytes):
+            self.__cached_url_identifier = hash_engine(
+                self.asset.storage_salt + self.url_identifier,
+                **kwargs).hexdigest()
+
+        elif isinstance(self.url_identifier, (list, tuple, set)):
+            self.__cached_url_identifier = hash_engine(
+                self.asset.storage_salt + b''.join([
+                    (x if isinstance(x, bytes)
+                     else str(x).encode(self.asset.encoding))
+                    for x in self.url_identifier]), **kwargs).hexdigest()
+
+        elif isinstance(self.url_identifier, dict):
+            self.__cached_url_identifier = hash_engine(
+                self.asset.storage_salt + b''.join([
+                    (x if isinstance(x, bytes)
+                     else str(x).encode(self.asset.encoding))
+                    for x in self.url_identifier.values()]),
+                **kwargs).hexdigest()
+
+        else:
+            self.__cached_url_identifier = hash_engine(
+                self.asset.storage_salt + str(
+                    self.url_identifier).encode(self.asset.encoding),
+                **kwargs).hexdigest()
+
+        return self.__cached_url_identifier \
+            if not (self.__cached_url_identifier
+                    and self.asset.storage_idlen) \
+            else self.__cached_url_identifier[:self.asset.storage_idlen]
 
     def __contains__(self, tags):
         """
@@ -660,14 +802,26 @@ class URLBase:
         this class.
         """
 
-        return {
-            # The socket read timeout
-            'rto': str(self.socket_read_timeout),
-            # The request/socket connect timeout
-            'cto': str(self.socket_connect_timeout),
-            # Certificate verification
-            'verify': 'yes' if self.verify_certificate else 'no',
-        }
+        # parameters are only provided on demand to keep the URL short
+        params = {}
+
+        # The socket read timeout
+        if self.socket_read_timeout != URLBase.socket_read_timeout:
+            params['rto'] = str(self.socket_read_timeout)
+
+        # The request/socket connect timeout
+        if self.socket_connect_timeout != URLBase.socket_connect_timeout:
+            params['cto'] = str(self.socket_connect_timeout)
+
+        # Persistent Storage Setting
+        if self.persistent_storage != URLBase.persistent_storage:
+            params['store'] = 'yes' if self.persistent_storage else 'no'
+
+        # Certificate verification
+        if self.verify_certificate != URLBase.verify_certificate:
+            params['verify'] = 'yes' if self.verify_certificate else 'no'
+
+        return params
 
     @staticmethod
     def post_process_parse_url_results(results):
@@ -736,6 +890,10 @@ class URLBase:
             # Store our socket connect timeout if specified
             if 'cto' in results['qsd']:
                 results['cto'] = results['qsd']['cto']
+
+            # Store our persistent storage boolean
+            if 'store' in results['qsd']:
+                results['store'] = results['qsd']['store']
 
             if 'port' in results['qsd']:
                 results['port'] = results['qsd']['port']

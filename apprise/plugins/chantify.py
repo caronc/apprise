@@ -181,6 +181,15 @@ class NotifyChantify(NotifyBase):
             params=NotifyChantify.urlencode(params),
         )
 
+    @property
+    def url_identifier(self):
+        """
+        Returns all of the identifiers that make this URL unique from
+        another simliar one. Targets or end points should never be identified
+        here.
+        """
+        return (self.secure_protocol, self.token)
+
     @staticmethod
     def parse_url(url):
         """
