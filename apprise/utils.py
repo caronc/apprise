@@ -289,7 +289,7 @@ def is_phone_no(phone, min_len=11):
 
     Returns:
         bool: Returns False if the address specified is not a phone number
-              and a dictionary of the parsed email if it is as:
+              and a dictionary of the parsed phone number if it is as:
                 {
                     'country': '1',
                     'area': '800',

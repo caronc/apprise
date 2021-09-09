@@ -108,7 +108,7 @@ class NotifyTwilio(NotifyBase):
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'^[a-f0-9]+$', 'i'),
+            'regex': (r'^[a-z0-9]+$', 'i'),
         },
         'from_phone': {
             'name': _('From Phone No'),
@@ -150,10 +150,16 @@ class NotifyTwilio(NotifyBase):
         'token': {
             'alias_of': 'auth_token',
         },
+        'apikey': {
+            'name': _('API Key'),
+            'type': 'string',
+            'private': True,
+            'regex': (r'^SK[a-f0-9]+$', 'i'),
+        },
     })
 
     def __init__(self, account_sid, auth_token, source, targets=None,
-                 **kwargs):
+                 apikey=None, ** kwargs):
         """
         Initialize Twilio Object
         """
@@ -176,6 +182,10 @@ class NotifyTwilio(NotifyBase):
                   '({}) was specified.'.format(auth_token)
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        # The API Key associated with the account (optional)
+        self.apikey = validate_regex(
+            apikey, *self.template_args['apikey']['regex'])
 
         result = is_phone_no(source, min_len=5)
         if not result:
@@ -218,7 +228,7 @@ class NotifyTwilio(NotifyBase):
                 continue
 
             # store valid phone number
-            self.targets.append('+{}'.format(result))
+            self.targets.append('+{}'.format(result['full']))
 
         return
 
@@ -259,8 +269,8 @@ class NotifyTwilio(NotifyBase):
         # Create a copy of the targets list
         targets = list(self.targets)
 
-        # Set up our authentication
-        auth = (self.account_sid, self.auth_token)
+        # Set up our authentication. Prefer the API Key if provided.
+        auth = (self.apikey or self.account_sid, self.auth_token)
 
         if len(targets) == 0:
             # No sources specified, use our own phone no
@@ -354,6 +364,10 @@ class NotifyTwilio(NotifyBase):
         # Our URL parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
+        if self.apikey is not None:
+            # apikey specified; pass it back on the url
+            params['apikey'] = self.apikey
+
         return '{schema}://{sid}:{token}@{source}/{targets}/?{params}'.format(
             schema=self.secure_protocol,
             sid=self.pprint(
@@ -399,6 +413,10 @@ class NotifyTwilio(NotifyBase):
             # Extract the account sid from an argument
             results['account_sid'] = \
                 NotifyTwilio.unquote(results['qsd']['sid'])
+
+        # API Key
+        if 'apikey' in results['qsd'] and len(results['qsd']['apikey']):
+            results['apikey'] = results['qsd']['apikey']
 
         # Support the 'from'  and 'source' variable so that we can support
         # targets this way too.
