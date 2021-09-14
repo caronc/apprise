@@ -23,6 +23,13 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+# PAHO MQTT Documentation:
+#  https://www.eclipse.org/paho/index.php?page=clients/python/docs/index.php
+#
+# Looking at the PAHO MQTT Source can help shed light on what's going on too
+# as their inline documentation is pretty good!
+#   https://github.com/eclipse/paho.mqtt.python\
+#           /blob/master/src/paho/mqtt/client.py
 import ssl
 import re
 from os.path import isfile
@@ -169,7 +176,7 @@ class NotifyMQTT(NotifyBase):
             'type': 'int',
             'default': 0,
             'min': 0,
-            'max': 3,
+            'max': 2,
         },
         'version': {
             'name': _('Version'),
