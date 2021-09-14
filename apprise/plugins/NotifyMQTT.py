@@ -49,6 +49,8 @@ try:
         "31": mqtt.MQTTv31,
         # v5.0
         "5": mqtt.MQTTv5,
+        # v5.0 (alias)
+        "50": mqtt.MQTTv5,
     }
 
 except ImportError:
@@ -192,7 +194,7 @@ class NotifyMQTT(NotifyBase):
         else:
             self.version = version
 
-        # Set up our QOS
+        # Set up our Quality of Service (QoS)
         try:
             self.qos = self.template_args['qos']['default'] \
                 if qos is None else int(qos)
@@ -417,11 +419,12 @@ class NotifyMQTT(NotifyBase):
         # Acquire remaining tokens
         results['targets'] = NotifyMQTT.split_path(results['fullpath'])
 
-        # The mqtt version to use
+        # The MQTT protocol version to use
         if 'version' in results['qsd'] and len(results['qsd']['version']):
             results['version'] = \
                 NotifyMQTT.unquote(results['qsd']['version'])
 
+        # The MQTT Quality of Service to use
         if 'qos' in results['qsd'] and len(results['qsd']['qos']):
             results['qos'] = \
                 NotifyMQTT.unquote(results['qsd']['qos'])
