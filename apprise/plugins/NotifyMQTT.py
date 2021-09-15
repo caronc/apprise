@@ -139,11 +139,22 @@ class NotifyMQTT(NotifyBase):
     templates = (
         '{schema}://{user}@{host}/{topic}',
         '{schema}://{user}@{host}:{port}/{topic}',
-        '{schema}://{user}:{pass}@{host}/{topic}',
-        '{schema}://{user}:{pass}@{host}:{port}/{topic}',
+        '{schema}://{user}:{password}@{host}/{topic}',
+        '{schema}://{user}:{password}@{host}:{port}/{topic}',
     )
 
     template_tokens = dict(NotifyBase.template_tokens, **{
+        'host': {
+            'name': _('Hostname'),
+            'type': 'string',
+            'required': True,
+        },
+        'port': {
+            'name': _('Port'),
+            'type': 'int',
+            'min': 1,
+            'max': 65535,
+        },
         'user': {
             'name': _('User Name'),
             'type': 'string',
@@ -338,20 +349,15 @@ class NotifyMQTT(NotifyBase):
                         format(result.rc, url))
                     return False
 
-                elif not result.is_pubished():
+                elif not result.is_published():
                     self.logger.debug(
                         'Blocking until MQTT payload is published...')
                     result.wait_for_publish()
+                    if not result.is_published():
+                        return False
 
             # Disconnect
             self.client.disconnect()
-
-        except ValueError as e:
-            # ValueError's are thrown from publish() call if there is a problem
-            self.logger.warning(
-                'MQTT Publishing error received: from {}'.format(url))
-            self.logger.debug('Socket Exception: %s' % str(e))
-            return False
 
         except ConnectionError as e:
             self.logger.warning(
@@ -362,6 +368,13 @@ class NotifyMQTT(NotifyBase):
         except ssl.CertificateError as e:
             self.logger.warning(
                 'MQTT SSL Certificate Error received from {}'.format(url))
+            self.logger.debug('Socket Exception: %s' % str(e))
+            return False
+
+        except ValueError as e:
+            # ValueError's are thrown from publish() call if there is a problem
+            self.logger.warning(
+                'MQTT Publishing error received: from {}'.format(url))
             self.logger.debug('Socket Exception: %s' % str(e))
             return False
 
@@ -418,7 +431,7 @@ class NotifyMQTT(NotifyBase):
 
         """
 
-        results = NotifyBase.parse_url(url, verify_host=False)
+        results = NotifyBase.parse_url(url)
         if not results:
             # We're done early as we couldn't load the results
             return results

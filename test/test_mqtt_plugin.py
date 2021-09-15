@@ -26,6 +26,7 @@
 import mock
 import re
 import sys
+import ssl
 import os
 import pytest
 
@@ -135,6 +136,7 @@ def test_mqtt_plugin(mock_client):
     # our call to publish() response object
     publish_result = mock.Mock()
     publish_result.rc = 0
+    publish_result.is_published.return_value = True
 
     # Our mqtt.Client() object
     _mock_client = mock.Mock()
@@ -146,7 +148,18 @@ def test_mqtt_plugin(mock_client):
 
     # Instantiate our object
     obj = apprise.Apprise.instantiate(
-        'mqtt://localhost/my/topic', suppress_exceptions=False)
+        'mqtt://localhost:1234/my/topic', suppress_exceptions=False)
+    assert isinstance(obj, apprise.plugins.NotifyMQTT)
+    assert obj.url().startswith('mqtt://localhost:1234/my/topic')
+    # Detect our defaults
+    assert re.search(r'qos=0', obj.url())
+    assert re.search(r'version=v3.1.1', obj.url())
+    # Send a good notification
+    assert obj.notify(body="test=test") is True
+
+    # leverage the to= argument to identify our topic
+    obj = apprise.Apprise.instantiate(
+        'mqtt://localhost?to=my/topic', suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyMQTT)
     assert obj.url().startswith('mqtt://localhost/my/topic')
     # Detect our defaults
@@ -154,12 +167,29 @@ def test_mqtt_plugin(mock_client):
     assert re.search(r'version=v3.1.1', obj.url())
     # Send a good notification
     assert obj.notify(body="test=test") is True
-    
+
     # Send a notification in a situation where our publish failed
     publish_result.rc = 2
     assert obj.notify(body="test=test") is False
     # Toggle our response object back to what it should be
     publish_result.rc = 0
+
+    # Test case where we provide an invalid/unsupported mqtt version
+    with pytest.raises(TypeError):
+        obj = apprise.Apprise.instantiate(
+            'mqtt://localhost?version=v1.0.0.0', suppress_exceptions=False)
+
+    # Test case where we provide an invalid/unsupported qos
+    with pytest.raises(TypeError):
+        obj = apprise.Apprise.instantiate(
+            'mqtt://localhost?qos=123', suppress_exceptions=False)
+    with pytest.raises(TypeError):
+        obj = apprise.Apprise.instantiate(
+            'mqtt://localhost?qos=invalid', suppress_exceptions=False)
+
+    # Test a bad URL
+    obj = apprise.Apprise.instantiate('mqtt://', suppress_exceptions=False)
+    assert obj is None
 
     # Instantiate our object without any topics
     # we also test that we can set our qos and version if we want from
@@ -181,4 +211,80 @@ def test_mqtt_plugin(mock_client):
     assert obj.notify(body="test=test") is True
 
     # Clear CA Certificates
-    obj.CA_CERTIFICATE_FILE_LOCATIONS = [] 
+    ca_certs_backup = \
+        apprise.plugins.NotifyMQTT.CA_CERTIFICATE_FILE_LOCATIONS.copy()
+    apprise.plugins.NotifyMQTT.CA_CERTIFICATE_FILE_LOCATIONS = []
+    obj = apprise.Apprise.instantiate(
+        'mqtts://user:pass@localhost/my/topic', suppress_exceptions=False)
+    assert isinstance(obj, apprise.plugins.NotifyMQTT)
+    assert obj.url().startswith('mqtts://user:pass@localhost/my/topic')
+
+    # A notification is not possible now (without ca_certs)
+    assert obj.notify(body="test=test") is False
+
+    # Restore our certificates (for future tests)
+    apprise.plugins.NotifyMQTT.CA_CERTIFICATE_FILE_LOCATIONS = ca_certs_backup
+
+    # A single user (not password) + no verifying of host
+    obj = apprise.Apprise.instantiate(
+        'mqtts://user@localhost/my/topic,my/other/topic?verify=False',
+        suppress_exceptions=False)
+    assert isinstance(obj, apprise.plugins.NotifyMQTT)
+    assert obj.url().startswith('mqtts://user@localhost')
+    assert re.search(r'my/other/topic', obj.url())
+    assert re.search(r'my/topic', obj.url())
+    assert obj.notify(body="test=test") is True
+
+    # handle case where we fail to connect
+    _mock_client.connect.return_value = 2
+    obj = apprise.Apprise.instantiate(
+        'mqtt://localhost/my/topic', suppress_exceptions=False)
+    assert isinstance(obj, apprise.plugins.NotifyMQTT)
+    assert obj.notify(body="test=test") is False
+    # Restore our values
+    _mock_client.connect.return_value = 0
+
+    # handle case where we fail to reconnect
+    _mock_client.reconnect.return_value = 2
+    _mock_client.is_connected.return_value = False
+    obj = apprise.Apprise.instantiate(
+        'mqtt://localhost/my/topic', suppress_exceptions=False)
+    assert isinstance(obj, apprise.plugins.NotifyMQTT)
+    assert obj.notify(body="test=test") is False
+    # Restore our values
+    _mock_client.reconnect.return_value = 0
+    _mock_client.is_connected.return_value = True
+
+    # handle case where we fail to publish()
+    publish_result.rc = 2
+    obj = apprise.Apprise.instantiate(
+        'mqtt://localhost/my/topic', suppress_exceptions=False)
+    assert isinstance(obj, apprise.plugins.NotifyMQTT)
+    assert obj.notify(body="test=test") is False
+    # Restore our values
+    publish_result.rc = 0
+    # Set another means of failing publish()
+    publish_result.is_published.return_value = False
+    assert obj.notify(body="test=test") is False
+    # Restore our values
+    publish_result.is_published.return_value = True
+    # Verify that was all we had to do
+    assert obj.notify(body="test=test") is True
+    # A slight variation on the same failure (but with recovery)
+    publish_result.is_published.return_value = None
+    publish_result.is_published.side_effect = (False, True)
+    # Our notification is still sent okay
+    assert obj.notify(body="test=test") is True
+
+    # Exception handling
+    obj = apprise.Apprise.instantiate(
+        'mqtt://localhost/my/topic', suppress_exceptions=False)
+    assert isinstance(obj, apprise.plugins.NotifyMQTT)
+    _mock_client.connect.return_value = None
+    for side_effect in (ValueError, ConnectionError, ssl.CertificateError):
+        _mock_client.connect.side_effect = side_effect
+        assert obj.notify(body="test=test") is False
+
+    # Restore our values
+    _mock_client.connect.side_effect = None
+    _mock_client.connect.return_value = 0
