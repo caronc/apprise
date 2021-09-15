@@ -278,7 +278,7 @@ class NotifyMQTT(NotifyBase):
                 return False
 
             self.client.tls_set(
-                ca_certs=self.ca_cert, certfile=None, keyfile=None,
+                ca_certs=self.ca_certs, certfile=None, keyfile=None,
                 cert_reqs=ssl.CERT_REQUIRED, tls_version=ssl.PROTOCOL_TLS,
                 ciphers=None)
 
@@ -397,7 +397,7 @@ class NotifyMQTT(NotifyBase):
         default_port = self.mqtt_secure_port \
             if self.secure else self.mqtt_insecure_port
 
-        return '{schema}://{auth}{hostname}{port}{targets}/?{params}'.format(
+        return '{schema}://{auth}{hostname}{port}/{targets}?{params}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
             # never encode hostname since we're expecting it to be a valid one
@@ -405,7 +405,7 @@ class NotifyMQTT(NotifyBase):
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
             targets=','.join(
-                [NotifyMQTT.quote(x, safe='') for x in self.topics]),
+                [NotifyMQTT.quote(x, safe='/') for x in self.topics]),
             params=NotifyMQTT.urlencode(params),
         )
 
@@ -423,8 +423,14 @@ class NotifyMQTT(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
-        # Acquire remaining tokens
-        results['targets'] = NotifyMQTT.split_path(results['fullpath'])
+        try:
+            # Acquire topic(s)
+            results['targets'] = NotifyMQTT.parse_list(
+                results['fullpath'].lstrip('/'))
+
+        except AttributeError:
+            # No 'fullpath' specified
+            results['targets'] = []
 
         # The MQTT protocol version to use
         if 'version' in results['qsd'] and len(results['qsd']['version']):
