@@ -27,6 +27,7 @@ import mock
 import re
 import sys
 import ssl
+import six
 import os
 import pytest
 
@@ -212,7 +213,7 @@ def test_mqtt_plugin(mock_client):
 
     # Clear CA Certificates
     ca_certs_backup = \
-        apprise.plugins.NotifyMQTT.CA_CERTIFICATE_FILE_LOCATIONS.copy()
+        list(apprise.plugins.NotifyMQTT.CA_CERTIFICATE_FILE_LOCATIONS)
     apprise.plugins.NotifyMQTT.CA_CERTIFICATE_FILE_LOCATIONS = []
     obj = apprise.Apprise.instantiate(
         'mqtts://user:pass@localhost/my/topic', suppress_exceptions=False)
@@ -281,9 +282,22 @@ def test_mqtt_plugin(mock_client):
         'mqtt://localhost/my/topic', suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyMQTT)
     _mock_client.connect.return_value = None
-    for side_effect in (ValueError, ConnectionError, ssl.CertificateError):
-        _mock_client.connect.side_effect = side_effect
-        assert obj.notify(body="test=test") is False
+
+    if six.PY2:
+        # Python v2.7 does not support the ConnectionError exception
+        for side_effect in (ValueError, ssl.CertificateError):
+            _mock_client.connect.side_effect = side_effect
+            assert obj.notify(body="test=test") is False
+
+    else:
+        for side_effect in (
+                ValueError,
+                # Python 2.7 doesn't recognize ConnectionError so for that
+                # reason we stick a noqa entry here...
+                ConnectionError,  # noqa: F821
+                ssl.CertificateError):
+            _mock_client.connect.side_effect = side_effect
+            assert obj.notify(body="test=test") is False
 
     # Restore our values
     _mock_client.connect.side_effect = None

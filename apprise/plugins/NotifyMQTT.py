@@ -32,6 +32,7 @@
 #           /blob/master/src/paho/mqtt/client.py
 import ssl
 import re
+import six
 from os.path import isfile
 from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
@@ -41,6 +42,11 @@ from ..AppriseLocale import gettext_lazy as _
 
 # Default our global support flag
 NOTIFY_MQTT_SUPPORT_ENABLED = False
+
+if six.PY2:
+    # handle Python v2.7 suport
+    class ConnectionError(Exception):
+        pass
 
 try:
     # 3rd party modules
