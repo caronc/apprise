@@ -201,6 +201,9 @@ def test_mqtt_plugin(mock_client):
     assert obj.url().startswith('mqtt://localhost')
     assert re.search(r'qos=1', obj.url())
     assert re.search(r'version=v3.1', obj.url())
+    assert re.search(r'session=no', obj.url())
+    assert re.search(r'client_id=', obj.url()) is None
+
     # Our notification will fail because we have no topics to notify
     assert obj.notify(body="test=test") is False
 
@@ -234,6 +237,17 @@ def test_mqtt_plugin(mock_client):
     assert obj.url().startswith('mqtts://user@localhost')
     assert re.search(r'my/other/topic', obj.url())
     assert re.search(r'my/topic', obj.url())
+    assert obj.notify(body="test=test") is True
+
+    # Session and client_id handling
+    obj = apprise.Apprise.instantiate(
+        'mqtts://user@localhost/my/topic?session=yes&client_id=apprise',
+        suppress_exceptions=False)
+    assert isinstance(obj, apprise.plugins.NotifyMQTT)
+    assert obj.url().startswith('mqtts://user@localhost')
+    assert re.search(r'my/topic', obj.url())
+    assert re.search(r'client_id=apprise', obj.url())
+    assert re.search(r'session=yes', obj.url())
     assert obj.notify(body="test=test") is True
 
     # handle case where we fail to connect

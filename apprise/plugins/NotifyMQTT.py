@@ -38,6 +38,7 @@ from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..utils import parse_list
+from ..utils import parse_bool
 from ..AppriseLocale import gettext_lazy as _
 
 # Default our global support flag
@@ -201,9 +202,19 @@ class NotifyMQTT(NotifyBase):
             'values': HUMAN_MQTT_PROTOCOL_MAP,
             'default': "v3.1.1",
         },
+        'client_id': {
+            'name': _('Client ID'),
+            'type': 'string',
+        },
+        'session': {
+            'name': _('Use Session'),
+            'type': 'bool',
+            'default': False,
+        },
     })
 
-    def __init__(self, targets=None, version=None, qos=None, **kwargs):
+    def __init__(self, targets=None, version=None, qos=None,
+                 client_id=None, session=None, **kwargs):
         """
         Initialize MQTT Object
         """
@@ -217,6 +228,14 @@ class NotifyMQTT(NotifyBase):
             self.version = self.template_args['version']['default']
         else:
             self.version = version
+
+        # Save our client id if specified
+        self.client_id = client_id
+
+        # Maintain our session (associated with our user id if set)
+        self.session = self.template_args['session']['default'] \
+            if session is None or not self.client_id \
+            else parse_bool(session)
 
         # Set up our Quality of Service (QoS)
         try:
@@ -263,7 +282,8 @@ class NotifyMQTT(NotifyBase):
 
         # Our MQTT Client Object
         self.client = mqtt.Client(
-            client_id="", clean_session=True, userdata=None,
+            client_id=self.client_id,
+            clean_session=not self.session, userdata=None,
             protocol=self.mqtt_protocol, transport=self.mqtt_transport,
         )
         self.client.max_inflight_messages_set(self.mqtt_inflight_messages)
@@ -395,7 +415,12 @@ class NotifyMQTT(NotifyBase):
         params = {
             'version': self.version,
             'qos': str(self.qos),
+            'session': 'yes' if self.session else 'no',
         }
+
+        if self.client_id:
+            # Our client id is set if specified
+            params['client_id'] = self.client_id
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
@@ -455,6 +480,14 @@ class NotifyMQTT(NotifyBase):
         if 'version' in results['qsd'] and len(results['qsd']['version']):
             results['version'] = \
                 NotifyMQTT.unquote(results['qsd']['version'])
+
+        # The MQTT Client ID
+        if 'client_id' in results['qsd'] and len(results['qsd']['client_id']):
+            results['client_id'] = \
+                NotifyMQTT.unquote(results['qsd']['client_id'])
+
+        if 'session' in results['qsd'] and len(results['qsd']['session']):
+            results['session'] = parse_bool(results['qsd']['session'])
 
         # The MQTT Quality of Service to use
         if 'qos' in results['qsd'] and len(results['qsd']['qos']):
