@@ -36,7 +36,6 @@
 # The API reference used to build this plugin was documented here:
 #  https://developers.clicksend.com/docs/rest/v3/
 #
-import re
 import requests
 from json import dumps
 from base64 import b64encode
@@ -44,7 +43,8 @@ from base64 import b64encode
 from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyType
-from ..utils import parse_list
+from ..utils import is_phone_no
+from ..utils import parse_phone_no
 from ..utils import parse_bool
 from ..AppriseLocale import gettext_lazy as _
 
@@ -52,12 +52,6 @@ from ..AppriseLocale import gettext_lazy as _
 CLICKSEND_HTTP_ERROR_MAP = {
     401: 'Unauthorized - Invalid Token.',
 }
-
-# Some Phone Number Detection
-IS_PHONE_NO = re.compile(r'^\+?(?P<phone>[0-9\s)(+-]+)\s*$')
-
-# Used to break path apart into list of channels
-TARGET_LIST_DELIM = re.compile(r'[ \t\r\n,#\\/]+')
 
 
 class NotifyClickSend(NotifyBase):
@@ -151,26 +145,18 @@ class NotifyClickSend(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        for target in parse_list(targets):
+        for target in parse_phone_no(targets):
             # Validate targets and drop bad ones:
-            result = IS_PHONE_NO.match(target)
-            if result:
-                # Further check our phone # for it's digit count
-                result = ''.join(re.findall(r'\d+', result.group('phone')))
-                if len(result) < 11 or len(result) > 14:
-                    self.logger.warning(
-                        'Dropped invalid phone # '
-                        '({}) specified.'.format(target),
-                    )
-                    continue
-
-                # store valid phone number
-                self.targets.append(result)
+            result = is_phone_no(target)
+            if not result:
+                self.logger.warning(
+                    'Dropped invalid phone # '
+                    '({}) specified.'.format(target),
+                )
                 continue
 
-            self.logger.warning(
-                'Dropped invalid phone # '
-                '({}) specified.'.format(target))
+            # store valid phone number
+            self.targets.append(result['full'])
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
@@ -321,8 +307,7 @@ class NotifyClickSend(NotifyBase):
         # Support the 'to' variable so that we can support rooms this way too
         # The 'to' makes it easier to use yaml configuration
         if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'] += [x for x in filter(
-                bool, TARGET_LIST_DELIM.split(
-                    NotifyClickSend.unquote(results['qsd']['to'])))]
+            results['targets'] += \
+                NotifyClickSend.parse_phone_no(results['qsd']['to'])
 
         return results

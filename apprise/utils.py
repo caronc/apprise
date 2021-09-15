@@ -115,7 +115,7 @@ GET_SCHEMA_RE = re.compile(r'\s*(?P<schema>[a-z0-9]{2,9})://.*$', re.I)
 #   - user@example.com
 #   - label+user@example.com
 GET_EMAIL_RE = re.compile(
-    r'((?P<name>[^:<]+)?[:<\s]+)?'
+    r'(([\s"\']+)?(?P<name>[^:<"\']+)?[:<\s"\']+)?'
     r'(?P<full_email>((?P<label>[^+]+)\+)?'
     r'(?P<email>(?P<userid>[a-z0-9$%=_~-]+'
     r'(?:\.[a-z0-9$%+=_~-]+)'
@@ -125,8 +125,13 @@ GET_EMAIL_RE = re.compile(
     r'[a-z0-9][a-z0-9_-]{5,})))'
     r'\s*>?', re.IGNORECASE)
 
-# Regular expression used to extract a phone number
-GET_PHONE_NO_RE = re.compile(r'^\+?(?P<phone>[0-9\s)(+-]+)\s*$')
+# A simple verification check to make sure the content specified
+# rougly conforms to a phone number before we parse it further
+IS_PHONE_NO = re.compile(r'^\+?(?P<phone>[0-9\s)(+-]+)\s*$')
+
+# Regular expression used to destinguish between multiple phone numbers
+PHONE_NO_DETECTION_RE = re.compile(
+    r'\s*([+(\s]*[0-9][0-9()\s-]+[0-9])(?=$|[\s,+(]+[0-9])', re.I)
 
 # Regular expression used to destinguish between multiple URLs
 URL_DETECTION_RE = re.compile(
@@ -271,6 +276,98 @@ def is_uuid(uuid):
         return False
 
     return True if match else False
+
+
+def is_phone_no(phone, min_len=11):
+    """Determine if the specified entry is a phone number
+
+    Args:
+        phone (str): The string you want to check.
+        min_len (int): Defines the smallest expected length of the phone
+                       before it's to be considered invalid. By default
+                       the phone number can't be any larger then 14
+
+    Returns:
+        bool: Returns False if the address specified is not a phone number
+              and a dictionary of the parsed phone number if it is as:
+                {
+                    'country': '1',
+                    'area': '800',
+                    'line': '1234567',
+                    'full': '18001234567',
+                    'pretty': '+1 800-123-4567',
+                }
+
+        Non conventional numbers such as 411 would look like provided that
+        `min_len` is set to at least a 3:
+                {
+                    'country': '',
+                    'area': '',
+                    'line': '411',
+                    'full': '411',
+                    'pretty': '411',
+                }
+
+    """
+
+    try:
+        if not IS_PHONE_NO.match(phone):
+            # not parseable content as it does not even conform closely to a
+            # phone number)
+            return False
+
+    except TypeError:
+        return False
+
+    # Tidy phone number up first
+    phone = re.sub(r'[^\d]+', '', phone)
+    if len(phone) > 14 or len(phone) < min_len:
+        # Invalid phone number
+        return False
+
+    # Full phone number without any markup is as is now
+    full = phone
+
+    # Break apart our phone number
+    line = phone[-7:]
+    phone = phone[:len(phone) - 7] if len(phone) > 7 else ''
+
+    # the area code (if present)
+    area = phone[-3:] if phone else ''
+
+    # The country code is the leftovers
+    country = phone[:len(phone) - 3] if len(phone) > 3 else ''
+
+    # Prepare a nicely (consistently) formatted phone number
+    pretty = ''
+
+    if country:
+        # The leftover is the country code
+        pretty += '+{} '.format(country)
+
+    if area:
+        pretty += '{}-'.format(area)
+
+    if len(line) >= 7:
+        pretty += '{}-{}'.format(line[:3], line[3:])
+
+    else:
+        pretty += line
+
+    return {
+        # The line code (last 7 digits)
+        'line': line,
+        # Area code
+        'area': area,
+        # The country code (if identified)
+        'country': country,
+
+        # A nicely formatted phone no
+        'pretty': pretty,
+
+        # All digits in-line
+        'full': full,
+    }
 
 
 def is_email(address):
@@ -633,9 +730,46 @@ def parse_bool(arg, default=False):
     return bool(arg)
 
 
+def parse_phone_no(*args, **kwargs):
+    """
+    Takes a string containing phone numbers separated by comma's and/or spaces
+    and returns a list.
+    """
+
+    # for Python 2.7 support, store_unparsable is not in the url above
+    # as just parse_emails(*args, store_unparseable=True) since it is
+    # an invalid syntax.  This is the workaround to be backards compatible:
+    store_unparseable = kwargs.get('store_unparseable', True)
+
+    result = []
+    for arg in args:
+        if isinstance(arg, six.string_types) and arg:
+            _result = PHONE_NO_DETECTION_RE.findall(arg)
+            if _result:
+                result += _result
+
+            elif not _result and store_unparseable:
+                # we had content passed into us that was lost because it was
+                # so poorly formatted that it didn't even come close to
+                # meeting the regular expression we defined. We intentially
+                # keep it as part of our result set so that parsing done
+                # at a higher level can at least report this to the end user
+                # and hopefully give them some indication as to what they
+                # may have done wrong.
+                result += \
+                    [x for x in filter(bool, re.split(STRING_DELIMITERS, arg))]
+
+        elif isinstance(arg, (set, list, tuple)):
+            # Use recursion to handle the list of phone numbers
+            result += parse_phone_no(
+                *arg, store_unparseable=store_unparseable)
+
+    return result
+
+
 def parse_emails(*args, **kwargs):
     """
-    Takes a string containing URLs separated by comma's and/or spaces and
+    Takes a string containing emails separated by comma's and/or spaces and
     returns a list.
     """
 

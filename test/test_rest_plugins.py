@@ -196,7 +196,10 @@ TEST_URLS = (
     }),
     ('d7sms://user:pass@{}/{}/{}'.format('1' * 10, '2' * 15, 'a' * 13), {
         # No valid targets to notify
-        'instance': TypeError,
+        'instance': plugins.NotifyD7Networks,
+        # Since there are no targets specified we expect a False return on
+        # send()
+        'notify_response': False,
     }),
     ('d7sms://user:pass@{}?batch=yes'.format('3' * 14), {
         # valid number
@@ -252,6 +255,71 @@ TEST_URLS = (
     }),
     ('d7sms://user:pass@{}'.format('3' * 14), {
         'instance': plugins.NotifyD7Networks,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
+    # NotifyDingTalk
+    ##################################
+    ('dingtalk://', {
+        # No Access Token specified
+        'instance': TypeError,
+    }),
+    ('dingtalk://a_bd_/', {
+        # invalid Access Token
+        'instance': TypeError,
+    }),
+    ('dingtalk://12345678', {
+        # access token
+        'instance': plugins.NotifyDingTalk,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'dingtalk://1...8',
+    }),
+    ('dingtalk://{}/{}'.format('a' * 8, '1' * 14), {
+        # access token + phone number
+        'instance': plugins.NotifyDingTalk,
+    }),
+    ('dingtalk://{}/{}/invalid'.format('a' * 8, '1' * 3), {
+        # access token + 2 invalid phone numbers
+        'instance': plugins.NotifyDingTalk,
+    }),
+    ('dingtalk://{}/?to={}'.format('a' * 8, '1' * 14), {
+        # access token + phone number using 'to'
+        'instance': plugins.NotifyDingTalk,
+    }),
+    # Test secret via user@
+    ('dingtalk://secret@{}/?to={}'.format('a' * 8, '1' * 14), {
+        # access token + phone number using 'to'
+        'instance': plugins.NotifyDingTalk,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'dingtalk://****@a...a',
+    }),
+    # Test secret via secret= and token=
+    ('dingtalk://?token={}&to={}&secret={}'.format(
+        'b' * 8, '1' * 14, 'a' * 15), {
+            # access token + phone number using 'to'
+            'instance': plugins.NotifyDingTalk,
+        'privacy_url': 'dingtalk://****@b...b',
+    }),
+    # Invalid secret
+    ('dingtalk://{}/?to={}&secret=_'.format('a' * 8, '1' * 14), {
+        'instance': TypeError,
+    }),
+    ('dingtalk://{}?format=markdown'.format('a' * 8), {
+        # access token
+        'instance': plugins.NotifyDingTalk,
+    }),
+    ('dingtalk://{}'.format('a' * 8), {
+        'instance': plugins.NotifyDingTalk,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('dingtalk://{}'.format('a' * 8), {
+        'instance': plugins.NotifyDingTalk,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -1297,8 +1365,11 @@ TEST_URLS = (
         'instance': TypeError,
     }),
     ('kavenegar://{}/{}/{}'.format('1' * 10, '2' * 15, 'a' * 13), {
-        # No valid targets to notify
-        'instance': TypeError,
+        # valid api key and valid authentication
+        'instance': plugins.NotifyKavenegar,
+        # Since there are no targets specified we expect a False return on
+        # send()
+        'notify_response': False,
     }),
     ('kavenegar://{}/{}'.format('a' * 24, '3' * 14), {
         # valid api key and valid number
@@ -1852,6 +1923,18 @@ TEST_URLS = (
         # despite uppercase characters
         'instance': plugins.NotifyMatrix,
     }),
+    ('matrix://user@localhost?mode=SLACK&format=markdown&token=mytoken', {
+        # user and token specified; slack webhook still detected
+        # despite uppercase characters; token also set on URL as arg
+        'instance': plugins.NotifyMatrix,
+    }),
+    ('matrix://_?mode=t2bot&token={}'.format('b' * 64), {
+        # Testing t2bot initialization and setting the password using the
+        # token directive
+        'instance': plugins.NotifyMatrix,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'matrix://b...b/',
+    }),
     # Image Reference
     ('matrixs://user:token@localhost?mode=slack&format=markdown&image=True', {
         # user and token specified; image set to True
@@ -1865,7 +1948,7 @@ TEST_URLS = (
      .format('a' * 64), {
          # user and token specified; image set to True
          'instance': plugins.NotifyMatrix}),
-    ('matrix://user@{}?mode=t2bot&format=markdown&image=False'
+    ('matrix://user@{}?mode=t2bot&format=html&image=False'
      .format('z' * 64), {
          # user and token specified; image set to True
          'instance': plugins.NotifyMatrix}),
@@ -2378,6 +2461,18 @@ TEST_URLS = (
         # No user specified
         'instance': TypeError,
     }),
+    ('ncloud://user@localhost?to=user1,user2&version=invalid', {
+        # An invalid version was specified
+        'instance': TypeError,
+    }),
+    ('ncloud://user@localhost?to=user1,user2&version=0', {
+        # An invalid version was specified
+        'instance': TypeError,
+    }),
+    ('ncloud://user@localhost?to=user1,user2&version=-23', {
+        # An invalid version was specified
+        'instance': TypeError,
+    }),
     ('ncloud://localhost/admin', {
         'instance': plugins.NotifyNextcloud,
     }),
@@ -2385,6 +2480,12 @@ TEST_URLS = (
         'instance': plugins.NotifyNextcloud,
     }),
     ('ncloud://user@localhost?to=user1,user2', {
+        'instance': plugins.NotifyNextcloud,
+    }),
+    ('ncloud://user@localhost?to=user1,user2&version=20', {
+        'instance': plugins.NotifyNextcloud,
+    }),
+    ('ncloud://user@localhost?to=user1,user2&version=21', {
         'instance': plugins.NotifyNextcloud,
     }),
     ('ncloud://user:pass@localhost/user1/user2', {
@@ -3432,6 +3533,10 @@ TEST_URLS = (
     ('pover://%s@%s?priority=high' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
     }),
+    # API Key + priority setting + html mode
+    ('pover://%s@%s?priority=high&format=html' % ('u' * 30, 'a' * 30), {
+        'instance': plugins.NotifyPushover,
+    }),
     # API Key + invalid priority setting
     ('pover://%s@%s?priority=invalid' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
@@ -3742,7 +3847,7 @@ TEST_URLS = (
         },
     }),
     # Several channels
-    ('rocket://user:pass@localhost/#channel1/#channel2/?avatar=No', {
+    ('rocket://user:pass@localhost/#channel1/#channel2/?avatar=Yes', {
         'instance': plugins.NotifyRocketChat,
         # The response text is expected to be the following on a success
         'requests_response_text': {
@@ -3766,7 +3871,7 @@ TEST_URLS = (
         },
     }),
     # A room and channel
-    ('rocket://user:pass@localhost/room/#channel?mode=basic', {
+    ('rocket://user:pass@localhost/room/#channel?mode=basic&avatar=Yes', {
         'instance': plugins.NotifyRocketChat,
         # The response text is expected to be the following on a success
         'requests_response_text': {
@@ -4034,7 +4139,9 @@ TEST_URLS = (
     ('sinch://{}:{}@{}'.format('a' * 32, 'b' * 32, '3' * 5), {
         # using short-code (5 characters) without a target
         # We can still instantiate ourselves with a valid short code
-        'instance': TypeError,
+        'instance': plugins.NotifySinch,
+        # Expected notify() response because we have no one to notify
+        'notify_response': False,
     }),
     ('sinch://{}:{}@{}'.format('a' * 32, 'b' * 32, '3' * 9), {
         # spi and token provided and from but invalid from no
@@ -4942,7 +5049,10 @@ TEST_URLS = (
     ('twilio://AC{}:{}@{}'.format('a' * 32, 'b' * 32, '3' * 5), {
         # using short-code (5 characters) without a target
         # We can still instantiate ourselves with a valid short code
-        'instance': TypeError,
+        'instance': plugins.NotifyTwilio,
+        # Since there are no targets specified we expect a False return on
+        # send()
+        'notify_response': False,
     }),
     ('twilio://AC{}:{}@{}'.format('a' * 32, 'b' * 32, '3' * 9), {
         # sid and token provided and from but invalid from no
@@ -5211,16 +5321,25 @@ TEST_URLS = (
         'instance': TypeError,
     }),
     ('msg91://{}'.format('a' * 23), {
-        # No number specified
-        'instance': TypeError,
+        # valid AuthKey
+        'instance': plugins.NotifyMSG91,
+        # Since there are no targets specified we expect a False return on
+        # send()
+        'notify_response': False,
     }),
     ('msg91://{}/123'.format('a' * 23), {
         # invalid phone number
-        'instance': TypeError,
+        'instance': plugins.NotifyMSG91,
+        # Since there are no targets specified we expect a False return on
+        # send()
+        'notify_response': False,
     }),
     ('msg91://{}/abcd'.format('a' * 23), {
         # No number to notify
-        'instance': TypeError,
+        'instance': plugins.NotifyMSG91,
+        # Since there are no targets specified we expect a False return on
+        # send()
+        'notify_response': False,
     }),
     ('msg91://{}/15551232000/?country=invalid'.format('a' * 23), {
         # invalid country
@@ -5293,12 +5412,18 @@ TEST_URLS = (
         'privacy_url': 'msgbird://a...a/15551232000',
     }),
     ('msgbird://{}/15551232000/abcd'.format('a' * 25), {
-        # invalid target phone number; we have no one to notify
-        'instance': TypeError,
+        # valid credentials
+        'instance': plugins.NotifyMessageBird,
+        # Since there are no targets specified we expect a False return on
+        # send()
+        'notify_response': False,
     }),
     ('msgbird://{}/15551232000/123'.format('a' * 25), {
-        # invalid target phone number
-        'instance': TypeError,
+        # valid credentials
+        'instance': plugins.NotifyMessageBird,
+        # Since there are no targets specified we expect a False return on
+        # send()
+        'notify_response': False,
     }),
     ('msgbird://{}/?from=15551233000&to=15551232000'.format('a' * 25), {
         # reference to to= and from=

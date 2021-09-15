@@ -40,20 +40,16 @@
 # or consider purchasing a short-code from here:
 #    https://www.twilio.com/docs/glossary/what-is-a-short-code
 #
-import re
 import requests
 from json import loads
 
 from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyType
-from ..utils import parse_list
+from ..utils import is_phone_no
+from ..utils import parse_phone_no
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
-
-
-# Some Phone Number Detection
-IS_PHONE_NO = re.compile(r'^\+?(?P<phone>[0-9\s)(+-]+)\s*$')
 
 
 class NotifyTwilio(NotifyBase):
@@ -112,7 +108,7 @@ class NotifyTwilio(NotifyBase):
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'^[a-f0-9]+$', 'i'),
+            'regex': (r'^[a-z0-9]+$', 'i'),
         },
         'from_phone': {
             'name': _('From Phone No'),
@@ -154,10 +150,16 @@ class NotifyTwilio(NotifyBase):
         'token': {
             'alias_of': 'auth_token',
         },
+        'apikey': {
+            'name': _('API Key'),
+            'type': 'string',
+            'private': True,
+            'regex': (r'^SK[a-f0-9]+$', 'i'),
+        },
     })
 
     def __init__(self, account_sid, auth_token, source, targets=None,
-                 **kwargs):
+                 apikey=None, ** kwargs):
         """
         Initialize Twilio Object
         """
@@ -181,17 +183,19 @@ class NotifyTwilio(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # The Source Phone # and/or short-code
-        self.source = source
+        # The API Key associated with the account (optional)
+        self.apikey = validate_regex(
+            apikey, *self.template_args['apikey']['regex'])
 
-        if not IS_PHONE_NO.match(self.source):
+        result = is_phone_no(source, min_len=5)
+        if not result:
             msg = 'The Account (From) Phone # or Short-code specified ' \
                   '({}) is invalid.'.format(source)
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # Tidy source
-        self.source = re.sub(r'[^\d]+', '', self.source)
+        # Store The Source Phone # and/or short-code
+        self.source = result['full']
 
         if len(self.source) < 11 or len(self.source) > 14:
             # https://www.twilio.com/docs/glossary/what-is-a-short-code
@@ -213,37 +217,18 @@ class NotifyTwilio(NotifyBase):
         # Parse our targets
         self.targets = list()
 
-        for target in parse_list(targets):
+        for target in parse_phone_no(targets):
             # Validate targets and drop bad ones:
-            result = IS_PHONE_NO.match(target)
-            if result:
-                # Further check our phone # for it's digit count
-                # if it's less than 10, then we can assume it's
-                # a poorly specified phone no and spit a warning
-                result = ''.join(re.findall(r'\d+', result.group('phone')))
-                if len(result) < 11 or len(result) > 14:
-                    self.logger.warning(
-                        'Dropped invalid phone # '
-                        '({}) specified.'.format(target),
-                    )
-                    continue
-
-                # store valid phone number
-                self.targets.append('+{}'.format(result))
+            result = is_phone_no(target)
+            if not result:
+                self.logger.warning(
+                    'Dropped invalid phone # '
+                    '({}) specified.'.format(target),
+                )
                 continue
 
-            self.logger.warning(
-                'Dropped invalid phone # '
-                '({}) specified.'.format(target),
-            )
-
-        if not self.targets:
-            if len(self.source) in (5, 6):
-                # raise a warning since we're a short-code.  We need
-                # a number to message
-                msg = 'There are no valid Twilio targets to notify.'
-                self.logger.warning(msg)
-                raise TypeError(msg)
+            # store valid phone number
+            self.targets.append('+{}'.format(result['full']))
 
         return
 
@@ -251,6 +236,14 @@ class NotifyTwilio(NotifyBase):
         """
         Perform Twilio Notification
         """
+
+        if not self.targets:
+            if len(self.source) in (5, 6):
+                # Generate a warning since we're a short-code.  We need
+                # a number to message at minimum
+                self.logger.warning(
+                    'There are no valid Twilio targets to notify.')
+                return False
 
         # error tracking (used for function return)
         has_error = False
@@ -276,8 +269,8 @@ class NotifyTwilio(NotifyBase):
         # Create a copy of the targets list
         targets = list(self.targets)
 
-        # Set up our authentication
-        auth = (self.account_sid, self.auth_token)
+        # Set up our authentication. Prefer the API Key if provided.
+        auth = (self.apikey or self.account_sid, self.auth_token)
 
         if len(targets) == 0:
             # No sources specified, use our own phone no
@@ -371,6 +364,10 @@ class NotifyTwilio(NotifyBase):
         # Our URL parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
+        if self.apikey is not None:
+            # apikey specified; pass it back on the url
+            params['apikey'] = self.apikey
+
         return '{schema}://{sid}:{token}@{source}/{targets}/?{params}'.format(
             schema=self.secure_protocol,
             sid=self.pprint(
@@ -417,6 +414,10 @@ class NotifyTwilio(NotifyBase):
             results['account_sid'] = \
                 NotifyTwilio.unquote(results['qsd']['sid'])
 
+        # API Key
+        if 'apikey' in results['qsd'] and len(results['qsd']['apikey']):
+            results['apikey'] = results['qsd']['apikey']
+
         # Support the 'from'  and 'source' variable so that we can support
         # targets this way too.
         # The 'from' makes it easier to use yaml configuration
@@ -431,6 +432,6 @@ class NotifyTwilio(NotifyBase):
         # The 'to' makes it easier to use yaml configuration
         if 'to' in results['qsd'] and len(results['qsd']['to']):
             results['targets'] += \
-                NotifyTwilio.parse_list(results['qsd']['to'])
+                NotifyTwilio.parse_phone_no(results['qsd']['to'])
 
         return results

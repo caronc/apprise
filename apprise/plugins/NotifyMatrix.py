@@ -30,6 +30,7 @@
 import re
 import six
 import requests
+from markdown import markdown
 from json import dumps
 from json import loads
 from time import time
@@ -41,6 +42,7 @@ from ..common import NotifyImageSize
 from ..common import NotifyFormat
 from ..utils import parse_bool
 from ..utils import parse_list
+from ..utils import apply_template
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
@@ -131,13 +133,13 @@ class NotifyMatrix(NotifyBase):
         '{schema}://{token}',
         '{schema}://{user}@{token}',
 
-        # All other non-t2bot setups require targets
+        # Disabled webhook
         '{schema}://{user}:{password}@{host}/{targets}',
         '{schema}://{user}:{password}@{host}:{port}/{targets}',
-        '{schema}://{token}:{password}@{host}/{targets}',
-        '{schema}://{token}:{password}@{host}:{port}/{targets}',
-        '{schema}://{user}:{token}:{password}@{host}/{targets}',
-        '{schema}://{user}:{token}:{password}@{host}:{port}/{targets}',
+
+        # Webhook mode
+        '{schema}://{user}:{token}@{host}/{targets}',
+        '{schema}://{user}:{token}@{host}:{port}/{targets}',
     )
 
     # Define our template tokens
@@ -207,6 +209,9 @@ class NotifyMatrix(NotifyBase):
         'to': {
             'alias_of': 'targets',
         },
+        'token': {
+            'alias_of': 'token',
+        },
     })
 
     def __init__(self, targets=None, mode=None, include_image=False, **kwargs):
@@ -245,10 +250,10 @@ class NotifyMatrix(NotifyBase):
         if self.mode == MatrixWebhookMode.T2BOT:
             # t2bot configuration requires that a webhook id is specified
             self.access_token = validate_regex(
-                self.host, r'^[a-z0-9]{64}$', 'i')
+                self.password, r'^[a-z0-9]{64}$', 'i')
             if not self.access_token:
                 msg = 'An invalid T2Bot/Matrix Webhook ID ' \
-                      '({}) was specified.'.format(self.host)
+                      '({}) was specified.'.format(self.password)
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
@@ -283,7 +288,7 @@ class NotifyMatrix(NotifyBase):
             default_port = 443 if self.secure else 80
 
             # Prepare our URL
-            url = '{schema}://{hostname}:{port}/{webhook_path}/{token}'.format(
+            url = '{schema}://{hostname}:{port}{webhook_path}/{token}'.format(
                 schema='https' if self.secure else 'http',
                 hostname=self.host,
                 port='' if self.port is None
@@ -412,20 +417,31 @@ class NotifyMatrix(NotifyBase):
         payload = {
             'displayName':
                 self.user if self.user else self.app_id,
-            'format': 'html',
+            'format': 'plain' if self.notify_format == NotifyFormat.TEXT
+            else 'html',
+            'text': '',
         }
 
         if self.notify_format == NotifyFormat.HTML:
-            payload['text'] = '{}{}'.format('' if not title else title, body)
+            # Add additional information to our content; use {{app_title}}
+            # to apply the title to the html body
+            tokens = {
+                'app_title': NotifyMatrix.escape_html(
+                    title, whitespace=False),
+            }
+            payload['text'] = apply_template(body, **tokens)
 
-        else:  # TEXT or MARKDOWN
+        elif self.notify_format == NotifyFormat.MARKDOWN:
+            # Add additional information to our content; use {{app_title}}
+            # to apply the title to the html body
+            tokens = {
+                'app_title': title,
+            }
+            payload['text'] = markdown(apply_template(body, **tokens))
 
-            # Ensure our content is escaped
-            title = NotifyMatrix.escape_html(title)
-            body = NotifyMatrix.escape_html(body)
-
-            payload['text'] = '{}{}'.format(
-                '' if not title else '<h4>{}</h4>'.format(title), body)
+        else:  # NotifyFormat.TEXT
+            payload['text'] = \
+                body if not title else '{}\r\n{}'.format(title, body)
 
         return payload
 
@@ -494,11 +510,6 @@ class NotifyMatrix(NotifyBase):
                 has_error = True
                 continue
 
-            # We have our data cached at this point we can freely use it
-            msg = '{title}{body}'.format(
-                title='' if not title else '{}\r\n'.format(title),
-                body=body)
-
             # Acquire our image url if we're configured to do so
             image_url = None if not self.include_image else \
                 self.image_url(notify_type)
@@ -524,8 +535,34 @@ class NotifyMatrix(NotifyBase):
             # Define our payload
             payload = {
                 'msgtype': 'm.text',
-                'body': msg,
+                'body': '{title}{body}'.format(
+                    title='' if not title else '{}\r\n'.format(title),
+                    body=body),
             }
+
+            # Update our payload advance formatting for the services that
+            # support them.
+            if self.notify_format == NotifyFormat.HTML:
+                # Add additional information to our content; use {{app_title}}
+                # to apply the title to the html body
+                tokens = {
+                    'app_title': NotifyMatrix.escape_html(
+                        title, whitespace=False),
+                }
+
+                payload.update({
+                    'format': 'org.matrix.custom.html',
+                    'formatted_body': apply_template(body, **tokens),
+                })
+
+            elif self.notify_format == NotifyFormat.MARKDOWN:
+                tokens = {
+                    'app_title': title,
+                }
+                payload.update({
+                    'format': 'org.matrix.custom.html',
+                    'formatted_body': markdown(apply_template(body, **tokens))
+                })
 
             # Build our path
             path = '/rooms/{}/send/m.room.message'.format(
@@ -694,7 +731,7 @@ class NotifyMatrix(NotifyBase):
         # Prepare our Join Payload
         payload = {}
 
-        # Not in cache, next step is to check if it's a room id...
+        # Check if it's a room id...
         result = IS_ROOM_ID.match(room)
         if result:
             # We detected ourselves the home_server
@@ -707,11 +744,23 @@ class NotifyMatrix(NotifyBase):
                 home_server,
             )
 
+            # Check our cache for speed:
+            if room_id in self._room_cache:
+                # We're done as we've already joined the channel
+                return self._room_cache[room_id]['id']
+
             # Build our URL
             path = '/join/{}'.format(NotifyMatrix.quote(room_id))
 
             # Make our query
             postokay, _ = self._fetch(path, payload=payload)
+            if postokay:
+                # Cache our entry for fast access later
+                self._room_cache[room_id] = {
+                    'id': room_id,
+                    'home_server': home_server,
+                }
+
             return room_id if postokay else None
 
         # Try to see if it's an alias then...
@@ -1003,8 +1052,53 @@ class NotifyMatrix(NotifyBase):
         """
         Ensure we relinquish our token
         """
-        if self.mode != MatrixWebhookMode.T2BOT:
+        if self.mode == MatrixWebhookMode.T2BOT:
+            # nothing to do
+            return
+
+        try:
             self._logout()
+
+        except LookupError:  # pragma: no cover
+            # Python v3.5 call to requests can sometimes throw the exception
+            #   "/usr/lib64/python3.7/socket.py", line 748, in getaddrinfo
+            #   LookupError: unknown encoding: idna
+            #
+            # This occurs every time when running unit-tests against Apprise:
+            # LANG=C.UTF-8 PYTHONPATH=$(pwd) py.test-3.7
+            #
+            # There has been an open issue on this since Jan 2017.
+            #   - https://bugs.python.org/issue29288
+            #
+            # A ~similar~ issue can be identified here in the requests
+            # ticket system as unresolved and has provided work-arounds
+            #   - https://github.com/kennethreitz/requests/issues/3578
+            pass
+
+        except ImportError:  # pragma: no cover
+            # The actual exception is `ModuleNotFoundError` however ImportError
+            # grants us backwards compatiblity with versions of Python older
+            # than v3.6
+
+            # Python code that makes early calls to sys.exit() can cause
+            # the __del__() code to run. However in some newer versions of
+            # Python, this causes the `sys` library to no longer be
+            # available. The stack overflow also goes on to suggest that
+            # it's not wise to use the __del__() as a deconstructor
+            # which is the case here.
+
+            # https://stackoverflow.com/questions/67218341/\
+            #       modulenotfounderror-import-of-time-halted-none-in-sys-\
+            #           modules-occured-when-obj?noredirect=1&lq=1
+            #
+            #
+            # Also see: https://stackoverflow.com/questions\
+            #       /1481488/what-is-the-del-method-and-how-do-i-call-it
+
+            # At this time it seems clean to try to log out (if we can)
+            # but not throw any unessisary exceptions (like this one) to
+            # the end user if we don't have to.
+            pass
 
     def url(self, privacy=False, *args, **kwargs):
         """
@@ -1020,26 +1114,30 @@ class NotifyMatrix(NotifyBase):
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        # Determine Authentication
         auth = ''
-        if self.user and self.password:
-            auth = '{user}:{password}@'.format(
-                user=NotifyMatrix.quote(self.user, safe=''),
-                password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
-            )
+        if self.mode != MatrixWebhookMode.T2BOT:
+            # Determine Authentication
+            if self.user and self.password:
+                auth = '{user}:{password}@'.format(
+                    user=NotifyMatrix.quote(self.user, safe=''),
+                    password=self.pprint(
+                        self.password, privacy, mode=PrivacyMode.Secret,
+                        safe=''),
+                )
 
-        elif self.user:
-            auth = '{user}@'.format(
-                user=NotifyMatrix.quote(self.user, safe=''),
-            )
+            elif self.user:
+                auth = '{user}@'.format(
+                    user=NotifyMatrix.quote(self.user, safe=''),
+                )
 
         default_port = 443 if self.secure else 80
 
         return '{schema}://{auth}{hostname}{port}/{rooms}?{params}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
-            hostname=NotifyMatrix.quote(self.host, safe=''),
+            hostname=NotifyMatrix.quote(self.host, safe='')
+            if self.mode != MatrixWebhookMode.T2BOT
+            else self.pprint(self.access_token, privacy, safe=''),
             port='' if self.port is None
             or self.port == default_port else ':{}'.format(self.port),
             rooms=NotifyMatrix.quote('/'.join(self.rooms)),
@@ -1085,6 +1183,15 @@ class NotifyMatrix(NotifyBase):
 
             # Default mode to t2bot
             results['mode'] = MatrixWebhookMode.T2BOT
+
+        if results['mode'] and \
+                results['mode'].lower() == MatrixWebhookMode.T2BOT:
+            # unquote our hostname and pass it in as the password/token
+            results['password'] = NotifyMatrix.unquote(results['host'])
+
+        # Support the use of the token= keyword
+        if 'token' in results['qsd'] and len(results['qsd']['token']):
+            results['password'] = NotifyMatrix.unquote(results['qsd']['token'])
 
         return results
 

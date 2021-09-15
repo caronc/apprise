@@ -35,12 +35,10 @@ from itertools import chain
 from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyType
+from ..utils import is_phone_no
 from ..utils import parse_list
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
-
-# Some Phone Number Detection
-IS_PHONE_NO = re.compile(r'^\+?(?P<phone>[0-9\s)(+-]+)\s*$')
 
 # Topic Detection
 # Summary: 256 Characters max, only alpha/numeric plus underscore (_) and
@@ -198,24 +196,10 @@ class NotifySNS(NotifyBase):
         self.aws_auth_algorithm = 'AWS4-HMAC-SHA256'
         self.aws_auth_request = 'aws4_request'
 
-        # Get our targets
-        targets = parse_list(targets)
-
         # Validate targets and drop bad ones:
-        for target in targets:
-            result = IS_PHONE_NO.match(target)
+        for target in parse_list(targets):
+            result = is_phone_no(target)
             if result:
-                # Further check our phone # for it's digit count
-                # if it's less than 10, then we can assume it's
-                # a poorly specified phone no and spit a warning
-                result = ''.join(re.findall(r'\d+', result.group('phone')))
-                if len(result) < 11 or len(result) > 14:
-                    self.logger.warning(
-                        'Dropped invalid phone # '
-                        '(%s) specified.' % target,
-                    )
-                    continue
-
                 # store valid phone number
                 self.phone.append('+{}'.format(result))
                 continue
@@ -231,18 +215,17 @@ class NotifySNS(NotifyBase):
                 '(%s) specified.' % target,
             )
 
-        if len(self.phone) == 0 and len(self.topics) == 0:
-            # We have a bot token and no target(s) to message
-            msg = 'No AWS targets to notify.'
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
         return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         wrapper to send_notification since we can alert more then one channel
         """
+
+        if len(self.phone) == 0 and len(self.topics) == 0:
+            # We have a bot token and no target(s) to message
+            self.logger.warning('No AWS targets to notify.')
+            return False
 
         # Initiaize our error tracking
         error_count = 0

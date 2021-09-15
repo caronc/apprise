@@ -355,7 +355,7 @@ class NotifyIFTTT(NotifyBase):
         result = re.match(
             r'^https?://maker\.ifttt\.com/use/'
             r'(?P<webhook_id>[A-Z0-9_-]+)'
-            r'/?(?P<events>([A-Z0-9_-]+/?)+)?'
+            r'((?P<events>(/[A-Z0-9_-]+)+))?'
             r'/?(?P<params>\?.+)?$', url, re.I)
 
         if result:

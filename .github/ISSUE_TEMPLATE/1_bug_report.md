@@ -10,7 +10,7 @@ assignees: ''
 :mega: **Notification Service(s) Impacted**
 <!-- Discord, Telegram, Pushbullet, etc  -->
 
-:beetle: **Describe the bug**
+:lady_beetle: **Describe the bug**
 <!-- A clear and concise description of the problem. -->
 
 :bulb: **Screenshots and Logs**

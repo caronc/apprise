@@ -29,6 +29,7 @@ import requests
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
+from ..common import NotifyFormat
 from ..utils import parse_list
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
@@ -319,6 +320,10 @@ class NotifyPushover(NotifyBase):
                 'device': device,
                 'sound': self.sound,
             }
+
+            if self.notify_format == NotifyFormat.HTML:
+                # https://pushover.net/api#html
+                payload['html'] = 1
 
             if self.priority == PushoverPriority.EMERGENCY:
                 payload.update({'retry': self.retry, 'expire': self.expire})

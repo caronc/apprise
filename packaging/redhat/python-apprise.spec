@@ -47,18 +47,18 @@ Apprise is a Python package for simplifying access to all of the different
 notification services that are out there. Apprise opens the door and makes
 it easy to access:
 
-Boxcar, ClickSend, Discord, E-Mail, Emby, Faast, FCM, Flock, Gitter, Google
-Chat, Gotify, Growl, Home Assistant, IFTTT, Join, Kavenegar, KODI, Kumulos,
-LaMetric, MacOSX, Mailgun, Mattermost, Matrix, Microsoft Windows, Microsoft
-Teams, MessageBird, MSG91, MyAndroid, Nexmo, Nextcloud, Notica, Notifico,
-Office365, OneSignal, Opsgenie, ParsePlatform, PopcornNotify, Prowl, Pushalot,
-PushBullet, Pushjet, Pushover, PushSafer, Reddit, Rocket.Chat, SendGrid,
-SimplePush, Sinch, Slack, SMTP2Go, Spontit, SparkPost, Super Toasty, Stride,
-Syslog, Techulus Push, Telegram, Twilio, Twitter, Twist, XBMC, XMPP,
+Boxcar, ClickSend, DingTalk, Discord, E-Mail, Emby, Faast, FCM, Flock, Gitter,
+Google Chat, Gotify, Growl, Home Assistant, IFTTT, Join, Kavenegar, KODI,
+Kumulos, LaMetric, MacOSX, Mailgun, Mattermost, Matrix, Microsoft Windows,
+Microsoft Teams, MessageBird, MSG91, MyAndroid, Nexmo, Nextcloud, Notica,
+Notifico, Office365, OneSignal, Opsgenie, ParsePlatform, PopcornNotify, Prowl,
+Pushalot, PushBullet, Pushjet, Pushover, PushSafer, Reddit, Rocket.Chat,
+SendGrid, SimplePush, Sinch, Slack, SMTP2Go, Spontit, SparkPost, Super Toasty,
+Stride, Syslog, Techulus Push, Telegram, Twilio, Twitter, Twist, XBMC, XMPP,
 Webex Teams}
 
 Name:           python-%{pypi_name}
-Version:        0.9.3
+Version:        0.9.4
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        MIT
@@ -145,8 +145,8 @@ BuildRequires: python%{python3_pkgversion}-requests-oauthlib
 BuildRequires: python%{python3_pkgversion}-six
 BuildRequires: python%{python3_pkgversion}-click >= 5.0
 BuildRequires: python%{python3_pkgversion}-markdown
-%if 0%{?rhel} && 0%{?rhel} >= 8
-# gntp isn't available from EPEL for RHEL/CentOS 8
+%if (0%{?rhel} && 0%{?rhel} >= 8) || (0%{?fedora} && 0%{?fedora} >= 35)
+# gntp isn't available from EPEL for RHEL/CentOS 8 or Fedora 35+
 %else
 # For all other distributions, include gntp
 BuildRequires: python%{python3_pkgversion}-gntp
@@ -159,8 +159,8 @@ Requires: python%{python3_pkgversion}-requests-oauthlib
 Requires: python%{python3_pkgversion}-six
 Requires: python%{python3_pkgversion}-markdown
 Requires: python%{python3_pkgversion}-cryptography
-%if 0%{?rhel} && 0%{?rhel} >= 8
-# gntp isn't available from EPEL for RHEL/CentOS 8
+%if (0%{?rhel} && 0%{?rhel} >= 8) || (0%{?fedora} && 0%{?fedora} >= 35)
+# gntp isn't available from EPEL for RHEL/CentOS 8 or Fedora 35+
 %else
 # For all other distributions, include gntp
 Requires: python%{python3_pkgversion}-gntp
@@ -248,6 +248,15 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 %endif
 
 %changelog
+* Wed Aug 11 2021 Chris Caron <lead2gold@gmail.com> - 0.9.4-1
+- Updated to v0.9.4
+
+* Fri Jul 23 2021 Fedora Release Engineering <releng@fedoraproject.org> - 0.9.3-3
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_35_Mass_Rebuild
+
+* Fri Jun 04 2021 Python Maint <python-maint@redhat.com> - 0.9.3-2
+- Rebuilt for Python 3.10
+
 * Sun May 16 2021 Chris Caron <lead2gold@gmail.com> - 0.9.3-1
 - Updated to v0.9.3
 

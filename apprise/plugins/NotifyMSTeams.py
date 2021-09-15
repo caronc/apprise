@@ -168,7 +168,7 @@ class NotifyMSTeams(NotifyBase):
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'^[A-Za-z0-9]+$', 'i'),
+            'regex': (r'^[a-z0-9]+$', 'i'),
         },
         # Token required as part of the API request
         #  /........./........./CCCCCCCCCCCCCCCCCCCCCCCC
@@ -177,7 +177,7 @@ class NotifyMSTeams(NotifyBase):
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'^[A-Z0-9-]+$', 'i'),
+            'regex': (r'^[a-z0-9-]+$', 'i'),
         },
     })
 
@@ -539,10 +539,13 @@ class NotifyMSTeams(NotifyBase):
             results['team'] = NotifyMSTeams.unquote(results['host'])
 
             # Get the token from the path
-            results['token_a'] = None if not entries else entries.pop(0)
+            results['token_a'] = None if not entries \
+                else NotifyMSTeams.unquote(entries.pop(0))
 
-        results['token_b'] = None if not entries else entries.pop(0)
-        results['token_c'] = None if not entries else entries.pop(0)
+        results['token_b'] = None if not entries \
+            else NotifyMSTeams.unquote(entries.pop(0))
+        results['token_c'] = None if not entries \
+            else NotifyMSTeams.unquote(entries.pop(0))
 
         # Get Image
         results['include_image'] = \

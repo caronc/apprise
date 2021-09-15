@@ -62,7 +62,7 @@ else:
 
 setup(
     name='apprise',
-    version='0.9.3',
+    version='0.9.4',
     description='Push Notifications that work with just about every platform!',
     license='MIT',
     long_description=open('README.md').read(),
@@ -70,14 +70,15 @@ setup(
     cmdclass=cmdclass,
     url='https://github.com/caronc/apprise',
     keywords='Push Notifications Alerts Email AWS SNS Boxcar ClickSend '
-        'Discord Dbus Emby Faast FCM Flock Gitter Gnome Google Chat Gotify '
-        'Growl Home Assistant IFTTT Join Kavenegar KODI Kumulos LaMetric '
-        'MacOS Mailgun Matrix Mattermost MessageBird MSG91 Nexmo Nextcloud '
-        'Notica Notifico Office365 OneSignal Opsgenie ParsePlatform '
-        'PopcornNotify Prowl PushBullet Pushjet Pushed Pushover PushSafer '
-        'Reddit Rocket.Chat Ryver SendGrid SimplePush Sinch Slack SMTP2Go '
-        'SparkPost Spontit Stride Syslog Techulus Telegram Twilio Twist '
-        'Twitter XBMC MSTeams Microsoft Windows Webex CLI API',
+        'Dingtalk Discord Dbus Emby Faast FCM Flock Gitter Gnome Google Chat '
+        'Gotify Growl Home Assistant IFTTT Join Kavenegar KODI Kumulos '
+        'LaMetric MacOS Mailgun Matrix Mattermost MessageBird MSG91 Nexmo '
+        'Nextcloud Notica Notifico Office365 OneSignal Opsgenie '
+        'ParsePlatform PopcornNotify Prowl PushBullet Pushjet Pushed '
+        'Pushover PushSafer Reddit Rocket.Chat Ryver SendGrid SimplePush '
+        'Sinch Slack SMTP2Go SparkPost Spontit Stride Syslog Techulus '
+        'Telegram Twilio Twist Twitter XBMC MSTeams Microsoft Windows Webex '
+        'CLI API',
     author='Chris Caron',
     author_email='lead2gold@gmail.com',
     packages=find_packages(),
@@ -88,6 +89,9 @@ setup(
             'assets/themes/default/*.ico',
             'i18n/*.py',
             'i18n/*/LC_MESSAGES/*.mo',
+            'py.typed',
+            '*.pyi',
+            '*/*.pyi'
         ],
     },
     install_requires=install_requires,

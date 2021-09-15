@@ -28,19 +28,15 @@
 # Get your (api) key and secret here:
 #   - https://dashboard.nexmo.com/getting-started-guide
 #
-
-import re
 import requests
 
 from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyType
-from ..utils import parse_list
+from ..utils import is_phone_no
+from ..utils import parse_phone_no
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
-
-# Some Phone Number Detection
-IS_PHONE_NO = re.compile(r'^\+?(?P<phone>[0-9\s)(+-]+)\s*$')
 
 
 class NotifyNexmo(NotifyBase):
@@ -185,44 +181,31 @@ class NotifyNexmo(NotifyBase):
         # The Source Phone #
         self.source = source
 
-        if not IS_PHONE_NO.match(self.source):
+        result = is_phone_no(source)
+        if not result:
             msg = 'The Account (From) Phone # specified ' \
                   '({}) is invalid.'.format(source)
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # Tidy source
-        self.source = re.sub(r'[^\d]+', '', self.source)
-        if len(self.source) < 11 or len(self.source) > 14:
-            msg = 'The Account (From) Phone # specified ' \
-                  '({}) contains an invalid digit count.'.format(source)
-            self.logger.warning(msg)
-            raise TypeError(msg)
+        # Store our parsed value
+        self.source = result['full']
 
         # Parse our targets
         self.targets = list()
 
-        for target in parse_list(targets):
+        for target in parse_phone_no(targets):
             # Validate targets and drop bad ones:
-            result = IS_PHONE_NO.match(target)
-            if result:
-                # Further check our phone # for it's digit count
-                result = ''.join(re.findall(r'\d+', result.group('phone')))
-                if len(result) < 11 or len(result) > 14:
-                    self.logger.warning(
-                        'Dropped invalid phone # '
-                        '({}) specified.'.format(target),
-                    )
-                    continue
-
-                # store valid phone number
-                self.targets.append(result)
+            result = is_phone_no(target)
+            if not result:
+                self.logger.warning(
+                    'Dropped invalid phone # '
+                    '({}) specified.'.format(target),
+                )
                 continue
 
-            self.logger.warning(
-                'Dropped invalid phone # '
-                '({}) specified.'.format(target),
-            )
+            # store valid phone number
+            self.targets.append(result['full'])
 
         return
 
@@ -393,10 +376,10 @@ class NotifyNexmo(NotifyBase):
             results['ttl'] = \
                 NotifyNexmo.unquote(results['qsd']['ttl'])
 
-        # Support the 'to' variable so that we can support targets this way too
+        # Support the 'to' variable so that we can support rooms this way too
         # The 'to' makes it easier to use yaml configuration
         if 'to' in results['qsd'] and len(results['qsd']['to']):
             results['targets'] += \
-                NotifyNexmo.parse_list(results['qsd']['to'])
+                NotifyNexmo.parse_phone_no(results['qsd']['to'])
 
         return results
