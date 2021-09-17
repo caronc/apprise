@@ -50,7 +50,7 @@ it easy to access:
 Boxcar, ClickSend, DingTalk, Discord, E-Mail, Emby, Faast, FCM, Flock, Gitter,
 Google Chat, Gotify, Growl, Home Assistant, IFTTT, Join, Kavenegar, KODI,
 Kumulos, LaMetric, MacOSX, Mailgun, Mattermost, Matrix, Microsoft Windows,
-Microsoft Teams, MessageBird, MSG91, MyAndroid, Nexmo, Nextcloud, Notica,
+Microsoft Teams, MessageBird, MQTT, MSG91, MyAndroid, Nexmo, Nextcloud, Notica,
 Notifico, Office365, OneSignal, Opsgenie, ParsePlatform, PopcornNotify, Prowl,
 Pushalot, PushBullet, Pushjet, Pushover, PushSafer, Reddit, Rocket.Chat,
 SendGrid, SimplePush, Sinch, Slack, SMTP2Go, Spontit, SparkPost, Super Toasty,
