@@ -33,6 +33,8 @@
 import ssl
 import re
 import six
+from time import sleep
+from datetime import datetime
 from os.path import isfile
 from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
@@ -103,6 +105,11 @@ class NotifyMQTT(NotifyBase):
     # The maximum length a body can be set to
     body_maxlen = 268435455
 
+    # Use a throttle; but it doesn't need to be so strict since most
+    # MQTT server hostings can handle the small bursts of packets and are
+    # locally hosted anyway
+    request_rate_per_sec = 0.5
+
     # This entry is a bit hacky, but it allows us to unit-test this library
     # in an environment that simply doesn't have the mqtt packages
     # available to us.  It also allows us to handle situations where the
@@ -123,6 +130,10 @@ class NotifyMQTT(NotifyBase):
 
     # The default mqtt transport
     mqtt_transport = "tcp"
+
+    # The number of seconds to wait for a publish to occur at before
+    # checking to see if it's been sent yet.
+    mqtt_block_time_sec = 0.2
 
     # Set the maximum number of messages with QoS>0 that can be part way
     # through their network flow at once.
@@ -286,7 +297,13 @@ class NotifyMQTT(NotifyBase):
             clean_session=not self.session, userdata=None,
             protocol=self.mqtt_protocol, transport=self.mqtt_transport,
         )
+
+        # Our maximum number of in-flight messages
         self.client.max_inflight_messages_set(self.mqtt_inflight_messages)
+
+        # Toggled to False once our connection has been established at least
+        # once
+        self.__initial_connect = True
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
@@ -304,42 +321,59 @@ class NotifyMQTT(NotifyBase):
             self.logger.warning('There were no MQTT topics to notify.')
             return False
 
-        if self.user:
-            self.client.username_pw_set(self.user, password=self.password)
-
-        if self.secure:
-            if self.ca_certs is None:
-                self.logger.warning(
-                    'MQTT Secure comunication can not be verified; '
-                    'no local CA certificate file')
-                return False
-
-            self.client.tls_set(
-                ca_certs=self.ca_certs, certfile=None, keyfile=None,
-                cert_reqs=ssl.CERT_REQUIRED, tls_version=ssl.PROTOCOL_TLS,
-                ciphers=None)
-
-            # Set our TLS Verify Flag
-            self.client.tls_insecure_set(self.verify_certificate)
-
         # For logging:
         url = '{host}:{port}'.format(host=self.host, port=self.port)
 
         try:
-            # Establish our connection
-            if self.client.connect(
-                    self.host, port=self.port, keepalive=self.mqtt_keepalive) \
-                    != mqtt.MQTT_ERR_SUCCESS:
-                self.logger.warning(
-                    'An MQTT connection could not be established for {}'.
-                    format(url))
-                return False
+            if self.__initial_connect:
+                # Our initial connection
+                if self.user:
+                    self.client.username_pw_set(
+                        self.user, password=self.password)
 
-            self.client.loop_start()
+                if self.secure:
+                    if self.ca_certs is None:
+                        self.logger.warning(
+                            'MQTT Secure comunication can not be verified; '
+                            'no local CA certificate file')
+                        return False
+
+                    self.client.tls_set(
+                        ca_certs=self.ca_certs, certfile=None, keyfile=None,
+                        cert_reqs=ssl.CERT_REQUIRED,
+                        tls_version=ssl.PROTOCOL_TLS,
+                        ciphers=None)
+
+                    # Set our TLS Verify Flag
+                    self.client.tls_insecure_set(self.verify_certificate)
+
+                # Establish our connection
+                if self.client.connect(
+                        self.host, port=self.port,
+                        keepalive=self.mqtt_keepalive) \
+                        != mqtt.MQTT_ERR_SUCCESS:
+                    self.logger.warning(
+                        'An MQTT connection could not be established for {}'.
+                        format(url))
+                    return False
+
+                # Start our client loop
+                self.client.loop_start()
+
+                # Throttle our start otherwise the starting handshaking doesnt
+                # work. I'm not sure if this is a bug or not, but with qos=0,
+                # and without this sleep(), the messages randomly fails to be
+                # delivered.
+                sleep(0.01)
+
+                # Toggle our flag since we never need to enter this area again
+                self.__initial_connect = False
 
             # Create a copy of the subreddits list
             topics = list(self.topics)
-            while len(topics) > 0:
+
+            has_error = False
+            while len(topics) > 0 and not has_error:
                 # Retrieve our subreddit
                 topic = topics.pop()
 
@@ -358,7 +392,8 @@ class NotifyMQTT(NotifyBase):
                     self.logger.warning(
                         'An MQTT connection could not be sustained for {}'.
                         format(url))
-                    return False
+                    has_error = True
+                    break
 
                 # Some Debug Logging
                 self.logger.debug('MQTT POST URL: {} (cert_verify={})'.format(
@@ -373,17 +408,26 @@ class NotifyMQTT(NotifyBase):
                     self.logger.warning(
                         'An error (rc={}) occured when sending MQTT to {}'.
                         format(result.rc, url))
-                    return False
+                    has_error = True
+                    break
 
                 elif not result.is_published():
                     self.logger.debug(
                         'Blocking until MQTT payload is published...')
-                    result.wait_for_publish()
-                    if not result.is_published():
-                        return False
+                    reference = datetime.now()
+                    while not has_error and not result.is_published():
+                        # Throttle
+                        sleep(self.mqtt_block_time_sec)
 
-            # Disconnect
-            self.client.disconnect()
+                        # Our own throttle so we can abort eventually....
+                        elapsed = (datetime.now() - reference).total_seconds()
+                        if elapsed >= self.socket_read_timeout:
+                            self.logger.warning(
+                                'The MQTT message could not be delivered')
+                            has_error = True
+
+                # if we reach here; we're at the bottom of our loop
+                # we loop around and do the next topic now
 
         except ConnectionError as e:
             self.logger.warning(
@@ -404,7 +448,7 @@ class NotifyMQTT(NotifyBase):
             self.logger.debug('Socket Exception: %s' % str(e))
             return False
 
-        return True
+        return not has_error
 
     def url(self, privacy=False, *args, **kwargs):
         """
@@ -469,8 +513,8 @@ class NotifyMQTT(NotifyBase):
 
         try:
             # Acquire topic(s)
-            results['targets'] = NotifyMQTT.parse_list(
-                results['fullpath'].lstrip('/'))
+            results['targets'] = parse_list(
+                NotifyMQTT.unquote(results['fullpath'].lstrip('/')))
 
         except AttributeError:
             # No 'fullpath' specified
