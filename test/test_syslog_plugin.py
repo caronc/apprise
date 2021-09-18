@@ -144,8 +144,8 @@ def test_notify_syslog_remote(
     # sendto() payload response
     mock_getpid.return_value = 123
 
-    # We add 4 bytes for the extra payload
-    mock_connection.sendto.return_value = len(payload) + 4
+    # our payload length
+    mock_connection.sendto.return_value = 16
     mock_socket.return_value = mock_connection
 
     # localhost does not lookup to any of the facility codes so this
@@ -154,24 +154,32 @@ def test_notify_syslog_remote(
     assert isinstance(obj, apprise.plugins.NotifySyslog)
     assert obj.url().startswith('syslog://localhost') is True
     assert re.search(r'syslog://.*mode=remote', obj.url())
+    assert re.search(r'logpid=yes', obj.url()) is not None
+    assert obj.notify(body=payload) is True
 
     # Test with port
     obj = apprise.Apprise.instantiate('syslog://localhost:518')
     assert isinstance(obj, apprise.plugins.NotifySyslog)
     assert obj.url().startswith('syslog://localhost:518') is True
     assert re.search(r'syslog://.*mode=remote', obj.url())
+    assert re.search(r'logpid=yes', obj.url()) is not None
+    assert obj.notify(body=payload) is True
 
     # Test with default port
     obj = apprise.Apprise.instantiate('syslog://localhost:514')
     assert isinstance(obj, apprise.plugins.NotifySyslog)
     assert obj.url().startswith('syslog://localhost') is True
     assert re.search(r'syslog://.*mode=remote', obj.url())
+    assert re.search(r'logpid=yes', obj.url()) is not None
+    assert obj.notify(body=payload) is True
 
     # Specify a facility
     obj = apprise.Apprise.instantiate('syslog://localhost/kern')
     assert isinstance(obj, apprise.plugins.NotifySyslog)
     assert obj.url().startswith('syslog://localhost/kern') is True
     assert re.search(r'syslog://.*mode=remote', obj.url())
+    assert re.search(r'logpid=yes', obj.url()) is not None
+    assert obj.notify(body=payload) is True
 
     # Specify a facility requiring a lookup and having the port identified
     # resolves any ambiguity
@@ -179,6 +187,9 @@ def test_notify_syslog_remote(
     assert isinstance(obj, apprise.plugins.NotifySyslog)
     assert obj.url().startswith('syslog://kern/daemon') is True
     assert re.search(r'syslog://.*mode=remote', obj.url())
+    assert re.search(r'logpid=yes', obj.url()) is not None
+    mock_connection.sendto.return_value = 17  # daemon is one more byte in size
+    assert obj.notify(body=payload) is True
 
     # We can attempt to exclusively set the mode as well without a port
     # to also remove ambiguity; this falls back to sending as the 'user'
