@@ -130,13 +130,20 @@ def test_notify_syslog_by_class(openlog, syslog):
 @mock.patch('syslog.syslog')
 @mock.patch('syslog.openlog')
 @mock.patch('socket.socket')
-def test_notify_syslog_remote(mock_socket, mock_openlog, mock_syslog):
+@mock.patch('os.getpid')
+def test_notify_syslog_remote(
+        mock_getpid, mock_socket, mock_openlog, mock_syslog):
     """
     API: Syslog Remote Testing
 
     """
     payload = "test"
     mock_connection = mock.Mock()
+
+    # Fix pid response since it can vary in length and this impacts the
+    # sendto() payload response
+    mock_getpid.return_value = 123
+
     # We add 4 bytes for the extra payload
     mock_connection.sendto.return_value = len(payload) + 4
     mock_socket.return_value = mock_connection
@@ -175,14 +182,18 @@ def test_notify_syslog_remote(mock_socket, mock_openlog, mock_syslog):
 
     # We can attempt to exclusively set the mode as well without a port
     # to also remove ambiguity; this falls back to sending as the 'user'
-    obj = apprise.Apprise.instantiate('syslog://kern/d?mode=remote')
+    obj = apprise.Apprise.instantiate('syslog://kern/d?mode=remote&logpid=no')
     assert isinstance(obj, apprise.plugins.NotifySyslog)
     assert obj.url().startswith('syslog://kern/daemon') is True
     assert re.search(r'syslog://.*mode=remote', obj.url())
+    assert re.search(r'logpid=no', obj.url()) is not None
+    assert re.search(r'logperror=no', obj.url()) is not None
 
     # Test notifications
     # + 1 byte in size due to user
-    mock_connection.sendto.return_value = len(payload) + 5
+    # + length of pid returned
+    mock_connection.sendto.return_value = len(payload) + 5 \
+        + len(str(mock_getpid.return_value))
     assert obj.notify(body=payload) is True
     # This only fails because the underlining sendto() will return a
     # length different then what was expected

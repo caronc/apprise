@@ -22,6 +22,7 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
+import os
 import six
 import syslog
 import socket
@@ -280,8 +281,13 @@ class NotifySyslog(NotifyBase):
             host = self.host
             port = self.port if self.port \
                 else self.template_tokens['port']['default']
-            payload = '<%d>%s' % (
-                _pmap[notify_type] + self.facility * 8, body)
+            if self.log_pid:
+                payload = '<%d>- %d - %s' % (
+                    _pmap[notify_type] + self.facility * 8, os.getpid(), body)
+
+            else:
+                payload = '<%d>- %s' % (
+                    _pmap[notify_type] + self.facility * 8, body)
 
             # send UDP packet to upstream server
             self.logger.debug(
