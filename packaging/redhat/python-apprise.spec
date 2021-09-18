@@ -54,8 +54,8 @@ Microsoft Teams, MessageBird, MQTT, MSG91, MyAndroid, Nexmo, Nextcloud, Notica,
 Notifico, Office365, OneSignal, Opsgenie, ParsePlatform, PopcornNotify, Prowl,
 Pushalot, PushBullet, Pushjet, Pushover, PushSafer, Reddit, Rocket.Chat,
 SendGrid, SimplePush, Sinch, Slack, SMTP2Go, Spontit, SparkPost, Super Toasty,
-Stride, Syslog, Techulus Push, Telegram, Twilio, Twitter, Twist, XBMC, XMPP,
-Webex Teams}
+Streamlabs, Stride, Syslog, Techulus Push, Telegram, Twilio, Twitter, Twist, XBMC,
+XMPP, Webex Teams}
 
 Name:           python-%{pypi_name}
 Version:        0.9.4

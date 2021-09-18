@@ -326,6 +326,91 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifyStreamlabs
+    ##################################
+    ('strmlabs://', {
+        # No Access Token specified
+        'instance': TypeError,
+    }),
+    ('strmlabs://a_bd_/', {
+        # invalid Access Token
+        'instance': TypeError,
+    }),
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso', {
+        # access token
+        'instance': plugins.NotifyStreamlabs,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'strmlabs://I...o',
+    }),
+    # Test incorrect currency
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/?currency=ABCD', {
+        'instance': TypeError,
+    }),
+    # Test complete params - donations
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/'
+     '?name=tt&identifier=pyt&amount=20&currency=USD&call=donations',
+     {'instance': plugins.NotifyStreamlabs, }),
+    # Test complete params - donations
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/'
+     '?image_href=https://example.org/rms.jpg'
+     '&sound_href=https://example.org/rms.mp3',
+     {'instance': plugins.NotifyStreamlabs, }),
+    # Test complete params - alerts
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/'
+     '?duration=1000&image_href=&'
+     'sound_href=&alert_type=donation&special_text_color=crimson',
+     {'instance': plugins.NotifyStreamlabs, }),
+    # Test incorrect call
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/'
+     '?name=tt&identifier=pyt&amount=20&currency=USD&call=rms',
+     {'instance': TypeError, }),
+    # Test incorrect alert_type
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/'
+     '?name=tt&identifier=pyt&amount=20&currency=USD&alert_type=rms',
+     {'instance': TypeError, }),
+    # Test incorrect name
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/?name=t', {
+        'instance': TypeError,
+    }),
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/?call=donations', {
+        'instance': plugins.NotifyStreamlabs,
+        # A failure has status set to zero
+        # Test without an 'error' flag
+        'requests_response_text': {
+            'status': 0,
+        },
+
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/?call=alerts', {
+        'instance': plugins.NotifyStreamlabs,
+        # A failure has status set to zero
+        # Test without an 'error' flag
+        'requests_response_text': {
+            'status': 0,
+        },
+
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/?call=alerts', {
+        'instance': plugins.NotifyStreamlabs,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/?call=donations', {
+        'instance': plugins.NotifyStreamlabs,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifyDiscord
     ##################################
     ('discord://', {
