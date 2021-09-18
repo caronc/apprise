@@ -62,7 +62,7 @@ else:
 
 setup(
     name='apprise',
-    version='0.9.4',
+    version='0.9.5',
     description='Push Notifications that work with just about every platform!',
     license='MIT',
     long_description=open('README.md').read(),
@@ -85,7 +85,7 @@ setup(
     packages=find_packages(),
     package_data={
         'apprise': [
-            'assets/NotifyXML-1.0.xsd',
+            'assets/NotifyXML-*.xsd',
             'assets/themes/default/*.png',
             'assets/themes/default/*.ico',
             'i18n/*.py',

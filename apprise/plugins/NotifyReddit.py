@@ -668,7 +668,7 @@ class NotifyReddit(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'Exception received when sending Reddit to {}: '.
+                'Exception received when sending Reddit to {}'.
                 format(url))
             self.logger.debug('Socket Exception: %s' % str(e))
 

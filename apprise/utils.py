@@ -225,7 +225,7 @@ def is_hostname(hostname, ipv4=True, ipv6=True):
     if len(hostname) > 253 or len(hostname) == 0:
         return False
 
-    # Strip trailling period on hostname (if one exists)
+    # Strip trailing period on hostname (if one exists)
     if hostname[-1] == ".":
         hostname = hostname[:-1]
 
