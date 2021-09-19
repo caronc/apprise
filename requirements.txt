@@ -5,3 +5,4 @@ six
 click >= 5.0
 markdown
 PyYAML
+paho-mqtt
