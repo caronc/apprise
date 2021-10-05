@@ -335,7 +335,6 @@ class Apprise(object):
         Set interpret_escapes to True if you want to pre-escape a string
         such as turning a \n into an actual new line, etc.
         """
-
         if ASYNCIO_SUPPORT:
             return py3compat.asyncio.tosync(
                 self.async_notify(
@@ -451,10 +450,10 @@ class Apprise(object):
 
         if len(self) == 0:
             # Nothing to notify
-            raise TypeError
+            raise TypeError("No service(s) to notify")
 
-        if not (title or body):
-            raise TypeError
+        if not (body or title):
+            raise TypeError("No message content specified to deliver")
 
         if six.PY2:
             # Python 2.7.x Unicode Character Handling
