@@ -624,6 +624,7 @@ def test_apprise_log_file_captures_py2(tmpdir):
     logging.disable(logging.CRITICAL)
 
 
+@pytest.mark.skipif(sys.version_info.major <= 2, reason="Requires Python 3.x+")
 @mock.patch('requests.post')
 def test_apprise_secure_logging(mock_post):
     """

@@ -1044,9 +1044,9 @@ def cwe312_word(word, force=False, advanced=True, threshold=5):
         ALPHA_UPPER = '+'
         # An Lower Case Character (abcdef... etc)
         ALPHA_LOWER = '-'
-        # A special Character ($%^;... etc)
+        # A Special Character ($%^;... etc)
         SPECIAL = 's'
-        # A numerical Character (1234... etc)
+        # A Numerical Character (1234... etc)
         NUMERIC = 'n'
 
     if not (isinstance(word, six.string_types) and word.strip()):
@@ -1082,7 +1082,7 @@ def cwe312_word(word, force=False, advanced=True, threshold=5):
 
         for c in word:
             # Detect our variance
-            if c.isnumeric():
+            if c.isdigit():
                 variance = Variance.NUMERIC
             elif c.isalpha() and c.isupper():
                 variance = Variance.ALPHA_UPPER
