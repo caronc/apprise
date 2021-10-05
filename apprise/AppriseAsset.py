@@ -110,6 +110,17 @@ class AppriseAsset(object):
     # to a new line.
     interpret_escapes = False
 
+    # For more detail see CWE-312 @
+    #    https://cwe.mitre.org/data/definitions/312.html
+    #
+    # By enabling this, the logging output has additional overhead applied to
+    # it preventing secure password and secret information from being
+    # displayed in the logging. Since there is overhead involved in performing
+    # this cleanup; system owners who run in a very isolated environment may
+    # choose to disable this for a slight performance bump. It is recommended
+    # that you leave this option as is otherwise.
+    secure_logging = True
+
     def __init__(self, **kwargs):
         """
         Asset Initialization

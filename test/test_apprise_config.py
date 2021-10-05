@@ -246,7 +246,7 @@ def test_apprise_multi_config_entries(tmpdir):
             # Pretend everything is okay
             return True
 
-        def url(self):
+        def url(self, **kwargs):
             # support url()
             return ''
 
@@ -537,7 +537,7 @@ def test_apprise_config_with_apprise_obj(tmpdir):
             # Pretend everything is okay
             return True
 
-        def url(self):
+        def url(self, **kwargs):
             # support url()
             return ''
 
