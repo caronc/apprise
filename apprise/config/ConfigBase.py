@@ -210,6 +210,7 @@ class ConfigBase(URLBase):
         # Configuration files were detected; recursively populate them
         # If we have been configured to do so
         for url in configs:
+
             if self.recursion > 0:
                 # Attempt to acquire the schema at the very least to allow
                 # our configuration based urls.
@@ -307,13 +308,13 @@ class ConfigBase(URLBase):
 
         if self._cached_servers:
             self.logger.info(
-                'Loaded %d entries from %s',
-                len(self._cached_servers),
-                self.url(privacy=asset.secure_logging))
+                'Loaded {} entries from {}'.format(
+                    len(self._cached_servers),
+                    self.url(privacy=asset.secure_logging)))
         else:
             self.logger.warning(
-                'Failed to load Apprise configuration from %s',
-                self.url(privacy=asset.secure_logging))
+                'Failed to load Apprise configuration from {}'.format(
+                    self.url(privacy=asset.secure_logging)))
 
         # Set the time our content was cached at
         self._cached_time = time.time()
@@ -603,7 +604,8 @@ class ConfigBase(URLBase):
             if results is None:
                 # Failed to parse the server URL
                 ConfigBase.logger.warning(
-                    'Unparseable URL %s on line %d.', loggable_url, line)
+                    'Unparseable URL {} on line {}.'.format(
+                        loggable_url, line))
                 continue
 
             # Build a list of tags to associate with the newly added

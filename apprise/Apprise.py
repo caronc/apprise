@@ -146,15 +146,16 @@ class Apprise(object):
                 # we can index into our loaded plugins
                 logger.error('Dictionary does not include a "schema" entry.')
                 logger.trace(
-                    'Invalid dictionary unpacked as:%s%s',
-                    os.linesep, os.linesep.join(
-                        ['{}="{}"'.format(k, v) for k, v in results.items()]))
+                    'Invalid dictionary unpacked as:{}{}'.format(
+                        os.linesep, os.linesep.join(
+                            ['{}="{}"'.format(k, v)
+                             for k, v in results.items()])))
                 return None
 
             logger.trace(
-                'Dictionary unpacked as:%s%s',
-                os.linesep, os.linesep.join(
-                    ['{}="{}"'.format(k, v) for k, v in results.items()]))
+                'Dictionary unpacked as:{}{}'.format(
+                    os.linesep, os.linesep.join(
+                        ['{}="{}"'.format(k, v) for k, v in results.items()])))
 
         # Otherwise we handle the invalid input specified
         else:
@@ -177,9 +178,9 @@ class Apprise(object):
 
                 # Create log entry of loaded URL
                 logger.debug(
-                    'Loaded %s URL: %s',
-                    plugins.SCHEMA_MAP[results['schema']].service_name,
-                    plugin.url(privacy=asset.secure_logging))
+                    'Loaded {} URL: {}'.format(
+                        plugins.SCHEMA_MAP[results['schema']].service_name,
+                        plugin.url(privacy=asset.secure_logging)))
 
             except Exception:
                 # CWE-312 (Secure Logging) Handling
@@ -188,9 +189,9 @@ class Apprise(object):
 
                 # the arguments are invalid or can not be used.
                 logger.error(
-                    'Could not load %s URL: %s',
-                    plugins.SCHEMA_MAP[results['schema']].service_name,
-                    loggable_url)
+                    'Could not load {} URL: {}'.format(
+                        plugins.SCHEMA_MAP[results['schema']].service_name,
+                        loggable_url))
                 return None
 
         else:
@@ -236,8 +237,8 @@ class Apprise(object):
 
         elif not isinstance(servers, (tuple, set, list)):
             logger.error(
-                "An invalid notification (type=%s) was specified.",
-                type(servers))
+                "An invalid notification (type={}) was specified.".format(
+                    type(servers)))
             return False
 
         for _server in servers:
@@ -249,8 +250,8 @@ class Apprise(object):
 
             elif not isinstance(_server, (six.string_types, dict)):
                 logger.error(
-                    "An invalid notification (type=%s) was specified.",
-                    type(_server))
+                    "An invalid notification (type={}) was specified.".format(
+                        type(_server)))
                 return_status = False
                 continue
 
@@ -335,6 +336,7 @@ class Apprise(object):
         Set interpret_escapes to True if you want to pre-escape a string
         such as turning a \n into an actual new line, etc.
         """
+
         if ASYNCIO_SUPPORT:
             return py3compat.asyncio.tosync(
                 self.async_notify(
@@ -452,7 +454,7 @@ class Apprise(object):
             # Nothing to notify
             raise TypeError("No service(s) to notify")
 
-        if not (body or title):
+        if not (title or body):
             raise TypeError("No message content specified to deliver")
 
         if six.PY2:

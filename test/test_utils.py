@@ -554,6 +554,13 @@ def test_is_hostname():
     assert utils.is_hostname('valid-underscores_in_host.ca') == \
         'valid-underscores_in_host.ca'
 
+    # Underscores are supported by default
+    assert utils.is_hostname('valid_dashes_in_host.ca') == \
+        'valid_dashes_in_host.ca'
+    # However they are not if specified otherwise:
+    assert utils.is_hostname(
+        'valid_dashes_in_host.ca', underscore=False) is False
+
     # Invalid Hostnames
     assert utils.is_hostname('-hostname.that.starts.with.a.dash') is False
     assert utils.is_hostname('invalid-characters_#^.ca') is False
