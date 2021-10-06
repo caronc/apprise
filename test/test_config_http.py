@@ -69,7 +69,7 @@ def test_config_http(mock_post):
             # Pretend everything is okay
             return True
 
-        def url(self):
+        def url(self, **kwargs):
             # Support url() function
             return ''
 

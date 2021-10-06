@@ -49,7 +49,7 @@ def test_apprise_asyncio_runtime_error():
             super(GoodNotification, self).__init__(
                 notify_format=NotifyFormat.HTML, **kwargs)
 
-        def url(self):
+        def url(self, **kwargs):
             # Support URL
             return ''
 

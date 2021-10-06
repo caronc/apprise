@@ -39,6 +39,7 @@ from ..utils import GET_SCHEMA_RE
 from ..utils import parse_list
 from ..utils import parse_bool
 from ..utils import parse_urls
+from ..utils import cwe312_url
 from . import SCHEMA_MAP
 
 # Test whether token is valid or not
@@ -209,8 +210,8 @@ class ConfigBase(URLBase):
         # Configuration files were detected; recursively populate them
         # If we have been configured to do so
         for url in configs:
-            if self.recursion > 0:
 
+            if self.recursion > 0:
                 # Attempt to acquire the schema at the very least to allow
                 # our configuration based urls.
                 schema = GET_SCHEMA_RE.match(url)
@@ -223,6 +224,7 @@ class ConfigBase(URLBase):
                         url = os.path.join(self.config_path, url)
 
                     url = '{}://{}'.format(schema, URLBase.quote(url))
+
                 else:
                     # Ensure our schema is always in lower case
                     schema = schema.group('schema').lower()
@@ -233,13 +235,17 @@ class ConfigBase(URLBase):
                             'Unsupported include schema {}.'.format(schema))
                         continue
 
+                # CWE-312 (Secure Logging) Handling
+                loggable_url = url if not asset.secure_logging \
+                    else cwe312_url(url)
+
                 # Parse our url details of the server object as dictionary
                 # containing all of the information parsed from our URL
                 results = SCHEMA_MAP[schema].parse_url(url)
                 if not results:
                     # Failed to parse the server URL
                     self.logger.warning(
-                        'Unparseable include URL {}'.format(url))
+                        'Unparseable include URL {}'.format(loggable_url))
                     continue
 
                 # Handle cross inclusion based on allow_cross_includes rules
@@ -253,7 +259,7 @@ class ConfigBase(URLBase):
                     # Prevent the loading if insecure base protocols
                     ConfigBase.logger.warning(
                         'Including {}:// based configuration is prohibited. '
-                        'Ignoring URL {}'.format(schema, url))
+                        'Ignoring URL {}'.format(schema, loggable_url))
                     continue
 
                 # Prepare our Asset Object
@@ -279,7 +285,7 @@ class ConfigBase(URLBase):
                 except Exception as e:
                     # the arguments are invalid or can not be used.
                     self.logger.warning(
-                        'Could not load include URL: {}'.format(url))
+                        'Could not load include URL: {}'.format(loggable_url))
                     self.logger.debug('Loading Exception: {}'.format(str(e)))
                     continue
 
@@ -292,16 +298,23 @@ class ConfigBase(URLBase):
                 del cfg_plugin
 
             else:
+                # CWE-312 (Secure Logging) Handling
+                loggable_url = url if not asset.secure_logging \
+                    else cwe312_url(url)
+
                 self.logger.debug(
-                    'Recursion limit reached; ignoring Include URL: %s' % url)
+                    'Recursion limit reached; ignoring Include URL: %s',
+                    loggable_url)
 
         if self._cached_servers:
-            self.logger.info('Loaded {} entries from {}'.format(
-                len(self._cached_servers), self.url()))
+            self.logger.info(
+                'Loaded {} entries from {}'.format(
+                    len(self._cached_servers),
+                    self.url(privacy=asset.secure_logging)))
         else:
             self.logger.warning(
                 'Failed to load Apprise configuration from {}'.format(
-                    self.url()))
+                    self.url(privacy=asset.secure_logging)))
 
         # Set the time our content was cached at
         self._cached_time = time.time()
@@ -531,6 +544,9 @@ class ConfigBase(URLBase):
         # the include keyword
         configs = list()
 
+        # Prepare our Asset Object
+        asset = asset if isinstance(asset, AppriseAsset) else AppriseAsset()
+
         # Define what a valid line should look like
         valid_line_re = re.compile(
             r'^\s*(?P<line>([;#]+(?P<comment>.*))|'
@@ -567,27 +583,37 @@ class ConfigBase(URLBase):
                 continue
 
             if config:
-                ConfigBase.logger.debug('Include URL: {}'.format(config))
+                # CWE-312 (Secure Logging) Handling
+                loggable_url = config if not asset.secure_logging \
+                    else cwe312_url(config)
+
+                ConfigBase.logger.debug(
+                    'Include URL: {}'.format(loggable_url))
 
                 # Store our include line
                 configs.append(config.strip())
                 continue
 
+            # CWE-312 (Secure Logging) Handling
+            loggable_url = url if not asset.secure_logging \
+                else cwe312_url(url)
+
             # Acquire our url tokens
-            results = plugins.url_to_dict(url)
+            results = plugins.url_to_dict(
+                url, secure_logging=asset.secure_logging)
             if results is None:
                 # Failed to parse the server URL
                 ConfigBase.logger.warning(
-                    'Unparseable URL {} on line {}.'.format(url, line))
+                    'Unparseable URL {} on line {}.'.format(
+                        loggable_url, line))
                 continue
 
             # Build a list of tags to associate with the newly added
             # notifications if any were set
             results['tag'] = set(parse_list(result.group('tags')))
 
-            # Prepare our Asset Object
-            results['asset'] = \
-                asset if isinstance(asset, AppriseAsset) else AppriseAsset()
+            # Set our Asset Object
+            results['asset'] = asset
 
             try:
                 # Attempt to create an instance of our plugin using the
@@ -595,13 +621,14 @@ class ConfigBase(URLBase):
                 plugin = plugins.SCHEMA_MAP[results['schema']](**results)
 
                 # Create log entry of loaded URL
-                ConfigBase.logger.debug('Loaded URL: {}'.format(plugin.url()))
+                ConfigBase.logger.debug(
+                    'Loaded URL: %s', plugin.url(privacy=asset.secure_logging))
 
             except Exception as e:
                 # the arguments are invalid or can not be used.
                 ConfigBase.logger.warning(
                     'Could not load URL {} on line {}.'.format(
-                        url, line))
+                        loggable_url, line))
                 ConfigBase.logger.debug('Loading Exception: %s' % str(e))
                 continue
 
@@ -756,6 +783,10 @@ class ConfigBase(URLBase):
             # we can. Reset it to None on each iteration
             results = list()
 
+            # CWE-312 (Secure Logging) Handling
+            loggable_url = url if not asset.secure_logging \
+                else cwe312_url(url)
+
             if isinstance(url, six.string_types):
                 # We're just a simple URL string...
                 schema = GET_SCHEMA_RE.match(url)
@@ -764,16 +795,18 @@ class ConfigBase(URLBase):
                     # config file at least has something to take action
                     # with.
                     ConfigBase.logger.warning(
-                        'Invalid URL {}, entry #{}'.format(url, no + 1))
+                        'Invalid URL {}, entry #{}'.format(
+                            loggable_url, no + 1))
                     continue
 
                 # We found a valid schema worthy of tracking; store it's
                 # details:
-                _results = plugins.url_to_dict(url)
+                _results = plugins.url_to_dict(
+                    url, secure_logging=asset.secure_logging)
                 if _results is None:
                     ConfigBase.logger.warning(
                         'Unparseable URL {}, entry #{}'.format(
-                            url, no + 1))
+                            loggable_url, no + 1))
                     continue
 
                 # add our results to our global set
@@ -819,7 +852,8 @@ class ConfigBase(URLBase):
                         'Unsupported URL, entry #{}'.format(no + 1))
                     continue
 
-                _results = plugins.url_to_dict(_url)
+                _results = plugins.url_to_dict(
+                    _url, secure_logging=asset.secure_logging)
                 if _results is None:
                     # Setup dictionary
                     _results = {
@@ -931,7 +965,8 @@ class ConfigBase(URLBase):
 
                     # Create log entry of loaded URL
                     ConfigBase.logger.debug(
-                        'Loaded URL: {}'.format(plugin.url()))
+                        'Loaded URL: {}'.format(
+                            plugin.url(privacy=asset.secure_logging)))
 
                 except Exception as e:
                     # the arguments are invalid or can not be used.
