@@ -210,13 +210,18 @@ class NotifyTelegram(NotifyBase):
             'type': 'bool',
             'default': False,
         },
+        'preview': {
+            'name': _('Web Page Preview'),
+            'type': 'bool',
+            'default': False,
+        },
         'to': {
             'alias_of': 'targets',
         },
     })
 
     def __init__(self, bot_token, targets, detect_owner=True,
-                 include_image=False, silent=None, **kwargs):
+                 include_image=False, silent=None, preview=None, **kwargs):
         """
         Initialize Telegram Object
         """
@@ -237,6 +242,10 @@ class NotifyTelegram(NotifyBase):
         # Define whether or not we should make audible alarms
         self.silent = self.template_args['silent']['default'] \
             if silent is None else bool(silent)
+
+        # Define whether or not we should display a web page preview
+        self.preview = self.template_args['preview']['default'] \
+            if preview is None else bool(preview)
 
         # if detect_owner is set to True, we will attempt to determine who
         # the bot owner is based on the first person who messaged it.  This
@@ -525,6 +534,8 @@ class NotifyTelegram(NotifyBase):
         payload = {
             # Notification Audible Control
             'disable_notification': self.silent,
+            # Display Web Page Preview (if possible)
+            'disable_web_page_preview': not self.preview,
         }
 
         # Prepare Email Message
@@ -730,6 +741,7 @@ class NotifyTelegram(NotifyBase):
             'image': self.include_image,
             'detect': 'yes' if self.detect_owner else 'no',
             'silent': 'yes' if self.silent else 'no',
+            'preview': 'yes' if self.preview else 'no',
         }
 
         # Extend our parameters
@@ -817,6 +829,10 @@ class NotifyTelegram(NotifyBase):
         # notification with no sound.
         results['silent'] = \
             parse_bool(results['qsd'].get('silent', False))
+
+        # Show Web Page Preview
+        results['preview'] = \
+            parse_bool(results['qsd'].get('preview', False))
 
         # Include images with our message
         results['include_image'] = \
