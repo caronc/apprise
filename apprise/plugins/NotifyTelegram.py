@@ -205,13 +205,18 @@ class NotifyTelegram(NotifyBase):
             'default': True,
             'map_to': 'detect_owner',
         },
+        'silent': {
+            'name': _('Silent Notification'),
+            'type': 'bool',
+            'default': False,
+        },
         'to': {
             'alias_of': 'targets',
         },
     })
 
     def __init__(self, bot_token, targets, detect_owner=True,
-                 include_image=False, **kwargs):
+                 include_image=False, silent=None, **kwargs):
         """
         Initialize Telegram Object
         """
@@ -228,6 +233,10 @@ class NotifyTelegram(NotifyBase):
 
         # Parse our list
         self.targets = parse_list(targets)
+
+        # Define whether or not we should make audible alarms
+        self.silent = self.template_args['silent']['default'] \
+            if silent is None else bool(silent)
 
         # if detect_owner is set to True, we will attempt to determine who
         # the bot owner is based on the first person who messaged it.  This
@@ -513,7 +522,10 @@ class NotifyTelegram(NotifyBase):
             'sendMessage'
         )
 
-        payload = {}
+        payload = {
+            # Notification Audible Control
+            'disable_notification': self.silent,
+        }
 
         # Prepare Email Message
         if self.notify_format == NotifyFormat.MARKDOWN:
@@ -717,6 +729,7 @@ class NotifyTelegram(NotifyBase):
         params = {
             'image': self.include_image,
             'detect': 'yes' if self.detect_owner else 'no',
+            'silent': 'yes' if self.silent else 'no',
         }
 
         # Extend our parameters
@@ -799,6 +812,11 @@ class NotifyTelegram(NotifyBase):
 
         # Store our bot token
         results['bot_token'] = bot_token
+
+        # Silent (Sends the message Silently); users will receive
+        # notification with no sound.
+        results['silent'] = \
+            parse_bool(results['qsd'].get('silent', False))
 
         # Include images with our message
         results['include_image'] = \
