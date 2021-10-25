@@ -251,10 +251,6 @@ class NotifyPushover(NotifyBase):
             self.targets = (PUSHOVER_SEND_TO_ALL, )
 
         # Setup supplemental url
-        if url_title and not url:
-            msg = "A URL must be specified to use URL Title"
-            self.logger.warning(msg)
-            raise TypeError(msg)
         self.supplemental_url = url
         self.supplemental_url_title = url_title
 
