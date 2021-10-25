@@ -5039,6 +5039,20 @@ TEST_URLS = (
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?format=text', {
         'instance': plugins.NotifyTelegram,
     }),
+    # Test Silent Settings
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?silent=yes', {
+        'instance': plugins.NotifyTelegram,
+    }),
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?silent=no', {
+        'instance': plugins.NotifyTelegram,
+    }),
+    # Test Web Page Preview Settings
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?preview=yes', {
+        'instance': plugins.NotifyTelegram,
+    }),
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?preview=no', {
+        'instance': plugins.NotifyTelegram,
+    }),
     # Simple Message without image
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/', {
         'instance': plugins.NotifyTelegram,
