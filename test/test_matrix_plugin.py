@@ -26,6 +26,7 @@
 import six
 import mock
 import requests
+import pytest
 from apprise import plugins
 from apprise import AppriseAsset
 from json import dumps
@@ -109,6 +110,21 @@ def test_notify_matrix_plugin_general(mock_post, mock_get):
     assert isinstance(obj, plugins.NotifyMatrix) is True
     obj.send(body="test") is True
     obj.send(title="title", body="test") is True
+
+    # Test notice type notifications
+    kwargs = plugins.NotifyMatrix.parse_url(
+        'matrix://user:passwd@hostname/#abcd?msgtype=notice')
+    obj = plugins.NotifyMatrix(**kwargs)
+    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj, plugins.NotifyMatrix) is True
+    obj.send(body="test") is True
+    obj.send(title="title", body="test") is True
+
+    with pytest.raises(TypeError):
+        # invalid message type specified
+        kwargs = plugins.NotifyMatrix.parse_url(
+            'matrix://user:passwd@hostname/#abcd?msgtype=invalid')
+        obj = plugins.NotifyMatrix(**kwargs)
 
     # Force a failed login
     ro = response_obj.copy()

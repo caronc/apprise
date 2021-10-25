@@ -67,6 +67,21 @@ IS_ROOM_ID = re.compile(
     r'(?P<home_server>[a-z0-9.-]+))?\s*$', re.I)
 
 
+class MatrixMessageType(object):
+    """
+    The Matrix Message types
+    """
+    TEXT = "text"
+    NOTICE = "notice"
+
+
+# matrix message types are placed into this list for validation purposes
+MATRIX_MESSAGE_TYPES = (
+    MatrixMessageType.TEXT,
+    MatrixMessageType.NOTICE,
+)
+
+
 class MatrixWebhookMode(object):
     # Webhook Mode is disabled
     DISABLED = "off"
@@ -81,7 +96,7 @@ class MatrixWebhookMode(object):
     T2BOT = "t2bot"
 
 
-# webhook modes are placed ito this list for validation purposes
+# webhook modes are placed into this list for validation purposes
 MATRIX_WEBHOOK_MODES = (
     MatrixWebhookMode.DISABLED,
     MatrixWebhookMode.MATRIX,
@@ -206,6 +221,12 @@ class NotifyMatrix(NotifyBase):
             'values': MATRIX_WEBHOOK_MODES,
             'default': MatrixWebhookMode.DISABLED,
         },
+        'msgtype': {
+            'name': _('Message Type'),
+            'type': 'choice:string',
+            'values': MATRIX_MESSAGE_TYPES,
+            'default': MatrixMessageType.TEXT,
+        },
         'to': {
             'alias_of': 'targets',
         },
@@ -214,7 +235,8 @@ class NotifyMatrix(NotifyBase):
         },
     })
 
-    def __init__(self, targets=None, mode=None, include_image=False, **kwargs):
+    def __init__(self, targets=None, mode=None, msgtype=None,
+                 include_image=False, **kwargs):
         """
         Initialize Matrix Object
         """
@@ -240,10 +262,18 @@ class NotifyMatrix(NotifyBase):
         self._room_cache = {}
 
         # Setup our mode
-        self.mode = MatrixWebhookMode.DISABLED \
+        self.mode = self.template_args['mode']['default'] \
             if not isinstance(mode, six.string_types) else mode.lower()
         if self.mode and self.mode not in MATRIX_WEBHOOK_MODES:
             msg = 'The mode specified ({}) is invalid.'.format(mode)
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
+        # Setup our message type
+        self.msgtype = self.template_args['msgtype']['default'] \
+            if not isinstance(msgtype, six.string_types) else msgtype.lower()
+        if self.msgtype and self.msgtype not in MATRIX_MESSAGE_TYPES:
+            msg = 'The msgtype specified ({}) is invalid.'.format(msgtype)
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -534,7 +564,7 @@ class NotifyMatrix(NotifyBase):
 
             # Define our payload
             payload = {
-                'msgtype': 'm.text',
+                'msgtype': 'm.{}'.format(self.msgtype),
                 'body': '{title}{body}'.format(
                     title='' if not title else '{}\r\n'.format(title),
                     body=body),
@@ -1109,6 +1139,7 @@ class NotifyMatrix(NotifyBase):
         params = {
             'image': 'yes' if self.include_image else 'no',
             'mode': self.mode,
+            'msgtype': self.msgtype,
         }
 
         # Extend our parameters
@@ -1188,6 +1219,11 @@ class NotifyMatrix(NotifyBase):
                 results['mode'].lower() == MatrixWebhookMode.T2BOT:
             # unquote our hostname and pass it in as the password/token
             results['password'] = NotifyMatrix.unquote(results['host'])
+
+        # Support the message type keyword
+        if 'msgtype' in results['qsd'] and len(results['qsd']['msgtype']):
+            results['msgtype'] = \
+                NotifyMatrix.unquote(results['qsd']['msgtype'])
 
         # Support the use of the token= keyword
         if 'token' in results['qsd'] and len(results['qsd']['token']):
