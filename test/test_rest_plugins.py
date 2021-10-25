@@ -3581,6 +3581,14 @@ TEST_URLS = (
     ('pover://%s@%s?sound=spacealarm' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
     }),
+    # API Key + invalid url_title setting
+    ('pover://%s@%s?url_title=invalid' % ('u' * 30, 'a' * 30), {
+        'instance': TypeError,
+    }),
+    # API Key + valid url_title with url
+    ('pover://%s@%s?url=my-url&url_title=title' % ('u' * 30, 'a' * 30), {
+        'instance': plugins.NotifyPushover,
+    }),
     # API Key + Valid User
     ('pover://%s@%s' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
