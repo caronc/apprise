@@ -196,6 +196,14 @@ class NotifyPushover(NotifyBase):
             'regex': (r'^[a-z]{1,12}$', 'i'),
             'default': PushoverSound.PUSHOVER,
         },
+        'url': {
+            'name': _('URL'),
+            'type': 'string',
+        },
+        'url_title': {
+            'name': _('URL Title'),
+            'type': 'string'
+        },
         'retry': {
             'name': _('Retry'),
             'type': 'int',
@@ -245,7 +253,6 @@ class NotifyPushover(NotifyBase):
         # Setup supplemental url
         self.supplemental_url = url
         self.supplemental_url_title = url_title
-
 
         # Setup our sound
         self.sound = NotifyPushover.default_pushover_sound \
