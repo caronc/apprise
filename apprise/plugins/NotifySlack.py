@@ -424,6 +424,8 @@ class NotifySlack(NotifyBase):
                 else self.image_url(notify_type)
 
             if image_url:
+                payload['icon_url'] = image_url
+
                 _footer['elements'].insert(0, {
                     'type': 'image',
                     'image_url': image_url,
