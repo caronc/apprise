@@ -34,6 +34,7 @@ from .common import MATCH_ALL_TAG
 from .utils import is_exclusive_match
 from .utils import parse_list
 from .utils import parse_urls
+from .utils import cwe312_url
 from .logger import logger
 
 from .AppriseAsset import AppriseAsset
@@ -123,9 +124,14 @@ class Apprise(object):
         # Initialize our result set
         results = None
 
+        # Prepare our Asset Object
+        asset = asset if isinstance(asset, AppriseAsset) else AppriseAsset()
+
         if isinstance(url, six.string_types):
             # Acquire our url tokens
-            results = plugins.url_to_dict(url)
+            results = plugins.url_to_dict(
+                url, secure_logging=asset.secure_logging)
+
             if results is None:
                 # Failed to parse the server URL; detailed logging handled
                 # inside url_to_dict - nothing to report here.
@@ -139,25 +145,30 @@ class Apprise(object):
                 # schema is a mandatory dictionary item as it is the only way
                 # we can index into our loaded plugins
                 logger.error('Dictionary does not include a "schema" entry.')
-                logger.trace('Invalid dictionary unpacked as:{}{}'.format(
-                    os.linesep, os.linesep.join(
-                        ['{}="{}"'.format(k, v) for k, v in results.items()])))
+                logger.trace(
+                    'Invalid dictionary unpacked as:{}{}'.format(
+                        os.linesep, os.linesep.join(
+                            ['{}="{}"'.format(k, v)
+                             for k, v in results.items()])))
                 return None
 
-            logger.trace('Dictionary unpacked as:{}{}'.format(
-                os.linesep, os.linesep.join(
-                    ['{}="{}"'.format(k, v) for k, v in results.items()])))
+            logger.trace(
+                'Dictionary unpacked as:{}{}'.format(
+                    os.linesep, os.linesep.join(
+                        ['{}="{}"'.format(k, v) for k, v in results.items()])))
 
+        # Otherwise we handle the invalid input specified
         else:
-            logger.error('Invalid URL specified: {}'.format(url))
+            logger.error(
+                'An invalid URL type (%s) was specified for instantiation',
+                type(url))
             return None
 
         # Build a list of tags to associate with the newly added notifications
         results['tag'] = set(parse_list(tag))
 
-        # Prepare our Asset Object
-        results['asset'] = \
-            asset if isinstance(asset, AppriseAsset) else AppriseAsset()
+        # Set our Asset Object
+        results['asset'] = asset
 
         if suppress_exceptions:
             try:
@@ -166,14 +177,21 @@ class Apprise(object):
                 plugin = plugins.SCHEMA_MAP[results['schema']](**results)
 
                 # Create log entry of loaded URL
-                logger.debug('Loaded {} URL: {}'.format(
-                    plugins.SCHEMA_MAP[results['schema']].service_name,
-                    plugin.url()))
+                logger.debug(
+                    'Loaded {} URL: {}'.format(
+                        plugins.SCHEMA_MAP[results['schema']].service_name,
+                        plugin.url(privacy=asset.secure_logging)))
 
             except Exception:
+                # CWE-312 (Secure Logging) Handling
+                loggable_url = url if not asset.secure_logging \
+                    else cwe312_url(url)
+
                 # the arguments are invalid or can not be used.
-                logger.error('Could not load {} URL: {}'.format(
-                    plugins.SCHEMA_MAP[results['schema']].service_name, url))
+                logger.error(
+                    'Could not load {} URL: {}'.format(
+                        plugins.SCHEMA_MAP[results['schema']].service_name,
+                        loggable_url))
                 return None
 
         else:
@@ -402,7 +420,7 @@ class Apprise(object):
         except Exception:
             # A catch all so we don't have to abort early
             # just because one of our plugins has a bug in it.
-            logger.exception("Notification Exception")
+            logger.exception("Unhandled Notification Exception")
             return False
 
     @staticmethod
@@ -434,10 +452,10 @@ class Apprise(object):
 
         if len(self) == 0:
             # Nothing to notify
-            raise TypeError
+            raise TypeError("No service(s) to notify")
 
         if not (title or body):
-            raise TypeError
+            raise TypeError("No message content specified to deliver")
 
         if six.PY2:
             # Python 2.7.x Unicode Character Handling

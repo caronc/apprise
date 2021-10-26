@@ -190,7 +190,7 @@ def apprise_test(do_notify):
             # We fail whenever we're initialized
             raise TypeError()
 
-        def url(self):
+        def url(self, **kwargs):
             # Support URL
             return ''
 
@@ -204,7 +204,7 @@ def apprise_test(do_notify):
             super(GoodNotification, self).__init__(
                 notify_format=NotifyFormat.HTML, **kwargs)
 
-        def url(self):
+        def url(self, **kwargs):
             # Support URL
             return ''
 
@@ -292,7 +292,7 @@ def apprise_test(do_notify):
             # Pretend everything is okay
             raise TypeError()
 
-        def url(self):
+        def url(self, **kwargs):
             # Support URL
             return ''
 
@@ -301,7 +301,7 @@ def apprise_test(do_notify):
             # Pretend everything is okay
             raise RuntimeError()
 
-        def url(self):
+        def url(self, **kwargs):
             # Support URL
             return ''
 
@@ -311,7 +311,7 @@ def apprise_test(do_notify):
             # Pretend everything is okay
             return False
 
-        def url(self):
+        def url(self, **kwargs):
             # Support URL
             return ''
 
@@ -346,7 +346,7 @@ def apprise_test(do_notify):
             # Pretend everything is okay
             raise TypeError()
 
-        def url(self):
+        def url(self, **kwargs):
             # Support URL
             return ''
 
@@ -744,7 +744,7 @@ def test_apprise_notify_formats(tmpdir):
             # Pretend everything is okay
             return True
 
-        def url(self):
+        def url(self, **kwargs):
             # Support URL
             return ''
 
@@ -760,7 +760,7 @@ def test_apprise_notify_formats(tmpdir):
             # Pretend everything is okay
             return True
 
-        def url(self):
+        def url(self, **kwargs):
             # Support URL
             return ''
 
@@ -776,7 +776,7 @@ def test_apprise_notify_formats(tmpdir):
             # Pretend everything is okay
             return True
 
-        def url(self):
+        def url(self, **kwargs):
             # Support URL
             return ''
 
@@ -1066,7 +1066,7 @@ def test_apprise_details():
             }
         })
 
-        def url(self):
+        def url(self, **kwargs):
             # Support URL
             return ''
 

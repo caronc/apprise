@@ -261,6 +261,156 @@ TEST_URLS = (
     }),
 
     ##################################
+    # NotifyDingTalk
+    ##################################
+    ('dingtalk://', {
+        # No Access Token specified
+        'instance': TypeError,
+    }),
+    ('dingtalk://a_bd_/', {
+        # invalid Access Token
+        'instance': TypeError,
+    }),
+    ('dingtalk://12345678', {
+        # access token
+        'instance': plugins.NotifyDingTalk,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'dingtalk://1...8',
+    }),
+    ('dingtalk://{}/{}'.format('a' * 8, '1' * 14), {
+        # access token + phone number
+        'instance': plugins.NotifyDingTalk,
+    }),
+    ('dingtalk://{}/{}/invalid'.format('a' * 8, '1' * 3), {
+        # access token + 2 invalid phone numbers
+        'instance': plugins.NotifyDingTalk,
+    }),
+    ('dingtalk://{}/?to={}'.format('a' * 8, '1' * 14), {
+        # access token + phone number using 'to'
+        'instance': plugins.NotifyDingTalk,
+    }),
+    # Test secret via user@
+    ('dingtalk://secret@{}/?to={}'.format('a' * 8, '1' * 14), {
+        # access token + phone number using 'to'
+        'instance': plugins.NotifyDingTalk,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'dingtalk://****@a...a',
+    }),
+    # Test secret via secret= and token=
+    ('dingtalk://?token={}&to={}&secret={}'.format(
+        'b' * 8, '1' * 14, 'a' * 15), {
+            # access token + phone number using 'to'
+            'instance': plugins.NotifyDingTalk,
+        'privacy_url': 'dingtalk://****@b...b',
+    }),
+    # Invalid secret
+    ('dingtalk://{}/?to={}&secret=_'.format('a' * 8, '1' * 14), {
+        'instance': TypeError,
+    }),
+    ('dingtalk://{}?format=markdown'.format('a' * 8), {
+        # access token
+        'instance': plugins.NotifyDingTalk,
+    }),
+    ('dingtalk://{}'.format('a' * 8), {
+        'instance': plugins.NotifyDingTalk,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('dingtalk://{}'.format('a' * 8), {
+        'instance': plugins.NotifyDingTalk,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
+    # NotifyStreamlabs
+    ##################################
+    ('strmlabs://', {
+        # No Access Token specified
+        'instance': TypeError,
+    }),
+    ('strmlabs://a_bd_/', {
+        # invalid Access Token
+        'instance': TypeError,
+    }),
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso', {
+        # access token
+        'instance': plugins.NotifyStreamlabs,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'strmlabs://I...o',
+    }),
+    # Test incorrect currency
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/?currency=ABCD', {
+        'instance': TypeError,
+    }),
+    # Test complete params - donations
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/'
+     '?name=tt&identifier=pyt&amount=20&currency=USD&call=donations',
+     {'instance': plugins.NotifyStreamlabs, }),
+    # Test complete params - donations
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/'
+     '?image_href=https://example.org/rms.jpg'
+     '&sound_href=https://example.org/rms.mp3',
+     {'instance': plugins.NotifyStreamlabs, }),
+    # Test complete params - alerts
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/'
+     '?duration=1000&image_href=&'
+     'sound_href=&alert_type=donation&special_text_color=crimson',
+     {'instance': plugins.NotifyStreamlabs, }),
+    # Test incorrect call
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/'
+     '?name=tt&identifier=pyt&amount=20&currency=USD&call=rms',
+     {'instance': TypeError, }),
+    # Test incorrect alert_type
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/'
+     '?name=tt&identifier=pyt&amount=20&currency=USD&alert_type=rms',
+     {'instance': TypeError, }),
+    # Test incorrect name
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/?name=t', {
+        'instance': TypeError,
+    }),
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/?call=donations', {
+        'instance': plugins.NotifyStreamlabs,
+        # A failure has status set to zero
+        # Test without an 'error' flag
+        'requests_response_text': {
+            'status': 0,
+        },
+
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/?call=alerts', {
+        'instance': plugins.NotifyStreamlabs,
+        # A failure has status set to zero
+        # Test without an 'error' flag
+        'requests_response_text': {
+            'status': 0,
+        },
+
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/?call=alerts', {
+        'instance': plugins.NotifyStreamlabs,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+    ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/?call=donations', {
+        'instance': plugins.NotifyStreamlabs,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    ##################################
     # NotifyDiscord
     ##################################
     ('discord://', {
@@ -1858,6 +2008,18 @@ TEST_URLS = (
         # despite uppercase characters
         'instance': plugins.NotifyMatrix,
     }),
+    ('matrix://user@localhost?mode=SLACK&format=markdown&token=mytoken', {
+        # user and token specified; slack webhook still detected
+        # despite uppercase characters; token also set on URL as arg
+        'instance': plugins.NotifyMatrix,
+    }),
+    ('matrix://_?mode=t2bot&token={}'.format('b' * 64), {
+        # Testing t2bot initialization and setting the password using the
+        # token directive
+        'instance': plugins.NotifyMatrix,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'matrix://b...b/',
+    }),
     # Image Reference
     ('matrixs://user:token@localhost?mode=slack&format=markdown&image=True', {
         # user and token specified; image set to True
@@ -1871,7 +2033,7 @@ TEST_URLS = (
      .format('a' * 64), {
          # user and token specified; image set to True
          'instance': plugins.NotifyMatrix}),
-    ('matrix://user@{}?mode=t2bot&format=markdown&image=False'
+    ('matrix://user@{}?mode=t2bot&format=html&image=False'
      .format('z' * 64), {
          # user and token specified; image set to True
          'instance': plugins.NotifyMatrix}),
@@ -2384,6 +2546,18 @@ TEST_URLS = (
         # No user specified
         'instance': TypeError,
     }),
+    ('ncloud://user@localhost?to=user1,user2&version=invalid', {
+        # An invalid version was specified
+        'instance': TypeError,
+    }),
+    ('ncloud://user@localhost?to=user1,user2&version=0', {
+        # An invalid version was specified
+        'instance': TypeError,
+    }),
+    ('ncloud://user@localhost?to=user1,user2&version=-23', {
+        # An invalid version was specified
+        'instance': TypeError,
+    }),
     ('ncloud://localhost/admin', {
         'instance': plugins.NotifyNextcloud,
     }),
@@ -2391,6 +2565,12 @@ TEST_URLS = (
         'instance': plugins.NotifyNextcloud,
     }),
     ('ncloud://user@localhost?to=user1,user2', {
+        'instance': plugins.NotifyNextcloud,
+    }),
+    ('ncloud://user@localhost?to=user1,user2&version=20', {
+        'instance': plugins.NotifyNextcloud,
+    }),
+    ('ncloud://user@localhost?to=user1,user2&version=21', {
         'instance': plugins.NotifyNextcloud,
     }),
     ('ncloud://user:pass@localhost/user1/user2', {
@@ -3401,6 +3581,10 @@ TEST_URLS = (
     ('pover://%s@%s?sound=spacealarm' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
     }),
+    # API Key + valid url_title with url
+    ('pover://%s@%s?url=my-url&url_title=title' % ('u' * 30, 'a' * 30), {
+        'instance': plugins.NotifyPushover,
+    }),
     # API Key + Valid User
     ('pover://%s@%s' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
@@ -3436,6 +3620,10 @@ TEST_URLS = (
     }),
     # API Key + priority setting
     ('pover://%s@%s?priority=high' % ('u' * 30, 'a' * 30), {
+        'instance': plugins.NotifyPushover,
+    }),
+    # API Key + priority setting + html mode
+    ('pover://%s@%s?priority=high&format=html' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
     }),
     # API Key + invalid priority setting
@@ -3748,7 +3936,7 @@ TEST_URLS = (
         },
     }),
     # Several channels
-    ('rocket://user:pass@localhost/#channel1/#channel2/?avatar=No', {
+    ('rocket://user:pass@localhost/#channel1/#channel2/?avatar=Yes', {
         'instance': plugins.NotifyRocketChat,
         # The response text is expected to be the following on a success
         'requests_response_text': {
@@ -3772,7 +3960,7 @@ TEST_URLS = (
         },
     }),
     # A room and channel
-    ('rocket://user:pass@localhost/room/#channel?mode=basic', {
+    ('rocket://user:pass@localhost/room/#channel?mode=basic&avatar=Yes', {
         'instance': plugins.NotifyRocketChat,
         # The response text is expected to be the following on a success
         'requests_response_text': {
@@ -4849,6 +5037,20 @@ TEST_URLS = (
         'instance': plugins.NotifyTelegram,
     }),
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?format=text', {
+        'instance': plugins.NotifyTelegram,
+    }),
+    # Test Silent Settings
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?silent=yes', {
+        'instance': plugins.NotifyTelegram,
+    }),
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?silent=no', {
+        'instance': plugins.NotifyTelegram,
+    }),
+    # Test Web Page Preview Settings
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?preview=yes', {
+        'instance': plugins.NotifyTelegram,
+    }),
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?preview=no', {
         'instance': plugins.NotifyTelegram,
     }),
     # Simple Message without image

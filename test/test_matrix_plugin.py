@@ -26,9 +26,9 @@
 import six
 import mock
 import requests
+import pytest
 from apprise import plugins
 from apprise import AppriseAsset
-# from apprise import Apprise
 from json import dumps
 
 # Disable logging for a cleaner testing output
@@ -85,6 +85,46 @@ def test_notify_matrix_plugin_general(mock_post, mock_get):
     assert isinstance(obj, plugins.NotifyMatrix) is True
     # Registration Successful
     assert obj.send(body="test") is True
+
+    # Test sending other format types
+    kwargs = plugins.NotifyMatrix.parse_url(
+        'matrix://user:passwd@hostname/#abcd?format=html')
+    obj = plugins.NotifyMatrix(**kwargs)
+    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj, plugins.NotifyMatrix) is True
+    obj.send(body="test") is True
+    obj.send(title="title", body="test") is True
+
+    kwargs = plugins.NotifyMatrix.parse_url(
+        'matrix://user:passwd@hostname/#abcd/#abcd:localhost?format=markdown')
+    obj = plugins.NotifyMatrix(**kwargs)
+    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj, plugins.NotifyMatrix) is True
+    obj.send(body="test") is True
+    obj.send(title="title", body="test") is True
+
+    kwargs = plugins.NotifyMatrix.parse_url(
+        'matrix://user:passwd@hostname/#abcd/!abcd:localhost?format=text')
+    obj = plugins.NotifyMatrix(**kwargs)
+    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj, plugins.NotifyMatrix) is True
+    obj.send(body="test") is True
+    obj.send(title="title", body="test") is True
+
+    # Test notice type notifications
+    kwargs = plugins.NotifyMatrix.parse_url(
+        'matrix://user:passwd@hostname/#abcd?msgtype=notice')
+    obj = plugins.NotifyMatrix(**kwargs)
+    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj, plugins.NotifyMatrix) is True
+    obj.send(body="test") is True
+    obj.send(title="title", body="test") is True
+
+    with pytest.raises(TypeError):
+        # invalid message type specified
+        kwargs = plugins.NotifyMatrix.parse_url(
+            'matrix://user:passwd@hostname/#abcd?msgtype=invalid')
+        obj = plugins.NotifyMatrix(**kwargs)
 
     # Force a failed login
     ro = response_obj.copy()
@@ -392,16 +432,36 @@ def test_notify_matrix_plugin_rooms(mock_post, mock_get):
 
     assert obj._register() is True
     assert obj.access_token is not None
+
+    assert obj._room_join('!abc123') == response_obj['room_id']
+    # Use cache to get same results
+    assert len(obj._room_cache) == 1
     assert obj._room_join('!abc123') == response_obj['room_id']
 
     obj._room_cache = {}
     assert obj._room_join('!abc123:localhost') == response_obj['room_id']
+    # Use cache to get same results
+    assert len(obj._room_cache) == 1
+    assert obj._room_join('!abc123:localhost') == response_obj['room_id']
+
     obj._room_cache = {}
     assert obj._room_join('abc123') == response_obj['room_id']
+    # Use cache to get same results
+    assert len(obj._room_cache) == 1
+    assert obj._room_join('abc123') == response_obj['room_id']
+
     obj._room_cache = {}
     assert obj._room_join('abc123:localhost') == response_obj['room_id']
+    # Use cache to get same results
+    assert len(obj._room_cache) == 1
+    assert obj._room_join('abc123:localhost') == response_obj['room_id']
+
     obj._room_cache = {}
     assert obj._room_join('#abc123:localhost') == response_obj['room_id']
+    # Use cache to get same results
+    assert len(obj._room_cache) == 1
+    assert obj._room_join('#abc123:localhost') == response_obj['room_id']
+
     obj._room_cache = {}
     assert obj._room_join('%') is None
     assert obj._room_join(None) is None

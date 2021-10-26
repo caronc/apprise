@@ -28,7 +28,9 @@ import os
 import sys
 import mock
 import pytest
+import requests
 from apprise import Apprise
+from apprise import AppriseAsset
 from apprise import URLBase
 from apprise.logger import LogCapture
 
@@ -617,6 +619,85 @@ def test_apprise_log_file_captures_py2(tmpdir):
             with LogCapture(path=str(log_file)) as fp:
                 # we'll never get here because we'll fail to open the file
                 pass
+
+    # Disable Logging
+    logging.disable(logging.CRITICAL)
+
+
+@pytest.mark.skipif(sys.version_info.major <= 2, reason="Requires Python 3.x+")
+@mock.patch('requests.post')
+def test_apprise_secure_logging(mock_post):
+    """
+    API: Apprise() secure logging tests
+    """
+
+    # Ensure we're not running in a disabled state
+    logging.disable(logging.NOTSET)
+
+    logger.setLevel(logging.CRITICAL)
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    # Default Secure Logging is set to enabled
+    asset = AppriseAsset()
+    assert asset.secure_logging is True
+
+    # Load our asset
+    a = Apprise(asset=asset)
+
+    with LogCapture(level=logging.DEBUG) as stream:
+        # add a test server
+        assert a.add("json://user:pass1$-3!@localhost") is True
+
+        # Our servers should carry this flag
+        a[0].asset.secure_logging is True
+
+        logs = re.split(r'\r*\n', stream.getvalue().rstrip())
+        assert len(logs) == 1
+        entry = re.split(r'\s-\s', logs[0])
+        assert len(entry) == 3
+        assert entry[1] == 'DEBUG'
+        assert entry[2].startswith(
+            'Loaded JSON URL: json://user:****@localhost/')
+
+    # Send notification
+    assert a.notify("test") is True
+
+    # Test our call count
+    assert mock_post.call_count == 1
+
+    # Reset
+    mock_post.reset_mock()
+
+    # Now we test the reverse configuration and turn off
+    # secure logging.
+
+    # Default Secure Logging is set to disable
+    asset = AppriseAsset(secure_logging=False)
+    assert asset.secure_logging is False
+
+    # Load our asset
+    a = Apprise(asset=asset)
+
+    with LogCapture(level=logging.DEBUG) as stream:
+        # add a test server
+        assert a.add("json://user:pass1$-3!@localhost") is True
+
+        # Our servers should carry this flag
+        a[0].asset.secure_logging is False
+
+        logs = re.split(r'\r*\n', stream.getvalue().rstrip())
+        assert len(logs) == 1
+        entry = re.split(r'\s-\s', logs[0])
+        assert len(entry) == 3
+        assert entry[1] == 'DEBUG'
+
+        # Note that our password is no longer escaped (it is however
+        # url encoded)
+        assert entry[2].startswith(
+            'Loaded JSON URL: json://user:pass1%24-3%21@localhost/')
 
     # Disable Logging
     logging.disable(logging.CRITICAL)

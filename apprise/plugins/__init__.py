@@ -44,6 +44,7 @@ from ..common import NOTIFY_IMAGE_SIZES
 from ..common import NotifyType
 from ..common import NOTIFY_TYPES
 from ..utils import parse_list
+from ..utils import cwe312_url
 from ..utils import GET_SCHEMA_RE
 from ..logger import logger
 from ..AppriseLocale import gettext_lazy as _
@@ -442,7 +443,7 @@ def details(plugin):
     }
 
 
-def url_to_dict(url):
+def url_to_dict(url, secure_logging=True):
     """
     Takes an apprise URL and returns the tokens associated with it
     if they can be acquired based on the plugins available.
@@ -457,13 +458,16 @@ def url_to_dict(url):
     # swap hash (#) tag values with their html version
     _url = url.replace('/#', '/%23')
 
+    # CWE-312 (Secure Logging) Handling
+    loggable_url = url if not secure_logging else cwe312_url(url)
+
     # Attempt to acquire the schema at the very least to allow our plugins to
     # determine if they can make a better interpretation of a URL geared for
     # them.
     schema = GET_SCHEMA_RE.match(_url)
     if schema is None:
         # Not a valid URL; take an early exit
-        logger.error('Unsupported URL: {}'.format(url))
+        logger.error('Unsupported URL: {}'.format(loggable_url))
         return None
 
     # Ensure our schema is always in lower case
@@ -480,7 +484,7 @@ def url_to_dict(url):
                  None)
 
         if not results:
-            logger.error('Unparseable URL {}'.format(url))
+            logger.error('Unparseable URL {}'.format(loggable_url))
             return None
 
         logger.trace('URL {} unpacked as:{}{}'.format(
@@ -493,7 +497,7 @@ def url_to_dict(url):
         results = SCHEMA_MAP[schema].parse_url(_url)
         if not results:
             logger.error('Unparseable {} URL {}'.format(
-                SCHEMA_MAP[schema].service_name, url))
+                SCHEMA_MAP[schema].service_name, loggable_url))
             return None
 
         logger.trace('{} URL {} unpacked as:{}{}'.format(

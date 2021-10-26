@@ -29,6 +29,7 @@ import requests
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
+from ..common import NotifyFormat
 from ..utils import parse_list
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
@@ -195,6 +196,14 @@ class NotifyPushover(NotifyBase):
             'regex': (r'^[a-z]{1,12}$', 'i'),
             'default': PushoverSound.PUSHOVER,
         },
+        'url': {
+            'name': _('URL'),
+            'type': 'string',
+        },
+        'url_title': {
+            'name': _('URL Title'),
+            'type': 'string'
+        },
         'retry': {
             'name': _('Retry'),
             'type': 'int',
@@ -214,7 +223,8 @@ class NotifyPushover(NotifyBase):
     })
 
     def __init__(self, user_key, token, targets=None, priority=None,
-                 sound=None, retry=None, expire=None, **kwargs):
+                 sound=None, retry=None, expire=None, url=None,
+                 url_title=None, **kwargs):
         """
         Initialize Pushover Object
         """
@@ -239,6 +249,10 @@ class NotifyPushover(NotifyBase):
         self.targets = parse_list(targets)
         if len(self.targets) == 0:
             self.targets = (PUSHOVER_SEND_TO_ALL, )
+
+        # Setup supplemental url
+        self.supplemental_url = url
+        self.supplemental_url_title = url_title
 
         # Setup our sound
         self.sound = NotifyPushover.default_pushover_sound \
@@ -318,7 +332,13 @@ class NotifyPushover(NotifyBase):
                 'message': body,
                 'device': device,
                 'sound': self.sound,
+                'url': self.supplemental_url,
+                'url_title': self.supplemental_url_title
             }
+
+            if self.notify_format == NotifyFormat.HTML:
+                # https://pushover.net/api#html
+                payload['html'] = 1
 
             if self.priority == PushoverPriority.EMERGENCY:
                 payload.update({'retry': self.retry, 'expire': self.expire})
@@ -563,6 +583,12 @@ class NotifyPushover(NotifyBase):
         if 'sound' in results['qsd'] and len(results['qsd']['sound']):
             results['sound'] = \
                 NotifyPushover.unquote(results['qsd']['sound'])
+
+        # Get the supplementary url
+        if 'url' in results['qsd'] and len(results['qsd']['url']):
+            results['url'] = NotifyPushover.unquote(results['qsd']['url'])
+        if 'url_title' in results['qsd'] and len(results['qsd']['url_title']):
+            results['url_title'] = results['qsd']['url_title']
 
         # Get expire and retry
         if 'expire' in results['qsd'] and len(results['qsd']['expire']):

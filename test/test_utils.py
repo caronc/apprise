@@ -554,6 +554,13 @@ def test_is_hostname():
     assert utils.is_hostname('valid-underscores_in_host.ca') == \
         'valid-underscores_in_host.ca'
 
+    # Underscores are supported by default
+    assert utils.is_hostname('valid_dashes_in_host.ca') == \
+        'valid_dashes_in_host.ca'
+    # However they are not if specified otherwise:
+    assert utils.is_hostname(
+        'valid_dashes_in_host.ca', underscore=False) is False
+
     # Invalid Hostnames
     assert utils.is_hostname('-hostname.that.starts.with.a.dash') is False
     assert utils.is_hostname('invalid-characters_#^.ca') is False
@@ -1493,3 +1500,65 @@ def test_apply_templating():
         template, app_mode=utils.TemplateType.JSON,
         **{'value': '"quotes are escaped"'})
     assert result == '{value: "\\"quotes are escaped\\""}'
+
+
+def test_cwe312_word():
+    """utils: cwe312_word() testing
+    """
+    assert utils.cwe312_word(None) is None
+    assert utils.cwe312_word(42) == 42
+    assert utils.cwe312_word('') == ''
+    assert utils.cwe312_word(' ') == ' '
+    assert utils.cwe312_word('!') == '!'
+
+    assert utils.cwe312_word('a') == 'a'
+    assert utils.cwe312_word('ab') == 'ab'
+    assert utils.cwe312_word('abc') == 'abc'
+    assert utils.cwe312_word('abcd') == 'abcd'
+    assert utils.cwe312_word('abcd', force=True) == 'a...d'
+
+    assert utils.cwe312_word('abc--d') == 'abc--d'
+    assert utils.cwe312_word('a-domain.ca') == 'a...a'
+
+    # Variances to still catch domain
+    assert utils.cwe312_word('a-domain.ca', advanced=False) == 'a-domain.ca'
+    assert utils.cwe312_word('a-domain.ca', threshold=6) == 'a-domain.ca'
+
+
+def test_cwe312_url():
+    """utils: cwe312_url() testing
+    """
+    assert utils.cwe312_url(None) is None
+    assert utils.cwe312_url(42) == 42
+    assert utils.cwe312_url('http://') == 'http://'
+    assert utils.cwe312_url('discord://') == 'discord://'
+    assert utils.cwe312_url('path') == 'http://path'
+    assert utils.cwe312_url('path/') == 'http://path/'
+
+    # Now test http:// private data
+    assert utils.cwe312_url(
+        'http://user:pass123@localhost') == 'http://user:p...3@localhost'
+    assert utils.cwe312_url(
+        'http://user@localhost') == 'http://user@localhost'
+    assert utils.cwe312_url(
+        'http://user@localhost?password=abc123') == \
+        'http://user@localhost?password=a...3'
+    assert utils.cwe312_url(
+        'http://user@localhost?secret=secret-.12345') == \
+        'http://user@localhost?secret=s...5'
+
+    # Now test other:// private data
+    assert utils.cwe312_url(
+        'gitter://b5637831f563aa846bb5b2c27d8fe8f633b8f026/apprise') == \
+        'gitter://b...6/apprise'
+    assert utils.cwe312_url(
+        'gitter://b5637831f563aa846bb5b2c27d8fe8f633b8f026'
+        '/apprise/?pass=abc123') == \
+        'gitter://b...6/apprise?pass=a...3'
+
+    assert utils.cwe312_url(
+        'slack://mybot@xoxb-43598234231-3248932482278-BZK5Wj15B9mPh1RkShJoCZ44'
+        '/lead2gold@gmail.com') == 'slack://mybot@x...4/l...m'
+    assert utils.cwe312_url(
+        'slack://test@B4QP3WWB4/J3QWT41JM/XIl2ffpqXkzkwMXrJdevi7W3/'
+        '#random') == 'slack://test@B...4/J...M/X...3'

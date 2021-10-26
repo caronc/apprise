@@ -301,7 +301,7 @@ class NotifyGoogleChat(NotifyBase):
         """
 
         result = re.match(
-            r'^https://chat.googleapis.com/v1/spaces/'
+            r'^https://chat\.googleapis\.com/v1/spaces/'
             r'(?P<workspace>[A-Z0-9_-]+)/messages/*(?P<params>.+)$',
             url, re.I)
 
