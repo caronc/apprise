@@ -191,13 +191,13 @@ def test_apprise_escaping_py3(mock_post):
     # the body only.  Now we run similar tests but only make the title
     # bad and always mark the body good
     assert a.notify(
-        title=None, body="valid", interpret_escapes=True) is False
+        title=None, body="valid", interpret_escapes=True) is True
     assert a.notify(
         title=4, body="valid", interpret_escapes=True) is False
     assert a.notify(
         title=object(), body="valid", interpret_escapes=True) is False
     assert a.notify(
-        title=False, body="valid", interpret_escapes=True) is False
+        title=False, body="valid", interpret_escapes=True) is True
     assert a.notify(
         title=b'byte title', body="valid", interpret_escapes=True) is False
 
@@ -320,10 +320,10 @@ def test_apprise_escaping_py2(mock_post):
     # the body only.  Now we run similar tests but only make the title
     # bad and always mark the body good
     assert a.notify(
-        title=None, body="valid", interpret_escapes=True) is False
+        title=None, body="valid", interpret_escapes=True) is True
     assert a.notify(
         title=4, body="valid", interpret_escapes=True) is False
     assert a.notify(
         title=object(), body="valid", interpret_escapes=True) is False
     assert a.notify(
-        title=False, body="valid", interpret_escapes=True) is False
+        title=False, body="valid", interpret_escapes=True) is True
