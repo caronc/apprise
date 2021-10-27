@@ -1175,6 +1175,10 @@ def test_apprise_details_plugin_verification():
         assert 'service_name' in entry
         assert isinstance(entry['service_name'], six.string_types)
 
+        # A Service URL MUST be defined
+        assert 'service_url' in entry
+        assert isinstance(entry['service_url'], six.string_types)
+
         # Acquire our protocols
         protocols = parse_list(
             entry['protocols'], entry['secure_protocols'])
