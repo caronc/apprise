@@ -64,9 +64,6 @@ class NotifyAppriseAPI(NotifyBase):
     # local anyway
     request_rate_per_sec = 0.0
 
-    # can not recurse more then one time
-    recursion_limit = 1
-
     # Define object templates
     templates = (
         '{schema}://{host}/{token}',
@@ -119,15 +116,6 @@ class NotifyAppriseAPI(NotifyBase):
         'to': {
             'alias_of': 'token',
         },
-        # From provides a means of tracing a source
-        # this is to ensure that an infinit loop isn't generated where an
-        # Apprise API calls another Apprise API and/or itself on the same
-        # Apprise API server.
-        'recursion': {
-            'type': 'int',
-            'default': 0,
-            'min': 0,
-        },
     })
 
     # Define any kwargs we're using
@@ -138,7 +126,7 @@ class NotifyAppriseAPI(NotifyBase):
         },
     }
 
-    def __init__(self, token=None, tags=None, headers=None, recursion=None, **kwargs):
+    def __init__(self, token=None, tags=None, headers=None, **kwargs):
         """
         Initialize Apprise API Object
 
@@ -159,19 +147,6 @@ class NotifyAppriseAPI(NotifyBase):
                 .format(token)
             self.logger.warning(msg)
             raise TypeError(msg)
-
-        try:
-            # Assign our recursion value
-            self.recursion = int(recursion)
-            if self.recursion > self.recursion_limit:
-                msg = 'The Apprise API recursion limit of {} has been reached.'\
-                    .format(recursion)
-                self.logger.warning(msg)
-                raise TypeError(msg)
-
-        except TypeError:
-            # Assign our default value
-            self.recursion = self.template_args['recursion']['default']
 
         # Build list of tags
         self.__tags = parse_list(tags)
@@ -196,9 +171,6 @@ class NotifyAppriseAPI(NotifyBase):
 
         if self.__tags:
             params['tags'] = ','.join([x for x in self.__tags])
-
-        # Return our recursive value
-        params['recursion'] = str(self.recursion + 1)
 
         # Determine Authentication
         auth = ''
@@ -271,8 +243,10 @@ class NotifyAppriseAPI(NotifyBase):
         headers.update({
             'User-Agent': self.app_id,
             'Content-Type': 'application/json',
-            # Pass our current recursion value to our upstream server
-            'X-Apprise-Recursion-Value': str(self.recursion + 1),
+            # Pass our Source UUID4 Identifier
+            'X-Apprise-ID': self.asset._uid,
+            # Pass our current recursion count to our upstream server
+            'X-Apprise-Recursion-Count': str(self.asset._recursion + 1),
         })
 
         self.logger.debug('Apprise API POST URL: %s (cert_verify=%r)' % (
