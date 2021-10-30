@@ -576,6 +576,23 @@ def test_apprise_cli_nux_env(tmpdir):
     ])
     assert result.exit_code == 1
 
+    # Test Escaping:
+    result = runner.invoke(cli.main, [
+        '-e',
+        '-t', 'test\ntitle',
+        '-b', 'test\nbody',
+        'good://localhost',
+    ])
+    assert result.exit_code == 0
+
+    # Test Escaping (without title)
+    result = runner.invoke(cli.main, [
+        '--interpret-escapes',
+        '-b', 'test\nbody',
+        'good://localhost',
+    ])
+    assert result.exit_code == 0
+
 
 @mock.patch('platform.system')
 def test_apprise_cli_windows_env(mock_system):
