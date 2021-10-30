@@ -693,8 +693,8 @@ urls:
     # There were no include entries defined
     assert len(config) == 0
 
-    # An asset we'll manipulate
-    asset = AppriseAsset()
+    # An asset we'll manipulate; set some system flags
+    asset = AppriseAsset(_uid="abc123", _recursion=1)
 
     # Global Tags
     result, config = ConfigBase.config_parse_yaml("""
@@ -704,6 +704,10 @@ asset:
   app_desc: Apprise Test Notifications
   app_url: http://nuxref.com
   async_mode: no
+
+  # System flags should never get set
+  _uid: custom_id
+  _recursion: 100
 
   # Support setting empty values
   image_url_mask:
@@ -738,6 +742,10 @@ urls:
     assert asset.app_id == "AppriseTest"
     assert asset.app_desc == "Apprise Test Notifications"
     assert asset.app_url == "http://nuxref.com"
+
+    # Verify our system flags retain only the value they were initialized to
+    assert asset._uid == "abc123"
+    assert asset._recursion == 1
 
     # Boolean types stay boolean
     assert asset.async_mode is False
