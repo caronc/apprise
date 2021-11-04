@@ -605,6 +605,10 @@ def test_is_hostname():
     assert utils.is_hostname(
         '2001:0db8:85a3:0000:0000:8a2e:0370:7334', ipv6=False) is False
 
+    # Test hostnames with a single character hostname
+    assert utils.is_hostname(
+        'cloud.a.example.com', ipv4=False, ipv6=False) == 'cloud.a.example.com'
+
 
 def test_is_ipaddr():
     """

@@ -246,9 +246,10 @@ def is_hostname(hostname, ipv4=True, ipv6=True, underscore=True):
     #   being able to address services in other stacks, we also allow
     #   underscores in hostnames (if flag is set accordingly)
     # - labels can not exceed 63 characters
+    # - allow single character alpha characters
     allowed = re.compile(
-        r'^[a-z0-9][a-z0-9_-]{1,62}(?<![_-])$' if underscore else
-        r'^[a-z0-9][a-z0-9-]{1,62}(?<!-)$',
+        r'^([a-z0-9][a-z0-9_-]{1,62}|[a-z_-])(?<![_-])$' if underscore else
+        r'^([a-z0-9][a-z0-9-]{1,62}|[a-z-])(?<!-)$',
         re.IGNORECASE,
     )
 
