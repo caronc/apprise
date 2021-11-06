@@ -196,12 +196,14 @@ class NotifyPushover(NotifyBase):
             'regex': (r'^[a-z]{1,12}$', 'i'),
             'default': PushoverSound.PUSHOVER,
         },
-        'supplemental_url': {
-            'name': _('Supplemental URL'),
+        'url': {
+            'name': _('URL'),
+            'map_to': 'supplemental_url',
             'type': 'string',
         },
-        'supplemental_url_title': {
-            'name': _('Supplemental URL Title'),
+        'url_title': {
+            'name': _('URL Title'),
+            'map_to': 'supplemental_url_title',
             'type': 'string'
         },
         'retry': {
@@ -589,17 +591,15 @@ class NotifyPushover(NotifyBase):
 
         # Get the supplementary url
         if 'supplemental_url' in results['qsd'] and len(
-            results['qsd']['supplemental_url']
+            results['qsd']['url']
         ):
             results['supplemental_url'] = NotifyPushover.unquote(
-                results['qsd']['supplemental_url']
+                results['qsd']['url']
             )
         if 'supplemental_url_title' in results['qsd'] and len(
-            results['qsd']['supplemental_url_title']
+            results['qsd']['url_title']
         ):
-            results['supplemental_url_title'] = results['qsd'][
-                'supplemental_url_title'
-            ]
+            results['supplemental_url_title'] = results['qsd']['url_title']
 
         # Get expire and retry
         if 'expire' in results['qsd'] and len(results['qsd']['expire']):
