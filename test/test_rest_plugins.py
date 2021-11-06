@@ -3707,7 +3707,7 @@ TEST_URLS = (
         'instance': plugins.NotifyPushover,
     }),
     # API Key + valid url_title with url
-    ('pover://%s@%s?supplemental_url=my-url&supplemental_url_title=title' % (
+    ('pover://%s@%s?url=my-url&url_title=title' % (
         'u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
     }),
