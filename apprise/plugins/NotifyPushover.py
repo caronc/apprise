@@ -590,15 +590,11 @@ class NotifyPushover(NotifyBase):
                 NotifyPushover.unquote(results['qsd']['sound'])
 
         # Get the supplementary url
-        if 'url' in results['qsd'] and len(
-            results['qsd']['url']
-        ):
+        if 'url' in results['qsd'] and len(results['qsd']['url']):
             results['supplemental_url'] = NotifyPushover.unquote(
                 results['qsd']['url']
             )
-        if 'url_title' in results['qsd'] and len(
-            results['qsd']['url_title']
-        ):
+        if 'url_title' in results['qsd'] and len(results['qsd']['url_title']):
             results['supplemental_url_title'] = results['qsd']['url_title']
 
         # Get expire and retry
