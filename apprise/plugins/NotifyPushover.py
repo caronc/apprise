@@ -590,13 +590,13 @@ class NotifyPushover(NotifyBase):
                 NotifyPushover.unquote(results['qsd']['sound'])
 
         # Get the supplementary url
-        if 'supplemental_url' in results['qsd'] and len(
+        if 'url' in results['qsd'] and len(
             results['qsd']['url']
         ):
             results['supplemental_url'] = NotifyPushover.unquote(
                 results['qsd']['url']
             )
-        if 'supplemental_url_title' in results['qsd'] and len(
+        if 'url_title' in results['qsd'] and len(
             results['qsd']['url_title']
         ):
             results['supplemental_url_title'] = results['qsd']['url_title']
