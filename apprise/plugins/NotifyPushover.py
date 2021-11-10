@@ -198,10 +198,12 @@ class NotifyPushover(NotifyBase):
         },
         'url': {
             'name': _('URL'),
+            'map_to': 'supplemental_url',
             'type': 'string',
         },
         'url_title': {
             'name': _('URL Title'),
+            'map_to': 'supplemental_url_title',
             'type': 'string'
         },
         'retry': {
@@ -223,8 +225,8 @@ class NotifyPushover(NotifyBase):
     })
 
     def __init__(self, user_key, token, targets=None, priority=None,
-                 sound=None, retry=None, expire=None, url=None,
-                 url_title=None, **kwargs):
+                 sound=None, retry=None, expire=None, supplemental_url=None,
+                 supplemental_url_title=None, **kwargs):
         """
         Initialize Pushover Object
         """
@@ -251,8 +253,8 @@ class NotifyPushover(NotifyBase):
             self.targets = (PUSHOVER_SEND_TO_ALL, )
 
         # Setup supplemental url
-        self.supplemental_url = url
-        self.supplemental_url_title = url_title
+        self.supplemental_url = supplemental_url
+        self.supplemental_url_title = supplemental_url_title
 
         # Setup our sound
         self.sound = NotifyPushover.default_pushover_sound \
@@ -332,9 +334,12 @@ class NotifyPushover(NotifyBase):
                 'message': body,
                 'device': device,
                 'sound': self.sound,
-                'url': self.supplemental_url,
-                'url_title': self.supplemental_url_title
             }
+
+            if self.supplemental_url:
+                payload['url'] = self.supplemental_url
+            if self.supplemental_url_title:
+                payload['url_title'] = self.supplemental_url_title
 
             if self.notify_format == NotifyFormat.HTML:
                 # https://pushover.net/api#html
@@ -586,9 +591,11 @@ class NotifyPushover(NotifyBase):
 
         # Get the supplementary url
         if 'url' in results['qsd'] and len(results['qsd']['url']):
-            results['url'] = NotifyPushover.unquote(results['qsd']['url'])
+            results['supplemental_url'] = NotifyPushover.unquote(
+                results['qsd']['url']
+            )
         if 'url_title' in results['qsd'] and len(results['qsd']['url_title']):
-            results['url_title'] = results['qsd']['url_title']
+            results['supplemental_url_title'] = results['qsd']['url_title']
 
         # Get expire and retry
         if 'expire' in results['qsd'] and len(results['qsd']['expire']):
