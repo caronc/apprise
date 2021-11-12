@@ -373,19 +373,14 @@ class NotifySlack(NotifyBase):
         # error tracking (used for function return)
         has_error = False
 
-
-        if self.notify_format == NotifyFormat.MARKDOWN:
-            body = self._re_formatting_rules.sub(  # pragma: no branch
-                lambda x: self._re_formatting_map[x.group()], body,
-            )
-
         #
         # Prepare JSON Object (applicable to both WEBHOOK and BOT mode)
         #
         if self.use_blocks:
             # Our slack format
             _slack_format = 'mrkdwn' \
-                if self.notify_format == NotifyFormat.MARKDOWN else 'plain_text'
+                if self.notify_format == NotifyFormat.MARKDOWN \
+                else 'plain_text'
 
             payload = {
                 'username': self.user if self.user else self.app_id,
@@ -419,33 +414,37 @@ class NotifySlack(NotifyBase):
                 image_url = None if not self.include_image \
                     else self.image_url(notify_type)
 
-                if self.use_blocks:
-                    # Prepare our footer based on the block structure
-                    _footer = {
-                        'type': 'context',
-                        'elements': [{
-                            'type': _slack_format,
-                            'text': self.app_id
-                        }]
-                    }
+                # Prepare our footer based on the block structure
+                _footer = {
+                    'type': 'context',
+                    'elements': [{
+                        'type': _slack_format,
+                        'text': self.app_id
+                    }]
+                }
 
-                    if image_url:
-                        payload['icon_url'] = image_url
+                if image_url:
+                    payload['icon_url'] = image_url
 
-                        _footer['elements'].insert(0, {
-                            'type': 'image',
-                            'image_url': image_url,
-                            'alt_text': notify_type
-                        })
+                    _footer['elements'].insert(0, {
+                        'type': 'image',
+                        'image_url': image_url,
+                        'alt_text': notify_type
+                    })
 
-                    payload['attachments'][0]['blocks'].append(_footer)
+                payload['attachments'][0]['blocks'].append(_footer)
 
         else:
             #
             # Legacy API Formatting
             #
+            if self.notify_format == NotifyFormat.MARKDOWN:
+                body = self._re_formatting_rules.sub(  # pragma: no branch
+                    lambda x: self._re_formatting_map[x.group()], body,
+                )
 
-            # Perform Formatting on title here; this is not needed for block mode above
+            # Perform Formatting on title here; this is not needed for block
+            # mode above
             title = self._re_formatting_rules.sub(  # pragma: no branch
                 lambda x: self._re_formatting_map[x.group()], title,
             )
