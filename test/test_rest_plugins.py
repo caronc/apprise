@@ -4859,6 +4859,33 @@ TEST_URLS = (
             },
         },
     }),
+    # Test blocks mode
+    ('slack://?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/'
+     '&to=#chan&blocks=yes&footer=yes',
+        {
+            'instance': plugins.NotifySlack,
+            'requests_response_text': 'ok'}),
+    ('slack://?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/'
+     '&to=#chan&blocks=yes&footer=no',
+        {
+            'instance': plugins.NotifySlack,
+            'requests_response_text': 'ok'}),
+    ('slack://?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/'
+     '&to=#chan&blocks=yes&footer=yes&image=no',
+        {
+            'instance': plugins.NotifySlack,
+            'requests_response_text': 'ok'}),
+    ('slack://?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/'
+     '&to=#chan&blocks=yes&format=text',
+        {
+            'instance': plugins.NotifySlack,
+            'requests_response_text': 'ok'}),
+    ('slack://?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/'
+     '&to=#chan&blocks=no&format=text',
+        {
+            'instance': plugins.NotifySlack,
+            'requests_response_text': 'ok'}),
+
     # Test using a bot-token as argument
     ('slack://?token=xoxb-1234-1234-abc124&to=#nuxref&footer=no&user=test', {
         'instance': plugins.NotifySlack,

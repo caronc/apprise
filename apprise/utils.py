@@ -694,10 +694,7 @@ def parse_url(url, default_schema='http', verify_host=True):
 
 def parse_bool(arg, default=False):
     """
-    NZBGet uses 'yes' and 'no' as well as other strings such as 'on' or
-    'off' etch to handle boolean operations from it's control interface.
-
-    This method can just simplify checks to these variables.
+    Support string based boolean settings.
 
     If the content could not be parsed, then the default is returned.
     """
