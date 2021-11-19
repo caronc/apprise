@@ -32,13 +32,22 @@ from ..common import NotifyType
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
-from cryptography.hazmat.primitives import padding
-from cryptography.hazmat.primitives.ciphers import Cipher
-from cryptography.hazmat.primitives.ciphers import algorithms
-from cryptography.hazmat.primitives.ciphers import modes
-from cryptography.hazmat.backends import default_backend
 from base64 import urlsafe_b64encode
 import hashlib
+
+try:
+    from cryptography.hazmat.primitives import padding
+    from cryptography.hazmat.primitives.ciphers import Cipher
+    from cryptography.hazmat.primitives.ciphers import algorithms
+    from cryptography.hazmat.primitives.ciphers import modes
+    from cryptography.hazmat.backends import default_backend
+
+    # We're good to go!
+    NOTIFY_SIMPLEPUSH_ENABLED = True
+
+except ImportError:
+    # cryptography is required in order for this package to work
+    NOTIFY_SIMPLEPUSH_ENABLED = False
 
 
 class NotifySimplePush(NotifyBase):
@@ -72,6 +81,9 @@ class NotifySimplePush(NotifyBase):
         '{schema}://{apikey}',
         '{schema}://{salt}:{password}@{apikey}',
     )
+
+    # Define whether or not we're enabled or not to work for others
+    _enabled = NOTIFY_SIMPLEPUSH_ENABLED
 
     # Define our template tokens
     template_tokens = dict(NotifyBase.template_tokens, **{
@@ -169,6 +181,12 @@ class NotifySimplePush(NotifyBase):
         """
         Perform SimplePush Notification
         """
+
+        if not self._enabled:
+            self.logger.warning(
+                "SimplePush Notifications are not supported by this system; "
+                "`pip install cryptography`.")
+            return False
 
         headers = {
             'User-Agent': self.app_id,

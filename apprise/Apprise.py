@@ -585,7 +585,7 @@ class Apprise(object):
                 attach=attach
             )
 
-    def details(self, lang=None):
+    def details(self, lang=None, show_disabled=True):
         """
         Returns the details associated with the Apprise object
 
@@ -603,6 +603,12 @@ class Apprise(object):
 
         # to add it's mapping to our hash table
         for plugin in set(plugins.SCHEMA_MAP.values()):
+
+            # Standard protocol(s) should be None or a tuple
+            enabled = getattr(plugin, '_enabled', True)
+            if not show_disabled and not enabled:
+                # Do not show inactive plugins
+                continue
 
             # Standard protocol(s) should be None or a tuple
             protocols = getattr(plugin, 'protocol', None)

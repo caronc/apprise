@@ -52,6 +52,13 @@ class NotifyBase(BASE_OBJECT):
     This is the base class for all notification services
     """
 
+    # An internal flag used to test the state of the plugin. If set to
+    # False, then the plugin is not used.  Plugins can disable themselves
+    # due to enviroment issues (such as missing libraries, or platform
+    # dependencies that are not present).  By default all plugins are
+    # enabled.
+    _enabled = True
+
     # The services URL
     service_url = None
 

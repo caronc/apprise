@@ -48,13 +48,29 @@
 import six
 import requests
 from json import dumps
-from .oauth import GoogleOAuth
 from ..NotifyBase import NotifyBase
 from ...common import NotifyType
 from ...utils import validate_regex
 from ...utils import parse_list
 from ...AppriseAttachment import AppriseAttachment
 from ...AppriseLocale import gettext_lazy as _
+
+# Default our global support flag
+NOTIFY_FCM_SUPPORT_ENABLED = False
+
+try:
+    from .oauth import GoogleOAuth
+
+    # We're good to go
+    NOTIFY_FCM_SUPPORT_ENABLED = True
+
+except ImportError:
+    # cryptography is the dependency of the .oauth library
+
+    # Create a dummy object for init() call to work
+    class GoogleOAuth(object):
+        pass
+
 
 # Our lookup map
 FCM_HTTP_ERROR_MAP = {
@@ -117,6 +133,9 @@ class NotifyFCM(NotifyBase):
     # A title can not be used for SMS Messages.  Setting this to zero will
     # cause any title (if defined) to get placed into the message body.
     title_maxlen = 0
+
+    # Define whether or not we're enabled or not to work for others
+    _enabled = NOTIFY_FCM_SUPPORT_ENABLED
 
     # Define object templates
     templates = (
@@ -278,6 +297,12 @@ class NotifyFCM(NotifyBase):
         """
         Perform FCM Notification
         """
+
+        if not self._enabled:
+            self.logger.warning(
+                "FCM Notifications are not supported by this system; "
+                "`pip install cryptography`.")
+            return False
 
         if not self.targets:
             # There is no one to email; we're done
