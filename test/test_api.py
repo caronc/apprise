@@ -43,6 +43,7 @@ from apprise import NotifyImageSize
 from apprise import __version__
 from apprise import URLBase
 from apprise import PrivacyMode
+from apprise.AppriseLocale import LazyTranslation
 
 from apprise.plugins import SCHEMA_MAP
 from apprise.plugins import __load_matrix
@@ -961,6 +962,143 @@ def test_apprise_asset(tmpdir):
         'http://localhost/default/info-256x256.test'
 
 
+def test_apprise_disabled_plugins():
+    """
+    API: Apprise() Disabled Plugin States
+
+    """
+    # Reset our matrix
+    __reset_matrix()
+
+    class TestDisabled01Notification(NotifyBase):
+        """
+        This class is used to test a pre-disabled state
+        """
+
+        # Just flat out disable our service
+        enabled = False
+
+        # we'll use this as a key to make our service easier to find
+        # in the next part of the testing
+        service_name = 'na01'
+
+        def url(self, **kwargs):
+            # Support URL
+            return ''
+
+        def notify(self, **kwargs):
+            # Pretend everything is okay (so we don't break other tests)
+            return True
+
+    SCHEMA_MAP['na01'] = TestDisabled01Notification
+
+    class TestDisabled02Notification(NotifyBase):
+        """
+        This class is used to test a post-disabled state
+        """
+
+        # we'll use this as a key to make our service easier to find
+        # in the next part of the testing
+        service_name = 'na02'
+
+        def __init__(self, *args, **kwargs):
+            super(TestDisabled02Notification, self).__init__(**kwargs)
+
+            # enable state changes AFTER we initialize
+            self.enabled = False
+
+        def url(self, **kwargs):
+            # Support URL
+            return ''
+
+        def notify(self, **kwargs):
+            # Pretend everything is okay (so we don't break other tests)
+            return True
+
+    SCHEMA_MAP['na02'] = TestDisabled02Notification
+
+    # Create our Apprise instance
+    a = Apprise()
+
+    result = a.details(lang='ca-en', show_disabled=True)
+    assert isinstance(result, dict)
+    assert 'schemas' in result
+    assert len(result['schemas']) == 2
+
+    # our na01 is disabled right from the get-go
+    entry = next((x for x in result['schemas']
+                  if x['service_name'] == 'na01'), None)
+    assert entry is not None
+    assert entry['enabled'] is False
+
+    plugin = a.instantiate('na01://localhost')
+    # Object is just flat out disabled... nothing is instatiated
+    assert plugin is None
+
+    # our na02 isn't however until it's initialized; as a result
+    # it get's returned in our result set
+    entry = next((x for x in result['schemas']
+                  if x['service_name'] == 'na02'), None)
+    assert entry is not None
+    assert entry['enabled'] is True
+
+    plugin = a.instantiate('na02://localhost')
+    # Object isn't disabled until the __init__() call.  But this is still
+    # enough to not instantiate the object:
+    assert plugin is None
+
+    # If we choose to filter our disabled, we can't unfortunately filter those
+    # that go disabled after instantiation, but we do filter out any that are
+    # already known to not be enabled:
+    result = a.details(lang='ca-en', show_disabled=False)
+    assert isinstance(result, dict)
+    assert 'schemas' in result
+    assert len(result['schemas']) == 1
+
+    # We'll add a good notification to our list
+    class TesEnabled01Notification(NotifyBase):
+        """
+        This class is just a simple enabled one
+        """
+
+        # we'll use this as a key to make our service easier to find
+        # in the next part of the testing
+        service_name = 'good'
+
+        def url(self, **kwargs):
+            # Support URL
+            return ''
+
+        def send(self, **kwargs):
+            # Pretend everything is okay (so we don't break other tests)
+            return True
+
+    SCHEMA_MAP['good'] = TesEnabled01Notification
+
+    # The last thing we'll simulate is a case where the plugin is just
+    # disabled at a later time long into it's life.  this is just to allow
+    # administrators to stop the flow of their notifications for their own
+    # given reasons.
+    plugin = a.instantiate('good://localhost')
+    assert isinstance(plugin, NotifyBase)
+
+    # we'll toggle our state
+    plugin.enabled = False
+
+    # As a result, we can now no longer send a notification:
+    assert plugin.notify("My Message") is False
+
+    # As just a proof of how you can toggle the state back:
+    plugin.enabled = True
+
+    # our notifications will go okay now
+    assert plugin.notify("My Message") is True
+
+    # Reset our matrix
+    __reset_matrix()
+    __load_matrix()
+
+
 def test_apprise_details():
     """
     API: Apprise() Details
@@ -1070,18 +1208,150 @@ def test_apprise_details():
             # Support URL
             return ''
 
-        def notify(self, **kwargs):
+        def send(self, **kwargs):
             # Pretend everything is okay (so we don't break other tests)
             return True
 
     # Store our good detail notification in our schema map
     SCHEMA_MAP['details'] = TestDetailNotification
 
+    # This is a made up class that is just used to verify
+    class TestReq01Notification(NotifyBase):
+        """
+        This class is used to test various requirement configurations
+        """
+
+        # Set some requirements
+        requirements = {
+            'packages_required': [
+                'cryptography <= 3.4',
+                'ultrasync',
+            ],
+            'packages_recommended': 'django',
+        }
+
+        def url(self, **kwargs):
+            # Support URL
+            return ''
+
+        def send(self, **kwargs):
+            # Pretend everything is okay (so we don't break other tests)
+            return True
+
+    SCHEMA_MAP['req01'] = TestDetailNotification
+
+    # This is a made up class that is just used to verify
+    class TestReq02Notification(NotifyBase):
+        """
+        This class is used to test various requirement configurations
+        """
+
+        # Just not enabled at all
+        enabled = False
+
+        # Set some requirements
+        requirements = {
+            # None and/or [] is implied, but jsut to show that the code won't
+            # crash if explicitly set this way:
+            'packages_required': None,
+
+            'packages_recommended': [
+                'cryptography <= 3.4',
+            ]
+        }
+
+        def url(self, **kwargs):
+            # Support URL
+            return ''
+
+        def send(self, **kwargs):
+            # Pretend everything is okay (so we don't break other tests)
+            return True
+
+    SCHEMA_MAP['req02'] = TestReq02Notification
+
+    # This is a made up class that is just used to verify
+    class TestReq03Notification(NotifyBase):
+        """
+        This class is used to test various requirement configurations
+        """
+
+        # Set some requirements
+        requirements = {
+            # We can over-ride the default details assigned to our plugin if
+            # specified
+            'details': _('some specified requirement details'),
+
+            # We can set a string value as well (it does not have to be a list)
+            'packages_recommended': 'cryptography <= 3.4'
+        }
+
+        def url(self, **kwargs):
+            # Support URL
+            return ''
+
+        def send(self, **kwargs):
+            # Pretend everything is okay (so we don't break other tests)
+            return True
+
+    SCHEMA_MAP['req03'] = TestReq03Notification
+
     # Create our Apprise instance
     a = Apprise()
 
     # Dictionary response
-    assert isinstance(a.details(), dict)
+    result = a.details()
+    assert isinstance(result, dict)
+
+    # Test different variations of our call
+    result = a.details(lang='ca-fr')
+    assert isinstance(result, dict)
+    for entry in result['schemas']:
+        # Verify our key does not exist because we did not ask for it
+        assert 'enabled' not in entry
+        assert 'requirements' not in entry
+
+    result = a.details(lang='us-en', show_requirements=True)
+    assert isinstance(result, dict)
+    for entry in result['schemas']:
+        # Verify our key does not exist because we did not ask for it
+        assert 'enabled' not in entry
+
+        # Requirements are set for display
+        assert 'requirements' in entry
+        assert 'details' in entry['requirements']
+        assert 'packages_required' in entry['requirements']
+        assert 'packages_recommended' in entry['requirements']
+        assert isinstance(entry['requirements']['details'], six.string_types)
+        assert isinstance(entry['requirements']['packages_required'], list)
+        assert isinstance(entry['requirements']['packages_recommended'], list)
+
+    result = a.details(lang='ca-en', show_disabled=True)
+    assert isinstance(result, dict)
+    for entry in result['schemas']:
+        # Verify that our plugin state is available to us
+        assert 'enabled' in entry
+        assert isinstance(entry['enabled'], bool)
+
+        # Verify our key does not exist because we did not ask for it
+        assert 'requirements' not in entry
+
+    result = a.details(
+        lang='ca-fr', show_requirements=True, show_disabled=True)
+    assert isinstance(result, dict)
+    for entry in result['schemas']:
+        # Plugin States are set for display
+        assert 'enabled' in entry
+        assert isinstance(entry['enabled'], bool)
+
+        # Requirements are set for display
+        assert 'requirements' in entry
+        assert 'details' in entry['requirements']
+        assert 'packages_required' in entry['requirements']
+        assert 'packages_recommended' in entry['requirements']
+        assert isinstance(entry['requirements']['details'], six.string_types)
+        assert isinstance(entry['requirements']['packages_required'], list)
+        assert isinstance(entry['requirements']['packages_recommended'], list)
 
     # Reset our matrix
     __reset_matrix()
@@ -1173,7 +1443,8 @@ def test_apprise_details_plugin_verification():
 
         # A Service Name MUST be defined
         assert 'service_name' in entry
-        assert isinstance(entry['service_name'], six.string_types)
+        assert isinstance(
+            entry['service_name'], (six.string_types, LazyTranslation))
 
         # Acquire our protocols
         protocols = parse_list(

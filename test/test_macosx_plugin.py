@@ -25,9 +25,21 @@
 
 import os
 import six
+import sys
 import mock
 
 import apprise
+
+try:
+    # Python v3.4+
+    from importlib import reload
+except ImportError:
+    try:
+        # Python v3.0-v3.3
+        from imp import reload
+    except ImportError:
+        # Python v2.7
+        pass
 
 # Disable logging for a cleaner testing output
 import logging
@@ -48,8 +60,6 @@ def test_macosx_plugin(mock_macver, mock_system, mock_popen, tmpdir):
     script.write('')
     # Give execute bit
     os.chmod(str(script), 0o755)
-    # Point our object to our new temporary existing file
-    apprise.plugins.NotifyMacOSX.notify_path = str(script)
     mock_cmd_response = mock.Mock()
 
     # Set a successful response
@@ -60,10 +70,18 @@ def test_macosx_plugin(mock_macver, mock_system, mock_popen, tmpdir):
     mock_macver.return_value = ('10.8', ('', '', ''), '')
     mock_popen.return_value = mock_cmd_response
 
+    # Ensure our enviroment is loaded with this configuration
+    reload(sys.modules['apprise.plugins.NotifyMacOSX'])
+    reload(sys.modules['apprise.plugins'])
+    reload(sys.modules['apprise.Apprise'])
+    reload(sys.modules['apprise'])
+
+    # Point our object to our new temporary existing file
+    apprise.plugins.NotifyMacOSX.notify_path = str(script)
+
     obj = apprise.Apprise.instantiate(
         'macosx://_/?image=True', suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyMacOSX) is True
-    assert obj._enabled is True
 
     # Test url() call
     assert isinstance(obj.url(), six.string_types) is True
@@ -79,14 +97,12 @@ def test_macosx_plugin(mock_macver, mock_system, mock_popen, tmpdir):
     obj = apprise.Apprise.instantiate(
         'macosx://_/?image=True', suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyMacOSX) is True
-    assert obj._enabled is True
     assert obj.notify(title='title', body='body',
                       notify_type=apprise.NotifyType.INFO) is True
 
     obj = apprise.Apprise.instantiate(
         'macosx://_/?image=False', suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyMacOSX) is True
-    assert obj._enabled is True
     assert isinstance(obj.url(), six.string_types) is True
     assert obj.notify(title='title', body='body',
                       notify_type=apprise.NotifyType.INFO) is True
@@ -95,64 +111,82 @@ def test_macosx_plugin(mock_macver, mock_system, mock_popen, tmpdir):
     obj = apprise.Apprise.instantiate(
         'macosx://_/?sound=default', suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyMacOSX) is True
-    assert obj._enabled is True
     assert obj.sound == 'default'
     assert isinstance(obj.url(), six.string_types) is True
     assert obj.notify(title='title', body='body',
                       notify_type=apprise.NotifyType.INFO) is True
 
-    # Now test cases where our environment isn't set up correctly
-    # In this case we'll simulate a situation where our binary isn't
-    # executable
+    # If our binary is inacccessible (or not executable), we can
+    # no longer send our notifications
     os.chmod(str(script), 0o644)
-    obj = apprise.Apprise.instantiate(
-        'macosx://_/?sound=default', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyMacOSX) is True
-    assert obj._enabled is False
     assert obj.notify(title='title', body='body',
                       notify_type=apprise.NotifyType.INFO) is False
+
     # Restore permission
     os.chmod(str(script), 0o755)
 
-    # Test case where we simply aren't on a mac
-    mock_system.return_value = 'Linux'
-    obj = apprise.Apprise.instantiate(
-        'macosx://_/?sound=default', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyMacOSX) is True
-    assert obj._enabled is False
+    # But now let's disrupt the path location
+    obj.notify_path = 'invalid_missing-file'
+    assert not os.path.isfile(obj.notify_path)
     assert obj.notify(title='title', body='body',
                       notify_type=apprise.NotifyType.INFO) is False
-    # Restore mac environment
-    mock_system.return_value = 'Darwin'
-
-    # Now we must be Mac OS v10.8 or higher... Test cases where we aren't
-    mock_macver.return_value = ('10.7', ('', '', ''), '')
-    obj = apprise.Apprise.instantiate(
-        'macosx://_/?sound=default', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyMacOSX) is True
-    assert obj._enabled is False
-    assert obj.notify(title='title', body='body',
-                      notify_type=apprise.NotifyType.INFO) is False
-    # Restore valid mac environment
-    mock_macver.return_value = ('10.8', ('', '', ''), '')
-
-    mock_macver.return_value = ('9.12', ('', '', ''), '')
-    obj = apprise.Apprise.instantiate(
-        'macosx://_/?sound=default', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyMacOSX) is True
-    assert obj._enabled is False
-    assert obj.notify(title='title', body='body',
-                      notify_type=apprise.NotifyType.INFO) is False
-    # Restore valid mac environment
-    mock_macver.return_value = ('10.8', ('', '', ''), '')
 
     # Test cases where the script just flat out fails
     mock_cmd_response.returncode = 1
     obj = apprise.Apprise.instantiate(
         'macosx://', suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyMacOSX) is True
-    assert obj._enabled is True
     assert obj.notify(title='title', body='body',
                       notify_type=apprise.NotifyType.INFO) is False
+
     # Restore script return value
-    mock_cmd_response.returncode = 1
+    mock_cmd_response.returncode = 0
+
+    # Test case where we simply aren't on a mac
+    mock_system.return_value = 'Linux'
+    reload(sys.modules['apprise.plugins.NotifyMacOSX'])
+    reload(sys.modules['apprise.plugins'])
+    reload(sys.modules['apprise.Apprise'])
+    reload(sys.modules['apprise'])
+
+    # Point our object to our new temporary existing file
+    apprise.plugins.NotifyMacOSX.notify_path = str(script)
+
+    # Our object is disabled
+    obj = apprise.Apprise.instantiate(
+        'macosx://_/?sound=default', suppress_exceptions=False)
+    assert obj is None
+
+    # Restore mac environment
+    mock_system.return_value = 'Darwin'
+
+    # Now we must be Mac OS v10.8 or higher...
+    mock_macver.return_value = ('10.7', ('', '', ''), '')
+    reload(sys.modules['apprise.plugins.NotifyMacOSX'])
+    reload(sys.modules['apprise.plugins'])
+    reload(sys.modules['apprise.Apprise'])
+    reload(sys.modules['apprise'])
+
+    # Point our object to our new temporary existing file
+    apprise.plugins.NotifyMacOSX.notify_path = str(script)
+
+    obj = apprise.Apprise.instantiate(
+        'macosx://_/?sound=default', suppress_exceptions=False)
+    assert obj is None
+
+    # A newer environment to test edge case where this is tested
+    mock_macver.return_value = ('9.12', ('', '', ''), '')
+    reload(sys.modules['apprise.plugins.NotifyMacOSX'])
+    reload(sys.modules['apprise.plugins'])
+    reload(sys.modules['apprise.Apprise'])
+    reload(sys.modules['apprise'])
+
+    # Point our object to our new temporary existing file
+    apprise.plugins.NotifyMacOSX.notify_path = str(script)
+
+    # This is just to test that the the minor (in this case .12)
+    # is only weighed with respect to the major number as wel
+    # with respect to the versioning
+    obj = apprise.Apprise.instantiate(
+        'macosx://_/?sound=default', suppress_exceptions=False)
+    assert obj is None

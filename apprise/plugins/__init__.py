@@ -439,6 +439,92 @@ def details(plugin):
     }
 
 
+def requirements(plugin):
+    """
+    Provides a list of packages and its requirement details
+
+    """
+    requirements = {
+        # Use the description to provide a human interpretable description of
+        # what is required to make the plugin work. This is only nessisary
+        # if there are package dependencies
+        'details': '',
+
+        # Define any required packages needed for the plugin to run.  This is
+        # an array of strings that simply look like lines in the
+        # `requirements.txt` file...
+        #
+        # A single string is perfectly acceptable:
+        # 'packages_required' = 'cryptography'
+        #
+        # Multiple entries should look like the following
+        # 'packages_required' = [
+        #   'cryptography < 3.4`,
+        # ]
+        #
+        'packages_required': [],
+
+        # Recommended packages identify packages that are not required to make
+        # your plugin work, but would improve it's use or grant it access to
+        # full functionality (that might otherwise be limited).
+
+        # Similar to `packages_required`, you would identify each entry in
+        # the array as you would in a `requirements.txt` file.
+        #
+        #   - Do not re-provide entries already in the `packages_required`
+        'packages_recommended': [],
+    }
+
+    # Populate our template differently if we don't find anything above
+    if not (hasattr(plugin, 'requirements')
+            and isinstance(plugin.requirements, dict)):
+        # We're done early
+        return requirements
+
+    # Get our required packages
+    _req_packages = plugin.requirements.get('packages_required')
+    if isinstance(_req_packages, six.string_types):
+        # Convert to list
+        _req_packages = [_req_packages]
+
+    elif not isinstance(_req_packages, (set, list, tuple)):
+        # Allow one to set the required packages to None (as an example)
+        _req_packages = []
+
+    requirements['packages_required'] = [str(p) for p in _req_packages]
+
+    # Get our recommended packages
+    _opt_packages = plugin.requirements.get('packages_recommended')
+    if isinstance(_opt_packages, six.string_types):
+        # Convert to list
+        _opt_packages = [_opt_packages]
+
+    elif not isinstance(_opt_packages, (set, list, tuple)):
+        # Allow one to set the recommended packages to None (as an example)
+        _opt_packages = []
+
+    requirements['packages_recommended'] = [str(p) for p in _opt_packages]
+
+    # Get our package details
+    _req_details = plugin.requirements.get('details')
+    if not _req_details:
+        if not (_req_packages and _opt_packages):
+            _req_details = _('No dependencies.')
+
+        elif _req_packages:
+            _req_details = _('Packages are required to function.')
+
+        else:  # opt_packages
+            _req_details = \
+                _('Packages are recommended to improve functionality.')
+    else:
+        # Store our details if defined
+        requirements['details'] = _req_details
+
+    # Return our compiled package requirements
+    return requirements
+
+
 def url_to_dict(url, secure_logging=True):
     """
     Takes an apprise URL and returns the tokens associated with it

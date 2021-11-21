@@ -28,6 +28,7 @@ import logging
 import platform
 import sys
 import os
+import re
 
 from os.path import isfile
 from os.path import expanduser
@@ -136,6 +137,9 @@ def print_version_msg():
               help='Perform a trial run but only prints the notification '
               'services to-be triggered to stdout. Notifications are never '
               'sent using this mode.')
+@click.option('--details', '-l', is_flag=True,
+              help='Prints details about the current services supported by '
+              'Apprise.')
 @click.option('--recursion-depth', '-R', default=DEFAULT_RECURSION_DEPTH,
               type=int,
               help='The number of recursive import entries that can be '
@@ -153,7 +157,7 @@ def print_version_msg():
                 metavar='SERVER_URL [SERVER_URL2 [SERVER_URL3]]',)
 def main(body, title, config, attach, urls, notification_type, theme, tag,
          input_format, dry_run, recursion_depth, verbose, disable_async,
-         interpret_escapes, debug, version):
+         details, interpret_escapes, debug, version):
     """
     Send a notification to all of the specified servers identified by their
     URLs the content provided within the title, body and notification-type.
@@ -247,6 +251,80 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
 
     # Create our Apprise object
     a = Apprise(asset=asset, debug=debug, location=ContentLocation.LOCAL)
+
+    if details:
+        # Print details and exit
+        results = a.details(show_requirements=True, show_disabled=True)
+
+        # Sort our results:
+        plugins = sorted(
+            results['schemas'], key=lambda i: str(i['service_name']))
+        for entry in plugins:
+            # skip over disabled
+            # {0: >2d}
+            # '{:<30}'
+
+            protocols = [] if not entry['protocols'] else \
+                [p for p in entry['protocols']]
+            protocols.extend(
+                [] if not entry['secure_protocols'] else
+                [p for p in entry['secure_protocols']])
+
+            if len(protocols) == 1:
+                # Simplify view by swapping {schema} with the single
+                # protocol value
+
+                # Convert tuple to list
+                entry['details']['templates'] = \
+                    list(entry['details']['templates'])
+
+                for x in range(len(entry['details']['templates'])):
+                    entry['details']['templates'][x] = \
+                        re.sub(
+                            r'^[^}]+}://',
+                            '{}://'.format(protocols[0]),
+                            entry['details']['templates'][x])
+
+            click.echo(click.style(
+                '{} {:<30} '.format(
+                    '+' if entry['enabled'] else '-',
+                    str(entry['service_name'])),
+                fg="green" if entry['enabled'] else "red", bold=True),
+                nl=(not entry['enabled'] or len(protocols) == 1))
+
+            if not entry['enabled']:
+                if entry['requirements']['details']:
+                    click.echo(
+                        '   ' + str(entry['requirements']['details']))
+
+                if entry['requirements']['packages_required']:
+                    click.echo('   Python Packages Required:')
+                    for req in entry['requirements']['packages_required']:
+                        click.echo('     - ' + req)
+
+                if entry['requirements']['packages_recommended']:
+                    click.echo('   Python Packages Recommended:')
+                    for req in entry['requirements']['packages_recommended']:
+                        click.echo('     - ' + req)
+
+                # new line padding between entries
+                click.echo()
+                continue
+
+            if len(protocols) > 1:
+                click.echo('| Schema(s): {}'.format(
+                    ', '.join(protocols),
+                ))
+
+            prefix = '   - '
+            click.echo('{}{}'.format(
+                prefix,
+                '\n{}'.format(prefix).join(entry['details']['templates'])))
+
+            # new line padding between entries
+            click.echo()
+
+        sys.exit(0)
 
     # The priorities of what is accepted are parsed in order below:
     #    1. URLs by command line

@@ -116,7 +116,7 @@ def test_windows_plugin():
     assert isinstance(obj.url(), six.string_types) is True
 
     # Check that it found our mocked environments
-    assert obj._enabled is True
+    assert obj.enabled is True
 
     # _on_destroy check
     obj._on_destroy(0, '', 0, 0)
@@ -185,7 +185,7 @@ def test_windows_plugin():
 
     # Toggle our testing for when we can't send notifications because the
     # package has been made unavailable to us
-    obj._enabled = False
+    obj.enabled = False
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is False

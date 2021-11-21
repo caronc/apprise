@@ -593,6 +593,20 @@ def test_apprise_cli_nux_env(tmpdir):
     ])
     assert result.exit_code == 0
 
+    #
+    # Testing the printout of our details
+    #   --details or -l
+    #
+    result = runner.invoke(cli.main, [
+        '--details',
+    ])
+    assert result.exit_code == 0
+
+    result = runner.invoke(cli.main, [
+        '-l',
+    ])
+    assert result.exit_code == 0
+
 
 @mock.patch('platform.system')
 def test_apprise_cli_windows_env(mock_system):

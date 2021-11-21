@@ -164,6 +164,16 @@ class Apprise(object):
                 type(url))
             return None
 
+        if not plugins.SCHEMA_MAP[results['schema']].enabled:
+            #
+            # First Plugin Enable Check (Pre Initialization)
+            #
+
+            # Plugin has been disabled at a global level
+            logger.error(
+                '%s:// is disabled on this system.', results['schema'])
+            return None
+
         # Build a list of tags to associate with the newly added notifications
         results['tag'] = set(parse_list(tag))
 
@@ -198,6 +208,24 @@ class Apprise(object):
             # Attempt to create an instance of our plugin using the parsed
             # URL information but don't wrap it in a try catch
             plugin = plugins.SCHEMA_MAP[results['schema']](**results)
+
+        if not plugin.enabled:
+            #
+            # Second Plugin Enable Check (Post Initialization)
+            #
+
+            # Service/Plugin is disabled (on a more local level).  This is a
+            # case where the plugin was initially enabled but then after the
+            # __init__() was called under the hood something pre-determined
+            # that it could no longer be used.
+
+            # The only downside to doing it this way is services are
+            # initialized prior to returning the details() if 3rd party tools
+            # are polling what is available. These services that become
+            # disabled thereafter are shown initially that they can be used.
+            logger.error(
+                '%s:// has become disabled on this system.', results['schema'])
+            return None
 
         return plugin
 
@@ -585,7 +613,7 @@ class Apprise(object):
                 attach=attach
             )
 
-    def details(self, lang=None, show_disabled=True):
+    def details(self, lang=None, show_requirements=False, show_disabled=False):
         """
         Returns the details associated with the Apprise object
 
@@ -601,14 +629,27 @@ class Apprise(object):
             'asset': self.asset.details(),
         }
 
-        # to add it's mapping to our hash table
         for plugin in set(plugins.SCHEMA_MAP.values()):
+            # Iterate over our hashed plugins and dynamically build details on
+            # their status:
+
+            content = {
+                'service_name': getattr(plugin, 'service_name', None),
+                'service_url': getattr(plugin, 'service_url', None),
+                'setup_url': getattr(plugin, 'setup_url', None),
+                # Placeholder - populated below
+                'details': None
+            }
 
             # Standard protocol(s) should be None or a tuple
-            enabled = getattr(plugin, '_enabled', True)
+            enabled = getattr(plugin, 'enabled', True)
             if not show_disabled and not enabled:
                 # Do not show inactive plugins
                 continue
+
+            elif show_disabled:
+                # Add current state to response
+                content['enabled'] = enabled
 
             # Standard protocol(s) should be None or a tuple
             protocols = getattr(plugin, 'protocol', None)
@@ -620,23 +661,27 @@ class Apprise(object):
             if isinstance(secure_protocols, six.string_types):
                 secure_protocols = (secure_protocols, )
 
+            # Add our protocol details to our content
+            content.update({
+                'protocols': protocols,
+                'secure_protocols': secure_protocols,
+            })
+
             if not lang:
                 # Simply return our results
-                details = plugins.details(plugin)
+                content['details'] = plugins.details(plugin)
+                if show_requirements:
+                    content['requirements'] = plugins.requirements(plugin)
+
             else:
                 # Emulate the specified language when returning our results
                 with self.locale.lang_at(lang):
-                    details = plugins.details(plugin)
+                    content['details'] = plugins.details(plugin)
+                    if show_requirements:
+                        content['requirements'] = plugins.requirements(plugin)
 
             # Build our response object
-            response['schemas'].append({
-                'service_name': getattr(plugin, 'service_name', None),
-                'service_url': getattr(plugin, 'service_url', None),
-                'setup_url': getattr(plugin, 'setup_url', None),
-                'protocols': protocols,
-                'secure_protocols': secure_protocols,
-                'details': details,
-            })
+            response['schemas'].append(content)
 
         return response
 

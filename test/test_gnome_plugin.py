@@ -116,7 +116,7 @@ def test_gnome_plugin():
     obj.duration = 0
 
     # Check that it found our mocked environments
-    assert obj._enabled is True
+    assert obj.enabled is True
 
     # Test url() call
     assert isinstance(obj.url(), six.string_types) is True
@@ -207,7 +207,7 @@ def test_gnome_plugin():
 
     # Toggle our testing for when we can't send notifications because the
     # package has been made unavailable to us
-    obj._enabled = False
+    obj.enabled = False
     assert obj.notify(title='title', body='body',
                       notify_type=apprise.NotifyType.INFO) is False
 
@@ -232,12 +232,7 @@ def test_gnome_plugin():
     reload(sys.modules['apprise.Apprise'])
     reload(sys.modules['apprise'])
 
-    # Create our instance
+    # We can now no longer load our instance
+    # The object internally is marked disabled
     obj = apprise.Apprise.instantiate('gnome://', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyGnome) is True
-    obj.duration = 0
-
-    # Our notifications can not work without our gi library having been
-    # loaded.
-    assert obj.notify(title='title', body='body',
-                      notify_type=apprise.NotifyType.INFO) is False
+    assert obj is None

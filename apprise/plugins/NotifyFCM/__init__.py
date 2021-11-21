@@ -104,6 +104,15 @@ class NotifyFCM(NotifyBase):
     """
     A wrapper for Google's Firebase Cloud Messaging Notifications
     """
+
+    # Set our global enabled flag
+    enabled = NOTIFY_FCM_SUPPORT_ENABLED
+
+    requirements = {
+        # Define our required packaging in order to work
+        'packages_required': 'cryptography'
+    }
+
     # The default descriptive name associated with the Notification
     service_name = 'Firebase Cloud Messaging'
 
@@ -133,9 +142,6 @@ class NotifyFCM(NotifyBase):
     # A title can not be used for SMS Messages.  Setting this to zero will
     # cause any title (if defined) to get placed into the message body.
     title_maxlen = 0
-
-    # Define whether or not we're enabled or not to work for others
-    _enabled = NOTIFY_FCM_SUPPORT_ENABLED
 
     # Define object templates
     templates = (
@@ -297,12 +303,6 @@ class NotifyFCM(NotifyBase):
         """
         Perform FCM Notification
         """
-
-        if not self._enabled:
-            self.logger.warning(
-                "FCM Notifications are not supported by this system; "
-                "`pip install cryptography`.")
-            return False
 
         if not self.targets:
             # There is no one to email; we're done

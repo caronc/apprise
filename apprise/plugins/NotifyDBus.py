@@ -38,10 +38,6 @@ NOTIFY_DBUS_SUPPORT_ENABLED = False
 # Image support is dependant on the GdkPixbuf library being available
 NOTIFY_DBUS_IMAGE_SUPPORT = False
 
-# The following are required to hook into the notifications:
-NOTIFY_DBUS_INTERFACE = 'org.freedesktop.Notifications'
-NOTIFY_DBUS_SETTING_LOCATION = '/org/freedesktop/Notifications'
-
 # Initialize our mainloops
 LOOP_GLIB = None
 LOOP_QT = None
@@ -132,8 +128,19 @@ class NotifyDBus(NotifyBase):
     A wrapper for local DBus/Qt Notifications
     """
 
+    # Set our global enabled flag
+    enabled = NOTIFY_DBUS_SUPPORT_ENABLED
+
+    requirements = {
+        # Define our required packaging in order to work
+        'details': _('libdbus-1.so.x must be installed.')
+    }
+
     # The default descriptive name associated with the Notification
-    service_name = 'DBus Notification'
+    service_name = _('DBus Notification')
+
+    # The services URL
+    service_url = 'http://www.freedesktop.org/Software/dbus/'
 
     # The default protocols
     # Python 3 keys() does not return a list object, it's it's own dict_keys()
@@ -158,14 +165,9 @@ class NotifyDBus(NotifyBase):
     # content to display
     body_max_line_count = 10
 
-    # This entry is a bit hacky, but it allows us to unit-test this library
-    # in an environment that simply doesn't have the gnome packages
-    # available to us.  It also allows us to handle situations where the
-    # packages actually are present but we need to test that they aren't.
-    # If anyone is seeing this had knows a better way of testing this
-    # outside of what is defined in test/test_glib_plugin.py, please
-    # let me know! :)
-    _enabled = NOTIFY_DBUS_SUPPORT_ENABLED
+    # The following are required to hook into the notifications:
+    dbus_interface = 'org.freedesktop.Notifications'
+    dbus_setting_location = '/org/freedesktop/Notifications'
 
     # Define object templates
     templates = (
@@ -242,7 +244,7 @@ class NotifyDBus(NotifyBase):
         Perform DBus Notification
         """
 
-        if not self._enabled or MAINLOOP_MAP[self.schema] is None:
+        if MAINLOOP_MAP[self.schema] is None:
             self.logger.warning(
                 "{} notifications could not be loaded.".format(self.schema))
             return False
@@ -265,14 +267,14 @@ class NotifyDBus(NotifyBase):
 
         # acquire our dbus object
         dbus_obj = session.get_object(
-            NOTIFY_DBUS_INTERFACE,
-            NOTIFY_DBUS_SETTING_LOCATION,
+            self.dbus_interface,
+            self.dbus_setting_location,
         )
 
         # Acquire our dbus interface
         dbus_iface = Interface(
             dbus_obj,
-            dbus_interface=NOTIFY_DBUS_INTERFACE,
+            dbus_interface=self.dbus_interface,
         )
 
         # image path

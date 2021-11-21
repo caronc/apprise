@@ -55,6 +55,14 @@ class NotifySimplePush(NotifyBase):
     A wrapper for SimplePush Notifications
     """
 
+    # Set our global enabled flag
+    enabled = NOTIFY_SIMPLEPUSH_ENABLED
+
+    requirements = {
+        # Define our required packaging in order to work
+        'packages_required': 'cryptography'
+    }
+
     # The default descriptive name associated with the Notification
     service_name = 'SimplePush'
 
@@ -81,9 +89,6 @@ class NotifySimplePush(NotifyBase):
         '{schema}://{apikey}',
         '{schema}://{salt}:{password}@{apikey}',
     )
-
-    # Define whether or not we're enabled or not to work for others
-    _enabled = NOTIFY_SIMPLEPUSH_ENABLED
 
     # Define our template tokens
     template_tokens = dict(NotifyBase.template_tokens, **{
@@ -181,12 +186,6 @@ class NotifySimplePush(NotifyBase):
         """
         Perform SimplePush Notification
         """
-
-        if not self._enabled:
-            self.logger.warning(
-                "SimplePush Notifications are not supported by this system; "
-                "`pip install cryptography`.")
-            return False
 
         headers = {
             'User-Agent': self.app_id,

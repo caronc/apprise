@@ -36,6 +36,19 @@ from ..common import NotifyType
 from ..utils import parse_bool
 from ..AppriseLocale import gettext_lazy as _
 
+# Default our global support flag
+NOTIFY_MACOSX_SUPPORT_ENABLED = False
+
+if platform.system() == 'Darwin':
+    # Check this is Mac OS X 10.8, or higher
+    major, minor = platform.mac_ver()[0].split('.')[:2]
+
+    # Toggle our enabled flag if verion is correct and executable
+    # found. This is done in such a way to provide verbosity to the
+    # end user so they know why it may or may not work for them.
+    NOTIFY_MACOSX_SUPPORT_ENABLED = \
+        (int(major) > 10 or (int(major) == 10 and int(minor) >= 8))
+
 
 class NotifyMacOSX(NotifyBase):
     """
@@ -44,8 +57,22 @@ class NotifyMacOSX(NotifyBase):
     Source: https://github.com/julienXX/terminal-notifier
     """
 
+    # Set our global enabled flag
+    enabled = NOTIFY_MACOSX_SUPPORT_ENABLED
+
+    requirements = {
+        # Define our required packaging in order to work
+        'details': _(
+            'Only works with Mac OS X 10.8 and higher. Additionally '
+            ' requires that /usr/local/bin/terminal-notifier is locally '
+            'accessible.')
+    }
+
     # The default descriptive name associated with the Notification
-    service_name = 'MacOSX Notification'
+    service_name = _('MacOSX Notification')
+
+    # The services URL
+    service_url = 'https://github.com/julienXX/terminal-notifier'
 
     # The default protocol
     protocol = 'macosx'
@@ -100,31 +127,8 @@ class NotifyMacOSX(NotifyBase):
         # or not.
         self.include_image = include_image
 
-        self._enabled = False
-        if platform.system() == 'Darwin':
-            # Check this is Mac OS X 10.8, or higher
-            major, minor = platform.mac_ver()[0].split('.')[:2]
-
-            # Toggle our _enabled flag if verion is correct and executable
-            # found. This is done in such a way to provide verbosity to the
-            # end user so they know why it may or may not work for them.
-            if not (int(major) > 10 or (int(major) == 10 and int(minor) >= 8)):
-                self.logger.warning(
-                    "MacOSX Notifications require your OS to be at least "
-                    "v10.8 (detected {}.{})".format(major, minor))
-
-            elif not os.access(self.notify_path, os.X_OK):
-                self.logger.warning(
-                    "MacOSX Notifications require '{}' to be in place."
-                    .format(self.notify_path))
-
-            else:
-                # We're good to go
-                self._enabled = True
-
         # Set sound object (no q/a for now)
         self.sound = sound
-
         return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
@@ -132,9 +136,10 @@ class NotifyMacOSX(NotifyBase):
         Perform MacOSX Notification
         """
 
-        if not self._enabled:
+        if not os.access(self.notify_path, os.X_OK):
             self.logger.warning(
-                "MacOSX Notifications are not supported by this system.")
+                "MacOSX Notifications require '{}' to be in place."
+                .format(self.notify_path))
             return False
 
         # Start with our notification path
@@ -159,6 +164,9 @@ class NotifyMacOSX(NotifyBase):
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
+
+        # Capture some output for helpful debugging later on
+        self.logger.debug('MacOSX CMD: {}'.format(' '.join(cmd)))
 
         # Send our notification
         output = subprocess.Popen(

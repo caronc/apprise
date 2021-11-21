@@ -156,9 +156,6 @@ def test_dbus_plugin(mock_mainloop, mock_byte, mock_bytearray,
     assert obj.url().startswith('glib://_/')
     obj.duration = 0
 
-    # Check that it found our mocked environments
-    assert obj._enabled is True
-
     # Test our class loading using a series of arguments
     with pytest.raises(TypeError):
         apprise.plugins.NotifyDBus(**{'schema': 'invalid'})
@@ -299,7 +296,7 @@ def test_dbus_plugin(mock_mainloop, mock_byte, mock_bytearray,
     # Test our exception handling during initialization
     # Toggle our testing for when we can't send notifications because the
     # package has been made unavailable to us
-    obj._enabled = False
+    obj.enabled = False
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is False
@@ -390,21 +387,14 @@ def test_dbus_plugin(mock_mainloop, mock_byte, mock_bytearray,
     reload(sys.modules['apprise.Apprise'])
     reload(sys.modules['apprise'])
 
-    # Create our instance
+    # We can no longer instantiate an instance because dbus has been
+    # officialy marked unavailable and thus the module is marked
+    # as such
     obj = apprise.Apprise.instantiate('glib://', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyDBus) is True
-    obj.duration = 0
-
-    # Test url() call
-    assert isinstance(obj.url(), six.string_types) is True
-
-    # Our notification fail because the dbus library wasn't present
-    assert obj.notify(
-        title='title', body='body',
-        notify_type=apprise.NotifyType.INFO) is False
+    assert obj is None
 
     # Since playing with the sys.modules is not such a good idea,
-    # let's just put it back now :)
+    # let's just put our old configuration back:
     sys.modules['dbus'] = _session_bus
     # Reload our modules
     reload(sys.modules['apprise.plugins.NotifyDBus'])

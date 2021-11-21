@@ -57,7 +57,48 @@ class NotifyBase(BASE_OBJECT):
     # due to enviroment issues (such as missing libraries, or platform
     # dependencies that are not present).  By default all plugins are
     # enabled.
-    _enabled = True
+    enabled = True
+
+    # Some plugins may require additional packages above what is provided
+    # already by Apprise.
+    #
+    # Use this section to relay this information to the users of the script to
+    # help guide them with what they need to know if they plan on using your
+    # plugin.   The below configuration should otherwise accomodate all normal
+    # situations and will not requrie any updating:
+    requirements = {
+        # Use the description to provide a human interpretable description of
+        # what is required to make the plugin work. This is only nessisary
+        # if there are package dependencies.  Setting this to default will
+        # cause a general response to be returned.  Only set this if you plan
+        # on over-riding the default.  Always consider language support here.
+        # So before providing a value do the following in your code base:
+        #
+        #  from apprise.AppriseLocale import gettext_lazy as _
+        #
+        # 'details': _('My detailed requirements')
+        'details': None,
+
+        # Define any required packages needed for the plugin to run.  This is
+        # an array of strings that simply look like lines residing in a
+        # `requirements.txt` file...
+        #
+        # As an example, an entry may look like:
+        # 'packages_required': [
+        #   'cryptography < 3.4`,
+        # ]
+        'packages_required': [],
+
+        # Recommended packages identify packages that are not required to make
+        # your plugin work, but would improve it's use or grant it access to
+        # full functionality (that might otherwise be limited).
+
+        # Similar to `packages_required`, you would identify each entry in
+        # the array as you would in a `requirements.txt` file.
+        #
+        #   - Do not re-provide entries already in the `packages_required`
+        'packages_recommended': [],
+    }
 
     # The services URL
     service_url = None
@@ -229,6 +270,13 @@ class NotifyBase(BASE_OBJECT):
         Performs notification
 
         """
+
+        if not self.enabled:
+            # Deny notifications issued to services that are disabled
+            self.logger.warning(
+                "{} is currently disabled on this system.".format(
+                    self.service_name))
+            return False
 
         # Prepare attachments if required
         if attach is not None and not isinstance(attach, AppriseAttachment):

@@ -40,9 +40,21 @@ class NotifyXMPP(NotifyBase):
     """
     A wrapper for XMPP Notifications
     """
+    # Set our global enabled flag
+    enabled = SleekXmppAdapter._enabled or SliXmppAdapter._enabled
+
+    requirements = {
+        # Define our required packaging in order to work
+        'packages_required': [
+            "slixmpp; python_version >= '3.7'",
+        ]
+    }
 
     # The default descriptive name associated with the Notification
     service_name = 'XMPP'
+
+    # The services URL
+    service_url = 'https://xmpp.org/'
 
     # The default protocol
     protocol = 'xmpp'
@@ -56,14 +68,6 @@ class NotifyXMPP(NotifyBase):
     # Lower throttle rate for XMPP
     request_rate_per_sec = 0.5
 
-    # This entry is a bit hacky, but it allows us to unit-test this library
-    # in an environment that simply doesn't have the slixmpp package
-    # available to us.
-    #
-    # If anyone is seeing this had knows a better way of testing this
-    # outside of what is defined in test/test_xmpp_plugin.py, please
-    # let me know! :)
-    _enabled = SliXmppAdapter._enabled
     _adapter = SliXmppAdapter if SliXmppAdapter._enabled else None
 
     # Define object templates
@@ -210,12 +214,6 @@ class NotifyXMPP(NotifyBase):
         """
         Perform XMPP Notification
         """
-
-        if not self._enabled:
-            self.logger.warning(
-                'XMPP Notifications are not supported by this system '
-                '- install slixmpp.')
-            return False
 
         # Detect our JID if it isn't otherwise specified
         jid = self.jid
