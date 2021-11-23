@@ -63,9 +63,6 @@ class NotifyXMPP(NotifyBase):
     # The default XMPP secure port
     default_secure_port = 5223
 
-    # XMPP does not support a title
-    title_maxlen = 0
-
     # This entry is a bit hacky, but it allows us to unit-test this library
     # in an environment that simply doesn't have the sleekxmpp package
     # available to us.
@@ -254,8 +251,9 @@ class NotifyXMPP(NotifyBase):
             xmpp_adapter = self._adapter(
                 host=self.host, port=port, secure=self.secure,
                 verify_certificate=self.verify_certificate, xep=self.xep,
-                jid=jid, password=password, body=body, targets=self.targets,
-                before_message=self.throttle, logger=self.logger)
+                jid=jid, password=password, body=body, subject=title,
+                targets=self.targets, before_message=self.throttle,
+                logger=self.logger)
 
         except ValueError:
             # We failed

@@ -70,7 +70,8 @@ class SliXmppAdapter(object):
 
     def __init__(self, host=None, port=None, secure=False,
                  verify_certificate=True, xep=None, jid=None, password=None,
-                 body=None, targets=None, before_message=None, logger=None):
+                 body=None, subject=None, targets=None, before_message=None,
+                 logger=None):
         """
         Initialize our SliXmppAdapter object
         """
@@ -85,6 +86,7 @@ class SliXmppAdapter(object):
         self.password = password
 
         self.body = body
+        self.subject = subject
         self.targets = targets
         self.before_message = before_message
 
@@ -188,7 +190,8 @@ class SliXmppAdapter(object):
             self.before_message()
 
             # The message we wish to send, and the JID that will receive it.
-            self.xmpp.send_message(mto=target, mbody=self.body, mtype='chat')
+            self.xmpp.send_message(mto=target, msubject=self.subject,
+                mbody=self.body, mtype='chat')
 
         # Using wait=True ensures that the send queue will be
         # emptied before ending the session.
