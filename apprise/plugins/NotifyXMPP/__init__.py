@@ -211,6 +211,7 @@ class NotifyXMPP(NotifyBase):
         # By default we send ourselves a message
         if targets:
             self.targets = parse_list(targets)
+            self.targets[0] = self.targets[0][1:]
 
         else:
             self.targets = list()
