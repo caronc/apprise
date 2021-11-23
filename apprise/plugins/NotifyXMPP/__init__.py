@@ -78,14 +78,8 @@ class NotifyXMPP(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{host}',
-        '{schema}://{password}@{host}',
-        '{schema}://{password}@{host}:{port}',
         '{schema}://{user}:{password}@{host}',
         '{schema}://{user}:{password}@{host}:{port}',
-        '{schema}://{host}/{targets}',
-        '{schema}://{password}@{host}/{targets}',
-        '{schema}://{password}@{host}:{port}/{targets}',
         '{schema}://{user}:{password}@{host}/{targets}',
         '{schema}://{user}:{password}@{host}:{port}/{targets}',
     )
@@ -106,6 +100,7 @@ class NotifyXMPP(NotifyBase):
         'user': {
             'name': _('Username'),
             'type': 'string',
+            'required': True,
         },
         'password': {
             'name': _('Password'),
@@ -235,14 +230,15 @@ class NotifyXMPP(NotifyBase):
         jid = self.jid
         password = self.password
         if not jid:
-            if self.user and self.password:
-                # xmpp://user:password@hostname
-                jid = '{}@{}'.format(self.user, self.host)
+            if not self.user:
+                self.logger.error(
+                    'Invalid JID, must be of the form username@server.')
+                return False
+            jid = '{}@{}'.format(self.user, self.host)
 
-            else:
-                # xmpp://password@hostname
-                jid = self.host
-                password = self.password if self.password else self.user
+        if not self.password:
+            self.logger.error('You must specify a XMPP password')
+            return False
 
         # Compute port number
         if not self.port:
