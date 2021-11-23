@@ -30,7 +30,6 @@ from ...URLBase import PrivacyMode
 from ...common import NotifyType
 from ...utils import parse_list
 from ...AppriseLocale import gettext_lazy as _
-from .SleekXmppAdapter import SleekXmppAdapter
 from .SliXmppAdapter import SliXmppAdapter
 
 # xep string parser
@@ -58,14 +57,14 @@ class NotifyXMPP(NotifyBase):
     request_rate_per_sec = 0.5
 
     # This entry is a bit hacky, but it allows us to unit-test this library
-    # in an environment that simply doesn't have the sleekxmpp package
+    # in an environment that simply doesn't have the slixmpp package
     # available to us.
     #
     # If anyone is seeing this had knows a better way of testing this
     # outside of what is defined in test/test_xmpp_plugin.py, please
     # let me know! :)
-    _enabled = SleekXmppAdapter._enabled or SliXmppAdapter._enabled
-    _adapter = SliXmppAdapter if SliXmppAdapter._enabled else SleekXmppAdapter
+    _enabled = SliXmppAdapter._enabled
+    _adapter = SliXmppAdapter if SliXmppAdapter._enabled else None
 
     # Define object templates
     templates = (
@@ -215,7 +214,7 @@ class NotifyXMPP(NotifyBase):
         if not self._enabled:
             self.logger.warning(
                 'XMPP Notifications are not supported by this system '
-                '- install sleekxmpp or slixmpp.')
+                '- install slixmpp.')
             return False
 
         # Detect our JID if it isn't otherwise specified
