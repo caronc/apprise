@@ -26,6 +26,7 @@
 import click
 import logging
 import platform
+import six
 import sys
 import os
 import re
@@ -260,15 +261,13 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
         plugins = sorted(
             results['schemas'], key=lambda i: str(i['service_name']))
         for entry in plugins:
-            # skip over disabled
-            # {0: >2d}
-            # '{:<30}'
-
             protocols = [] if not entry['protocols'] else \
-                [p for p in entry['protocols']]
+                [p for p in entry['protocols']
+                 if isinstance(p, six.string_types)]
             protocols.extend(
                 [] if not entry['secure_protocols'] else
-                [p for p in entry['secure_protocols']])
+                [p for p in entry['secure_protocols']
+                 if isinstance(p, six.string_types)])
 
             if len(protocols) == 1:
                 # Simplify view by swapping {schema} with the single

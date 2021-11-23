@@ -24,13 +24,22 @@
 # THE SOFTWARE.
 import io
 import os
+import sys
 import mock
+import pytest
 import requests
 import json
 from apprise import Apprise
 from apprise import plugins
-from apprise.plugins.NotifyFCM.oauth import GoogleOAuth
-from cryptography.exceptions import UnsupportedAlgorithm
+from helpers import ModuleManipulation, RestFrameworkTester
+
+try:
+    from apprise.plugins.NotifyFCM.oauth import GoogleOAuth
+    from cryptography.exceptions import UnsupportedAlgorithm
+
+except ImportError:
+    # Cryptography isn't availalable
+    pass
 
 try:
     from json.decoder import JSONDecodeError
@@ -42,13 +51,126 @@ except ImportError:
 # Test files for KeyFile Directory
 PRIVATE_KEYFILE_DIR = os.path.join(os.path.dirname(__file__), 'var', 'fcm')
 
+apprise_url_tests = (
+    ##################################
+    # NotifyFCM
+    ##################################
+    ('fcm://', {
+        # We failed to identify any valid authentication
+        'instance': TypeError,
+    }),
+    ('fcm://:@/', {
+        # We failed to identify any valid authentication
+        'instance': TypeError,
+    }),
+    ('fcm://project@%20%20/', {
+        # invalid apikey
+        'instance': TypeError,
+    }),
+    ('fcm://apikey/', {
+        # no project id specified so we operate in legacy mode
+        'instance': plugins.NotifyFCM,
+        # but there are no targets specified so we return False
+        'notify_response': False,
+    }),
+    ('fcm://apikey/device', {
+        # Valid device
+        'instance': plugins.NotifyFCM,
+        'privacy_url': 'fcm://a...y/device',
+    }),
+    ('fcm://apikey/#topic', {
+        # Valid topic
+        'instance': plugins.NotifyFCM,
+        'privacy_url': 'fcm://a...y/%23topic',
+    }),
+    ('fcm://apikey/device?mode=invalid', {
+        # Valid device, invalid mode
+        'instance': TypeError,
+    }),
+    ('fcm://apikey/#topic1/device/%20/', {
+        # Valid topic, valid device, and invalid entry
+        'instance': plugins.NotifyFCM,
+    }),
+    ('fcm://apikey?to=#topic1,device', {
+        # Test to=
+        'instance': plugins.NotifyFCM,
+    }),
+    ('fcm://?apikey=abc123&to=device', {
+        # Test apikey= to=
+        'instance': plugins.NotifyFCM,
+    }),
+    ('fcm://%20?to=device&keyfile=/invalid/path', {
+        # invalid Project ID
+        'instance': TypeError,
+    }),
+    ('fcm://project_id?to=device&keyfile=/invalid/path', {
+        # Test to= and auto detection of oauth mode
+        'instance': plugins.NotifyFCM,
+        # we'll fail to send our notification as a result
+        'response': False,
+    }),
+    ('fcm://?to=device&project=project_id&keyfile=/invalid/path', {
+        # Test project= & to= and auto detection of oauth mode
+        'instance': plugins.NotifyFCM,
+        # we'll fail to send our notification as a result
+        'response': False,
+    }),
+    ('fcm://project_id?to=device&mode=oauth2', {
+        # no keyfile was specified
+        'instance': TypeError,
+    }),
+    ('fcm://project_id?to=device&mode=oauth2&keyfile=/invalid/path', {
+        # Same test as above except we explicitly set our oauth2 mode
+        # Test to= and auto detection of oauth mode
+        'instance': plugins.NotifyFCM,
+        # we'll fail to send our notification as a result
+        'response': False,
+    }),
+    ('fcm://apikey/#topic1/device/?mode=legacy', {
+        'instance': plugins.NotifyFCM,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('fcm://apikey/#topic1/device/?mode=legacy', {
+        'instance': plugins.NotifyFCM,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+    ('fcm://project/#topic1/device/?mode=oauth2&keyfile=file://{}'.format(
+        os.path.join(
+            os.path.dirname(__file__), 'var', 'fcm',
+            'service_account.json')), {
+                'instance': plugins.NotifyFCM,
+                # throw a bizzare code forcing us to fail to look it up
+                'response': False,
+                'requests_response_code': 999,
+    }),
+    ('fcm://projectid/#topic1/device/?mode=oauth2&keyfile=file://{}'.format(
+        os.path.join(
+            os.path.dirname(__file__), 'var', 'fcm',
+            'service_account.json')), {
+                'instance': plugins.NotifyFCM,
+                # Throws a series of connection and transfer exceptions when
+                # this flag is set and tests that we gracfully handle them
+                'test_requests_exceptions': True,
+    }),
+)
 
+
+@pytest.mark.skipif(
+    'cryptography' not in sys.modules, reason="requires cryptography")
 @mock.patch('requests.post')
 def test_fcm_plugin(mock_post):
     """
     API: NotifyFCM() General Checks
 
     """
+
+    # Run our general tests
+    RestFrameworkTester(tests=apprise_url_tests).run_all()
+
     # Valid Keyfile
     path = os.path.join(PRIVATE_KEYFILE_DIR, 'service_account.json')
 
@@ -102,6 +224,8 @@ def test_fcm_plugin(mock_post):
         'https://fcm.googleapis.com/v1/projects/mock-project-id/messages:send'
 
 
+@pytest.mark.skipif(
+    'cryptography' not in sys.modules, reason="requires cryptography")
 @mock.patch('requests.post')
 def test_fcm_keyfile_parse(mock_post):
     """
@@ -256,6 +380,8 @@ def test_fcm_keyfile_parse(mock_post):
         assert oauth.access_token is None
 
 
+@pytest.mark.skipif(
+    'cryptography' not in sys.modules, reason="requires cryptography")
 def test_fcm_bad_keyfile_parse():
     """
     API: NotifyFCM() KeyFile Bad Service Account Type Tests
@@ -266,6 +392,8 @@ def test_fcm_bad_keyfile_parse():
     assert oauth.load(path) is False
 
 
+@pytest.mark.skipif(
+    'cryptography' not in sys.modules, reason="requires cryptography")
 def test_fcm_keyfile_missing_entries_parse(tmpdir):
     """
     API: NotifyFCM() KeyFile Missing Entries Test
@@ -302,3 +430,45 @@ def test_fcm_keyfile_missing_entries_parse(tmpdir):
     path.write('{')
     oauth = GoogleOAuth()
     assert oauth.load(str(path)) is False
+
+
+@pytest.mark.skipif(
+    'cryptography' not in sys.modules, reason="requires cryptography")
+@mock.patch('requests.post')
+def test_fcm_cryptography_dependency(mock_post):
+    """
+    Cryptography loading failure
+    """
+
+    with ModuleManipulation(
+            "cryptography",
+            base=r"^(apprise|apprise.plugins(\.NotifyFCM(\..*)?)?)$"):
+
+        # Valid Keyfile
+        path = os.path.join(PRIVATE_KEYFILE_DIR, 'service_account.json')
+
+        # Disable Throttling to speed testing
+        plugins.NotifyBase.request_rate_per_sec = 0
+
+        # Prepare a good response
+        response = mock.Mock()
+        response.content = json.dumps({
+            "access_token": "ya29.c.abcd",
+            "expires_in": 3599,
+            "token_type": "Bearer",
+        })
+        response.status_code = requests.codes.ok
+        mock_post.return_value = response
+
+        # Attempt to instantiate our object
+        obj = Apprise.instantiate(
+            'fcm://mock-project-id/device/#topic/?keyfile={}'.format(
+                str(path)))
+
+        # It's not possible because our cryptography depedancy is missing
+        assert obj is None
+
+    # Verify we restored everything okay
+    obj = Apprise.instantiate(
+        'fcm://mock-project-id/device/#topic/?keyfile={}'.format(str(path)))
+    assert obj is not None

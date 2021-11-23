@@ -28,22 +28,10 @@ import re
 import sys
 import ssl
 import six
-import os
 import pytest
-
-# Rebuild our Apprise environment
 import apprise
+from helpers import ModuleManipulation
 
-try:
-    # Python v3.4+
-    from importlib import reload
-except ImportError:
-    try:
-        # Python v3.0-v3.3
-        from imp import reload
-    except ImportError:
-        # Python v2.7
-        pass
 
 # Disable logging for a cleaner testing output
 import logging
@@ -56,71 +44,19 @@ def test_paho_mqtt_plugin_import_error(tmpdir):
     API: NotifyMQTT Plugin() Import Error
 
     """
-    # This is a really confusing test case; it can probably be done better,
-    # but this was all I could come up with.  Effectively Apprise is will
-    # still work flawlessly without the paho dependancy.  Since
-    # paho is actually required to be installed to run these unit tests
-    # we need to do some hacky tricks into fooling our test cases that the
-    # package isn't available.
+    with ModuleManipulation(
+            "paho",
+            base=r"^(apprise|apprise.plugins(\.NotifyMQTT(\..*)?)?)$"):
 
-    # So we create a temporary directory called paho (simulating the
-    # library itself) and writing an __init__.py in it that does nothing
-    # but throw an ImportError exception (simulating that the library
-    # isn't found).
-    suite = tmpdir.mkdir("paho")
-    suite.join("__init__.py").write('')
-    module_name = 'paho'
-    suite.join("{}.py".format(module_name)).write('raise ImportError()')
-
-    # The second part of the test is to update our PYTHON_PATH to look
-    # into this new directory first (before looking where the actual
-    # valid paths are).  This will allow us to override 'JUST' the sleekxmpp
-    # path.
-
-    # Update our path to point to our new test suite
-    sys.path.insert(0, str(suite))
-
-    # We need to remove the sleekxmpp modules that have already been loaded
-    # in memory otherwise they'll just be used instead. Python is smart and
-    # won't go try and reload everything again if it doesn't have to.
-    for name in list(sys.modules.keys()):
-        if name.startswith('{}.'.format(module_name)):
-            del sys.modules[name]
-    del sys.modules[module_name]
-
-    # The following libraries need to be reloaded to prevent
-    #  TypeError: super(type, obj): obj must be an instance or subtype of type
-    #  This is better explained in this StackOverflow post:
-    #     https://stackoverflow.com/questions/31363311/\
-    #       any-way-to-manually-fix-operation-of-\
-    #          super-after-ipython-reload-avoiding-ty
-    #
-    reload(sys.modules['apprise.plugins.NotifyMQTT'])
-    reload(sys.modules['apprise.plugins'])
-    reload(sys.modules['apprise.Apprise'])
-    reload(sys.modules['apprise'])
-
-    # This tests that Apprise still works without sleekxmpp.
-    # XMPP objects can still be instantiated in these cases.
-    obj = apprise.Apprise.instantiate('mqtt://user:pass@localhost/my/topic')
-    assert isinstance(obj, apprise.plugins.NotifyMQTT)
-    # We can still retrieve our url back to us
-    assert obj.url().startswith('mqtt://user:pass@localhost/my/topic')
-    # Notifications are not possible
-    assert obj.notify(body="test") is False
-
-    # Tidy-up / restore things to how they were
-    # Remove our garbage library
-    os.unlink(str(suite.join("{}.py".format(module_name))))
-
-    # Remove our custom entry into the path
-    sys.path.remove(str(suite))
-
-    # Reload the libraries we care about
-    reload(sys.modules['apprise.plugins.NotifyMQTT'])
-    reload(sys.modules['apprise.plugins'])
-    reload(sys.modules['apprise.Apprise'])
-    reload(sys.modules['apprise'])
+        # This tests that Apprise still works without sleekxmpp.
+        # MQTT objects can still be instantiated in these cases.
+        obj = apprise.Apprise.instantiate(
+            'mqtt://user:pass@localhost/my/topic')
+        assert isinstance(obj, apprise.plugins.NotifyMQTT)
+        # We can still retrieve our url back to us
+        assert obj.url().startswith('mqtt://user:pass@localhost/my/topic')
+        # Notifications are not possible
+        assert obj.notify(body="test") is False
 
 
 @pytest.mark.skipif(
