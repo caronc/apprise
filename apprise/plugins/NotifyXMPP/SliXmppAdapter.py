@@ -151,6 +151,9 @@ class SliXmppAdapter(object):
                         'no local CA certificate file')
                     return False
 
+        # Instruct slixmpp to connect to the XMPP service.
+        self.xmpp.connect((self.host, self.port), use_ssl=self.secure)
+
         # We're good
         return True
 
@@ -160,32 +163,9 @@ class SliXmppAdapter(object):
 
         """
 
-        # Establish connection to XMPP server.
-        # To speed up sending messages, don't use the "reattempt" feature,
-        # it will add a nasty delay even before connecting to XMPP server.
-        if not self.xmpp.connect((self.host, self.port),
-                                 use_ssl=self.secure, reattempt=False):
-
-            default_port = self.default_secure_port \
-                if self.secure else self.default_unsecure_port
-
-            default_schema = self.secure_protocol \
-                if self.secure else self.protocol
-
-            # Log connection issue
-            self.logger.warning(
-                'Failed to authenticate {jid} with: {schema}://{host}{port}'
-                .format(
-                    jid=self.jid,
-                    schema=default_schema,
-                    host=self.host,
-                    port='' if not self.port or self.port == default_port
-                         else ':{}'.format(self.port),
-                ))
-            return False
-
-        # Process XMPP communication.
-        self.xmpp.process(block=True)
+        # Run the asyncio event loop, and return once disconnected,
+        # for any reason.
+        self.xmpp.process(forever=False)
 
         return self.success
 
