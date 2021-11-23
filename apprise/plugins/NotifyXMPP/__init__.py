@@ -57,12 +57,6 @@ class NotifyXMPP(NotifyBase):
     # Lower throttle rate for XMPP
     request_rate_per_sec = 0.5
 
-    # The default XMPP port
-    default_unsecure_port = 5222
-
-    # The default XMPP secure port
-    default_secure_port = 5223
-
     # This entry is a bit hacky, but it allows us to unit-test this library
     # in an environment that simply doesn't have the sleekxmpp package
     # available to us.
@@ -238,18 +232,10 @@ class NotifyXMPP(NotifyBase):
             self.logger.error('You must specify a XMPP password')
             return False
 
-        # Compute port number
-        if not self.port:
-            port = self.default_secure_port \
-                if self.secure else self.default_unsecure_port
-
-        else:
-            port = self.port
-
         try:
             # Communicate with XMPP.
             xmpp_adapter = self._adapter(
-                host=self.host, port=port, secure=self.secure,
+                host=self.host, port=self.port, secure=self.secure,
                 verify_certificate=self.verify_certificate, xep=self.xep,
                 jid=jid, password=password, body=body, subject=title,
                 targets=self.targets, before_message=self.throttle,
@@ -284,9 +270,6 @@ class NotifyXMPP(NotifyBase):
         # and/or space as a delimiters - %20 = space
         jids = '%20'.join([NotifyXMPP.quote(x, safe='') for x in self.targets])
 
-        default_port = self.default_secure_port \
-            if self.secure else self.default_unsecure_port
-
         default_schema = self.secure_protocol if self.secure else self.protocol
 
         if self.user and self.password:
@@ -305,7 +288,7 @@ class NotifyXMPP(NotifyBase):
             schema=default_schema,
             # never encode hostname since we're expecting it to be a valid one
             hostname=self.host,
-            port='' if not self.port or self.port == default_port
+            port='' if not self.port
                  else ':{}'.format(self.port),
             jids=jids,
             params=NotifyXMPP.urlencode(params),

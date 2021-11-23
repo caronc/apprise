@@ -39,12 +39,6 @@ class SliXmppAdapter(object):
     # The default secure protocol
     secure_protocol = 'xmpps'
 
-    # The default XMPP port
-    default_unsecure_port = 5222
-
-    # The default XMPP secure port
-    default_secure_port = 5223
-
     # Taken from https://golang.org/src/crypto/x509/root_linux.go
     CA_CERTIFICATE_FILE_LOCATIONS = [
         # Debian/Ubuntu/Gentoo etc.
@@ -153,8 +147,15 @@ class SliXmppAdapter(object):
                         'no local CA certificate file')
                     return False
 
+        # If the user specified a port, skip SRV resolving, otherwise it is a
+        # lot easier to let slixmpp handle DNS instead of the user.
+        if self.port is None:
+            override_connection = None
+        else:
+            override_connection = (self.host, self.port)
+
         # Instruct slixmpp to connect to the XMPP service.
-        self.xmpp.connect((self.host, self.port), use_ssl=self.secure)
+        self.xmpp.connect(override_connection, use_ssl=self.secure)
 
         # We're good
         return True
