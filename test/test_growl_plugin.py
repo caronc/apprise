@@ -23,28 +23,16 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import os
 import sys
 import mock
 import six
 import pytest
 import apprise
+from helpers import ModuleManipulation
 
 # Disable logging for a cleaner testing output
 import logging
 logging.disable(logging.CRITICAL)
-
-try:
-    # Python v3.4+
-    from importlib import reload
-except ImportError:
-    try:
-        # Python v3.0-v3.3
-        from imp import reload
-    except ImportError:
-        # Python v2.7
-        pass
-
 
 try:
     from gntp import errors
@@ -65,78 +53,23 @@ except ImportError:
 
 
 @pytest.mark.skipif('gntp' not in sys.modules, reason="requires gntp")
-def test_growl_plugin_import_error(tmpdir):
+def test_growl_plugin_import_error():
     """
-    API: NotifyGrowl Plugin() Import Error
+    NotifyGrowl Plugin() Import Error
 
     """
-    # This is a really confusing test case; it can probably be done better,
-    # but this was all I could come up with.  Effectively Apprise is will
-    # still work flawlessly without the gntp dependancy.  Since
-    # gntp is actually required to be installed to run these unit tests
-    # we need to do some hacky tricks into fooling our test cases that the
-    # package isn't available.
+    with ModuleManipulation(
+            "gntp",
+            base=r"^(apprise|apprise.plugins(\.NotifyGrowl(\..*)?)?)$"):
 
-    # So we create a temporary directory called gntp (simulating the
-    # library itself) and writing an __init__.py in it that does nothing
-    # but throw an ImportError exception (simulating that the library
-    # isn't found).
-    suite = tmpdir.mkdir("gntp")
-    suite.join("__init__.py").write('')
-    module_name = 'gntp'
-    suite.join("{}.py".format(module_name)).write('raise ImportError()')
+        # This tests that Apprise still works without gntp.
+        obj = apprise.Apprise.instantiate('growl://growl.server')
+        assert isinstance(obj, apprise.plugins.NotifyGrowl)
 
-    # The second part of the test is to update our PYTHON_PATH to look
-    # into this new directory first (before looking where the actual
-    # valid paths are).  This will allow us to override 'JUST' the sleekxmpp
-    # path.
-
-    # Update our path to point to our new test suite
-    sys.path.insert(0, str(suite))
-
-    # We need to remove the gntp modules that have already been loaded
-    # in memory otherwise they'll just be used instead. Python is smart and
-    # won't go try and reload everything again if it doesn't have to.
-    for name in list(sys.modules.keys()):
-        if name.startswith('{}.'.format(module_name)):
-            del sys.modules[name]
-    del sys.modules[module_name]
-
-    # The following libraries need to be reloaded to prevent
-    #  TypeError: super(type, obj): obj must be an instance or subtype of type
-    #  This is better explained in this StackOverflow post:
-    #     https://stackoverflow.com/questions/31363311/\
-    #       any-way-to-manually-fix-operation-of-\
-    #          super-after-ipython-reload-avoiding-ty
-    #
-    reload(sys.modules['apprise.plugins.NotifyGrowl'])
-    reload(sys.modules['apprise.plugins'])
-    reload(sys.modules['apprise.Apprise'])
-    reload(sys.modules['apprise'])
-
-    # This tests that Apprise still works without gntp.
-    obj = apprise.Apprise.instantiate('growl://growl.server')
-
-    # Growl objects can still be instantiated however
-    assert obj is not None
-
-    # Notifications won't work because gntp did not load
-    assert obj.notify(
-        title='test', body='body',
-        notify_type=apprise.NotifyType.INFO) is False
-
-    # Tidy-up / restore things to how they were
-    # Remove our garbage library
-    os.unlink(str(suite.join("{}.py".format(module_name))))
-
-    # Remove our custom entry into the path
-    sys.path.remove(str(suite))
-
-    # Reload the libraries we care about
-    reload(sys.modules['apprise.plugins.NotifyGrowl'])
-    reload(sys.modules['apprise.plugins'])
-    reload(sys.modules['apprise.Apprise'])
-    reload(sys.modules['apprise'])
+        # Notifications won't work because gntp did not load
+        assert obj.notify(
+            title='test', body='body',
+            notify_type=apprise.NotifyType.INFO) is False
 
 
 @pytest.mark.skipif('gntp' not in sys.modules, reason="requires gntp")
@@ -145,9 +78,6 @@ def test_growl_exception_handling(mock_gntp):
     """
     API: NotifyGrowl Exception Handling
     """
-
-    from gntp import errors
-
     TEST_GROWL_EXCEPTIONS = (
         errors.NetworkError(
             0, 'gntp.ParseError() not handled'),

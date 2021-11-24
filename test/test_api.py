@@ -1004,7 +1004,7 @@ def test_apprise_disabled_plugins():
         def __init__(self, *args, **kwargs):
             super(TestDisabled02Notification, self).__init__(**kwargs)
 
-            # enable state changes AFTER we initialize
+            # enable state changes **AFTER** we initialize
             self.enabled = False
 
         def url(self, **kwargs):

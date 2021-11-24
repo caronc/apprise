@@ -41,7 +41,7 @@ logging.disable(logging.CRITICAL)
 @pytest.mark.skipif('paho' not in sys.modules, reason="requires paho-mqtt")
 def test_paho_mqtt_plugin_import_error(tmpdir):
     """
-    API: NotifyMQTT Plugin() Import Error
+    NotifyMQTT Plugin() Import Error
 
     """
     with ModuleManipulation(
@@ -64,7 +64,7 @@ def test_paho_mqtt_plugin_import_error(tmpdir):
 @mock.patch('paho.mqtt.client.Client')
 def test_mqtt_plugin(mock_client):
     """
-    API: NotifyMQTT Plugin()
+    NotifyMQTT Plugin()
 
     """
     # Speed up request rate for testing

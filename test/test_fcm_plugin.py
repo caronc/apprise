@@ -51,10 +51,8 @@ except ImportError:
 # Test files for KeyFile Directory
 PRIVATE_KEYFILE_DIR = os.path.join(os.path.dirname(__file__), 'var', 'fcm')
 
+# Our Testing URLs
 apprise_url_tests = (
-    ##################################
-    # NotifyFCM
-    ##################################
     ('fcm://', {
         # We failed to identify any valid authentication
         'instance': TypeError,
@@ -437,7 +435,7 @@ def test_fcm_keyfile_missing_entries_parse(tmpdir):
 @mock.patch('requests.post')
 def test_fcm_cryptography_dependency(mock_post):
     """
-    Cryptography loading failure
+    NotifyFCM Cryptography loading failure
     """
 
     with ModuleManipulation(
