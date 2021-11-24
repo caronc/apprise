@@ -39,12 +39,6 @@ class SliXmppAdapter(object):
     # The default secure protocol
     secure_protocol = 'xmpps'
 
-    # The default XMPP port
-    default_unsecure_port = 5222
-
-    # The default XMPP secure port
-    default_secure_port = 5223
-
     # Taken from https://golang.org/src/crypto/x509/root_linux.go
     CA_CERTIFICATE_FILE_LOCATIONS = [
         # Debian/Ubuntu/Gentoo etc.
@@ -70,7 +64,8 @@ class SliXmppAdapter(object):
 
     def __init__(self, host=None, port=None, secure=False,
                  verify_certificate=True, xep=None, jid=None, password=None,
-                 body=None, targets=None, before_message=None, logger=None):
+                 body=None, subject=None, targets=None, before_message=None,
+                 logger=None):
         """
         Initialize our SliXmppAdapter object
         """
@@ -85,6 +80,7 @@ class SliXmppAdapter(object):
         self.password = password
 
         self.body = body
+        self.subject = subject
         self.targets = targets
         self.before_message = before_message
 
@@ -151,6 +147,16 @@ class SliXmppAdapter(object):
                         'no local CA certificate file')
                     return False
 
+        # If the user specified a port, skip SRV resolving, otherwise it is a
+        # lot easier to let slixmpp handle DNS instead of the user.
+        if self.port is None:
+            override_connection = None
+        else:
+            override_connection = (self.host, self.port)
+
+        # Instruct slixmpp to connect to the XMPP service.
+        self.xmpp.connect(override_connection, use_ssl=self.secure)
+
         # We're good
         return True
 
@@ -160,32 +166,9 @@ class SliXmppAdapter(object):
 
         """
 
-        # Establish connection to XMPP server.
-        # To speed up sending messages, don't use the "reattempt" feature,
-        # it will add a nasty delay even before connecting to XMPP server.
-        if not self.xmpp.connect((self.host, self.port),
-                                 use_ssl=self.secure, reattempt=False):
-
-            default_port = self.default_secure_port \
-                if self.secure else self.default_unsecure_port
-
-            default_schema = self.secure_protocol \
-                if self.secure else self.protocol
-
-            # Log connection issue
-            self.logger.warning(
-                'Failed to authenticate {jid} with: {schema}://{host}{port}'
-                .format(
-                    jid=self.jid,
-                    schema=default_schema,
-                    host=self.host,
-                    port='' if not self.port or self.port == default_port
-                         else ':{}'.format(self.port),
-                ))
-            return False
-
-        # Process XMPP communication.
-        self.xmpp.process(block=True)
+        # Run the asyncio event loop, and return once disconnected,
+        # for any reason.
+        self.xmpp.process(forever=False)
 
         return self.success
 
@@ -208,7 +191,8 @@ class SliXmppAdapter(object):
             self.before_message()
 
             # The message we wish to send, and the JID that will receive it.
-            self.xmpp.send_message(mto=target, mbody=self.body, mtype='chat')
+            self.xmpp.send_message(mto=target, msubject=self.subject,
+                mbody=self.body, mtype='chat')
 
         # Using wait=True ensures that the send queue will be
         # emptied before ending the session.

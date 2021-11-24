@@ -11,7 +11,6 @@ babel
 #
 
 # Provides xmpp:// support
-sleekxmpp
 slixmpp; python_version >= '3.7'
 
 # Provides growl:// support
