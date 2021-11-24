@@ -41,7 +41,7 @@ class NotifyXMPP(NotifyBase):
     A wrapper for XMPP Notifications
     """
     # Set our global enabled flag
-    enabled = SleekXmppAdapter._enabled or SliXmppAdapter._enabled
+    enabled = SliXmppAdapter._enabled
 
     requirements = {
         # Define our required packaging in order to work
