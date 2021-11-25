@@ -68,6 +68,9 @@ The Apprise options are as follows:
 
   return characters prior to the delivery of the notification.
 
+  `-l`, `--details`
+  Prints details about the current services supported by Apprise.
+
   `-v`, `--verbose`:
   The more of these you specify, the more verbose the output is. e.g: -vvvv
 

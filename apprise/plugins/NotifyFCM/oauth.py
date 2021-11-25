@@ -52,6 +52,7 @@ except ImportError:
     from urllib.parse import urlencode as _urlencode
 
 try:
+    # Python 3.x
     from json.decoder import JSONDecodeError
 
 except ImportError:

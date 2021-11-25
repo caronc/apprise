@@ -32,19 +32,36 @@ from ..common import NotifyType
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
-from cryptography.hazmat.primitives import padding
-from cryptography.hazmat.primitives.ciphers import Cipher
-from cryptography.hazmat.primitives.ciphers import algorithms
-from cryptography.hazmat.primitives.ciphers import modes
-from cryptography.hazmat.backends import default_backend
 from base64 import urlsafe_b64encode
 import hashlib
+
+try:
+    from cryptography.hazmat.primitives import padding
+    from cryptography.hazmat.primitives.ciphers import Cipher
+    from cryptography.hazmat.primitives.ciphers import algorithms
+    from cryptography.hazmat.primitives.ciphers import modes
+    from cryptography.hazmat.backends import default_backend
+
+    # We're good to go!
+    NOTIFY_SIMPLEPUSH_ENABLED = True
+
+except ImportError:
+    # cryptography is required in order for this package to work
+    NOTIFY_SIMPLEPUSH_ENABLED = False
 
 
 class NotifySimplePush(NotifyBase):
     """
     A wrapper for SimplePush Notifications
     """
+
+    # Set our global enabled flag
+    enabled = NOTIFY_SIMPLEPUSH_ENABLED
+
+    requirements = {
+        # Define our required packaging in order to work
+        'packages_required': 'cryptography'
+    }
 
     # The default descriptive name associated with the Notification
     service_name = 'SimplePush'

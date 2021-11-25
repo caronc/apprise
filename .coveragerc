@@ -1,5 +1,4 @@
 [run]
-omit=*/gntp/*
 disable_warnings = no-data-collected
 branch = True
 source =
@@ -15,4 +14,4 @@ source =
 show_missing = True
 skip_covered = True
 skip_empty = True
-fail_under = 99.0
+fail_under = 95.0

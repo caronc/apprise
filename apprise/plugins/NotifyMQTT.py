@@ -87,6 +87,14 @@ class NotifyMQTT(NotifyBase):
     A wrapper for MQTT Notifications
     """
 
+    # Set our global enabled flag
+    enabled = NOTIFY_MQTT_SUPPORT_ENABLED
+
+    requirements = {
+        # Define our required packaging in order to work
+        'packages_required': 'paho-mqtt'
+    }
+
     # The default descriptive name associated with the Notification
     service_name = 'MQTT Notification'
 
@@ -109,15 +117,6 @@ class NotifyMQTT(NotifyBase):
     # MQTT server hostings can handle the small bursts of packets and are
     # locally hosted anyway
     request_rate_per_sec = 0.5
-
-    # This entry is a bit hacky, but it allows us to unit-test this library
-    # in an environment that simply doesn't have the mqtt packages
-    # available to us.  It also allows us to handle situations where the
-    # packages actually are present but we need to test that they aren't.
-    # If anyone is seeing this had knows a better way of testing this
-    # outside of what is defined in test/test_mqtt_plugin.py, please
-    # let me know! :)
-    _enabled = NOTIFY_MQTT_SUPPORT_ENABLED
 
     # Port Defaults (unless otherwise specified)
     mqtt_insecure_port = 1883
@@ -275,10 +274,6 @@ class NotifyMQTT(NotifyBase):
                 (cert for cert in self.CA_CERTIFICATE_FILE_LOCATIONS
                  if isfile(cert)), None)
 
-        if not self._enabled:
-            # Nothing more we can do
-            return
-
         # Set up our MQTT Publisher
         try:
             # Get our protocol
@@ -309,12 +304,6 @@ class NotifyMQTT(NotifyBase):
         """
         Perform MQTT Notification
         """
-
-        if not self._enabled:
-            self.logger.warning(
-                "MQTT Notifications are not supported by this system; "
-                "`pip install paho-mqtt`.")
-            return False
 
         if len(self.topics) == 0:
             # There were no services to notify

@@ -48,13 +48,29 @@
 import six
 import requests
 from json import dumps
-from .oauth import GoogleOAuth
 from ..NotifyBase import NotifyBase
 from ...common import NotifyType
 from ...utils import validate_regex
 from ...utils import parse_list
 from ...AppriseAttachment import AppriseAttachment
 from ...AppriseLocale import gettext_lazy as _
+
+# Default our global support flag
+NOTIFY_FCM_SUPPORT_ENABLED = False
+
+try:
+    from .oauth import GoogleOAuth
+
+    # We're good to go
+    NOTIFY_FCM_SUPPORT_ENABLED = True
+
+except ImportError:
+    # cryptography is the dependency of the .oauth library
+
+    # Create a dummy object for init() call to work
+    class GoogleOAuth(object):
+        pass
+
 
 # Our lookup map
 FCM_HTTP_ERROR_MAP = {
@@ -88,6 +104,15 @@ class NotifyFCM(NotifyBase):
     """
     A wrapper for Google's Firebase Cloud Messaging Notifications
     """
+
+    # Set our global enabled flag
+    enabled = NOTIFY_FCM_SUPPORT_ENABLED
+
+    requirements = {
+        # Define our required packaging in order to work
+        'packages_required': 'cryptography'
+    }
+
     # The default descriptive name associated with the Notification
     service_name = 'Firebase Cloud Messaging'
 

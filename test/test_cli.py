@@ -34,6 +34,8 @@ from apprise import NotifyBase
 from click.testing import CliRunner
 from apprise.plugins import SCHEMA_MAP
 from apprise.utils import environ
+from apprise.plugins import __load_matrix
+from apprise.plugins import __reset_matrix
 
 
 try:
@@ -592,6 +594,195 @@ def test_apprise_cli_nux_env(tmpdir):
         'good://localhost',
     ])
     assert result.exit_code == 0
+
+
+def test_apprise_cli_details(tmpdir):
+    """
+    API: Apprise() Disabled Plugin States
+
+    """
+
+    runner = CliRunner()
+
+    #
+    # Testing the printout of our details
+    #   --details or -l
+    #
+    result = runner.invoke(cli.main, [
+        '--details',
+    ])
+    assert result.exit_code == 0
+
+    result = runner.invoke(cli.main, [
+        '-l',
+    ])
+    assert result.exit_code == 0
+
+    # Reset our matrix
+    __reset_matrix()
+
+    # This is a made up class that is just used to verify
+    class TestReq01Notification(NotifyBase):
+        """
+        This class is used to test various requirement configurations
+        """
+
+        # Set some requirements
+        requirements = {
+            'packages_required': [
+                'cryptography <= 3.4',
+                'ultrasync',
+            ],
+            'packages_recommended': 'django',
+        }
+
+        def url(self, **kwargs):
+            # Support URL
+            return ''
+
+        def send(self, **kwargs):
+            # Pretend everything is okay (so we don't break other tests)
+            return True
+
+    SCHEMA_MAP['req01'] = TestReq01Notification
+
+    # This is a made up class that is just used to verify
+    class TestReq02Notification(NotifyBase):
+        """
+        This class is used to test various requirement configurations
+        """
+
+        # Just not enabled at all
+        enabled = False
+
+        # Set some requirements
+        requirements = {
+            # None and/or [] is implied, but jsut to show that the code won't
+            # crash if explicitly set this way:
+            'packages_required': None,
+
+            'packages_recommended': [
+                'cryptography <= 3.4',
+            ]
+        }
+
+        def url(self, **kwargs):
+            # Support URL
+            return ''
+
+        def send(self, **kwargs):
+            # Pretend everything is okay (so we don't break other tests)
+            return True
+
+    SCHEMA_MAP['req02'] = TestReq02Notification
+
+    # This is a made up class that is just used to verify
+    class TestReq03Notification(NotifyBase):
+        """
+        This class is used to test various requirement configurations
+        """
+
+        # Set some requirements
+        requirements = {
+            # We can over-ride the default details assigned to our plugin if
+            # specified
+            'details': _('some specified requirement details'),
+
+            # We can set a string value as well (it does not have to be a list)
+            'packages_recommended': 'cryptography <= 3.4'
+        }
+
+        def url(self, **kwargs):
+            # Support URL
+            return ''
+
+        def send(self, **kwargs):
+            # Pretend everything is okay (so we don't break other tests)
+            return True
+
+    SCHEMA_MAP['req03'] = TestReq03Notification
+
+    class TestDisabled01Notification(NotifyBase):
+        """
+        This class is used to test a pre-disabled state
+        """
+
+        # Just flat out disable our service
+        enabled = False
+
+        # we'll use this as a key to make our service easier to find
+        # in the next part of the testing
+        service_name = 'na01'
+
+        def url(self, **kwargs):
+            # Support URL
+            return ''
+
+        def notify(self, **kwargs):
+            # Pretend everything is okay (so we don't break other tests)
+            return True
+
+    SCHEMA_MAP['na01'] = TestDisabled01Notification
+
+    class TestDisabled02Notification(NotifyBase):
+        """
+        This class is used to test a post-disabled state
+        """
+
+        # we'll use this as a key to make our service easier to find
+        # in the next part of the testing
+        service_name = 'na02'
+
+        def __init__(self, *args, **kwargs):
+            super(TestDisabled02Notification, self).__init__(**kwargs)
+
+            # enable state changes **AFTER** we initialize
+            self.enabled = False
+
+        def url(self, **kwargs):
+            # Support URL
+            return ''
+
+        def notify(self, **kwargs):
+            # Pretend everything is okay (so we don't break other tests)
+            return True
+
+    SCHEMA_MAP['na02'] = TestDisabled02Notification
+
+    # We'll add a good notification to our list
+    class TesEnabled01Notification(NotifyBase):
+        """
+        This class is just a simple enabled one
+        """
+
+        # we'll use this as a key to make our service easier to find
+        # in the next part of the testing
+        service_name = 'good'
+
+        def url(self, **kwargs):
+            # Support URL
+            return ''
+
+        def send(self, **kwargs):
+            # Pretend everything is okay (so we don't break other tests)
+            return True
+
+    SCHEMA_MAP['good'] = TesEnabled01Notification
+
+    # Verify that we can pass through all of our different details
+    result = runner.invoke(cli.main, [
+        '--details',
+    ])
+    assert result.exit_code == 0
+
+    result = runner.invoke(cli.main, [
+        '-l',
+    ])
+    assert result.exit_code == 0
+
+    # Reset our matrix
+    __reset_matrix()
+    __load_matrix()
 
 
 @mock.patch('platform.system')

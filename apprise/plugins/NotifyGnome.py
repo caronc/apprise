@@ -78,8 +78,19 @@ class NotifyGnome(NotifyBase):
     A wrapper for local Gnome Notifications
     """
 
+    # Set our global enabled flag
+    enabled = NOTIFY_GNOME_SUPPORT_ENABLED
+
+    requirements = {
+        # Define our required packaging in order to work
+        'details': _('A local Gnome environment is required.')
+    }
+
     # The default descriptive name associated with the Notification
-    service_name = 'Gnome Notification'
+    service_name = _('Gnome Notification')
+
+    # The service URL
+    service_url = 'https://www.gnome.org/'
 
     # The default protocol
     protocol = 'gnome'
@@ -101,15 +112,6 @@ class NotifyGnome(NotifyBase):
     # A title can not be used for Gnome Messages.  Setting this to zero will
     # cause any title (if defined) to get placed into the message body.
     title_maxlen = 0
-
-    # This entry is a bit hacky, but it allows us to unit-test this library
-    # in an environment that simply doesn't have the gnome packages
-    # available to us.  It also allows us to handle situations where the
-    # packages actually are present but we need to test that they aren't.
-    # If anyone is seeing this had knows a better way of testing this
-    # outside of what is defined in test/test_gnome_plugin.py, please
-    # let me know! :)
-    _enabled = NOTIFY_GNOME_SUPPORT_ENABLED
 
     # Define object templates
     templates = (
@@ -156,11 +158,6 @@ class NotifyGnome(NotifyBase):
         """
         Perform Gnome Notification
         """
-
-        if not self._enabled:
-            self.logger.warning(
-                "Gnome Notifications are not supported by this system.")
-            return False
 
         try:
             # App initialization

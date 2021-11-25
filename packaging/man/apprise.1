@@ -1,224 +1,141 @@
-.\" generated with Ronn/v0.7.3
-.\" http://github.com/rtomayko/ronn/tree/0.7.3
-.
-.TH "APPRISE" "1" "February 2021" "ff" ""
-.
+.\" generated with Ronn-NG/v0.9.1
+.\" http://github.com/apjanke/ronn-ng/tree/0.9.1
+.TH "APPRISE" "1" "November 2021" ""
 .SH "NAME"
 \fBapprise\fR \- Push Notifications that work with just about every platform!
-.
 .SH "SYNOPSIS"
-\fBapprise\fR [\fIoptions\fR\.\.\.] \fIservice\-url\fR\.\.\.
-.
+\fBapprise\fR [\fIoptions\fR\|\.\|\.\|\.] \fIservice\-url\fR\|\.\|\.\|\.
 .br
-.
 .SH "DESCRIPTION"
 \fBApprise\fR allows you to send a notification to \fIalmost all\fR of the most popular notification services available to us today such as: Discord, Telegram, Pushbullet, Slack, Twitter, etc\.
-.
-.IP "\(bu" 4
+.IP "\[ci]" 4
 One notification library to rule them all\.
-.
-.IP "\(bu" 4
+.IP "\[ci]" 4
 A common and intuitive notification syntax\.
-.
-.IP "\(bu" 4
+.IP "\[ci]" 4
 Supports the handling of images (to the notification services that will accept them)\.
-.
 .IP "" 0
-.
 .SH "OPTIONS"
 The Apprise options are as follows:
-.
 .P
 \fB\-b\fR, \fB\-\-body=\fR\fITEXT\fR: Specify the message body\. If no body is specified then content is read from \fIstdin\fR\.
-.
 .P
 \fB\-t\fR, \fB\-\-title=\fR\fITEXT\fR: Specify the message title\. This field is complete optional\.
-.
 .P
 \fB\-c\fR, \fB\-\-config=\fR\fICONFIG\-URL\fR: Specify one or more configuration locations\.
-.
 .P
 \fB\-a\fR, \fB\-\-attach=\fR\fIATTACH\-URL\fR: Specify one or more file attachment locations\.
-.
 .P
 \fB\-n\fR, \fB\-\-notification\-type=\fR\fITYPE\fR: Specify the message type (default=info)\. Possible values are "info", "success", "failure", and "warning"\.
-.
 .P
 \fB\-i\fR, \fB\-\-input\-format=\fR\fIFORMAT\fR: Specify the input message format (default=text)\. Possible values are "text", "html", and "markdown"\.
-.
 .P
 \fB\-T\fR, \fB\-\-theme=\fRTHEME: Specify the default theme\.
-.
 .P
 \fB\-g\fR, \fB\-\-tag=\fRTAG: Specify one or more tags to filter which services to notify\. Use multiple \fB\-\-tag\fR (\fB\-g\fR) entries to \fBOR\fR the tags together and comma separated to \fBAND\fR them\. If no tags are specified then all services are notified\.
-.
 .P
 \fB\-Da\fR, \fB\-\-disable\-async\fR: Send notifications synchronously (one after the other) instead of all at once\.
-.
 .P
 \fB\-R\fR, \fB\-\-recursion\-depth\fR: he number of recursive import entries that can be loaded from within Apprise configuration\. By default this is set to 1\. If this is set to zero, then import statements found in any configuration is ignored\.
-.
 .P
 \fB\-e\fR, \fB\-\-interpret\-escapes\fR Enable interpretation of backslash escapes\. For example, this would convert sequences such as \en and \er to their respected ascii new\-line and carriage
-.
 .P
 \fB\-d\fR, \fB\-\-dry\-run\fR: Perform a trial run but only prints the notification services to\-be triggered to \fBstdout\fR\. Notifications are never sent using this mode\.
-.
 .P
 return characters prior to the delivery of the notification\.
-.
+.P
+\fB\-l\fR, \fB\-\-details\fR Prints details about the current services supported by Apprise\.
 .P
 \fB\-v\fR, \fB\-\-verbose\fR: The more of these you specify, the more verbose the output is\. e\.g: \-vvvv
-.
 .P
 \fB\-D\fR, \fB\-\-debug\fR: A debug mode; useful for troubleshooting\.
-.
 .P
 \fB\-V\fR, \fB\-\-version\fR: Display the apprise version and exit\.
-.
 .P
 \fB\-h\fR, \fB\-\-help\fR: Show this message and exit\.
-.
 .SH "EXIT STATUS"
 \fBapprise\fR exits with a status of:
-.
-.IP "\(bu" 4
+.IP "\[ci]" 4
 \fB0\fR if all of the notifications were sent successfully\.
-.
-.IP "\(bu" 4
+.IP "\[ci]" 4
 \fB1\fR if one or more notifications could not be sent\.
-.
-.IP "\(bu" 4
+.IP "\[ci]" 4
 \fB2\fR if there was an error specified on the command line such as not providing an valid argument\.
-.
-.IP "\(bu" 4
+.IP "\[ci]" 4
 \fB3\fR if there was one or more Apprise Service URLs successfully loaded but none could be notified due to user filtering (via tags)\.
-.
 .IP "" 0
-.
 .SH "SERVICE URLS"
 There are to many service URL and combinations to list here\. It\'s best to visit the Apprise GitHub page \fIhttps://github\.com/caronc/apprise/wiki#notification\-services\fR and see what\'s available\.
-.
 .SH "EXAMPLES"
 Send a notification to as many servers as you want to specify as you can easily chain them together:
-.
 .IP "" 4
-.
 .nf
-
 $ apprise \-vv \-t "my title" \-b "my notification body" \e
    "mailto://myemail:mypass@gmail\.com" \e
    "pbul://o\.gn5kj6nfhv736I7jC3cj3QLRiyhgl98b"
-.
 .fi
-.
 .IP "" 0
-.
 .P
 If you don\'t specify a \fB\-\-body\fR (\fB\-b\fR) then stdin is used allowing you to use the tool as part of your every day administration:
-.
 .IP "" 4
-.
 .nf
-
 $ cat /proc/cpuinfo | apprise \-vv \-t "cpu info" \e
     "mailto://myemail:mypass@gmail\.com"
-.
 .fi
-.
 .IP "" 0
-.
 .P
 Load in a configuration file which identifies all of your notification service URLs and notify them all:
-.
 .IP "" 4
-.
 .nf
-
 $ apprise \-vv \-t "my title" \-b "my notification body" \e
    \-\-config=~/apprise\.yml
-.
 .fi
-.
 .IP "" 0
-.
 .P
 Load in a configuration file from a remote server that identifies all of your notification service URLs and only notify the ones tagged as \fIdevops\fR\.
-.
 .IP "" 4
-.
 .nf
-
 $ apprise \-vv \-t "my title" \-b "my notification body" \e
    \-\-config=https://localhost/my/apprise/config \e
    \-t devops
-.
 .fi
-.
 .IP "" 0
-.
 .P
 Include an attachment:
-.
 .IP "" 4
-.
 .nf
-
 $ apprise \-vv \-t "School Assignment" \-b "See attached" \e
    \-\-attach=Documents/FinalReport\.docx
-.
 .fi
-.
 .IP "" 0
-.
 .SH "CONFIGURATION"
 A configuration file can be in the format of either \fBTEXT\fR or \fBYAML\fR where [TEXT][textconfig] is the easiest and most ideal solution for most users\. However YAML \fIhttps://github\.com/caronc/apprise/wiki/config_yaml\fR configuration files grants the user a bit more leverage and access to some of the internal features of Apprise\. Reguardless of which format you choose, both provide the users the ability to leverage \fBtagging\fR which adds a more rich and powerful notification environment\.
-.
 .P
 Configuration files can be directly referenced via \fBapprise\fR when referencing the \fB\-\-config=\fR (\fB\-c\fR) CLI directive\. You can identify as many as you like on the command line and all of them will be loaded\. You can also point your configuration to a cloud location (by referencing \fBhttp://\fR or \fBhttps://\fR\. By default \fBapprise\fR looks in the following local locations for configuration files and loads them:
-.
 .IP "" 4
-.
 .nf
-
 $ ~/\.apprise
 $ ~/\.apprise\.yml
 $ ~/\.config/apprise
 $ ~/\.config/apprise\.yml
-.
 .fi
-.
 .IP "" 0
-.
 .P
 If a default configuration file is referenced in any way by the \fBapprise\fR tool, you no longer need to provide it a Service URL\. Usage of the \fBapprise\fR tool simplifies to:
-.
 .IP "" 4
-.
 .nf
-
 $ apprise \-vv \-t "my title" \-b "my notification body"
-.
 .fi
-.
 .IP "" 0
-.
 .P
 If you leveraged tagging \fIhttps://github\.com/caronc/apprise/wiki/CLI_Usage#label\-leverage\-tagging\fR, you can define all of Apprise Service URLs in your configuration that you want and only specifically notify a subset of them:
-.
 .IP "" 4
-.
 .nf
-
 $ apprise \-vv \-t "Will Be Late" \-b "Go ahead and make dinner without me" \e
           \-\-tag=family
-.
 .fi
-.
 .IP "" 0
-.
 .SH "BUGS"
 If you find any bugs, please make them known at: \fIhttps://github\.com/caronc/apprise/issues\fR
-.
 .SH "COPYRIGHT"
 Apprise is Copyright (C) 2021 Chris Caron \fIlead2gold@gmail\.com\fR

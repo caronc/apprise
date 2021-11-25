@@ -56,6 +56,13 @@ class NotifyWindows(NotifyBase):
     """
     A wrapper for local Windows Notifications
     """
+    # Set our global enabled flag
+    enabled = NOTIFY_WINDOWS_SUPPORT_ENABLED
+
+    requirements = {
+        # Define our required packaging in order to work
+        'details': _('A local Microsoft Windows environment is required.')
+    }
 
     # The default descriptive name associated with the Notification
     service_name = 'Windows Notification'
@@ -79,15 +86,6 @@ class NotifyWindows(NotifyBase):
 
     # The number of seconds to display the popup for
     default_popup_duration_sec = 12
-
-    # This entry is a bit hacky, but it allows us to unit-test this library
-    # in an environment that simply doesn't have the windows packages
-    # available to us.  It also allows us to handle situations where the
-    # packages actually are present but we need to test that they aren't.
-    # If anyone is seeing this had knows a better way of testing this
-    # outside of what is defined in test/test_windows_plugin.py, please
-    # let me know! :)
-    _enabled = NOTIFY_WINDOWS_SUPPORT_ENABLED
 
     # Define object templates
     templates = (
@@ -143,12 +141,6 @@ class NotifyWindows(NotifyBase):
         """
         Perform Windows Notification
         """
-
-        if not self._enabled:
-            self.logger.warning(
-                "Windows Notifications are not supported by this system; "
-                "`pip install pywin32`.")
-            return False
 
         # Always call throttle before any remote server i/o is made
         self.throttle()

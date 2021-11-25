@@ -5,16 +5,3 @@ pytest
 pytest-cov
 tox
 babel
-
-#
-# Plugin Dependencies
-#
-
-# Provides xmpp:// support
-slixmpp; python_version >= '3.7'
-
-# Provides growl:// support
-gntp
-
-# Provides mqtt:// support
-paho-mqtt

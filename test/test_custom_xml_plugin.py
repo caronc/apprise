@@ -43,7 +43,7 @@ TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), 'var')
 @mock.patch('requests.post')
 def test_notify_xml_plugin_attachments(mock_post):
     """
-    API: NotifyXML() Attachments
+    NotifyXML() Attachments
 
     """
     # Disable Throttling to speed testing
