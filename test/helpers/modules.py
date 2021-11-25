@@ -28,7 +28,7 @@ import os
 import sys
 import six
 from shutil import rmtree
-from tempfile import TemporaryDirectory
+from tempfile import mkdtemp
 from apprise.plugins import __reset_matrix as reset_matrix
 from apprise.plugins import __load_matrix as load_matrix
 
@@ -106,7 +106,7 @@ class ModuleManipulation(object):
             if unavailable and self.__prev_unloaded[module]['path'] is None:
                 # We'll now create a temporary location to store our temporary
                 # failing module (forcing an ImportError)
-                self.__prev_unloaded[module]['path'] = TemporaryDirectory()
+                self.__prev_unloaded[module]['path'] = mkdtemp()
 
                 # Empty File
                 open(os.path.join(
