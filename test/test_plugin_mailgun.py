@@ -27,7 +27,7 @@ import os
 import sys
 import mock
 import requests
-from helpers import RestFrameworkTester
+from helpers import AppriseURLTester
 from apprise import plugins
 from apprise import Apprise
 from apprise import AppriseAttachment
@@ -172,7 +172,7 @@ def test_plugin_mailgun_urls():
     """
 
     # Run our general tests
-    RestFrameworkTester(tests=apprise_url_tests).run_all()
+    AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
 @mock.patch('requests.post')

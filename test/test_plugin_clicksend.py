@@ -23,7 +23,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 from apprise import plugins
-from helpers import RestFrameworkTester
+from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
 import logging
@@ -80,4 +80,4 @@ def test_plugin_clicksend_urls():
     """
 
     # Run our general tests
-    RestFrameworkTester(tests=apprise_url_tests).run_all()
+    AppriseURLTester(tests=apprise_url_tests).run_all()

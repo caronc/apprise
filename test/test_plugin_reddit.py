@@ -27,7 +27,7 @@ import six
 import requests
 import mock
 from apprise import plugins
-from helpers import RestFrameworkTester
+from helpers import AppriseURLTester
 
 from json import dumps
 from datetime import datetime
@@ -222,7 +222,7 @@ def test_plugin_reddit_urls():
     """
 
     # Run our general tests
-    RestFrameworkTester(tests=apprise_url_tests).run_all()
+    AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
 @mock.patch('requests.post')

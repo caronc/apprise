@@ -27,7 +27,7 @@ import six
 import pytest
 import mock
 import requests
-from helpers import RestFrameworkTester
+from helpers import AppriseURLTester
 from apprise import plugins
 
 from json import dumps
@@ -109,7 +109,7 @@ def test_plugin_gitter_urls():
     """
 
     # Run our general tests
-    RestFrameworkTester(tests=apprise_url_tests).run_all()
+    AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
 @mock.patch('requests.get')

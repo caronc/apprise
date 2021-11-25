@@ -11,8 +11,6 @@ matrix:
   include:
     - python: "2.7"
       env: TOXENV=py27
-    - python: "3.5"
-      env: TOXENV=py35
     - python: "3.6"
       env: TOXENV=py36
     - python: "3.7"
@@ -23,10 +21,15 @@ matrix:
       env: TOXENV=py39
     - python: "3.9-dev"
       env: TOXENV=py39-dev
+    # PyPy Environments
     - python: "pypy2.7-6.0"
       env: TOXENV=pypy
     - python: "pypy3.5-7.0"
       env: TOXENV=pypy3
+    # An extra environment where additional packages are not installed
+    - python: "3.9"
+      env:
+        - TOXENV=bare
 
 install:
   - pip install babel
@@ -36,8 +39,10 @@ install:
   - pip install codecov
   - pip install -r dev-requirements.txt
   - pip install -r requirements.txt
-  - if [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then travis_retry pip install dbus-python; fi
-
+  # bare installs do not include extra package dependencies
+  - if [[ $TOXENV != 'bare' ]]; then pip install -r all-plugin-requirements.txt; fi
+  # pypy and bare installs do not include dbus-python
+  - if [[ $TOXENV != 'bare' ]] && [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then travis_retry pip install dbus-python; fi
 
 # run tests
 script:

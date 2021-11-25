@@ -31,7 +31,7 @@ from json import dumps
 from apprise import AppriseAttachment
 from apprise import NotifyType
 from apprise import plugins
-from helpers import RestFrameworkTester
+from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
 import logging
@@ -216,7 +216,7 @@ def test_plugin_pushsafer_urls():
     """
 
     # Run our general tests
-    RestFrameworkTester(tests=apprise_url_tests).run_all()
+    AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
 @mock.patch('requests.post')
@@ -226,7 +226,7 @@ def test_plugin_pushsafer_general(mock_post):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
+    plugins.NotifyPushSafer.request_rate_per_sec = 0
 
     # Private Key
     privatekey = 'abc123'

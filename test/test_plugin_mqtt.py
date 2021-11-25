@@ -30,36 +30,29 @@ import ssl
 import six
 import pytest
 import apprise
-from helpers import ModuleManipulation
 
 # Disable logging for a cleaner testing output
 import logging
 logging.disable(logging.CRITICAL)
 
 
-@pytest.mark.skipif('paho' not in sys.modules, reason="requires paho-mqtt")
-def test_plugin_paho_mqtt_import_error(tmpdir):
+@pytest.mark.skipif(
+    'paho' in sys.modules,
+    reason="Requires that cryptography NOT be installed")
+@mock.patch('requests.post')
+def test_plugin_mqtt_paho_import_error(mock_post):
     """
-    NotifyMQTT() Import Error
-
+    NotifyFCM Cryptography loading failure
     """
-    with ModuleManipulation(
-            "paho",
-            base=r"^(apprise|apprise.plugins(\.NotifyMQTT(\..*)?)?)$"):
 
-        # This tests that Apprise still works without sleekxmpp.
-        # MQTT objects can still be instantiated in these cases.
-        obj = apprise.Apprise.instantiate(
-            'mqtt://user:pass@localhost/my/topic')
-        assert isinstance(obj, apprise.plugins.NotifyMQTT)
-        # We can still retrieve our url back to us
-        assert obj.url().startswith('mqtt://user:pass@localhost/my/topic')
-        # Notifications are not possible
-        assert obj.notify(body="test") is False
+    # without the library, the object can't be instantiated
+    obj = apprise.Apprise.instantiate(
+        'mqtt://user:pass@localhost/my/topic')
+    assert obj is None
 
 
 @pytest.mark.skipif(
-    'paho' not in sys.modules, reason="requires paho-mqtt")
+    'paho' not in sys.modules, reason="Requires paho-mqtt")
 @mock.patch('paho.mqtt.client.Client')
 def test_plugin_mqtt_general(mock_client):
     """

@@ -28,11 +28,6 @@ import mock
 import six
 import pytest
 import apprise
-from helpers import ModuleManipulation
-
-# Disable logging for a cleaner testing output
-import logging
-logging.disable(logging.CRITICAL)
 
 try:
     from gntp import errors
@@ -47,36 +42,31 @@ try:
         errors.UnsupportedError(
             0, 'gntp.UnsupportedError() not handled'),
     )
+
 except ImportError:
-    # no problem; these tests will be skipped at this point
-    TEST_GROWL_EXCEPTIONS = tuple()
+    # no problem; gntp isn't available to us
+    pass
+
+# Disable logging for a cleaner testing output
+import logging
+logging.disable(logging.CRITICAL)
 
 
-if 'gntp' not in sys.modules:
-    # Environment doesn't allow for dbus
-    pytest.skip(
-        "Skipping growl based tests; requires gntp", allow_module_level=True)
-
-
-def test_plugin_growlimport_error():
+@pytest.mark.skipif(
+    'gntp' in sys.modules,
+    reason="Requires that gntp NOT be installed")
+def test_plugin_growl_gntp_import_error():
     """
     NotifyGrowl() Import Error
 
     """
-    with ModuleManipulation(
-            "gntp",
-            base=r"^(apprise|apprise.plugins(\.NotifyGrowl(\..*)?)?)$"):
-
-        # This tests that Apprise still works without gntp.
-        obj = apprise.Apprise.instantiate('growl://growl.server')
-        assert isinstance(obj, apprise.plugins.NotifyGrowl)
-
-        # Notifications won't work because gntp did not load
-        assert obj.notify(
-            title='test', body='body',
-            notify_type=apprise.NotifyType.INFO) is False
+    # If the object is disabled, then it can't be instantiated
+    obj = apprise.Apprise.instantiate('growl://growl.server')
+    assert obj is None
 
 
+@pytest.mark.skipif(
+    'gntp' not in sys.modules, reason="Requires gntp")
 @mock.patch('gntp.notifier.GrowlNotifier')
 def test_plugin_growl_exception_handling(mock_gntp):
     """
@@ -133,6 +123,8 @@ def test_plugin_growl_exception_handling(mock_gntp):
             notify_type=apprise.NotifyType.INFO) is False
 
 
+@pytest.mark.skipif(
+    'gntp' not in sys.modules, reason="Requires gntp")
 @mock.patch('gntp.notifier.GrowlNotifier')
 def test_plugin_growl_general(mock_gntp):
     """

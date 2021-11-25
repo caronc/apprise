@@ -27,7 +27,7 @@ from json import dumps
 from apprise import Apprise
 from apprise import plugins
 import requests
-from helpers import RestFrameworkTester
+from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
 import logging
@@ -77,7 +77,7 @@ def test_plugin_template_urls():
     """
 
     # Run our general tests
-    RestFrameworkTester(tests=apprise_url_tests).run_all()
+    AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
 @mock.patch('apprise.plugins.NotifyEmby.sessions')
@@ -119,7 +119,7 @@ def test_plugin_emby_general(mock_post, mock_get, mock_logout,
     obj.user_id = '123'
 
     # Test our exception handling
-    for _exception in RestFrameworkTester.req_exceptions:
+    for _exception in AppriseURLTester.req_exceptions:
         mock_post.side_effect = _exception
         mock_get.side_effect = _exception
         # We'll fail to log in each time
@@ -178,7 +178,7 @@ def test_plugin_emby_login(mock_post, mock_get):
     assert isinstance(obj, plugins.NotifyEmby)
 
     # Test our exception handling
-    for _exception in RestFrameworkTester.req_exceptions:
+    for _exception in AppriseURLTester.req_exceptions:
         mock_post.side_effect = _exception
         mock_get.side_effect = _exception
         # We'll fail to log in each time
@@ -300,7 +300,7 @@ def test_plugin_emby_sessions(mock_post, mock_get, mock_logout, mock_login):
     obj.user_id = '123'
 
     # Test our exception handling
-    for _exception in RestFrameworkTester.req_exceptions:
+    for _exception in AppriseURLTester.req_exceptions:
         mock_post.side_effect = _exception
         mock_get.side_effect = _exception
         # We'll fail to log in each time
@@ -396,7 +396,7 @@ def test_plugin_emby_logout(mock_post, mock_get, mock_login):
     obj.user_id = '123'
 
     # Test our exception handling
-    for _exception in RestFrameworkTester.req_exceptions:
+    for _exception in AppriseURLTester.req_exceptions:
         mock_post.side_effect = _exception
         mock_get.side_effect = _exception
         # We'll fail to log in each time

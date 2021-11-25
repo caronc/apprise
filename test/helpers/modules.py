@@ -44,9 +44,20 @@ except ImportError:
         pass
 
 
-class ModuleManipulation(object):
+class ModuleImportError(object):
     """
-    A Simple class for managing what modules are loaded
+    A Simple class/context manager for managing what modules are loaded
+    forcing them to cause an import error.
+
+    Syntax:
+
+        with ModuleImportError(modules_to_throw_import_errors):
+            # do your stuff
+
+
+    The class automatically reloads any modules you specify in the base input
+    variable before and after the module manipulation; thus it handles the
+    cleanup for you.
     """
 
     base = r"^(apprise|apprise.plugins(\..*))$"
@@ -110,24 +121,24 @@ class ModuleManipulation(object):
 
                 # Empty File
                 open(os.path.join(
-                    self.__prev_unloaded[module]['path'].name, '__init__.py'),
+                    self.__prev_unloaded[module]['path'], '__init__.py'),
                     'w').close()
 
                 os.makedirs(os.path.join(
-                    self.__prev_unloaded[module]['path'].name, module))
+                    self.__prev_unloaded[module]['path'], module))
 
                 with open(os.path.join(
-                        self.__prev_unloaded[module]['path'].name,
+                        self.__prev_unloaded[module]['path'],
                         module, '__init__.py'), 'w') as fp:
                     fp.write('raise ImportError()')
 
                 # Update our python path to point to our new temporary object
-                sys.path.insert(0, self.__prev_unloaded[module]['path'].name)
+                sys.path.insert(0, self.__prev_unloaded[module]['path'])
 
             elif not unavailable and module in self.__prev_unloaded:
                 if self.__prev_unloaded[module]['path']:
-                    rmtree(self.__prev_unloaded[module]['path'].name)
-                    sys.path.remove(self.__prev_unloaded[module]['path'].name)
+                    rmtree(self.__prev_unloaded[module]['path'])
+                    sys.path.remove(self.__prev_unloaded[module]['path'])
 
                 # Restore our modules
                 for name, module in \

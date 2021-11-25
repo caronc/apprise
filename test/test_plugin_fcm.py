@@ -31,16 +31,15 @@ import requests
 import json
 from apprise import Apprise
 from apprise import plugins
-from helpers import ModuleManipulation, RestFrameworkTester
+from helpers import AppriseURLTester
 
-if 'cryptography' not in sys.modules:
-    # Environment doesn't allow for dbus
-    pytest.skip(
-        "Skipping FCM cryptography based tests", allow_module_level=True)
+try:
+    from apprise.plugins.NotifyFCM.oauth import GoogleOAuth
+    from cryptography.exceptions import UnsupportedAlgorithm
 
-from dbus import DBusException  # noqa E402
-from apprise.plugins.NotifyFCM.oauth import GoogleOAuth  # noqa E402
-from cryptography.exceptions import UnsupportedAlgorithm  # noqa E402
+except ImportError:
+    # No problem; there is no cryptography support
+    pass
 
 try:
     from json.decoder import JSONDecodeError
@@ -162,6 +161,8 @@ apprise_url_tests = (
 )
 
 
+@pytest.mark.skipif(
+    'cryptography' not in sys.modules, reason="Requires cryptography")
 def test_plugin_fcm_urls():
     """
     NotifyFCM() Apprise URLs
@@ -169,9 +170,11 @@ def test_plugin_fcm_urls():
     """
 
     # Run our general tests
-    RestFrameworkTester(tests=apprise_url_tests).run_all()
+    AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
+@pytest.mark.skipif(
+    'cryptography' not in sys.modules, reason="Requires cryptography")
 @mock.patch('requests.post')
 def test_plugin_fcm_general(mock_post):
     """
@@ -232,6 +235,8 @@ def test_plugin_fcm_general(mock_post):
         'https://fcm.googleapis.com/v1/projects/mock-project-id/messages:send'
 
 
+@pytest.mark.skipif(
+    'cryptography' not in sys.modules, reason="Requires cryptography")
 @mock.patch('requests.post')
 def test_plugin_fcm_keyfile_parse(mock_post):
     """
@@ -386,6 +391,8 @@ def test_plugin_fcm_keyfile_parse(mock_post):
         assert oauth.access_token is None
 
 
+@pytest.mark.skipif(
+    'cryptography' not in sys.modules, reason="Requires cryptography")
 def test_plugin_fcm_bad_keyfile_parse():
     """
     NotifyFCM() KeyFile Bad Service Account Type Tests
@@ -396,6 +403,8 @@ def test_plugin_fcm_bad_keyfile_parse():
     assert oauth.load(path) is False
 
 
+@pytest.mark.skipif(
+    'cryptography' not in sys.modules, reason="Requires cryptography")
 def test_plugin_fcm_keyfile_missing_entries_parse(tmpdir):
     """
     NotifyFCM() KeyFile Missing Entries Test
@@ -434,41 +443,20 @@ def test_plugin_fcm_keyfile_missing_entries_parse(tmpdir):
     assert oauth.load(str(path)) is False
 
 
-@mock.patch('requests.post')
-def test_plugin_fcm_cryptography_dependency(mock_post):
+@pytest.mark.skipif(
+    'cryptography' in sys.modules,
+    reason="Requires that cryptography NOT be installed")
+def test_plugin_fcm_cryptography_import_error():
     """
     NotifyFCM Cryptography loading failure
     """
 
-    with ModuleManipulation(
-            "cryptography",
-            base=r"^(apprise|apprise.plugins(\.NotifyFCM(\..*)?)?)$"):
+    # Prepare a base keyfile reference to use
+    path = os.path.join(PRIVATE_KEYFILE_DIR, 'service_account.json')
 
-        # Valid Keyfile
-        path = os.path.join(PRIVATE_KEYFILE_DIR, 'service_account.json')
-
-        # Disable Throttling to speed testing
-        plugins.NotifyBase.request_rate_per_sec = 0
-
-        # Prepare a good response
-        response = mock.Mock()
-        response.content = json.dumps({
-            "access_token": "ya29.c.abcd",
-            "expires_in": 3599,
-            "token_type": "Bearer",
-        })
-        response.status_code = requests.codes.ok
-        mock_post.return_value = response
-
-        # Attempt to instantiate our object
-        obj = Apprise.instantiate(
-            'fcm://mock-project-id/device/#topic/?keyfile={}'.format(
-                str(path)))
-
-        # It's not possible because our cryptography depedancy is missing
-        assert obj is None
-
-    # Verify we restored everything okay
+    # Attempt to instantiate our object
     obj = Apprise.instantiate(
         'fcm://mock-project-id/device/#topic/?keyfile={}'.format(str(path)))
-    assert obj is not None
+
+    # It's not possible because our cryptography depedancy is missing
+    assert obj is None

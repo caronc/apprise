@@ -31,7 +31,7 @@ import requests
 from apprise import plugins
 from apprise import NotifyType
 from apprise import AppriseAttachment
-from helpers import RestFrameworkTester
+from helpers import AppriseURLTester
 
 from json import dumps
 
@@ -258,7 +258,7 @@ def test_plugin_slack_urls():
     """
 
     # Run our general tests
-    RestFrameworkTester(tests=apprise_url_tests).run_all()
+    AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
 @mock.patch('requests.post')
@@ -268,7 +268,7 @@ def test_plugin_slack_oauth_access_token(mock_post):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
+    plugins.NotifySlack.request_rate_per_sec = 0
 
     # Generate an invalid bot token
     token = 'xo-invalid'
@@ -391,7 +391,7 @@ def test_plugin_slack_webhook_mode(mock_post):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
+    plugins.NotifySlack.request_rate_per_sec = 0
 
     # Prepare Mock
     mock_post.return_value = requests.Request()
@@ -439,7 +439,7 @@ def test_plugin_slack_send_by_email(mock_get, mock_post):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
+    plugins.NotifySlack.request_rate_per_sec = 0
 
     # Generate a (valid) bot token
     token = 'xoxb-1234-1234-abc124'

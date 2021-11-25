@@ -29,7 +29,6 @@ import ssl
 import mock
 import pytest
 import apprise
-from helpers import ModuleManipulation
 
 # Disable logging for a cleaner testing output
 import logging
@@ -37,25 +36,20 @@ logging.disable(logging.CRITICAL)
 
 
 @pytest.mark.skipif(
-    'slixmpp' not in sys.modules, reason="requires slixmpp")
-def test_plugin_slixmpp_plugin_import_error():
+    'slixmpp' in sys.modules, reason="Requires that slixmpp NOT be installed")
+def test_plugin_xmpp_slixmpp_import_error():
     """
     NotifyXMPP() 'slixmpp' Import Error
 
     """
-    with ModuleManipulation(
-            "slixmpp",
-            base=r"^(apprise|apprise.plugins(\.NotifyXMPP(\..*)?)?)$"):
-
-        # This tests that Apprise still works without sleekxmpp.
-        # XMPP objects can still be instantiated in these cases.
-        obj = apprise.Apprise.instantiate('xmpp://user:pass@localhost')
-        assert isinstance(obj, apprise.plugins.NotifyXMPP)
+    # Without the slixmpp library, we can not load our object
+    obj = apprise.Apprise.instantiate('xmpp://user:pass@localhost')
+    assert obj is None
 
 
 @pytest.mark.skipif(
-    'slixmpp' not in sys.modules, reason="requires slixmpp")
-def test_plugin_slixmpp(tmpdir):
+    'slixmpp' not in sys.modules, reason="Requires slixmpp")
+def test_plugin_xmpp_general(tmpdir):
     """
     NotifyXMPP() General Checks
     """
@@ -152,15 +146,16 @@ def test_plugin_slixmpp(tmpdir):
             'u': 'xmpps://user:pass@localhost?xep=ignored&verify=no',
             'p': 'xmpps://user:****@localhost',
         }, {
-            'u': 'xmpps://pass@localhost/?verify=false'
+            'u': 'xmpps://user:pass@localhost/?verify=false&to='
                  'user@test.com, user2@test.com/resource',
-            'p': 'xmpps://****@localhost',
+                 'p': 'xmpps://user:****@localhost',
         }, {
-            'u': 'xmpps://pass@localhost:5226?jid=user@test.com&verify=no',
-            'p': 'xmpps://****@localhost:5226',
+            'u': 'xmpps://user:pass@localhost:5226?'
+                 'jid=user@test.com&verify=no',
+            'p': 'xmpps://user:****@localhost:5226',
         }, {
-            'u': 'xmpps://pass@localhost?jid=user@test.com&verify=False',
-            'p': 'xmpps://****@localhost',
+            'u': 'xmpps://user:pass@localhost?jid=user@test.com&verify=False',
+            'p': 'xmpps://user:****@localhost',
         }, {
             'u': 'xmpps://user:pass@localhost?verify=False',
             'p': 'xmpps://user:****@localhost',
@@ -197,6 +192,7 @@ def test_plugin_slixmpp(tmpdir):
             client_stream.connect.return_value = True
             mock_stream.return_value = client_stream
 
+            print(obj.url())
             # test notifications
             assert obj.notify(
                 title='title', body='body',
@@ -242,7 +238,7 @@ def test_plugin_slixmpp(tmpdir):
         [str(ca_cert), ]
 
     obj = apprise.Apprise.instantiate(
-        'xmpps://pass@localhost/user@test.com?verify=yes',
+        'xmpps://user:pass@localhost/user@test.com?verify=yes',
         suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyXMPP) is True
 
@@ -259,8 +255,8 @@ def test_plugin_slixmpp(tmpdir):
 
 
 @pytest.mark.skipif(
-    'slixmpp' not in sys.modules, reason="requires slixmpp")
-def test_slixmpp_callbacks():
+    'slixmpp' not in sys.modules, reason="Requires slixmpp")
+def test_plugin_xmpp_slixmpp_callbacks():
     """
     NotifyXMPP() slixmpp callback tests
 

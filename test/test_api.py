@@ -1238,7 +1238,7 @@ def test_apprise_details():
             # Pretend everything is okay (so we don't break other tests)
             return True
 
-    SCHEMA_MAP['req01'] = TestDetailNotification
+    SCHEMA_MAP['req01'] = TestReq01Notification
 
     # This is a made up class that is just used to verify
     class TestReq02Notification(NotifyBase):
@@ -1295,6 +1295,26 @@ def test_apprise_details():
             return True
 
     SCHEMA_MAP['req03'] = TestReq03Notification
+
+    # This is a made up class that is just used to verify
+    class TestReq04Notification(NotifyBase):
+        """
+        This class is used to test a case where our requirements is fixed
+        to a None
+        """
+
+        # This is the same as saying there are no requirements
+        requirements = None
+
+        def url(self, **kwargs):
+            # Support URL
+            return ''
+
+        def send(self, **kwargs):
+            # Pretend everything is okay (so we don't break other tests)
+            return True
+
+    SCHEMA_MAP['req04'] = TestReq04Notification
 
     # Create our Apprise instance
     a = Apprise()

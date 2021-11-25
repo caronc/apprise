@@ -44,7 +44,7 @@ import logging
 logging.disable(logging.CRITICAL)
 
 
-class RestFrameworkTester(object):
+class AppriseURLTester(object):
 
     # Some exception handling we'll use
     req_exceptions = (
@@ -224,7 +224,10 @@ class RestFrameworkTester(object):
                 url, str(obj)))
             assert False
 
-        assert isinstance(obj, instance) is True
+        if not isinstance(obj, instance):
+            print('%s instantiated %s (but expected %s)' % (
+                url, type(instance), str(obj)))
+            assert False
 
         if isinstance(obj, plugins.NotifyBase):
             # We loaded okay; now lets make sure we can reverse

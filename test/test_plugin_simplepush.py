@@ -29,7 +29,7 @@ import requests
 import json
 from apprise import Apprise
 from apprise import plugins
-from helpers import ModuleManipulation, RestFrameworkTester
+from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
 import logging
@@ -101,7 +101,7 @@ apprise_url_tests = (
 
 
 @pytest.mark.skipif(
-    'cryptography' not in sys.modules, reason="requires cryptography")
+    'cryptography' not in sys.modules, reason="Requires cryptography")
 def test_plugin_simplepush_urls():
     """
     NotifySimplePush() Apprise URLs
@@ -109,44 +109,26 @@ def test_plugin_simplepush_urls():
     """
 
     # Run our general tests
-    RestFrameworkTester(tests=apprise_url_tests).run_all()
+    AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
 @pytest.mark.skipif(
-    'cryptography' not in sys.modules, reason="requires cryptography")
-@mock.patch('requests.post')
-def test_plugin_simplepush_cryptography_dependency(mock_post):
+    'cryptography' in sys.modules,
+    reason="Requires that cryptography NOT be installed")
+def test_plugin_fcm_cryptography_import_error():
     """
     NotifySimplePush() Cryptography loading failure
     """
 
-    with ModuleManipulation(
-            "cryptography",
-            base=r"^(apprise|apprise.plugins(\.NotifySimplePush(\..*)?)?)$"):
-
-        # Disable Throttling to speed testing
-        plugins.NotifyBase.request_rate_per_sec = 0
-
-        # Prepare a good response
-        response = mock.Mock()
-        response.content = \
-            json.dumps({'requests_response_text': {'status': 'OK'}})
-        response.status_code = requests.codes.ok
-        mock_post.return_value = response
-
-        # Attempt to instantiate our object
-        obj = Apprise.instantiate('spush://{}'.format('Y' * 14))
-
-        # It's not possible because our cryptography depedancy is missing
-        assert obj is None
-
-    # Verify we restored everything okay
+    # Attempt to instantiate our object
     obj = Apprise.instantiate('spush://{}'.format('Y' * 14))
-    assert obj is not None
+
+    # It's not possible because our cryptography depedancy is missing
+    assert obj is None
 
 
 @pytest.mark.skipif(
-    'cryptography' not in sys.modules, reason="requires cryptography")
+    'cryptography' not in sys.modules, reason="Requires cryptography")
 def test_plugin_simplepush_edge_cases():
     """
     NotifySimplePush() Edge Cases
@@ -168,3 +150,27 @@ def test_plugin_simplepush_edge_cases():
 
     with pytest.raises(TypeError):
         plugins.NotifySimplePush(apikey="abc", event="  ")
+
+
+@pytest.mark.skipif(
+    'cryptography' not in sys.modules, reason="Requires cryptography")
+@mock.patch('requests.post')
+def test_plugin_simplepush_general(mock_post):
+    """
+    NotifySimplePush() General Tests
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.request_rate_per_sec = 0
+
+    # Prepare a good response
+    response = mock.Mock()
+    response.content = json.dumps({
+        'status': 'OK',
+    })
+    response.status_code = requests.codes.ok
+    mock_post.return_value = response
+
+    obj = Apprise.instantiate('spush://{}'.format('Y' * 14))
+
+    # Verify our content works as expected
+    assert obj.notify(title="test", body="test") is True

@@ -243,12 +243,6 @@ class NotifyDBus(NotifyBase):
         """
         Perform DBus Notification
         """
-
-        if MAINLOOP_MAP[self.schema] is None:
-            self.logger.warning(
-                "{} notifications could not be loaded.".format(self.schema))
-            return False
-
         # Acquire our session
         try:
             session = SessionBus(mainloop=MAINLOOP_MAP[self.schema])

@@ -22,9 +22,9 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
-from .modules import ModuleManipulation
-from .rest import RestFrameworkTester
+from .modules import ModuleImportError
+from .rest import AppriseURLTester
 
 __all__ = [
-    'ModuleManipulation', 'RestFrameworkTester',
+    'ModuleImportError', 'AppriseURLTester',
 ]

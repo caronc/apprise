@@ -68,6 +68,7 @@ class NotifyXMPP(NotifyBase):
     # Lower throttle rate for XMPP
     request_rate_per_sec = 0.5
 
+    # Our XMPP Adapter we use to communicate through
     _adapter = SliXmppAdapter if SliXmppAdapter._enabled else None
 
     # Define object templates

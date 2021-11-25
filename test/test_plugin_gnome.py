@@ -46,11 +46,7 @@ import logging
 logging.disable(logging.CRITICAL)
 
 
-if 'gi' not in sys.modules:
-    # Environment doesn't allow for dbus
-    pytest.skip("Skipping Gnome based tests", allow_module_level=True)
-
-
+@pytest.mark.skipif(sys.version_info.major <= 2, reason="Requires Python 3.x+")
 def test_plugin_gnome_general():
     """
     NotifyGnome() General Checks
@@ -118,6 +114,9 @@ def test_plugin_gnome_general():
 
     # Create our instance
     obj = apprise.Apprise.instantiate('gnome://', suppress_exceptions=False)
+    assert obj is not None
+
+    # Set our duration to 0 to speed up timeouts (for testing)
     obj.duration = 0
 
     # Check that it found our mocked environments

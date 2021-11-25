@@ -25,7 +25,7 @@
 import pytest
 import requests
 from apprise import plugins
-from helpers import RestFrameworkTester
+from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
 import logging
@@ -231,7 +231,7 @@ def test_plugin_lametric_urls():
     """
 
     # Run our general tests
-    RestFrameworkTester(tests=apprise_url_tests).run_all()
+    AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
 def test_plugin_lametric_edge_cases():

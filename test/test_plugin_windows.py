@@ -46,10 +46,11 @@ import logging
 logging.disable(logging.CRITICAL)
 
 
+@pytest.mark.skipif(sys.version_info.major <= 2, reason="Requires Python 3.x+")
 @pytest.mark.skipif((
     'win32api' in sys.modules or
     'win32con' in sys.modules or
-    'win32gui' in sys.modules), reason="requires non-windows platform")
+    'win32gui' in sys.modules), reason="Requires non-windows platform")
 def test_plugin_windows_mocked():
     """
     NotifyWindows() General Checks (via non-Windows platform)
@@ -201,7 +202,7 @@ def test_plugin_windows_mocked():
     'win32api' not in sys.modules and
     'win32con' not in sys.modules and
     'win32gui' not in sys.modules,
-    reason="requires win32api, win32con, and win32gui packages")
+    reason="Requires win32api, win32con, and win32gui")
 @mock.patch('win32gui.UpdateWindow')
 @mock.patch('win32gui.Shell_NotifyIcon')
 @mock.patch('win32gui.LoadImage')

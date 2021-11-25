@@ -25,7 +25,7 @@
 import pytest
 from apprise import plugins
 import requests
-from helpers import RestFrameworkTester
+from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
 import logging
@@ -112,7 +112,7 @@ def test_plugin_zulip_urls():
     """
 
     # Run our general tests
-    RestFrameworkTester(tests=apprise_url_tests).run_all()
+    AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
 def test_plugin_zulip_edge_cases():

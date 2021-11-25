@@ -24,7 +24,7 @@
 # THE SOFTWARE.
 import pytest
 import mock
-from helpers import RestFrameworkTester
+from helpers import AppriseURLTester
 from apprise import plugins
 from apprise import NotifyType
 import requests
@@ -113,7 +113,7 @@ def test_plugin_boxcar_urls():
     """
 
     # Run our general tests
-    RestFrameworkTester(tests=apprise_url_tests).run_all()
+    AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
 @mock.patch('requests.get')

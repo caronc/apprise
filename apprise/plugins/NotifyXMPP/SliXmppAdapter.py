@@ -149,13 +149,8 @@ class SliXmppAdapter(object):
 
         # If the user specified a port, skip SRV resolving, otherwise it is a
         # lot easier to let slixmpp handle DNS instead of the user.
-        if self.port is None:
-            override_connection = None
-        else:
-            override_connection = (self.host, self.port)
-
-        # Instruct slixmpp to connect to the XMPP service.
-        self.xmpp.connect(override_connection, use_ssl=self.secure)
+        self.override_connection = \
+            None if not self.port else (self.host, self.port)
 
         # We're good
         return True
@@ -165,6 +160,11 @@ class SliXmppAdapter(object):
         Thread that handles the server/client i/o
 
         """
+
+        # Instruct slixmpp to connect to the XMPP service.
+        if not self.xmpp.connect(
+                self.override_connection, use_ssl=self.secure):
+            return False
 
         # Run the asyncio event loop, and return once disconnected,
         # for any reason.
