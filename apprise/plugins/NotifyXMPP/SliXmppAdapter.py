@@ -191,7 +191,8 @@ class SliXmppAdapter(object):
             self.before_message()
 
             # The message we wish to send, and the JID that will receive it.
-            self.xmpp.send_message(mto=target, msubject=self.subject,
+            self.xmpp.send_message(
+                mto=target, msubject=self.subject,
                 mbody=self.body, mtype='chat')
 
         # Using wait=True ensures that the send queue will be
