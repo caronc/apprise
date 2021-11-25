@@ -32,7 +32,6 @@ from datetime import datetime
 from apprise import plugins
 from helpers import RestFrameworkTester
 
-
 # Disable logging for a cleaner testing output
 import logging
 logging.disable(logging.CRITICAL)

@@ -28,8 +28,6 @@ import mock
 import sys
 import six
 import types
-
-# Rebuild our Apprise environment
 import apprise
 
 try:

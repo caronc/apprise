@@ -29,6 +29,10 @@ from apprise import plugins
 from apprise import NotifyType
 import requests
 
+# Disable logging for a cleaner testing output
+import logging
+logging.disable(logging.CRITICAL)
+
 # Our Testing URLs
 apprise_url_tests = (
     ('boxcar://', {

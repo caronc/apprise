@@ -47,7 +47,7 @@ logging.disable(logging.CRITICAL)
 class RestFrameworkTester(object):
 
     # Some exception handling we'll use
-    __req_exceptions = (
+    req_exceptions = (
         requests.ConnectionError(
             0, 'requests.ConnectionError() not handled'),
         requests.RequestException(
@@ -187,7 +187,7 @@ class RestFrameworkTester(object):
         else:
             # Handle exception testing; first we turn the boolean flag
             # into a list of exceptions
-            test_requests_exceptions = self.__req_exceptions
+            test_requests_exceptions = self.req_exceptions
 
         try:
             # We can now instantiate our object:
@@ -354,7 +354,7 @@ class RestFrameworkTester(object):
         else:
             # Handle exception testing; first we turn the boolean flag
             # into a list of exceptions
-            test_requests_exceptions = self.__req_exceptions
+            test_requests_exceptions = self.req_exceptions
 
         try:
             if test_requests_exceptions is False:
@@ -446,7 +446,7 @@ class RestFrameworkTester(object):
                 # Disable throttling
                 obj.request_rate_per_sec = 0
 
-                for _exception in self.__req_exceptions:
+                for _exception in self.req_exceptions:
                     mock_post.side_effect = _exception
                     mock_get.side_effect = _exception
 
@@ -487,7 +487,7 @@ class RestFrameworkTester(object):
                     == notify_response
 
             else:
-                for _exception in self.__req_exceptions:
+                for _exception in self.req_exceptions:
                     mock_post.side_effect = _exception
                     mock_get.side_effect = _exception
 

@@ -32,7 +32,6 @@ import pytest
 import apprise
 from helpers import ModuleManipulation
 
-
 # Disable logging for a cleaner testing output
 import logging
 logging.disable(logging.CRITICAL)

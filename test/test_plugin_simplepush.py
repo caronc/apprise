@@ -31,6 +31,10 @@ from apprise import Apprise
 from apprise import plugins
 from helpers import ModuleManipulation, RestFrameworkTester
 
+# Disable logging for a cleaner testing output
+import logging
+logging.disable(logging.CRITICAL)
+
 # Our Testing URLs
 apprise_url_tests = (
     ('spush://', {

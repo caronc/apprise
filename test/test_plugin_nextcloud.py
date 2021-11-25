@@ -33,7 +33,6 @@ from helpers import RestFrameworkTester
 import logging
 logging.disable(logging.CRITICAL)
 
-
 apprise_url_tests = (
     ##################################
     # NotifyNextcloud

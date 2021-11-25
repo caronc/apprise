@@ -61,8 +61,7 @@ from dbus import DBusException  # noqa E402
 def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
                              mock_interface, mock_sessionbus):
     """
-    API: NotifyDBus Plugin()
-
+    NotifyDBus() General Tests
     """
 
     # Our module base

@@ -29,6 +29,7 @@ import requests
 import pytest
 from json import dumps
 from apprise import Apprise
+from apprise import NotifyType
 from apprise import AppriseAttachment
 from apprise import plugins
 from helpers import RestFrameworkTester
@@ -298,9 +299,11 @@ def test_plugin_pushover_attachments(mock_post, tmpdir):
         assert obj.send(body="test") is False
 
 
-def test_plugin_pushover_edge_cases():
+@mock.patch('requests.get')
+@mock.patch('requests.post')
+def test_plugin_pushover_edge_cases(mock_post, mock_get):
     """
-    API: NotifyPushover() Edge Cases
+    NotifyPushover() Edge Cases
 
     """
     # Disable Throttling to speed testing
@@ -309,3 +312,59 @@ def test_plugin_pushover_edge_cases():
     # No token
     with pytest.raises(TypeError):
         plugins.NotifyPushover(token=None)
+
+    # Initialize some generic (but valid) tokens
+    token = 'a' * 30
+    user_key = 'u' * 30
+
+    invalid_device = 'd' * 35
+
+    # Support strings
+    devices = 'device1,device2,,,,%s' % invalid_device
+
+    # Prepare Mock
+    mock_get.return_value = requests.Request()
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_get.return_value.status_code = requests.codes.ok
+
+    # No webhook id specified
+    with pytest.raises(TypeError):
+        plugins.NotifyPushover(user_key=user_key, webhook_id=None)
+
+    obj = plugins.NotifyPushover(
+        user_key=user_key, token=token, targets=devices)
+    assert isinstance(obj, plugins.NotifyPushover) is True
+    assert len(obj.targets) == 3
+
+    # This call fails because there is 1 invalid device
+    assert obj.notify(
+        body='body', title='title',
+        notify_type=NotifyType.INFO) is False
+
+    obj = plugins.NotifyPushover(user_key=user_key, token=token)
+    assert isinstance(obj, plugins.NotifyPushover) is True
+    # Default is to send to all devices, so there will be a
+    # device defined here
+    assert len(obj.targets) == 1
+
+    # This call succeeds because all of the devices are valid
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
+
+    obj = plugins.NotifyPushover(user_key=user_key, token=token, targets=set())
+    assert isinstance(obj, plugins.NotifyPushover) is True
+    # Default is to send to all devices, so there will be a
+    # device defined here
+    assert len(obj.targets) == 1
+
+    # No User Key specified
+    with pytest.raises(TypeError):
+        plugins.NotifyPushover(user_key=None, token="abcd")
+
+    # No Access Token specified
+    with pytest.raises(TypeError):
+        plugins.NotifyPushover(user_key="abcd", token=None)
+
+    with pytest.raises(TypeError):
+        plugins.NotifyPushover(user_key="abcd", token="  ")

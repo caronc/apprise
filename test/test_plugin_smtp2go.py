@@ -157,7 +157,7 @@ def test_plugin_smtp2go_urls():
 @mock.patch('requests.post')
 def test_plugin_smtp2go_attachments(mock_post):
     """
-    API: NotifySMTP2Go() Attachments
+    NotifySMTP2Go() Attachments
 
     """
     # Disable Throttling to speed testing

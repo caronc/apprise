@@ -26,6 +26,10 @@ from helpers import RestFrameworkTester
 from apprise import plugins
 import requests
 
+# Disable logging for a cleaner testing output
+import logging
+logging.disable(logging.CRITICAL)
+
 # Our Testing URLs
 apprise_url_tests = (
     ('apprise://', {

@@ -42,13 +42,16 @@ from dbus import DBusException  # noqa E402
 from apprise.plugins.NotifyFCM.oauth import GoogleOAuth  # noqa E402
 from cryptography.exceptions import UnsupportedAlgorithm  # noqa E402
 
-
 try:
     from json.decoder import JSONDecodeError
 
 except ImportError:
     # Python v2.7 Backwards Compatibility support
     JSONDecodeError = ValueError
+
+# Disable logging for a cleaner testing output
+import logging
+logging.disable(logging.CRITICAL)
 
 # Test files for KeyFile Directory
 PRIVATE_KEYFILE_DIR = os.path.join(os.path.dirname(__file__), 'var', 'fcm')
