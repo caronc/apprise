@@ -682,7 +682,7 @@ def test_apprise_cli_details(tmpdir):
         This class is used to test various requirement configurations
         """
 
-        # Set some requirements
+        # Set some requirements (but additionally include a details over-ride)
         requirements = {
             # We can over-ride the default details assigned to our plugin if
             # specified
@@ -701,6 +701,47 @@ def test_apprise_cli_details(tmpdir):
             return True
 
     SCHEMA_MAP['req03'] = TestReq03Notification
+
+    # This is a made up class that is just used to verify
+    class TestReq04Notification(NotifyBase):
+        """
+        This class is used to test a case where our requirements is fixed
+        to a None
+        """
+
+        # This is the same as saying there are no requirements
+        requirements = None
+
+        def url(self, **kwargs):
+            # Support URL
+            return ''
+
+        def send(self, **kwargs):
+            # Pretend everything is okay (so we don't break other tests)
+            return True
+
+    SCHEMA_MAP['req04'] = TestReq04Notification
+
+    # This is a made up class that is just used to verify
+    class TestReq05Notification(NotifyBase):
+        """
+        This class is used to test a case where only packages_recommended
+        is identified
+        """
+
+        requirements = {
+            'packages_recommended': 'cryptography <= 3.4'
+        }
+
+        def url(self, **kwargs):
+            # Support URL
+            return ''
+
+        def send(self, **kwargs):
+            # Pretend everything is okay (so we don't break other tests)
+            return True
+
+    SCHEMA_MAP['req05'] = TestReq04Notification
 
     class TestDisabled01Notification(NotifyBase):
         """

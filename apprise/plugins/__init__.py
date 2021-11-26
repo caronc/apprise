@@ -508,7 +508,7 @@ def requirements(plugin):
     # Get our package details
     _req_details = plugin.requirements.get('details')
     if not _req_details:
-        if not (_req_packages and _opt_packages):
+        if not (_req_packages or _opt_packages):
             _req_details = _('No dependencies.')
 
         elif _req_packages:

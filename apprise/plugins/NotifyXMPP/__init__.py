@@ -220,15 +220,7 @@ class NotifyXMPP(NotifyBase):
         jid = self.jid
         password = self.password
         if not jid:
-            if not self.user:
-                self.logger.error(
-                    'Invalid JID, must be of the form username@server.')
-                return False
             jid = '{}@{}'.format(self.user, self.host)
-
-        if not self.password:
-            self.logger.error('You must specify a XMPP password')
-            return False
 
         try:
             # Communicate with XMPP.
@@ -270,16 +262,10 @@ class NotifyXMPP(NotifyBase):
 
         default_schema = self.secure_protocol if self.secure else self.protocol
 
-        if self.user and self.password:
-            auth = '{user}:{password}'.format(
-                user=NotifyXMPP.quote(self.user, safe=''),
-                password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=''))
-
-        else:
-            auth = self.pprint(
-                self.password if self.password else self.user, privacy,
-                mode=PrivacyMode.Secret, safe='')
+        auth = '{user}:{password}'.format(
+            user=NotifyXMPP.quote(self.user, safe=''),
+            password=self.pprint(
+                self.password, privacy, mode=PrivacyMode.Secret, safe=''))
 
         return '{schema}://{auth}@{hostname}{port}/{jids}?{params}'.format(
             auth=auth,

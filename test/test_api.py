@@ -1316,6 +1316,28 @@ def test_apprise_details():
 
     SCHEMA_MAP['req04'] = TestReq04Notification
 
+    # This is a made up class that is just used to verify
+    class TestReq05Notification(NotifyBase):
+        """
+        This class is used to test a case where only packages_recommended
+        is identified
+        """
+
+        requirements = {
+            # We can set a string value as well (it does not have to be a list)
+            'packages_recommended': 'cryptography <= 3.4'
+        }
+
+        def url(self, **kwargs):
+            # Support URL
+            return ''
+
+        def send(self, **kwargs):
+            # Pretend everything is okay (so we don't break other tests)
+            return True
+
+    SCHEMA_MAP['req05'] = TestReq05Notification
+
     # Create our Apprise instance
     a = Apprise()
 
@@ -1699,20 +1721,20 @@ def test_apprise_details_plugin_verification():
             if arg not in function_args:
                 # This print statement just makes the error easier to
                 # troubleshoot
-                print('{}:// template/arg/func reference missing error.'
-                      .format(protocols[0]))
-            assert arg in function_args
+                raise AssertionError(
+                    '{}.__init__() expects a {}=None entry according to '
+                    'template configuration'
+                    .format(SCHEMA_MAP[protocols[0]].__name__, arg))
 
         # Iterate over all of the function arguments and make sure that
         # it maps back to a key
         function_args -= valid_kwargs
         for arg in function_args:
             if arg not in map_to_entries:
-                # This print statement just makes the error easier to
-                # troubleshoot
-                print('{}:// template/func/arg reference missing error.'
-                      .format(protocols[0]))
-            assert arg in map_to_entries
+                raise AssertionError(
+                    '{}.__init__({}) found but not defined in the '
+                    'template configuration'
+                    .format(SCHEMA_MAP[protocols[0]].__name__, arg))
 
         # Iterate over our map_to_aliases and make sure they were defined in
         # either the as a token or arg
