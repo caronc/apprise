@@ -169,6 +169,10 @@ class NotifyFCM(NotifyBase):
             'values': FCM_MODES,
             'default': FCMMode.Legacy,
         },
+        'image': {
+            'name': _('Image URL'),
+            'type': 'string',
+        },
         'project': {
             'name': _('Project ID'),
             'type': 'string',
@@ -206,7 +210,7 @@ class NotifyFCM(NotifyBase):
     }
 
     def __init__(self, project, apikey, targets=None, mode=None, keyfile=None,
-                 data_kwargs=None, **kwargs):
+                 data_kwargs=None, image=None, **kwargs):
         """
         Initialize Firebase Cloud Messaging
 
@@ -280,6 +284,11 @@ class NotifyFCM(NotifyBase):
         self.data_kwargs = {}
         if isinstance(data_kwargs, dict):
             self.data_kwargs.update(data_kwargs)
+
+        # Image URL
+        # FCM allows you to provide a remote https?:// URL to an image located
+        # on the internet that it will download and include in the payload
+        self.image = image
 
         return
 
@@ -366,6 +375,9 @@ class NotifyFCM(NotifyBase):
                     }
                 }
 
+                if self.image:
+                    payload['message']['notification']['image'] = self.image
+
                 if self.data_kwargs:
                     payload['message']['data'] = self.data_kwargs
 
@@ -384,12 +396,14 @@ class NotifyFCM(NotifyBase):
             else:  # FCMMode.Legacy
                 payload = {
                     'notification': {
-                        'notification': {
-                            'title': title,
-                            'body': body,
-                        }
+                        'title': title,
+                        'body': body,
                     }
                 }
+
+                if self.image:
+                    payload['notification']['image'] = \
+                        self.image
 
                 if self.data_kwargs:
                     payload['data'] = self.data_kwargs
@@ -471,6 +485,10 @@ class NotifyFCM(NotifyBase):
             params['keyfile'] = NotifyFCM.quote(
                 self.keyfile[0].url(privacy=privacy), safe='')
 
+        if self.image:
+            # Include our image path as part of our URL payload
+            params['image'] = self.image
+
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
@@ -531,6 +549,11 @@ class NotifyFCM(NotifyBase):
         if 'keyfile' in results['qsd'] and results['qsd']['keyfile']:
             results['keyfile'] = \
                 NotifyFCM.unquote(results['qsd']['keyfile'])
+
+        # Extract image url if it was specified
+        if 'image' in results['qsd']:
+            results['image'] = \
+                NotifyFCM.unquote(results['qsd']['image'])
 
         # Store our data keyword/args if specified
         results['data_kwargs'] = results['qsd+']

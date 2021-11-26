@@ -101,6 +101,11 @@ apprise_url_tests = (
         # Test apikey= to=
         'instance': plugins.NotifyFCM,
     }),
+    ('fcm://?apikey=abc123&to=device'
+        '&image=http://example.com/interesting.jpg', {
+            # Test apikey= to=
+            'instance': plugins.NotifyFCM}),
+
     ('fcm://?apikey=abc123&to=device&+key=value&+key2=value2', {
         # Test apikey= to= and data arguments
         'instance': plugins.NotifyFCM,
@@ -242,7 +247,8 @@ def test_plugin_fcm_general(mock_post):
     # Now we test using a valid Project ID and data parameters
     obj = Apprise.instantiate(
         'fcm://mock-project-id/device/#topic/?keyfile={}'
-        '&+key=value&+key2=value2'.format(str(path)))
+        '&+key=value&+key2=value2'
+        '&image=https://example.com/interesting.png'.format(str(path)))
 
     # we'll fail as a result
     assert obj.notify("test") is True
@@ -264,6 +270,12 @@ def test_plugin_fcm_general(mock_post):
     assert data['message']['data']['key'] == 'value'
     assert 'key2' in data['message']['data']
     assert data['message']['data']['key2'] == 'value2'
+
+    assert 'notification' in data['message']
+    assert isinstance(data['message']['notification'], dict)
+    assert 'image' in data['message']['notification']
+    assert data['message']['notification']['image'] == \
+        'https://example.com/interesting.png'
 
     assert mock_post.call_args_list[2][0][0] == \
         'https://fcm.googleapis.com/v1/projects/mock-project-id/messages:send'
