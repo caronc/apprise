@@ -419,13 +419,15 @@ class NotifyFCM(NotifyBase):
             else:  # FCMMode.Legacy
                 payload = {
                     'notification': {
-                        'title': title,
-                        'body': body,
+                        'notification': {
+                            'title': title,
+                            'body': body,
+                        }
                     }
                 }
 
                 if self.include_image and image:
-                    payload['notification']['image'] = image
+                    payload['notification']['notification']['image'] = image
 
                 if self.data_kwargs:
                     payload['data'] = self.data_kwargs

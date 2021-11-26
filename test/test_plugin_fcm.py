@@ -237,8 +237,10 @@ def test_plugin_fcm_general_legacy(mock_post):
 
     assert 'notification' in data
     assert isinstance(data['notification'], dict)
-    assert 'image' in data['notification']
-    assert data['notification']['image'] == \
+    assert 'notification' in data['notification']
+    assert isinstance(data['notification']['notification'], dict)
+    assert 'image' in data['notification']['notification']
+    assert data['notification']['notification']['image'] == \
         'https://example.com/interesting.png'
 
 
