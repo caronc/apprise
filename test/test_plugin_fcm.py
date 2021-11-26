@@ -42,6 +42,9 @@ from helpers import AppriseURLTester
 
 try:
     from apprise.plugins.NotifyFCM.oauth import GoogleOAuth
+    from apprise.plugins.NotifyFCM.common import FCM_MODES
+    from apprise.plugins.NotifyFCM.priority import (
+        FCMPriorityManager, FCM_PRIORITIES)
     from cryptography.exceptions import UnsupportedAlgorithm
 
 except ImportError:
@@ -214,7 +217,7 @@ def test_plugin_fcm_general_legacy(mock_post):
 
     # A valid Legacy URL
     obj = Apprise.instantiate(
-        'fcm://abc123/&to=device'
+        'fcm://abc123/device/'
         '?+key=value&+key2=value2'
         '&image_url=https://example.com/interesting.png')
 
@@ -242,6 +245,35 @@ def test_plugin_fcm_general_legacy(mock_post):
     assert 'image' in data['notification']['notification']
     assert data['notification']['notification']['image'] == \
         'https://example.com/interesting.png'
+
+    #
+    # Test priorities
+    #
+    mock_post.reset_mock()
+    obj = Apprise.instantiate(
+        'fcm://abc123/device/?priority=low')
+    assert mock_post.call_count == 0
+
+    # Send our notification
+    assert obj.notify(title="title", body="body") is True
+
+    # Test our call count
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://fcm.googleapis.com/fcm/send'
+
+    payload = mock_post.mock_calls[0][2]
+    data = json.loads(payload['data'])
+    assert 'data' not in data
+    assert 'notification' in data
+    assert isinstance(data['notification'], dict)
+    assert 'notification' in data['notification']
+    assert isinstance(data['notification']['notification'], dict)
+    assert 'image' not in data['notification']['notification']
+    assert 'priority' in data
+
+    # legacy can only switch between high/low
+    assert data['priority'] == "normal"
 
 
 @pytest.mark.skipif(
@@ -311,6 +343,7 @@ def test_plugin_fcm_general_oauth(mock_post):
         'fcm://mock-project-id/device/#topic/?keyfile={}'
         '&+key=value&+key2=value2'
         '&image_url=https://example.com/interesting.png'.format(str(path)))
+    assert mock_post.call_count == 0
 
     # send our notification
     assert obj.notify("test") is True
@@ -358,6 +391,40 @@ def test_plugin_fcm_general_oauth(mock_post):
     assert 'image' in data['message']['notification']
     assert data['message']['notification']['image'] == \
         'https://example.com/interesting.png'
+
+    #
+    # Test priorities
+    #
+    mock_post.reset_mock()
+    obj = Apprise.instantiate(
+        'fcm://mock-project-id/device/?keyfile={}'
+        '&priority=high'.format(str(path)))
+    assert mock_post.call_count == 0
+
+    # Send our notification
+    assert obj.notify(title="title", body="body") is True
+
+    # Test our call count
+    assert mock_post.call_count == 2
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://accounts.google.com/o/oauth2/token'
+
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://fcm.googleapis.com/v1/projects/mock-project-id/messages:send'
+    payload = mock_post.mock_calls[1][2]
+    data = json.loads(payload['data'])
+    assert 'message' in data
+    assert isinstance(data['message'], dict)
+    assert 'data' not in data['message']
+    assert 'notification' in data['message']
+    assert isinstance(data['message']['notification'], dict)
+    assert 'image' not in data['message']['notification']
+    assert 'image' not in data['message']['notification']
+    assert data['message']['apns']['headers']['apns-priority'] == "10"
+    assert data['message']['webpush']['headers']['Urgency'] == "high"
+    assert data['message']['android']['priority'] == "high"
+    assert data['message']['notification']['notification_priority'] \
+        == "PRIORITY_HIGH"
 
 
 @pytest.mark.skipif(
@@ -566,6 +633,41 @@ def test_plugin_fcm_keyfile_missing_entries_parse(tmpdir):
     path.write('{')
     oauth = GoogleOAuth()
     assert oauth.load(str(path)) is False
+
+
+@pytest.mark.skipif(
+    'cryptography' not in sys.modules, reason="Requires cryptography")
+def test_plugin_fcm_priorities():
+    """
+    NotifyFCM() FCMPriorityManager() Testing
+    """
+
+    for mode in FCM_MODES:
+        for priority in FCM_PRIORITIES:
+            instance = FCMPriorityManager(mode, priority)
+            assert isinstance(instance.payload(), dict)
+            # Verify it's not empty
+            assert bool(instance)
+            assert instance.payload()
+            assert str(instance) == priority
+
+    # We do not have to set a priority
+    instance = FCMPriorityManager(mode)
+    assert isinstance(instance.payload(), dict)
+
+    # Dictionary is empty though
+    assert not bool(instance)
+    assert not instance.payload()
+    assert str(instance) == ''
+
+    with pytest.raises(TypeError):
+        instance = FCMPriorityManager(mode, 'invalid')
+
+    with pytest.raises(TypeError):
+        instance = FCMPriorityManager('invald', 'high')
+
+    # mode validation is done at the higher NotifyFCM() level so
+    # it is not tested here (not required)
 
 
 @pytest.mark.skipif(

@@ -56,6 +56,8 @@ from ...utils import parse_bool
 from ...common import NotifyImageSize
 from ...AppriseAttachment import AppriseAttachment
 from ...AppriseLocale import gettext_lazy as _
+from .common import (FCMMode, FCM_MODES)
+from .priority import (FCM_PRIORITIES, FCMPriorityManager)
 
 # Default our global support flag
 NOTIFY_FCM_SUPPORT_ENABLED = False
@@ -80,26 +82,6 @@ FCM_HTTP_ERROR_MAP = {
     401: 'The provided API Key was not valid.',
     404: 'The token could not be registered.',
 }
-
-
-class FCMMode(object):
-    """
-    Define the Firebase Cloud Messaging Modes
-    """
-    # The legacy way of sending a message
-    Legacy = "legacy"
-
-    # The new API
-    OAuth2 = "oauth2"
-
-
-# FCM Modes
-FCM_MODES = (
-    # Legacy API
-    FCMMode.Legacy,
-    # HTTP v1 URL
-    FCMMode.OAuth2,
-)
 
 
 class NotifyFCM(NotifyBase):
@@ -144,10 +126,6 @@ class NotifyFCM(NotifyBase):
     # The maximum length of the body
     body_maxlen = 1024
 
-    # A title can not be used for SMS Messages.  Setting this to zero will
-    # cause any title (if defined) to get placed into the message body.
-    title_maxlen = 0
-
     # Define object templates
     templates = (
         # OAuth2
@@ -167,12 +145,6 @@ class NotifyFCM(NotifyBase):
             'name': _('OAuth2 KeyFile'),
             'type': 'string',
             'private': True,
-        },
-        'mode': {
-            'name': _('Mode'),
-            'type': 'choice:string',
-            'values': FCM_MODES,
-            'default': FCMMode.Legacy,
         },
         'project': {
             'name': _('Project ID'),
@@ -200,6 +172,17 @@ class NotifyFCM(NotifyBase):
         'to': {
             'alias_of': 'targets',
         },
+        'mode': {
+            'name': _('Mode'),
+            'type': 'choice:string',
+            'values': FCM_MODES,
+            'default': FCMMode.Legacy,
+        },
+        'priority': {
+            'name': _('Mode'),
+            'type': 'choice:string',
+            'values': FCM_PRIORITIES,
+        },
         'image_url': {
             'name': _('Custom Image URL'),
             'type': 'string',
@@ -222,7 +205,7 @@ class NotifyFCM(NotifyBase):
 
     def __init__(self, project, apikey, targets=None, mode=None, keyfile=None,
                  data_kwargs=None, image_url=None, include_image=False,
-                 **kwargs):
+                 priority=None, **kwargs):
         """
         Initialize Firebase Cloud Messaging
 
@@ -238,7 +221,7 @@ class NotifyFCM(NotifyBase):
             self.mode = NotifyFCM.template_tokens['mode']['default'] \
                 if not isinstance(mode, six.string_types) else mode.lower()
             if self.mode and self.mode not in FCM_MODES:
-                msg = 'The mode specified ({}) is invalid.'.format(mode)
+                msg = 'The FCM mode specified ({}) is invalid.'.format(mode)
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
@@ -308,6 +291,9 @@ class NotifyFCM(NotifyBase):
         # self.image_url() is reserved as an internal function name; so we
         # jsut store it into a different variable for now
         self.image_src = image_url
+
+        # Initialize our priority
+        self.priority = FCMPriorityManager(self.mode, priority)
 
         return
 
@@ -444,6 +430,18 @@ class NotifyFCM(NotifyBase):
                         "FCM recipient %s parsed as a device token",
                         recipient)
 
+            #
+            # Apply our priority configuration (if set)
+            #
+            def merge(d1, d2):
+                for k in d2:
+                    if k in d1 and isinstance(d1[k], dict) \
+                            and isinstance(d2[k], dict):
+                        merge(d1[k], d2[k])
+                    else:
+                        d1[k] = d2[k]
+            merge(payload, self.priority.payload())
+
             self.logger.debug(
                 'FCM %s POST URL: %s (cert_verify=%r)',
                 self.mode, notify_url, self.verify_certificate,
@@ -504,6 +502,10 @@ class NotifyFCM(NotifyBase):
             'mode': self.mode,
             'image': 'yes' if self.include_image else 'no',
         }
+
+        if self.priority:
+            # Store our priority if one was defined
+            params['priority'] = str(self.priority)
 
         if self.keyfile:
             # Include our keyfile if specified
@@ -574,6 +576,11 @@ class NotifyFCM(NotifyBase):
         if 'keyfile' in results['qsd'] and results['qsd']['keyfile']:
             results['keyfile'] = \
                 NotifyFCM.unquote(results['qsd']['keyfile'])
+
+        # Our Priority
+        if 'priority' in results['qsd'] and results['qsd']['priority']:
+            results['priority'] = \
+                NotifyFCM.unquote(results['qsd']['priority'])
 
         # Boolean to include an image or not
         results['include_image'] = parse_bool(results['qsd'].get(
