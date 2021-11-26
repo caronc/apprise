@@ -174,10 +174,6 @@ class NotifyFCM(NotifyBase):
             'values': FCM_MODES,
             'default': FCMMode.Legacy,
         },
-        'image_src': {
-            'name': _('Image URL'),
-            'type': 'string',
-        },
         'project': {
             'name': _('Project ID'),
             'type': 'string',
@@ -207,12 +203,12 @@ class NotifyFCM(NotifyBase):
         'image_url': {
             'name': _('Custom Image URL'),
             'type': 'string',
-            'map_to': 'image_url',
         },
         'image': {
             'name': _('Include Image'),
             'type': 'bool',
             'default': False,
+            'map_to': 'include_image',
         },
     })
 
