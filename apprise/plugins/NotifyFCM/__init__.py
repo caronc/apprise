@@ -52,6 +52,8 @@ from ..NotifyBase import NotifyBase
 from ...common import NotifyType
 from ...utils import validate_regex
 from ...utils import parse_list
+from ...utils import parse_bool
+from ...common import NotifyImageSize
 from ...AppriseAttachment import AppriseAttachment
 from ...AppriseLocale import gettext_lazy as _
 
@@ -136,6 +138,9 @@ class NotifyFCM(NotifyBase):
     # If it is more than this, then it is not accepted.
     max_fcm_keyfile_size = 5000
 
+    # Allows the user to specify the NotifyImageSize object
+    image_size = NotifyImageSize.XY_256
+
     # The maximum length of the body
     body_maxlen = 1024
 
@@ -169,7 +174,7 @@ class NotifyFCM(NotifyBase):
             'values': FCM_MODES,
             'default': FCMMode.Legacy,
         },
-        'image': {
+        'image_src': {
             'name': _('Image URL'),
             'type': 'string',
         },
@@ -199,6 +204,16 @@ class NotifyFCM(NotifyBase):
         'to': {
             'alias_of': 'targets',
         },
+        'image_url': {
+            'name': _('Custom Image URL'),
+            'type': 'string',
+            'map_to': 'image_url',
+        },
+        'image': {
+            'name': _('Include Image'),
+            'type': 'bool',
+            'default': False,
+        },
     })
 
     # Define our data entry
@@ -210,7 +225,8 @@ class NotifyFCM(NotifyBase):
     }
 
     def __init__(self, project, apikey, targets=None, mode=None, keyfile=None,
-                 data_kwargs=None, image=None, **kwargs):
+                 data_kwargs=None, image_url=None, include_image=False,
+                 **kwargs):
         """
         Initialize Firebase Cloud Messaging
 
@@ -285,10 +301,17 @@ class NotifyFCM(NotifyBase):
         if isinstance(data_kwargs, dict):
             self.data_kwargs.update(data_kwargs)
 
-        # Image URL
-        # FCM allows you to provide a remote https?:// URL to an image located
-        # on the internet that it will download and include in the payload
-        self.image = image
+        # Include the image as part of the payload
+        self.include_image = include_image
+
+        # A Custom Image URL
+        # FCM allows you to provide a remote https?:// URL to an image_url
+        # located on the internet that it will download and include in the
+        # payload.
+        #
+        # self.image_url() is reserved as an internal function name; so we
+        # jsut store it into a different variable for now
+        self.image_src = image_url
 
         return
 
@@ -358,6 +381,10 @@ class NotifyFCM(NotifyBase):
             # Prepare our notify URL
             notify_url = self.notify_legacy_url
 
+        # Acquire image url
+        image = self.image_url(notify_type) \
+            if not self.image_src else self.image_src
+
         has_error = False
         # Create a copy of the targets list
         targets = list(self.targets)
@@ -375,8 +402,8 @@ class NotifyFCM(NotifyBase):
                     }
                 }
 
-                if self.image:
-                    payload['message']['notification']['image'] = self.image
+                if self.include_image and image:
+                    payload['message']['notification']['image'] = image
 
                 if self.data_kwargs:
                     payload['message']['data'] = self.data_kwargs
@@ -401,9 +428,8 @@ class NotifyFCM(NotifyBase):
                     }
                 }
 
-                if self.image:
-                    payload['notification']['image'] = \
-                        self.image
+                if self.include_image and image:
+                    payload['notification']['image'] = image
 
                 if self.data_kwargs:
                     payload['data'] = self.data_kwargs
@@ -478,6 +504,7 @@ class NotifyFCM(NotifyBase):
         # Define any URL parameters
         params = {
             'mode': self.mode,
+            'image': 'yes' if self.include_image else 'no',
         }
 
         if self.keyfile:
@@ -485,9 +512,9 @@ class NotifyFCM(NotifyBase):
             params['keyfile'] = NotifyFCM.quote(
                 self.keyfile[0].url(privacy=privacy), safe='')
 
-        if self.image:
+        if self.image_src:
             # Include our image path as part of our URL payload
-            params['image'] = self.image
+            params['image_url'] = self.image_src
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
@@ -550,10 +577,18 @@ class NotifyFCM(NotifyBase):
             results['keyfile'] = \
                 NotifyFCM.unquote(results['qsd']['keyfile'])
 
-        # Extract image url if it was specified
-        if 'image' in results['qsd']:
-            results['image'] = \
-                NotifyFCM.unquote(results['qsd']['image'])
+        # Boolean to include an image or not
+        results['include_image'] = parse_bool(results['qsd'].get(
+            'image', NotifyFCM.template_args['image']['default']))
+
+        # Extract image_url if it was specified
+        if 'image_url' in results['qsd']:
+            results['image_url'] = \
+                NotifyFCM.unquote(results['qsd']['image_url'])
+            if 'image' not in results['qsd']:
+                # Toggle default behaviour if a custom image was provided
+                # but ONLY if the `image` boolean was not set
+                results['include_image'] = True
 
         # Store our data keyword/args if specified
         results['data_kwargs'] = results['qsd+']

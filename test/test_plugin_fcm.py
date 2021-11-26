@@ -22,6 +22,13 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
+#
+# Great Resources:
+# - Dev/Legacy API:
+#    https://firebase.google.com/docs/cloud-messaging/http-server-ref
+# - Legacy API (v1) -> OAuth
+# - https://firebase.google.com/docs/cloud-messaging/migrate-v1
+
 import io
 import os
 import sys
@@ -101,11 +108,18 @@ apprise_url_tests = (
         # Test apikey= to=
         'instance': plugins.NotifyFCM,
     }),
+    ('fcm://?apikey=abc123&to=device&image=yes', {
+        # Test image boolean
+        'instance': plugins.NotifyFCM,
+    }),
     ('fcm://?apikey=abc123&to=device'
-        '&image=http://example.com/interesting.jpg', {
-            # Test apikey= to=
+        '&image_url=http://example.com/interesting.jpg', {
+            # Test image_url
             'instance': plugins.NotifyFCM}),
-
+    ('fcm://?apikey=abc123&to=device'
+        '&image_url=http://example.com/interesting.jpg&image=no', {
+            # Test image_url but set to no
+            'instance': plugins.NotifyFCM}),
     ('fcm://?apikey=abc123&to=device&+key=value&+key2=value2', {
         # Test apikey= to= and data arguments
         'instance': plugins.NotifyFCM,
@@ -185,9 +199,55 @@ def test_plugin_fcm_urls():
 @pytest.mark.skipif(
     'cryptography' not in sys.modules, reason="Requires cryptography")
 @mock.patch('requests.post')
-def test_plugin_fcm_general(mock_post):
+def test_plugin_fcm_general_legacy(mock_post):
     """
-    NotifyFCM() General Checks
+    NotifyFCM() General Legacy/APIKey Checks
+
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.request_rate_per_sec = 0
+
+    # Prepare a good response
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    mock_post.return_value = response
+
+    # A valid Legacy URL
+    obj = Apprise.instantiate(
+        'fcm://abc123/&to=device'
+        '?+key=value&+key2=value2'
+        '&image_url=https://example.com/interesting.png')
+
+    # Send our notification
+    assert obj.notify("test") is True
+
+    # Test our call count
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://fcm.googleapis.com/fcm/send'
+
+    payload = mock_post.mock_calls[0][2]
+    data = json.loads(payload['data'])
+    assert 'data' in data
+    assert isinstance(data, dict)
+    assert 'key' in data['data']
+    assert data['data']['key'] == 'value'
+    assert 'key2' in data['data']
+    assert data['data']['key2'] == 'value2'
+
+    assert 'notification' in data
+    assert isinstance(data['notification'], dict)
+    assert 'image' in data['notification']
+    assert data['notification']['image'] == \
+        'https://example.com/interesting.png'
+
+
+@pytest.mark.skipif(
+    'cryptography' not in sys.modules, reason="Requires cryptography")
+@mock.patch('requests.post')
+def test_plugin_fcm_general_oauth(mock_post):
+    """
+    NotifyFCM() General OAuth Checks
 
     """
 
@@ -231,7 +291,7 @@ def test_plugin_fcm_general(mock_post):
     obj = Apprise.instantiate(
         'fcm://mock-project-id/device/#topic/?keyfile={}'.format(str(path)))
 
-    # we'll fail as a result
+    # send our notification
     assert obj.notify("test") is True
 
     # Test our call count
@@ -248,9 +308,9 @@ def test_plugin_fcm_general(mock_post):
     obj = Apprise.instantiate(
         'fcm://mock-project-id/device/#topic/?keyfile={}'
         '&+key=value&+key2=value2'
-        '&image=https://example.com/interesting.png'.format(str(path)))
+        '&image_url=https://example.com/interesting.png'.format(str(path)))
 
-    # we'll fail as a result
+    # send our notification
     assert obj.notify("test") is True
 
     # Test our call count
@@ -290,6 +350,12 @@ def test_plugin_fcm_general(mock_post):
     assert data['message']['data']['key'] == 'value'
     assert 'key2' in data['message']['data']
     assert data['message']['data']['key2'] == 'value2'
+
+    assert 'notification' in data['message']
+    assert isinstance(data['message']['notification'], dict)
+    assert 'image' in data['message']['notification']
+    assert data['message']['notification']['image'] == \
+        'https://example.com/interesting.png'
 
 
 @pytest.mark.skipif(
