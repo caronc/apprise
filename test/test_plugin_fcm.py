@@ -101,6 +101,10 @@ apprise_url_tests = (
         # Test apikey= to=
         'instance': plugins.NotifyFCM,
     }),
+    ('fcm://?apikey=abc123&to=device&+key=value&+key2=value2', {
+        # Test apikey= to= and data arguments
+        'instance': plugins.NotifyFCM,
+    }),
     ('fcm://%20?to=device&keyfile=/invalid/path', {
         # invalid Project ID
         'instance': TypeError,
@@ -233,6 +237,47 @@ def test_plugin_fcm_general(mock_post):
         'https://fcm.googleapis.com/v1/projects/mock-project-id/messages:send'
     assert mock_post.call_args_list[2][0][0] == \
         'https://fcm.googleapis.com/v1/projects/mock-project-id/messages:send'
+
+    mock_post.reset_mock()
+    # Now we test using a valid Project ID and data parameters
+    obj = Apprise.instantiate(
+        'fcm://mock-project-id/device/#topic/?keyfile={}'
+        '&+key=value&+key2=value2'.format(str(path)))
+
+    # we'll fail as a result
+    assert obj.notify("test") is True
+
+    # Test our call count
+    assert mock_post.call_count == 3
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://accounts.google.com/o/oauth2/token'
+
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://fcm.googleapis.com/v1/projects/mock-project-id/messages:send'
+    payload = mock_post.mock_calls[1][2]
+    data = json.loads(payload['data'])
+    assert 'message' in data
+    assert isinstance(data['message'], dict)
+    assert 'data' in data['message']
+    assert isinstance(data['message']['data'], dict)
+    assert 'key' in data['message']['data']
+    assert data['message']['data']['key'] == 'value'
+    assert 'key2' in data['message']['data']
+    assert data['message']['data']['key2'] == 'value2'
+
+    assert mock_post.call_args_list[2][0][0] == \
+        'https://fcm.googleapis.com/v1/projects/mock-project-id/messages:send'
+
+    payload = mock_post.mock_calls[2][2]
+    data = json.loads(payload['data'])
+    assert 'message' in data
+    assert isinstance(data['message'], dict)
+    assert 'data' in data['message']
+    assert isinstance(data['message']['data'], dict)
+    assert 'key' in data['message']['data']
+    assert data['message']['data']['key'] == 'value'
+    assert 'key2' in data['message']['data']
+    assert data['message']['data']['key2'] == 'value2'
 
 
 @pytest.mark.skipif(

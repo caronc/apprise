@@ -197,8 +197,16 @@ class NotifyFCM(NotifyBase):
         },
     })
 
+    # Define our data entry
+    template_kwargs = {
+        'data_kwargs': {
+            'name': _('Data Entries'),
+            'prefix': '+',
+        },
+    }
+
     def __init__(self, project, apikey, targets=None, mode=None, keyfile=None,
-                 **kwargs):
+                 data_kwargs=None, **kwargs):
         """
         Initialize Firebase Cloud Messaging
 
@@ -267,6 +275,12 @@ class NotifyFCM(NotifyBase):
 
         # Acquire Device IDs to notify
         self.targets = parse_list(targets)
+
+        # Our data Keyword/Arguments to include in our outbound payload
+        self.data_kwargs = {}
+        if isinstance(data_kwargs, dict):
+            self.data_kwargs.update(data_kwargs)
+
         return
 
     @property
@@ -352,6 +366,9 @@ class NotifyFCM(NotifyBase):
                     }
                 }
 
+                if self.data_kwargs:
+                    payload['message']['data'] = self.data_kwargs
+
                 if recipient[0] == '#':
                     payload['message']['topic'] = recipient[1:]
                     self.logger.debug(
@@ -373,6 +390,10 @@ class NotifyFCM(NotifyBase):
                         }
                     }
                 }
+
+                if self.data_kwargs:
+                    payload['data'] = self.data_kwargs
+
                 if recipient[0] == '#':
                     payload['to'] = '/topics/{}'.format(recipient)
                     self.logger.debug(
@@ -453,6 +474,10 @@ class NotifyFCM(NotifyBase):
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
+        # Add our data keyword/args into our URL response
+        params.update(
+            {'+{}'.format(k): v for k, v in self.data_kwargs.items()})
+
         reference = NotifyFCM.quote(self.project) \
             if self.mode == FCMMode.OAuth2 \
             else self.pprint(self.apikey, privacy, safe='')
@@ -506,5 +531,8 @@ class NotifyFCM(NotifyBase):
         if 'keyfile' in results['qsd'] and results['qsd']['keyfile']:
             results['keyfile'] = \
                 NotifyFCM.unquote(results['qsd']['keyfile'])
+
+        # Store our data keyword/args if specified
+        results['data_kwargs'] = results['qsd+']
 
         return results
