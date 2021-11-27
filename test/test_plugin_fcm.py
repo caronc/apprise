@@ -687,3 +687,26 @@ def test_plugin_fcm_cryptography_import_error():
 
     # It's not possible because our cryptography depedancy is missing
     assert obj is None
+
+
+@pytest.mark.skipif(
+    'cryptography' not in sys.modules, reason="Requires cryptography")
+@mock.patch('requests.post')
+def test_plugin_fcm_edge_cases(mock_post):
+    """
+    NotifyFCM() Edge Cases
+
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.request_rate_per_sec = 0
+
+    # Prepare a good response
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    mock_post.return_value = response
+
+    # this tests an edge case where verify if the data_kwargs is a dictionary
+    # or not.  Below, we don't even define it, so it will be None (causing
+    # the check to go).  We'll still correctly instantiate a plugin:
+    obj = plugins.NotifyFCM("project", "api:123", targets='device')
+    assert obj is not None
