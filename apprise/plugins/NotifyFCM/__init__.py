@@ -58,6 +58,7 @@ from ...AppriseAttachment import AppriseAttachment
 from ...AppriseLocale import gettext_lazy as _
 from .common import (FCMMode, FCM_MODES)
 from .priority import (FCM_PRIORITIES, FCMPriorityManager)
+from .color import FCMColorManager
 
 # Default our global support flag
 NOTIFY_FCM_SUPPORT_ENABLED = False
@@ -193,6 +194,13 @@ class NotifyFCM(NotifyBase):
             'default': False,
             'map_to': 'include_image',
         },
+        # Color can either be yes, no, or a #rrggbb (
+        # rrggbb without hashtag is accepted to)
+        'color': {
+            'name': _('Notification Color'),
+            'type': 'string',
+            'default': 'yes',
+        },
     })
 
     # Define our data entry
@@ -205,7 +213,7 @@ class NotifyFCM(NotifyBase):
 
     def __init__(self, project, apikey, targets=None, mode=None, keyfile=None,
                  data_kwargs=None, image_url=None, include_image=False,
-                 priority=None, **kwargs):
+                 color=None, priority=None, **kwargs):
         """
         Initialize Firebase Cloud Messaging
 
@@ -295,6 +303,8 @@ class NotifyFCM(NotifyBase):
         # Initialize our priority
         self.priority = FCMPriorityManager(self.mode, priority)
 
+        # Initialize our color
+        self.color = FCMColorManager(color, asset=self.asset)
         return
 
     @property
@@ -384,6 +394,11 @@ class NotifyFCM(NotifyBase):
                     }
                 }
 
+                if self.color:
+                    # Acquire our color
+                    payload['message']['notification']['color'] = \
+                        self.color.get(notify_type)
+
                 if self.include_image and image:
                     payload['message']['notification']['image'] = image
 
@@ -411,6 +426,11 @@ class NotifyFCM(NotifyBase):
                         }
                     }
                 }
+
+                if self.color:
+                    # Acquire our color
+                    payload['notification']['notification']['color'] = \
+                        self.color.get(notify_type)
 
                 if self.include_image and image:
                     payload['notification']['notification']['image'] = image
@@ -501,6 +521,7 @@ class NotifyFCM(NotifyBase):
         params = {
             'mode': self.mode,
             'image': 'yes' if self.include_image else 'no',
+            'color': str(self.color),
         }
 
         if self.priority:
@@ -581,6 +602,11 @@ class NotifyFCM(NotifyBase):
         if 'priority' in results['qsd'] and results['qsd']['priority']:
             results['priority'] = \
                 NotifyFCM.unquote(results['qsd']['priority'])
+
+        # Our Color
+        if 'color' in results['qsd'] and results['qsd']['color']:
+            results['color'] = \
+                NotifyFCM.unquote(results['qsd']['color'])
 
         # Boolean to include an image or not
         results['include_image'] = parse_bool(results['qsd'].get(
