@@ -828,6 +828,15 @@ def test_plugin_fcm_colors():
     # str() response does not include hashtag
     assert str(instance) == 'a2b3a4'
 
+    # Custom color (no hashtag) but only using 3 letter rgb values
+    instance = FCMColorManager('AC4')
+    assert isinstance(instance.get(), six.string_types)
+    # Hashtag is always part of output
+    assert instance.get() == '#aacc44'
+    assert bool(instance) is True
+    # str() response does not include hashtag
+    assert str(instance) == 'aacc44'
+
 
 @pytest.mark.skipif(
     'cryptography' in sys.modules,
