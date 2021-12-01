@@ -444,6 +444,9 @@ class NotifyDiscord(NotifyBase):
             'fields': 'yes' if self.fields else 'no',
         }
 
+        if self.avatar_url:
+            params['avatar_url'] = self.avatar_url
+
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
