@@ -58,7 +58,7 @@ SparkPost, Super Toasty, Streamlabs, Stride, Syslog, Techulus Push, Telegram,
 Twilio, Twitter, Twist, XBMC, XMPP, Webex Teams}
 
 Name:           python-%{pypi_name}
-Version:        0.9.5.1
+Version:        0.9.6
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        MIT
@@ -145,12 +145,6 @@ BuildRequires: python%{python3_pkgversion}-requests-oauthlib
 BuildRequires: python%{python3_pkgversion}-six
 BuildRequires: python%{python3_pkgversion}-click >= 5.0
 BuildRequires: python%{python3_pkgversion}-markdown
-%if (0%{?rhel} && 0%{?rhel} >= 8) || (0%{?fedora} && 0%{?fedora} >= 35)
-# gntp isn't available from EPEL for RHEL/CentOS 8 or Fedora 35+
-%else
-# For all other distributions, include gntp
-BuildRequires: python%{python3_pkgversion}-gntp
-%endif
 BuildRequires: python%{python3_pkgversion}-yaml
 BuildRequires: python%{python3_pkgversion}-babel
 BuildRequires: python%{python3_pkgversion}-cryptography
@@ -159,12 +153,6 @@ Requires: python%{python3_pkgversion}-requests-oauthlib
 Requires: python%{python3_pkgversion}-six
 Requires: python%{python3_pkgversion}-markdown
 Requires: python%{python3_pkgversion}-cryptography
-%if (0%{?rhel} && 0%{?rhel} >= 8) || (0%{?fedora} && 0%{?fedora} >= 35)
-# gntp isn't available from EPEL for RHEL/CentOS 8 or Fedora 35+
-%else
-# For all other distributions, include gntp
-Requires: python%{python3_pkgversion}-gntp
-%endif
 Requires: python%{python3_pkgversion}-yaml
 
 %if %{with tests}
@@ -248,6 +236,9 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 %endif
 
 %changelog
+* Wed Dec  1 2021 Chris Caron <lead2gold@gmail.com> - 0.9.6-1
+- Updated to v0.9.6
+
 * Sat Sep 18 2021 Chris Caron <lead2gold@gmail.com> - 0.9.5.1-2
 - Updated to v0.9.5.1
 

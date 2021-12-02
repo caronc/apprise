@@ -6,16 +6,22 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: apprise 0.9.5.1\n"
+"Project-Id-Version: apprise 0.9.6\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2021-09-18 16:01-0400\n"
+"POT-Creation-Date: 2021-12-01 18:56-0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.8.1\n"
+"Generated-By: Babel 2.9.1\n"
+
+msgid "A local Gnome environment is required."
+msgstr ""
+
+msgid "A local Microsoft Windows environment is required."
+msgstr ""
 
 msgid "API Key"
 msgstr ""
@@ -137,6 +143,9 @@ msgstr ""
 msgid "Cycles"
 msgstr ""
 
+msgid "DBus Notification"
+msgstr ""
+
 msgid "Details"
 msgstr ""
 
@@ -215,6 +224,9 @@ msgstr ""
 msgid "From Phone No"
 msgstr ""
 
+msgid "Gnome Notification"
+msgstr ""
+
 msgid "Group"
 msgstr ""
 
@@ -269,6 +281,9 @@ msgstr ""
 msgid "Long-Lived Access Token"
 msgstr ""
 
+msgid "MacOSX Notification"
+msgstr ""
+
 msgid "Master Key"
 msgstr ""
 
@@ -279,6 +294,9 @@ msgid "Message Hook"
 msgstr ""
 
 msgid "Message Mode"
+msgstr ""
+
+msgid "Message Type"
 msgstr ""
 
 msgid "Modal"
@@ -293,6 +311,9 @@ msgstr ""
 msgid "Name"
 msgstr ""
 
+msgid "No dependencies."
+msgstr ""
+
 msgid "Notification ID"
 msgstr ""
 
@@ -305,6 +326,11 @@ msgstr ""
 msgid "OAuth2 KeyFile"
 msgstr ""
 
+msgid ""
+"Only works with Mac OS X 10.8 and higher. Additionally  requires that "
+"/usr/local/bin/terminal-notifier is locally accessible."
+msgstr ""
+
 msgid "Organization"
 msgstr ""
 
@@ -312,6 +338,12 @@ msgid "Originating Address"
 msgstr ""
 
 msgid "Overflow Mode"
+msgstr ""
+
+msgid "Packages are recommended to improve functionality."
+msgstr ""
+
+msgid "Packages are required to function."
 msgstr ""
 
 msgid "Password"
@@ -387,6 +419,9 @@ msgid "Server Key"
 msgstr ""
 
 msgid "Server Timeout"
+msgstr ""
+
+msgid "Silent Notification"
 msgstr ""
 
 msgid "Socket Connect Timeout"
@@ -542,10 +577,19 @@ msgstr ""
 msgid "Token C"
 msgstr ""
 
+msgid "URL"
+msgstr ""
+
+msgid "URL Title"
+msgstr ""
+
 msgid "Urgency"
 msgstr ""
 
 msgid "Use Avatar"
+msgstr ""
+
+msgid "Use Blocks"
 msgstr ""
 
 msgid "Use Fields"
@@ -578,6 +622,9 @@ msgstr ""
 msgid "Web Based"
 msgstr ""
 
+msgid "Web Page Preview"
+msgstr ""
+
 msgid "Webhook"
 msgstr ""
 
@@ -603,6 +650,9 @@ msgid "XEP"
 msgstr ""
 
 msgid "Y-Axis"
+msgstr ""
+
+msgid "libdbus-1.so.x must be installed."
 msgstr ""
 
 msgid "ttl"
