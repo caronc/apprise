@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2019 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2021 Chris Caron <lead2gold@gmail.com>
 # All rights reserved.
 #
 # This code is licensed under the MIT License.
@@ -24,21 +24,78 @@
 # THE SOFTWARE.
 
 # API Information:
-# - https://docs.aws.amazon.com/ses/latest/APIReference-V2/API_SendEmail.html
+# - https://docs.aws.amazon.com/ses/latest/APIReference/API_SendRawEmail.html
 #
+# AWS Credentials (access_key and secret_access_key)
+# - https://docs.aws.amazon.com/sdk-for-java/v1/developer-guide/\
+#       setup-credentials.html
+# - https://docs.aws.amazon.com/toolkit-for-eclipse/v1/user-guide/\
+#       setup-credentials.html
+#
+#      Other systems write these credentials to:
+#        -  ~/.aws/credentials on Linux, macOS, or Unix
+#        -  C:\Users\USERNAME\.aws\credentials on Windows
+#
+#
+#      To get A users access key ID and secret access key
+#
+#        1. Open the IAM console: https://console.aws.amazon.com/iam/home
+#        2. On the navigation menu, choose Users.
+#        3. Choose your IAM user name (not the check box).
+#        4. Open the Security credentials tab, and then choose:
+#             Create Access key - Programmatic access
+#        5. To see the new access key, choose Show. Your credentials resemble
+#           the following:
+#               Access key ID: AKIAIOSFODNN7EXAMPLE
+#               Secret access key: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+#
+#      To download the key pair, choose Download .csv file. Store the keys
+#      The account requries this permssion to 'SES v2 : SendEmail' in order to
+#      work
+#
+#      To get the root users account (if you're logged in as that) you can
+#      visit: https://console.aws.amazon.com/iam/home#/\
+#                 security_credentials$access_key
+#
+#    This information is vital to work with SES
+
+
+# To use/test the service, i logged into the portal via:
+#       - https://portal.aws.amazon.com
+#
+# Go to the dashboard of the Amazon SES (Simple Email Service)
+#  1. You must have a verified identity; click on that option and create one
+#     if you don't already have one. Until it's verified, you won't be able to
+#     do the next step.
+#  2. From here you'll be able to retrieve your ARN associated with your
+#     identity you want Apprise to send emails on behalf. It might look
+#     something like:
+#          arn:aws:ses:us-east-2:133216123003:identity/user@example.com
+#
+#  This is your ARN (Amazon Record Name)
+#
+#
+
 import re
 import hmac
+import base64
 import requests
 from hashlib import sha256
 from datetime import datetime
 from collections import OrderedDict
 from xml.etree import ElementTree
-from itertools import chain
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.utils import formataddr
 from email.header import Header
+try:
+    # Python v3.x
+    from urllib.parse import quote
+
+except ImportError:
+    # Python v2.x
+    from urllib import quote
 
 from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
@@ -49,12 +106,10 @@ from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 from ..utils import is_email
 
-# Because our AWS Access Key Secret contains slashes, we actually use the
-# region as a delimiter. This is a bit hacky; but it's much easier than having
-# users of this product search though this Access Key Secret and escape all
-# of the forward slashes!
+# Our Regin Identifier
+# support us-gov-west-1 syntax as well
 IS_REGION = re.compile(
-    r'^\s*(?P<country>[a-z]{2})-(?P<area>[a-z]+)-(?P<no>[0-9]+)\s*$', re.I)
+    r'^\s*(?P<country>[a-z]{2})-(?P<area>[a-z-]+?)-(?P<no>[0-9]+)\s*$', re.I)
 
 # Extend HTTP Error Messages
 AWS_HTTP_ERROR_MAP = {
@@ -86,31 +141,18 @@ class NotifySES(NotifyBase):
     # Default Notify Format
     notify_format = NotifyFormat.HTML
 
-    # A batch size for bulk email handling
-    default_batch_size = 2000
-
-    # A title can not be used for SMS Messages.  Setting this to zero will
-    # cause any title (if defined) to get placed into the message body.
-    title_maxlen = 0
-
     # Define object templates
     templates = (
-        '{schema}://{user}@{host}/{access_key_id}/{secret_access_key}{region}/{targets}',
-        #           ^^^^^^^^^^^^
-        # Amazon requires that the sender email be validated
+        '{schema}://{from_email}/{access_key_id}/{secret_access_key}/'
+        '{region}/{targets}',
     )
 
     # Define our template tokens
     template_tokens = dict(NotifyBase.template_tokens, **{
-        'user': {
-            'name': _('User Name'),
+        'from_email': {
+            'name': _('From Email'),
             'type': 'string',
-            'required': True,
-        },
-        'host': {
-            'name': _('Domain'),
-            'type': 'string',
-            'required': True,
+            'map_to': 'from_addr',
         },
         'access_key_id': {
             'name': _('Access Key ID'),
@@ -127,8 +169,7 @@ class NotifySES(NotifyBase):
         'region': {
             'name': _('Region'),
             'type': 'string',
-            'required': True,
-            'regex': (r'^[a-z]{2}-[a-z]+-[0-9]+$', 'i'),
+            'regex': (r'^[a-z]{2}-[a-z-]+?-[0-9]+$', 'i'),
             'map_to': 'region_name',
         },
         'targets': {
@@ -142,6 +183,9 @@ class NotifySES(NotifyBase):
         'to': {
             'alias_of': 'targets',
         },
+        'from': {
+            'alias_of': 'from_email',
+        },
         'cc': {
             'name': _('Carbon Copy'),
             'type': 'list:string',
@@ -150,16 +194,20 @@ class NotifySES(NotifyBase):
             'name': _('Blind Carbon Copy'),
             'type': 'list:string',
         },
-        'batch': {
-            'name': _('Batch Mode'),
-            'type': 'bool',
-            'default': False,
+        'access': {
+            'alias_of': 'access_key_id',
+        },
+        'secret': {
+            'alias_of': 'secret_access_key',
+        },
+        'region': {
+            'alias_of': 'region',
         },
     })
 
     def __init__(self, access_key_id, secret_access_key, region_name,
-                 from_name=None, targets=None, cc=None, bcc=None, batch=False,
-                 **kwargs):
+                 from_addr=None, from_name=None, targets=None, cc=None,
+                 bcc=None, **kwargs):
         """
         Initialize Notify AWS SES Object
         """
@@ -190,9 +238,6 @@ class NotifySES(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # Prepare Batch Mode Flag
-        self.batch = batch
-
         # Acquire Email 'To'
         self.targets = list()
 
@@ -203,12 +248,12 @@ class NotifySES(NotifyBase):
         self.bcc = set()
 
         # Set our notify_url based on our region
-        self.notify_url = 'https://email.{}.amazonaws.com/'\
+        self.notify_url = 'https://email.{}.amazonaws.com'\
             .format(self.aws_region_name)
 
         # AWS Service Details
         self.aws_service_name = 'ses'
-        self.aws_canonical_uri = '/v2/email/outbound-emails'
+        self.aws_canonical_uri = '/'
 
         # AWS Authentication Details
         self.aws_auth_version = 'AWS4'
@@ -218,12 +263,15 @@ class NotifySES(NotifyBase):
         # Get our From username (if specified)
         self.from_name = from_name
 
-        # Get our from email address
-        self.from_addr = '{user}@{host}'.format(user=self.user, host=self.host)
-
-        if not is_email(self.from_addr):
-            # Parse Source domain based on from_addr
-            msg = 'Invalid ~From~ email format: {}'.format(self.from_addr)
+        if from_addr:
+            self.from_addr = from_addr
+        else:
+            # Get our from email address
+            self.from_addr = '{user}@{host}'.format(
+                user=self.user, host=self.host) if self.user else None
+        if not (self.from_addr and is_email(self.from_addr)):
+            msg = 'An invalid AWS From ({}) was specified.'.format(
+                '{user}@{host}'.format(user=self.user, host=self.host))
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -242,7 +290,7 @@ class NotifySES(NotifyBase):
                     '({}) specified.'.format(recipient),
                 )
 
-        else:
+        elif self.from_addr:
             # If our target email list is empty we want to add ourselves to it
             self.targets.append(
                 (self.from_name if self.from_name else False, self.from_addr))
@@ -296,21 +344,21 @@ class NotifySES(NotifyBase):
         # error tracking (used for function return)
         has_error = False
 
-        try:
-            reply_to = formataddr(
-                (self.from_name if self.from_name else False,
-                 self.from_addr), charset='utf-8')
+        if self.from_addr:
+            # Initialize our default from name
+            from_name = self.from_name if self.from_name else self.app_desc
 
-        except TypeError:
-            # Python v2.x Support (no charset keyword)
-            # Format our cc addresses to support the Name field
-            reply_to = formataddr(
-                (self.from_name if self.from_name else False,
-                 self.from_addr))
+            reply_to = '{} <{}>'.format(
+                quote(from_name, ' '),
+                quote(self.from_addr, '@ '))
 
-        # Initialize our default from name
-        from_name = self.from_name if self.from_name else self.app_desc
+            self.logger.debug('Email From: {}'.format(reply_to))
 
+        else:
+            reply_to = None
+
+        # Create a copy of the targets list
+        emails = list(self.targets)
         while len(emails):
             # Get our email to notify
             to_name, to_addr = emails.pop(0)
@@ -342,8 +390,6 @@ class NotifySES(NotifyBase):
                 bcc = [formataddr(  # pragma: no branch
                     (self.names.get(addr, False), addr)) for addr in bcc]
 
-            self.logger.debug(
-                'Email From: {} <{}>'.format(from_name, self.from_addr))
             self.logger.debug('Email To: {}'.format(to_addr))
             if cc:
                 self.logger.debug('Email Cc: {}'.format(', '.join(cc)))
@@ -357,11 +403,8 @@ class NotifySES(NotifyBase):
             else:
                 content = MIMEText(body, 'plain', 'utf-8')
 
+            # Create a Multipart container if there is an attachment
             base = MIMEMultipart() if attach else content
-
-            # Apply any provided custom headers
-            for k, v in self.headers.items():
-                base[k] = Header(v, 'utf-8')
 
             base['Subject'] = Header(title, 'utf-8')
             try:
@@ -403,8 +446,8 @@ class NotifySES(NotifyBase):
                             attachment.url(privacy=True)))
 
                     with open(attachment.path, "rb") as abody:
-                        app = MIMEApplication(
-                            abody.read(), attachment.mimetype)
+                        app = MIMEApplication(abody.read())
+                        app.set_type(attachment.mimetype)
 
                         app.add_header(
                             'Content-Disposition',
@@ -416,120 +459,26 @@ class NotifySES(NotifyBase):
 
             # Prepare our payload object
             payload = {
-                'Content': {
-                    'Raw': {
-                        'Data': base.as_string()
-                    },
-                }
-                'Destination': {
-                    'BccAddresses': list(bcc),
-                    'CcAddresses': list(Cc),
-                    'ToAddresses': to_addr,
-                },
-                'FromEmailAddress': self.from_addr,
+                'Action': 'SendRawEmail',
+                'Version': '2010-12-01',
+                'RawMessage.Data': base64.b64encode(
+                    base.as_string().encode('utf-8')).decode('utf-8')
             }
 
-            (result, response) = self._post(payload=payload, to=topic)
+            for no, email in enumerate(([to_addr] + bcc + cc), start=1):
+                payload['Destinations.member.{}'.format(no)] = email
+
+            if reply_to:
+                # Specify from address
+                payload['Source'] = reply_to
+
+            (result, response) = self._post(payload=payload, to=to_addr)
             if not result:
                 # Mark our failure
                 has_error = True
                 continue
 
-            self.logger.info(
-                'Sent Email notification to "{}".'.format(to_addr))
-
         return not has_error
-
-        # Prepare our payload
-        # payload = {
-        #     'Body': {},
-        #     'Subject': {
-        #         'Charset': 'utf-8',
-        #         'Data': title if title else 'Apprise Notification',
-        #     }
-        # }
-
-        # if self.notify_format == NotifyFormat.HTML:
-        #     payload['Body']['Html'] = {
-        #         'Charset': 'utf-8',
-        #         'Data': body,
-        #     }
-
-        # else:
-        #     payload['Body']['Text'] = {
-        #         'Charset': 'utf-8',
-        #         'Data': body,
-        #     }
-
-        # # Create a copy of the targets list
-        # emails = list(self.targets)
-
-        # for index in range(0, len(emails), batch_size):
-        #     # Initialize our cc list
-        #     cc = (self.cc - self.bcc)
-
-        #     # Initialize our bcc list
-        #     bcc = set(self.bcc)
-
-        #     # Initialize our to list
-        #     to = list()
-
-        # while len(phone) > 0:
-
-        #     # Get Phone No
-        #     no = phone.pop(0)
-
-        #     # Prepare SES Message Payload
-        #     payload = {
-        #         'Action': u'Publish',
-        #         'Message': body,
-        #         'Version': u'2010-03-31',
-        #         'PhoneNumber': no,
-        #     }
-
-        #     (result, _) = self._post(payload=payload, to=no)
-        #     if not result:
-        #         error_count += 1
-
-        # # Send all our defined topic id's
-        # while len(topics):
-
-        #     # Get Topic
-        #     topic = topics.pop(0)
-
-        #     # First ensure our topic exists, if it doesn't, it gets created
-        #     payload = {
-        #         'Action': u'CreateTopic',
-        #         'Version': u'2010-03-31',
-        #         'Name': topic,
-        #     }
-
-        #     (result, response) = self._post(payload=payload, to=topic)
-        #     if not result:
-        #         error_count += 1
-        #         continue
-
-        #     # Get the Amazon Resource Name
-        #     topic_arn = response.get('topic_arn')
-        #     if not topic_arn:
-        #         # Could not acquire our topic; we're done
-        #         error_count += 1
-        #         continue
-
-        #     # Build our payload now that we know our topic_arn
-        #     payload = {
-        #         'Action': u'Publish',
-        #         'Version': u'2010-03-31',
-        #         'TopicArn': topic_arn,
-        #         'Message': body,
-        #     }
-
-        #     # Send our payload to AWS
-        #     (result, _) = self._post(payload=payload, to=topic)
-        #     if not result:
-        #         error_count += 1
-
-        # return error_count == 0
 
     def _post(self, payload, to):
         """
@@ -554,15 +503,14 @@ class NotifySES(NotifyBase):
         # Prepare our AWS Headers based on our payload
         headers = self.aws_prepare_request(payload)
 
-        notify_url = '{}/{}'.format(self.notify_url, self.aws_canonical_uri)
         self.logger.debug('AWS SES POST URL: %s (cert_verify=%r)' % (
-            notify_url, self.verify_certificate,
+            self.notify_url, self.verify_certificate,
         ))
-        self.logger.debug('AWS SES Payload: %s' % str(payload))
+        self.logger.debug('AWS SES Payload (%d bytes)', len(payload))
 
         try:
             r = requests.post(
-                notify_url,
+                self.notify_url,
                 data=payload,
                 headers=headers,
                 verify=self.verify_certificate,
@@ -641,8 +589,7 @@ class NotifySES(NotifyBase):
         # Similar to headers; but a subset.  keys must be lowercase
         signed_headers = OrderedDict([
             ('content-type', headers['Content-Type']),
-            ('host', '{service}.{region}.amazonaws.com'.format(
-                service=self.aws_service_name,
+            ('host', 'email.{region}.amazonaws.com'.format(
                 region=self.aws_region_name)),
             ('x-amz-date', headers['X-Amz-Date']),
         ])
@@ -731,13 +678,24 @@ class NotifySES(NotifyBase):
         eg:
           IN:
 
-             TODO
+            <SendRawEmailResponse
+                 xmlns="http://ses.amazonaws.com/doc/2010-12-01/">
+              <SendRawEmailResult>
+                <MessageId>
+                   010f017d87656ee2-a2ea291f-79ea-
+                   44f3-9d25-00d041de3007-000000</MessageId>
+              </SendRawEmailResult>
+              <ResponseMetadata>
+                <RequestId>7abb454e-904b-4e46-a23c-2f4d2fc127a6</RequestId>
+              </ResponseMetadata>
+            </SendRawEmailResponse>
 
           OUT:
            {
-              type: 'CreateTopicResponse',
-              request_id: '604bef0f-369c-50c5-a7a4-bbd474c83d6a',
-              topic_arn: 'arn:aws:sns:us-east-1:000000000000:abcd',
+             'type': 'SendRawEmailResponse',
+              'message_id': '010f017d87656ee2-a2ea291f-79ea-
+                             44f3-9d25-00d041de3007-000000',
+              'request_id': '7abb454e-904b-4e46-a23c-2f4d2fc127a6',
            }
         """
 
@@ -746,7 +704,6 @@ class NotifySES(NotifyBase):
         # object
         aws_keep_map = {
             'RequestId': 'request_id',
-            'TopicArn': 'topic_arn',
             'MessageId': 'message_id',
 
             # Error Message Handling
@@ -760,6 +717,7 @@ class NotifySES(NotifyBase):
         response = {
             'type': None,
             'request_id': None,
+            'message_id': None,
         }
 
         try:
@@ -797,13 +755,8 @@ class NotifySES(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any URL parameters
-        params = {
-            'batch': 'yes' if self.batch else 'no',
-        }
-
-        # Extend our parameters
-        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+        # Acquire any global URL parameters
+        params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         if self.from_name is not None:
             # from_name specified; pass it back on the url
@@ -826,7 +779,7 @@ class NotifySES(NotifyBase):
             not (len(self.targets) == 1
                  and self.targets[0][1] == self.from_addr)
 
-        return '{schema}://{user}@{host}/{key_id}/{key_secret}/{region}/'
+        return '{schema}://{user}@{host}/{key_id}/{key_secret}/{region}/' \
             '{targets}/?{params}'.format(
                 schema=self.secure_protocol,
                 host=self.host,
@@ -850,7 +803,7 @@ class NotifySES(NotifyBase):
         us to re-instantiate this object.
 
         """
-        results = NotifySES.parse_url(url, verify_host=False)
+        results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
@@ -876,15 +829,11 @@ class NotifySES(NotifyBase):
 
         # Section 1: Get Region and Access Secret
         index = 0
-        for i, entry in enumerate(entries):
+        for index, entry in enumerate(entries, start=1):
 
             # Are we at the region yet?
             result = IS_REGION.match(entry)
             if result:
-                # We found our Region; Rebuild our access key secret based on
-                # all entries we found prior to this:
-                secret_access_key = '/'.join(secret_access_key_parts)
-
                 # Ensure region is nicely formatted
                 region_name = "{country}-{area}-{no}".format(
                     country=result.group('country').lower(),
@@ -892,15 +841,20 @@ class NotifySES(NotifyBase):
                     no=result.group('no'),
                 )
 
-                # Track our index as we'll use this to grab the remaining
-                # content in the next Section
-                index = i + 1
+                # We're done with Section 1 of our url (the credentials)
+                break
 
-                # We're done with Section 1
+            elif is_email(entry):
+                # We're done with Section 1 of our url (the credentials)
+                index -= 1
                 break
 
             # Store our secret parts
             secret_access_key_parts.append(entry)
+
+        # Prepare our Secret Access Key
+        secret_access_key = '/'.join(secret_access_key_parts) \
+            if secret_access_key_parts else None
 
         # Section 2: Get our Recipients (basically all remaining entries)
         results['targets'] = entries[index:]
@@ -922,15 +876,27 @@ class NotifySES(NotifyBase):
         if 'bcc' in results['qsd'] and len(results['qsd']['bcc']):
             results['bcc'] = results['qsd']['bcc']
 
-        # Get Batch Mode Flag
-        results['batch'] = \
-            parse_bool(results['qsd'].get(
-                'batch', NotifySES.template_args['batch']['default']))
+        # Handle From Address handling
+        if 'from' in results['qsd'] and len(results['qsd']['from']):
+            results['from_addr'] = results['qsd']['from']
 
-        # Store our other detected data (if at all)
-        results['region_name'] = region_name
-        results['access_key_id'] = access_key_id
-        results['secret_access_key'] = secret_access_key
+        # Handle secret_access_key over-ride
+        if 'secret' in results['qsd'] and len(results['qsd']['secret']):
+            results['secret_access_key'] = results['qsd']['secret']
+        else:
+            results['secret_access_key'] = secret_access_key
+
+        # Handle access key id over-ride
+        if 'access' in results['qsd'] and len(results['qsd']['access']):
+            results['access_key_id'] = results['qsd']['access']
+        else:
+            results['access_key_id'] = access_key_id
+
+        # Handle region name id over-ride
+        if 'region' in results['qsd'] and len(results['qsd']['region']):
+            results['region_name'] = results['qsd']['region']
+        else:
+            results['region_name'] = region_name
 
         # Return our result set
         return results
