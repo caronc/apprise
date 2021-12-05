@@ -145,6 +145,8 @@ class NotifySES(NotifyBase):
     templates = (
         '{schema}://{from_email}/{access_key_id}/{secret_access_key}/'
         '{region}/{targets}',
+        '{schema}://{from_email}/{access_key_id}/{secret_access_key}/'
+        '{region}',
     )
 
     # Define our template tokens
@@ -186,6 +188,11 @@ class NotifySES(NotifyBase):
         'from': {
             'alias_of': 'from_email',
         },
+        'reply': {
+            'name': _('Reply To Email'),
+            'type': 'string',
+            'map_to': 'reply_to',
+        },
         'cc': {
             'name': _('Carbon Copy'),
             'type': 'list:string',
@@ -206,8 +213,8 @@ class NotifySES(NotifyBase):
     })
 
     def __init__(self, access_key_id, secret_access_key, region_name,
-                 from_addr=None, from_name=None, targets=None, cc=None,
-                 bcc=None, **kwargs):
+                 reply_to=None, from_addr=None, from_name=None, targets=None,
+                 cc=None, bcc=None, **kwargs):
         """
         Initialize Notify AWS SES Object
         """
@@ -265,15 +272,30 @@ class NotifySES(NotifyBase):
 
         if from_addr:
             self.from_addr = from_addr
+
         else:
             # Get our from email address
             self.from_addr = '{user}@{host}'.format(
                 user=self.user, host=self.host) if self.user else None
+
         if not (self.from_addr and is_email(self.from_addr)):
             msg = 'An invalid AWS From ({}) was specified.'.format(
                 '{user}@{host}'.format(user=self.user, host=self.host))
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        self.reply_to = None
+        if reply_to:
+            result = is_email(reply_to)
+            if not result:
+                msg = 'An invalid AWS Reply To ({}) was specified.'.format(
+                    '{user}@{host}'.format(user=self.user, host=self.host))
+                self.logger.warning(msg)
+                raise TypeError(msg)
+
+            self.reply_to = (
+                result['name'] if result['name'] else False,
+                result['full_email'])
 
         if targets:
             # Validate recipients (to:) and drop bad ones:
@@ -344,18 +366,14 @@ class NotifySES(NotifyBase):
         # error tracking (used for function return)
         has_error = False
 
-        if self.from_addr:
-            # Initialize our default from name
-            from_name = self.from_name if self.from_name else self.app_desc
+        # Initialize our default from name
+        from_name = self.from_name if self.from_name \
+            else self.reply_to[0] if self.reply_to and \
+            self.reply_to[0] else self.app_desc
 
-            reply_to = '{} <{}>'.format(
-                quote(from_name, ' '),
-                quote(self.from_addr, '@ '))
-
-            self.logger.debug('Email From: {}'.format(reply_to))
-
-        else:
-            reply_to = None
+        reply_to = (
+            from_name, self.from_addr
+            if not self.reply_to else self.reply_to[1])
 
         # Create a copy of the targets list
         emails = list(self.targets)
@@ -390,6 +408,10 @@ class NotifySES(NotifyBase):
                 bcc = [formataddr(  # pragma: no branch
                     (self.names.get(addr, False), addr)) for addr in bcc]
 
+            self.logger.debug('Email From: {} <{}>'.format(
+                quote(reply_to[0], ' '),
+                quote(reply_to[1], '@ ')))
+
             self.logger.debug('Email To: {}'.format(to_addr))
             if cc:
                 self.logger.debug('Email Cc: {}'.format(', '.join(cc)))
@@ -412,12 +434,16 @@ class NotifySES(NotifyBase):
                     (from_name if from_name else False, self.from_addr),
                     charset='utf-8')
                 base['To'] = formataddr((to_name, to_addr), charset='utf-8')
+                if reply_to[1] != self.from_addr:
+                    base['Reply-To'] = formataddr(reply_to, charset='utf-8')
 
             except TypeError:
                 # Python v2.x Support (no charset keyword)
                 base['From'] = formataddr(
                     (from_name if from_name else False, self.from_addr))
                 base['To'] = formataddr((to_name, to_addr))
+                if reply_to[1] != self.from_addr:
+                    base['Reply-To'] = formataddr(reply_to)
 
             base['Cc'] = ','.join(cc)
             base['Date'] = \
@@ -468,9 +494,10 @@ class NotifySES(NotifyBase):
             for no, email in enumerate(([to_addr] + bcc + cc), start=1):
                 payload['Destinations.member.{}'.format(no)] = email
 
-            if reply_to:
-                # Specify from address
-                payload['Source'] = reply_to
+            # Specify from address
+            payload['Source'] = '{} <{}>'.format(
+                quote(from_name, ' '),
+                quote(self.from_addr, '@ '))
 
             (result, response) = self._post(payload=payload, to=to_addr)
             if not result:
@@ -773,6 +800,11 @@ class NotifySES(NotifyBase):
             # Handle our Blind Carbon Copy Addresses
             params['bcc'] = ','.join(self.bcc)
 
+        if self.reply_to:
+            # Handle our reply to address
+            params['reply'] = '{} <{}>'.format(*self.reply_to) \
+                if self.reply_to[0] else self.reply_to[1]
+
         # a simple boolean check as to whether we display our target emails
         # or not
         has_targets = \
@@ -870,31 +902,40 @@ class NotifySES(NotifyBase):
 
         # Handle Carbon Copy Addresses
         if 'cc' in results['qsd'] and len(results['qsd']['cc']):
-            results['cc'] = results['qsd']['cc']
+            results['cc'] = NotifySES.unquote(results['qsd']['cc'])
 
         # Handle Blind Carbon Copy Addresses
         if 'bcc' in results['qsd'] and len(results['qsd']['bcc']):
-            results['bcc'] = results['qsd']['bcc']
+            results['bcc'] = NotifySES.unquote(results['qsd']['bcc'])
 
         # Handle From Address handling
         if 'from' in results['qsd'] and len(results['qsd']['from']):
-            results['from_addr'] = results['qsd']['from']
+            results['from_addr'] = \
+                NotifySES.unquote(results['qsd']['from'])
+
+        # Handle Reply To Address
+        if 'reply' in results['qsd'] and len(results['qsd']['reply']):
+            results['reply_to'] = \
+                NotifySES.unquote(results['qsd']['reply'])
 
         # Handle secret_access_key over-ride
         if 'secret' in results['qsd'] and len(results['qsd']['secret']):
-            results['secret_access_key'] = results['qsd']['secret']
+            results['secret_access_key'] = \
+                NotifySES.unquote(results['qsd']['secret'])
         else:
             results['secret_access_key'] = secret_access_key
 
         # Handle access key id over-ride
         if 'access' in results['qsd'] and len(results['qsd']['access']):
-            results['access_key_id'] = results['qsd']['access']
+            results['access_key_id'] = \
+                NotifySES.unquote(results['qsd']['access'])
         else:
             results['access_key_id'] = access_key_id
 
         # Handle region name id over-ride
         if 'region' in results['qsd'] and len(results['qsd']['region']):
-            results['region_name'] = results['qsd']['region']
+            results['region_name'] = \
+                NotifySES.unquote(results['qsd']['region'])
         else:
             results['region_name'] = region_name
 

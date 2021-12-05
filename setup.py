@@ -69,7 +69,7 @@ setup(
     long_description_content_type='text/markdown',
     cmdclass=cmdclass,
     url='https://github.com/caronc/apprise',
-    keywords='Push Notifications Alerts Email AWS SNS Boxcar ClickSend '
+    keywords='Push Notifications Alerts Email AWS SES SNS Boxcar ClickSend '
         'Dingtalk Discord Dbus Emby Faast FCM Flock Gitter Gnome Google Chat '
         'Gotify Growl Home Assistant IFTTT Join Kavenegar KODI Kumulos '
         'LaMetric MacOS Mailgun Matrix Mattermost MessageBird MQTT MSG91 '
