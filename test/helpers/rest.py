@@ -245,8 +245,11 @@ class AppriseURLTester(object):
 
             if privacy_url:
                 # Assess that our privacy url is as expected
-                assert obj.url(
-                    privacy=True).startswith(privacy_url)
+                if not obj.url(privacy=True).startswith(privacy_url):
+                    raise AssertionError(
+                        "Privacy URL: '{}' != expected '{}'".format(
+                            obj.url(privacy=True)[:len(privacy_url)],
+                            privacy_url))
 
             if url_matches:
                 # Assess that our URL matches a set regex

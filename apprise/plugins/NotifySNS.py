@@ -662,19 +662,22 @@ class NotifySNS(NotifyBase):
 
         # Handle secret_access_key over-ride
         if 'secret' in results['qsd'] and len(results['qsd']['secret']):
-            results['secret_access_key'] = results['qsd']['secret']
+            results['secret_access_key'] = \
+                NotifySNS.unquote(results['qsd']['secret'])
         else:
             results['secret_access_key'] = secret_access_key
 
         # Handle access key id over-ride
         if 'access' in results['qsd'] and len(results['qsd']['access']):
-            results['access_key_id'] = results['qsd']['access']
+            results['access_key_id'] = \
+                NotifySNS.unquote(results['qsd']['access'])
         else:
             results['access_key_id'] = access_key_id
 
         # Handle region name id over-ride
         if 'region' in results['qsd'] and len(results['qsd']['region']):
-            results['region_name'] = results['qsd']['region']
+            results['region_name'] = \
+                NotifySNS.unquote(results['qsd']['region'])
         else:
             results['region_name'] = region_name
 

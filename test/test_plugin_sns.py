@@ -59,6 +59,11 @@ apprise_url_tests = (
         # we have a valid URL and one number to text
         'instance': plugins.NotifySNS,
     }),
+    ('sns://?access=T1JJ3T3L2&secret=A1BRTD4JD/TIiajkdnlazkcevi7FQ'
+        '&region=us-west-2&to=12223334444', {
+            # Initialize using get parameters instead
+            'instance': plugins.NotifySNS,
+        }),
     ('sns://T1JJ3TD4JD/TIiajkdnlazk7FQ/us-west-2/12223334444/12223334445', {
         # Multi SNS Suppport
         'instance': plugins.NotifySNS,

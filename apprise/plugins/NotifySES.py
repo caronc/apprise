@@ -193,6 +193,11 @@ class NotifySES(NotifyBase):
             'type': 'string',
             'map_to': 'reply_to',
         },
+        'name': {
+            'name': _('From Name'),
+            'type': 'string',
+            'map_to': 'from_name',
+        },
         'cc': {
             'name': _('Carbon Copy'),
             'type': 'list:string',
@@ -254,6 +259,9 @@ class NotifySES(NotifyBase):
         # Acquire Blind Carbon Copies
         self.bcc = set()
 
+        # For tracking our email -> name lookups
+        self.names = {}
+
         # Set our notify_url based on our region
         self.notify_url = 'https://email.{}.amazonaws.com'\
             .format(self.aws_region_name)
@@ -312,7 +320,7 @@ class NotifySES(NotifyBase):
                     '({}) specified.'.format(recipient),
                 )
 
-        elif self.from_addr:
+        else:
             # If our target email list is empty we want to add ourselves to it
             self.targets.append(
                 (self.from_name if self.from_name else False, self.from_addr))
@@ -811,11 +819,10 @@ class NotifySES(NotifyBase):
             not (len(self.targets) == 1
                  and self.targets[0][1] == self.from_addr)
 
-        return '{schema}://{user}@{host}/{key_id}/{key_secret}/{region}/' \
+        return '{schema}://{from_addr}/{key_id}/{key_secret}/{region}/' \
             '{targets}/?{params}'.format(
                 schema=self.secure_protocol,
-                host=self.host,
-                user=NotifySES.quote(self.user, safe=''),
+                from_addr=NotifySES.quote(self.from_addr, safe='@'),
                 key_id=self.pprint(self.aws_access_key_id, privacy, safe=''),
                 key_secret=self.pprint(
                     self.aws_secret_access_key, privacy,
@@ -902,11 +909,11 @@ class NotifySES(NotifyBase):
 
         # Handle Carbon Copy Addresses
         if 'cc' in results['qsd'] and len(results['qsd']['cc']):
-            results['cc'] = NotifySES.unquote(results['qsd']['cc'])
+            results['cc'] = NotifySES.parse_list(results['qsd']['cc'])
 
         # Handle Blind Carbon Copy Addresses
         if 'bcc' in results['qsd'] and len(results['qsd']['bcc']):
-            results['bcc'] = NotifySES.unquote(results['qsd']['bcc'])
+            results['bcc'] = NotifySES.parse_list(results['qsd']['bcc'])
 
         # Handle From Address handling
         if 'from' in results['qsd'] and len(results['qsd']['from']):
