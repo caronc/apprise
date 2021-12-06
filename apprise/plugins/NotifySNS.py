@@ -56,7 +56,7 @@ IS_TOPIC = re.compile(r'^#?(?P<name>[A-Za-z0-9_-]+)\s*$')
 # users of this product search though this Access Key Secret and escape all
 # of the forward slashes!
 IS_REGION = re.compile(
-    r'^\s*(?P<country>[a-z]{2})-(?P<area>[a-z]+)-(?P<no>[0-9]+)\s*$', re.I)
+    r'^\s*(?P<country>[a-z]{2})-(?P<area>[a-z-]+?)-(?P<no>[0-9]+)\s*$', re.I)
 
 # Extend HTTP Error Messages
 AWS_HTTP_ERROR_MAP = {
@@ -116,7 +116,7 @@ class NotifySNS(NotifyBase):
             'name': _('Region'),
             'type': 'string',
             'required': True,
-            'regex': (r'^[a-z]{2}-[a-z]+-[0-9]+$', 'i'),
+            'regex': (r'^[a-z]{2}-[a-z-]+?-[0-9]+$', 'i'),
             'map_to': 'region_name',
         },
         'target_phone_no': {
@@ -142,6 +142,15 @@ class NotifySNS(NotifyBase):
     template_args = dict(NotifyBase.template_args, **{
         'to': {
             'alias_of': 'targets',
+        },
+        'access': {
+            'alias_of': 'access_key_id',
+        },
+        'secret': {
+            'alias_of': 'secret_access_key',
+        },
+        'region': {
+            'alias_of': 'region',
         },
     })
 
@@ -651,10 +660,26 @@ class NotifySNS(NotifyBase):
             results['targets'] += \
                 NotifySNS.parse_list(results['qsd']['to'])
 
-        # Store our other detected data (if at all)
-        results['region_name'] = region_name
-        results['access_key_id'] = access_key_id
-        results['secret_access_key'] = secret_access_key
+        # Handle secret_access_key over-ride
+        if 'secret' in results['qsd'] and len(results['qsd']['secret']):
+            results['secret_access_key'] = \
+                NotifySNS.unquote(results['qsd']['secret'])
+        else:
+            results['secret_access_key'] = secret_access_key
+
+        # Handle access key id over-ride
+        if 'access' in results['qsd'] and len(results['qsd']['access']):
+            results['access_key_id'] = \
+                NotifySNS.unquote(results['qsd']['access'])
+        else:
+            results['access_key_id'] = access_key_id
+
+        # Handle region name id over-ride
+        if 'region' in results['qsd'] and len(results['qsd']['region']):
+            results['region_name'] = \
+                NotifySNS.unquote(results['qsd']['region'])
+        else:
+            results['region_name'] = region_name
 
         # Return our result set
         return results

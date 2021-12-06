@@ -708,8 +708,8 @@ class NotifyEmail(NotifyBase):
                             attachment.url(privacy=True)))
 
                     with open(attachment.path, "rb") as abody:
-                        app = MIMEApplication(
-                            abody.read(), attachment.mimetype)
+                        app = MIMEApplication(abody.read())
+                        app.set_type(attachment.mimetype)
 
                         app.add_header(
                             'Content-Disposition',
