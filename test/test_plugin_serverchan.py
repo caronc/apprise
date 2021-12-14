@@ -31,28 +31,28 @@ logging.disable(logging.CRITICAL)
 
 # Our Testing URLs
 apprise_url_tests = (
-    ('serverchan://', {
+    ('schan://', {
         # No Access Token specified
         'instance': TypeError,
     }),
-    ('serverchan://a_bd_/', {
+    ('schan://a_bd_/', {
         # invalid Access Token
         'instance': TypeError,
     }),
-    ('serverchan://12345678', {
+    ('schan://12345678', {
         # access token
         'instance': plugins.NotifyServerChan,
 
         # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'serverchan://1...8',
+        'privacy_url': 'schan://1...8',
     }),
-    ('serverchan://{}'.format('a' * 8), {
+    ('schan://{}'.format('a' * 8), {
         'instance': plugins.NotifyServerChan,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
-    ('serverchan://{}'.format('a' * 8), {
+    ('schan://{}'.format('a' * 8), {
         'instance': plugins.NotifyServerChan,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them

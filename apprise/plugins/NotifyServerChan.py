@@ -36,7 +36,7 @@ from ..AppriseLocale import gettext_lazy as _
 #   - do as the page describe and you will get the token
 
 # Syntax:
-#  serverchan://{access_token}/
+#  schan://{access_token}/
 
 
 class NotifyServerChan(NotifyBase):
@@ -51,8 +51,7 @@ class NotifyServerChan(NotifyBase):
     service_url = 'https://sct.ftqq.com/'
 
     # All notification requests are secure
-    protocol = 'serverchan'
-    secure_protocol = 'serverchan'
+    secure_protocol = 'schan'
 
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_serverchan'
@@ -167,7 +166,7 @@ class NotifyServerChan(NotifyBase):
             # We're done early as we couldn't parse the URL
             return results
 
-        pattern = 'serverchan://([a-zA-Z0-9]+)/' + \
+        pattern = 'schan://([a-zA-Z0-9]+)/' + \
                   ('?' if not url.endswith('/') else '')
         result = re.match(pattern, url)
         results['token'] = result.group(1) if result else ''
