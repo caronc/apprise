@@ -13,7 +13,7 @@ The tools are as follows:
 
     ```bash
     # simply make your code changes to apprise and test it out:
-    ./bin/apprise -t title -m message \
+    ./bin/apprise -t title -b body \
           mailto://user:pass@example.com
     ```
 
