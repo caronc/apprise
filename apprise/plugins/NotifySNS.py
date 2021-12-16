@@ -210,7 +210,7 @@ class NotifySNS(NotifyBase):
             result = is_phone_no(target)
             if result:
                 # store valid phone number
-                self.phone.append('+{}'.format(result))
+                self.phone.append('+{}'.format(result['full']))
                 continue
 
             result = IS_TOPIC.match(target)
