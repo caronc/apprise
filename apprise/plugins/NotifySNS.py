@@ -209,7 +209,7 @@ class NotifySNS(NotifyBase):
         for target in parse_list(targets):
             result = is_phone_no(target)
             if result:
-                # store valid phone number
+                # store valid phone number in E.164 format
                 self.phone.append('+{}'.format(result['full']))
                 continue
 
@@ -585,8 +585,8 @@ class NotifySNS(NotifyBase):
                 region=NotifySNS.quote(self.aws_region_name, safe=''),
                 targets='/'.join(
                     [NotifySNS.quote(x) for x in chain(
-                        # Phone # are prefixed with a plus symbol
-                        ['+{}'.format(x) for x in self.phone],
+                        # Phone # are already prefixed with a plus symbol
+                        self.phone,
                         # Topics are prefixed with a pound/hashtag symbol
                         ['#{}'.format(x) for x in self.topics],
                     )]),
