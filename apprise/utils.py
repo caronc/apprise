@@ -129,9 +129,17 @@ GET_EMAIL_RE = re.compile(
 # rougly conforms to a phone number before we parse it further
 IS_PHONE_NO = re.compile(r'^\+?(?P<phone>[0-9\s)(+-]+)\s*$')
 
+# A simple verification check to make sure the content specified
+# rougly conforms to a ham radio call sign before we parse it further
+IS_CALL_SIGN = re.compile(r'^([a-zA-Z0-9]{1,3}[0-9][a-zA-Z0-9]{0,3}[-]{0,1}[a-zA-Z0-9]{1,2})\s*$')
+
 # Regular expression used to destinguish between multiple phone numbers
 PHONE_NO_DETECTION_RE = re.compile(
     r'\s*([+(\s]*[0-9][0-9()\s-]+[0-9])(?=$|[\s,+(]+[0-9])', re.I)
+
+# Regular expression used to destinguish between multiple ham radio call signs
+CALL_SIGN_DETECTION_RE = re.compile(
+    r'\s*([a-zA-Z0-9]{1,3}[0-9][a-zA-Z0-9]{0,3}[-]{0,1}[a-zA-Z0-9]{1,2})', re.I)
 
 # Regular expression used to destinguish between multiple URLs
 URL_DETECTION_RE = re.compile(
@@ -371,6 +379,37 @@ def is_phone_no(phone, min_len=11):
         'full': full,
     }
 
+def is_call_sign(callsign, min_len=3):
+    """Determine if the specified entry is a ham radio call sign
+
+    Args:
+        callsign (str): The string you want to check.
+        min_len (int): Defines the smallest expected length of the phone
+                       before it's to be considered invalid. By default
+                       the phone number can't be any larger then 7
+                       (call sign excluding SSID) or 10 (including SSID)
+
+    Returns:
+        bool: Returns False if the address specified is not a phone number
+    """
+
+    try:
+        if not IS_CALL_SIGN.match(callsign):
+            # not parseable content as it does not even conform closely to a
+            # callsign)
+            return False
+
+    except TypeError:
+        return False
+
+    callsign = callsign.upper()
+    # get rid of callsign SSID if present
+    cs = callsign.split('-')[0].upper()
+
+    return {
+        'full': callsign,
+        'callsign': cs,
+    }
 
 def is_email(address):
     """Determine if the specified entry is an email address
@@ -765,6 +804,41 @@ def parse_phone_no(*args, **kwargs):
 
     return result
 
+def parse_call_sign(*args, **kwargs):
+    """
+    Takes a string containing ham radio call signs separated by comma's and/or spaces
+    and returns a list. Call sign SSIDs are not supported
+    """
+
+    # for Python 2.7 support, store_unparsable is not in the url above
+    # as just parse_emails(*args, store_unparseable=True) since it is
+    # an invalid syntax.  This is the workaround to be backards compatible:
+    store_unparseable = kwargs.get('store_unparseable', True)
+
+    result = []
+    for arg in args:
+        if isinstance(arg, six.string_types) and arg:
+            _result = CALL_SIGN_DETECTION_RE.findall(arg)
+            if _result:
+                result += _result
+
+            elif not _result and store_unparseable:
+                # we had content passed into us that was lost because it was
+                # so poorly formatted that it didn't even come close to
+                # meeting the regular expression we defined. We intentially
+                # keep it as part of our result set so that parsing done
+                # at a higher level can at least report this to the end user
+                # and hopefully give them some indication as to what they
+                # may have done wrong.
+                result += \
+                    [x for x in filter(bool, re.split(STRING_DELIMITERS, arg))]
+
+        elif isinstance(arg, (set, list, tuple)):
+            # Use recursion to handle the list of call signs
+            result += parse_call_sign(
+                *arg, store_unparseable=store_unparseable)
+
+    return result
 
 def parse_emails(*args, **kwargs):
     """
