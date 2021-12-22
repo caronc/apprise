@@ -40,43 +40,17 @@ apprise_url_tests = (
         # We failed to identify any valid authentication
         'instance': TypeError,
     }),
-    ('clicksend://user:pass@{}/{}/{}'.format('1' * 10, '2' * 15, 'a' * 13), {
-        # invalid target numbers; we'll fail to notify anyone
-        'instance': plugins.NotifyClickSend,
+    ('dapnet://user:pass@{}/{}/{}'.format('abcdefghi', 'a', '0A1DEF'), {
+        # invalid call signs
+        'instance': plugins.NotifyDapnet,
         'notify_response': False,
-    }),
-    ('clicksend://user:pass@{}?batch=yes'.format('3' * 14), {
-        # valid number
-        'instance': plugins.NotifyClickSend,
-    }),
-    ('clicksend://user:pass@{}?batch=yes&to={}'.format('3' * 14, '6' * 14), {
-        # valid number but using the to= variable
-        'instance': plugins.NotifyClickSend,
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'clicksend://user:****',
-    }),
-    ('clicksend://user:pass@{}?batch=no'.format('3' * 14), {
-        # valid number - no batch
-        'instance': plugins.NotifyClickSend,
-    }),
-    ('clicksend://user:pass@{}'.format('3' * 14), {
-        'instance': plugins.NotifyClickSend,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('clicksend://user:pass@{}'.format('3' * 14), {
-        'instance': plugins.NotifyClickSend,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
+    })
 )
 
 
-def test_plugin_clicksend_urls():
+def test_plugin_dapnet_urls():
     """
-    NotifyClickSend() Apprise URLs
+    NotifyDapnet() Apprise URLs
 
     """
 
