@@ -407,7 +407,7 @@ def is_call_sign(callsign, min_len=3):
     callsign = callsign.upper()
 
     # get rid of callsign's SSID whereas present
-    cs = callsign.split('-')[0].trim()
+    cs = (callsign.split('-')[0]).strip()
 
     return {
         'full': callsign,
