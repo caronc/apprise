@@ -148,7 +148,8 @@ class NotifyDapnet(NotifyBase):
         }
     )
 
-    def __init__(self, targets=None, priority=None, transmittergroups=None, **kwargs):
+    def __init__(self, targets=None, priority=None,
+                 transmittergroups=None, **kwargs):
         """
         Initialize Dapnet Object
         """
@@ -211,12 +212,13 @@ class NotifyDapnet(NotifyBase):
         # prepare JSON payload
 
         # prepare the emergency mode
-        emergency_mode = True if self.priority == DapnetPriority.EMERGENCY else False
+        emergency_mode = True \
+            if self.priority == DapnetPriority.EMERGENCY else False
 
         # truncate the body (if necessary)
         _payload_body = body
         if len(_payload_body) > 80:
-            self.logger.debug('Message exceeds max DAPNET message length; truncating...')
+            self.logger.debug('Message exceeds max DAPNET msglen; truncating')
             _payload_body = _payload_body[:80]
 
         payload = {
@@ -245,7 +247,9 @@ class NotifyDapnet(NotifyBase):
                 self.logger.warning(
                     'Failed to send DAPNET notification {} to {}: '
                     'error={}.'.format(
-                        payload['text'], ' to {}'.format(self.targets), r.status_code
+                        payload['text'],
+                        ' to {}'.format(self.targets),
+                        r.status_code
                     )
                 )
 
@@ -304,7 +308,8 @@ class NotifyDapnet(NotifyBase):
         return '{schema}://{auth}{targets}?{params}'.format(
             schema=self.secure_protocol,
             auth=auth,
-            targets='/'.join([NotifyDapnet.quote(x, safe='') for x in self.targets]),
+            targets='/'.join([NotifyDapnet.quote(x, safe='')
+                              for x in self.targets]),
             params=NotifyDapnet.urlencode(params),
         )
 
@@ -329,7 +334,8 @@ class NotifyDapnet(NotifyBase):
         # Support the 'to' variable so that we can support rooms this way too
         # The 'to' makes it easier to use yaml configuration
         if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'] += NotifyDapnet.parse_call_sign(results['qsd']['to'])
+            results['targets'] += \
+                NotifyDapnet.parse_call_sign(results['qsd']['to'])
 
         # Check for priority
         if 'priority' in results['qsd'] and len(results['qsd']['priority']):
@@ -356,7 +362,8 @@ class NotifyDapnet(NotifyBase):
         if 'transmittergroups' in results['qsd']:
             try:
                 _tgroups = results['qsd']['transmittergroups'].lower()
-                results['transmittergroups'] = [x.strip() for x in _tgroups.split(',')]
+                results['transmittergroups'] = \
+                    [x.strip() for x in _tgroups.split(',')]
             except KeyError:
                 pass
 
