@@ -131,7 +131,8 @@ IS_PHONE_NO = re.compile(r'^\+?(?P<phone>[0-9\s)(+-]+)\s*$')
 
 # A simple verification check to make sure the content specified
 # rougly conforms to a ham radio call sign before we parse it further
-IS_CALL_SIGN = re.compile(r'^([a-zA-Z0-9]{1,3}[0-9][a-zA-Z0-9]{0,3}[-]{0,1}[a-zA-Z0-9]{1,2})\s*$')
+IS_CALL_SIGN = re.compile(
+    r'^([a-zA-Z0-9]{1,3}[0-9][a-zA-Z0-9]{0,3}[-]?[a-zA-Z0-9]{1,2})\s*$')
 
 # Regular expression used to destinguish between multiple phone numbers
 PHONE_NO_DETECTION_RE = re.compile(
@@ -139,7 +140,7 @@ PHONE_NO_DETECTION_RE = re.compile(
 
 # Regular expression used to destinguish between multiple ham radio call signs
 CALL_SIGN_DETECTION_RE = re.compile(
-    r'\s*([a-zA-Z0-9]{1,3}[0-9][a-zA-Z0-9]{0,3}[-]{0,1}[a-zA-Z0-9]{1,2})', re.I)
+    r'\s*([a-zA-Z0-9]{1,3}[0-9][a-zA-Z0-9]{0,3}[-]?[a-zA-Z0-9]{1,2})', re.I)
 
 # Regular expression used to destinguish between multiple URLs
 URL_DETECTION_RE = re.compile(
