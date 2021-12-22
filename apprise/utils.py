@@ -379,6 +379,7 @@ def is_phone_no(phone, min_len=11):
         'full': full,
     }
 
+
 def is_call_sign(callsign, min_len=3):
     """Determine if the specified entry is a ham radio call sign
 
@@ -410,6 +411,7 @@ def is_call_sign(callsign, min_len=3):
         'full': callsign,
         'callsign': cs,
     }
+
 
 def is_email(address):
     """Determine if the specified entry is an email address
@@ -804,10 +806,11 @@ def parse_phone_no(*args, **kwargs):
 
     return result
 
+
 def parse_call_sign(*args, **kwargs):
     """
-    Takes a string containing ham radio call signs separated by comma's and/or spaces
-    and returns a list. Call sign SSIDs are not supported
+    Takes a string containing ham radio call signs separated by
+    comma and/or spacesand returns a list.
     """
 
     # for Python 2.7 support, store_unparsable is not in the url above
@@ -839,6 +842,7 @@ def parse_call_sign(*args, **kwargs):
                 *arg, store_unparseable=store_unparseable)
 
     return result
+
 
 def parse_emails(*args, **kwargs):
     """
