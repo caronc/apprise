@@ -40,6 +40,22 @@ apprise_url_tests = (
         # We failed to identify any valid authentication
         'instance': TypeError,
     }),
+    ('dapnet://user:pass@{}'.format('DF1ABC'), {
+        # valid call sign
+        'instance': plugins.NotifyDapnet,
+    }),
+    ('dapnet://user:pass@{}/{}'.format('DF1ABC', 'DF1DEF'), {
+        # valid call signs
+        'instance': plugins.NotifyDapnet,
+    }),
+    ('dapnet://user:pass@{}?priority=normal'.format('DF1ABC'), {
+        # valid call sign with priority
+        'instance': plugins.NotifyDapnet,
+    }),
+    ('dapnet://user:pass@{}?transmittergroups=dl-all,all'.format('DF1ABC'), {
+        # valid call sign with two transmitter groups
+        'instance': plugins.NotifyDapnet,
+    }),
     ('dapnet://user:pass@{}/{}/{}'.format('abcdefghi', 'a', '0A1DEF'), {
         # invalid call signs
         'instance': plugins.NotifyDapnet,
