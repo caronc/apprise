@@ -140,7 +140,7 @@ PHONE_NO_DETECTION_RE = re.compile(
 
 # Regular expression used to destinguish between multiple ham radio call signs
 CALL_SIGN_DETECTION_RE = re.compile(
-    r'\s*([a-zA-Z0-9]{1,3}[0-9][a-zA-Z0-9]{0,3}[-]?[a-zA-Z0-9]{1,2})', re.I)
+    r'\s*([a-z0-9]{1,3}[0-9][a-z0-9]{0,3}[-]?[a-z0-9]{1,2})', re.I)
 
 # Regular expression used to destinguish between multiple URLs
 URL_DETECTION_RE = re.compile(
@@ -404,6 +404,7 @@ def is_call_sign(callsign, min_len=3):
     except TypeError:
         return False
 
+    # always treat call signs as uppercase content
     callsign = callsign.upper()
 
     # get rid of callsign's SSID whereas present
