@@ -260,8 +260,8 @@ class NotifyDapnet(NotifyBase):
 
             else:
                 self.logger.info(
-                    'Sent {} DAPNET notification {}'.format(
-                        payload['text'], ' to {}'.format(self.targets)
+                    'Sent \'{}\' DAPNET notification {}'.format(
+                        payload['text'], 'to {}'.format(self.targets)
                     )
                 )
 
