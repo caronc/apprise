@@ -24,6 +24,7 @@
 # THE SOFTWARE.
 # Disable logging for a cleaner testing output
 import logging
+import requests
 
 from apprise import plugins
 from helpers import AppriseURLTester
@@ -43,18 +44,26 @@ apprise_url_tests = (
     ('dapnet://user:pass@{}'.format('DF1ABC'), {
         # valid call sign
         'instance': plugins.NotifyDapnet,
+        'response': False,
+        'requests_response_code': requests.codes.ok,
     }),
     ('dapnet://user:pass@{}/{}'.format('DF1ABC', 'DF1DEF'), {
         # valid call signs
         'instance': plugins.NotifyDapnet,
+        'response': False,
+        'requests_response_code': requests.codes.ok,
     }),
     ('dapnet://user:pass@{}?priority=normal'.format('DF1ABC'), {
         # valid call sign with priority
         'instance': plugins.NotifyDapnet,
+        'response': False,
+        'requests_response_code': requests.codes.ok,
     }),
     ('dapnet://user:pass@{}?transmittergroups=dl-all,all'.format('DF1ABC'), {
         # valid call sign with two transmitter groups
         'instance': plugins.NotifyDapnet,
+        'response': False,
+        'requests_response_code': requests.codes.ok,
     }),
     ('dapnet://user:pass@{}/{}/{}'.format('abcdefghi', 'a', '0A1DEF'), {
         # invalid call signs
