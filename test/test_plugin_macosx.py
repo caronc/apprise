@@ -77,7 +77,7 @@ def test_plugin_macosx_general(mock_macver, mock_system, mock_popen, tmpdir):
     reload(sys.modules['apprise'])
 
     # Point our object to our new temporary existing file
-    apprise.plugins.NotifyMacOSX.notify_path = str(script)
+    apprise.plugins.NotifyMacOSX.notify_paths = (str(script), )
 
     obj = apprise.Apprise.instantiate(
         'macosx://_/?image=True', suppress_exceptions=False)
@@ -150,7 +150,7 @@ def test_plugin_macosx_general(mock_macver, mock_system, mock_popen, tmpdir):
     reload(sys.modules['apprise'])
 
     # Point our object to our new temporary existing file
-    apprise.plugins.NotifyMacOSX.notify_path = str(script)
+    apprise.plugins.NotifyMacOSX.notify_paths = (str(script), )
 
     # Our object is disabled
     obj = apprise.Apprise.instantiate(
@@ -168,7 +168,7 @@ def test_plugin_macosx_general(mock_macver, mock_system, mock_popen, tmpdir):
     reload(sys.modules['apprise'])
 
     # Point our object to our new temporary existing file
-    apprise.plugins.NotifyMacOSX.notify_path = str(script)
+    apprise.plugins.NotifyMacOSX.notify_paths = (str(script), )
 
     obj = apprise.Apprise.instantiate(
         'macosx://_/?sound=default', suppress_exceptions=False)
@@ -182,7 +182,7 @@ def test_plugin_macosx_general(mock_macver, mock_system, mock_popen, tmpdir):
     reload(sys.modules['apprise'])
 
     # Point our object to our new temporary existing file
-    apprise.plugins.NotifyMacOSX.notify_path = str(script)
+    apprise.plugins.NotifyMacOSX.notify_paths = (str(script), )
 
     # This is just to test that the the minor (in this case .12)
     # is only weighed with respect to the major number as wel
