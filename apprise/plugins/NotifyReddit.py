@@ -465,7 +465,7 @@ class NotifyReddit(NotifyBase):
                 'api_type': 'json',
                 'extension': 'json',
                 'sr': subreddit,
-                'title': title,
+                'title': title if title else self.app_desc,
                 'kind': kind,
                 'nsfw': True if self.nsfw else False,
                 'resubmit': True if self.resubmit else False,
