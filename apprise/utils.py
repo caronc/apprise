@@ -129,18 +129,20 @@ GET_EMAIL_RE = re.compile(
 # rougly conforms to a phone number before we parse it further
 IS_PHONE_NO = re.compile(r'^\+?(?P<phone>[0-9\s)(+-]+)\s*$')
 
-# A simple verification check to make sure the content specified
-# rougly conforms to a ham radio call sign before we parse it further
-IS_CALL_SIGN = re.compile(
-    r'^([a-zA-Z0-9]{1,3}[0-9][a-zA-Z0-9]{0,3}[-]?[a-zA-Z0-9]{1,2})\s*$')
-
 # Regular expression used to destinguish between multiple phone numbers
 PHONE_NO_DETECTION_RE = re.compile(
     r'\s*([+(\s]*[0-9][0-9()\s-]+[0-9])(?=$|[\s,+(]+[0-9])', re.I)
 
+# A simple verification check to make sure the content specified
+# rougly conforms to a ham radio call sign before we parse it further
+IS_CALL_SIGN = re.compile(
+    r'^(?P<callsign>[a-z0-9]{2,3}[0-9][a-z0-9]{3})'
+    r'(?P<ssid>-[a-z0-9]{1,2})?\s*$', re.I)
+
 # Regular expression used to destinguish between multiple ham radio call signs
 CALL_SIGN_DETECTION_RE = re.compile(
-    r'\s*([a-z0-9]{1,3}[0-9][a-z0-9]{0,3}[-]?[a-z0-9]{1,2})', re.I)
+    r'\s*([a-z0-9]{2,3}[0-9][a-z0-9]{3}(?:-[a-z0-9]{1,2})?)'
+    r'(?=$|[\s,]+[a-z0-9]{4,6})', re.I)
 
 # Regular expression used to destinguish between multiple URLs
 URL_DETECTION_RE = re.compile(
@@ -381,38 +383,34 @@ def is_phone_no(phone, min_len=11):
     }
 
 
-def is_call_sign(callsign, min_len=3):
+def is_call_sign(callsign):
     """Determine if the specified entry is a ham radio call sign
 
     Args:
         callsign (str): The string you want to check.
-        min_len (int): Defines the smallest expected length of the phone
-                       before it's to be considered invalid. By default
-                       the phone number can't be any larger then 7
-                       (call sign excluding SSID) or 10 (including SSID)
 
     Returns:
         bool: Returns False if the address specified is not a phone number
     """
 
     try:
-        if not IS_CALL_SIGN.match(callsign):
+        result = IS_CALL_SIGN.match(callsign)
+        if not result:
             # not parseable content as it does not even conform closely to a
-            # callsign)
+            # callsign
             return False
 
     except TypeError:
+        # not parseable content
         return False
 
-    # always treat call signs as uppercase content
-    callsign = callsign.upper()
-
-    # get rid of callsign's SSID whereas present
-    cs = (callsign.split('-')[0]).strip()
-
+    ssid = result.group('ssid')
     return {
-        'full': callsign,
-        'callsign': cs,
+        # always treat call signs as uppercase content
+        'callsign': result.group('callsign').upper(),
+        # Prevent the storing of the None keyword in the event the SSID was
+        # not detected
+        'ssid': ssid if ssid else '',
     }
 
 

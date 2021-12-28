@@ -36,7 +36,7 @@
 
 # Optional parameters:
 #   - priority (NORMAL or EMERGENCY). Default: NORMAL
-#   - transmittergroups --> comma-separated list of DAPNET transmitter
+#   - txgroups --> comma-separated list of DAPNET transmitter
 #                           groups. Default: 'dl-all'
 #                           https://hampager.de/#/transmitters/groups
 
@@ -54,6 +54,8 @@ from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..utils import is_call_sign
 from ..utils import parse_call_sign
+from ..utils import parse_list
+from ..utils import parse_bool
 
 
 class DapnetPriority(object):
@@ -90,9 +92,12 @@ class NotifyDapnet(NotifyBase):
     # The maximum length of the body
     body_maxlen = 80
 
-    # A title can not be used for SMS Messages.  Setting this to zero will
+    # A title can not be used for Dapnet Messages.  Setting this to zero will
     # cause any title (if defined) to get placed into the message body.
     title_maxlen = 0
+
+    # The maximum amount of emails that can reside within a single transmission
+    default_batch_size = 50
 
     # Define object templates
     templates = ('{schema}://{user}:{password}@{targets}',)
@@ -116,8 +121,7 @@ class NotifyDapnet(NotifyBase):
                 'name': _('Target Callsign'),
                 'type': 'string',
                 'regex': (
-                    r'^[a-z0-9]{1,3}[0-9][a-z0-9]{0,3}[-]{0,1}[a-z0-9]{1,2}$',
-                    'i',
+                    r'^[a-z0-9]{2,5}(-[a-z0-9]{1,2})?$', 'i',
                 ),
                 'map_to': 'targets',
             },
@@ -133,23 +137,33 @@ class NotifyDapnet(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
+            'to': {
+                'name': _('Target Callsign'),
+                'type': 'string',
+                'map_to': 'targets',
+            },
             'priority': {
                 'name': _('Priority'),
                 'type': 'choice:int',
                 'values': DAPNET_PRIORITIES,
                 'default': DapnetPriority.NORMAL,
             },
-            'transmittergroups': {
+            'txgroups': {
                 'name': _('Transmitter Groups'),
                 'type': 'string',
-                'default': ['dl-all'],
+                'default': 'dl-all',
                 'private': True,
+            },
+            'batch': {
+                'name': _('Batch Mode'),
+                'type': 'bool',
+                'default': False,
             },
         }
     )
 
-    def __init__(self, targets=None, priority=None,
-                 transmittergroups=None, **kwargs):
+    def __init__(self, targets=None, priority=None, txgroups=None,
+                 batch=False, **kwargs):
         """
         Initialize Dapnet Object
         """
@@ -170,36 +184,41 @@ class NotifyDapnet(NotifyBase):
             raise TypeError(msg)
 
         # Get the transmitter group
-        self.transmittergroups = transmittergroups
-        if not self.transmittergroups:
-            msg = 'Transmitter Groups not specified; using default'
-            self.logger.debug(msg)
-            self.transmittergroups = ['dl-all']
+        self.txgroups = parse_list(
+            NotifyDapnet.template_args['txgroups']['default']
+            if not txgroups else txgroups)
+
+        # Prepare Batch Mode Flag
+        self.batch = batch
 
         for target in parse_call_sign(targets):
             # Validate targets and drop bad ones:
             result = is_call_sign(target)
             if not result:
                 self.logger.warning(
-                    'Dropping invalid call sign ({}).'.format(target),
+                    'Dropping invalid Amateur radio call sign ({}).'.format(
+                        target),
                 )
                 continue
 
-            # store valid call sign if not yet present
-            # duplicates are possible if the user has
-            # provided call signs with SSIDs
-            if result['callsign'] not in self.targets:
-                self.targets.append(result['callsign'])
+            # Store callsign
+            self.targets.append(result['callsign'])
+
+        return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Dapnet Notification
         """
 
-        if len(self.targets) == 0:
-            # There were no services to notify
-            self.logger.warning('There were no Dapnet targets to notify.')
+        if not self.targets:
+            # There is no one to email; we're done
+            self.logger.warning(
+                'There are no Amateur radio callsigns to notify')
             return False
+
+        # Send in batches if identified to do so
+        batch_size = 1 if not self.batch else self.default_batch_size
 
         headers = {
             'User-Agent': self.app_id,
@@ -209,71 +228,72 @@ class NotifyDapnet(NotifyBase):
         # error tracking (used for function return)
         has_error = False
 
-        # prepare JSON payload
-
         # prepare the emergency mode
         emergency_mode = True \
             if self.priority == DapnetPriority.EMERGENCY else False
 
-        # truncate the body (if necessary)
-        _payload_body = body
-        if len(_payload_body) > 80:
-            self.logger.debug('Message exceeds max DAPNET msglen; truncating')
-            _payload_body = _payload_body[:80]
+        # Create a copy of the targets list
+        targets = list(self.targets)
 
-        payload = {
-            'text': _payload_body,
-            'callSignNames': self.targets,
-            'transmitterGroupNames': self.transmittergroups,
-            'emergency': emergency_mode,
-        }
+        for index in range(0, len(targets), batch_size):
 
-        self.logger.debug('DAPNET POST URL: %s' % self.notify_url)
-        self.logger.debug('DAPNET Payload: %s' % dumps(payload))
+            # prepare JSON payload
+            payload = {
+                'text': body,
+                'callSignNames': targets[index:index + batch_size],
+                'transmitterGroupNames': self.txgroups,
+                'emergency': emergency_mode,
+            }
 
-        # Always call throttle before any remote server i/o is made
-        self.throttle()
-        try:
-            r = requests.post(
-                self.notify_url,
-                data=dumps(payload),
-                headers=headers,
-                auth=HTTPBasicAuth(username=self.user, password=self.password),
-                timeout=self.request_timeout,
-            )
-            if r.status_code != requests.codes.created:
-                # We had a problem
+            self.logger.debug('DAPNET POST URL: %s' % self.notify_url)
+            self.logger.debug('DAPNET Payload: %s' % dumps(payload))
 
-                self.logger.warning(
-                    'Failed to send DAPNET notification {} to {}: '
-                    'error={}.'.format(
-                        payload['text'],
-                        ' to {}'.format(self.targets),
-                        r.status_code
-                    )
+            # Always call throttle before any remote server i/o is made
+            self.throttle()
+            try:
+                r = requests.post(
+                    self.notify_url,
+                    data=dumps(payload),
+                    headers=headers,
+                    auth=HTTPBasicAuth(
+                        username=self.user, password=self.password),
+                    verify=self.verify_certificate,
+                    timeout=self.request_timeout,
                 )
+                if r.status_code != requests.codes.created:
+                    # We had a problem
 
-                self.logger.debug('Response Details:\r\n{}'.format(r.content))
+                    self.logger.warning(
+                        'Failed to send DAPNET notification {} to {}: '
+                        'error={}.'.format(
+                            payload['text'],
+                            ' to {}'.format(self.targets),
+                            r.status_code
+                        )
+                    )
+
+                    self.logger.debug(
+                        'Response Details:\r\n{}'.format(r.content))
+
+                    # Mark our failure
+                    has_error = True
+
+                else:
+                    self.logger.info(
+                        'Sent \'{}\' DAPNET notification {}'.format(
+                            payload['text'], 'to {}'.format(self.targets)
+                        )
+                    )
+
+            except requests.RequestException as e:
+                self.logger.warning(
+                    'A Connection error occurred sending DAPNET '
+                    'notification to {}'.format(self.targets)
+                )
+                self.logger.debug('Socket Exception: %s' % str(e))
 
                 # Mark our failure
                 has_error = True
-
-            else:
-                self.logger.info(
-                    'Sent \'{}\' DAPNET notification {}'.format(
-                        payload['text'], 'to {}'.format(self.targets)
-                    )
-                )
-
-        except requests.RequestException as e:
-            self.logger.warning(
-                'A Connection error occurred sending DAPNET '
-                'notification to {}'.format(self.targets)
-            )
-            self.logger.debug('Socket Exception: %s' % str(e))
-
-            # Mark our failure
-            has_error = True
 
         return not has_error
 
@@ -292,6 +312,8 @@ class NotifyDapnet(NotifyBase):
         params = {
             'priority': 'normal' if self.priority not in _map
             else _map[self.priority],
+            'batch': 'yes' if self.batch else 'no',
+            'txgroups': ','.join(self.txgroups),
         }
 
         # Extend our parameters
@@ -308,7 +330,7 @@ class NotifyDapnet(NotifyBase):
         return '{schema}://{auth}{targets}?{params}'.format(
             schema=self.secure_protocol,
             auth=auth,
-            targets='/'.join([NotifyDapnet.quote(x, safe='')
+            targets='/'.join([self.pprint(x, privacy, safe='')
                               for x in self.targets]),
             params=NotifyDapnet.urlencode(params),
         )
@@ -334,8 +356,7 @@ class NotifyDapnet(NotifyBase):
         # Support the 'to' variable so that we can support rooms this way too
         # The 'to' makes it easier to use yaml configuration
         if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'] += \
-                NotifyDapnet.parse_call_sign(results['qsd']['to'])
+            results['targets'] += parse_call_sign(results['qsd']['to'])
 
         # Check for priority
         if 'priority' in results['qsd'] and len(results['qsd']['priority']):
@@ -359,12 +380,14 @@ class NotifyDapnet(NotifyBase):
 
         # Check for one or multiple transmitter groups (comma separated)
         # and split them up, when necessary
-        if 'transmittergroups' in results['qsd']:
-            try:
-                _tgroups = results['qsd']['transmittergroups'].lower()
-                results['transmittergroups'] = \
-                    [x.strip() for x in _tgroups.split(',')]
-            except KeyError:
-                pass
+        if 'txgroups' in results['qsd']:
+            results['txgroups'] = \
+                [x.lower() for x in
+                 NotifyDapnet.parse_list(results['qsd']['txgroups'])]
+
+        # Get Batch Mode Flag
+        results['batch'] = \
+            parse_bool(results['qsd'].get(
+                'batch', NotifyDapnet.template_args['batch']['default']))
 
         return results

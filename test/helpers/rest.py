@@ -230,6 +230,9 @@ class AppriseURLTester(object):
             assert False
 
         if isinstance(obj, plugins.NotifyBase):
+            # Ensure we are not performing any type of thorttling
+            obj.request_rate_per_sec = 0
+
             # We loaded okay; now lets make sure we can reverse
             # this url
             assert isinstance(obj.url(), six.string_types) is True
