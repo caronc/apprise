@@ -133,6 +133,17 @@ IS_PHONE_NO = re.compile(r'^\+?(?P<phone>[0-9\s)(+-]+)\s*$')
 PHONE_NO_DETECTION_RE = re.compile(
     r'\s*([+(\s]*[0-9][0-9()\s-]+[0-9])(?=$|[\s,+(]+[0-9])', re.I)
 
+# A simple verification check to make sure the content specified
+# rougly conforms to a ham radio call sign before we parse it further
+IS_CALL_SIGN = re.compile(
+    r'^(?P<callsign>[a-z0-9]{2,3}[0-9][a-z0-9]{3})'
+    r'(?P<ssid>-[a-z0-9]{1,2})?\s*$', re.I)
+
+# Regular expression used to destinguish between multiple ham radio call signs
+CALL_SIGN_DETECTION_RE = re.compile(
+    r'\s*([a-z0-9]{2,3}[0-9][a-z0-9]{3}(?:-[a-z0-9]{1,2})?)'
+    r'(?=$|[\s,]+[a-z0-9]{4,6})', re.I)
+
 # Regular expression used to destinguish between multiple URLs
 URL_DETECTION_RE = re.compile(
     r'([a-z0-9]+?:\/\/.*?)(?=$|[\s,]+[a-z0-9]{2,9}?:\/\/)', re.I)
@@ -369,6 +380,37 @@ def is_phone_no(phone, min_len=11):
 
         # All digits in-line
         'full': full,
+    }
+
+
+def is_call_sign(callsign):
+    """Determine if the specified entry is a ham radio call sign
+
+    Args:
+        callsign (str): The string you want to check.
+
+    Returns:
+        bool: Returns False if the address specified is not a phone number
+    """
+
+    try:
+        result = IS_CALL_SIGN.match(callsign)
+        if not result:
+            # not parseable content as it does not even conform closely to a
+            # callsign
+            return False
+
+    except TypeError:
+        # not parseable content
+        return False
+
+    ssid = result.group('ssid')
+    return {
+        # always treat call signs as uppercase content
+        'callsign': result.group('callsign').upper(),
+        # Prevent the storing of the None keyword in the event the SSID was
+        # not detected
+        'ssid': ssid if ssid else '',
     }
 
 
@@ -761,6 +803,43 @@ def parse_phone_no(*args, **kwargs):
         elif isinstance(arg, (set, list, tuple)):
             # Use recursion to handle the list of phone numbers
             result += parse_phone_no(
+                *arg, store_unparseable=store_unparseable)
+
+    return result
+
+
+def parse_call_sign(*args, **kwargs):
+    """
+    Takes a string containing ham radio call signs separated by
+    comma and/or spacesand returns a list.
+    """
+
+    # for Python 2.7 support, store_unparsable is not in the url above
+    # as just parse_emails(*args, store_unparseable=True) since it is
+    # an invalid syntax.  This is the workaround to be backards compatible:
+    store_unparseable = kwargs.get('store_unparseable', True)
+
+    result = []
+    for arg in args:
+        if isinstance(arg, six.string_types) and arg:
+            _result = CALL_SIGN_DETECTION_RE.findall(arg)
+            if _result:
+                result += _result
+
+            elif not _result and store_unparseable:
+                # we had content passed into us that was lost because it was
+                # so poorly formatted that it didn't even come close to
+                # meeting the regular expression we defined. We intentially
+                # keep it as part of our result set so that parsing done
+                # at a higher level can at least report this to the end user
+                # and hopefully give them some indication as to what they
+                # may have done wrong.
+                result += \
+                    [x for x in filter(bool, re.split(STRING_DELIMITERS, arg))]
+
+        elif isinstance(arg, (set, list, tuple)):
+            # Use recursion to handle the list of call signs
+            result += parse_call_sign(
                 *arg, store_unparseable=store_unparseable)
 
     return result

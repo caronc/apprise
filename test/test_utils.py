@@ -751,6 +751,44 @@ def test_is_email():
     assert utils.is_email("Name <bademail>") is False
 
 
+def test_is_call_sign_no():
+    """
+    API: is_call_sign() function
+
+    """
+    # Invalid numbers
+    assert utils.is_call_sign(None) is False
+    assert utils.is_call_sign(42) is False
+    assert utils.is_call_sign(object) is False
+    assert utils.is_call_sign('') is False
+    assert utils.is_call_sign('1') is False
+    assert utils.is_call_sign('12') is False
+    assert utils.is_call_sign('abc') is False
+    assert utils.is_call_sign('+()') is False
+    assert utils.is_call_sign('+') is False
+    assert utils.is_call_sign(None) is False
+    assert utils.is_call_sign(42) is False
+
+    # To short or 2 long
+    assert utils.is_call_sign('DF1AB') is False
+    assert utils.is_call_sign('DF1ABCX') is False
+    assert utils.is_call_sign('DF1ABCEFG') is False
+    assert utils.is_call_sign('1ABCX') is False
+    # 4th character is not an number
+    assert utils.is_call_sign('XXXXXX') is False
+
+    # Some valid checks
+    result = utils.is_call_sign('DF1ABC')
+    assert isinstance(result, dict)
+    assert 'DF1ABC' == result['callsign']
+    assert '' == result['ssid']
+
+    # Get our SSID
+    result = utils.is_call_sign('DF1ABC-14')
+    assert 'DF1ABC' == result['callsign']
+    assert '-14' == result['ssid']
+
+
 def test_is_phone_no():
     """
     API: is_phone_no() function
@@ -859,6 +897,48 @@ def test_is_phone_no():
     assert '1234567' == results['line']
     assert '+1 800-123-4567' == results['pretty']
     assert '18001234567' == results['full']
+
+
+def test_parse_call_sign():
+    """utils: parse_call_sign() testing """
+    # A simple single array entry (As str)
+    results = utils.parse_call_sign('')
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    # just delimeters
+    results = utils.parse_call_sign(',  ,, , ,,, ')
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    results = utils.parse_call_sign(None)
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    results = utils.parse_call_sign(42)
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    results = utils.parse_call_sign('this is not a parseable call sign at all')
+    assert isinstance(results, list)
+    assert len(results) == 9
+
+    results = utils.parse_call_sign(
+        'this is not a parseable call sign at all', store_unparseable=False)
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    # Now test valid call signs
+    results = utils.parse_call_sign('0A1DEF')
+    assert isinstance(results, list)
+    assert len(results) == 1
+    assert '0A1DEF' in results
+
+    results = utils.parse_call_sign('0A1DEF, DF1ABC')
+    assert isinstance(results, list)
+    assert len(results) == 2
+    assert '0A1DEF' in results
+    assert 'DF1ABC' in results
 
 
 def test_parse_phone_no():
