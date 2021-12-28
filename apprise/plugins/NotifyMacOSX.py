@@ -131,8 +131,8 @@ class NotifyMacOSX(NotifyBase):
         self.include_image = include_image
 
         # Acquire the notify path
-        self.notify_path = \
-            next((p for p in self.notify_paths if os.access(p, os.X_OK)), None)
+        self.notify_path = next(  # pragma: no branch
+            (p for p in self.notify_paths if os.access(p, os.X_OK)), None)
 
         # Set sound object (no q/a for now)
         self.sound = sound
