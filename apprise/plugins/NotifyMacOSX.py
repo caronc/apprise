@@ -91,8 +91,11 @@ class NotifyMacOSX(NotifyBase):
     # content to display
     body_max_line_count = 10
 
-    # The path to the terminal-notifier
-    notify_path = '/usr/local/bin/terminal-notifier'
+    # The possible paths to the terminal-notifier
+    notify_paths = (
+        '/opt/homebrew/bin/terminal-notify',
+        '/usr/local/bin/terminal-notifier',
+    )
 
     # Define object templates
     templates = (
@@ -127,6 +130,10 @@ class NotifyMacOSX(NotifyBase):
         # or not.
         self.include_image = include_image
 
+        # Acquire the notify path
+        self.notify_path = next(  # pragma: no branch
+            (p for p in self.notify_paths if os.access(p, os.X_OK)), None)
+
         # Set sound object (no q/a for now)
         self.sound = sound
         return
@@ -136,10 +143,11 @@ class NotifyMacOSX(NotifyBase):
         Perform MacOSX Notification
         """
 
-        if not os.access(self.notify_path, os.X_OK):
+        if not (self.notify_path and os.access(self.notify_path, os.X_OK)):
             self.logger.warning(
-                "MacOSX Notifications require '{}' to be in place."
-                .format(self.notify_path))
+                "MacOSX Notifications requires one of the following to "
+                "be in place: '{}'.".format(
+                    '\', \''.join(self.notify_paths)))
             return False
 
         # Start with our notification path
