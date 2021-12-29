@@ -150,6 +150,8 @@ class NotifyMQTT(NotifyBase):
         "/etc/pki/tls/cacert.pem",
         # CentOS/RHEL 7
         "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
+        # Alpine Linux
+        "/etc/ssl/cert.pem",
     ]
 
     # Define object templates
