@@ -35,6 +35,16 @@ from ..common import NotifyType
 from ..AppriseLocale import gettext_lazy as _
 
 
+# Defines the method to send the notification
+METHODS = (
+    'POST',
+    'GET',
+    'DELETE',
+    'PUT',
+    'HEAD'
+)
+
+
 class NotifyXML(NotifyBase):
     """
     A wrapper for XML Notifications
@@ -98,6 +108,17 @@ class NotifyXML(NotifyBase):
             'type': 'string',
             'private': True,
         },
+
+    })
+
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'method': {
+            'name': _('Fetch Method'),
+            'type': 'choice:string',
+            'values': METHODS,
+            'default': METHODS[0],
+        },
     })
 
     # Define any kwargs we're using
@@ -108,7 +129,7 @@ class NotifyXML(NotifyBase):
         },
     }
 
-    def __init__(self, headers=None, **kwargs):
+    def __init__(self, headers=None, method=None, **kwargs):
         """
         Initialize XML Object
 
@@ -138,6 +159,14 @@ class NotifyXML(NotifyBase):
         if not isinstance(self.fullpath, six.string_types):
             self.fullpath = '/'
 
+        self.method = self.template_args['method']['default'] \
+            if not isinstance(method, six.string_types) else method.upper()
+
+        if self.method not in METHODS:
+            msg = 'The method specified ({}) is invalid.'.format(method)
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
         self.headers = {}
         if headers:
             # Store our extra headers
@@ -150,11 +179,16 @@ class NotifyXML(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Store our defined headers into our URL parameters
-        params = {'+{}'.format(k): v for k, v in self.headers.items()}
+        # Define any URL parameters
+        params = {
+            'method': self.method,
+        }
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+
+        # Append our headers into our parameters
+        params.update({'+{}'.format(k): v for k, v in self.headers.items()})
 
         # Determine Authentication
         auth = ''
@@ -277,8 +311,23 @@ class NotifyXML(NotifyBase):
         # Always call throttle before any remote server i/o is made
         self.throttle()
 
+        if self.method == 'GET':
+            method = requests.get
+
+        elif self.method == 'PUT':
+            method = requests.put
+
+        elif self.method == 'DELETE':
+            method = requests.delete
+
+        elif self.method == 'HEAD':
+            method = requests.head
+
+        else:  # POST
+            method = requests.post
+
         try:
-            r = requests.post(
+            r = method(
                 url,
                 data=payload,
                 headers=headers,
@@ -292,11 +341,11 @@ class NotifyXML(NotifyBase):
                     NotifyXML.http_response_code_lookup(r.status_code)
 
                 self.logger.warning(
-                    'Failed to send XML notification: '
-                    '{}{}error={}.'.format(
-                        status_str,
-                        ', ' if status_str else '',
-                        r.status_code))
+                    'Failed to send JSON %s notification: %s%serror=%s.',
+                    self.method,
+                    status_str,
+                    ', ' if status_str else '',
+                    str(r.status_code))
 
                 self.logger.debug('Response Details:\r\n{}'.format(r.content))
 
@@ -304,7 +353,7 @@ class NotifyXML(NotifyBase):
                 return False
 
             else:
-                self.logger.info('Sent XML notification.')
+                self.logger.info('Sent XML %s notification.', self.method)
 
         except requests.RequestException as e:
             self.logger.warning(
@@ -341,5 +390,9 @@ class NotifyXML(NotifyBase):
         # Tidy our header entries by unquoting them
         results['headers'] = {NotifyXML.unquote(x): NotifyXML.unquote(y)
                               for x, y in results['headers'].items()}
+
+        # Set method if not otherwise set
+        if 'method' in results['qsd'] and len(results['qsd']['method']):
+            results['method'] = NotifyXML.unquote(results['qsd']['method'])
 
         return results

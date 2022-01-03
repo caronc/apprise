@@ -298,7 +298,11 @@ class AppriseURLTester(object):
 
     @mock.patch('requests.get')
     @mock.patch('requests.post')
-    def __notify(self, url, obj, meta, asset, mock_post, mock_get):
+    @mock.patch('requests.head')
+    @mock.patch('requests.put')
+    @mock.patch('requests.delete')
+    def __notify(self, url, obj, meta, asset, mock_del, mock_put, mock_head,
+                 mock_post, mock_get):
         """
         Perform notification testing against object specified
         """
@@ -344,20 +348,36 @@ class AppriseURLTester(object):
         robj.content = u''
         mock_get.return_value = robj
         mock_post.return_value = robj
+        mock_head.return_value = robj
+        mock_del.return_value = robj
+        mock_put.return_value = robj
 
         if test_requests_exceptions is False:
             # Handle our default response
+            mock_put.return_value.status_code = requests_response_code
+            mock_head.return_value.status_code = requests_response_code
+            mock_del.return_value.status_code = requests_response_code
             mock_post.return_value.status_code = requests_response_code
             mock_get.return_value.status_code = requests_response_code
 
             # Handle our default text response
             mock_get.return_value.content = requests_response_text
             mock_post.return_value.content = requests_response_text
+            mock_del.return_value.content = requests_response_text
+            mock_put.return_value.content = requests_response_text
+            mock_head.return_value.content = requests_response_text
+
             mock_get.return_value.text = requests_response_text
             mock_post.return_value.text = requests_response_text
+            mock_put.return_value.text = requests_response_text
+            mock_del.return_value.text = requests_response_text
+            mock_head.return_value.text = requests_response_text
 
             # Ensure there is no side effect set
             mock_post.side_effect = None
+            mock_del.side_effect = None
+            mock_put.side_effect = None
+            mock_head.side_effect = None
             mock_get.side_effect = None
 
         else:
@@ -457,6 +477,9 @@ class AppriseURLTester(object):
 
                 for _exception in self.req_exceptions:
                     mock_post.side_effect = _exception
+                    mock_head.side_effect = _exception
+                    mock_del.side_effect = _exception
+                    mock_put.side_effect = _exception
                     mock_get.side_effect = _exception
 
                     try:
@@ -498,6 +521,9 @@ class AppriseURLTester(object):
             else:
                 for _exception in self.req_exceptions:
                     mock_post.side_effect = _exception
+                    mock_del.side_effect = _exception
+                    mock_put.side_effect = _exception
+                    mock_head.side_effect = _exception
                     mock_get.side_effect = _exception
 
                     try:

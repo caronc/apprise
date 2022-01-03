@@ -47,12 +47,34 @@ apprise_url_tests = (
     ('xml://user@localhost', {
         'instance': plugins.NotifyXML,
     }),
+    ('xml://user@localhost?method=invalid', {
+        'instance': TypeError,
+    }),
     ('xml://user:pass@localhost', {
         'instance': plugins.NotifyXML,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'xml://user:****@localhost',
     }),
+
+    # Test method variations
+    ('xml://user@localhost?method=put', {
+        'instance': plugins.NotifyXML,
+    }),
+    ('xml://user@localhost?method=get', {
+        'instance': plugins.NotifyXML,
+    }),
+    ('xml://user@localhost?method=post', {
+        'instance': plugins.NotifyXML,
+    }),
+    ('xml://user@localhost?method=head', {
+        'instance': plugins.NotifyXML,
+    }),
+    ('xml://user@localhost?method=delete', {
+        'instance': plugins.NotifyXML,
+    }),
+
+    # Continue testing other cases
     ('xml://localhost:8080', {
         'instance': plugins.NotifyXML,
     }),
@@ -64,9 +86,25 @@ apprise_url_tests = (
     }),
     ('xmls://user:pass@localhost', {
         'instance': plugins.NotifyXML,
-
+    }),
+    # Continue testing other cases
+    ('xml://localhost:8080', {
+        'instance': plugins.NotifyXML,
+    }),
+    ('xml://user:pass@localhost:8080', {
+        'instance': plugins.NotifyXML,
+    }),
+    ('xml://localhost', {
+        'instance': plugins.NotifyXML,
+    }),
+    ('xmls://user:pass@localhost', {
+        'instance': plugins.NotifyXML,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'xmls://user:****@localhost',
+    }),
+    ('xml://user@localhost:8080/path/', {
+        'instance': plugins.NotifyXML,
+        'privacy_url': 'xml://user@localhost:8080/path',
     }),
     ('xmls://localhost:8080/path/', {
         'instance': plugins.NotifyXML,
