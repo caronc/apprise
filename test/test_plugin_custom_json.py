@@ -44,6 +44,9 @@ apprise_url_tests = (
     ('json://localhost', {
         'instance': plugins.NotifyJSON,
     }),
+    ('json://user@localhost?method=invalid', {
+        'instance': TypeError,
+    }),
     ('json://user:pass@localhost', {
         'instance': plugins.NotifyJSON,
 
@@ -53,6 +56,25 @@ apprise_url_tests = (
     ('json://user@localhost', {
         'instance': plugins.NotifyJSON,
     }),
+
+    # Test method variations
+    ('json://user@localhost?method=put', {
+        'instance': plugins.NotifyJSON,
+    }),
+    ('json://user@localhost?method=get', {
+        'instance': plugins.NotifyJSON,
+    }),
+    ('json://user@localhost?method=post', {
+        'instance': plugins.NotifyJSON,
+    }),
+    ('json://user@localhost?method=head', {
+        'instance': plugins.NotifyJSON,
+    }),
+    ('json://user@localhost?method=delete', {
+        'instance': plugins.NotifyJSON,
+    }),
+
+    # Continue testing other cases
     ('json://localhost:8080', {
         'instance': plugins.NotifyJSON,
     }),

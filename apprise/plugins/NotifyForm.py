@@ -25,8 +25,6 @@
 
 import six
 import requests
-import base64
-from json import dumps
 
 from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
@@ -45,27 +43,27 @@ METHODS = (
 )
 
 
-class NotifyJSON(NotifyBase):
+class NotifyForm(NotifyBase):
     """
-    A wrapper for JSON Notifications
+    A wrapper for Form Notifications
     """
 
     # The default descriptive name associated with the Notification
-    service_name = 'JSON'
+    service_name = 'Form'
 
     # The default protocol
-    protocol = 'json'
+    protocol = 'form'
 
     # The default secure protocol
-    secure_protocol = 'jsons'
+    secure_protocol = 'forms'
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_Custom_JSON'
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_Custom_Form'
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_128
 
-    # Disable throttle rate for JSON requests since they are normally
+    # Disable throttle rate for Form requests since they are normally
     # local anyway
     request_rate_per_sec = 0
 
@@ -122,17 +120,21 @@ class NotifyJSON(NotifyBase):
             'name': _('HTTP Header'),
             'prefix': '+',
         },
+        'payload': {
+            'name': _('Payload Extras'),
+            'prefix': ':',
+        },
     }
 
-    def __init__(self, headers=None, method=None, **kwargs):
+    def __init__(self, headers=None, method=None, payload=None, **kwargs):
         """
-        Initialize JSON Object
+        Initialize Form Object
 
         headers can be a dictionary of key/value pairs that you want to
         additionally include as part of the server headers to post with
 
         """
-        super(NotifyJSON, self).__init__(**kwargs)
+        super(NotifyForm, self).__init__(**kwargs)
 
         self.fullpath = kwargs.get('fullpath')
         if not isinstance(self.fullpath, six.string_types):
@@ -150,6 +152,11 @@ class NotifyJSON(NotifyBase):
         if headers:
             # Store our extra headers
             self.headers.update(headers)
+
+        self.payload_extras = {}
+        if payload:
+            # Store our extra payload entries
+            self.payload_extras.update(payload)
 
         return
 
@@ -169,17 +176,21 @@ class NotifyJSON(NotifyBase):
         # Append our headers into our parameters
         params.update({'+{}'.format(k): v for k, v in self.headers.items()})
 
+        # Append our payload extra's into our parameters
+        params.update(
+            {':{}'.format(k): v for k, v in self.payload_extras.items()})
+
         # Determine Authentication
         auth = ''
         if self.user and self.password:
             auth = '{user}:{password}@'.format(
-                user=NotifyJSON.quote(self.user, safe=''),
+                user=NotifyForm.quote(self.user, safe=''),
                 password=self.pprint(
                     self.password, privacy, mode=PrivacyMode.Secret, safe=''),
             )
         elif self.user:
             auth = '{user}@'.format(
-                user=NotifyJSON.quote(self.user, safe=''),
+                user=NotifyForm.quote(self.user, safe=''),
             )
 
         default_port = 443 if self.secure else 80
@@ -191,28 +202,27 @@ class NotifyJSON(NotifyBase):
             hostname=self.host,
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
-            fullpath=NotifyJSON.quote(self.fullpath, safe='/'),
-            params=NotifyJSON.urlencode(params),
+            fullpath=NotifyForm.quote(self.fullpath, safe='/'),
+            params=NotifyForm.urlencode(params),
         )
 
     def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
              **kwargs):
         """
-        Perform JSON Notification
+        Perform Form Notification
         """
 
         headers = {
             'User-Agent': self.app_id,
-            'Content-Type': 'application/json'
         }
 
         # Apply any/all header over-rides defined
         headers.update(self.headers)
 
         # Track our potential attachments
-        attachments = []
+        files = []
         if attach:
-            for attachment in attach:
+            for no, attachment in enumerate(attach, start=1):
                 # Perform some simple error checking
                 if not attachment:
                     # We could not access the attachment
@@ -222,24 +232,27 @@ class NotifyJSON(NotifyBase):
                     return False
 
                 try:
-                    with open(attachment.path, 'rb') as f:
-                        # Output must be in a DataURL format (that's what
-                        # PushSafer calls it):
-                        attachments.append({
-                            'filename': attachment.name,
-                            'base64': base64.b64encode(f.read())
-                            .decode('utf-8'),
-                            'mimetype': attachment.mimetype,
-                        })
+                    files.append((
+                        'file{:02d}'.format(no), (
+                            attachment.name,
+                            open(attachment.path, 'rb'),
+                            attachment.mimetype)
+                    ))
 
                 except (OSError, IOError) as e:
                     self.logger.warning(
-                        'An I/O error occurred while reading {}.'.format(
+                        'An I/O error occurred while opening {}.'.format(
                             attachment.name if attachment else 'attachment'))
                     self.logger.debug('I/O Exception: %s' % str(e))
                     return False
 
-        # prepare JSON Object
+                finally:
+                    for file in files:
+                        # Ensure all files are closed
+                        if file[1][1]:
+                            file[1][1].close()
+
+        # prepare Form Object
         payload = {
             # Version: Major.Minor,  Major is only updated if the entire
             # schema is changed. If just adding new items (or removing
@@ -247,9 +260,11 @@ class NotifyJSON(NotifyBase):
             'version': '1.0',
             'title': title,
             'message': body,
-            'attachments': attachments,
             'type': notify_type,
         }
+
+        # Apply any/all payload over-rides defined
+        payload.update(self.payload_extras)
 
         auth = None
         if self.user:
@@ -264,10 +279,10 @@ class NotifyJSON(NotifyBase):
 
         url += self.fullpath
 
-        self.logger.debug('JSON POST URL: %s (cert_verify=%r)' % (
+        self.logger.debug('Form POST URL: %s (cert_verify=%r)' % (
             url, self.verify_certificate,
         ))
-        self.logger.debug('JSON Payload: %s' % str(payload))
+        self.logger.debug('Form Payload: %s' % str(payload))
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -290,7 +305,8 @@ class NotifyJSON(NotifyBase):
         try:
             r = method(
                 url,
-                data=dumps(payload),
+                files=None if not files else files,
+                data=payload,
                 headers=headers,
                 auth=auth,
                 verify=self.verify_certificate,
@@ -299,10 +315,10 @@ class NotifyJSON(NotifyBase):
             if r.status_code != requests.codes.ok:
                 # We had a problem
                 status_str = \
-                    NotifyJSON.http_response_code_lookup(r.status_code)
+                    NotifyForm.http_response_code_lookup(r.status_code)
 
                 self.logger.warning(
-                    'Failed to send JSON %s notification: %s%serror=%s.',
+                    'Failed to send Form %s notification: %s%serror=%s.',
                     self.method,
                     status_str,
                     ', ' if status_str else '',
@@ -314,16 +330,28 @@ class NotifyJSON(NotifyBase):
                 return False
 
             else:
-                self.logger.info('Sent JSON %s notification.', self.method)
+                self.logger.info('Sent Form %s notification.', self.method)
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occurred sending JSON '
+                'A Connection error occurred sending Form '
                 'notification to %s.' % self.host)
             self.logger.debug('Socket Exception: %s' % str(e))
 
             # Return; we're done
             return False
+
+        except (OSError, IOError) as e:
+            self.logger.warning(
+                'An I/O error occurred while reading one of the '
+                'attached files.')
+            self.logger.debug('I/O Exception: %s' % str(e))
+            return False
+
+        finally:
+            for file in files:
+                # Ensure all files are closed
+                file[1][1].close()
 
         return True
 
@@ -339,21 +367,25 @@ class NotifyJSON(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
+        # store any additional payload extra's defined
+        results['payload'] = {NotifyForm.unquote(x): NotifyForm.unquote(y)
+                              for x, y in results['qsd:'].items()}
+
         # Add our headers that the user can potentially over-ride if they wish
         # to to our returned result set
         results['headers'] = results['qsd+']
         if results['qsd-']:
             results['headers'].update(results['qsd-'])
             NotifyBase.logger.deprecate(
-                "minus (-) based JSON header tokens are being "
+                "minus (-) based Form header tokens are being "
                 " removed; use the plus (+) symbol instead.")
 
         # Tidy our header entries by unquoting them
-        results['headers'] = {NotifyJSON.unquote(x): NotifyJSON.unquote(y)
+        results['headers'] = {NotifyForm.unquote(x): NotifyForm.unquote(y)
                               for x, y in results['headers'].items()}
 
         # Set method if not otherwise set
         if 'method' in results['qsd'] and len(results['qsd']['method']):
-            results['method'] = NotifyJSON.unquote(results['qsd']['method'])
+            results['method'] = NotifyForm.unquote(results['qsd']['method'])
 
         return results
