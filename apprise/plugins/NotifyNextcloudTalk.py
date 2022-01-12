@@ -159,10 +159,6 @@ class NotifyNextcloudTalk(NotifyBase):
                     if title else self.app_desc + '\r\n' + body,
                 }
 
-            auth = None
-            if self.user:
-                auth = (self.user, self.password)
-
             # Nextcloud Talk URL
             notify_url = '{schema}://{host}'\
                          '/ocs/v2.php/apps/spreed/api/v1/chat/{target}'
@@ -189,7 +185,7 @@ class NotifyNextcloudTalk(NotifyBase):
                     notify_url,
                     data=payload,
                     headers=headers,
-                    auth=auth,
+                    auth=(self.user, self.password),
                     verify=self.verify_certificate,
                     timeout=self.request_timeout,
                 )
@@ -234,17 +230,11 @@ class NotifyNextcloudTalk(NotifyBase):
         """
 
         # Determine Authentication
-        auth = ''
-        if self.user and self.password:
-            auth = '{user}:{password}@'.format(
-                user=NotifyNextcloudTalk.quote(self.user, safe=''),
-                password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
-            )
-        elif self.user:
-            auth = '{user}@'.format(
-                user=NotifyNextcloudTalk.quote(self.user, safe=''),
-            )
+        auth = '{user}:{password}@'.format(
+            user=NotifyNextcloudTalk.quote(self.user, safe=''),
+            password=self.pprint(
+                self.password, privacy, mode=PrivacyMode.Secret, safe=''),
+        )
 
         default_port = 443 if self.secure else 80
 
