@@ -51,7 +51,7 @@ Apprise API, AWS SES, AWS SNS, Boxcar, ClickSend, DAPNET, DingTalk, Discord, E-M
 Emby, Faast, FCM, Flock, Gitter, Google Chat, Gotify, Growl, Home Assistant,
 IFTTT, Join, Kavenegar, KODI, Kumulos, LaMetric, MacOSX, Mailgun, Mattermost,
 Matrix, Microsoft Windows, Microsoft Teams, MessageBird, MQTT, MSG91, MyAndroid,
-Nexmo, Nextcloud, Notica, Notifico, Office365, OneSignal, Opsgenie,
+Nexmo, Nextcloud, NextcloudTalk, Notica, Notifico, Office365, OneSignal, Opsgenie,
 ParsePlatform, PopcornNotify, Prowl, Pushalot, PushBullet, Pushjet, Pushover,
 PushSafer, Reddit, Rocket.Chat, SendGrid, ServerChan, SimplePush, Sinch, Slack,
 SMTP2Go, Spontit, SparkPost, Super Toasty, Streamlabs, Stride, Syslog, Techulus Push,
