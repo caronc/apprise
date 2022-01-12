@@ -306,7 +306,7 @@ apobj.notify(
 # this case after 3 seconds).
 apobj.notify(
     title='Latest security image',
-    attach='http:/admin:password@hikvision-cam01/ISAPI/Streaming/channels/101/picture?cache=3'
+    attach='http://admin:password@hikvision-cam01/ISAPI/Streaming/channels/101/picture?cache=3'
 )
 ```
 
