@@ -485,13 +485,14 @@ class NotifyTelegram(NotifyBase):
 
         if 'ok' in response and response['ok'] is True \
                 and 'result' in response and len(response['result']):
-            entry = response['result'][0]
-            _id = entry['message']['from'].get('id', 0)
-            _user = entry['message']['from'].get('first_name')
-            self.logger.info('Detected Telegram user %s (userid=%d)' % (
-                _user, _id))
-            # Return our detected userid
-            return _id
+            for entry in response['result']: 
+                if 'message' in entry and 'from' in entry['message']:
+                    _id = entry['message']['from'].get('id', 0)
+                    _user = entry['message']['from'].get('first_name')
+                    self.logger.info('Detected Telegram user %s (userid=%d)' % (
+                        _user, _id))
+                    # Return our detected userid
+                    return _id
 
         self.logger.warning(
             'Failed to detect a Telegram user; '
