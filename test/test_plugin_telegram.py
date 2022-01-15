@@ -349,9 +349,30 @@ def test_plugin_telegram_general(mock_post, mock_get):
     mock_post.return_value.content = dumps({
         "ok": True,
         "result": [{
+            "update_id": 645421319,
+            # Entry without `message` in it
+        }, {
+            # Entry without `from` in `message`
+            "update_id": 645421320,
+            "message": {
+                "message_id": 2,
+                "chat": {
+                    "id": 532389719,
+                    "first_name": "Chris",
+                    "type": "private"
+                },
+                "date": 1519694394,
+                "text": "/start",
+                "entities": [{
+                    "offset": 0,
+                    "length": 6,
+                    "type": "bot_command",
+                }],
+            }
+        }, {
             "update_id": 645421321,
             "message": {
-                "message_id": 1,
+                "message_id": 2,
                 "from": {
                     "id": 532389719,
                     "is_bot": False,
@@ -428,6 +449,54 @@ def test_plugin_telegram_general(mock_post, mock_get):
     assert obj.notify(title='hello', body='world') is False
     assert len(obj.targets) == 0
 
+    # Do the test again, but with ok not set to True
+    mock_post.return_value.content = dumps({
+        "ok": False,
+        "result": [{
+            "update_id": 645421321,
+            "message": {
+                "message_id": 2,
+                "from": {
+                    "id": 532389719,
+                    "is_bot": False,
+                    "first_name": "Chris",
+                    "language_code": "en-US"
+                },
+                "chat": {
+                    "id": 532389719,
+                    "first_name": "Chris",
+                    "type": "private"
+                },
+                "date": 1519694394,
+                "text": "/start",
+                "entities": [{
+                    "offset": 0,
+                    "length": 6,
+                    "type": "bot_command",
+                }],
+            }},
+        ],
+    })
+
+    # No user will be detected now
+    obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+    # No user detected; this happens after our firsst notification
+    assert len(obj.targets) == 0
+    assert obj.notify(title='hello', body='world') is False
+    assert len(obj.targets) == 0
+
+    # An edge case where no results were provided; this will probably never
+    # happen, but it helps with test coverage completeness
+    mock_post.return_value.content = dumps({
+        "ok": True,
+    })
+
+    # No user will be detected now
+    obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+    # No user detected; this happens after our firsst notification
+    assert len(obj.targets) == 0
+    assert obj.notify(title='hello', body='world') is False
+    assert len(obj.targets) == 0
     # Detect the bot with a bad response
     mock_post.return_value.content = dumps({})
     obj.detect_bot_owner()
