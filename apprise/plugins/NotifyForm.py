@@ -138,7 +138,7 @@ class NotifyForm(NotifyBase):
 
         self.fullpath = kwargs.get('fullpath')
         if not isinstance(self.fullpath, six.string_types):
-            self.fullpath = '/'
+            self.fullpath = ''
 
         self.method = self.template_args['method']['default'] \
             if not isinstance(method, six.string_types) else method.upper()
@@ -195,14 +195,15 @@ class NotifyForm(NotifyBase):
 
         default_port = 443 if self.secure else 80
 
-        return '{schema}://{auth}{hostname}{port}{fullpath}/?{params}'.format(
+        return '{schema}://{auth}{hostname}{port}{fullpath}?{params}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
             # never encode hostname since we're expecting it to be a valid one
             hostname=self.host,
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
-            fullpath=NotifyForm.quote(self.fullpath, safe='/'),
+            fullpath=NotifyForm.quote(self.fullpath, safe='/')
+            if self.fullpath else '/',
             params=NotifyForm.urlencode(params),
         )
 
@@ -279,8 +280,8 @@ class NotifyForm(NotifyBase):
 
         url += self.fullpath
 
-        self.logger.debug('Form POST URL: %s (cert_verify=%r)' % (
-            url, self.verify_certificate,
+        self.logger.debug('Form %s URL: %s (cert_verify=%r)' % (
+            self.method, url, self.verify_certificate,
         ))
         self.logger.debug('Form Payload: %s' % str(payload))
 

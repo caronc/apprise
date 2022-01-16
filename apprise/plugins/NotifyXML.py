@@ -157,7 +157,7 @@ class NotifyXML(NotifyBase):
 
         self.fullpath = kwargs.get('fullpath')
         if not isinstance(self.fullpath, six.string_types):
-            self.fullpath = '/'
+            self.fullpath = ''
 
         self.method = self.template_args['method']['default'] \
             if not isinstance(method, six.string_types) else method.upper()
@@ -205,14 +205,15 @@ class NotifyXML(NotifyBase):
 
         default_port = 443 if self.secure else 80
 
-        return '{schema}://{auth}{hostname}{port}{fullpath}/?{params}'.format(
+        return '{schema}://{auth}{hostname}{port}{fullpath}?{params}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
             # never encode hostname since we're expecting it to be a valid one
             hostname=self.host,
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
-            fullpath=NotifyXML.quote(self.fullpath, safe='/'),
+            fullpath=NotifyXML.quote(self.fullpath, safe='/')
+            if self.fullpath else '/',
             params=NotifyXML.urlencode(params),
         )
 
