@@ -313,7 +313,7 @@ class NotifyForm(NotifyBase):
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
             )
-            if r.status_code != requests.codes.ok:
+            if r.status_code < 200 or r.status_code >= 300:
                 # We had a problem
                 status_str = \
                     NotifyForm.http_response_code_lookup(r.status_code)
