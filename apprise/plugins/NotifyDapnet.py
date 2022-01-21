@@ -201,8 +201,10 @@ class NotifyDapnet(NotifyBase):
                 )
                 continue
 
-            # Store callsign
-            self.targets.append(result['callsign'])
+            # Store callsign without SSID and
+            # ignore duplicates
+            if result['callsign'] not in self.targets:
+                self.targets.append(result['callsign'])
 
         return
 
