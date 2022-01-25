@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2019 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2022 Chris Caron <lead2gold@gmail.com>
 # All rights reserved.
 #
 # This code is licensed under the MIT License.
@@ -307,7 +307,8 @@ class NotifyForm(NotifyBase):
             r = method(
                 url,
                 files=None if not files else files,
-                data=payload,
+                data=payload if self.method != 'GET' else None,
+                parms=payload if self.method == 'GET' else None,
                 headers=headers,
                 auth=auth,
                 verify=self.verify_certificate,
