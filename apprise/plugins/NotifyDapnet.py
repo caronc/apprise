@@ -201,8 +201,10 @@ class NotifyDapnet(NotifyBase):
                 )
                 continue
 
-            # Store callsign
-            self.targets.append(result['callsign'])
+            # Store callsign without SSID and
+            # ignore duplicates
+            if result['callsign'] not in self.targets:
+                self.targets.append(result['callsign'])
 
         return
 
@@ -356,7 +358,8 @@ class NotifyDapnet(NotifyBase):
         # Support the 'to' variable so that we can support rooms this way too
         # The 'to' makes it easier to use yaml configuration
         if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'] += parse_call_sign(results['qsd']['to'])
+            results['targets'] += \
+                NotifyDapnet.parse_list(results['qsd']['to'])
 
         # Check for priority
         if 'priority' in results['qsd'] and len(results['qsd']['priority']):

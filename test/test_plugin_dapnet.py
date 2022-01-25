@@ -59,6 +59,15 @@ apprise_url_tests = (
         'instance': plugins.NotifyDapnet,
         'requests_response_code': requests.codes.created,
     }),
+    ('dapnet://user:pass@DF1ABC-1/DF1ABC/DF1ABC-15', {
+        # valid call signs; but a few are duplicates;
+        # at the end there will only be 1 entry
+        'instance': plugins.NotifyDapnet,
+        'requests_response_code': requests.codes.created,
+        # Our expected url(privacy=True) startswith() response:
+        # Note that only 1 entry is saved (as other 2 are duplicates)
+        'privacy_url': 'dapnet://user:****@D...C?',
+    }),
     ('dapnet://user:pass@?to={},{}'.format('DF1ABC', 'DF1DEF'), {
         # support the to= argument
         'instance': plugins.NotifyDapnet,
