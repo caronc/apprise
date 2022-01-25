@@ -481,9 +481,7 @@ def test_plugin_fcm_general_oauth(mock_post):
     assert 'image' not in data['message']['notification']
     assert data['message']['apns']['headers']['apns-priority'] == "10"
     assert data['message']['webpush']['headers']['Urgency'] == "high"
-    assert data['message']['android']['priority'] == "high"
-    assert data['message']['notification']['notification_priority'] \
-        == "PRIORITY_HIGH"
+    assert data['message']['android']['priority'] == "HIGH"
 
     #
     # Test colors
@@ -536,8 +534,8 @@ def test_plugin_fcm_general_oauth(mock_post):
     assert 'data' not in data['message']
     assert 'notification' in data['message']
     assert isinstance(data['message']['notification'], dict)
-    assert 'color' in data['message']['notification']
-    assert data['message']['notification']['color'] == '#12aabb'
+    assert 'color' in data['message']['android']['notification']
+    assert data['message']['android']['notification']['color'] == '#12aabb'
 
 
 @pytest.mark.skipif(

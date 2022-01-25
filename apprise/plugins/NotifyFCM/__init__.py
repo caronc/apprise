@@ -396,8 +396,8 @@ class NotifyFCM(NotifyBase):
 
                 if self.color:
                     # Acquire our color
-                    payload['message']['notification']['color'] = \
-                        self.color.get(notify_type)
+                    payload['message']['android'] = {
+                        'notification': {'color': self.color.get(notify_type)}}
 
                 if self.include_image and image:
                     payload['message']['notification']['image'] = image

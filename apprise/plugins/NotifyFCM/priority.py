@@ -37,44 +37,30 @@ class NotificationPriority(object):
     """
     Defines the Notification Priorities as described on:
     https://firebase.google.com/docs/reference/fcm/rest/v1/\
-            projects.messages#notificationpriority
+            projects.messages#androidmessagepriority
 
-        0 - PRIORITY_UNSPECIFIED:
-            If priority is unspecified, notification priority is set to
-            PRIORITY_DEFAULT. <- not used here
+        NORMAL:
+            Default priority for data messages. Normal priority messages won't
+            open network connections on a sleeping device, and their delivery
+            may be delayed to conserve the battery. For less time-sensitive
+            messages, such as notifications of new email or other data to sync,
+            choose normal delivery priority.
 
-        1 - PRIORITY_MIN:
-            Lowest notification priority. Notifications with this PRIORITY_MIN
-            might not be shown to the user except under special circumstances,
-            such as detailed notification logs.
-
-        2 - PRIORITY_LOW:
-            Lower notification priority. The UI may choose to show the
-            notifications smaller, or at a different position in the list,
-            compared with notifications with PRIORITY_DEFAULT.
-
-        3 - PRIORITY_DEFAULT:
-            Default notification priority. If the application does not
-            prioritize its own notifications, use this value for all
-            notifications.
-
-        4 - PRIORITY_HIGH:
-            Higher notification priority. Use this for more important
-            notifications or alerts. The UI may choose to show these
-            notifications larger, or at a different position in the
-            notification lists, compared with notifications with
-            PRIORITY_DEFAULT.
-
-        5 - PRIORITY_MAX:
-            Highest notification priority. Use this for the application's most
-            important items that require the user's prompt attention or input.
+        HIGH:
+            Default priority for notification messages. FCM attempts to
+            deliver high priority messages immediately, allowing the FCM
+            service to wake a sleeping device when possible and open a network
+            connection to your app server. Apps with instant messaging, chat,
+            or voice call alerts, for example, generally need to open a
+            network connection and make sure FCM delivers the message to the
+            device without delay. Set high priority if the message is
+            time-critical and requires the user's immediate interaction, but
+            beware that setting your messages to high priority contributes
+            more to battery drain compared with normal priority messages.
     """
 
-    PRIORITY_MIN = 'PRIORITY_MIN'
-    PRIORITY_LOW = 'PRIORITY_LOW'
-    PRIORITY_DEFAULT = 'PRIORITY_DEFAULT'
-    PRIORITY_HIGH = 'PRIORITY_HIGH'
-    PRIORITY_MAX = 'PRIORITY_MAX'
+    NORMAL = 'NORMAL'
+    HIGH = 'HIGH'
 
 
 class FCMPriority(object):
@@ -111,7 +97,7 @@ class FCMPriorityManager(object):
             FCMMode.OAuth2: {
                 'message': {
                     'android': {
-                        'priority': 'normal'
+                        'priority': NotificationPriority.NORMAL
                     },
                     'apns': {
                         'headers': {
@@ -123,10 +109,6 @@ class FCMPriorityManager(object):
                             'Urgency': 'very-low'
                         }
                     },
-                    'notification': {
-                        'notification_priority':
-                        NotificationPriority.PRIORITY_MIN,
-                    }
                 }
             },
             FCMMode.Legacy: {
@@ -137,7 +119,7 @@ class FCMPriorityManager(object):
             FCMMode.OAuth2: {
                 'message': {
                     'android': {
-                        'priority': 'normal'
+                        'priority': NotificationPriority.NORMAL
                     },
                     'apns': {
                         'headers': {
@@ -148,10 +130,6 @@ class FCMPriorityManager(object):
                         'headers': {
                             'Urgency': 'low'
                         }
-                    },
-                    'notification': {
-                        'notification_priority':
-                        NotificationPriority.PRIORITY_LOW,
                     }
                 }
             },
@@ -163,7 +141,7 @@ class FCMPriorityManager(object):
             FCMMode.OAuth2: {
                 'message': {
                     'android': {
-                        'priority': 'normal'
+                        'priority': NotificationPriority.NORMAL
                     },
                     'apns': {
                         'headers': {
@@ -174,10 +152,6 @@ class FCMPriorityManager(object):
                         'headers': {
                             'Urgency': 'normal'
                         }
-                    },
-                    'notification': {
-                        'notification_priority':
-                        NotificationPriority.PRIORITY_DEFAULT,
                     }
                 }
             },
@@ -189,7 +163,7 @@ class FCMPriorityManager(object):
             FCMMode.OAuth2: {
                 'message': {
                     'android': {
-                        'priority': 'high'
+                        'priority': NotificationPriority.HIGH
                     },
                     'apns': {
                         'headers': {
@@ -200,10 +174,6 @@ class FCMPriorityManager(object):
                         'headers': {
                             'Urgency': 'high'
                         }
-                    },
-                    'notification': {
-                        'notification_priority':
-                        NotificationPriority.PRIORITY_HIGH,
                     }
                 }
             },
@@ -215,7 +185,7 @@ class FCMPriorityManager(object):
             FCMMode.OAuth2: {
                 'message': {
                     'android': {
-                        'priority': 'high'
+                        'priority': NotificationPriority.HIGH
                     },
                     'apns': {
                         'headers': {
@@ -226,10 +196,6 @@ class FCMPriorityManager(object):
                         'headers': {
                             'Urgency': 'high'
                         }
-                    },
-                    'notification': {
-                        'notification_priority':
-                        NotificationPriority.PRIORITY_MAX,
                     }
                 }
             },
