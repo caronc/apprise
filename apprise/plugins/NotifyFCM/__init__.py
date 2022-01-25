@@ -52,8 +52,13 @@ from ..NotifyBase import NotifyBase
 from ...common import NotifyType
 from ...utils import validate_regex
 from ...utils import parse_list
+from ...utils import parse_bool
+from ...common import NotifyImageSize
 from ...AppriseAttachment import AppriseAttachment
 from ...AppriseLocale import gettext_lazy as _
+from .common import (FCMMode, FCM_MODES)
+from .priority import (FCM_PRIORITIES, FCMPriorityManager)
+from .color import FCMColorManager
 
 # Default our global support flag
 NOTIFY_FCM_SUPPORT_ENABLED = False
@@ -78,26 +83,6 @@ FCM_HTTP_ERROR_MAP = {
     401: 'The provided API Key was not valid.',
     404: 'The token could not be registered.',
 }
-
-
-class FCMMode(object):
-    """
-    Define the Firebase Cloud Messaging Modes
-    """
-    # The legacy way of sending a message
-    Legacy = "legacy"
-
-    # The new API
-    OAuth2 = "oauth2"
-
-
-# FCM Modes
-FCM_MODES = (
-    # Legacy API
-    FCMMode.Legacy,
-    # HTTP v1 URL
-    FCMMode.OAuth2,
-)
 
 
 class NotifyFCM(NotifyBase):
@@ -136,12 +121,11 @@ class NotifyFCM(NotifyBase):
     # If it is more than this, then it is not accepted.
     max_fcm_keyfile_size = 5000
 
+    # Allows the user to specify the NotifyImageSize object
+    image_size = NotifyImageSize.XY_256
+
     # The maximum length of the body
     body_maxlen = 1024
-
-    # A title can not be used for SMS Messages.  Setting this to zero will
-    # cause any title (if defined) to get placed into the message body.
-    title_maxlen = 0
 
     # Define object templates
     templates = (
@@ -162,12 +146,6 @@ class NotifyFCM(NotifyBase):
             'name': _('OAuth2 KeyFile'),
             'type': 'string',
             'private': True,
-        },
-        'mode': {
-            'name': _('Mode'),
-            'type': 'choice:string',
-            'values': FCM_MODES,
-            'default': FCMMode.Legacy,
         },
         'project': {
             'name': _('Project ID'),
@@ -195,10 +173,47 @@ class NotifyFCM(NotifyBase):
         'to': {
             'alias_of': 'targets',
         },
+        'mode': {
+            'name': _('Mode'),
+            'type': 'choice:string',
+            'values': FCM_MODES,
+            'default': FCMMode.Legacy,
+        },
+        'priority': {
+            'name': _('Mode'),
+            'type': 'choice:string',
+            'values': FCM_PRIORITIES,
+        },
+        'image_url': {
+            'name': _('Custom Image URL'),
+            'type': 'string',
+        },
+        'image': {
+            'name': _('Include Image'),
+            'type': 'bool',
+            'default': False,
+            'map_to': 'include_image',
+        },
+        # Color can either be yes, no, or a #rrggbb (
+        # rrggbb without hashtag is accepted to)
+        'color': {
+            'name': _('Notification Color'),
+            'type': 'string',
+            'default': 'yes',
+        },
     })
 
+    # Define our data entry
+    template_kwargs = {
+        'data_kwargs': {
+            'name': _('Data Entries'),
+            'prefix': '+',
+        },
+    }
+
     def __init__(self, project, apikey, targets=None, mode=None, keyfile=None,
-                 **kwargs):
+                 data_kwargs=None, image_url=None, include_image=False,
+                 color=None, priority=None, **kwargs):
         """
         Initialize Firebase Cloud Messaging
 
@@ -214,7 +229,7 @@ class NotifyFCM(NotifyBase):
             self.mode = NotifyFCM.template_tokens['mode']['default'] \
                 if not isinstance(mode, six.string_types) else mode.lower()
             if self.mode and self.mode not in FCM_MODES:
-                msg = 'The mode specified ({}) is invalid.'.format(mode)
+                msg = 'The FCM mode specified ({}) is invalid.'.format(mode)
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
@@ -267,6 +282,29 @@ class NotifyFCM(NotifyBase):
 
         # Acquire Device IDs to notify
         self.targets = parse_list(targets)
+
+        # Our data Keyword/Arguments to include in our outbound payload
+        self.data_kwargs = {}
+        if isinstance(data_kwargs, dict):
+            self.data_kwargs.update(data_kwargs)
+
+        # Include the image as part of the payload
+        self.include_image = include_image
+
+        # A Custom Image URL
+        # FCM allows you to provide a remote https?:// URL to an image_url
+        # located on the internet that it will download and include in the
+        # payload.
+        #
+        # self.image_url() is reserved as an internal function name; so we
+        # jsut store it into a different variable for now
+        self.image_src = image_url
+
+        # Initialize our priority
+        self.priority = FCMPriorityManager(self.mode, priority)
+
+        # Initialize our color
+        self.color = FCMColorManager(color, asset=self.asset)
         return
 
     @property
@@ -335,6 +373,10 @@ class NotifyFCM(NotifyBase):
             # Prepare our notify URL
             notify_url = self.notify_legacy_url
 
+        # Acquire image url
+        image = self.image_url(notify_type) \
+            if not self.image_src else self.image_src
+
         has_error = False
         # Create a copy of the targets list
         targets = list(self.targets)
@@ -351,6 +393,17 @@ class NotifyFCM(NotifyBase):
                         }
                     }
                 }
+
+                if self.color:
+                    # Acquire our color
+                    payload['message']['android'] = {
+                        'notification': {'color': self.color.get(notify_type)}}
+
+                if self.include_image and image:
+                    payload['message']['notification']['image'] = image
+
+                if self.data_kwargs:
+                    payload['message']['data'] = self.data_kwargs
 
                 if recipient[0] == '#':
                     payload['message']['topic'] = recipient[1:]
@@ -373,6 +426,18 @@ class NotifyFCM(NotifyBase):
                         }
                     }
                 }
+
+                if self.color:
+                    # Acquire our color
+                    payload['notification']['notification']['color'] = \
+                        self.color.get(notify_type)
+
+                if self.include_image and image:
+                    payload['notification']['notification']['image'] = image
+
+                if self.data_kwargs:
+                    payload['data'] = self.data_kwargs
+
                 if recipient[0] == '#':
                     payload['to'] = '/topics/{}'.format(recipient)
                     self.logger.debug(
@@ -384,6 +449,18 @@ class NotifyFCM(NotifyBase):
                     self.logger.debug(
                         "FCM recipient %s parsed as a device token",
                         recipient)
+
+            #
+            # Apply our priority configuration (if set)
+            #
+            def merge(d1, d2):
+                for k in d2:
+                    if k in d1 and isinstance(d1[k], dict) \
+                            and isinstance(d2[k], dict):
+                        merge(d1[k], d2[k])
+                    else:
+                        d1[k] = d2[k]
+            merge(payload, self.priority.payload())
 
             self.logger.debug(
                 'FCM %s POST URL: %s (cert_verify=%r)',
@@ -443,15 +520,29 @@ class NotifyFCM(NotifyBase):
         # Define any URL parameters
         params = {
             'mode': self.mode,
+            'image': 'yes' if self.include_image else 'no',
+            'color': str(self.color),
         }
+
+        if self.priority:
+            # Store our priority if one was defined
+            params['priority'] = str(self.priority)
 
         if self.keyfile:
             # Include our keyfile if specified
             params['keyfile'] = NotifyFCM.quote(
                 self.keyfile[0].url(privacy=privacy), safe='')
 
+        if self.image_src:
+            # Include our image path as part of our URL payload
+            params['image_url'] = self.image_src
+
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+
+        # Add our data keyword/args into our URL response
+        params.update(
+            {'+{}'.format(k): v for k, v in self.data_kwargs.items()})
 
         reference = NotifyFCM.quote(self.project) \
             if self.mode == FCMMode.OAuth2 \
@@ -506,5 +597,31 @@ class NotifyFCM(NotifyBase):
         if 'keyfile' in results['qsd'] and results['qsd']['keyfile']:
             results['keyfile'] = \
                 NotifyFCM.unquote(results['qsd']['keyfile'])
+
+        # Our Priority
+        if 'priority' in results['qsd'] and results['qsd']['priority']:
+            results['priority'] = \
+                NotifyFCM.unquote(results['qsd']['priority'])
+
+        # Our Color
+        if 'color' in results['qsd'] and results['qsd']['color']:
+            results['color'] = \
+                NotifyFCM.unquote(results['qsd']['color'])
+
+        # Boolean to include an image or not
+        results['include_image'] = parse_bool(results['qsd'].get(
+            'image', NotifyFCM.template_args['image']['default']))
+
+        # Extract image_url if it was specified
+        if 'image_url' in results['qsd']:
+            results['image_url'] = \
+                NotifyFCM.unquote(results['qsd']['image_url'])
+            if 'image' not in results['qsd']:
+                # Toggle default behaviour if a custom image was provided
+                # but ONLY if the `image` boolean was not set
+                results['include_image'] = True
+
+        # Store our data keyword/args if specified
+        results['data_kwargs'] = results['qsd+']
 
         return results

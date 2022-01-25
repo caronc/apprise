@@ -22,8 +22,16 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
+#
+# Great Resources:
+# - Dev/Legacy API:
+#    https://firebase.google.com/docs/cloud-messaging/http-server-ref
+# - Legacy API (v1) -> OAuth
+# - https://firebase.google.com/docs/cloud-messaging/migrate-v1
+
 import io
 import os
+import six
 import sys
 import mock
 import pytest
@@ -35,6 +43,10 @@ from helpers import AppriseURLTester
 
 try:
     from apprise.plugins.NotifyFCM.oauth import GoogleOAuth
+    from apprise.plugins.NotifyFCM.common import FCM_MODES
+    from apprise.plugins.NotifyFCM.priority import (
+        FCMPriorityManager, FCM_PRIORITIES)
+    from apprise.plugins.NotifyFCM.color import FCMColorManager
     from cryptography.exceptions import UnsupportedAlgorithm
 
 except ImportError:
@@ -99,6 +111,30 @@ apprise_url_tests = (
     }),
     ('fcm://?apikey=abc123&to=device', {
         # Test apikey= to=
+        'instance': plugins.NotifyFCM,
+    }),
+    ('fcm://?apikey=abc123&to=device&image=yes', {
+        # Test image boolean
+        'instance': plugins.NotifyFCM,
+    }),
+    ('fcm://?apikey=abc123&to=device&color=no', {
+        # Disable colors
+        'instance': plugins.NotifyFCM,
+    }),
+    ('fcm://?apikey=abc123&to=device&color=aabbcc', {
+        # custom colors
+        'instance': plugins.NotifyFCM,
+    }),
+    ('fcm://?apikey=abc123&to=device'
+        '&image_url=http://example.com/interesting.jpg', {
+            # Test image_url
+            'instance': plugins.NotifyFCM}),
+    ('fcm://?apikey=abc123&to=device'
+        '&image_url=http://example.com/interesting.jpg&image=no', {
+            # Test image_url but set to no
+            'instance': plugins.NotifyFCM}),
+    ('fcm://?apikey=abc123&to=device&+key=value&+key2=value2', {
+        # Test apikey= to= and data arguments
         'instance': plugins.NotifyFCM,
     }),
     ('fcm://%20?to=device&keyfile=/invalid/path', {
@@ -176,9 +212,136 @@ def test_plugin_fcm_urls():
 @pytest.mark.skipif(
     'cryptography' not in sys.modules, reason="Requires cryptography")
 @mock.patch('requests.post')
-def test_plugin_fcm_general(mock_post):
+def test_plugin_fcm_general_legacy(mock_post):
     """
-    NotifyFCM() General Checks
+    NotifyFCM() General Legacy/APIKey Checks
+
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.request_rate_per_sec = 0
+
+    # Prepare a good response
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    mock_post.return_value = response
+
+    # A valid Legacy URL
+    obj = Apprise.instantiate(
+        'fcm://abc123/device/'
+        '?+key=value&+key2=value2'
+        '&image_url=https://example.com/interesting.png')
+
+    # Send our notification
+    assert obj.notify("test") is True
+
+    # Test our call count
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://fcm.googleapis.com/fcm/send'
+
+    payload = mock_post.mock_calls[0][2]
+    data = json.loads(payload['data'])
+    assert 'data' in data
+    assert isinstance(data, dict)
+    assert 'key' in data['data']
+    assert data['data']['key'] == 'value'
+    assert 'key2' in data['data']
+    assert data['data']['key2'] == 'value2'
+
+    assert 'notification' in data
+    assert isinstance(data['notification'], dict)
+    assert 'notification' in data['notification']
+    assert isinstance(data['notification']['notification'], dict)
+    assert 'image' in data['notification']['notification']
+    assert data['notification']['notification']['image'] == \
+        'https://example.com/interesting.png'
+
+    #
+    # Test priorities
+    #
+    mock_post.reset_mock()
+    obj = Apprise.instantiate(
+        'fcm://abc123/device/?priority=low')
+    assert mock_post.call_count == 0
+
+    # Send our notification
+    assert obj.notify(title="title", body="body") is True
+
+    # Test our call count
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://fcm.googleapis.com/fcm/send'
+
+    payload = mock_post.mock_calls[0][2]
+    data = json.loads(payload['data'])
+    assert 'data' not in data
+    assert 'notification' in data
+    assert isinstance(data['notification'], dict)
+    assert 'notification' in data['notification']
+    assert isinstance(data['notification']['notification'], dict)
+    assert 'image' not in data['notification']['notification']
+    assert 'priority' in data
+
+    # legacy can only switch between high/low
+    assert data['priority'] == "normal"
+
+    #
+    # Test colors
+    #
+    mock_post.reset_mock()
+    obj = Apprise.instantiate(
+        'fcm://abc123/device/?color=no')
+    assert mock_post.call_count == 0
+
+    # Send our notification
+    assert obj.notify(title="title", body="body") is True
+
+    # Test our call count
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://fcm.googleapis.com/fcm/send'
+
+    payload = mock_post.mock_calls[0][2]
+    data = json.loads(payload['data'])
+    assert 'data' not in data
+    assert 'notification' in data
+    assert isinstance(data['notification'], dict)
+    assert 'notification' in data['notification']
+    assert isinstance(data['notification']['notification'], dict)
+    assert 'image' not in data['notification']['notification']
+    assert 'color' not in data['notification']['notification']
+
+    mock_post.reset_mock()
+    obj = Apprise.instantiate(
+        'fcm://abc123/device/?color=AA001b')
+    assert mock_post.call_count == 0
+
+    # Send our notification
+    assert obj.notify(title="title", body="body") is True
+
+    # Test our call count
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://fcm.googleapis.com/fcm/send'
+
+    payload = mock_post.mock_calls[0][2]
+    data = json.loads(payload['data'])
+    assert 'data' not in data
+    assert 'notification' in data
+    assert isinstance(data['notification'], dict)
+    assert 'notification' in data['notification']
+    assert isinstance(data['notification']['notification'], dict)
+    assert 'image' not in data['notification']['notification']
+    assert 'color' in data['notification']['notification']
+    assert data['notification']['notification']['color'] == '#aa001b'
+
+
+@pytest.mark.skipif(
+    'cryptography' not in sys.modules, reason="Requires cryptography")
+@mock.patch('requests.post')
+def test_plugin_fcm_general_oauth(mock_post):
+    """
+    NotifyFCM() General OAuth Checks
 
     """
 
@@ -222,7 +385,7 @@ def test_plugin_fcm_general(mock_post):
     obj = Apprise.instantiate(
         'fcm://mock-project-id/device/#topic/?keyfile={}'.format(str(path)))
 
-    # we'll fail as a result
+    # send our notification
     assert obj.notify("test") is True
 
     # Test our call count
@@ -233,6 +396,146 @@ def test_plugin_fcm_general(mock_post):
         'https://fcm.googleapis.com/v1/projects/mock-project-id/messages:send'
     assert mock_post.call_args_list[2][0][0] == \
         'https://fcm.googleapis.com/v1/projects/mock-project-id/messages:send'
+
+    mock_post.reset_mock()
+    # Now we test using a valid Project ID and data parameters
+    obj = Apprise.instantiate(
+        'fcm://mock-project-id/device/#topic/?keyfile={}'
+        '&+key=value&+key2=value2'
+        '&image_url=https://example.com/interesting.png'.format(str(path)))
+    assert mock_post.call_count == 0
+
+    # send our notification
+    assert obj.notify("test") is True
+
+    # Test our call count
+    assert mock_post.call_count == 3
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://accounts.google.com/o/oauth2/token'
+
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://fcm.googleapis.com/v1/projects/mock-project-id/messages:send'
+    payload = mock_post.mock_calls[1][2]
+    data = json.loads(payload['data'])
+    assert 'message' in data
+    assert isinstance(data['message'], dict)
+    assert 'data' in data['message']
+    assert isinstance(data['message']['data'], dict)
+    assert 'key' in data['message']['data']
+    assert data['message']['data']['key'] == 'value'
+    assert 'key2' in data['message']['data']
+    assert data['message']['data']['key2'] == 'value2'
+
+    assert 'notification' in data['message']
+    assert isinstance(data['message']['notification'], dict)
+    assert 'image' in data['message']['notification']
+    assert data['message']['notification']['image'] == \
+        'https://example.com/interesting.png'
+
+    assert mock_post.call_args_list[2][0][0] == \
+        'https://fcm.googleapis.com/v1/projects/mock-project-id/messages:send'
+
+    payload = mock_post.mock_calls[2][2]
+    data = json.loads(payload['data'])
+    assert 'message' in data
+    assert isinstance(data['message'], dict)
+    assert 'data' in data['message']
+    assert isinstance(data['message']['data'], dict)
+    assert 'key' in data['message']['data']
+    assert data['message']['data']['key'] == 'value'
+    assert 'key2' in data['message']['data']
+    assert data['message']['data']['key2'] == 'value2'
+
+    assert 'notification' in data['message']
+    assert isinstance(data['message']['notification'], dict)
+    assert 'image' in data['message']['notification']
+    assert data['message']['notification']['image'] == \
+        'https://example.com/interesting.png'
+
+    #
+    # Test priorities
+    #
+    mock_post.reset_mock()
+    obj = Apprise.instantiate(
+        'fcm://mock-project-id/device/?keyfile={}'
+        '&priority=high'.format(str(path)))
+    assert mock_post.call_count == 0
+
+    # Send our notification
+    assert obj.notify(title="title", body="body") is True
+
+    # Test our call count
+    assert mock_post.call_count == 2
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://accounts.google.com/o/oauth2/token'
+
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://fcm.googleapis.com/v1/projects/mock-project-id/messages:send'
+    payload = mock_post.mock_calls[1][2]
+    data = json.loads(payload['data'])
+    assert 'message' in data
+    assert isinstance(data['message'], dict)
+    assert 'data' not in data['message']
+    assert 'notification' in data['message']
+    assert isinstance(data['message']['notification'], dict)
+    assert 'image' not in data['message']['notification']
+    assert data['message']['apns']['headers']['apns-priority'] == "10"
+    assert data['message']['webpush']['headers']['Urgency'] == "high"
+    assert data['message']['android']['priority'] == "HIGH"
+
+    #
+    # Test colors
+    #
+    mock_post.reset_mock()
+    obj = Apprise.instantiate(
+        'fcm://mock-project-id/device/?keyfile={}'
+        '&color=no'.format(str(path)))
+    assert mock_post.call_count == 0
+
+    # Send our notification
+    assert obj.notify(title="title", body="body") is True
+
+    # Test our call count
+    assert mock_post.call_count == 2
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://accounts.google.com/o/oauth2/token'
+
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://fcm.googleapis.com/v1/projects/mock-project-id/messages:send'
+    payload = mock_post.mock_calls[1][2]
+    data = json.loads(payload['data'])
+    assert 'message' in data
+    assert isinstance(data['message'], dict)
+    assert 'data' not in data['message']
+    assert 'notification' in data['message']
+    assert isinstance(data['message']['notification'], dict)
+    assert 'color' not in data['message']['notification']
+
+    mock_post.reset_mock()
+    obj = Apprise.instantiate(
+        'fcm://mock-project-id/device/?keyfile={}'
+        '&color=#12AAbb'.format(str(path)))
+    assert mock_post.call_count == 0
+
+    # Send our notification
+    assert obj.notify(title="title", body="body") is True
+
+    # Test our call count
+    assert mock_post.call_count == 2
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://accounts.google.com/o/oauth2/token'
+
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://fcm.googleapis.com/v1/projects/mock-project-id/messages:send'
+    payload = mock_post.mock_calls[1][2]
+    data = json.loads(payload['data'])
+    assert 'message' in data
+    assert isinstance(data['message'], dict)
+    assert 'data' not in data['message']
+    assert 'notification' in data['message']
+    assert isinstance(data['message']['notification'], dict)
+    assert 'color' in data['message']['android']['notification']
+    assert data['message']['android']['notification']['color'] == '#12aabb'
 
 
 @pytest.mark.skipif(
@@ -444,6 +747,96 @@ def test_plugin_fcm_keyfile_missing_entries_parse(tmpdir):
 
 
 @pytest.mark.skipif(
+    'cryptography' not in sys.modules, reason="Requires cryptography")
+def test_plugin_fcm_priorities():
+    """
+    NotifyFCM() FCMPriorityManager() Testing
+    """
+
+    for mode in FCM_MODES:
+        for priority in FCM_PRIORITIES:
+            instance = FCMPriorityManager(mode, priority)
+            assert isinstance(instance.payload(), dict)
+            # Verify it's not empty
+            assert bool(instance)
+            assert instance.payload()
+            assert str(instance) == priority
+
+    # We do not have to set a priority
+    instance = FCMPriorityManager(mode)
+    assert isinstance(instance.payload(), dict)
+
+    # Dictionary is empty though
+    assert not bool(instance)
+    assert not instance.payload()
+    assert str(instance) == ''
+
+    with pytest.raises(TypeError):
+        instance = FCMPriorityManager(mode, 'invalid')
+
+    with pytest.raises(TypeError):
+        instance = FCMPriorityManager('invald', 'high')
+
+    # mode validation is done at the higher NotifyFCM() level so
+    # it is not tested here (not required)
+
+
+@pytest.mark.skipif(
+    'cryptography' not in sys.modules, reason="Requires cryptography")
+def test_plugin_fcm_colors():
+    """
+    NotifyFCM() FCMColorManager() Testing
+    """
+
+    # No colors
+    instance = FCMColorManager('no')
+    assert bool(instance) is False
+    assert instance.get() is None
+    # We'll return that we are not defined
+    assert str(instance) == 'no'
+
+    # Asset colors
+    instance = FCMColorManager('yes')
+    assert isinstance(instance.get(), six.string_types)
+    # Output: #rrggbb
+    assert len(instance.get()) == 7
+    # Starts with has symbol
+    assert instance.get()[0] == '#'
+    # We'll return that we are defined but using default configuration
+    assert str(instance) == 'yes'
+
+    # We will be `true` because we can acquire a color based on what was
+    # passed in
+    assert bool(instance) is True
+
+    # Custom color
+    instance = FCMColorManager('#A2B3A4')
+    assert isinstance(instance.get(), six.string_types)
+    assert instance.get() == '#a2b3a4'
+    assert bool(instance) is True
+    # str() response does not include hashtag
+    assert str(instance) == 'a2b3a4'
+
+    # Custom color (no hashtag)
+    instance = FCMColorManager('A2B3A4')
+    assert isinstance(instance.get(), six.string_types)
+    # Hashtag is always part of output
+    assert instance.get() == '#a2b3a4'
+    assert bool(instance) is True
+    # str() response does not include hashtag
+    assert str(instance) == 'a2b3a4'
+
+    # Custom color (no hashtag) but only using 3 letter rgb values
+    instance = FCMColorManager('AC4')
+    assert isinstance(instance.get(), six.string_types)
+    # Hashtag is always part of output
+    assert instance.get() == '#aacc44'
+    assert bool(instance) is True
+    # str() response does not include hashtag
+    assert str(instance) == 'aacc44'
+
+
+@pytest.mark.skipif(
     'cryptography' in sys.modules,
     reason="Requires that cryptography NOT be installed")
 def test_plugin_fcm_cryptography_import_error():
@@ -460,3 +853,26 @@ def test_plugin_fcm_cryptography_import_error():
 
     # It's not possible because our cryptography depedancy is missing
     assert obj is None
+
+
+@pytest.mark.skipif(
+    'cryptography' not in sys.modules, reason="Requires cryptography")
+@mock.patch('requests.post')
+def test_plugin_fcm_edge_cases(mock_post):
+    """
+    NotifyFCM() Edge Cases
+
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.request_rate_per_sec = 0
+
+    # Prepare a good response
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    mock_post.return_value = response
+
+    # this tests an edge case where verify if the data_kwargs is a dictionary
+    # or not.  Below, we don't even define it, so it will be None (causing
+    # the check to go).  We'll still correctly instantiate a plugin:
+    obj = plugins.NotifyFCM("project", "api:123", targets='device')
+    assert obj is not None
