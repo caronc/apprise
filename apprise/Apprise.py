@@ -23,12 +23,10 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import re
 import os
 import six
 from itertools import chain
 from .common import NotifyType
-from .common import NotifyFormat
 from .common import MATCH_ALL_TAG
 from .conversion import convert_between
 from .utils import is_exclusive_match
