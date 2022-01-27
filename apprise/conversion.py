@@ -25,8 +25,15 @@
 
 
 import re
+import six
 from markdown import markdown
+from os import linesep
 from .common import NotifyFormat
+
+if six.PY2:
+    from HTMLParser import HTMLParser
+else:
+    from html.parser import HTMLParser
 
 
 def convert_between(from_format, to_format, body):
@@ -35,13 +42,14 @@ def convert_between(from_format, to_format, body):
     or the selected one fails, the original text will be returned.
     """
 
-    if from_format == NotifyFormat.MARKDOWN and to_format == NotifyFormat.HTML:
-        return markdown(body)
+    converters = {
+        (NotifyFormat.MARKDOWN, NotifyFormat.HTML): markdown,
+        (NotifyFormat.TEXT, NotifyFormat.HTML): text_to_html,
+        (NotifyFormat.HTML, NotifyFormat.TEXT): html_to_text,
+    }
 
-    if from_format == NotifyFormat.TEXT and to_format == NotifyFormat.HTML:
-        return text_to_html(body)
-
-    return body
+    convert = converters.get((from_format, to_format))
+    return convert(body) if convert is not None else body
 
 
 def text_to_html(body):
@@ -76,6 +84,47 @@ def text_to_html(body):
 
     # Execute our map against our body in addition to
     # swapping out new lines and replacing them with <br/>
-    return re.sub(r'\r*\n', '<br/>\r\n',
-        re_table.sub(
-            lambda x: re_map[x.group()], body))
+    return re.sub(
+        r'\r*\n', '<br/>\r\n', re_table.sub(lambda x: re_map[x.group()], body))
+
+
+def html_to_text(body):
+    """
+    Converts a notification body from HTML to plain text.
+    """
+
+    parser = HTMLConverter()
+    parser.feed(body)
+    parser.close()
+    return parser.converted
+
+
+class HTMLConverter(HTMLParser, object):
+    """An HTML to plain text converter tuned for email messages."""
+
+    def __init__(self, **kwargs):
+        super(HTMLConverter, self).__init__(**kwargs)
+
+        self.converted = ""
+
+    def close(self):
+        # Removes all html before the last "}". Some HTML can return additional
+        # style information with text output.
+        self.converted = str(self.converted).split('}')[-1].strip()
+
+    def handle_data(self, data):
+        self.converted += data.strip()
+
+    def handle_starttag(self, tag, attrs):
+        if tag == 'li':
+            self.converted += linesep + '- '
+        elif tag == 'blockquote':
+            self.converted += linesep + linesep + '\t'
+        elif tag in ('p', 'h1', 'h2', 'h3', 'h4', 'tr', 'th'):
+            self.converted += linesep + '\n'
+        elif tag == 'br':
+            self.converted += linesep
+
+    def handle_endtag(self, tag):
+        if tag == 'blockquote':
+            self.converted += linesep + linesep
