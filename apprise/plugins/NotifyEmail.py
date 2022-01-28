@@ -235,7 +235,6 @@ EMAIL_TEMPLATES = (
         },
     ),
 
-
     # SendGrid (Email Server)
     # You must specify an authenticated sender address in the from= settings
     # and a valid email in the to= to deliver your emails to
@@ -250,6 +249,36 @@ EMAIL_TEMPLATES = (
             'secure': True,
             'secure_mode': SecureMailMode.SSL,
             'login_type': (WebBaseLogin.USERID, )
+        },
+    ),
+
+    # 163.com
+    (
+        '163.com',
+        re.compile(
+            r'^((?P<label>[^+]+)\+)?(?P<id>[^@]+)@'
+            r'(?P<domain>163\.com)$', re.I),
+        {
+            'port': 465,
+            'smtp_host': 'smtp.163.com',
+            'secure': True,
+            'secure_mode': SecureMailMode.SSL,
+            'login_type': (WebBaseLogin.EMAIL, )
+        },
+    ),
+
+    # Foxmail.com
+    (
+        'Foxmail.com',
+        re.compile(
+            r'^((?P<label>[^+]+)\+)?(?P<id>[^@]+)@'
+            r'(?P<domain>(foxmail|qq)\.com)$', re.I),
+        {
+            'port': 587,
+            'smtp_host': 'smtp.qq.com',
+            'secure': True,
+            'secure_mode': SecureMailMode.STARTTLS,
+            'login_type': (WebBaseLogin.EMAIL, )
         },
     ),
 
