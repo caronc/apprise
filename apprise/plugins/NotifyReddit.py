@@ -161,14 +161,14 @@ class NotifyReddit(NotifyBase):
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'^[a-z0-9-]+$', 'i'),
+            'regex': (r'^[a-z0-9_-]+$', 'i'),
         },
         'app_secret': {
             'name': _('Application Secret'),
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'^[a-z0-9-]+$', 'i'),
+            'regex': (r'^[a-z0-9_-]+$', 'i'),
         },
         'target_subreddit': {
             'name': _('Target Subreddit'),
