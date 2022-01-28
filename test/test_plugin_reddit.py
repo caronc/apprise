@@ -54,12 +54,12 @@ apprise_url_tests = (
         # No app secret
         'instance': TypeError,
     }),
-    ('reddit://user:password@app_id/appsecret/apprise', {
-        # No invalid app_id (has underscore)
+    ('reddit://user:password@app%id/appsecret/apprise', {
+        # No invalid app_id (has percent)
         'instance': TypeError,
     }),
-    ('reddit://user:password@app-id/app_secret/apprise', {
-        # No invalid app_secret (has underscore)
+    ('reddit://user:password@app%id/app_secret/apprise', {
+        # No invalid app_secret (has percent)
         'instance': TypeError,
     }),
     ('reddit://user:password@app-id/app-secret/apprise?kind=invalid', {
