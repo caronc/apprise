@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2019 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2022 Chris Caron <lead2gold@gmail.com>
 # All rights reserved.
 #
 # This code is licensed under the MIT License.
@@ -138,7 +138,7 @@ class NotifyForm(NotifyBase):
 
         self.fullpath = kwargs.get('fullpath')
         if not isinstance(self.fullpath, six.string_types):
-            self.fullpath = '/'
+            self.fullpath = ''
 
         self.method = self.template_args['method']['default'] \
             if not isinstance(method, six.string_types) else method.upper()
@@ -195,14 +195,15 @@ class NotifyForm(NotifyBase):
 
         default_port = 443 if self.secure else 80
 
-        return '{schema}://{auth}{hostname}{port}{fullpath}/?{params}'.format(
+        return '{schema}://{auth}{hostname}{port}{fullpath}?{params}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
             # never encode hostname since we're expecting it to be a valid one
             hostname=self.host,
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
-            fullpath=NotifyForm.quote(self.fullpath, safe='/'),
+            fullpath=NotifyForm.quote(self.fullpath, safe='/')
+            if self.fullpath else '/',
             params=NotifyForm.urlencode(params),
         )
 
@@ -279,8 +280,8 @@ class NotifyForm(NotifyBase):
 
         url += self.fullpath
 
-        self.logger.debug('Form POST URL: %s (cert_verify=%r)' % (
-            url, self.verify_certificate,
+        self.logger.debug('Form %s URL: %s (cert_verify=%r)' % (
+            self.method, url, self.verify_certificate,
         ))
         self.logger.debug('Form Payload: %s' % str(payload))
 
@@ -306,13 +307,14 @@ class NotifyForm(NotifyBase):
             r = method(
                 url,
                 files=None if not files else files,
-                data=payload,
+                data=payload if self.method != 'GET' else None,
+                params=payload if self.method == 'GET' else None,
                 headers=headers,
                 auth=auth,
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
             )
-            if r.status_code != requests.codes.ok:
+            if r.status_code < 200 or r.status_code >= 300:
                 # We had a problem
                 status_str = \
                     NotifyForm.http_response_code_lookup(r.status_code)
