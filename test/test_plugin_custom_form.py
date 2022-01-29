@@ -362,11 +362,11 @@ def test_plugin_custom_form_edge_cases(mock_get, mock_post):
     details = mock_get.call_args_list[0]
     assert details[0][0] == 'http://localhost:8080/command'
 
-    assert 'title' in details[1]['parms']
-    assert details[1]['parms']['title'] == 'title'
+    assert 'title' in details[1]['params']
+    assert details[1]['params']['title'] == 'title'
     # 'body' is over-ridden by 'test' passed inline with the URL
-    assert 'message' in details[1]['parms']
-    assert details[1]['parms']['message'] == 'test'
+    assert 'message' in details[1]['params']
+    assert details[1]['params']['message'] == 'test'
 
     assert instance.url(privacy=False).startswith(
         'form://localhost:8080/command?')
