@@ -308,7 +308,7 @@ class NotifyForm(NotifyBase):
                 url,
                 files=None if not files else files,
                 data=payload if self.method != 'GET' else None,
-                parms=payload if self.method == 'GET' else None,
+                params=payload if self.method == 'GET' else None,
                 headers=headers,
                 auth=auth,
                 verify=self.verify_certificate,
