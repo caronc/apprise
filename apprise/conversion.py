@@ -27,7 +27,6 @@
 import re
 import six
 from markdown import markdown
-from os import linesep
 from .common import NotifyFormat
 
 if six.PY2:
@@ -46,6 +45,8 @@ def convert_between(from_format, to_format, body):
         (NotifyFormat.MARKDOWN, NotifyFormat.HTML): markdown,
         (NotifyFormat.TEXT, NotifyFormat.HTML): text_to_html,
         (NotifyFormat.HTML, NotifyFormat.TEXT): html_to_text,
+        # For now; use same converter for Markdown support
+        (NotifyFormat.HTML, NotifyFormat.MARKDOWN): html_to_text,
     }
 
     convert = converters.get((from_format, to_format))
@@ -96,35 +97,109 @@ def html_to_text(body):
     parser = HTMLConverter()
     parser.feed(body)
     parser.close()
-    return parser.converted
+    result = parser.converted
+
+    return result
 
 
 class HTMLConverter(HTMLParser, object):
     """An HTML to plain text converter tuned for email messages."""
 
+    # The following tags must start on a new line
+    BLOCK_TAGS = ('p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+                  'div' 'tr', 'th', 'code', 'pre', 'label')
+
+    # the folowing tags ignore any internal text
+    IGNORE_TAGS = ('style', 'link', 'meta', 'title', 'html', 'head', 'script')
+
+    # Condense Whitespace
+    WS_TRIM = re.compile(r'[\s]+', re.DOTALL | re.MULTILINE)
+
     def __init__(self, **kwargs):
         super(HTMLConverter, self).__init__(**kwargs)
+
+        # Shoudl we store the text content or not?
+        self._do_store = True
+
+        # Track whether we started a block tag and moved into a non-block style
+        # we need to write a new_line and flip the dirty switch
+        self._dirty_newline = False
+
+        # Track entries pasted on line
+        self._line_paste_count = 0
 
         self.converted = ""
 
     def close(self):
         # Removes all html before the last "}". Some HTML can return additional
         # style information with text output.
-        self.converted = str(self.converted).split('}')[-1].strip()
+        self.converted = str(self.converted).split('}')[-1].rstrip()
 
-    def handle_data(self, data):
-        self.converted += data.strip()
+    def handle_data(self, data, *args, **kwargs):
+        """
+        Store our data if it is not on the ignore list
+        """
+
+        # initialize our previous flag
+        if self._do_store:
+
+            # Tidy our whitespace
+            content = self.WS_TRIM.sub(' ', data)
+
+            # if self._dirty_newline and self._line_paste_count > 0:
+            #     self.converted += '\n'
+            #     self._line_paste_count = 0
+            #     self._dirty_newline = False
+
+            if content:
+                self.converted += content \
+                    if self._line_paste_count > 0 else content.lstrip()
+
+                # Track our writes
+                self._line_paste_count += 1
 
     def handle_starttag(self, tag, attrs):
-        if tag == 'li':
-            self.converted += linesep + '- '
-        elif tag == 'blockquote':
-            self.converted += linesep + linesep + '\t'
-        elif tag in ('p', 'h1', 'h2', 'h3', 'h4', 'tr', 'th'):
-            self.converted += linesep + '\n'
-        elif tag == 'br':
-            self.converted += linesep
+        """
+        Process our starting HTML Tag
+        """
+        # Toggle initial states
+        self._do_store = False
+
+        if tag not in self.IGNORE_TAGS:
+            # Process our data
+            self._do_store = True
+
+            if tag == 'li':
+                self.converted += '- '
+                self._dirty_newline = True
+
+            elif tag == 'br':
+                self._dirty_newline = True
+                self._line_paste_count = 1
+
+            elif tag in self.BLOCK_TAGS:
+                self._dirty_newline = True
+
+            elif tag == 'blockquote':
+                self.converted += ' >'
+                self._dirty_newline = True
+
+            elif self._dirty_newline:
+                self.converted += '\n'
+                self._line_paste_count = 0
+                self._dirty_newline = False
 
     def handle_endtag(self, tag):
-        if tag == 'blockquote':
-            self.converted += linesep + linesep
+        """
+        Edge case handling of open/close tags
+        """
+        if tag == 'br':
+            # Handle <br/> entries
+            self.converted += '\n'
+            self._line_paste_count = 0
+            self._dirty_newline = False
+
+        elif tag in self.BLOCK_TAGS and self._dirty_newline:
+            self.converted += '\n'
+            self._line_paste_count = 0
+            self._dirty_newline = False

@@ -517,6 +517,13 @@ class Apprise(object):
                 conversion_map[server.notify_format] = \
                     convert_between(body_format, server.notify_format, body)
 
+                if conversion_map[server.notify_format] is None:
+                    # Conversion Failed
+                    logger.error(
+                        'Failed to convert message body from %s to %s',
+                        body_format, server.notify_format)
+                    raise TypeError
+
             if interpret_escapes:
                 #
                 # Escape our content
