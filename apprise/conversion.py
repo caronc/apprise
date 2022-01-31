@@ -128,7 +128,8 @@ class HTMLConverter(HTMLParser, object):
         # Initialize internal result list
         self._result = []
 
-        # Initialize public result field (not populated until close() is called)
+        # Initialize public result field (not populated until close() is
+        # called)
         self.converted = ""
 
     def close(self):
@@ -137,8 +138,8 @@ class HTMLConverter(HTMLParser, object):
 
     def _finalize(self, result):
         """
-        Combines and strips consecutive strings, then converts consecutive block
-        ends into singleton newlines.
+        Combines and strips consecutive strings, then converts consecutive
+        block ends into singleton newlines.
 
         [ {be} " Hello " {be} {be} " World!" ] -> "\nHello\nWorld!"
         """

@@ -100,7 +100,6 @@ def test_html_to_text():
                    "<a href='#'>my link</a>") == \
         "test my link"
 
-    result = to_html("<body><div>line 1 <b>bold</b></div> <a href='#'>my link</a>  <p>3rd line</body>")
     # </p> missing
     assert to_html("<body><div>line 1 <b>bold</b></div>  "
                    " <a href='#'>my link</a>"
