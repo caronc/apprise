@@ -514,15 +514,19 @@ class Apprise(object):
             # was set to None), or we did define a tag and the logic above
             # determined we need to notify the service it's associated with
             if server.notify_format not in conversion_map:
-                conversion_map[server.notify_format] = \
-                    convert_between(body_format, server.notify_format, body)
+                try:
+                    converted = convert_between(
+                        body_format, server.notify_format, body)
 
-                if conversion_map[server.notify_format] is None:
+                except:
                     # Conversion Failed
                     logger.error(
                         'Failed to convert message body from %s to %s',
                         body_format, server.notify_format)
                     raise TypeError
+
+                else:
+                    conversion_map[server.notify_format] = converted
 
             if interpret_escapes:
                 #
