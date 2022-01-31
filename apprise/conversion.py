@@ -107,7 +107,7 @@ class HTMLConverter(HTMLParser, object):
 
     # The following tags must start on a new line
     BLOCK_TAGS = ('p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-                  'div' 'tr', 'th', 'code', 'pre', 'label')
+                  'div', 'tr', 'th', 'code', 'pre', 'label')
 
     # the folowing tags ignore any internal text
     IGNORE_TAGS = ('style', 'link', 'meta', 'title', 'html', 'head', 'script')
@@ -115,25 +115,58 @@ class HTMLConverter(HTMLParser, object):
     # Condense Whitespace
     WS_TRIM = re.compile(r'[\s]+', re.DOTALL | re.MULTILINE)
 
+    # Sentinel value for block tag boundaries, which may be consolidated into a
+    # single line break.
+    BLOCK_END = {}
+
     def __init__(self, **kwargs):
         super(HTMLConverter, self).__init__(**kwargs)
 
         # Shoudl we store the text content or not?
         self._do_store = True
 
-        # Track whether we started a block tag and moved into a non-block style
-        # we need to write a new_line and flip the dirty switch
-        self._dirty_newline = False
+        # Initialize internal result list
+        self._result = []
 
-        # Track entries pasted on line
-        self._line_paste_count = 0
-
+        # Initialize public result field (not populated until close() is called)
         self.converted = ""
 
     def close(self):
-        # Removes all html before the last "}". Some HTML can return additional
-        # style information with text output.
-        self.converted = str(self.converted).split('}')[-1].rstrip()
+        string = ''.join(self._finalize(self._result))
+        self.converted = string.strip()
+
+    def _finalize(self, result):
+        """
+        Combines and strips consecutive strings, then converts consecutive block
+        ends into singleton newlines.
+
+        [ {be} " Hello " {be} {be} " World!" ] -> "\nHello\nWorld!"
+        """
+
+        # None means the last visited item was a block end.
+        accum = None
+
+        for item in result:
+            if item == self.BLOCK_END:
+                # Multiple consecutive block ends; do nothing.
+                if accum is None:
+                    continue
+
+                # First block end; yield the current string, plus a newline.
+                yield accum.strip() + '\n'
+                accum = None
+
+            # Multiple consecutive strings; combine them.
+            elif accum is not None:
+                accum += item
+
+            # First consecutive string; store it.
+            else:
+                accum = item
+
+        # Yield the last string if we have not already done so.
+        if accum is not None:
+            yield accum.strip()
 
     def handle_data(self, data, *args, **kwargs):
         """
@@ -145,61 +178,32 @@ class HTMLConverter(HTMLParser, object):
 
             # Tidy our whitespace
             content = self.WS_TRIM.sub(' ', data)
-
-            # if self._dirty_newline and self._line_paste_count > 0:
-            #     self.converted += '\n'
-            #     self._line_paste_count = 0
-            #     self._dirty_newline = False
-
-            if content:
-                self.converted += content \
-                    if self._line_paste_count > 0 else content.lstrip()
-
-                # Track our writes
-                self._line_paste_count += 1
+            self._result.append(content)
 
     def handle_starttag(self, tag, attrs):
         """
         Process our starting HTML Tag
         """
         # Toggle initial states
-        self._do_store = False
+        self._do_store = tag not in self.IGNORE_TAGS
 
-        if tag not in self.IGNORE_TAGS:
-            # Process our data
-            self._do_store = True
+        if tag in self.BLOCK_TAGS:
+            self._result.append(self.BLOCK_END)
 
-            if tag == 'li':
-                self.converted += '- '
-                self._dirty_newline = True
+        if tag == 'li':
+            self._result.append('- ')
 
-            elif tag == 'br':
-                self._dirty_newline = True
-                self._line_paste_count = 1
+        elif tag == 'br':
+            self._result.append('\n')
 
-            elif tag in self.BLOCK_TAGS:
-                self._dirty_newline = True
-
-            elif tag == 'blockquote':
-                self.converted += ' >'
-                self._dirty_newline = True
-
-            elif self._dirty_newline:
-                self.converted += '\n'
-                self._line_paste_count = 0
-                self._dirty_newline = False
+        elif tag == 'blockquote':
+            self._result.append(' >')
 
     def handle_endtag(self, tag):
         """
         Edge case handling of open/close tags
         """
-        if tag == 'br':
-            # Handle <br/> entries
-            self.converted += '\n'
-            self._line_paste_count = 0
-            self._dirty_newline = False
+        self._do_store = True
 
-        elif tag in self.BLOCK_TAGS and self._dirty_newline:
-            self.converted += '\n'
-            self._line_paste_count = 0
-            self._dirty_newline = False
+        if tag in self.BLOCK_TAGS:
+            self._result.append(self.BLOCK_END)
