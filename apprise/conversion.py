@@ -31,12 +31,9 @@ from .common import NotifyFormat
 
 if six.PY2:
     from HTMLParser import HTMLParser
-    __hp = HTMLParser()
-    unescape = __hp.unescape
 
 else:
     from html.parser import HTMLParser
-    from html import unescape
 
 
 def convert_between(from_format, to_format, body):
@@ -90,7 +87,7 @@ def text_to_html(body):
     # Execute our map against our body in addition to
     # swapping out new lines and replacing them with <br/>
     return re.sub(
-        r'\r*\n', '<br/>\r\n', re_table.sub(lambda x: re_map[x.group()], body))
+        r'\r*\n', '<br/>\n', re_table.sub(lambda x: re_map[x.group()], body))
 
 
 def html_to_text(body):
@@ -99,6 +96,10 @@ def html_to_text(body):
     """
 
     parser = HTMLConverter()
+    if six.PY2:
+        # Python 2.7 requires an additional parsing to un-escape characters
+        body = parser.unescape(body)
+
     parser.feed(body)
     parser.close()
     result = parser.converted
@@ -110,7 +111,7 @@ class HTMLConverter(HTMLParser, object):
     """An HTML to plain text converter tuned for email messages."""
 
     # The following tags must start on a new line
-    BLOCK_TAGS = ('p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr',
+    BLOCK_TAGS = ('p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
                   'div', 'td', 'th', 'code', 'pre', 'label', 'li',)
 
     # the folowing tags ignore any internal text
@@ -139,6 +140,14 @@ class HTMLConverter(HTMLParser, object):
     def close(self):
         string = ''.join(self._finalize(self._result))
         self.converted = string.strip()
+
+        if six.PY2:
+            # See https://stackoverflow.com/questions/10993612/\
+            #       how-to-remove-xa0-from-string-in-python
+            #
+            # This is required since the unescape() nbsp; with \xa0 when
+            # using Python 2.7
+            self.converted = self.converted.replace(u'\xa0', u' ')
 
     def _finalize(self, result):
         """
@@ -182,7 +191,7 @@ class HTMLConverter(HTMLParser, object):
         if self._do_store:
 
             # Tidy our whitespace
-            content = unescape(self.WS_TRIM.sub(' ', data))
+            content = self.WS_TRIM.sub(' ', data)
             self._result.append(content)
 
     def handle_starttag(self, tag, attrs):
@@ -202,7 +211,10 @@ class HTMLConverter(HTMLParser, object):
             self._result.append('\n')
 
         elif tag == 'hr':
-            self._result.append('---\n')
+            if self._result:
+                self._result[-1] = self._result[-1].rstrip(' ')
+
+            self._result.append('\n---\n')
 
         elif tag == 'blockquote':
             self._result.append(' >')

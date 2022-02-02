@@ -106,6 +106,10 @@ def test_html_to_text():
                    "<p>3rd line</body>") == \
         "line 1 bold\nmy link\n3rd line"
 
+    # <hr/> on it's own
+    assert to_html("<hr/>") == "---"
+    assert to_html("<hr>") == "---"
+
     # We need to handle HTML Encodings
     assert to_html("""
         <html>

@@ -514,50 +514,19 @@ class Apprise(object):
             # was set to None), or we did define a tag and the logic above
             # determined we need to notify the service it's associated with
             if server.notify_format not in conversion_map:
-                try:
-                    converted = convert_between(
-                        body_format, server.notify_format, body)
+                conversion_map[server.notify_format] = convert_between(
+                    body_format, server.notify_format, body)
 
-                except:
-                    # Conversion Failed
-                    logger.error(
-                        'Failed to convert message body from %s to %s',
-                        body_format, server.notify_format)
-                    raise TypeError
+                if interpret_escapes:
+                    #
+                    # Escape our content
+                    #
 
-                else:
-                    conversion_map[server.notify_format] = converted
-
-            if interpret_escapes:
-                #
-                # Escape our content
-                #
-
-                try:
-                    # Added overhead required due to Python 3 Encoding Bug
-                    # identified here: https://bugs.python.org/issue21331
-                    conversion_map[server.notify_format] = \
-                        conversion_map[server.notify_format]\
-                        .encode('ascii', 'backslashreplace')\
-                        .decode('unicode-escape')
-
-                except UnicodeDecodeError:  # pragma: no cover
-                    # This occurs using a very old verion of Python 2.7 such
-                    # as the one that ships with CentOS/RedHat 7.x (v2.7.5).
-                    conversion_map[server.notify_format] = \
-                        conversion_map[server.notify_format] \
-                        .decode('string_escape')
-
-                except AttributeError:
-                    # Must be of string type
-                    logger.error('Failed to escape message body')
-                    raise TypeError
-
-                if title:
                     try:
                         # Added overhead required due to Python 3 Encoding Bug
                         # identified here: https://bugs.python.org/issue21331
-                        title = title\
+                        conversion_map[server.notify_format] = \
+                            conversion_map[server.notify_format]\
                             .encode('ascii', 'backslashreplace')\
                             .decode('unicode-escape')
 
@@ -565,12 +534,34 @@ class Apprise(object):
                         # This occurs using a very old verion of Python 2.7
                         # such as the one that ships with CentOS/RedHat 7.x
                         # (v2.7.5).
-                        title = title.decode('string_escape')
+                        conversion_map[server.notify_format] = \
+                            conversion_map[server.notify_format] \
+                            .decode('string_escape')
 
                     except AttributeError:
                         # Must be of string type
-                        logger.error('Failed to escape message title')
+                        logger.error('Failed to escape message body')
                         raise TypeError
+
+                    if title:
+                        try:
+                            # Added overhead required due to Python 3 Encoding
+                            # Bug identified here:
+                            #  https://bugs.python.org/issue21331
+                            title = title\
+                                .encode('ascii', 'backslashreplace')\
+                                .decode('unicode-escape')
+
+                        except UnicodeDecodeError:  # pragma: no cover
+                            # This occurs using a very old verion of Python 2.7
+                            # such as the one that ships with CentOS/RedHat 7.x
+                            # (v2.7.5).
+                            title = title.decode('string_escape')
+
+                        except AttributeError:
+                            # Must be of string type
+                            logger.error('Failed to escape message title')
+                            raise TypeError
 
             yield handler(
                 server,
