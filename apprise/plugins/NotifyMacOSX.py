@@ -93,7 +93,7 @@ class NotifyMacOSX(NotifyBase):
 
     # The possible paths to the terminal-notifier
     notify_paths = (
-        '/opt/homebrew/bin/terminal-notify',
+        '/opt/homebrew/bin/terminal-notifier',
         '/usr/local/bin/terminal-notifier',
     )
 
