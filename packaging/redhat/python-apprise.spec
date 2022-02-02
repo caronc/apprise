@@ -1,4 +1,4 @@
-# Copyright (C) 2021 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2022 Chris Caron <lead2gold@gmail.com>
 # All rights reserved.
 #
 # This code is licensed under the MIT License.
@@ -58,7 +58,7 @@ SMTP2Go, Spontit, SparkPost, Super Toasty, Streamlabs, Stride, Syslog, Techulus 
 Telegram, Twilio, Twitter, Twist, XBMC, XMPP, Webex Teams}
 
 Name:           python-%{pypi_name}
-Version:        0.9.6
+Version:        0.9.7
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        MIT
@@ -236,6 +236,9 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 %endif
 
 %changelog
+* Wed Feb  2 2022 Chris Caron <lead2gold@gmail.com> - 0.9.7-1
+- Updated to v0.9.7
+
 * Wed Dec  1 2021 Chris Caron <lead2gold@gmail.com> - 0.9.6-1
 - Updated to v0.9.6
 

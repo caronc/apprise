@@ -1,14 +1,14 @@
 # Translations template for apprise.
-# Copyright (C) 2021 Chris Caron
+# Copyright (C) 2022 Chris Caron
 # This file is distributed under the same license as the apprise project.
-# FIRST AUTHOR <EMAIL@ADDRESS>, 2021.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
 #
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: apprise 0.9.6\n"
+"Project-Id-Version: apprise 0.9.7\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2021-12-01 18:56-0500\n"
+"POT-Creation-Date: 2022-02-02 14:27-0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -140,10 +140,16 @@ msgstr ""
 msgid "Custom Icon"
 msgstr ""
 
+msgid "Custom Image URL"
+msgstr ""
+
 msgid "Cycles"
 msgstr ""
 
 msgid "DBus Notification"
+msgstr ""
+
+msgid "Data Entries"
 msgstr ""
 
 msgid "Details"
@@ -198,6 +204,9 @@ msgid "Expire"
 msgstr ""
 
 msgid "Facility"
+msgstr ""
+
+msgid "Fetch Method"
 msgstr ""
 
 msgid "Flair ID"
@@ -311,7 +320,13 @@ msgstr ""
 msgid "Name"
 msgstr ""
 
+msgid "Nextcloud Talk"
+msgstr ""
+
 msgid "No dependencies."
+msgstr ""
+
+msgid "Notification Color"
 msgstr ""
 
 msgid "Notification ID"
@@ -352,6 +367,9 @@ msgstr ""
 msgid "Path"
 msgstr ""
 
+msgid "Payload Extras"
+msgstr ""
+
 msgid "Port"
 msgstr ""
 
@@ -380,6 +398,9 @@ msgid "Region Name"
 msgstr ""
 
 msgid "Remove Tokens"
+msgstr ""
+
+msgid "Reply To Email"
 msgstr ""
 
 msgid "Resubmit Flag"
@@ -458,6 +479,9 @@ msgid "Syslog Mode"
 msgstr ""
 
 msgid "Tags"
+msgstr ""
+
+msgid "Target Callsign"
 msgstr ""
 
 msgid "Target Channel"
@@ -575,6 +599,9 @@ msgid "Token B"
 msgstr ""
 
 msgid "Token C"
+msgstr ""
+
+msgid "Transmitter Groups"
 msgstr ""
 
 msgid "URL"
