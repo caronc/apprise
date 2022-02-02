@@ -31,8 +31,12 @@ from .common import NotifyFormat
 
 if six.PY2:
     from HTMLParser import HTMLParser
+    __hp = HTMLParser()
+    unescape = __hp.unescape
+
 else:
     from html.parser import HTMLParser
+    from html import unescape
 
 
 def convert_between(from_format, to_format, body):
@@ -106,8 +110,8 @@ class HTMLConverter(HTMLParser, object):
     """An HTML to plain text converter tuned for email messages."""
 
     # The following tags must start on a new line
-    BLOCK_TAGS = ('p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-                  'div', 'tr', 'th', 'code', 'pre', 'label')
+    BLOCK_TAGS = ('p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'hr',
+                  'div', 'td', 'th', 'code', 'pre', 'label', 'li',)
 
     # the folowing tags ignore any internal text
     IGNORE_TAGS = ('style', 'link', 'meta', 'title', 'html', 'head', 'script')
@@ -178,7 +182,7 @@ class HTMLConverter(HTMLParser, object):
         if self._do_store:
 
             # Tidy our whitespace
-            content = self.WS_TRIM.sub(' ', data)
+            content = unescape(self.WS_TRIM.sub(' ', data))
             self._result.append(content)
 
     def handle_starttag(self, tag, attrs):
@@ -196,6 +200,9 @@ class HTMLConverter(HTMLParser, object):
 
         elif tag == 'br':
             self._result.append('\n')
+
+        elif tag == 'hr':
+            self._result.append('---\n')
 
         elif tag == 'blockquote':
             self._result.append(' >')
