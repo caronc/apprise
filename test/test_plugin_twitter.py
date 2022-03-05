@@ -583,6 +583,8 @@ def test_plugin_twitter_dm_attachments(mock_get, mock_post):
         os.path.join(TEST_VAR_DIR, 'apprise-test.gif'),
         os.path.join(TEST_VAR_DIR, 'apprise-test.jpeg'),
         os.path.join(TEST_VAR_DIR, 'apprise-test.png'),
+        # This one is not supported, so it's ignored gracefully
+        os.path.join(TEST_VAR_DIR, 'apprise-test.mp4'),
     ]
 
     assert obj.notify(
@@ -611,3 +613,28 @@ def test_plugin_twitter_dm_attachments(mock_get, mock_post):
 
     mock_get.reset_mock()
     mock_post.reset_mock()
+
+    # We have an OSError thrown in the middle of our preparation
+    mock_post.side_effect = [good_media_response, OSError()]
+    mock_get.return_value = good_dm_response
+
+    # 2 images are produced
+    attach = [
+        os.path.join(TEST_VAR_DIR, 'apprise-test.gif'),
+        os.path.join(TEST_VAR_DIR, 'apprise-test.png'),
+        # This one is not supported, so it's ignored gracefully
+        os.path.join(TEST_VAR_DIR, 'apprise-test.mp4'),
+    ]
+
+    # We'll fail to send this time
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=attach) is False
+
+    assert mock_get.call_count == 0
+    # No get request as cached response is used
+    assert mock_post.call_count == 2
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://upload.twitter.com/1.1/media/upload.json'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://upload.twitter.com/1.1/media/upload.json'

@@ -288,10 +288,10 @@ class NotifyTwitter(NotifyBase):
 
                 if not re.match(r'^image/.*', attachment.mimetype, re.I):
                     # Only support images at this time
-                    self.logger.error(
-                        'Unsupported Twitter attachment {}.'.format(
+                    self.logger.warning(
+                        'Ignoring unsupported Twitter attachment {}.'.format(
                             attachment.url(privacy=True)))
-                    return False
+                    continue
 
                 self.logger.debug(
                     'Preparing Twiter attachment {}'.format(
