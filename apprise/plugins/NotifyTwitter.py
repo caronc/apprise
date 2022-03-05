@@ -182,10 +182,15 @@ class NotifyTwitter(NotifyBase):
         'to': {
             'alias_of': 'targets',
         },
+        'batch': {
+            'name': _('Batch Mode'),
+            'type': 'bool',
+            'default': True,
+        },
     })
 
     def __init__(self, ckey, csecret, akey, asecret, targets=None,
-                 mode=TwitterMessageMode.DM, cache=True, **kwargs):
+                 mode=TwitterMessageMode.DM, cache=True, batch=True, **kwargs):
         """
         Initialize Twitter Object
 
@@ -222,6 +227,9 @@ class NotifyTwitter(NotifyBase):
 
         # Set Cache Flag
         self.cache = cache
+
+        # Prepare Image Batch Mode Flag
+        self.batch = batch
 
         if self.mode not in TWITTER_MESSAGE_MODES:
             msg = 'The Twitter message mode specified ({}) is invalid.' \
@@ -301,6 +309,13 @@ class NotifyTwitter(NotifyBase):
                     # We can't post our attachment
                     return False
 
+                if not (isinstance(response, dict)
+                        and response.get('media_id')):
+                    self.logger.debug(
+                        'Could not attach the file to Twitter: %s (mime=%s)',
+                        attachment.name, attachment.mimetype)
+                    continue
+
                 # If we get here, our output will look something like this:
                 # {
                 #   "media_id": 710511363345354753,
@@ -350,14 +365,33 @@ class NotifyTwitter(NotifyBase):
             payloads.append(payload)
 
         else:
-            # Group our images
+            # Group our images if batch is set to do so
+            batch_size = 1 if not self.batch \
+                else self.__tweet_non_gif_images_batch
+
+            # Track our batch control in our message generation
             batches = []
             batch = []
             for attachment in attachments:
                 batch.append(str(attachment['media_id']))
+
+                # Twitter supports batching images together.  This allows
+                # the batching of multiple images together.  Twitter also
+                # makes it clear that you can't batch `gif` files; they need
+                # to be separate.  So the below preserves the ordering that
+                # a user passed their attachments in.  if 4-non-gif images
+                # are passed, they are all part of a single message.
+                #
+                # however, if they pass in image, gif, image, gif.  The
+                # gif's inbetween break apart the batches so this would
+                # produce 4 separate tweets.
+                #
+                # If you passed in, image, image, gif, image. <- This would
+                # produce 3 images (as the first 2 images could be lumped
+                # together as a batch)
                 if not re.match(
                         r'^image/(png|jpe?g)', attachment['file_mime'], re.I) \
-                        or len(batch) >= self.__tweet_non_gif_images_batch:
+                        or len(batch) >= batch_size:
                     batches.append(','.join(batch))
                     batch = []
 
@@ -739,6 +773,8 @@ class NotifyTwitter(NotifyBase):
         # Define any URL parameters
         params = {
             'mode': self.mode,
+            'batch': 'yes' if self.batch else 'no',
+            'cache': 'yes' if self.cache else 'no',
         }
 
         # Extend our parameters
@@ -811,9 +847,15 @@ class NotifyTwitter(NotifyBase):
         # Store any remaining items as potential targets
         results['targets'].extend(tokens[3:])
 
+        # Get Cache Flag (reduces lookup hits)
         if 'cache' in results['qsd'] and len(results['qsd']['cache']):
             results['cache'] = \
                 parse_bool(results['qsd']['cache'], True)
+
+        # Get Batch Mode Flag
+        results['batch'] = \
+            parse_bool(results['qsd'].get(
+                'batch', NotifyTwitter.template_args['batch']['default']))
 
         # The 'to' makes it easier to use yaml configuration
         if 'to' in results['qsd'] and len(results['qsd']['to']):
