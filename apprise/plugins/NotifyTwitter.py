@@ -419,11 +419,36 @@ class NotifyTwitter(NotifyBase):
             if not postokay:
                 # Track our error
                 has_error = True
+
+                errors = []
+                try:
+                    errors = ['Error Code {}: {}'.format(
+                        e.get('code', 'unk'), e.get('message'))
+                        for e in response['errors']]
+
+                except (KeyError, TypeError):
+                    pass
+
+                for error in errors:
+                    self.logger.debug(
+                        'Tweet [%.2d/%.2d] Details: %s',
+                        no, len(payloads), error)
                 continue
 
+            try:
+                url = 'https://twitter.com/{}/status/{}'.format(
+                    response['user']['screen_name'],
+                    response['id_str'])
+
+            except (KeyError, TypeError):
+                url = 'unknown'
+
+            self.logger.debug(
+                'Tweet [%.2d/%.2d] Details: %s', no, len(payloads), url)
+
             self.logger.info(
-                'Sent [{:02d}/{:02d}] Twitter notification as public tweet.'
-                .format(no, len(payloads)))
+                'Sent [%.2d/%.2d] Twitter notification as public tweet.',
+                no, len(payloads))
 
         return not has_error
 
@@ -691,6 +716,15 @@ class NotifyTwitter(NotifyBase):
                 timeout=self.request_timeout,
             )
 
+            try:
+                content = loads(r.content)
+
+            except (AttributeError, TypeError, ValueError):
+                # ValueError = r.content is Unparsable
+                # TypeError = r.content is None
+                # AttributeError = r is None
+                content = {}
+
             if r.status_code != requests.codes.ok:
                 # We had a problem
                 status_str = \
@@ -709,15 +743,6 @@ class NotifyTwitter(NotifyBase):
 
                 # Mark our failure
                 return (False, content)
-
-            try:
-                content = loads(r.content)
-
-            except (AttributeError, TypeError, ValueError):
-                # ValueError = r.content is Unparsable
-                # TypeError = r.content is None
-                # AttributeError = r is None
-                content = {}
 
             try:
                 # Capture rate limiting if possible

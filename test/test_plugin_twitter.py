@@ -723,6 +723,86 @@ def test_plugin_twitter_tweet_attachments(mock_get, mock_post):
     assert mock_post.call_args_list[1][0][0] == \
         'https://api.twitter.com/1.1/statuses/update.json'
 
+    # Update our good response to have more details in it
+    good_tweet_response_obj = {
+        'screen_name': screen_name,
+        'id': 9876,
+        # needed for additional logging
+        'id_str': '12345',
+        'user': {
+            'screen_name': screen_name,
+        }
+    }
+
+    good_tweet_response.content = dumps(good_tweet_response_obj)
+
+    mock_get.reset_mock()
+    mock_post.reset_mock()
+
+    mock_post.side_effect = [good_media_response, good_tweet_response]
+    mock_get.return_value = good_tweet_response
+
+    # instantiate our object
+    obj = Apprise.instantiate(twitter_url)
+
+    # Send our notification (again); this time there willb e more tweet logging
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=attach) is True
+
+    # Test our call count
+    assert mock_get.call_count == 0
+    assert mock_post.call_count == 2
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://upload.twitter.com/1.1/media/upload.json'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://api.twitter.com/1.1/statuses/update.json'
+
+    mock_get.reset_mock()
+    mock_post.reset_mock()
+
+    mock_post.side_effect = [good_media_response, bad_media_response]
+
+    # instantiate our object
+    obj = Apprise.instantiate(twitter_url)
+
+    # Our notification will fail now since our tweet will error out
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=attach) is False
+
+    # Test our call count
+    assert mock_get.call_count == 0
+    assert mock_post.call_count == 2
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://upload.twitter.com/1.1/media/upload.json'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://api.twitter.com/1.1/statuses/update.json'
+
+    mock_get.reset_mock()
+    mock_post.reset_mock()
+
+    bad_media_response.content = ''
+
+    mock_post.side_effect = [good_media_response, bad_media_response]
+
+    # instantiate our object
+    obj = Apprise.instantiate(twitter_url)
+
+    # Our notification will fail now since our tweet will error out
+    # This is the same test as above, except our error response isn't parseable
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=attach) is False
+
+    # Test our call count
+    assert mock_get.call_count == 0
+    assert mock_post.call_count == 2
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://upload.twitter.com/1.1/media/upload.json'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://api.twitter.com/1.1/statuses/update.json'
+
     mock_get.reset_mock()
     mock_post.reset_mock()
 
