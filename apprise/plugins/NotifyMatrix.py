@@ -43,6 +43,7 @@ from ..common import NotifyFormat
 from ..utils import parse_bool
 from ..utils import parse_list
 from ..utils import apply_template
+from ..utils import is_hostname
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
@@ -284,6 +285,22 @@ class NotifyMatrix(NotifyBase):
             if not self.access_token:
                 msg = 'An invalid T2Bot/Matrix Webhook ID ' \
                       '({}) was specified.'.format(self.password)
+                self.logger.warning(msg)
+                raise TypeError(msg)
+
+        elif not is_hostname(self.host):
+            msg = 'An invalid Matrix Hostname ({}) was specified'\
+                  .format(self.host)
+            self.logger.warning(msg)
+            raise TypeError(msg)
+        else:
+            # Verify port if specified
+            if self.port is not None and not (
+                    isinstance(self.port, int)
+                    and self.port >= self.template_tokens['port']['min']
+                    and self.port <= self.template_tokens['port']['max']):
+                msg = 'An invalid Matrix Port ({}) was specified'\
+                      .format(self.port)
                 self.logger.warning(msg)
                 raise TypeError(msg)
 

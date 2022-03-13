@@ -565,7 +565,7 @@ def parse_qsd(qs):
     return result
 
 
-def parse_url(url, default_schema='http', verify_host=True):
+def parse_url(url, default_schema='http', verify_host=True, strict_port=False):
     """A function that greatly simplifies the parsing of a url
     specified by the end user.
 
@@ -697,13 +697,29 @@ def parse_url(url, default_schema='http', verify_host=True):
             # and it's already assigned
             pass
 
-    # Max port is 65535 so (1,5 digits)
-    match = re.search(
-        r'^(?P<host>.+):(?P<port>[1-9][0-9]{0,4})$', result['host'])
-    if match:
+    # Port Parsing
+    pmatch = re.search(
+        r'^(?P<host>([[0-9a-f:]+]|[^:]+)):(?P<port>[^:]*)$',
+        result['host'])
+
+    if pmatch:
         # Separate our port from our hostname (if port is detected)
-        result['host'] = match.group('host')
-        result['port'] = int(match.group('port'))
+        result['host'] = pmatch.group('host')
+        try:
+            # If we're dealing with an integer, go ahead and convert it
+            # otherwise return an 'x' which will raise a ValueError
+            #
+            # This small extra check allows us to treat floats/doubles
+            # as strings. Hence a value like '4.2' won't be converted to a 4
+            # (and the .2 lost)
+            result['port'] = int(
+                pmatch.group('port')
+                if re.search(r'[0-9]', pmatch.group('port')) else 'x')
+
+        except ValueError:
+            if verify_host:
+                # Invalid Host Specified
+                return None
 
     if verify_host:
         # Verify and Validate our hostname
@@ -712,6 +728,26 @@ def parse_url(url, default_schema='http', verify_host=True):
             # Nothing more we can do without a hostname; give the user
             # some indication as to what went wrong
             return None
+
+        # Max port is 65535 and min is 1
+        if isinstance(result['port'], int) and not ((
+            not strict_port or (
+                strict_port and
+                result['port'] > 0 and result['port'] <= 65535))):
+
+            # An invalid port was specified
+            return None
+
+    elif pmatch and not isinstance(result['port'], int):
+        if strict_port:
+            # Store port
+            result['port'] = pmatch.group('port').strip()
+
+        else:
+            # Fall back
+            result['port'] = None
+            result['host'] = '{}:{}'.format(
+                pmatch.group('host'), pmatch.group('port'))
 
     # Re-assemble cleaned up version of the url
     result['url'] = '%s://' % result['schema']
@@ -725,8 +761,12 @@ def parse_url(url, default_schema='http', verify_host=True):
             result['url'] += '@'
     result['url'] += result['host']
 
-    if result['port']:
-        result['url'] += ':%d' % result['port']
+    if result['port'] is not None:
+        try:
+            result['url'] += ':%d' % result['port']
+
+        except TypeError:
+            result['url'] += ':%s' % result['port']
 
     if result['fullpath']:
         result['url'] += result['fullpath']

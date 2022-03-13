@@ -100,6 +100,23 @@ def test_parse_url():
     # colon after hostname without port number is no good
     assert utils.parse_url('http://hostname:') is None
 
+    # An invalid port
+    result = utils.parse_url(
+        'http://hostname:invalid', verify_host=False, strict_port=True)
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname'
+    assert result['port'] == 'invalid'
+    assert result['user'] is None
+    assert result['password'] is None
+    assert result['fullpath'] is None
+    assert result['path'] is None
+    assert result['query'] is None
+    assert result['url'] == 'http://hostname:invalid'
+    assert result['qsd'] == {}
+    assert result['qsd-'] == {}
+    assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
+
     # However if we don't verify the host, it is okay
     result = utils.parse_url('http://hostname:', verify_host=False)
     assert result['schema'] == 'http'
@@ -116,14 +133,190 @@ def test_parse_url():
     assert result['qsd+'] == {}
     assert result['qsd:'] == {}
 
-    # A port of Zero is not valid
-    assert utils.parse_url('http://hostname:0') is None
+    # A port of Zero is not valid with strict port checking
+    assert utils.parse_url('http://hostname:0', strict_port=True) is None
 
-    # Port set to zero; port is not stored
+    # Without strict port checking however, it is okay
+    result = utils.parse_url('http://hostname:0', strict_port=False)
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname'
+    assert result['port'] == 0
+    assert result['user'] is None
+    assert result['password'] is None
+    assert result['fullpath'] is None
+    assert result['path'] is None
+    assert result['query'] is None
+    assert result['url'] == 'http://hostname:0'
+    assert result['qsd'] == {}
+    assert result['qsd-'] == {}
+    assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
+
+    # A negative port is not valid
+    assert utils.parse_url('http://hostname:-92', strict_port=True) is None
+    result = utils.parse_url(
+        'http://hostname:-92', verify_host=False, strict_port=True)
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname'
+    assert result['port'] == -92
+    assert result['user'] is None
+    assert result['password'] is None
+    assert result['fullpath'] is None
+    assert result['path'] is None
+    assert result['query'] is None
+    assert result['url'] == 'http://hostname:-92'
+    assert result['qsd'] == {}
+    assert result['qsd-'] == {}
+    assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
+
+    # A port that is too large is not valid
+    assert utils.parse_url('http://hostname:65536', strict_port=True) is None
+
+    # This is an accetable port (the maximum)
+    result = utils.parse_url('http://hostname:65535', strict_port=True)
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname'
+    assert result['port'] == 65535
+    assert result['user'] is None
+    assert result['password'] is None
+    assert result['fullpath'] is None
+    assert result['path'] is None
+    assert result['query'] is None
+    assert result['url'] == 'http://hostname:65535'
+    assert result['qsd'] == {}
+    assert result['qsd-'] == {}
+    assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
+
+    # This is an accetable port (the maximum)
+    result = utils.parse_url('http://hostname:1', strict_port=True)
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname'
+    assert result['port'] == 1
+    assert result['user'] is None
+    assert result['password'] is None
+    assert result['fullpath'] is None
+    assert result['path'] is None
+    assert result['query'] is None
+    assert result['url'] == 'http://hostname:1'
+    assert result['qsd'] == {}
+    assert result['qsd-'] == {}
+    assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
+
+    # A port that was identfied as a string is invalid
+    assert utils.parse_url('http://hostname:invalid', strict_port=True) is None
+    result = utils.parse_url(
+        'http://hostname:invalid', verify_host=False, strict_port=True)
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname'
+    assert result['port'] == 'invalid'
+    assert result['user'] is None
+    assert result['password'] is None
+    assert result['fullpath'] is None
+    assert result['path'] is None
+    assert result['query'] is None
+    assert result['url'] == 'http://hostname:invalid'
+    assert result['qsd'] == {}
+    assert result['qsd-'] == {}
+    assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
+
+    result = utils.parse_url(
+        'http://hostname:invalid', verify_host=False, strict_port=False)
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname:invalid'
+    assert result['port'] is None
+    assert result['user'] is None
+    assert result['password'] is None
+    assert result['fullpath'] is None
+    assert result['path'] is None
+    assert result['query'] is None
+    assert result['url'] == 'http://hostname:invalid'
+    assert result['qsd'] == {}
+    assert result['qsd-'] == {}
+    assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
+
+    result = utils.parse_url(
+        'http://hostname:invalid?key=value&-minuskey=mvalue',
+        verify_host=False, strict_port=False)
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname:invalid'
+    assert result['port'] is None
+    assert result['user'] is None
+    assert result['password'] is None
+    assert result['fullpath'] is None
+    assert result['path'] is None
+    assert result['query'] is None
+    assert result['url'] == 'http://hostname:invalid'
+    assert unquote(result['qsd']['-minuskey']) == 'mvalue'
+    assert unquote(result['qsd']['key']) == 'value'
+    assert unquote(result['qsd-']['minuskey']) == 'mvalue'
+    assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
+
+    # Handling of floats
+    assert utils.parse_url('http://hostname:4.2', strict_port=True) is None
+    result = utils.parse_url(
+        'http://hostname:4.2', verify_host=False, strict_port=True)
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname'
+    assert result['port'] == '4.2'
+    assert result['user'] is None
+    assert result['password'] is None
+    assert result['fullpath'] is None
+    assert result['path'] is None
+    assert result['query'] is None
+    assert result['url'] == 'http://hostname:4.2'
+    assert result['qsd'] == {}
+    assert result['qsd-'] == {}
+    assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
+
+    # A Port of zero is not acceptable for a regular hostname
+    assert utils.parse_url('http://hostname:0', strict_port=True) is None
+
+    # No host verification (zero is an acceptable port when this is the case
     result = utils.parse_url('http://hostname:0', verify_host=False)
     assert result['schema'] == 'http'
-    assert result['host'] == 'hostname:0'
-    assert result['port'] is None
+    assert result['host'] == 'hostname'
+    assert result['port'] == 0
+    assert result['user'] is None
+    assert result['password'] is None
+    assert result['fullpath'] is None
+    assert result['path'] is None
+    assert result['query'] is None
+    assert result['url'] == 'http://hostname:0'
+    assert result['qsd'] == {}
+    assert result['qsd-'] == {}
+    assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
+
+    result = utils.parse_url(
+        'http://[2001:db8:002a:3256:adfe:05c0:0003:0006]:8080',
+        verify_host=False)
+    assert result['schema'] == 'http'
+    assert result['host'] == '[2001:db8:002a:3256:adfe:05c0:0003:0006]'
+    assert result['port'] == 8080
+    assert result['user'] is None
+    assert result['password'] is None
+    assert result['fullpath'] is None
+    assert result['path'] is None
+    assert result['query'] is None
+    assert result['url'] == \
+        'http://[2001:db8:002a:3256:adfe:05c0:0003:0006]:8080'
+    assert result['qsd'] == {}
+    assert result['qsd-'] == {}
+    assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
+
+    result = utils.parse_url(
+        'http://hostname:0', verify_host=False, strict_port=True)
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname'
+    assert result['port'] == 0
     assert result['user'] is None
     assert result['password'] is None
     assert result['fullpath'] is None
