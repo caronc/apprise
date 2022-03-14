@@ -49,6 +49,14 @@ apprise_url_tests = (
     ('kodi://[2001:db8:002a:3256:adfe:05c0:0003:0006]', {
         # Support IPv6 Addresses
         'instance': plugins.NotifyXBMC,
+        # Privacy URL
+        'privacy_url': 'kodi://[2001:db8:002a:3256:adfe:05c0:0003:0006]',
+    }),
+    ('kodi://[2001:db8:002a:3256:adfe:05c0:0003:0006]:8282', {
+        # Support IPv6 Addresses with port
+        'instance': plugins.NotifyXBMC,
+        # Privacy URL
+        'privacy_url': 'kodi://[2001:db8:002a:3256:adfe:05c0:0003:0006]:8282',
     }),
     ('kodi://user:pass@localhost', {
         'instance': plugins.NotifyXBMC,
