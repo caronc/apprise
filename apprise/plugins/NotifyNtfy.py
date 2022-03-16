@@ -119,6 +119,18 @@ class NotifyNtfy(NotifyBase):
 
     # Define our template arguments
     template_args = dict(NotifyBase.template_args, **{
+        'click': {
+            'name': _('Click'),
+            'type': 'string',
+         },
+        'delay': {
+            'name': _('Delay'),
+            'type': 'string',
+         },
+        'email': {
+            'name': _('Email'),
+            'type': 'string',
+         },
         'priority': {
             'name': _('Priority'),
             'type': 'choice:string',
@@ -131,7 +143,8 @@ class NotifyNtfy(NotifyBase):
         },
     })
 
-    def __init__(self, topic, priority=None, tags=None, **kwargs):
+    def __init__(self, topic, click=None, delay=None, email=None,
+                 priority=None, tags=None, **kwargs):
         """
         Initialize Ntfy Object
         """
@@ -142,6 +155,15 @@ class NotifyNtfy(NotifyBase):
             raise TypeError(msg)
 
         self.topic = topic
+
+        # A clickthrough option for notifications
+        self.click = click
+
+        # Time delay for notifications (various string formats)
+        self.delay = delay
+
+        # An email to forward notifications to
+        self.email = email
 
         # The priority of the message
         if priority not in NTFY_PRIORITIES:
@@ -172,6 +194,12 @@ class NotifyNtfy(NotifyBase):
             headers['X-Priority'] = priority
         if title:
             headers['X-Title'] = title
+        if self.click is not None:
+            headers['X-Click'] = self.click
+        if self.delay is not None:
+            headers['X-Delay'] = self.delay
+        if self.email is not None:
+            headers['X-Email'] = self.email
         if self.__tags:
             headers['X-Tags'] = ",".join(self.__tags)
 
@@ -276,6 +304,12 @@ class NotifyNtfy(NotifyBase):
             else NTFY_PRIORITIES.DEFAULT,
         }
 
+        if self.click is not None:
+            params['click'] = self.click
+        if self.delay is not None:
+            params['delay'] = self.delay
+        if self.email is not None:
+            params['email'] = self.email
         if self.__tags:
             params['tags'] = ','.join(self.__tags)
 
@@ -315,6 +349,15 @@ class NotifyNtfy(NotifyBase):
                     NtfyPriority.get_priority(results['qsd']['priority'])
             except KeyError:  # no priority was set
                 pass
+
+        if 'click' in results['qsd'] and len(results['qsd']['click']):
+            results['click'] = NotifyNtfy.unquote(results['qsd']['click'])
+
+        if 'delay' in results['qsd'] and len(results['qsd']['delay']):
+            results['delay'] = NotifyNtfy.unquote(results['qsd']['delay'])
+
+        if 'email' in results['qsd'] and len(results['qsd']['email']):
+            results['email'] = NotifyNtfy.unquote(results['qsd']['email'])
 
         if 'tags' in results['qsd'] and len(results['qsd']['tags']):
             results['tags'] = \
