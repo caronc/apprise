@@ -119,6 +119,10 @@ class NotifyNtfy(NotifyBase):
 
     # Define our template arguments
     template_args = dict(NotifyBase.template_args, **{
+        'attach': {
+            'name': _('Attach'),
+            'type': 'string',
+         },
         'click': {
             'name': _('Click'),
             'type': 'string',
@@ -143,8 +147,8 @@ class NotifyNtfy(NotifyBase):
         },
     })
 
-    def __init__(self, topic, click=None, delay=None, email=None,
-                 priority=None, tags=None, **kwargs):
+    def __init__(self, topic, attach=None, click=None, delay=None,
+                 email=None, priority=None, tags=None, **kwargs):
         """
         Initialize Ntfy Object
         """
@@ -155,6 +159,9 @@ class NotifyNtfy(NotifyBase):
             raise TypeError(msg)
 
         self.topic = topic
+
+        # Attach a file (URL supported)
+        self.attach = attach
 
         # A clickthrough option for notifications
         self.click = click
@@ -194,6 +201,8 @@ class NotifyNtfy(NotifyBase):
             headers['X-Priority'] = priority
         if title:
             headers['X-Title'] = title
+        if self.attach is not None:
+            headers['X-Attach'] = self.attach
         if self.click is not None:
             headers['X-Click'] = self.click
         if self.delay is not None:
@@ -304,6 +313,8 @@ class NotifyNtfy(NotifyBase):
             else NTFY_PRIORITIES.DEFAULT,
         }
 
+        if self.attach is not None:
+            params['attach'] = self.attach
         if self.click is not None:
             params['click'] = self.click
         if self.delay is not None:
@@ -349,6 +360,9 @@ class NotifyNtfy(NotifyBase):
                     NtfyPriority.get_priority(results['qsd']['priority'])
             except KeyError:  # no priority was set
                 pass
+
+        if 'attach' in results['qsd'] and len(results['qsd']['attach']):
+            results['attach'] = NotifyNtfy.unquote(results['qsd']['attach'])
 
         if 'click' in results['qsd'] and len(results['qsd']['click']):
             results['click'] = NotifyNtfy.unquote(results['qsd']['click'])
