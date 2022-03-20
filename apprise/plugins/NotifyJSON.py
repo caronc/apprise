@@ -122,9 +122,13 @@ class NotifyJSON(NotifyBase):
             'name': _('HTTP Header'),
             'prefix': '+',
         },
+        'payload': {
+            'name': _('Payload Extras'),
+            'prefix': ':',
+        },
     }
 
-    def __init__(self, headers=None, method=None, **kwargs):
+    def __init__(self, headers=None, method=None, payload=None, **kwargs):
         """
         Initialize JSON Object
 
@@ -151,6 +155,11 @@ class NotifyJSON(NotifyBase):
             # Store our extra headers
             self.headers.update(headers)
 
+        self.payload_extras = {}
+        if payload:
+            # Store our extra payload entries
+            self.payload_extras.update(payload)
+
         return
 
     def url(self, privacy=False, *args, **kwargs):
@@ -168,6 +177,10 @@ class NotifyJSON(NotifyBase):
 
         # Append our headers into our parameters
         params.update({'+{}'.format(k): v for k, v in self.headers.items()})
+
+        # Append our payload extra's into our parameters
+        params.update(
+            {':{}'.format(k): v for k, v in self.payload_extras.items()})
 
         # Determine Authentication
         auth = ''
@@ -251,6 +264,9 @@ class NotifyJSON(NotifyBase):
             'attachments': attachments,
             'type': notify_type,
         }
+
+        # Apply any/all payload over-rides defined
+        payload.update(self.payload_extras)
 
         auth = None
         if self.user:
@@ -339,6 +355,10 @@ class NotifyJSON(NotifyBase):
         if not results:
             # We're done early as we couldn't load the results
             return results
+
+        # store any additional payload extra's defined
+        results['payload'] = {NotifyJSON.unquote(x): NotifyJSON.unquote(y)
+                              for x, y in results['qsd:'].items()}
 
         # Add our headers that the user can potentially over-ride if they wish
         # to to our returned result set

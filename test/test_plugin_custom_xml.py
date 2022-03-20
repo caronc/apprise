@@ -22,14 +22,24 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
+import os
+import sys
+import re
 import mock
 import requests
 from apprise import plugins
+from apprise import Apprise
+from apprise import AppriseAttachment
+from apprise import NotifyType
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
 import logging
 logging.disable(logging.CRITICAL)
+
+# Attachment Directory
+TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), 'var')
+
 
 # Our Testing URLs
 apprise_url_tests = (
@@ -150,6 +160,74 @@ def test_plugin_custom_xml_urls():
 
 
 @mock.patch('requests.post')
+def test_notify_xml_plugin_attachments(mock_post):
+    """
+    NotifyXML() Attachments
+
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.request_rate_per_sec = 0
+
+    okay_response = requests.Request()
+    okay_response.status_code = requests.codes.ok
+    okay_response.content = ""
+
+    # Assign our mock object our return value
+    mock_post.return_value = okay_response
+
+    obj = Apprise.instantiate('xml://localhost.localdomain/')
+    assert isinstance(obj, plugins.NotifyXML)
+
+    # Test Valid Attachment
+    path = os.path.join(TEST_VAR_DIR, 'apprise-test.gif')
+    attach = AppriseAttachment(path)
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=attach) is True
+
+    # Test invalid attachment
+    path = os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=path) is False
+
+    # Get a appropriate "builtin" module name for pythons 2/3.
+    if sys.version_info.major >= 3:
+        builtin_open_function = 'builtins.open'
+
+    else:
+        builtin_open_function = '__builtin__.open'
+
+    # Test Valid Attachment (load 3)
+    path = (
+        os.path.join(TEST_VAR_DIR, 'apprise-test.gif'),
+        os.path.join(TEST_VAR_DIR, 'apprise-test.gif'),
+        os.path.join(TEST_VAR_DIR, 'apprise-test.gif'),
+    )
+    attach = AppriseAttachment(path)
+
+    # Return our good configuration
+    mock_post.side_effect = None
+    mock_post.return_value = okay_response
+    with mock.patch(builtin_open_function, side_effect=OSError()):
+        # We can't send the message we can't open the attachment for reading
+        assert obj.notify(
+            body='body', title='title', notify_type=NotifyType.INFO,
+            attach=attach) is False
+
+    # test the handling of our batch modes
+    obj = Apprise.instantiate('xml://no-reply@example.com/')
+    assert isinstance(obj, plugins.NotifyXML)
+
+    # Now send an attachment normally without issues
+    mock_post.reset_mock()
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=attach) is True
+    assert mock_post.call_count == 1
+
+
+@mock.patch('requests.post')
 @mock.patch('requests.get')
 def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
     """
@@ -168,7 +246,8 @@ def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
     mock_get.return_value = response
 
     results = plugins.NotifyXML.parse_url(
-        'xml://localhost:8080/command?:message=test&method=GET')
+        'xml://localhost:8080/command?:Message=test&method=GET'
+        '&:Key=value&:,=invalid')
 
     assert isinstance(results, dict)
     assert results['user'] is None
@@ -181,7 +260,9 @@ def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
     assert results['schema'] == 'xml'
     assert results['url'] == 'xml://localhost:8080/command'
     assert isinstance(results['qsd:'], dict) is True
-    assert results['qsd:']['message'] == 'test'
+    assert results['qsd:']['Message'] == 'test'
+    assert results['qsd:']['Key'] == 'value'
+    assert results['qsd:'][','] == 'invalid'
 
     instance = plugins.NotifyXML(**results)
     assert isinstance(instance, plugins.NotifyXML)
@@ -201,3 +282,12 @@ def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
     for k in ('user', 'password', 'port', 'host', 'fullpath', 'path', 'query',
               'schema', 'url', 'method'):
         assert new_results[k] == results[k]
+
+    # Test our data set for our key/value pair
+    assert re.search('<Version>[1-9]+\.[0-9]+</Version>', details[1]['data'])
+    assert re.search('<MessageType>info</MessageType>', details[1]['data'])
+    assert re.search('<Subject>title</Subject>', details[1]['data'])
+    # Custom entry Message acts as Over-ride and kicks in here
+    assert re.search('<Message>test</Message>', details[1]['data'])
+    # Custom entry
+    assert re.search('<Key>value</Key>', details[1]['data'])
