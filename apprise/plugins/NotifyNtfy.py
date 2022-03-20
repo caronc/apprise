@@ -19,6 +19,12 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
+#
+# Examples:
+#   ntfys://my-topic
+#   ntfy://ntfy.local.domain/my-topic
+#   ntfys://ntfy.local.domain:8080/my-topic
+#   ntfy://ntfy.local.domain/?priority=max
 import requests
 import six
 from json import loads
@@ -27,10 +33,13 @@ from .NotifyBase import NotifyBase
 from ..common import NotifyType
 from ..AppriseLocale import gettext_lazy as _
 from ..utils import parse_list
+from ..URLBase import PrivacyMode
 
 
-# Priorities
 class NtfyPriority(object):
+    """
+    Ntfy Priority Definitions
+    """
     MAX = 'max'
     HIGH = 'high'
     DEFAULT = 'default'
@@ -96,6 +105,10 @@ class NotifyNtfy(NotifyBase):
         '{schema}://{topic}',
         '{schema}://{host}/{topic}',
         '{schema}://{host}:{port}/{topic}',
+        '{schema}://{user}@{host}/{topic}',
+        '{schema}://{user}@{host}:{port}/{topic}',
+        '{schema}://{user}:{password}@{host}/{topic}',
+        '{schema}://{user}:{password}@{host}:{port}/{topic}',
     )
 
     # Define our template tokens
@@ -115,6 +128,15 @@ class NotifyNtfy(NotifyBase):
             'min': 1,
             'max': 65535,
         },
+        'user': {
+            'name': _('Username'),
+            'type': 'string',
+        },
+        'password': {
+            'name': _('Password'),
+            'type': 'string',
+            'private': True,
+        },
     })
 
     # Define our template arguments
@@ -122,19 +144,19 @@ class NotifyNtfy(NotifyBase):
         'attach': {
             'name': _('Attach'),
             'type': 'string',
-         },
+        },
         'click': {
             'name': _('Click'),
             'type': 'string',
-         },
+        },
         'delay': {
             'name': _('Delay'),
             'type': 'string',
-         },
+        },
         'email': {
             'name': _('Email'),
             'type': 'string',
-         },
+        },
         'priority': {
             'name': _('Priority'),
             'type': 'choice:string',
@@ -195,25 +217,38 @@ class NotifyNtfy(NotifyBase):
         has_error = False
 
         # Prepare our headers
-        headers = {}
+        headers = {
+            'User-Agent': self.app_id,
+        }
+
         priority = NtfyPriority.get_priority(self.priority)
         if priority != NtfyPriority.DEFAULT:
             headers['X-Priority'] = priority
+
         if title:
             headers['X-Title'] = title
+
         if self.attach is not None:
             headers['X-Attach'] = self.attach
+
         if self.click is not None:
             headers['X-Click'] = self.click
+
         if self.delay is not None:
             headers['X-Delay'] = self.delay
+
         if self.email is not None:
             headers['X-Email'] = self.email
+
         if self.__tags:
             headers['X-Tags'] = ",".join(self.__tags)
 
         # Prepare our payload
         payload = body
+
+        auth = None
+        if self.user:
+            auth = (self.user, self.password)
 
         # Prepare our Ntfy URL
         schema = 'https' if self.secure else 'http'
@@ -242,6 +277,7 @@ class NotifyNtfy(NotifyBase):
                 url,
                 data=payload,
                 headers=headers,
+                auth=auth,
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
             )
@@ -315,24 +351,37 @@ class NotifyNtfy(NotifyBase):
 
         if self.attach is not None:
             params['attach'] = self.attach
+
         if self.click is not None:
             params['click'] = self.click
+
         if self.delay is not None:
             params['delay'] = self.delay
+
         if self.email is not None:
             params['email'] = self.email
+
         if self.__tags:
             params['tags'] = ','.join(self.__tags)
 
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        # Examples:
-        # ntfys://my-topic
-        # ntfy://ntfy.local.domain/my-topic
-        # ntfys://ntfy.local.domain:8080/my-topic
-        # ntfy://ntfy.local.domain/?priority=max
-        return '{schema}://{host}{port}{topic}/?{params}'.format(
+        # Determine Authentication
+        auth = ''
+        if self.user and self.password:
+            auth = '{user}:{password}@'.format(
+                user=NotifyNtfy.quote(self.user, safe=''),
+                password=self.pprint(
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
+            )
+        elif self.user:
+            auth = '{user}@'.format(
+                user=NotifyNtfy.quote(self.user, safe=''),
+            )
+
+        return '{schema}://{auth}{host}{port}{topic}/?{params}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
+            auth=auth,
             host='' if self.host == self.default_host else self.host,
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
@@ -380,6 +429,7 @@ class NotifyNtfy(NotifyBase):
         try:
             # Grab the topic from the URL
             results['topic'] = NotifyNtfy.split_path(results['fullpath'])[-1]
+
         except IndexError:  # Not enough paths, probably no host provided
             results['topic'] = results['host']
             results['host'] = NotifyNtfy.default_host
