@@ -25,6 +25,7 @@
 #   ntfy://ntfy.local.domain/my-topic
 #   ntfys://ntfy.local.domain:8080/my-topic
 #   ntfy://ntfy.local.domain/?priority=max
+import re
 import requests
 import six
 from json import loads
@@ -33,7 +34,26 @@ from .NotifyBase import NotifyBase
 from ..common import NotifyType
 from ..AppriseLocale import gettext_lazy as _
 from ..utils import parse_list
+from ..utils import is_hostname
+from ..utils import is_ipaddr
 from ..URLBase import PrivacyMode
+
+
+class NtfyMode(object):
+    """
+    Define Ntfy Notification Modes
+    """
+    # App posts upstream to the developer API on Ntfy's website
+    CLOUD = "cloud"
+
+    # Running a dedicated private Ntfy Server
+    PRIVATE = "private"
+
+
+NTFY_MODES = (
+    NtfyMode.CLOUD,
+    NtfyMode.PRIVATE,
+)
 
 
 class NtfyPriority(object):
@@ -94,8 +114,8 @@ class NotifyNtfy(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_ntfy'
 
-    # Default host if none is defined
-    default_host = 'ntfy.sh'
+    # Default upstream/cloud host if none is defined
+    cloud_notify_url = 'https://ntfy.sh'
 
     # Message time to live (if remote client isn't around to receive it)
     time_to_live = 2419200
@@ -103,21 +123,16 @@ class NotifyNtfy(NotifyBase):
     # Define object templates
     templates = (
         '{schema}://{topic}',
-        '{schema}://{host}/{topic}',
-        '{schema}://{host}:{port}/{topic}',
-        '{schema}://{user}@{host}/{topic}',
-        '{schema}://{user}@{host}:{port}/{topic}',
-        '{schema}://{user}:{password}@{host}/{topic}',
-        '{schema}://{user}:{password}@{host}:{port}/{topic}',
+        '{schema}://{host}/{targets}',
+        '{schema}://{host}:{port}/{targets}',
+        '{schema}://{user}@{host}/{targets}',
+        '{schema}://{user}@{host}:{port}/{targets}',
+        '{schema}://{user}:{password}@{host}/{targets}',
+        '{schema}://{user}:{password}@{host}:{port}/{targets}',
     )
 
     # Define our template tokens
     template_tokens = dict(NotifyBase.template_tokens, **{
-        'topic': {
-            'name': _('Topic'),
-            'type': 'string',
-            'required': True,
-        },
         'host': {
             'name': _('Hostname'),
             'type': 'string',
@@ -136,6 +151,15 @@ class NotifyNtfy(NotifyBase):
             'name': _('Password'),
             'type': 'string',
             'private': True,
+        },
+        'topic': {
+            'name': _('Topic'),
+            'type': 'string',
+            'map_to': 'targets',
+        },
+        'targets': {
+            'name': _('Targets'),
+            'type': 'list:string',
         },
     })
 
@@ -167,20 +191,36 @@ class NotifyNtfy(NotifyBase):
             'name': _('Tags'),
             'type': 'string',
         },
+        'mode': {
+            'name': _('Mode'),
+            'type': 'choice:string',
+            'values': NTFY_MODES,
+            'default': NtfyMode.PRIVATE,
+        },
+        'to': {
+            'alias_of': 'targets',
+        },
     })
 
-    def __init__(self, topic, attach=None, click=None, delay=None,
-                 email=None, priority=None, tags=None, **kwargs):
+    def __init__(self, targets=None, attach=None, click=None, delay=None,
+                 email=None, priority=None, tags=None, mode=None, **kwargs):
         """
         Initialize Ntfy Object
         """
         super(NotifyNtfy, self).__init__(**kwargs)
-        if not topic:
-            msg = 'A topic name must be provided.'
+
+        # Prepare our mode
+        self.mode = mode.strip().lower() \
+            if isinstance(mode, six.string_types) \
+            else self.template_args['mode']['default']
+
+        if self.mode not in NTFY_MODES:
+            msg = 'An invalid Ntfy Mode ({}) was specified.'.format(mode)
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        self.topic = topic
+        # Build list of topics
+        self.topics = parse_list(targets)
 
         # Attach a file (URL supported)
         self.attach = attach
@@ -197,16 +237,17 @@ class NotifyNtfy(NotifyBase):
         # The priority of the message
         if priority not in NTFY_PRIORITIES:
             self.priority = self.template_args['priority']['default']
+
         else:
             self.priority = priority
 
         # Any optional tags to attach to the notification
         self.__tags = parse_list(tags)
 
-        # prepare our fullpath
-        self.fullpath = kwargs.get('fullpath')
-        if not isinstance(self.fullpath, six.string_types):
-            self.fullpath = '/'
+        if not self.topics:
+            self.logger.warning(
+                'No Ntfy topics were identified to be notified')
+        return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
@@ -215,6 +256,11 @@ class NotifyNtfy(NotifyBase):
 
         # error tracking (used for function return)
         has_error = False
+
+        if not len(self.topics):
+            # We have nothing to notify; we're done
+            self.logger.warning('There are no Ntfy topics to notify')
+            return False
 
         # Prepare our headers
         headers = {
@@ -247,91 +293,100 @@ class NotifyNtfy(NotifyBase):
         payload = body
 
         auth = None
-        if self.user:
-            auth = (self.user, self.password)
+        if self.mode == NtfyMode.CLOUD:
+            # Cloud Service
+            template_url = self.cloud_notify_url
 
-        # Prepare our Ntfy URL
-        schema = 'https' if self.secure else 'http'
+        else:  # NotifyNtfy.PRVATE
+            # Allow more settings to be applied now
+            if self.user:
+                auth = (self.user, self.password)
 
-        # Use default host if one is not defined
-        host = self.default_host
-        if self.host != self.default_host:
-            host = self.host
+            # Prepare our Ntfy Template URL
+            schema = 'https' if self.secure else 'http'
 
-        url = '%s://%s' % (schema, host)
-        if isinstance(self.port, int):
-            url += ':%d' % self.port
+            template_url = '%s://%s' % (schema, self.host)
+            if isinstance(self.port, int):
+                template_url += ':%d' % self.port
 
-        url += self.fullpath
+        template_url += '/{topic}'
 
-        self.logger.debug('ntfy POST URL: %s (cert_verify=%r)' % (
-            url, self.verify_certificate,
-        ))
-        self.logger.debug('ntfy Payload: %s' % str(payload))
+        # Create a copy of the subreddits list
+        topics = list(self.topics)
+        while len(topics) > 0:
+            # Retrieve our topic
+            topic = topics.pop()
 
-        # Always call throttle before any remote server i/o is made
-        self.throttle()
+            # Create our Posting URL per topic provided
+            url = template_url.format(topic=topic)
+            self.logger.debug('Ntfy POST URL: %s (cert_verify=%r)' % (
+                url, self.verify_certificate,
+            ))
+            self.logger.debug('Ntfy Payload: %s' % str(payload))
 
-        try:
-            r = requests.post(
-                url,
-                data=payload,
-                headers=headers,
-                auth=auth,
-                verify=self.verify_certificate,
-                timeout=self.request_timeout,
-            )
+            # Always call throttle before any remote server i/o is made
+            self.throttle()
 
-            if r.status_code != requests.codes.ok:
-                # We had a problem
-                status_str = \
-                    NotifyBase.http_response_code_lookup(r.status_code)
+            try:
+                r = requests.post(
+                    url,
+                    data=payload,
+                    headers=headers,
+                    auth=auth,
+                    verify=self.verify_certificate,
+                    timeout=self.request_timeout,
+                )
 
-                # set up our status code to use
-                status_code = r.status_code
+                if r.status_code != requests.codes.ok:
+                    # We had a problem
+                    status_str = \
+                        NotifyBase.http_response_code_lookup(r.status_code)
 
-                try:
-                    # Update our status response if we can
-                    json_response = loads(r.content)
-                    status_code = json_response.get('code', status_code)
-                    status_str = json_response.get('error', status_str)
+                    # set up our status code to use
+                    status_code = r.status_code
 
-                except (AttributeError, TypeError, ValueError):
-                    # ValueError = r.content is Unparsable
-                    # TypeError = r.content is None
-                    # AttributeError = r is None
+                    try:
+                        # Update our status response if we can
+                        json_response = loads(r.content)
+                        status_code = json_response.get('code', status_code)
+                        status_str = json_response.get('error', status_str)
 
-                    # We could not parse JSON response.
-                    # We will just use the status we already have.
-                    pass
+                    except (AttributeError, TypeError, ValueError):
+                        # ValueError = r.content is Unparsable
+                        # TypeError = r.content is None
+                        # AttributeError = r is None
 
+                        # We could not parse JSON response.
+                        # We will just use the status we already have.
+                        pass
+
+                    self.logger.warning(
+                        "Failed to send Ntfy notification to topic '{}': "
+                        '{}{}error={}.'.format(
+                            topic,
+                            status_str,
+                            ', ' if status_str else '',
+                            status_code))
+
+                    self.logger.debug(
+                        'Response Details:\r\n{}'.format(r.content))
+
+                    # Mark our failure
+                    has_error = True
+
+                else:
+                    self.logger.info(
+                        "Sent Ntfy notification to '{}'.".format(url))
+
+            except requests.RequestException as e:
                 self.logger.warning(
-                    "Failed to send Ntfy notification to topic '{}': "
-                    '{}{}error={}.'.format(
-                        self.topic,
-                        status_str,
-                        ', ' if status_str else '',
-                        status_code))
-
-                self.logger.debug(
-                    'Response Details:\r\n{}'.format(r.content))
+                    'A Connection error occurred sending Ntfy:%s ' % (
+                        url) + 'notification.'
+                )
+                self.logger.debug('Socket Exception: %s' % str(e))
 
                 # Mark our failure
                 has_error = True
-
-            else:
-                self.logger.info(
-                    "Sent Ntfy notification to '{}'.".format(url))
-
-        except requests.RequestException as e:
-            self.logger.warning(
-                'A Connection error occurred sending Ntfy:%s ' % (
-                    url) + 'notification.'
-            )
-            self.logger.debug('Socket Exception: %s' % str(e))
-
-            # Mark our failure
-            has_error = True
 
         return not has_error
 
@@ -340,13 +395,13 @@ class NotifyNtfy(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        host = self.host or self.default_host
         default_port = 443 if self.secure else 80
 
         params = {
             'priority': self.priority
             if self.priority
             else NTFY_PRIORITIES.DEFAULT,
+            'mode': self.mode,
         }
 
         if self.attach is not None:
@@ -379,17 +434,25 @@ class NotifyNtfy(NotifyBase):
                 user=NotifyNtfy.quote(self.user, safe=''),
             )
 
-        return '{schema}://{auth}{host}{port}{topic}/?{params}'.format(
-            schema=self.secure_protocol if self.secure else self.protocol,
-            auth=auth,
-            host='' if self.host == self.default_host else self.host,
-            port='' if self.port is None or self.port == default_port
-                 else ':{}'.format(self.port),
-            topic='{}{}'.format(
-                  '' if host == self.default_host and self.port == default_port
-                  else '/', self.topic),
-            params=NotifyNtfy.urlencode(params)
-        )
+        if self.mode == NtfyMode.PRIVATE:
+            return '{schema}://{auth}{host}{port}/{targets}?{params}'.format(
+                schema=self.secure_protocol if self.secure else self.protocol,
+                auth=auth,
+                host=self.host,
+                port='' if self.port is None or self.port == default_port
+                else ':{}'.format(self.port),
+                targets='/'.join(
+                    [NotifyNtfy.quote(x, safe='') for x in self.topics]),
+                params=NotifyNtfy.urlencode(params)
+            )
+
+        else:  # Cloud mode
+            return '{schema}://{targets}?{params}'.format(
+                schema=self.secure_protocol,
+                targets='/'.join(
+                    [NotifyNtfy.quote(x, safe='') for x in self.topics]),
+                params=NotifyNtfy.urlencode(params)
+            )
 
     @staticmethod
     def parse_url(url):
@@ -397,8 +460,7 @@ class NotifyNtfy(NotifyBase):
         Parses the URL and returns enough arguments that can allow
         us to re-instantiate this object.
         """
-        results = NotifyBase.parse_url(url)
-
+        results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
@@ -426,13 +488,69 @@ class NotifyNtfy(NotifyBase):
             results['tags'] = \
                 parse_list(NotifyNtfy.unquote(results['qsd']['tags']))
 
-        try:
-            # Grab the topic from the URL
-            results['topic'] = NotifyNtfy.split_path(results['fullpath'])[-1]
+        # Acquire our targets/topics
+        results['targets'] = NotifyNtfy.split_path(results['fullpath'])
 
-        except IndexError:  # Not enough paths, probably no host provided
-            results['topic'] = results['host']
-            results['host'] = NotifyNtfy.default_host
-            results['fullpath'] = '/{}'.format(results['topic'])
+        # The 'to' makes it easier to use yaml configuration
+        if 'to' in results['qsd'] and len(results['qsd']['to']):
+            results['targets'] += \
+                NotifyNtfy.parse_list(results['qsd']['to'])
+
+        # Mode override
+        if 'mode' in results['qsd'] and results['qsd']['mode']:
+            results['mode'] = NotifyNtfy.unquote(
+                results['qsd']['mode'].strip().lower())
+
+        else:
+            # We can try to detect the mode based on the validity of the
+            # hostname.
+            #
+            # This isn't a surfire way to do things though; it's best to
+            # specify the mode= flag
+            results['mode'] = NtfyMode.PRIVATE \
+                if ((is_hostname(results['host']) or
+                    is_ipaddr(results['host'])) and results['targets']) \
+                else NtfyMode.CLOUD
+
+        if results['mode'] == NtfyMode.CLOUD:
+            # Store first entry as it can be a topic too in this case
+            # But only if we also rule it out not being the words
+            # ntfy.sh itself, something that starts wiht an non-alpha numeric
+            # character:
+            if not re.search(
+                    r'(ntfy\.sh|[^A-Za-z0-9][A-Za-z0-9_-]*)', results['host']):
+                # Add it to the front of the list for consistency
+                results['targets'].insert(0, results['host'])
+
+        elif results['mode'] == NtfyMode.PRIVATE and \
+                not (is_hostname(results['host'] or
+                     is_ipaddr(results['host']))):
+            # Invalid Host for NtfyMode.PRIVATE
+            return None
 
         return results
+
+    @staticmethod
+    def parse_native_url(url):
+        """
+        Support https://ntfy.sh/topic
+        """
+
+        # Quick lookup for users who want to just paste
+        # the ntfy.sh url directly into Apprise
+        result = re.match(
+            r'^https?://ntfy\.sh/'
+            r'(?P<topics>[^?]+)'
+            r'(?P<params>\?.+)?$', url, re.I)
+
+        if result:
+            mode = 'mode=%s' % NtfyMode.CLOUD
+            return NotifyNtfy.parse_url(
+                '{schema}://{topics}{params}'.format(
+                    schema=NotifyNtfy.secure_protocol,
+                    topics=result.group('topics'),
+                    params='?%s' % mode
+                    if not result.group('params')
+                    else result.group('params') + '&%s' % mode))
+
+        return None
