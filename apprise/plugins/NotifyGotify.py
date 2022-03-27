@@ -170,11 +170,6 @@ class NotifyGotify(NotifyBase):
         # Append our remaining path
         url += '{fullpath}message'.format(fullpath=self.fullpath)
 
-        # Define our parameteers
-        params = {
-            'token': self.token,
-        }
-
         # Prepare Gotify Object
         payload = {
             'priority': self.priority,
@@ -193,6 +188,7 @@ class NotifyGotify(NotifyBase):
         headers = {
             'User-Agent': self.app_id,
             'Content-Type': 'application/json',
+            'X-Gotify-Key': self.token,
         }
 
         self.logger.debug('Gotify POST URL: %s (cert_verify=%r)' % (
@@ -206,7 +202,6 @@ class NotifyGotify(NotifyBase):
         try:
             r = requests.post(
                 url,
-                params=params,
                 data=dumps(payload),
                 headers=headers,
                 verify=self.verify_certificate,
