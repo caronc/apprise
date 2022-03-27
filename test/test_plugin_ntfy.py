@@ -22,6 +22,8 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
+import json
+import mock
 import requests
 from apprise import plugins
 from helpers import AppriseURLTester
@@ -83,6 +85,36 @@ apprise_url_tests = (
         'instance': plugins.NotifyNtfy,
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
+    # A Email Testing
+    ('ntfy://localhost/topic1/?email=user@gmail.com', {
+        'instance': plugins.NotifyNtfy,
+        'requests_response_text': GOOD_RESPONSE_TEXT,
+    }),
+    # Tags
+    ('ntfy://localhost/topic1/?tags=tag1,tag2,tag3', {
+        'instance': plugins.NotifyNtfy,
+        'requests_response_text': GOOD_RESPONSE_TEXT,
+    }),
+    # Delay
+    ('ntfy://localhost/topic1/?delay=3600', {
+        'instance': plugins.NotifyNtfy,
+        'requests_response_text': GOOD_RESPONSE_TEXT,
+    }),
+    # Title
+    ('ntfy://localhost/topic1/?title=A%20Great%20Title', {
+        'instance': plugins.NotifyNtfy,
+        'requests_response_text': GOOD_RESPONSE_TEXT,
+    }),
+    # Attach
+    ('ntfy://localhost/topic1/?attach=file.jpg', {
+        'instance': plugins.NotifyNtfy,
+        'requests_response_text': GOOD_RESPONSE_TEXT,
+    }),
+    # Priority
+    ('ntfy://localhost/topic1/?priority=default', {
+        'instance': plugins.NotifyNtfy,
+        'requests_response_text': GOOD_RESPONSE_TEXT,
+    }),
     # A topic and port identifier
     ('ntfy://user:pass@localhost:8080/topic/', {
         'instance': plugins.NotifyNtfy,
@@ -95,8 +127,14 @@ apprise_url_tests = (
         # The response text is expected to be the following on a success
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
+    # reference the ntfy.sh url
+    ('https://ntfy.sh?to=topic', {
+        'instance': plugins.NotifyNtfy,
+        # The response text is expected to be the following on a success
+        'requests_response_text': GOOD_RESPONSE_TEXT,
+    }),
     # Several topics
-    ('ntfy://user:pass@localhost/topic/topic/?avatar=Yes', {
+    ('ntfy://user:pass@localhost/topic/topic/?mode=cloud', {
         'instance': plugins.NotifyNtfy,
         # The response text is expected to be the following on a success
         'requests_response_text': {
@@ -140,3 +178,44 @@ def test_plugin_ntfy_chat_urls():
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+@mock.patch('requests.post')
+def test_plugin_custom_ntfy_edge_cases(mock_post):
+    """
+    NotifyNtfy() Edge Cases
+
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.request_rate_per_sec = 0
+
+    # Prepare our response
+    response = requests.Request()
+    response.status_code = requests.codes.ok
+    response.content = json.dumps(GOOD_RESPONSE_TEXT)
+
+    # Prepare Mock
+    mock_post.return_value = response
+
+    results = plugins.NotifyNtfy.parse_url(
+        'ntfys://abc---,topic2,~~,,?priority=max&tags=smile,de')
+
+    assert isinstance(results, dict)
+    assert results['user'] is None
+    assert results['password'] is None
+    assert results['port'] is None
+    assert results['host'] == 'abc---,topic2,~~,,'
+    assert results['fullpath'] is None
+    assert results['path'] is None
+    assert results['query'] is None
+    assert results['schema'] == 'ntfys'
+    assert results['url'] == 'ntfys://abc---,topic2,~~,,'
+    assert isinstance(results['qsd:'], dict) is True
+    assert results['qsd']['priority'] == 'max'
+    assert results['qsd']['tags'] == 'smile,de'
+
+    instance = plugins.NotifyNtfy(**results)
+    assert isinstance(instance, plugins.NotifyNtfy)
+    assert len(instance.topics) == 2
+    assert 'abc---' in instance.topics
+    assert 'topic2' in instance.topics

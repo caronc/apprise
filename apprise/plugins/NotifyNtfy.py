@@ -36,6 +36,7 @@ from ..AppriseLocale import gettext_lazy as _
 from ..utils import parse_list
 from ..utils import is_hostname
 from ..utils import is_ipaddr
+from ..utils import validate_regex
 from ..URLBase import PrivacyMode
 
 
@@ -76,6 +77,9 @@ class NtfyPriority(object):
 
     @classmethod
     def get_priority(cls, value):
+        """
+        Get Priority
+        """
         priorities = [p[0] for p in NtfyPriority.VALUES if p[1] == value]
         if priorities:
             return priorities[0]
@@ -156,6 +160,7 @@ class NotifyNtfy(NotifyBase):
             'name': _('Topic'),
             'type': 'string',
             'map_to': 'targets',
+            'regex': (r'^[a-z0-9_-]{1,64}$', 'i')
         },
         'targets': {
             'name': _('Targets'),
@@ -219,9 +224,6 @@ class NotifyNtfy(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # Build list of topics
-        self.topics = parse_list(targets)
-
         # Attach a file (URL supported)
         self.attach = attach
 
@@ -244,9 +246,18 @@ class NotifyNtfy(NotifyBase):
         # Any optional tags to attach to the notification
         self.__tags = parse_list(tags)
 
-        if not self.topics:
-            self.logger.warning(
-                'No Ntfy topics were identified to be notified')
+        # Build list of topics
+        topics = parse_list(targets)
+        self.topics = []
+        for _topic in topics:
+            topic = validate_regex(
+                _topic, *self.template_tokens['topic']['regex'])
+            if not topic:
+                self.logger.warning(
+                    'A specified Ntfy topic ({}) is invalid and will be '
+                    'ignored'.format(_topic))
+                continue
+            self.topics.append(topic)
         return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
@@ -517,8 +528,7 @@ class NotifyNtfy(NotifyBase):
             # But only if we also rule it out not being the words
             # ntfy.sh itself, something that starts wiht an non-alpha numeric
             # character:
-            if not re.search(
-                    r'(ntfy\.sh|[^A-Za-z0-9][A-Za-z0-9_-]*)', results['host']):
+            if not re.search(r'(ntfy\.sh)', results['host']):
                 # Add it to the front of the list for consistency
                 results['targets'].insert(0, results['host'])
 
@@ -539,8 +549,8 @@ class NotifyNtfy(NotifyBase):
         # Quick lookup for users who want to just paste
         # the ntfy.sh url directly into Apprise
         result = re.match(
-            r'^https?://ntfy\.sh/'
-            r'(?P<topics>[^?]+)'
+            r'^https?://ntfy\.sh'
+            r'(?P<topics>/[^?]+)?'
             r'(?P<params>\?.+)?$', url, re.I)
 
         if result:
@@ -548,7 +558,8 @@ class NotifyNtfy(NotifyBase):
             return NotifyNtfy.parse_url(
                 '{schema}://{topics}{params}'.format(
                     schema=NotifyNtfy.secure_protocol,
-                    topics=result.group('topics'),
+                    topics=result.group('topics')
+                    if result.group('topics') else '',
                     params='?%s' % mode
                     if not result.group('params')
                     else result.group('params') + '&%s' % mode))
