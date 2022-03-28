@@ -182,7 +182,8 @@ def test_plugin_custom_json_edge_cases(mock_get, mock_post):
     dataset = json.loads(details[1]['data'])
     assert dataset['title'] == 'title'
     assert 'message' in dataset
-    assert dataset['message'] == 'body'
+    # message over-ride was provided
+    assert dataset['message'] == 'test'
 
     assert instance.url(privacy=False).startswith(
         'json://localhost:8080/command?')
