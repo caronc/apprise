@@ -129,7 +129,7 @@ EMAIL_TEMPLATES = (
             r'(?P<domain>(hotmail|live)\.com)$', re.I),
         {
             'port': 587,
-            'smtp_host': 'smtp.live.com',
+            'smtp_host': 'smtp-mail.outlook.com',
             'secure': True,
             'secure_mode': SecureMailMode.STARTTLS,
             'login_type': (WebBaseLogin.EMAIL, )
