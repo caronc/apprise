@@ -995,7 +995,7 @@ def parse_list(*args):
     return sorted([x for x in filter(bool, list(set(result)))])
 
 
-def is_exclusive_match(logic, data, match_all='all'):
+def is_exclusive_match(logic, data, match_all='all', match_always='always'):
     """
 
     The data variable should always be a set of strings that the logic can be
@@ -1011,6 +1011,9 @@ def is_exclusive_match(logic, data, match_all='all'):
         logic=['tagA', 'tagB']            = tagA or tagB
         logic=[('tagA', 'tagC'), 'tagB']  = (tagA and tagC) or tagB
         logic=[('tagB', 'tagC')]          = tagB and tagC
+
+    If `match_always` is not set to None, then its value is added as an 'or'
+    to all specified logic searches.
     """
 
     if isinstance(logic, six.string_types):
@@ -1025,6 +1028,14 @@ def is_exclusive_match(logic, data, match_all='all'):
     if not isinstance(logic, (list, tuple, set)):
         # garbage input
         return False
+
+    if isinstance(logic, (list, tuple)):
+        # Convert to set
+        logic = set(logic)
+
+    if match_always:
+        # Add our match_always to our logic searching if secified
+        logic.add(match_always)
 
     # Track what we match against; but by default we do not match
     # against anything
