@@ -28,15 +28,18 @@ SCRIPT=$(readlink -f "$0")
 # Absolute path this script is in, thus /home/user/bin
 SCRIPTPATH=$(dirname "$SCRIPT")
 
+PYTHONPATH=""
+
 FOUNDROOT=1
 if [ -f "$(dirname $SCRIPTPATH)/setup.cfg" ]; then
    pushd "$(dirname $SCRIPTPATH)" &>/dev/null
    FOUNDROOT=$?
+   PYTHONPATH="$(dirname $SCRIPTPATH)"
 
 elif [ -f "$SCRIPTPATH/setup.cfg" ]; then
    pushd "$SCRIPTPATH" &>/dev/null
    FOUNDROOT=$?
-
+   PYTHONPATH="$SCRIPTPATH"
 fi
 
 if [ $FOUNDROOT -ne 0 ]; then
@@ -59,7 +62,7 @@ which coverage &>/dev/null
    exit 1
 
 echo "Performing PEP8 check..."
-flake8 . --show-source --statistics
+LANG=C.UTF-8 PYTHONPATH=$PYTHONPATH flake8 . --show-source --statistics
 if [ $? -ne 0 ]; then
    echo "PEP8 check failed"
    exit 1
@@ -69,11 +72,20 @@ echo
 
 # Run our unit test coverage check
 echo "Running test coverage check..."
-coverage run -m pytest -vv
-if [ $? -ne 0 ]; then
+pushd $PYTHONPATH &>/dev/null
+if [ ! -z "$@" ]; then
+   LANG=C.UTF-8 PYTHONPATH=$PYTHONPATH coverage run -m pytest -vv -k "$@"
+   RET=$?
+
+else
+   LANG=C.UTF-8 PYTHONPATH=$PYTHONPATH coverage run -m pytest -vv
+   RET=$?
+fi
+
+if [ $RET -ne 0 ]; then
    echo "Tests failed."
    exit 1
 fi
 
 # Print our report
-coverage report --show-missing
+LANG=C.UTF-8 PYTHONPATH=$PYTHONPATH coverage report --show-missing
