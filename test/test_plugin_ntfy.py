@@ -26,6 +26,7 @@ import json
 import mock
 import requests
 from apprise import plugins
+from apprise import NotifyType
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -45,6 +46,7 @@ apprise_url_tests = (
         'instance': plugins.NotifyNtfy,
         # invalid topics specified (nothing to notify)
         # as a result the response type will be false
+        'requests_response_text': GOOD_RESPONSE_TEXT,
         'response': False,
     }),
     ('ntfys://', {
@@ -52,6 +54,7 @@ apprise_url_tests = (
         'instance': plugins.NotifyNtfy,
         # invalid topics specified (nothing to notify)
         # as a result the response type will be false
+        'requests_response_text': GOOD_RESPONSE_TEXT,
         'response': False,
     }),
     ('ntfy://:@/', {
@@ -59,6 +62,7 @@ apprise_url_tests = (
         'instance': plugins.NotifyNtfy,
         # invalid topics specified (nothing to notify)
         # as a result the response type will be false
+        'requests_response_text': GOOD_RESPONSE_TEXT,
         'response': False,
     }),
     # No topics
@@ -66,6 +70,7 @@ apprise_url_tests = (
         'instance': plugins.NotifyNtfy,
         # invalid topics specified (nothing to notify)
         # as a result the response type will be false
+        'requests_response_text': GOOD_RESPONSE_TEXT,
         'response': False,
     }),
     # No valid topics
@@ -73,10 +78,16 @@ apprise_url_tests = (
         'instance': plugins.NotifyNtfy,
         # invalid topics specified (nothing to notify)
         # as a result the response type will be false
+        'requests_response_text': GOOD_RESPONSE_TEXT,
         'response': False,
     }),
     # user/pass combos
     ('ntfy://user@localhost/topic/', {
+        'instance': plugins.NotifyNtfy,
+        'requests_response_text': GOOD_RESPONSE_TEXT,
+    }),
+    # Ntfy cloud mode (enforced)
+    ('ntfy://ntfy.sh/topic1/topic2/', {
         'instance': plugins.NotifyNtfy,
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
@@ -105,8 +116,28 @@ apprise_url_tests = (
         'instance': plugins.NotifyNtfy,
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
+    # Click
+    ('ntfy://localhost/topic1/?click=yes', {
+        'instance': plugins.NotifyNtfy,
+        'requests_response_text': GOOD_RESPONSE_TEXT,
+    }),
+    # Email
+    ('ntfy://localhost/topic1/?email=user@example.com', {
+        'instance': plugins.NotifyNtfy,
+        'requests_response_text': GOOD_RESPONSE_TEXT,
+    }),
     # Attach
-    ('ntfy://localhost/topic1/?attach=file.jpg', {
+    ('ntfy://localhost/topic1/?attach=http://example.com/file.jpg', {
+        'instance': plugins.NotifyNtfy,
+        'requests_response_text': GOOD_RESPONSE_TEXT,
+    }),
+    # Attach with filename over-ride
+    ('ntfy://localhost/topic1/'
+     '?attach=http://example.com/file.jpg&filename=smoke.jpg', {
+         'instance': plugins.NotifyNtfy,
+         'requests_response_text': GOOD_RESPONSE_TEXT}),
+    # Attach with bad url
+    ('ntfy://localhost/topic1/?attach=http://-%20', {
         'instance': plugins.NotifyNtfy,
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
@@ -114,6 +145,15 @@ apprise_url_tests = (
     ('ntfy://localhost/topic1/?priority=default', {
         'instance': plugins.NotifyNtfy,
         'requests_response_text': GOOD_RESPONSE_TEXT,
+    }),
+    # Priority higher
+    ('ntfy://localhost/topic1/?priority=high', {
+        'instance': plugins.NotifyNtfy,
+        'requests_response_text': GOOD_RESPONSE_TEXT,
+    }),
+    # Invalid Priority
+    ('ntfy://localhost/topic1/?priority=invalid', {
+        'instance': TypeError,
     }),
     # A topic and port identifier
     ('ntfy://user:pass@localhost:8080/topic/', {
@@ -127,6 +167,10 @@ apprise_url_tests = (
         # The response text is expected to be the following on a success
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
+    ('https://just/a/random/host/that/means/nothing', {
+        # Nothing transpires from this
+        'instance': None
+    }),
     # reference the ntfy.sh url
     ('https://ntfy.sh?to=topic', {
         'instance': plugins.NotifyNtfy,
@@ -134,20 +178,24 @@ apprise_url_tests = (
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
     # Several topics
-    ('ntfy://user:pass@localhost/topic/topic/?mode=cloud', {
+    ('ntfy://user:pass@topic1/topic2/topic3/?mode=cloud', {
         'instance': plugins.NotifyNtfy,
         # The response text is expected to be the following on a success
-        'requests_response_text': {
-            'status': 'success',
-            'data': {
-                'authToken': 'abcd',
-                'userId': 'user',
-            },
-        },
+        'requests_response_text': GOOD_RESPONSE_TEXT,
+    }),
+    # Several topics (but do not add ntfy.sh)
+    ('ntfy://user:pass@ntfy.sh/topic1/topic2/?mode=cloud', {
+        'instance': plugins.NotifyNtfy,
+        # The response text is expected to be the following on a success
+        'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
     ('ntfys://user:web/token@localhost/topic/?mode=invalid', {
         # Invalid mode
         'instance': TypeError,
+    }),
+    # Invalid hostname on localhost/private mode
+    ('ntfys://user:web@-_/topic1/topic2/?mode=private', {
+        'instance': None,
     }),
     ('ntfy://user:pass@localhost:8081/topic/topic2', {
         'instance': plugins.NotifyNtfy,
@@ -160,12 +208,14 @@ apprise_url_tests = (
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
+        'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
     ('ntfy://user:pass@localhost:8083/topic1/topic2/', {
         'instance': plugins.NotifyNtfy,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
+        'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
 )
 
@@ -219,3 +269,37 @@ def test_plugin_custom_ntfy_edge_cases(mock_post):
     assert len(instance.topics) == 2
     assert 'abc---' in instance.topics
     assert 'topic2' in instance.topics
+
+    results = plugins.NotifyNtfy.parse_url(
+        'ntfy://localhost/topic1/'
+        '?attach=http://example.com/file.jpg&filename=smoke.jpg')
+
+    assert isinstance(results, dict)
+    assert results['user'] is None
+    assert results['password'] is None
+    assert results['port'] is None
+    assert results['host'] == 'localhost'
+    assert results['fullpath'] == '/topic1'
+    assert results['path'] == '/'
+    assert results['query'] == 'topic1'
+    assert results['schema'] == 'ntfy'
+    assert results['url'] == 'ntfy://localhost/topic1'
+    assert results['attach'] == 'http://example.com/file.jpg'
+    assert results['filename'] == 'smoke.jpg'
+
+    instance = plugins.NotifyNtfy(**results)
+    assert isinstance(instance, plugins.NotifyNtfy)
+    assert len(instance.topics) == 1
+    assert 'topic1' in instance.topics
+
+    assert instance.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
+
+    # Test our call count
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'http://localhost/topic1'
+    assert mock_post.call_args_list[0][1]['headers'].get('X-Attach') == \
+        'http://example.com/file.jpg'
+    assert mock_post.call_args_list[0][1]['headers'].get('X-Filename') == \
+        'smoke.jpg'

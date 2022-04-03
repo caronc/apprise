@@ -29,6 +29,7 @@ import re
 import requests
 import six
 from json import loads
+from os.path import basename
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
@@ -42,12 +43,12 @@ from ..URLBase import PrivacyMode
 
 class NtfyMode(object):
     """
-    Define Ntfy Notification Modes
+    Define ntfy Notification Modes
     """
-    # App posts upstream to the developer API on Ntfy's website
+    # App posts upstream to the developer API on ntfy's website
     CLOUD = "cloud"
 
-    # Running a dedicated private Ntfy Server
+    # Running a dedicated private ntfy Server
     PRIVATE = "private"
 
 
@@ -63,36 +64,15 @@ class NtfyPriority(object):
     """
     MAX = 'max'
     HIGH = 'high'
-    DEFAULT = 'default'
+    NORMAL = 'default'
     LOW = 'low'
     MIN = 'min'
-
-    VALUES = (
-        (MAX, 5),
-        (HIGH, 4),
-        (DEFAULT, 3),
-        (LOW, 2),
-        (MIN, 1),
-    )
-
-    @classmethod
-    def get_priority(cls, value):
-        """
-        Get Priority
-        """
-        priorities = [p[0] for p in NtfyPriority.VALUES if p[1] == value]
-        if priorities:
-            return priorities[0]
-        named_priorities = [p[0] for p in NtfyPriority.VALUES if p[0] == value]
-        if named_priorities:
-            return named_priorities[0]
-        return
 
 
 NTFY_PRIORITIES = (
     NtfyPriority.MAX,
     NtfyPriority.HIGH,
-    NtfyPriority.DEFAULT,
+    NtfyPriority.NORMAL,
     NtfyPriority.LOW,
     NtfyPriority.MIN,
 )
@@ -100,7 +80,7 @@ NTFY_PRIORITIES = (
 
 class NotifyNtfy(NotifyBase):
     """
-    A wrapper for Ntfy Notifications
+    A wrapper for ntfy Notifications
     """
 
     # The default descriptive name associated with the Notification
@@ -123,6 +103,10 @@ class NotifyNtfy(NotifyBase):
 
     # Message time to live (if remote client isn't around to receive it)
     time_to_live = 2419200
+
+    # if our hostname matches the following we automatically enforce
+    # cloud mode
+    __auto_cloud_host = re.compile(r'ntfy\.sh', re.IGNORECASE)
 
     # Define object templates
     templates = (
@@ -174,6 +158,10 @@ class NotifyNtfy(NotifyBase):
             'name': _('Attach'),
             'type': 'string',
         },
+        'filename': {
+            'name': _('Attach Filename'),
+            'type': 'string',
+        },
         'click': {
             'name': _('Click'),
             'type': 'string',
@@ -190,7 +178,7 @@ class NotifyNtfy(NotifyBase):
             'name': _('Priority'),
             'type': 'choice:string',
             'values': NTFY_PRIORITIES,
-            'default': NtfyPriority.DEFAULT,
+            'default': NtfyPriority.NORMAL,
         },
         'tags': {
             'name': _('Tags'),
@@ -207,10 +195,11 @@ class NotifyNtfy(NotifyBase):
         },
     })
 
-    def __init__(self, targets=None, attach=None, click=None, delay=None,
-                 email=None, priority=None, tags=None, mode=None, **kwargs):
+    def __init__(self, targets=None, attach=None, filename=None, click=None,
+                 delay=None, email=None, priority=None, tags=None, mode=None,
+                 **kwargs):
         """
-        Initialize Ntfy Object
+        Initialize ntfy Object
         """
         super(NotifyNtfy, self).__init__(**kwargs)
 
@@ -220,12 +209,15 @@ class NotifyNtfy(NotifyBase):
             else self.template_args['mode']['default']
 
         if self.mode not in NTFY_MODES:
-            msg = 'An invalid Ntfy Mode ({}) was specified.'.format(mode)
+            msg = 'An invalid ntfy Mode ({}) was specified.'.format(mode)
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Attach a file (URL supported)
         self.attach = attach
+
+        # Our filename (if defined)
+        self.filename = filename
 
         # A clickthrough option for notifications
         self.click = click
@@ -237,11 +229,17 @@ class NotifyNtfy(NotifyBase):
         self.email = email
 
         # The priority of the message
-        if priority not in NTFY_PRIORITIES:
-            self.priority = self.template_args['priority']['default']
 
+        if priority is None:
+            self.priority = self.template_args['priority']['default']
         else:
             self.priority = priority
+
+        if self.priority not in NTFY_PRIORITIES:
+            msg = 'An invalid ntfy Priority ({}) was specified.'.format(
+                priority)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         # Any optional tags to attach to the notification
         self.__tags = parse_list(tags)
@@ -254,7 +252,7 @@ class NotifyNtfy(NotifyBase):
                 _topic, *self.template_tokens['topic']['regex'])
             if not topic:
                 self.logger.warning(
-                    'A specified Ntfy topic ({}) is invalid and will be '
+                    'A specified ntfy topic ({}) is invalid and will be '
                     'ignored'.format(_topic))
                 continue
             self.topics.append(topic)
@@ -262,7 +260,7 @@ class NotifyNtfy(NotifyBase):
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
-        Perform Ntfy Notification
+        Perform ntfy Notification
         """
 
         # error tracking (used for function return)
@@ -270,7 +268,7 @@ class NotifyNtfy(NotifyBase):
 
         if not len(self.topics):
             # We have nothing to notify; we're done
-            self.logger.warning('There are no Ntfy topics to notify')
+            self.logger.warning('There are no ntfy topics to notify')
             return False
 
         # Prepare our headers
@@ -278,15 +276,16 @@ class NotifyNtfy(NotifyBase):
             'User-Agent': self.app_id,
         }
 
-        priority = NtfyPriority.get_priority(self.priority)
-        if priority != NtfyPriority.DEFAULT:
-            headers['X-Priority'] = priority
+        if self.priority != NtfyPriority.NORMAL:
+            headers['X-Priority'] = self.priority
 
         if title:
             headers['X-Title'] = title
 
         if self.attach is not None:
             headers['X-Attach'] = self.attach
+            if self.filename is not None:
+                headers['X-Filename'] = self.filename
 
         if self.click is not None:
             headers['X-Click'] = self.click
@@ -313,7 +312,7 @@ class NotifyNtfy(NotifyBase):
             if self.user:
                 auth = (self.user, self.password)
 
-            # Prepare our Ntfy Template URL
+            # Prepare our ntfy Template URL
             schema = 'https' if self.secure else 'http'
 
             template_url = '%s://%s' % (schema, self.host)
@@ -330,10 +329,10 @@ class NotifyNtfy(NotifyBase):
 
             # Create our Posting URL per topic provided
             url = template_url.format(topic=topic)
-            self.logger.debug('Ntfy POST URL: %s (cert_verify=%r)' % (
+            self.logger.debug('ntfy POST URL: %s (cert_verify=%r)' % (
                 url, self.verify_certificate,
             ))
-            self.logger.debug('Ntfy Payload: %s' % str(payload))
+            self.logger.debug('ntfy Payload: %s' % str(payload))
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -359,8 +358,9 @@ class NotifyNtfy(NotifyBase):
                     try:
                         # Update our status response if we can
                         json_response = loads(r.content)
-                        status_code = json_response.get('code', status_code)
                         status_str = json_response.get('error', status_str)
+                        status_code = \
+                            int(json_response.get('code', status_code))
 
                     except (AttributeError, TypeError, ValueError):
                         # ValueError = r.content is Unparsable
@@ -372,7 +372,7 @@ class NotifyNtfy(NotifyBase):
                         pass
 
                     self.logger.warning(
-                        "Failed to send Ntfy notification to topic '{}': "
+                        "Failed to send ntfy notification to topic '{}': "
                         '{}{}error={}.'.format(
                             topic,
                             status_str,
@@ -387,11 +387,11 @@ class NotifyNtfy(NotifyBase):
 
                 else:
                     self.logger.info(
-                        "Sent Ntfy notification to '{}'.".format(url))
+                        "Sent ntfy notification to '{}'.".format(url))
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occurred sending Ntfy:%s ' % (
+                    'A Connection error occurred sending ntfy:%s ' % (
                         url) + 'notification.'
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))
@@ -409,9 +409,7 @@ class NotifyNtfy(NotifyBase):
         default_port = 443 if self.secure else 80
 
         params = {
-            'priority': self.priority
-            if self.priority
-            else NTFY_PRIORITIES.DEFAULT,
+            'priority': self.priority,
             'mode': self.mode,
         }
 
@@ -477,14 +475,43 @@ class NotifyNtfy(NotifyBase):
             return results
 
         if 'priority' in results['qsd'] and len(results['qsd']['priority']):
+            _map = {
+                # Supported lookups
+                'mi': NtfyPriority.MIN,
+                '1': NtfyPriority.MIN,
+                'l': NtfyPriority.LOW,
+                '2': NtfyPriority.LOW,
+                'n': NtfyPriority.NORMAL,  # support normal keyword
+                'd': NtfyPriority.NORMAL,  # default keyword
+                '3': NtfyPriority.NORMAL,
+                'h': NtfyPriority.HIGH,
+                '4': NtfyPriority.HIGH,
+                'ma': NtfyPriority.MAX,
+                '5': NtfyPriority.MAX,
+            }
             try:
+                # pretty-format (and update short-format)
                 results['priority'] = \
-                    NtfyPriority.get_priority(results['qsd']['priority'])
-            except KeyError:  # no priority was set
+                    _map[results['qsd']['priority'][0:2].lower()]
+
+            except KeyError:
+                # Pass along what was set so it can be handed during
+                # initialization
+                results['priority'] = str(results['qsd']['priority'])
                 pass
 
         if 'attach' in results['qsd'] and len(results['qsd']['attach']):
             results['attach'] = NotifyNtfy.unquote(results['qsd']['attach'])
+            _results = NotifyBase.parse_url(results['attach'])
+            if _results:
+                results['filename'] = \
+                    None if _results['fullpath'] \
+                    else basename(_results['fullpath'])
+
+            if 'filename' in results['qsd'] and \
+                    len(results['qsd']['filename']):
+                results['filename'] = \
+                    basename(NotifyNtfy.unquote(results['qsd']['filename']))
 
         if 'click' in results['qsd'] and len(results['qsd']['click']):
             results['click'] = NotifyNtfy.unquote(results['qsd']['click'])
@@ -519,8 +546,8 @@ class NotifyNtfy(NotifyBase):
             # This isn't a surfire way to do things though; it's best to
             # specify the mode= flag
             results['mode'] = NtfyMode.PRIVATE \
-                if ((is_hostname(results['host']) or
-                    is_ipaddr(results['host'])) and results['targets']) \
+                if ((is_hostname(results['host'])
+                    or is_ipaddr(results['host'])) and results['targets']) \
                 else NtfyMode.CLOUD
 
         if results['mode'] == NtfyMode.CLOUD:
@@ -528,7 +555,7 @@ class NotifyNtfy(NotifyBase):
             # But only if we also rule it out not being the words
             # ntfy.sh itself, something that starts wiht an non-alpha numeric
             # character:
-            if not re.search(r'(ntfy\.sh)', results['host']):
+            if not NotifyNtfy.__auto_cloud_host.search(results['host']):
                 # Add it to the front of the list for consistency
                 results['targets'].insert(0, results['host'])
 
@@ -549,7 +576,7 @@ class NotifyNtfy(NotifyBase):
         # Quick lookup for users who want to just paste
         # the ntfy.sh url directly into Apprise
         result = re.match(
-            r'^https?://ntfy\.sh'
+            r'^(http|ntfy)s?://ntfy\.sh'
             r'(?P<topics>/[^?]+)?'
             r'(?P<params>\?.+)?$', url, re.I)
 
