@@ -1591,7 +1591,7 @@ def test_exclusive_match():
     #
     # Update our data set so we can do more advance checks
     #
-    data = set(['always','entry1'])
+    data = set(['always', 'entry1'])
     # We'll always match on the with keyword always
     assert utils.is_exclusive_match(logic='always', data=data) is True
     assert utils.is_exclusive_match(logic='garbage', data=data) is True
