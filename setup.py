@@ -73,7 +73,7 @@ setup(
         'DAPNET Dingtalk Discord Dbus Emby Faast FCM Flock Gitter Gnome '
         'Google Chat Gotify Growl Home Assistant IFTTT Join Kavenegar KODI '
         'Kumulos LaMetric MacOS Mailgun Matrix Mattermost MessageBird MQTT '
-        'MSG91 Nexmo Nextcloud NextcloudTalk Notica Notifico Office365 '
+        'MSG91 Nexmo Nextcloud NextcloudTalk Notica Notifico Ntfy Office365 '
         'OneSignal Opsgenie ParsePlatform PopcornNotify Prowl PushBullet '
         'Pushjet Pushed Pushover PushSafer Reddit Rocket.Chat Ryver SendGrid '
         'ServerChan SimplePush Sinch Slack SMTP2Go SparkPost Spontit '
