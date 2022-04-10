@@ -28,6 +28,7 @@ import six
 from itertools import chain
 from .common import NotifyType
 from .common import MATCH_ALL_TAG
+from .common import MATCH_ALWAYS_TAG
 from .conversion import convert_between
 from .utils import is_exclusive_match
 from .utils import parse_list
@@ -303,7 +304,7 @@ class Apprise(object):
         """
         self.servers[:] = []
 
-    def find(self, tag=MATCH_ALL_TAG):
+    def find(self, tag=MATCH_ALL_TAG, match_always=True):
         """
         Returns an list of all servers matching against the tag specified.
 
@@ -319,6 +320,10 @@ class Apprise(object):
         #     tag=[('tagA', 'tagC'), 'tagB']  = (tagA and tagC) or tagB
         #     tag=[('tagB', 'tagC')]          = tagB and tagC
 
+        # A match_always flag allows us to pick up on our 'any' keyword
+        # and notify these services under all circumstances
+        match_always = MATCH_ALWAYS_TAG if match_always else None
+
         # Iterate over our loaded plugins
         for entry in self.servers:
 
@@ -332,13 +337,14 @@ class Apprise(object):
             for server in servers:
                 # Apply our tag matching based on our defined logic
                 if is_exclusive_match(
-                        logic=tag, data=server.tags, match_all=MATCH_ALL_TAG):
+                        logic=tag, data=server.tags, match_all=MATCH_ALL_TAG,
+                        match_always=match_always):
                     yield server
         return
 
     def notify(self, body, title='', notify_type=NotifyType.INFO,
-               body_format=None, tag=MATCH_ALL_TAG, attach=None,
-               interpret_escapes=None):
+               body_format=None, tag=MATCH_ALL_TAG, match_always=True,
+               attach=None, interpret_escapes=None):
         """
         Send a notification to all of the plugins previously loaded.
 
@@ -368,7 +374,7 @@ class Apprise(object):
                 self.async_notify(
                     body, title,
                     notify_type=notify_type, body_format=body_format,
-                    tag=tag, attach=attach,
+                    tag=tag, match_always=match_always, attach=attach,
                     interpret_escapes=interpret_escapes,
                 ),
                 debug=self.debug
@@ -466,8 +472,8 @@ class Apprise(object):
             return py3compat.asyncio.toasyncwrap(status)
 
     def _notifyall(self, handler, body, title='', notify_type=NotifyType.INFO,
-                   body_format=None, tag=MATCH_ALL_TAG, attach=None,
-                   interpret_escapes=None):
+                   body_format=None, tag=MATCH_ALL_TAG, match_always=True,
+                   attach=None, interpret_escapes=None):
         """
         Creates notifications for all of the plugins loaded.
 
@@ -509,7 +515,7 @@ class Apprise(object):
             if interpret_escapes is None else interpret_escapes
 
         # Iterate over our loaded plugins
-        for server in self.find(tag):
+        for server in self.find(tag, match_always=match_always):
             # If our code reaches here, we either did not define a tag (it
             # was set to None), or we did define a tag and the logic above
             # determined we need to notify the service it's associated with

@@ -416,6 +416,33 @@ def test_apprise_config_tagging(tmpdir):
     # all matches everything
     assert len(ac.servers(tag='all')) == 3
 
+    # Test cases using the `always` keyword
+    # Create ourselves a config object
+    ac = AppriseConfig()
+
+    # Add an item associated with tag a
+    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='a,always') is True
+    # Add an item associated with tag b
+    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='b') is True
+    # Add an item associated with tag a or b
+    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='c,d') is True
+
+    # Now filter: a:
+    assert len(ac.servers(tag='a')) == 1
+    # Now filter: a or b:
+    assert len(ac.servers(tag='a,b')) == 2
+    # Now filter: e
+    # we'll match the `always'
+    assert len(ac.servers(tag='e')) == 1
+    assert len(ac.servers(tag='e', match_always=False)) == 0
+    # all matches everything
+    assert len(ac.servers(tag='all')) == 3
+
+    # Now filter: d
+    # we'll match the `always' tag
+    assert len(ac.servers(tag='d')) == 2
+    assert len(ac.servers(tag='d', match_always=False)) == 1
+
 
 def test_apprise_config_instantiate():
     """
@@ -1171,6 +1198,59 @@ def test_config_base_parse_yaml_file03(tmpdir):
     assert sum(1 for _ in a.find('test3')) == 1
     # Match test1 or test3 entry; (only matches test3)
     assert sum(1 for _ in a.find('test1, test3')) == 1
+
+
+def test_config_base_parse_yaml_file04(tmpdir):
+    """
+    API: ConfigBase.parse_yaml_file (#4)
+
+    Test the always keyword
+
+    """
+    t = tmpdir.mkdir("always-keyword").join("apprise.yml")
+    t.write("""urls:
+  - pover://nsisxnvnqixq39t0cw54pxieyvtdd9@2jevtmstfg5a7hfxndiybasttxxfku:
+    - tag: test1,always
+  - pover://rg8ta87qngcrkc6t4qbykxktou0uug@tqs3i88xlufexwl8t4asglt4zp5wfn:
+    - tag: test2
+  - pover://jcqgnlyq2oetea4qg3iunahj8d5ijm@evalvutkhc8ipmz2lcgc70wtsm0qpb:
+    - tag: test3""")
+
+    # Create ourselves a config object
+    ac = AppriseConfig(paths=str(t))
+
+    # The number of configuration files that exist
+    assert len(ac) == 1
+
+    # no notifications are loaded
+    assert len(ac.servers()) == 3
+
+    # Test our ability to add Config objects to our apprise object
+    a = Apprise()
+
+    # Add our configuration object
+    assert a.add(servers=ac) is True
+
+    # Detect our 3 entry as they should have loaded successfully
+    assert len(a) == 3
+
+    # No match still matches `always` keyword
+    assert sum(1 for _ in a.find('no-match')) == 1
+    # Unless we explicitly do not look for that file
+    assert sum(1 for _ in a.find('no-match', match_always=False)) == 0
+    # Match everything
+    assert sum(1 for _ in a.find('all')) == 3
+    # Match test1 entry (also has `always` keyword
+    assert sum(1 for _ in a.find('test1')) == 1
+    assert sum(1 for _ in a.find('test1', match_always=False)) == 1
+    # Match test2 entry (and test1 due to always keyword)
+    assert sum(1 for _ in a.find('test2')) == 2
+    assert sum(1 for _ in a.find('test2', match_always=False)) == 1
+    # Match test3 entry (and test1 due to always keyword)
+    assert sum(1 for _ in a.find('test3')) == 2
+    assert sum(1 for _ in a.find('test3', match_always=False)) == 1
+    # Match test1 or test3 entry
+    assert sum(1 for _ in a.find('test1, test3')) == 2
 
 
 def test_apprise_config_template_parse(tmpdir):

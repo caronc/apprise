@@ -1588,6 +1588,17 @@ def test_exclusive_match():
     assert utils.is_exclusive_match(logic=['www'], data=data) is False
     assert utils.is_exclusive_match(logic='all', data=data) is True
 
+    #
+    # Update our data set so we can do more advance checks
+    #
+    data = set(['always', 'entry1'])
+    # We'll always match on the with keyword always
+    assert utils.is_exclusive_match(logic='always', data=data) is True
+    assert utils.is_exclusive_match(logic='garbage', data=data) is True
+    # However we will not match if we turn this feature off
+    assert utils.is_exclusive_match(
+        logic='garbage', data=data, match_always=False) is False
+
     # Change default value from 'all' to 'match_me'. Logic matches
     # so we pass
     assert utils.is_exclusive_match(

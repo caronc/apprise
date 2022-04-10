@@ -32,6 +32,7 @@ from . import URLBase
 from .AppriseAsset import AppriseAsset
 
 from .common import MATCH_ALL_TAG
+from .common import MATCH_ALWAYS_TAG
 from .utils import GET_SCHEMA_RE
 from .utils import parse_list
 from .utils import is_exclusive_match
@@ -266,7 +267,7 @@ class AppriseConfig(object):
         # Return our status
         return True
 
-    def servers(self, tag=MATCH_ALL_TAG, *args, **kwargs):
+    def servers(self, tag=MATCH_ALL_TAG, match_always=True, *args, **kwargs):
         """
         Returns all of our servers dynamically build based on parsed
         configuration.
@@ -277,7 +278,15 @@ class AppriseConfig(object):
         This is for filtering the configuration files polled for
         results.
 
+        If the anytag is set, then any notification that is found
+        set with that tag are included in the response.
+
         """
+
+        # A match_always flag allows us to pick up on our 'any' keyword
+        # and notify these services under all circumstances
+        match_always = MATCH_ALWAYS_TAG if match_always else None
+
         # Build our tag setup
         #   - top level entries are treated as an 'or'
         #   - second level (or more) entries are treated as 'and'
@@ -294,7 +303,8 @@ class AppriseConfig(object):
 
             # Apply our tag matching based on our defined logic
             if is_exclusive_match(
-                    logic=tag, data=entry.tags, match_all=MATCH_ALL_TAG):
+                    logic=tag, data=entry.tags, match_all=MATCH_ALL_TAG,
+                    match_always=match_always):
                 # Build ourselves a list of services dynamically and return the
                 # as a list
                 response.extend(entry.servers())

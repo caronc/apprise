@@ -187,3 +187,7 @@ CONTENT_LOCATIONS = (
 # This is a reserved tag that is automatically assigned to every
 # Notification Plugin
 MATCH_ALL_TAG = 'all'
+
+# Will cause notification to trigger under any circumstance even if an
+# exclusive tagging was provided.
+MATCH_ALWAYS_TAG = 'always'

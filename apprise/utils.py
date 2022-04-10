@@ -28,8 +28,11 @@ import six
 import json
 import contextlib
 import os
+from itertools import chain
 from os.path import expanduser
 from functools import reduce
+from .common import MATCH_ALL_TAG
+from .common import MATCH_ALWAYS_TAG
 
 try:
     # Python 2.7
@@ -995,7 +998,8 @@ def parse_list(*args):
     return sorted([x for x in filter(bool, list(set(result)))])
 
 
-def is_exclusive_match(logic, data, match_all='all'):
+def is_exclusive_match(logic, data, match_all=MATCH_ALL_TAG,
+                       match_always=MATCH_ALWAYS_TAG):
     """
 
     The data variable should always be a set of strings that the logic can be
@@ -1011,6 +1015,9 @@ def is_exclusive_match(logic, data, match_all='all'):
         logic=['tagA', 'tagB']            = tagA or tagB
         logic=[('tagA', 'tagC'), 'tagB']  = (tagA and tagC) or tagB
         logic=[('tagB', 'tagC')]          = tagB and tagC
+
+    If `match_always` is not set to None, then its value is added as an 'or'
+    to all specified logic searches.
     """
 
     if isinstance(logic, six.string_types):
@@ -1025,6 +1032,10 @@ def is_exclusive_match(logic, data, match_all='all'):
     if not isinstance(logic, (list, tuple, set)):
         # garbage input
         return False
+
+    if match_always:
+        # Add our match_always to our logic searching if secified
+        logic = chain(logic, [match_always])
 
     # Track what we match against; but by default we do not match
     # against anything
