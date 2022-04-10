@@ -515,11 +515,27 @@ class Apprise(object):
             # was set to None), or we did define a tag and the logic above
             # determined we need to notify the service it's associated with
             if server.notify_format not in conversion_body_map:
-                (conversion_title_map[server.notify_format],
-                 conversion_body_map[server.notify_format]) = \
-                    convert_between(
-                        body_format, server.notify_format, body=body,
-                        title=title)
+                try:
+                    (conversion_title_map[server.notify_format],
+                     conversion_body_map[server.notify_format]) = \
+                        convert_between(
+                            body_format, server.notify_format, body=body,
+                            title=title, encoding_in=self.asset.encoding)
+
+                except AttributeError:
+                    # this occurs if a non-string was passed in
+                    logger.error(
+                        'An invalid message/title was provided to Apprise')
+                    raise TypeError()
+
+                except UnicodeDecodeError:
+                    # Python v2.7 will throw this if the string fed in isn't
+                    # what is otherwise configured in Python. Users can
+                    # over-ride this if they set the `encoding` option
+                    logger.error(
+                        'The content passed into Apprise was not of encoding '
+                        'type: {}'.format(self.asset.encoding))
+                    raise TypeError()
 
                 if interpret_escapes:
                     #
@@ -554,7 +570,7 @@ class Apprise(object):
                     except AttributeError:
                         # Must be of string type
                         logger.error('Failed to escape message body')
-                        raise TypeError
+                        raise TypeError()
 
                     if title:
                         try:
@@ -574,7 +590,7 @@ class Apprise(object):
                         except AttributeError:
                             # Must be of string type
                             logger.error('Failed to escape message title')
-                            raise TypeError
+                            raise TypeError()
 
             yield handler(
                 server,

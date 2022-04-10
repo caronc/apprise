@@ -37,7 +37,7 @@ else:
 
 
 def convert_between(from_format, to_format, body, title=None,
-                    encoding='utf-8'):
+                    encoding_in='utf-8', encoding_out='utf-8'):
     """
     Converts between different notification formats. If no conversion exists,
     or the selected one fails, the original text will be returned.
@@ -53,6 +53,14 @@ def convert_between(from_format, to_format, body, title=None,
         (NotifyFormat.HTML, NotifyFormat.MARKDOWN): html_to_text,
     }
 
+    if six.PY2:
+        # Python 2.7 requires markdown to get unicode characters
+        if title and isinstance(title, str):  # noqa: F821
+            title = title.decode(encoding_in)
+
+        if body and isinstance(body, str):  # noqa: F821
+            body = body.decode(encoding_in)
+
     if NotifyFormat.MARKDOWN in (from_format, to_format):
         # Tidy any exising pre-formating configuration
         title = '' if not title else title.lstrip('\r\n \t\v\b*#-')
@@ -61,22 +69,24 @@ def convert_between(from_format, to_format, body, title=None,
         title = '' if not title else title
 
     convert = converters.get((from_format, to_format))
-    return convert(title=title, body=body, encoding=encoding) \
+    title, body = convert(title=title, body=body) \
         if convert is not None else (title, body)
-
-
-def markdown_to_html(body, title=None, encoding='utf-8'):
-    """
-    Handle Markdown conversions
-    """
 
     if six.PY2:
         # Python 2.7 requires markdown to get unicode characters
-        if title and not isinstance(title, unicode):  # noqa: F821
-            title = title.decode(encoding)
+        if title and isinstance(title, unicode):  # noqa: F821
+            title = title.encode(encoding_out)
 
-        if body and not isinstance(body, unicode):  # noqa: F821
-            body = body.decode(encoding)
+        if body and isinstance(body, unicode):  # noqa: F821
+            body = body.encode(encoding_out)
+
+    return (title, body)
+
+
+def markdown_to_html(body, title=None):
+    """
+    Handle Markdown conversions
+    """
 
     return (
         # Title
@@ -87,7 +97,7 @@ def markdown_to_html(body, title=None, encoding='utf-8'):
     )
 
 
-def text_to_html(body, title=None, encoding='utf-8'):
+def text_to_html(body, title=None):
     """
     Converts a notification body from plain text to HTML.
     """
@@ -131,7 +141,7 @@ def text_to_html(body, title=None, encoding='utf-8'):
                 lambda x: re_map[x.group()], body)))
 
 
-def html_to_text(body, title=None, encoding='utf-8'):
+def html_to_text(body, title=None):
     """
     Converts a notification body from HTML to plain text.
     """

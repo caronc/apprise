@@ -899,3 +899,53 @@ def test_plugin_telegram_formating_py2(mock_post):
         u'<h1><p>\U0001f6a8 Change detected for <em>Apprise Test Title</em>' \
         u'</p></h1><p><em><a href="http://localhost">Apprise Body Title</a>' \
         u'</em> had <a href="http://127.0.0.1">a change</a></p>'
+
+    # Reset our values
+    mock_post.reset_mock()
+
+    # Now test hebrew types (outside of default utf-8)
+    # כותרת נפלאה translates to 'A wonderful title'
+    # זו הודעה translates to 'This is a notification'
+    title = 'כותרת נפלאה' \
+            .decode('utf-8').encode('ISO-8859-8')
+    body = '[_[זו הודעה](http://localhost)_' \
+           .decode('utf-8').encode('ISO-8859-8')
+
+    asset = AppriseAsset(encoding='utf-8')
+    # Now test default entries
+    aobj = Apprise(asset=asset)
+    aobj.add('tgram://123456789:abcdefg_hijklmnop/')
+    assert len(aobj) == 1
+
+    # Our notification will fail because we'll have an encoding error
+    assert not aobj.notify(title=title, body=body)
+    # Nothing was even attempted to be notified
+    assert mock_post.call_count == 0
+
+    # Let's use the expected input
+    asset = AppriseAsset(encoding='ISO-8859-8')
+
+    # Now test default entries
+    aobj = Apprise(asset=asset)
+
+    aobj.add('tgram://123456789:abcdefg_hijklmnop/')
+    assert len(aobj) == 1
+
+    # Our notification will work now
+    assert aobj.notify(title=title, body=body)
+
+    # Test our calls
+    assert mock_post.call_count == 2
+
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.telegram.org/bot123456789:abcdefg_hijklmnop/getUpdates'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://api.telegram.org/bot123456789:abcdefg_hijklmnop/sendMessage'
+
+    payload = loads(mock_post.call_args_list[1][1]['data'])
+
+    # Test that everything is escaped properly in a HTML mode
+    assert payload['text'] == \
+        u'<h1>\u05db\u05d5\u05ea\u05e8\u05ea \u05e0\u05e4\u05dc\u05d0\u05d4' \
+        u'</h1>[_[\u05d6\u05d5 \u05d4\u05d5\u05d3\u05e2\u05d4]' \
+        u'(http://localhost)_'
