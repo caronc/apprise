@@ -56,6 +56,9 @@ def convert_between(from_format, to_format, body, title=None):
         # Tidy any exising pre-formating configuration
         title = '' if not title else title.lstrip('\r\n \t\v\b*#-')
 
+    else:
+        title = '' if not title else title
+
     convert = converters.get((from_format, to_format))
     return convert(title=title, body=body) \
         if convert is not None else (title, body)
@@ -133,7 +136,7 @@ def html_to_text(body, title=None):
     parser.close()
     result = parser.converted
 
-    return (title, result)
+    return ('' if not title else title, result)
 
 
 class HTMLConverter(HTMLParser, object):

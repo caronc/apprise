@@ -404,10 +404,9 @@ def test_plugin_telegram_general(mock_post):
     assert mock_post.call_count == 1
     payload = loads(mock_post.call_args_list[0][1]['data'])
 
-    # Our special characters are escaped properly
+    # Test our payload
     assert payload['text'] == \
-        '<b>special characters</b>\r\n&lt;p&gt;'\
-        '\'"This can\'t\t\r\nfail us"\'&lt;/p&gt;'
+        '<h1>special characters</h1><p>\'"This can\'t\t\r\nfail us"\'</p>'
 
     # Test sending attachments
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
