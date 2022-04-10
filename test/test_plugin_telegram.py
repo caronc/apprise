@@ -34,6 +34,7 @@ from apprise import Apprise
 from apprise import AppriseAttachment
 from apprise import AppriseAsset
 from apprise import NotifyType
+from apprise import NotifyFormat
 from apprise import plugins
 from helpers import AppriseURLTester
 
@@ -211,20 +212,22 @@ def test_plugin_telegram_urls():
 
     """
 
+    # Disable Throttling to speed testing
+    plugins.NotifyTelegram.request_rate_per_sec = 0
+
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-@mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_telegram_general(mock_post, mock_get):
+def test_plugin_telegram_general(mock_post):
     """
     NotifyTelegram() General Tests
 
     """
 
     # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
+    plugins.NotifyTelegram.request_rate_per_sec = 0
 
     # Bot Token
     bot_token = '123456789:abcdefg_hijklmnop'
@@ -234,11 +237,8 @@ def test_plugin_telegram_general(mock_post, mock_get):
     chat_ids = 'l2g, lead2gold'
 
     # Prepare Mock
-    mock_get.return_value = requests.Request()
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.ok
-    mock_get.return_value.status_code = requests.codes.ok
-    mock_get.return_value.content = '{}'
     mock_post.return_value.content = '{}'
 
     # Exception should be thrown about the fact no bot token was specified
@@ -246,20 +246,17 @@ def test_plugin_telegram_general(mock_post, mock_get):
         plugins.NotifyTelegram(bot_token=None, targets=chat_ids)
 
     # Invalid JSON while trying to detect bot owner
-    mock_get.return_value.content = '{'
     mock_post.return_value.content = '}'
     obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
     obj.notify(title='hello', body='world')
 
     # Invalid JSON while trying to detect bot owner + 400 error
-    mock_get.return_value.status_code = requests.codes.internal_server_error
     mock_post.return_value.status_code = requests.codes.internal_server_error
     obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
     obj.notify(title='hello', body='world')
 
     # Return status back to how they were
     mock_post.return_value.status_code = requests.codes.ok
-    mock_get.return_value.status_code = requests.codes.ok
 
     # Exception should be thrown about the fact an invalid bot token was
     # specifed
@@ -280,9 +277,7 @@ def test_plugin_telegram_general(mock_post, mock_get):
     assert not obj.send_media(obj.targets[0], NotifyType.INFO)
 
     # Restore their entries
-    mock_get.side_effect = None
     mock_post.side_effect = None
-    mock_get.return_value.content = '{}'
     mock_post.return_value.content = '{}'
 
     # test url call
@@ -304,7 +299,6 @@ def test_plugin_telegram_general(mock_post, mock_get):
     response.content = dumps({
         'description': 'test',
     })
-    mock_get.return_value = response
     mock_post.return_value = response
 
     # No image asset
@@ -545,3 +539,182 @@ def test_plugin_telegram_general(mock_post, mock_get):
     assert isinstance(obj, plugins.NotifyTelegram)
     assert len(obj.targets) == 1
     assert '-123456789525' in obj.targets
+
+
+@mock.patch('requests.post')
+def test_plugin_telegram_formating(mock_post):
+    """
+    NotifyTelegram() Formatting Tests
+
+    """
+
+    # Disable Throttling to speed testing
+    plugins.NotifyTelegram.request_rate_per_sec = 0
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = '{}'
+
+    # Simple success response
+    mock_post.return_value.content = dumps({
+        "ok": True,
+        "result": [{
+            "update_id": 645421321,
+            "message": {
+                "message_id": 2,
+                "from": {
+                    "id": 532389719,
+                    "is_bot": False,
+                    "first_name": "Chris",
+                    "language_code": "en-US"
+                },
+                "chat": {
+                    "id": 532389719,
+                    "first_name": "Chris",
+                    "type": "private"
+                },
+                "date": 1519694394,
+                "text": "/start",
+                "entities": [{
+                    "offset": 0,
+                    "length": 6,
+                    "type": "bot_command",
+                }],
+            }},
+        ],
+    })
+    mock_post.return_value.status_code = requests.codes.ok
+
+    results = plugins.NotifyTelegram.parse_url(
+        'tgram://123456789:abcdefg_hijklmnop/')
+
+    instance = plugins.NotifyTelegram(**results)
+    assert isinstance(instance, plugins.NotifyTelegram)
+
+    response = instance.send(title='title', body='body')
+    assert response is True
+    # 1 call to look up bot owner, and second for notification
+    assert mock_post.call_count == 2
+
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.telegram.org/bot123456789:abcdefg_hijklmnop/getUpdates'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://api.telegram.org/bot123456789:abcdefg_hijklmnop/sendMessage'
+
+    # Reset our values
+    mock_post.reset_mock()
+
+    # Now test our HTML Conversion as TEXT)
+    aobj = Apprise()
+    aobj.add('tgram://123456789:abcdefg_hijklmnop/')
+    assert len(aobj) == 1
+
+    title = '🚨 Change detected for <i>Apprise Test Title</i>'
+    body = '<a href="http://localhost"><i>Apprise Body Title</i></a>' \
+           ' had <a href="http://127.0.0.1">a change</a>'
+
+    assert aobj.notify(title=title, body=body, body_format=NotifyFormat.TEXT)
+
+    # Test our calls
+    assert mock_post.call_count == 2
+
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.telegram.org/bot123456789:abcdefg_hijklmnop/getUpdates'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://api.telegram.org/bot123456789:abcdefg_hijklmnop/sendMessage'
+
+    payload = loads(mock_post.call_args_list[1][1]['data'])
+
+    # Test that everything is escaped properly in a TEXT mode
+    assert payload['text'] == \
+        '<h1>🚨 Change detected for &lt;i&gt;Apprise Test Title&lt;/i&gt;' \
+        '</h1>&lt;a href="http://localhost"&gt;&lt;i&gt;Apprise Body Title' \
+        '&lt;/i&gt;&lt;/a&gt; had &lt;a href="http://127.0.0.1"&gt;a change' \
+        '&lt;/a&gt;'
+
+    # Reset our values
+    mock_post.reset_mock()
+
+    # Now test our HTML Conversion as TEXT)
+    aobj = Apprise()
+    aobj.add('tgram://123456789:abcdefg_hijklmnop/?format=html')
+    assert len(aobj) == 1
+
+    assert aobj.notify(title=title, body=body, body_format=NotifyFormat.HTML)
+
+    # Test our calls
+    assert mock_post.call_count == 2
+
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.telegram.org/bot123456789:abcdefg_hijklmnop/getUpdates'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://api.telegram.org/bot123456789:abcdefg_hijklmnop/sendMessage'
+
+    payload = loads(mock_post.call_args_list[1][1]['data'])
+
+    # Test that everything is escaped properly in a HTML mode
+    assert payload['text'] == \
+        '<h1>🚨 Change detected for <i>Apprise Test Title</i></h1>' \
+        '<a href="http://localhost"><i>Apprise Body Title</i></a> had ' \
+        '<a href="http://127.0.0.1">a change</a>'
+
+    # Reset our values
+    mock_post.reset_mock()
+
+    # Now test our MARKDOWN Handling
+    title = '# 🚨 Change detected for _Apprise Test Title_'
+    body = '_[Apprise Body Title](http://localhost)_' \
+           ' had [a change](http://127.0.0.1)'
+
+    aobj = Apprise()
+    aobj.add('tgram://123456789:abcdefg_hijklmnop/?format=markdown')
+    assert len(aobj) == 1
+
+    assert aobj.notify(
+        title=title, body=body, body_format=NotifyFormat.MARKDOWN)
+
+    # Test our calls
+    assert mock_post.call_count == 2
+
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.telegram.org/bot123456789:abcdefg_hijklmnop/getUpdates'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://api.telegram.org/bot123456789:abcdefg_hijklmnop/sendMessage'
+
+    payload = loads(mock_post.call_args_list[1][1]['data'])
+
+    # Test that everything is escaped properly in a HTML mode
+    assert payload['text'] == \
+        '# 🚨 Change detected for _Apprise Test Title_\r\n' \
+        '_[Apprise Body Title](http://localhost)_ had ' \
+        '[a change](http://127.0.0.1)'
+
+    # Reset our values
+    mock_post.reset_mock()
+
+    # Upstream to use HTML but input specified as Markdown
+    aobj = Apprise()
+    aobj.add('tgram://987654321:abcdefg_hijklmnop/?format=html')
+    assert len(aobj) == 1
+
+    # HTML forced by the command line, but MARKDOWN spacified as
+    # upstream mode
+    assert aobj.notify(
+        title=title, body=body, body_format=NotifyFormat.MARKDOWN)
+
+    # Test our calls
+    assert mock_post.call_count == 2
+
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.telegram.org/bot987654321:abcdefg_hijklmnop/getUpdates'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://api.telegram.org/bot987654321:abcdefg_hijklmnop/sendMessage'
+
+    payload = loads(mock_post.call_args_list[1][1]['data'])
+
+    # Test that everything is escaped properly in a HTML mode
+    assert payload['text'] == \
+        '<h1><p>🚨 Change detected for <em>Apprise Test Title</em></p>' \
+        '</h1><p><em><a href="http://localhost">Apprise Body Title</a></em> ' \
+        'had <a href="http://127.0.0.1">a change</a></p>'

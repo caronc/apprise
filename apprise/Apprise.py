@@ -514,8 +514,8 @@ class Apprise(object):
             # was set to None), or we did define a tag and the logic above
             # determined we need to notify the service it's associated with
             if server.notify_format not in conversion_map:
-                conversion_map[server.notify_format] = convert_between(
-                    body_format, server.notify_format, body)
+                title, conversion_map[server.notify_format] = convert_between(
+                    body_format, server.notify_format, body=body, title=title)
 
                 if interpret_escapes:
                     #

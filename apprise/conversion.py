@@ -36,25 +36,46 @@ else:
     from html.parser import HTMLParser
 
 
-def convert_between(from_format, to_format, body):
+def convert_between(from_format, to_format, body, title=None):
     """
     Converts between different notification formats. If no conversion exists,
     or the selected one fails, the original text will be returned.
+
+    This function returns a tuple as (title, body)
     """
 
     converters = {
-        (NotifyFormat.MARKDOWN, NotifyFormat.HTML): markdown,
+        (NotifyFormat.MARKDOWN, NotifyFormat.HTML): markdown_to_html,
         (NotifyFormat.TEXT, NotifyFormat.HTML): text_to_html,
         (NotifyFormat.HTML, NotifyFormat.TEXT): html_to_text,
         # For now; use same converter for Markdown support
         (NotifyFormat.HTML, NotifyFormat.MARKDOWN): html_to_text,
     }
 
+    if NotifyFormat.MARKDOWN in (from_format, to_format):
+        # Tidy any exising pre-formating configuration
+        title = '' if not title else title.lstrip('\r\n \t\v\b*#-')
+
     convert = converters.get((from_format, to_format))
-    return convert(body) if convert is not None else body
+    return convert(title=title, body=body) \
+        if convert is not None else (title, body)
 
 
-def text_to_html(body):
+def markdown_to_html(body, title=None):
+    """
+    Handle Markdown conversions
+    """
+
+    return (
+        # Title
+        '' if not title else markdown(title),
+
+        # Body
+        markdown(body),
+    )
+
+
+def text_to_html(body, title=None):
     """
     Converts a notification body from plain text to HTML.
     """
@@ -86,11 +107,19 @@ def text_to_html(body):
 
     # Execute our map against our body in addition to
     # swapping out new lines and replacing them with <br/>
-    return re.sub(
-        r'\r*\n', '<br/>\n', re_table.sub(lambda x: re_map[x.group()], body))
+    return (
+        # Title; swap whitespace with space
+        '' if not title else re.sub(
+            r'[\r\n]+', ' ', re_table.sub(
+                lambda x: re_map[x.group()], title)),
+
+        # Body Formatting
+        re.sub(
+            r'\r*\n', '<br/>\n', re_table.sub(
+                lambda x: re_map[x.group()], body)))
 
 
-def html_to_text(body):
+def html_to_text(body, title=None):
     """
     Converts a notification body from HTML to plain text.
     """
@@ -104,7 +133,7 @@ def html_to_text(body):
     parser.close()
     result = parser.converted
 
-    return result
+    return (title, result)
 
 
 class HTMLConverter(HTMLParser, object):
