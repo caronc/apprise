@@ -25,6 +25,7 @@
 
 import os
 import six
+import sys
 import pytest
 import mock
 import requests
@@ -540,10 +541,11 @@ def test_plugin_telegram_general(mock_post):
     assert '-123456789525' in obj.targets
 
 
+@pytest.mark.skipif(sys.version_info.major <= 2, reason="Requires Python 3.x+")
 @mock.patch('requests.post')
-def test_plugin_telegram_formating(mock_post):
+def test_plugin_telegram_formating_py3(mock_post):
     """
-    NotifyTelegram() Formatting Tests
+    NotifyTelegram() Python v3+ Formatting Tests
 
     """
 
@@ -717,3 +719,183 @@ def test_plugin_telegram_formating(mock_post):
         '<h1><p>🚨 Change detected for <em>Apprise Test Title</em></p>' \
         '</h1><p><em><a href="http://localhost">Apprise Body Title</a></em> ' \
         'had <a href="http://127.0.0.1">a change</a></p>'
+
+
+@pytest.mark.skipif(sys.version_info.major >= 3, reason="Requires Python 2.x+")
+@mock.patch('requests.post')
+def test_plugin_telegram_formating_py2(mock_post):
+    """
+    NotifyTelegram() Python v2 Formatting Tests
+
+    """
+
+    # Disable Throttling to speed testing
+    plugins.NotifyTelegram.request_rate_per_sec = 0
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = '{}'
+
+    # Simple success response
+    mock_post.return_value.content = dumps({
+        "ok": True,
+        "result": [{
+            "update_id": 645421321,
+            "message": {
+                "message_id": 2,
+                "from": {
+                    "id": 532389719,
+                    "is_bot": False,
+                    "first_name": "Chris",
+                    "language_code": "en-US"
+                },
+                "chat": {
+                    "id": 532389719,
+                    "first_name": "Chris",
+                    "type": "private"
+                },
+                "date": 1519694394,
+                "text": "/start",
+                "entities": [{
+                    "offset": 0,
+                    "length": 6,
+                    "type": "bot_command",
+                }],
+            }},
+        ],
+    })
+    mock_post.return_value.status_code = requests.codes.ok
+
+    results = plugins.NotifyTelegram.parse_url(
+        'tgram://123456789:abcdefg_hijklmnop/')
+
+    instance = plugins.NotifyTelegram(**results)
+    assert isinstance(instance, plugins.NotifyTelegram)
+
+    response = instance.send(title='title', body='body')
+    assert response is True
+    # 1 call to look up bot owner, and second for notification
+    assert mock_post.call_count == 2
+
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.telegram.org/bot123456789:abcdefg_hijklmnop/getUpdates'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://api.telegram.org/bot123456789:abcdefg_hijklmnop/sendMessage'
+
+    # Reset our values
+    mock_post.reset_mock()
+
+    # Now test our HTML Conversion as TEXT)
+    aobj = Apprise()
+    aobj.add('tgram://123456789:abcdefg_hijklmnop/')
+    assert len(aobj) == 1
+
+    title = '🚨 Change detected for <i>Apprise Test Title</i>'
+    body = '<a href="http://localhost"><i>Apprise Body Title</i></a>' \
+           ' had <a href="http://127.0.0.1">a change</a>'
+
+    assert aobj.notify(title=title, body=body, body_format=NotifyFormat.TEXT)
+
+    # Test our calls
+    assert mock_post.call_count == 2
+
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.telegram.org/bot123456789:abcdefg_hijklmnop/getUpdates'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://api.telegram.org/bot123456789:abcdefg_hijklmnop/sendMessage'
+
+    payload = loads(mock_post.call_args_list[1][1]['data'])
+
+    # Test that everything is escaped properly in a TEXT mode
+    assert payload['text'] == \
+        u'<h1>\U0001f6a8 Change detected for &lt;i&gt;Apprise Test Title' \
+        u'&lt;/i&gt;</h1>&lt;a href="http://localhost"&gt;&lt;i&gt;' \
+        u'Apprise Body Title&lt;/i&gt;&lt;/a&gt; had &lt;a ' \
+        u'href="http://127.0.0.1"&gt;a change&lt;/a&gt;'
+
+    # Reset our values
+    mock_post.reset_mock()
+
+    # Now test our HTML Conversion as TEXT)
+    aobj = Apprise()
+    aobj.add('tgram://123456789:abcdefg_hijklmnop/?format=html')
+    assert len(aobj) == 1
+
+    assert aobj.notify(title=title, body=body, body_format=NotifyFormat.HTML)
+
+    # Test our calls
+    assert mock_post.call_count == 2
+
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.telegram.org/bot123456789:abcdefg_hijklmnop/getUpdates'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://api.telegram.org/bot123456789:abcdefg_hijklmnop/sendMessage'
+
+    payload = loads(mock_post.call_args_list[1][1]['data'])
+
+    # Test that everything is escaped properly in a HTML mode
+    assert payload['text'] == \
+        u'<h1>\U0001f6a8 Change detected for <i>Apprise Test Title</i></h1>' \
+        u'<a href="http://localhost"><i>Apprise Body Title</i></a> had ' \
+        u'<a href="http://127.0.0.1">a change</a>'
+
+    # Reset our values
+    mock_post.reset_mock()
+
+    # Now test our MARKDOWN Handling
+    title = '# 🚨 Change detected for _Apprise Test Title_'
+    body = '_[Apprise Body Title](http://localhost)_' \
+           ' had [a change](http://127.0.0.1)'
+
+    aobj = Apprise()
+    aobj.add('tgram://123456789:abcdefg_hijklmnop/?format=markdown')
+    assert len(aobj) == 1
+
+    assert aobj.notify(
+        title=title, body=body, body_format=NotifyFormat.MARKDOWN)
+
+    # Test our calls
+    assert mock_post.call_count == 2
+
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.telegram.org/bot123456789:abcdefg_hijklmnop/getUpdates'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://api.telegram.org/bot123456789:abcdefg_hijklmnop/sendMessage'
+
+    payload = loads(mock_post.call_args_list[1][1]['data'])
+
+    # Test that everything is escaped properly in a HTML mode
+    assert payload['text'] == \
+        u'# \U0001f6a8 Change detected for _Apprise Test Title_\r\n' \
+        u'_[Apprise Body Title](http://localhost)_ had ' \
+        u'[a change](http://127.0.0.1)'
+
+    # Reset our values
+    mock_post.reset_mock()
+
+    # Upstream to use HTML but input specified as Markdown
+    aobj = Apprise()
+    aobj.add('tgram://987654321:abcdefg_hijklmnop/?format=html')
+    assert len(aobj) == 1
+
+    # HTML forced by the command line, but MARKDOWN spacified as
+    # upstream mode
+    assert aobj.notify(
+        title=title, body=body, body_format=NotifyFormat.MARKDOWN)
+
+    # Test our calls
+    assert mock_post.call_count == 2
+
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.telegram.org/bot987654321:abcdefg_hijklmnop/getUpdates'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://api.telegram.org/bot987654321:abcdefg_hijklmnop/sendMessage'
+
+    payload = loads(mock_post.call_args_list[1][1]['data'])
+
+    # Test that everything is escaped properly in a HTML mode
+    assert payload['text'] == \
+        u'<h1><p>\U0001f6a8 Change detected for <em>Apprise Test Title</em>' \
+        u'</p></h1><p><em><a href="http://localhost">Apprise Body Title</a>' \
+        u'</em> had <a href="http://127.0.0.1">a change</a></p>'

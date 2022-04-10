@@ -36,7 +36,8 @@ else:
     from html.parser import HTMLParser
 
 
-def convert_between(from_format, to_format, body, title=None):
+def convert_between(from_format, to_format, body, title=None,
+                    encoding='utf-8'):
     """
     Converts between different notification formats. If no conversion exists,
     or the selected one fails, the original text will be returned.
@@ -60,14 +61,22 @@ def convert_between(from_format, to_format, body, title=None):
         title = '' if not title else title
 
     convert = converters.get((from_format, to_format))
-    return convert(title=title, body=body) \
+    return convert(title=title, body=body, encoding=encoding) \
         if convert is not None else (title, body)
 
 
-def markdown_to_html(body, title=None):
+def markdown_to_html(body, title=None, encoding='utf-8'):
     """
     Handle Markdown conversions
     """
+
+    if six.PY2:
+        # Python 2.7 requires markdown to get unicode characters
+        if title and not isinstance(title, unicode):  # noqa: F821
+            title = title.decode(encoding)
+
+        if body and not isinstance(body, unicode):  # noqa: F821
+            body = body.decode(encoding)
 
     return (
         # Title
@@ -78,7 +87,7 @@ def markdown_to_html(body, title=None):
     )
 
 
-def text_to_html(body, title=None):
+def text_to_html(body, title=None, encoding='utf-8'):
     """
     Converts a notification body from plain text to HTML.
     """
@@ -122,7 +131,7 @@ def text_to_html(body, title=None):
                 lambda x: re_map[x.group()], body)))
 
 
-def html_to_text(body, title=None):
+def html_to_text(body, title=None, encoding='utf-8'):
     """
     Converts a notification body from HTML to plain text.
     """
@@ -132,11 +141,20 @@ def html_to_text(body, title=None):
         # Python 2.7 requires an additional parsing to un-escape characters
         body = parser.unescape(body)
 
+    if title:
+        if six.PY2:
+            # Python 2.7 requires an additional parsing to un-escape characters
+            title = parser.unescape(title)
+
+        parser.feed(title)
+        parser.close()
+        title = parser.converted
+
     parser.feed(body)
     parser.close()
-    result = parser.converted
+    body = parser.converted
 
-    return ('' if not title else title, result)
+    return ('' if not title else title, body)
 
 
 class HTMLConverter(HTMLParser, object):
