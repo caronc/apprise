@@ -47,15 +47,16 @@ Apprise is a Python package for simplifying access to all of the different
 notification services that are out there. Apprise opens the door and makes
 it easy to access:
 
-Apprise API, AWS SES, AWS SNS, Boxcar, ClickSend, DAPNET, DingTalk, Discord, E-Mail,
-Emby, Faast, FCM, Flock, Gitter, Google Chat, Gotify, Growl, Home Assistant,
-IFTTT, Join, Kavenegar, KODI, Kumulos, LaMetric, MacOSX, Mailgun, Mattermost,
-Matrix, Microsoft Windows, Microsoft Teams, MessageBird, MQTT, MSG91, MyAndroid,
-Nexmo, Nextcloud, NextcloudTalk, Notica, Notifico, ntfy, Office365, OneSignal,
-Opsgenie, ParsePlatform, PopcornNotify, Prowl, Pushalot, PushBullet, Pushjet,
-Pushover, PushSafer, Reddit, Rocket.Chat, SendGrid, ServerChan, SimplePush, Sinch,
-Slack, SMTP2Go, Spontit, SparkPost, Super Toasty, Streamlabs, Stride, Syslog,
-Techulus Push, Telegram, Twilio, Twitter, Twist, XBMC, XMPP, Webex Teams}
+Apprise API, AWS SES, AWS SNS, Boxcar, ClickSend, DAPNET, DingTalk, Discord,
+E-Mail, Emby, Faast, FCM, Flock, Gitter, Google Chat, Gotify, Growl, Home
+Assistant, IFTTT, Join, Kavenegar, KODI, Kumulos, LaMetric, MacOSX, Mailgun,
+Mattermost, Matrix, Microsoft Windows, Microsoft Teams, MessageBird, MQTT, MSG91,
+MyAndroid, Nexmo, Nextcloud, NextcloudTalk, Notica, Notifico, ntfy, Office365,
+OneSignal, Opsgenie, ParsePlatform, PopcornNotify, Prowl, Pushalot,
+PushBullet, Pushjet, Pushover, PushSafer, Reddit, Rocket.Chat, SendGrid,
+ServerChan, Signal, SimplePush, Sinch, Slack, SMTP2Go, Spontit, SparkPost,
+Super Toasty, Streamlabs, Stride, Syslog, Techulus Push, Telegram, Twilio,
+Twitter, Twist, XBMC, XMPP, Webex Teams}
 
 Name:           python-%{pypi_name}
 Version:        0.9.7
