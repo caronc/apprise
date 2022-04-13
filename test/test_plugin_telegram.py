@@ -808,11 +808,12 @@ def test_plugin_telegram_formating_py2(mock_post):
     payload = loads(mock_post.call_args_list[1][1]['data'])
 
     # Test that everything is escaped properly in a TEXT mode
-    assert payload['text'] == \
-        u'<h1>\U0001f6a8 Change detected for &lt;i&gt;Apprise Test Title' \
-        u'&lt;/i&gt;</h1>&lt;a href="http://localhost"&gt;&lt;i&gt;' \
-        u'Apprise Body Title&lt;/i&gt;&lt;/a&gt; had &lt;a ' \
-        u'href="http://127.0.0.1"&gt;a change&lt;/a&gt;'
+    assert payload['text'].encode('utf-8') == \
+        '<h1>\xf0\x9f\x9a\xa8 Change detected for &lt;i&gt;' \
+        'Apprise Test Title&lt;/i&gt;</h1>' \
+        '&lt;a href="http://localhost"&gt;&lt;i&gt;' \
+        'Apprise Body Title&lt;/i&gt;&lt;/a&gt; had &lt;a ' \
+        'href="http://127.0.0.1"&gt;a change&lt;/a&gt;'
 
     # Reset our values
     mock_post.reset_mock()
@@ -835,10 +836,10 @@ def test_plugin_telegram_formating_py2(mock_post):
     payload = loads(mock_post.call_args_list[1][1]['data'])
 
     # Test that everything is escaped properly in a HTML mode
-    assert payload['text'] == \
-        u'<h1>\U0001f6a8 Change detected for <i>Apprise Test Title</i></h1>' \
-        u'<a href="http://localhost"><i>Apprise Body Title</i></a> had ' \
-        u'<a href="http://127.0.0.1">a change</a>'
+    assert payload['text'].encode('utf-8') == \
+        '<h1>\xf0\x9f\x9a\xa8 Change detected for <i>Apprise Test Title</i>' \
+        '</h1><a href="http://localhost"><i>Apprise Body Title</i></a> had ' \
+        '<a href="http://127.0.0.1">a change</a>'
 
     # Reset our values
     mock_post.reset_mock()
@@ -866,10 +867,10 @@ def test_plugin_telegram_formating_py2(mock_post):
     payload = loads(mock_post.call_args_list[1][1]['data'])
 
     # Test that everything is escaped properly in a HTML mode
-    assert payload['text'] == \
-        u'# \U0001f6a8 Change detected for _Apprise Test Title_\r\n' \
-        u'_[Apprise Body Title](http://localhost)_ had ' \
-        u'[a change](http://127.0.0.1)'
+    assert payload['text'].encode('utf-8') == \
+        '# \xf0\x9f\x9a\xa8 Change detected for _Apprise Test Title_\r\n_' \
+        '[Apprise Body Title](http://localhost)_ had ' \
+        '[a change](http://127.0.0.1)'
 
     # Reset our values
     mock_post.reset_mock()
@@ -895,10 +896,11 @@ def test_plugin_telegram_formating_py2(mock_post):
     payload = loads(mock_post.call_args_list[1][1]['data'])
 
     # Test that everything is escaped properly in a HTML mode
-    assert payload['text'] == \
-        u'<h1><p>\U0001f6a8 Change detected for <em>Apprise Test Title</em>' \
-        u'</p></h1><p><em><a href="http://localhost">Apprise Body Title</a>' \
-        u'</em> had <a href="http://127.0.0.1">a change</a></p>'
+    assert payload['text'].encode('utf-8') == \
+        '<h1><p>\xf0\x9f\x9a\xa8 Change detected for ' \
+        '<em>Apprise Test Title</em></p></h1><p><em>' \
+        '<a href="http://localhost">Apprise Body Title</a></em>' \
+        ' had <a href="http://127.0.0.1">a change</a></p>'
 
     # Reset our values
     mock_post.reset_mock()
@@ -945,7 +947,7 @@ def test_plugin_telegram_formating_py2(mock_post):
     payload = loads(mock_post.call_args_list[1][1]['data'])
 
     # Test that everything is escaped properly in a HTML mode
-    assert payload['text'] == \
-        u'<h1>\u05db\u05d5\u05ea\u05e8\u05ea \u05e0\u05e4\u05dc\u05d0\u05d4' \
-        u'</h1>[_[\u05d6\u05d5 \u05d4\u05d5\u05d3\u05e2\u05d4]' \
-        u'(http://localhost)_'
+    assert payload['text'].encode('utf-8') == \
+        '<h1>\xd7\x9b\xd7\x95\xd7\xaa\xd7\xa8\xd7\xaa '\
+        '\xd7\xa0\xd7\xa4\xd7\x9c\xd7\x90\xd7\x94</h1>[_[\xd7\x96\xd7\x95 '\
+        '\xd7\x94\xd7\x95\xd7\x93\xd7\xa2\xd7\x94](http://localhost)_'
