@@ -499,24 +499,12 @@ class Apprise(object):
                 if body and isinstance(body, str):  # noqa: F821
                     body = body.decode(self.asset.encoding)
 
-                elif not isinstance(body, unicode):  # noqa: F821
-                    # this occurs if a non-string was passed in
-                    msg = 'An invalid message body was provided to Apprise'
-                    logger.error(msg)
-                    raise TypeError(msg)
-
             else:  # Python 3+
                 if title and isinstance(title, bytes):  # noqa: F821
                     title = title.decode(self.asset.encoding)
 
                 if body and isinstance(body, bytes):  # noqa: F821
                     body = body.decode(self.asset.encoding)
-
-                elif not isinstance(body, str):  # noqa: F821
-                    # this occurs if a non-string was passed in
-                    msg = 'An invalid message body was provided to Apprise'
-                    logger.error(msg)
-                    raise TypeError(msg)
 
         except UnicodeDecodeError:
             msg = 'The content passed into Apprise was not of encoding ' \
