@@ -181,3 +181,37 @@ def test_plugin_signal_edge_cases(mock_post):
     payload = loads(details[1]['data'])
     # Status flag is set
     assert payload['message'] == '[i] My Title\r\ntest body'
+
+
+@mock.patch('requests.post')
+def test_plugin_signal_test_based_on_feedback(mock_post):
+    """
+    NotifySignalAPI() User Feedback Test
+
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.request_rate_per_sec = 0
+
+    # Prepare our response
+    response = requests.Request()
+    response.status_code = requests.codes.ok
+
+    # Prepare Mock
+    mock_post.return_value = response
+
+    body = "test body"
+    title = "My Title"
+
+    aobj = Apprise()
+    aobj.add('signal://10.0.0.112:8080/+12512222222/+12513333333')
+
+    assert aobj.notify(title=title, body=body)
+
+    assert mock_post.call_count == 1
+
+    details = mock_post.call_args_list[0]
+    assert details[0][0] == 'http://10.0.0.112:8080/v2/send'
+    payload = loads(details[1]['data'])
+    assert payload['message'] == 'My Title\r\ntest body'
+    assert payload['number'] == "+12512222222"
+    assert payload['recipients'] == ["+12513333333"]
