@@ -478,10 +478,14 @@ class Apprise(object):
 
         if len(self) == 0:
             # Nothing to notify
-            raise TypeError("No service(s) to notify")
+            msg = "There are service(s) to notify"
+            logger.error(msg)
+            raise TypeError(msg)
 
         if not (title or body):
-            raise TypeError("No message content specified to deliver")
+            msg = "No message content specified to deliver"
+            logger.error(msg)
+            raise TypeError(msg)
 
         try:
             if six.PY2:
@@ -495,6 +499,12 @@ class Apprise(object):
                 if body and isinstance(body, str):  # noqa: F821
                     body = body.decode(self.asset.encoding)
 
+                elif not isinstance(body, unicode):  # noqa: F821
+                    # this occurs if a non-string was passed in
+                    msg = 'An invalid message body was provided to Apprise'
+                    logger.error(msg)
+                    raise TypeError(msg)
+
             else:  # Python 3+
                 if title and isinstance(title, bytes):  # noqa: F821
                     title = title.decode(self.asset.encoding)
@@ -502,20 +512,17 @@ class Apprise(object):
                 if body and isinstance(body, bytes):  # noqa: F821
                     body = body.decode(self.asset.encoding)
 
-        except AttributeError:
-            # this occurs if a non-string was passed in
-            logger.error(
-                'An invalid message/title was provided to Apprise')
-            raise TypeError()
+                elif not isinstance(body, str):  # noqa: F821
+                    # this occurs if a non-string was passed in
+                    msg = 'An invalid message body was provided to Apprise'
+                    logger.error(msg)
+                    raise TypeError(msg)
 
         except UnicodeDecodeError:
-            # Python v2.7 will throw this if the string fed in isn't
-            # what is otherwise configured in Python. Users can
-            # over-ride this if they set the `encoding` option
-            logger.error(
-                'The content passed into Apprise was not of encoding '
-                'type: {}'.format(self.asset.encoding))
-            raise TypeError()
+            msg = 'The content passed into Apprise was not of encoding ' \
+                  'type: {}'.format(self.asset.encoding)
+            logger.error(msg)
+            raise TypeError(msg)
 
         # Tracks conversions
         conversion_body_map = dict()
@@ -540,27 +547,12 @@ class Apprise(object):
             # was set to None), or we did define a tag and the logic above
             # determined we need to notify the service it's associated with
             if server.notify_format not in conversion_body_map:
-                try:
-                    (conversion_title_map[server.notify_format],
-                     conversion_body_map[server.notify_format]) = \
-                        convert_between(
-                            body_format, server.notify_format, body=body,
-                            title=title)
-
-                except AttributeError:
-                    # this occurs if a non-string was passed in
-                    logger.error(
-                        'An invalid message/title was provided to Apprise')
-                    raise TypeError()
-
-                except UnicodeDecodeError:
-                    # Python v2.7 will throw this if the string fed in isn't
-                    # what is otherwise configured in Python. Users can
-                    # over-ride this if they set the `encoding` option
-                    logger.error(
-                        'The content passed into Apprise was not of encoding '
-                        'type: {}'.format(self.asset.encoding))
-                    raise TypeError()
+                # Perform Conversion
+                (conversion_title_map[server.notify_format],
+                 conversion_body_map[server.notify_format]) = \
+                    convert_between(
+                        body_format, server.notify_format, body=body,
+                        title=title)
 
                 if interpret_escapes:
                     #
@@ -594,8 +586,9 @@ class Apprise(object):
 
                     except AttributeError:
                         # Must be of string type
-                        logger.error('Failed to escape message body')
-                        raise TypeError()
+                        msg = 'Failed to escape message body'
+                        logger.error(msg)
+                        raise TypeError(msg)
 
                     if conversion_title_map[server.notify_format]:
                         try:
@@ -621,8 +614,8 @@ class Apprise(object):
                             raise TypeError()
 
                 if six.PY2:
-                    # Python 2.7 strings must be encoded as utf-8 as Python 3
-                    # ones if not already.
+                    # Python 2.7 strings must be encoded as utf-8 for
+                    # consistency across all platforms
                     if conversion_title_map[server.notify_format] and \
                             isinstance(
                                 conversion_title_map[server.notify_format],
