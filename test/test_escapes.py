@@ -183,9 +183,36 @@ def test_apprise_escaping_py3(mock_post):
         title=object(), body=False, interpret_escapes=True) is False
     assert a.notify(
         title=False, body=object(), interpret_escapes=True) is False
+
+    # We support bytes
     assert a.notify(
         title=b'byte title', body=b'byte body',
+        interpret_escapes=True) is True
+
+    # However they're escaped as 'utf-8' by default unless we tell Apprise
+    # otherwise
+    # Now test hebrew types (outside of default utf-8)
+    # כותרת נפלאה translates to 'A wonderful title'
+    # זו הודעה translates to 'This is a notification'
+    title = 'כותרת נפלאה'.encode('ISO-8859-8')
+    body = '[_[זו הודעה](http://localhost)_'.encode('ISO-8859-8')
+    assert a.notify(
+        title=title, body=body,
         interpret_escapes=True) is False
+
+    # However if we let Apprise know in advance the encoding, it will handle
+    # it for us
+    asset = apprise.AppriseAsset(encoding='ISO-8859-8')
+    a = apprise.Apprise(asset=asset)
+    # Create ourselves a test object to work with
+    a.add('json://localhost')
+    assert a.notify(
+        title=title, body=body,
+        interpret_escapes=True) is True
+
+    # We'll restore our configuration back to how it was now
+    a = apprise.Apprise()
+    a.add('json://localhost')
 
     # The body is proessed first, so the errors thrown above get tested on
     # the body only.  Now we run similar tests but only make the title
@@ -198,8 +225,9 @@ def test_apprise_escaping_py3(mock_post):
         title=object(), body="valid", interpret_escapes=True) is False
     assert a.notify(
         title=False, body="valid", interpret_escapes=True) is True
+    # Bytes are supported
     assert a.notify(
-        title=b'byte title', body="valid", interpret_escapes=True) is False
+        title=b'byte title', body="valid", interpret_escapes=True) is True
 
 
 @pytest.mark.skipif(sys.version_info.major >= 3, reason="Requires Python 2.x+")

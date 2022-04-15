@@ -36,8 +36,7 @@ else:
     from html.parser import HTMLParser
 
 
-def convert_between(from_format, to_format, body, title=None,
-                    encoding_in='utf-8', encoding_out='utf-8'):
+def convert_between(from_format, to_format, body, title=None):
     """
     Converts between different notification formats. If no conversion exists,
     or the selected one fails, the original text will be returned.
@@ -53,14 +52,6 @@ def convert_between(from_format, to_format, body, title=None,
         (NotifyFormat.HTML, NotifyFormat.MARKDOWN): html_to_text,
     }
 
-    if six.PY2:
-        # Python 2.7 requires markdown to get unicode characters
-        if title and isinstance(title, str):  # noqa: F821
-            title = title.decode(encoding_in)
-
-        if body and isinstance(body, str):  # noqa: F821
-            body = body.decode(encoding_in)
-
     if NotifyFormat.MARKDOWN in (from_format, to_format):
         # Tidy any exising pre-formating configuration
         title = '' if not title else title.lstrip('\r\n \t\v\b*#-')
@@ -71,14 +62,6 @@ def convert_between(from_format, to_format, body, title=None,
     convert = converters.get((from_format, to_format))
     title, body = convert(title=title, body=body) \
         if convert is not None else (title, body)
-
-    if six.PY2:
-        # Python 2.7 requires markdown to get unicode characters
-        if title and isinstance(title, unicode):  # noqa: F821
-            title = title.encode(encoding_out)
-
-        if body and isinstance(body, unicode):  # noqa: F821
-            body = body.encode(encoding_out)
 
     return (title, body)
 

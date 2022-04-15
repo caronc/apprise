@@ -483,14 +483,39 @@ class Apprise(object):
         if not (title or body):
             raise TypeError("No message content specified to deliver")
 
-        if six.PY2:
-            # Python 2.7.x Unicode Character Handling
-            # Ensure we're working with utf-8
-            if isinstance(title, unicode):  # noqa: F821
-                title = title.encode('utf-8')
+        try:
+            if six.PY2:
+                # Python 2.7 encoding support isn't the greatest, so we try
+                # to ensure that we're ALWAYS dealing with unicode characters
+                # prior to entrying the next part.  This is especially required
+                # for Markdown support
+                if title and isinstance(title, str):  # noqa: F821
+                    title = title.decode(self.asset.encoding)
 
-            if isinstance(body, unicode):  # noqa: F821
-                body = body.encode('utf-8')
+                if body and isinstance(body, str):  # noqa: F821
+                    body = body.decode(self.asset.encoding)
+
+            else:  # Python 3+
+                if title and isinstance(title, bytes):  # noqa: F821
+                    title = title.decode(self.asset.encoding)
+
+                if body and isinstance(body, bytes):  # noqa: F821
+                    body = body.decode(self.asset.encoding)
+
+        except AttributeError:
+            # this occurs if a non-string was passed in
+            logger.error(
+                'An invalid message/title was provided to Apprise')
+            raise TypeError()
+
+        except UnicodeDecodeError:
+            # Python v2.7 will throw this if the string fed in isn't
+            # what is otherwise configured in Python. Users can
+            # over-ride this if they set the `encoding` option
+            logger.error(
+                'The content passed into Apprise was not of encoding '
+                'type: {}'.format(self.asset.encoding))
+            raise TypeError()
 
         # Tracks conversions
         conversion_body_map = dict()
@@ -520,7 +545,7 @@ class Apprise(object):
                      conversion_body_map[server.notify_format]) = \
                         convert_between(
                             body_format, server.notify_format, body=body,
-                            title=title, encoding_in=self.asset.encoding)
+                            title=title)
 
                 except AttributeError:
                     # this occurs if a non-string was passed in
@@ -572,12 +597,13 @@ class Apprise(object):
                         logger.error('Failed to escape message body')
                         raise TypeError()
 
-                    if title:
+                    if conversion_title_map[server.notify_format]:
                         try:
                             # Added overhead required due to Python 3 Encoding
                             # Bug identified here:
                             #  https://bugs.python.org/issue21331
-                            title = title\
+                            conversion_title_map[server.notify_format] = \
+                                conversion_title_map[server.notify_format]\
                                 .encode('ascii', 'backslashreplace')\
                                 .decode('unicode-escape')
 
@@ -585,12 +611,33 @@ class Apprise(object):
                             # This occurs using a very old verion of Python 2.7
                             # such as the one that ships with CentOS/RedHat 7.x
                             # (v2.7.5).
-                            title = title.decode('string_escape')
+                            conversion_title_map[server.notify_format] = \
+                                conversion_title_map[server.notify_format]\
+                                .decode('string_escape')
 
                         except AttributeError:
                             # Must be of string type
                             logger.error('Failed to escape message title')
                             raise TypeError()
+
+                if six.PY2:
+                    # Python 2.7 strings must be encoded as utf-8 as Python 3
+                    # ones if not already.
+                    if conversion_title_map[server.notify_format] and \
+                            isinstance(
+                                conversion_title_map[server.notify_format],
+                                unicode):  # noqa: F821
+                        conversion_title_map[server.notify_format] = \
+                            conversion_title_map[server.notify_format]\
+                            .encode('utf-8')
+
+                    if conversion_body_map[server.notify_format] and \
+                            isinstance(
+                                conversion_body_map[server.notify_format],
+                                unicode):  # noqa: F821
+                        conversion_body_map[server.notify_format] = \
+                            conversion_body_map[server.notify_format]\
+                            .encode('utf-8')
 
             yield handler(
                 server,
