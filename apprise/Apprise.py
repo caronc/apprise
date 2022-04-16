@@ -578,29 +578,6 @@ class Apprise(object):
                         logger.error(msg)
                         raise TypeError(msg)
 
-                    if conversion_title_map[server.notify_format]:
-                        try:
-                            # Added overhead required due to Python 3 Encoding
-                            # Bug identified here:
-                            #  https://bugs.python.org/issue21331
-                            conversion_title_map[server.notify_format] = \
-                                conversion_title_map[server.notify_format]\
-                                .encode('ascii', 'backslashreplace')\
-                                .decode('unicode-escape')
-
-                        except UnicodeDecodeError:  # pragma: no cover
-                            # This occurs using a very old verion of Python 2.7
-                            # such as the one that ships with CentOS/RedHat 7.x
-                            # (v2.7.5).
-                            conversion_title_map[server.notify_format] = \
-                                conversion_title_map[server.notify_format]\
-                                .decode('string_escape')
-
-                        except AttributeError:
-                            # Must be of string type
-                            logger.error('Failed to escape message title')
-                            raise TypeError()
-
                 if six.PY2:
                     # Python 2.7 strings must be encoded as utf-8 for
                     # consistency across all platforms

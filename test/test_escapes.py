@@ -340,6 +340,8 @@ def test_apprise_escaping_py2(mock_post):
     assert a.notify(
         title=4, body=None, interpret_escapes=True) is False
     assert a.notify(
+        title=4, body="valid body", interpret_escapes=True) is False
+    assert a.notify(
         title=object(), body=False, interpret_escapes=True) is False
     assert a.notify(
         title=False, body=object(), interpret_escapes=True) is False
