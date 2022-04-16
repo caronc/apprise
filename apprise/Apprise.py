@@ -484,22 +484,43 @@ class Apprise(object):
 
         if len(self) == 0:
             # Nothing to notify
-            raise TypeError("No service(s) to notify")
+            msg = "There are service(s) to notify"
+            logger.error(msg)
+            raise TypeError(msg)
 
         if not (title or body):
-            raise TypeError("No message content specified to deliver")
+            msg = "No message content specified to deliver"
+            logger.error(msg)
+            raise TypeError(msg)
 
-        if six.PY2:
-            # Python 2.7.x Unicode Character Handling
-            # Ensure we're working with utf-8
-            if isinstance(title, unicode):  # noqa: F821
-                title = title.encode('utf-8')
+        try:
+            if six.PY2:
+                # Python 2.7 encoding support isn't the greatest, so we try
+                # to ensure that we're ALWAYS dealing with unicode characters
+                # prior to entrying the next part.  This is especially required
+                # for Markdown support
+                if title and isinstance(title, str):  # noqa: F821
+                    title = title.decode(self.asset.encoding)
 
-            if isinstance(body, unicode):  # noqa: F821
-                body = body.encode('utf-8')
+                if body and isinstance(body, str):  # noqa: F821
+                    body = body.decode(self.asset.encoding)
+
+            else:  # Python 3+
+                if title and isinstance(title, bytes):  # noqa: F821
+                    title = title.decode(self.asset.encoding)
+
+                if body and isinstance(body, bytes):  # noqa: F821
+                    body = body.decode(self.asset.encoding)
+
+        except UnicodeDecodeError:
+            msg = 'The content passed into Apprise was not of encoding ' \
+                  'type: {}'.format(self.asset.encoding)
+            logger.error(msg)
+            raise TypeError(msg)
 
         # Tracks conversions
-        conversion_map = dict()
+        conversion_body_map = dict()
+        conversion_title_map = dict()
 
         # Prepare attachments if required
         if attach is not None and not isinstance(attach, AppriseAttachment):
@@ -519,9 +540,13 @@ class Apprise(object):
             # If our code reaches here, we either did not define a tag (it
             # was set to None), or we did define a tag and the logic above
             # determined we need to notify the service it's associated with
-            if server.notify_format not in conversion_map:
-                conversion_map[server.notify_format] = convert_between(
-                    body_format, server.notify_format, body)
+            if server.notify_format not in conversion_body_map:
+                # Perform Conversion
+                (conversion_title_map[server.notify_format],
+                 conversion_body_map[server.notify_format]) = \
+                    convert_between(
+                        body_format, server.notify_format, body=body,
+                        title=title)
 
                 if interpret_escapes:
                     #
@@ -531,8 +556,13 @@ class Apprise(object):
                     try:
                         # Added overhead required due to Python 3 Encoding Bug
                         # identified here: https://bugs.python.org/issue21331
-                        conversion_map[server.notify_format] = \
-                            conversion_map[server.notify_format]\
+                        conversion_body_map[server.notify_format] = \
+                            conversion_body_map[server.notify_format]\
+                            .encode('ascii', 'backslashreplace')\
+                            .decode('unicode-escape')
+
+                        conversion_title_map[server.notify_format] = \
+                            conversion_title_map[server.notify_format]\
                             .encode('ascii', 'backslashreplace')\
                             .decode('unicode-escape')
 
@@ -540,39 +570,43 @@ class Apprise(object):
                         # This occurs using a very old verion of Python 2.7
                         # such as the one that ships with CentOS/RedHat 7.x
                         # (v2.7.5).
-                        conversion_map[server.notify_format] = \
-                            conversion_map[server.notify_format] \
+                        conversion_body_map[server.notify_format] = \
+                            conversion_body_map[server.notify_format] \
+                            .decode('string_escape')
+
+                        conversion_title_map[server.notify_format] = \
+                            conversion_title_map[server.notify_format] \
                             .decode('string_escape')
 
                     except AttributeError:
                         # Must be of string type
-                        logger.error('Failed to escape message body')
-                        raise TypeError
+                        msg = 'Failed to escape message body'
+                        logger.error(msg)
+                        raise TypeError(msg)
 
-                    if title:
-                        try:
-                            # Added overhead required due to Python 3 Encoding
-                            # Bug identified here:
-                            #  https://bugs.python.org/issue21331
-                            title = title\
-                                .encode('ascii', 'backslashreplace')\
-                                .decode('unicode-escape')
+                if six.PY2:
+                    # Python 2.7 strings must be encoded as utf-8 for
+                    # consistency across all platforms
+                    if conversion_title_map[server.notify_format] and \
+                            isinstance(
+                                conversion_title_map[server.notify_format],
+                                unicode):  # noqa: F821
+                        conversion_title_map[server.notify_format] = \
+                            conversion_title_map[server.notify_format]\
+                            .encode('utf-8')
 
-                        except UnicodeDecodeError:  # pragma: no cover
-                            # This occurs using a very old verion of Python 2.7
-                            # such as the one that ships with CentOS/RedHat 7.x
-                            # (v2.7.5).
-                            title = title.decode('string_escape')
-
-                        except AttributeError:
-                            # Must be of string type
-                            logger.error('Failed to escape message title')
-                            raise TypeError
+                    if conversion_body_map[server.notify_format] and \
+                            isinstance(
+                                conversion_body_map[server.notify_format],
+                                unicode):  # noqa: F821
+                        conversion_body_map[server.notify_format] = \
+                            conversion_body_map[server.notify_format]\
+                            .encode('utf-8')
 
             yield handler(
                 server,
-                body=conversion_map[server.notify_format],
-                title=title,
+                body=conversion_body_map[server.notify_format],
+                title=conversion_title_map[server.notify_format],
                 notify_type=notify_type,
                 attach=attach
             )

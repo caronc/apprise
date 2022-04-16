@@ -93,6 +93,9 @@ class NotifyTelegram(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_telegram'
 
+    # Default Notify Format
+    notify_format = NotifyFormat.HTML
+
     # Telegram uses the http protocol with JSON requests
     notify_url = 'https://api.telegram.org/bot'
 
@@ -543,12 +546,11 @@ class NotifyTelegram(NotifyBase):
             payload['parse_mode'] = 'MARKDOWN'
 
             payload['text'] = '{}{}'.format(
-                '{}\r\n'.format(title) if title else '',
+                '# {}\r\n'.format(title) if title else '',
                 body,
             )
 
-        else:  # HTML or TEXT
-
+        else:  # TEXT or HTML
             # Use Telegram's HTML mode
             payload['parse_mode'] = 'HTML'
 
@@ -592,6 +594,7 @@ class NotifyTelegram(NotifyBase):
                         mo.string[mo.start():mo.end()][1:5]], title)
 
             if self.notify_format == NotifyFormat.TEXT:
+                # Further html escaping required...
                 telegram_escape_text_dict = {
                     # We need to escape characters that conflict with html
                     # entity blocks (< and >) when displaying text
@@ -615,8 +618,9 @@ class NotifyTelegram(NotifyBase):
                         lambda mo: telegram_escape_text_dict[
                             mo.string[mo.start():mo.end()]], title)
 
+            # prepare our payload based on HTML or TEXT
             payload['text'] = '{}{}'.format(
-                '<b>{}</b>\r\n'.format(title) if title else '',
+                '<h1>{}</h1>'.format(title) if title else '',
                 body,
             )
 
