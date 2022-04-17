@@ -282,7 +282,11 @@ class NotifyNtfy(NotifyBase):
             if attach:
                 # We need to upload our payload first so that we can source it
                 # in remaining messages
-                for attachment in attach:
+                for no, attachment in enumerate(attach):
+
+                    # First message only includes the text
+                    _body = body if not no else None
+                    _title = title if not no else None
 
                     # Perform some simple error checking
                     if not attachment:
@@ -296,20 +300,21 @@ class NotifyNtfy(NotifyBase):
                         'Preparing ntfy attachment {}'.format(
                             attachment.url(privacy=True)))
 
-                    okay, response = self._send(attachment, topic)
+                    okay, response = self._send(
+                        topic, body=_body, title=_title, attach=attachment)
                     if not okay:
                         # We can't post our attachment; abort immediately
                         return False
-
-            # Send our Notification Message
-            okay, response = self._send(body, topic, title=title)
-            if not okay:
-                # Mark our failure, but contiue to move on
-                has_error = True
+            else:
+                # Send our Notification Message
+                okay, response = self._send(topic, body=body, title=title)
+                if not okay:
+                    # Mark our failure, but contiue to move on
+                    has_error = True
 
         return not has_error
 
-    def _send(self, payload, topic, title=None, **kwargs):
+    def _send(self, topic, body=None, title=None, attach=None, **kwargs):
         """
         Wrapper to the requests (post) object
         """
@@ -317,47 +322,45 @@ class NotifyNtfy(NotifyBase):
         # Prepare our headers
         headers = {
             'User-Agent': self.app_id,
+            'Content-Type': 'application/json',
         }
 
         # Some default values for our request object to which we'll update
         # depending on what our payload is
         files = None
-        data = None
 
-        if not isinstance(payload, AttachBase):
-            # Send our payload as a JSON object
-            headers['Content-Type'] = 'application/json'
-            data = payload if payload else None
+        if title:
+            headers['X-Title'] = title
 
-            if self.priority != NtfyPriority.NORMAL:
-                headers['X-Priority'] = self.priority
+        if body:
+            headers['X-Message'] = body
 
-            if title:
-                headers['X-Title'] = title
+        if self.priority != NtfyPriority.NORMAL:
+            headers['X-Priority'] = self.priority
 
-            if self.attach is not None:
-                headers['X-Attach'] = self.attach
-                if self.filename is not None:
-                    headers['X-Filename'] = self.filename
+        if self.click is not None:
+            headers['X-Click'] = self.click
 
-            if self.click is not None:
-                headers['X-Click'] = self.click
+        if self.delay is not None:
+            headers['X-Delay'] = self.delay
 
-            if self.delay is not None:
-                headers['X-Delay'] = self.delay
+        if self.email is not None:
+            headers['X-Email'] = self.email
 
-            if self.email is not None:
-                headers['X-Email'] = self.email
+        if self.__tags:
+            headers['X-Tags'] = ",".join(self.__tags)
 
-            if self.__tags:
-                headers['X-Tags'] = ",".join(self.__tags)
-
-        else:
+        if isinstance(attach, AttachBase):
             # Prepare our Header
-            headers['X-Filename'] = payload.name
+            headers['X-Filename'] = attach.name
 
             # prepare our files object
-            files = {'file': (payload.name, open(payload.path, 'rb'))}
+            files = {'file': (attach.name, open(attach.path, 'rb'))}
+
+        elif self.attach is not None:
+            headers['X-Attach'] = self.attach
+            if self.filename is not None:
+                headers['X-Filename'] = self.filename
 
         auth = None
         if self.mode == NtfyMode.CLOUD:
@@ -383,7 +386,7 @@ class NotifyNtfy(NotifyBase):
         self.logger.debug('ntfy POST URL: %s (cert_verify=%r)' % (
             url, self.verify_certificate,
         ))
-        self.logger.debug('ntfy Payload: %s' % str(payload))
+        self.logger.debug('ntfy Payload: %s' % str(attach))
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -394,7 +397,7 @@ class NotifyNtfy(NotifyBase):
         try:
             r = requests.post(
                 url,
-                data=data,
+                data=None,
                 headers=headers,
                 files=files,
                 auth=auth,
@@ -456,8 +459,8 @@ class NotifyNtfy(NotifyBase):
         except (OSError, IOError) as e:
             self.logger.warning(
                 'An I/O error occurred while handling {}.'.format(
-                    payload.name if isinstance(payload, AttachBase)
-                    else payload))
+                    attach.name if isinstance(attach, AttachBase)
+                    else attach))
             self.logger.debug('I/O Exception: %s' % str(e))
             return False, response
 

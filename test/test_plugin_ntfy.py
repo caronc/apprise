@@ -261,36 +261,43 @@ def test_plugin_ntfy_attachments(mock_post):
     # Send a good attachment
     assert obj.notify(body="test", attach=attach) is True
 
-    # Test our call count (one for the message, and two for the attachment)
-    assert mock_post.call_count == 2
+    # Test our call count; includes both image and message
+    assert mock_post.call_count == 1
 
-    # Image Send
-    assert mock_post.call_args_list[1][0][0] == \
-        'http://localhost:8084/topic'
-    # Message
     assert mock_post.call_args_list[0][0][0] == \
         'http://localhost:8084/topic'
+    assert mock_post.call_args_list[0][1]['headers'].get('X-Filename') == \
+        'apprise-test.gif'
+    assert mock_post.call_args_list[0][1]['headers']['X-Message'] == 'test'
+    assert 'X-Title' not in mock_post.call_args_list[0][1]['headers']
 
     # Reset our mock object
     mock_post.reset_mock()
 
     # Add another attachment so we drop into the area of the PushBullet code
     # that sends remaining attachments (if more detected)
-    attach.add(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
+    attach.add(os.path.join(TEST_VAR_DIR, 'apprise-test.png'))
 
     # Send our attachments
-    assert obj.notify(body="test", attach=attach) is True
+    assert obj.notify(body="test", title="wonderful", attach=attach) is True
 
     # Test our call count
-    assert mock_post.call_count == 3
-    # Image Send
+    assert mock_post.call_count == 2
+    # Image + Message sent
     assert mock_post.call_args_list[0][0][0] == \
         'http://localhost:8084/topic'
-    assert mock_post.call_args_list[0][0][0] == \
-        'http://localhost:8084/topic'
-    # Message
+    assert mock_post.call_args_list[0][1]['headers'].get('X-Filename') == \
+        'apprise-test.gif'
+    assert mock_post.call_args_list[0][1]['headers']['X-Message'] == 'test'
+    assert mock_post.call_args_list[0][1]['headers']['X-Title'] == 'wonderful'
+
+    # Image no2 Send
     assert mock_post.call_args_list[1][0][0] == \
         'http://localhost:8084/topic'
+    assert mock_post.call_args_list[1][1]['headers'].get('X-Filename') == \
+        'apprise-test.png'
+    assert 'X-Message' not in mock_post.call_args_list[1][1]['headers']
+    assert 'X-Title' not in mock_post.call_args_list[1][1]['headers']
 
     # Reset our mock object
     mock_post.reset_mock()
@@ -388,5 +395,5 @@ def test_plugin_custom_ntfy_edge_cases(mock_post):
         'http://example.com/file.jpg'
     assert mock_post.call_args_list[0][1]['headers'].get('X-Filename') == \
         'smoke.jpg'
-    assert mock_post.call_args_list[0][1]['data'] == 'body'
+    assert mock_post.call_args_list[0][1]['headers']['X-Message'] == 'body'
     assert mock_post.call_args_list[0][1]['headers']['X-Title'] == 'title'
