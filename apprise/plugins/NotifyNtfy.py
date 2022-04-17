@@ -29,6 +29,7 @@ import re
 import requests
 import six
 from json import loads
+from json import dumps
 from os.path import basename
 
 from .NotifyBase import NotifyBase
@@ -329,43 +330,48 @@ class NotifyNtfy(NotifyBase):
         # depending on what our payload is
         files = None
 
+        # See https://ntfy.sh/docs/publish/#publish-as-json
+        payload = {
+            'topic': topic,
+        }
+
         if title:
-            headers['X-Title'] = title
+            payload['title'] = title
 
         if body:
-            headers['X-Message'] = body
+            payload['message'] = body
 
         if self.priority != NtfyPriority.NORMAL:
             headers['X-Priority'] = self.priority
 
-        if self.click is not None:
-            headers['X-Click'] = self.click
-
         if self.delay is not None:
             headers['X-Delay'] = self.delay
 
+        if self.click is not None:
+            payload['click'] = self.click
+
         if self.email is not None:
-            headers['X-Email'] = self.email
+            payload['email'] = self.email
 
         if self.__tags:
-            headers['X-Tags'] = ",".join(self.__tags)
+            payload['tags'] = self.__tags
 
         if isinstance(attach, AttachBase):
             # Prepare our Header
-            headers['X-Filename'] = attach.name
+            payload['filename'] = attach.name
 
             # prepare our files object
             files = {'file': (attach.name, open(attach.path, 'rb'))}
 
         elif self.attach is not None:
-            headers['X-Attach'] = self.attach
+            payload['attach'] = self.attach
             if self.filename is not None:
-                headers['X-Filename'] = self.filename
+                payload['filename'] = self.filename
 
         auth = None
         if self.mode == NtfyMode.CLOUD:
             # Cloud Service
-            template_url = self.cloud_notify_url
+            notify_url = self.cloud_notify_url
 
         else:  # NotifyNtfy.PRVATE
             # Allow more settings to be applied now
@@ -375,18 +381,15 @@ class NotifyNtfy(NotifyBase):
             # Prepare our ntfy Template URL
             schema = 'https' if self.secure else 'http'
 
-            template_url = '%s://%s' % (schema, self.host)
+            notify_url = '%s://%s' % (schema, self.host)
             if isinstance(self.port, int):
-                template_url += ':%d' % self.port
+                notify_url += ':%d' % self.port
 
-        template_url += '/{topic}'
-
-        # Create our Posting URL per topic provided
-        url = template_url.format(topic=topic)
         self.logger.debug('ntfy POST URL: %s (cert_verify=%r)' % (
-            url, self.verify_certificate,
+            notify_url, self.verify_certificate,
         ))
-        self.logger.debug('ntfy Payload: %s' % str(attach))
+        self.logger.debug('ntfy Payload: %s' % str(payload))
+        self.logger.debug('ntfy Headers: %s' % str(headers))
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -396,8 +399,8 @@ class NotifyNtfy(NotifyBase):
 
         try:
             r = requests.post(
-                url,
-                data=None,
+                notify_url,
+                data=dumps(payload),
                 headers=headers,
                 files=files,
                 auth=auth,
@@ -444,14 +447,14 @@ class NotifyNtfy(NotifyBase):
 
             # otherwise we were successful
             self.logger.info(
-                "Sent ntfy notification to '{}'.".format(url))
+                "Sent ntfy notification to '{}'.".format(notify_url))
 
             return True, response
 
         except requests.RequestException as e:
             self.logger.warning(
                 'A Connection error occurred sending ntfy:%s ' % (
-                    url) + 'notification.'
+                    notify_url) + 'notification.'
             )
             self.logger.debug('Socket Exception: %s' % str(e))
             return False, response
@@ -460,7 +463,7 @@ class NotifyNtfy(NotifyBase):
             self.logger.warning(
                 'An I/O error occurred while handling {}.'.format(
                     attach.name if isinstance(attach, AttachBase)
-                    else attach))
+                    else payload))
             self.logger.debug('I/O Exception: %s' % str(e))
             return False, response
 

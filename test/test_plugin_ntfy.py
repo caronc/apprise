@@ -265,11 +265,13 @@ def test_plugin_ntfy_attachments(mock_post):
     assert mock_post.call_count == 1
 
     assert mock_post.call_args_list[0][0][0] == \
-        'http://localhost:8084/topic'
-    assert mock_post.call_args_list[0][1]['headers'].get('X-Filename') == \
-        'apprise-test.gif'
-    assert mock_post.call_args_list[0][1]['headers']['X-Message'] == 'test'
-    assert 'X-Title' not in mock_post.call_args_list[0][1]['headers']
+        'http://localhost:8084'
+
+    response = json.loads(mock_post.call_args_list[0][1]['data'])
+    assert response['topic'] == 'topic'
+    assert response['message'] == 'test'
+    assert 'title' not in response
+    assert response['filename'] == 'apprise-test.gif'
 
     # Reset our mock object
     mock_post.reset_mock()
@@ -285,19 +287,23 @@ def test_plugin_ntfy_attachments(mock_post):
     assert mock_post.call_count == 2
     # Image + Message sent
     assert mock_post.call_args_list[0][0][0] == \
-        'http://localhost:8084/topic'
-    assert mock_post.call_args_list[0][1]['headers'].get('X-Filename') == \
-        'apprise-test.gif'
-    assert mock_post.call_args_list[0][1]['headers']['X-Message'] == 'test'
-    assert mock_post.call_args_list[0][1]['headers']['X-Title'] == 'wonderful'
+        'http://localhost:8084'
+    response = json.loads(mock_post.call_args_list[0][1]['data'])
+    assert response['topic'] == 'topic'
+    assert response['message'] == 'test'
+    assert response['title'] == 'wonderful'
+    assert 'attach' not in response
+    assert response['filename'] == 'apprise-test.gif'
 
     # Image no2 Send
     assert mock_post.call_args_list[1][0][0] == \
-        'http://localhost:8084/topic'
-    assert mock_post.call_args_list[1][1]['headers'].get('X-Filename') == \
-        'apprise-test.png'
-    assert 'X-Message' not in mock_post.call_args_list[1][1]['headers']
-    assert 'X-Title' not in mock_post.call_args_list[1][1]['headers']
+        'http://localhost:8084'
+    response = json.loads(mock_post.call_args_list[1][1]['data'])
+    assert response['topic'] == 'topic'
+    assert 'title' not in response
+    assert 'message' not in response
+    assert 'attach' not in response
+    assert response['filename'] == 'apprise-test.png'
 
     # Reset our mock object
     mock_post.reset_mock()
@@ -389,11 +395,11 @@ def test_plugin_custom_ntfy_edge_cases(mock_post):
 
     # Test our call count
     assert mock_post.call_count == 1
-    assert mock_post.call_args_list[0][0][0] == \
-        'http://localhost/topic1'
-    assert mock_post.call_args_list[0][1]['headers'].get('X-Attach') == \
-        'http://example.com/file.jpg'
-    assert mock_post.call_args_list[0][1]['headers'].get('X-Filename') == \
-        'smoke.jpg'
-    assert mock_post.call_args_list[0][1]['headers']['X-Message'] == 'body'
-    assert mock_post.call_args_list[0][1]['headers']['X-Title'] == 'title'
+    assert mock_post.call_args_list[0][0][0] == 'http://localhost'
+
+    response = json.loads(mock_post.call_args_list[0][1]['data'])
+    assert response['topic'] == 'topic1'
+    assert response['message'] == 'body'
+    assert response['title'] == 'title'
+    assert response['attach'] == 'http://example.com/file.jpg'
+    assert response['filename'] == 'smoke.jpg'
