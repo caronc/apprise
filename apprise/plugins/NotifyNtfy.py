@@ -29,6 +29,7 @@ import re
 import requests
 import six
 from json import loads
+from json import dumps
 from os.path import basename
 
 from .NotifyBase import NotifyBase
@@ -39,6 +40,7 @@ from ..utils import is_hostname
 from ..utils import is_ipaddr
 from ..utils import validate_regex
 from ..URLBase import PrivacyMode
+from ..attachment.AttachBase import AttachBase
 
 
 class NtfyMode(object):
@@ -258,7 +260,8 @@ class NotifyNtfy(NotifyBase):
             self.topics.append(topic)
         return
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
+             **kwargs):
         """
         Perform ntfy Notification
         """
@@ -271,36 +274,91 @@ class NotifyNtfy(NotifyBase):
             self.logger.warning('There are no ntfy topics to notify')
             return False
 
+        # Create a copy of the subreddits list
+        topics = list(self.topics)
+        while len(topics) > 0:
+            # Retrieve our topic
+            topic = topics.pop()
+
+            if attach:
+                # We need to upload our payload first so that we can source it
+                # in remaining messages
+                for attachment in attach:
+
+                    # Perform some simple error checking
+                    if not attachment:
+                        # We could not access the attachment
+                        self.logger.error(
+                            'Could not access attachment {}.'.format(
+                                attachment.url(privacy=True)))
+                        return False
+
+                    self.logger.debug(
+                        'Preparing ntfy attachment {}'.format(
+                            attachment.url(privacy=True)))
+
+                    okay, response = self._send(attachment, topic)
+                    if not okay:
+                        # We can't post our attachment; abort immediately
+                        return False
+
+            # Send our Notification Message
+            okay, response = self._send(body, topic, title=title)
+            if not okay:
+                # Mark our failure, but contiue to move on
+                has_error = True
+
+        return not has_error
+
+    def _send(self, payload, topic, title=None, **kwargs):
+        """
+        Wrapper to the requests (post) object
+        """
+
         # Prepare our headers
         headers = {
             'User-Agent': self.app_id,
         }
 
-        if self.priority != NtfyPriority.NORMAL:
-            headers['X-Priority'] = self.priority
+        # Some default values for our request object to which we'll update
+        # depending on what our payload is
+        files = None
+        data = None
 
-        if title:
-            headers['X-Title'] = title
+        if not isinstance(payload, AttachBase):
+            # Send our payload as a JSON object
+            headers['Content-Type'] = 'application/json'
+            data = dumps(payload) if payload else None
 
-        if self.attach is not None:
-            headers['X-Attach'] = self.attach
-            if self.filename is not None:
-                headers['X-Filename'] = self.filename
+            if self.priority != NtfyPriority.NORMAL:
+                headers['X-Priority'] = self.priority
 
-        if self.click is not None:
-            headers['X-Click'] = self.click
+            if title:
+                headers['X-Title'] = title
 
-        if self.delay is not None:
-            headers['X-Delay'] = self.delay
+            if self.attach is not None:
+                headers['X-Attach'] = self.attach
+                if self.filename is not None:
+                    headers['X-Filename'] = self.filename
 
-        if self.email is not None:
-            headers['X-Email'] = self.email
+            if self.click is not None:
+                headers['X-Click'] = self.click
 
-        if self.__tags:
-            headers['X-Tags'] = ",".join(self.__tags)
+            if self.delay is not None:
+                headers['X-Delay'] = self.delay
 
-        # Prepare our payload
-        payload = body
+            if self.email is not None:
+                headers['X-Email'] = self.email
+
+            if self.__tags:
+                headers['X-Tags'] = ",".join(self.__tags)
+
+        else:
+            # Prepare our Header
+            headers['Filename'] = payload.name
+
+            # prepare our files object
+            files = {'file': (payload.name, open(payload.path, 'rb'))}
 
         auth = None
         if self.mode == NtfyMode.CLOUD:
@@ -321,85 +379,94 @@ class NotifyNtfy(NotifyBase):
 
         template_url += '/{topic}'
 
-        # Create a copy of the subreddits list
-        topics = list(self.topics)
-        while len(topics) > 0:
-            # Retrieve our topic
-            topic = topics.pop()
+        # Create our Posting URL per topic provided
+        url = template_url.format(topic=topic)
+        self.logger.debug('ntfy POST URL: %s (cert_verify=%r)' % (
+            url, self.verify_certificate,
+        ))
+        self.logger.debug('ntfy Payload: %s' % str(payload))
 
-            # Create our Posting URL per topic provided
-            url = template_url.format(topic=topic)
-            self.logger.debug('ntfy POST URL: %s (cert_verify=%r)' % (
-                url, self.verify_certificate,
-            ))
-            self.logger.debug('ntfy Payload: %s' % str(payload))
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
 
-            # Always call throttle before any remote server i/o is made
-            self.throttle()
+        # Default response type
+        response = None
 
-            try:
-                r = requests.post(
-                    url,
-                    data=payload,
-                    headers=headers,
-                    auth=auth,
-                    verify=self.verify_certificate,
-                    timeout=self.request_timeout,
-                )
+        try:
+            r = requests.post(
+                url,
+                data=data,
+                headers=headers,
+                files=files,
+                auth=auth,
+                verify=self.verify_certificate,
+                timeout=self.request_timeout,
+            )
 
-                if r.status_code != requests.codes.ok:
-                    # We had a problem
-                    status_str = \
-                        NotifyBase.http_response_code_lookup(r.status_code)
+            if r.status_code != requests.codes.ok:
+                # We had a problem
+                status_str = \
+                    NotifyBase.http_response_code_lookup(r.status_code)
 
-                    # set up our status code to use
-                    status_code = r.status_code
+                # set up our status code to use
+                status_code = r.status_code
 
-                    try:
-                        # Update our status response if we can
-                        json_response = loads(r.content)
-                        status_str = json_response.get('error', status_str)
-                        status_code = \
-                            int(json_response.get('code', status_code))
+                try:
+                    # Update our status response if we can
+                    response = loads(r.content)
+                    status_str = response.get('error', status_str)
+                    status_code = \
+                        int(response.get('code', status_code))
 
-                    except (AttributeError, TypeError, ValueError):
-                        # ValueError = r.content is Unparsable
-                        # TypeError = r.content is None
-                        # AttributeError = r is None
+                except (AttributeError, TypeError, ValueError):
+                    # ValueError = r.content is Unparsable
+                    # TypeError = r.content is None
+                    # AttributeError = r is None
 
-                        # We could not parse JSON response.
-                        # We will just use the status we already have.
-                        pass
+                    # We could not parse JSON response.
+                    # We will just use the status we already have.
+                    pass
 
-                    self.logger.warning(
-                        "Failed to send ntfy notification to topic '{}': "
-                        '{}{}error={}.'.format(
-                            topic,
-                            status_str,
-                            ', ' if status_str else '',
-                            status_code))
-
-                    self.logger.debug(
-                        'Response Details:\r\n{}'.format(r.content))
-
-                    # Mark our failure
-                    has_error = True
-
-                else:
-                    self.logger.info(
-                        "Sent ntfy notification to '{}'.".format(url))
-
-            except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occurred sending ntfy:%s ' % (
-                        url) + 'notification.'
-                )
-                self.logger.debug('Socket Exception: %s' % str(e))
+                    "Failed to send ntfy notification to topic '{}': "
+                    '{}{}error={}.'.format(
+                        topic,
+                        status_str,
+                        ', ' if status_str else '',
+                        status_code))
 
-                # Mark our failure
-                has_error = True
+                self.logger.debug(
+                    'Response Details:\r\n{}'.format(r.content))
 
-        return not has_error
+                return False, response
+
+            # otherwise we were successful
+            self.logger.info(
+                "Sent ntfy notification to '{}'.".format(url))
+
+            return True, response
+
+        except requests.RequestException as e:
+            self.logger.warning(
+                'A Connection error occurred sending ntfy:%s ' % (
+                    url) + 'notification.'
+            )
+            self.logger.debug('Socket Exception: %s' % str(e))
+            return False, response
+
+        except (OSError, IOError) as e:
+            self.logger.warning(
+                'An I/O error occurred while handling {}.'.format(
+                    payload.name if isinstance(payload, AttachBase)
+                    else payload))
+            self.logger.debug('I/O Exception: %s' % str(e))
+            return False, response
+
+        finally:
+            # Close our file (if it's open) stored in the second element
+            # of our files tuple (index 1)
+            if files:
+                files['file'][1].close()
 
     def url(self, privacy=False, *args, **kwargs):
         """
