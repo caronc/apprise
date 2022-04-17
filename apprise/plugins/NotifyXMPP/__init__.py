@@ -206,7 +206,6 @@ class NotifyXMPP(NotifyBase):
         # By default we send ourselves a message
         if targets:
             self.targets = parse_list(targets)
-            self.targets[0] = self.targets[0][1:]
 
         else:
             self.targets = list()
@@ -292,7 +291,7 @@ class NotifyXMPP(NotifyBase):
 
         # Get our targets; we ignore path slashes since they identify
         # our resources
-        results['targets'] = NotifyXMPP.parse_list(results['fullpath'])
+        results['targets'] = NotifyXMPP.split_path(results['fullpath'])
 
         # Over-ride the xep plugins
         if 'xep' in results['qsd'] and len(results['qsd']['xep']):
