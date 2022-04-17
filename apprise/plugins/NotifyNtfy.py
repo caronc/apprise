@@ -29,7 +29,6 @@ import re
 import requests
 import six
 from json import loads
-from json import dumps
 from os.path import basename
 
 from .NotifyBase import NotifyBase
@@ -328,7 +327,7 @@ class NotifyNtfy(NotifyBase):
         if not isinstance(payload, AttachBase):
             # Send our payload as a JSON object
             headers['Content-Type'] = 'application/json'
-            data = dumps(payload) if payload else None
+            data = payload if payload else None
 
             if self.priority != NtfyPriority.NORMAL:
                 headers['X-Priority'] = self.priority

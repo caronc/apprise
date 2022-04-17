@@ -388,3 +388,5 @@ def test_plugin_custom_ntfy_edge_cases(mock_post):
         'http://example.com/file.jpg'
     assert mock_post.call_args_list[0][1]['headers'].get('X-Filename') == \
         'smoke.jpg'
+    assert mock_post.call_args_list[0][1]['data'] == 'body'
+    assert mock_post.call_args_list[0][1]['headers']['X-Title'] == 'title'
