@@ -355,7 +355,7 @@ class NotifyNtfy(NotifyBase):
 
         else:
             # Prepare our Header
-            headers['Filename'] = payload.name
+            headers['X-Filename'] = payload.name
 
             # prepare our files object
             files = {'file': (payload.name, open(payload.path, 'rb'))}
