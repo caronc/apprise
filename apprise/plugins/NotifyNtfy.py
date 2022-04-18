@@ -323,7 +323,6 @@ class NotifyNtfy(NotifyBase):
         # Prepare our headers
         headers = {
             'User-Agent': self.app_id,
-            'Content-Type': 'application/json',
         }
 
         # Some default values for our request object to which we'll update
@@ -331,42 +330,10 @@ class NotifyNtfy(NotifyBase):
         files = None
 
         # See https://ntfy.sh/docs/publish/#publish-as-json
-        payload = {
-            'topic': topic,
-        }
+        data = {}
 
-        if title:
-            payload['title'] = title
-
-        if body:
-            payload['message'] = body
-
-        if self.priority != NtfyPriority.NORMAL:
-            headers['X-Priority'] = self.priority
-
-        if self.delay is not None:
-            headers['X-Delay'] = self.delay
-
-        if self.click is not None:
-            payload['click'] = self.click
-
-        if self.email is not None:
-            payload['email'] = self.email
-
-        if self.__tags:
-            payload['tags'] = self.__tags
-
-        if isinstance(attach, AttachBase):
-            # Prepare our Header
-            payload['filename'] = attach.name
-
-            # prepare our files object
-            files = {'file': (attach.name, open(attach.path, 'rb'))}
-
-        elif self.attach is not None:
-            payload['attach'] = self.attach
-            if self.filename is not None:
-                payload['filename'] = self.filename
+        # Posting Parameters
+        params = {}
 
         auth = None
         if self.mode == NtfyMode.CLOUD:
@@ -385,10 +352,54 @@ class NotifyNtfy(NotifyBase):
             if isinstance(self.port, int):
                 notify_url += ':%d' % self.port
 
+        if not attach:
+            headers['Content-Type'] = 'application/json'
+
+            data['topic'] = topic
+            virt_payload = data
+
+        else:
+            # Point our payload to our parameters
+            virt_payload = params
+            notify_url += '/{topic}'.format(topic=topic)
+
+        if title:
+            virt_payload['title'] = title
+
+        if body:
+            virt_payload['message'] = body
+
+        if self.priority != NtfyPriority.NORMAL:
+            headers['X-Priority'] = self.priority
+
+        if self.delay is not None:
+            headers['X-Delay'] = self.delay
+
+        if self.click is not None:
+            headers['X-Click'] = self.click
+
+        if self.email is not None:
+            headers['X-Email'] = self.email
+
+        if self.__tags:
+            headers['X-Tags'] = ",".join(self.__tags)
+
+        if isinstance(attach, AttachBase):
+            # Prepare our Header
+            params['filename'] = attach.name
+
+            # prepare our files object
+            files = {'file': (attach.name, open(attach.path, 'rb'))}
+
+        elif self.attach is not None:
+            data['attach'] = self.attach
+            if self.filename is not None:
+                data['filename'] = self.filename
+
         self.logger.debug('ntfy POST URL: %s (cert_verify=%r)' % (
             notify_url, self.verify_certificate,
         ))
-        self.logger.debug('ntfy Payload: %s' % str(payload))
+        self.logger.debug('ntfy Payload: %s' % str(virt_payload))
         self.logger.debug('ntfy Headers: %s' % str(headers))
 
         # Always call throttle before any remote server i/o is made
@@ -400,7 +411,8 @@ class NotifyNtfy(NotifyBase):
         try:
             r = requests.post(
                 notify_url,
-                data=dumps(payload),
+                params=params if params else None,
+                data=dumps(data) if data else None,
                 headers=headers,
                 files=files,
                 auth=auth,
@@ -463,7 +475,7 @@ class NotifyNtfy(NotifyBase):
             self.logger.warning(
                 'An I/O error occurred while handling {}.'.format(
                     attach.name if isinstance(attach, AttachBase)
-                    else payload))
+                    else virt_payload))
             self.logger.debug('I/O Exception: %s' % str(e))
             return False, response
 

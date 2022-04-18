@@ -251,6 +251,32 @@ def test_plugin_ntfy_attachments(mock_post):
     response.status_code = requests.codes.ok
     mock_post.return_value = response
 
+    # Test how the notifications work without attachments as they use the
+    # JSON type posting instead
+
+    # Reset our mock object
+    mock_post.reset_mock()
+
+    # Prepare our object
+    obj = Apprise.instantiate(
+        'ntfy://user:pass@localhost:8080/topic')
+
+    # Send a good attachment
+    assert obj.notify(title="hello", body="world")
+    assert mock_post.call_count == 1
+
+    assert mock_post.call_args_list[0][0][0] == \
+        'http://localhost:8080'
+
+    response = json.loads(mock_post.call_args_list[0][1]['data'])
+    assert response['topic'] == 'topic'
+    assert response['title'] == 'hello'
+    assert response['message'] == 'world'
+    assert 'attach' not in response
+
+    # Reset our mock object
+    mock_post.reset_mock()
+
     # prepare our attachment
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
 
@@ -265,13 +291,12 @@ def test_plugin_ntfy_attachments(mock_post):
     assert mock_post.call_count == 1
 
     assert mock_post.call_args_list[0][0][0] == \
-        'http://localhost:8084'
+        'http://localhost:8084/topic'
 
-    response = json.loads(mock_post.call_args_list[0][1]['data'])
-    assert response['topic'] == 'topic'
-    assert response['message'] == 'test'
-    assert 'title' not in response
-    assert response['filename'] == 'apprise-test.gif'
+    assert mock_post.call_args_list[0][1]['params']['message'] == 'test'
+    assert 'title' not in mock_post.call_args_list[0][1]['params']
+    assert mock_post.call_args_list[0][1]['params']['filename'] == \
+        'apprise-test.gif'
 
     # Reset our mock object
     mock_post.reset_mock()
@@ -287,23 +312,21 @@ def test_plugin_ntfy_attachments(mock_post):
     assert mock_post.call_count == 2
     # Image + Message sent
     assert mock_post.call_args_list[0][0][0] == \
-        'http://localhost:8084'
-    response = json.loads(mock_post.call_args_list[0][1]['data'])
-    assert response['topic'] == 'topic'
-    assert response['message'] == 'test'
-    assert response['title'] == 'wonderful'
-    assert 'attach' not in response
-    assert response['filename'] == 'apprise-test.gif'
+        'http://localhost:8084/topic'
+    assert mock_post.call_args_list[0][1]['params']['message'] == \
+        'test'
+    assert mock_post.call_args_list[0][1]['params']['title'] == \
+        'wonderful'
+    assert mock_post.call_args_list[0][1]['params']['filename'] == \
+        'apprise-test.gif'
 
-    # Image no2 Send
+    # Image no 2 (no message)
     assert mock_post.call_args_list[1][0][0] == \
-        'http://localhost:8084'
-    response = json.loads(mock_post.call_args_list[1][1]['data'])
-    assert response['topic'] == 'topic'
-    assert 'title' not in response
-    assert 'message' not in response
-    assert 'attach' not in response
-    assert response['filename'] == 'apprise-test.png'
+        'http://localhost:8084/topic'
+    assert 'message' not in mock_post.call_args_list[1][1]['params']
+    assert 'title' not in mock_post.call_args_list[1][1]['params']
+    assert mock_post.call_args_list[1][1]['params']['filename'] == \
+        'apprise-test.png'
 
     # Reset our mock object
     mock_post.reset_mock()
