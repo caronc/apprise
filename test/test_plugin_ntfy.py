@@ -22,16 +22,22 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
+import os
 import json
 import mock
 import requests
+from apprise import Apprise
 from apprise import plugins
 from apprise import NotifyType
 from helpers import AppriseURLTester
+from apprise import AppriseAttachment
 
 # Disable logging for a cleaner testing output
 import logging
 logging.disable(logging.CRITICAL)
+
+# Attachment Directory
+TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), 'var')
 
 # For testing our return response
 GOOD_RESPONSE_TEXT = {
@@ -66,7 +72,7 @@ apprise_url_tests = (
         'response': False,
     }),
     # No topics
-    ('ntfy://user:pass@localhost', {
+    ('ntfy://user:pass@localhost?mode=private', {
         'instance': plugins.NotifyNtfy,
         # invalid topics specified (nothing to notify)
         # as a result the response type will be false
@@ -197,7 +203,7 @@ apprise_url_tests = (
     ('ntfys://user:web@-_/topic1/topic2/?mode=private', {
         'instance': None,
     }),
-    ('ntfy://user:pass@localhost:8081/topic/topic2', {
+    ('ntfy://user:pass@localhost:8089/topic/topic2', {
         'instance': plugins.NotifyNtfy,
         # force a failure using basic mode
         'response': False,
@@ -228,6 +234,121 @@ def test_plugin_ntfy_chat_urls():
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+@mock.patch('requests.post')
+def test_plugin_ntfy_attachments(mock_post):
+    """
+    NotifyNtfy() Attachment Checks
+
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyNtfy.request_rate_per_sec = 0
+
+    # Prepare Mock return object
+    response = mock.Mock()
+    response.content = GOOD_RESPONSE_TEXT
+    response.status_code = requests.codes.ok
+    mock_post.return_value = response
+
+    # Test how the notifications work without attachments as they use the
+    # JSON type posting instead
+
+    # Reset our mock object
+    mock_post.reset_mock()
+
+    # Prepare our object
+    obj = Apprise.instantiate(
+        'ntfy://user:pass@localhost:8080/topic')
+
+    # Send a good attachment
+    assert obj.notify(title="hello", body="world")
+    assert mock_post.call_count == 1
+
+    assert mock_post.call_args_list[0][0][0] == \
+        'http://localhost:8080'
+
+    response = json.loads(mock_post.call_args_list[0][1]['data'])
+    assert response['topic'] == 'topic'
+    assert response['title'] == 'hello'
+    assert response['message'] == 'world'
+    assert 'attach' not in response
+
+    # Reset our mock object
+    mock_post.reset_mock()
+
+    # prepare our attachment
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
+
+    # Prepare our object
+    obj = Apprise.instantiate(
+        'ntfy://user:pass@localhost:8084/topic')
+
+    # Send a good attachment
+    assert obj.notify(body="test", attach=attach) is True
+
+    # Test our call count; includes both image and message
+    assert mock_post.call_count == 1
+
+    assert mock_post.call_args_list[0][0][0] == \
+        'http://localhost:8084/topic'
+
+    assert mock_post.call_args_list[0][1]['params']['message'] == 'test'
+    assert 'title' not in mock_post.call_args_list[0][1]['params']
+    assert mock_post.call_args_list[0][1]['params']['filename'] == \
+        'apprise-test.gif'
+
+    # Reset our mock object
+    mock_post.reset_mock()
+
+    # Add another attachment so we drop into the area of the PushBullet code
+    # that sends remaining attachments (if more detected)
+    attach.add(os.path.join(TEST_VAR_DIR, 'apprise-test.png'))
+
+    # Send our attachments
+    assert obj.notify(body="test", title="wonderful", attach=attach) is True
+
+    # Test our call count
+    assert mock_post.call_count == 2
+    # Image + Message sent
+    assert mock_post.call_args_list[0][0][0] == \
+        'http://localhost:8084/topic'
+    assert mock_post.call_args_list[0][1]['params']['message'] == \
+        'test'
+    assert mock_post.call_args_list[0][1]['params']['title'] == \
+        'wonderful'
+    assert mock_post.call_args_list[0][1]['params']['filename'] == \
+        'apprise-test.gif'
+
+    # Image no 2 (no message)
+    assert mock_post.call_args_list[1][0][0] == \
+        'http://localhost:8084/topic'
+    assert 'message' not in mock_post.call_args_list[1][1]['params']
+    assert 'title' not in mock_post.call_args_list[1][1]['params']
+    assert mock_post.call_args_list[1][1]['params']['filename'] == \
+        'apprise-test.png'
+
+    # Reset our mock object
+    mock_post.reset_mock()
+
+    # An invalid attachment will cause a failure
+    path = os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
+    attach = AppriseAttachment(path)
+    assert obj.notify(body="test", attach=attach) is False
+
+    # Test our call count
+    assert mock_post.call_count == 0
+
+    # prepare our attachment
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
+
+    # Throw an exception on the first call to requests.post()
+    mock_post.return_value = None
+    for side_effect in (requests.RequestException(), OSError()):
+        mock_post.side_effect = side_effect
+
+        # We'll fail now because of our error handling
+        assert obj.send(body="test", attach=attach) is False
 
 
 @mock.patch('requests.post')
@@ -297,9 +418,11 @@ def test_plugin_custom_ntfy_edge_cases(mock_post):
 
     # Test our call count
     assert mock_post.call_count == 1
-    assert mock_post.call_args_list[0][0][0] == \
-        'http://localhost/topic1'
-    assert mock_post.call_args_list[0][1]['headers'].get('X-Attach') == \
-        'http://example.com/file.jpg'
-    assert mock_post.call_args_list[0][1]['headers'].get('X-Filename') == \
-        'smoke.jpg'
+    assert mock_post.call_args_list[0][0][0] == 'http://localhost'
+
+    response = json.loads(mock_post.call_args_list[0][1]['data'])
+    assert response['topic'] == 'topic1'
+    assert response['message'] == 'body'
+    assert response['title'] == 'title'
+    assert response['attach'] == 'http://example.com/file.jpg'
+    assert response['filename'] == 'smoke.jpg'
