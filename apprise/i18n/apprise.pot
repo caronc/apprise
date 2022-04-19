@@ -6,9 +6,9 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: apprise 0.9.7\n"
+"Project-Id-Version: apprise 0.9.8\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2022-02-02 14:27-0500\n"
+"POT-Creation-Date: 2022-04-19 12:42-0400\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -77,6 +77,12 @@ msgstr ""
 msgid "Application Secret"
 msgstr ""
 
+msgid "Attach"
+msgstr ""
+
+msgid "Attach Filename"
+msgstr ""
+
 msgid "Auth Token"
 msgstr ""
 
@@ -119,6 +125,9 @@ msgstr ""
 msgid "Channels"
 msgstr ""
 
+msgid "Click"
+msgstr ""
+
 msgid "Client ID"
 msgstr ""
 
@@ -150,6 +159,9 @@ msgid "DBus Notification"
 msgstr ""
 
 msgid "Data Entries"
+msgstr ""
+
+msgid "Delay"
 msgstr ""
 
 msgid "Details"
@@ -442,6 +454,9 @@ msgstr ""
 msgid "Server Timeout"
 msgstr ""
 
+msgid "Show Status"
+msgstr ""
+
 msgid "Silent Notification"
 msgstr ""
 
@@ -599,6 +614,9 @@ msgid "Token B"
 msgstr ""
 
 msgid "Token C"
+msgstr ""
+
+msgid "Topic"
 msgstr ""
 
 msgid "Transmitter Groups"

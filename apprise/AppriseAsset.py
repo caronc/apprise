@@ -29,7 +29,6 @@ from os.path import join
 from os.path import dirname
 from os.path import isfile
 from os.path import abspath
-from locale import getpreferredencoding
 from .common import NotifyType
 
 
@@ -120,7 +119,7 @@ class AppriseAsset(object):
     interpret_escapes = False
 
     # Defines the encoding of the content passed into Apprise
-    encoding = getpreferredencoding()
+    encoding = 'utf-8'
 
     # For more detail see CWE-312 @
     #    https://cwe.mitre.org/data/definitions/312.html
