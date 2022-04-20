@@ -407,7 +407,7 @@ def test_plugin_telegram_general(mock_post):
 
     # Test our payload
     assert payload['text'] == \
-        '<h1>special characters</h1><p>\'"This can\'t\t\r\nfail us"\'</p>'
+        '<b>special characters</b>\r\n<p>\'"This can\'t\t\r\nfail us"\'</p>'
 
     # Test sending attachments
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
@@ -629,8 +629,8 @@ def test_plugin_telegram_formating_py3(mock_post):
 
     # Test that everything is escaped properly in a TEXT mode
     assert payload['text'] == \
-        '<h1>🚨 Change detected for &lt;i&gt;Apprise Test Title&lt;/i&gt;' \
-        '</h1>&lt;a href="http://localhost"&gt;&lt;i&gt;Apprise Body Title' \
+        '<b>🚨 Change detected for &lt;i&gt;Apprise Test Title&lt;/i&gt;</b>' \
+        '\r\n&lt;a href="http://localhost"&gt;&lt;i&gt;Apprise Body Title' \
         '&lt;/i&gt;&lt;/a&gt; had &lt;a href="http://127.0.0.1"&gt;a change' \
         '&lt;/a&gt;'
 
@@ -656,7 +656,7 @@ def test_plugin_telegram_formating_py3(mock_post):
 
     # Test that everything is escaped properly in a HTML mode
     assert payload['text'] == \
-        '<h1>🚨 Change detected for <i>Apprise Test Title</i></h1>' \
+        '<b>🚨 Change detected for <i>Apprise Test Title</i></b>\r\n' \
         '<a href="http://localhost"><i>Apprise Body Title</i></a> had ' \
         '<a href="http://127.0.0.1">a change</a>'
 
@@ -716,8 +716,8 @@ def test_plugin_telegram_formating_py3(mock_post):
 
     # Test that everything is escaped properly in a HTML mode
     assert payload['text'] == \
-        '<h1><p>🚨 Change detected for <em>Apprise Test Title</em></p>' \
-        '</h1><p><em><a href="http://localhost">Apprise Body Title</a></em> ' \
+        '<b><p>🚨 Change detected for <em>Apprise Test Title</em></p></b>' \
+        '\r\n<p><em><a href="http://localhost">Apprise Body Title</a></em> ' \
         'had <a href="http://127.0.0.1">a change</a></p>'
 
 
@@ -809,8 +809,8 @@ def test_plugin_telegram_formating_py2(mock_post):
 
     # Test that everything is escaped properly in a TEXT mode
     assert payload['text'].encode('utf-8') == \
-        '<h1>\xf0\x9f\x9a\xa8 Change detected for &lt;i&gt;' \
-        'Apprise Test Title&lt;/i&gt;</h1>' \
+        '<b>\xf0\x9f\x9a\xa8 Change detected for &lt;i&gt;' \
+        'Apprise Test Title&lt;/i&gt;</b>\r\n' \
         '&lt;a href="http://localhost"&gt;&lt;i&gt;' \
         'Apprise Body Title&lt;/i&gt;&lt;/a&gt; had &lt;a ' \
         'href="http://127.0.0.1"&gt;a change&lt;/a&gt;'
@@ -837,9 +837,9 @@ def test_plugin_telegram_formating_py2(mock_post):
 
     # Test that everything is escaped properly in a HTML mode
     assert payload['text'].encode('utf-8') == \
-        '<h1>\xf0\x9f\x9a\xa8 Change detected for <i>Apprise Test Title</i>' \
-        '</h1><a href="http://localhost"><i>Apprise Body Title</i></a> had ' \
-        '<a href="http://127.0.0.1">a change</a>'
+        '<b>\xf0\x9f\x9a\xa8 Change detected for <i>Apprise Test Title</i>' \
+        '</b>\r\n<a href="http://localhost"><i>Apprise Body Title</i></a> ' \
+        'had <a href="http://127.0.0.1">a change</a>'
 
     # Reset our values
     mock_post.reset_mock()
@@ -897,8 +897,8 @@ def test_plugin_telegram_formating_py2(mock_post):
 
     # Test that everything is escaped properly in a HTML mode
     assert payload['text'].encode('utf-8') == \
-        '<h1><p>\xf0\x9f\x9a\xa8 Change detected for ' \
-        '<em>Apprise Test Title</em></p></h1><p><em>' \
+        '<b><p>\xf0\x9f\x9a\xa8 Change detected for ' \
+        '<em>Apprise Test Title</em></p></b>\r\n<p><em>' \
         '<a href="http://localhost">Apprise Body Title</a></em>' \
         ' had <a href="http://127.0.0.1">a change</a></p>'
 
@@ -948,6 +948,6 @@ def test_plugin_telegram_formating_py2(mock_post):
 
     # Test that everything is escaped properly in a HTML mode
     assert payload['text'].encode('utf-8') == \
-        '<h1>\xd7\x9b\xd7\x95\xd7\xaa\xd7\xa8\xd7\xaa '\
-        '\xd7\xa0\xd7\xa4\xd7\x9c\xd7\x90\xd7\x94</h1>[_[\xd7\x96\xd7\x95 '\
+        '<b>\xd7\x9b\xd7\x95\xd7\xaa\xd7\xa8\xd7\xaa '\
+        '\xd7\xa0\xd7\xa4\xd7\x9c\xd7\x90\xd7\x94</b>\r\n[_[\xd7\x96\xd7\x95 '\
         '\xd7\x94\xd7\x95\xd7\x93\xd7\xa2\xd7\x94](http://localhost)_'
