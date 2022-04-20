@@ -620,7 +620,7 @@ class NotifyTelegram(NotifyBase):
 
             # prepare our payload based on HTML or TEXT
             payload['text'] = '{}{}'.format(
-                '<h1>{}</h1>'.format(title) if title else '',
+                '<b>{}</b>\r\n'.format(title) if title else '',
                 body,
             )
 
