@@ -121,6 +121,13 @@ class NotifyBase(BASE_OBJECT):
     # automatically placed into the body
     title_maxlen = 250
 
+    # Set this to HTML for services that support the conversion of HTML in
+    # the title. For example; services like Telegram support HTML in the
+    # title, however services like Email (where this goes in the Subject line)
+    # do not (but the body does).  By default we do not convert titles but
+    # allow those who wish to over-ride this to do so.
+    title_format = NotifyFormat.TEXT
+
     # Set the maximum line count; if this is set to anything larger then zero
     # the message (prior to it being sent) will be truncated to this number
     # of lines. Setting this to zero disables this feature.

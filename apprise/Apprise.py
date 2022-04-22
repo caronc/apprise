@@ -546,7 +546,7 @@ class Apprise(object):
                  conversion_body_map[server.notify_format]) = \
                     convert_between(
                         body_format, server.notify_format, body=body,
-                        title=title)
+                        title=title, title_format=server.title_format)
 
                 if interpret_escapes:
                     #
