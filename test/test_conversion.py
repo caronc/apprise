@@ -40,7 +40,7 @@ def test_html_to_text():
         """
         A function to simply html conversion tests
         """
-        return convert_between(NotifyFormat.HTML, NotifyFormat.TEXT, body)[1]
+        return convert_between(NotifyFormat.HTML, NotifyFormat.TEXT, body)
 
     assert to_html("No HTML code here.") == "No HTML code here."
 

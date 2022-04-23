@@ -121,13 +121,6 @@ class NotifyBase(BASE_OBJECT):
     # automatically placed into the body
     title_maxlen = 250
 
-    # Set this to HTML for services that support the conversion of HTML in
-    # the title. For example; services like Telegram support HTML in the
-    # title, however services like Email (where this goes in the Subject line)
-    # do not (but the body does).  By default we do not convert titles but
-    # allow those who wish to over-ride this to do so.
-    title_format = NotifyFormat.TEXT
-
     # Set the maximum line count; if this is set to anything larger then zero
     # the message (prior to it being sent) will be truncated to this number
     # of lines. Setting this to zero disables this feature.
@@ -272,7 +265,7 @@ class NotifyBase(BASE_OBJECT):
         )
 
     def notify(self, body, title=None, notify_type=NotifyType.INFO,
-               overflow=None, attach=None, **kwargs):
+               overflow=None, attach=None, body_format=None, **kwargs):
         """
         Performs notification
 
@@ -298,18 +291,22 @@ class NotifyBase(BASE_OBJECT):
         title = '' if not title else title
 
         # Apply our overflow (if defined)
-        for chunk in self._apply_overflow(body=body, title=title,
-                                          overflow=overflow):
+        for chunk in self._apply_overflow(
+                body=body, title=title, overflow=overflow,
+                body_format=body_format):
+
             # Send notification
             if not self.send(body=chunk['body'], title=chunk['title'],
-                             notify_type=notify_type, attach=attach):
+                             notify_type=notify_type, attach=attach,
+                             body_format=body_format):
 
                 # Toggle our return status flag
                 return False
 
         return True
 
-    def _apply_overflow(self, body, title=None, overflow=None):
+    def _apply_overflow(self, body, title=None, overflow=None,
+                        body_format=None):
         """
         Takes the message body and title as input.  This function then
         applies any defined overflow restrictions associated with the
@@ -341,18 +338,26 @@ class NotifyBase(BASE_OBJECT):
             overflow = self.overflow_mode
 
         if self.title_maxlen <= 0 and len(title) > 0:
-            if self.notify_format == NotifyFormat.MARKDOWN:
-                # Content is appended to body as markdown
-                body = '**{}**\r\n{}'.format(title, body)
 
-            elif self.notify_format == NotifyFormat.HTML:
+            if self.notify_format == NotifyFormat.HTML:
                 # Content is appended to body as html
                 body = '<{open_tag}>{title}</{close_tag}>' \
                     '<br />\r\n{body}'.format(
                         open_tag=self.default_html_tag_id,
-                        title=self.escape_html(title),
+                        # We only escape our title if the source provided was
+                        # of TEXT formatting
+                        title=self.escape_html(title)
+                        if body_format == NotifyFormat.TEXT else title,
                         close_tag=self.default_html_tag_id,
                         body=body)
+
+            elif self.notify_format == NotifyFormat.MARKDOWN:
+                # Content is appended to body as markdown
+                title = title.lstrip('\r\n \t\v\f#-')
+                if title:
+                    # Content is appended to body as text
+                    body = '# {}\r\n{}'.format(title, body)
+
             else:
                 # Content is appended to body as text
                 body = '{}\r\n{}'.format(title, body)

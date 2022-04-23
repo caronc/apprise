@@ -36,13 +36,12 @@ else:
     from html.parser import HTMLParser
 
 
-def convert_between(from_format, to_format, body, title=None,
-                    title_format=NotifyFormat.TEXT):
+def convert_between(from_format, to_format, content):
     """
-    Converts between different notification formats. If no conversion exists,
+    Converts between different suported formats. If no conversion exists,
     or the selected one fails, the original text will be returned.
 
-    This function returns a tuple as (title, body)
+    This function returns the content translated (if required)
     """
 
     converters = {
@@ -53,41 +52,21 @@ def convert_between(from_format, to_format, body, title=None,
         (NotifyFormat.HTML, NotifyFormat.MARKDOWN): html_to_text,
     }
 
-    if NotifyFormat.MARKDOWN in (from_format, to_format):
-        # Tidy any exising pre-formating configuration
-        title = '' if not title else title.lstrip('\r\n \t\v\b*#-')
-
-    else:
-        title = '' if not title else title
-
     convert = converters.get((from_format, to_format))
-    title, body = convert(title=title, body=body, title_format=title_format) \
-        if convert is not None else (title, body)
-
-    return (title, body)
+    return convert(content) if convert else content
 
 
-def markdown_to_html(body, title=None, title_format=None):
+def markdown_to_html(content):
     """
-    Handle Markdown conversions
+    Converts specified content from markdown to HTML.
     """
 
-    if title_format == NotifyFormat.HTML and title:
-        # perform conversion if otherwise told to do so
-        title = markdown(title)
-
-    return (
-        # Title
-        '' if not title else title,
-
-        # Body
-        markdown(body),
-    )
+    return markdown(content)
 
 
-def text_to_html(body, title=None, title_format=None):
+def text_to_html(content):
     """
-    Converts a notification body from plain text to HTML.
+    Converts specified content from plain text to HTML.
     """
 
     # Basic TEXT to HTML format map; supports keys only
@@ -115,44 +94,26 @@ def text_to_html(body, title=None, title_format=None):
         re.IGNORECASE,
     )
 
-    # Execute our map against our body in addition to
+    # Execute our map against our content in addition to
     # swapping out new lines and replacing them with <br/>
-    return (
-        # Title; swap whitespace with space
-        '' if not title else re.sub(
-            r'[\r\n]+', ' ', re_table.sub(
-                lambda x: re_map[x.group()], title)),
-
-        # Body Formatting
-        re.sub(
-            r'\r*\n', '<br/>\n', re_table.sub(
-                lambda x: re_map[x.group()], body)))
+    return re.sub(
+        r'\r*\n', '<br/>\n',
+        re_table.sub(lambda x: re_map[x.group()], content))
 
 
-def html_to_text(body, title=None, title_format=None):
+def html_to_text(content):
     """
-    Converts a notification body from HTML to plain text.
+    Converts a content from HTML to plain text.
     """
 
     parser = HTMLConverter()
     if six.PY2:
         # Python 2.7 requires an additional parsing to un-escape characters
-        body = parser.unescape(body)
+        content = parser.unescape(content)
 
-    if title:
-        if six.PY2:
-            # Python 2.7 requires an additional parsing to un-escape characters
-            title = parser.unescape(title)
-
-        parser.feed(title)
-        parser.close()
-        title = parser.converted
-
-    parser.feed(body)
+    parser.feed(content)
     parser.close()
-    body = parser.converted
-
-    return ('' if not title else title, body)
+    return parser.converted
 
 
 class HTMLConverter(HTMLParser, object):

@@ -311,10 +311,6 @@ def test_plugin_telegram_general(mock_post):
     # ensures our plugin inheritance is working properly
     assert obj.body_maxlen == plugins.NotifyTelegram.body_maxlen
 
-    # We don't override the title maxlen so we should be set to the same
-    # as our parent class in this case
-    assert obj.title_maxlen == plugins.NotifyBase.title_maxlen
-
     # This tests erroneous messages involving multiple chat ids
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO) is False
@@ -629,10 +625,10 @@ def test_plugin_telegram_formating_py3(mock_post):
 
     # Test that everything is escaped properly in a TEXT mode
     assert payload['text'] == \
-        '<b>🚨 Change detected&nbsp;for&nbsp;&lt;i&gt;Apprise&nbsp;Test' \
-        '&nbsp;Title&lt;/i&gt;</b>\r\n&lt;a href="http://localhost"&gt;' \
-        '&lt;i&gt;Apprise Body&nbsp;Title&lt;/i&gt;&lt;/a&gt;&nbsp;had' \
-        '&nbsp;&lt;a&nbsp;href="http://127.0.0.1"&gt;a&nbsp;change&lt;/a&gt;'
+        '<b>🚨 Change detected for <i>Apprise Test Title</i></b>' \
+        '\r\n&lt;a href="http://localhost"&gt;&lt;i&gt;Apprise ' \
+        'Body&nbsp;Title&lt;/i&gt;&lt;/a&gt;&nbsp;had&nbsp;&lt;a' \
+        '&nbsp;href="http://127.0.0.1"&gt;a&nbsp;change&lt;/a&gt;'
 
     # Reset our values
     mock_post.reset_mock()
@@ -699,6 +695,11 @@ def test_plugin_telegram_formating_py3(mock_post):
     aobj.add('tgram://987654321:abcdefg_hijklmnop/?format=html')
     assert len(aobj) == 1
 
+    # Now test our MARKDOWN Handling
+    title = '# 🚨 Another Change detected for _Apprise Test Title_'
+    body = '_[Apprise Body Title](http://localhost)_' \
+           ' had [a change](http://127.0.0.2)'
+
     # HTML forced by the command line, but MARKDOWN spacified as
     # upstream mode
     assert aobj.notify(
@@ -716,9 +717,9 @@ def test_plugin_telegram_formating_py3(mock_post):
 
     # Test that everything is escaped properly in a HTML mode
     assert payload['text'] == \
-        '<b>🚨 Change detected for <i>Apprise Test Title</i></b>\r\n<i>' \
-        '<a href="http://localhost">Apprise Body Title</a></i> ' \
-        'had <a href="http://127.0.0.1">a change</a>'
+        '<b>🚨 Another Change detected for <i>Apprise Test Title</i>' \
+        '</b>\r\n<i><a href="http://localhost">Apprise Body Title</a>' \
+        '</i> had <a href="http://127.0.0.2">a change</a>'
 
 
 @pytest.mark.skipif(sys.version_info.major >= 3, reason="Requires Python 2.x+")
@@ -1020,8 +1021,8 @@ def test_plugin_telegram_html_formatting(mock_post):
 
     # Test that everything is escaped properly in a HTML mode
     assert payload['text'] == \
-        '<b><b>\'information\'</b></b>\r\n<i>"This is in Italic"</i>' \
-        '<b>      Headings are dropped and converted to bold</b>'
+        '<b><b>\'information\'</b></b>\r\n<i>"This is in Italic"' \
+        '</i>\r\n<b>      Headings are dropped and converted to bold</b>'
 
     mock_post.reset_mock()
 
@@ -1033,7 +1034,7 @@ def test_plugin_telegram_html_formatting(mock_post):
     payload = loads(mock_post.call_args_list[0][1]['data'])
 
     assert payload['text'] == \
-        '<b>&lt;title&gt;&amp;apos;information&amp;apos&lt;/title&gt;</b>' \
-        '\r\n&lt;em&gt;&amp;quot;This is in&nbsp;Italic&amp;quot&lt;/em&gt;' \
-        '&lt;br/&gt;&lt;h5&gt;&amp;emsp;&amp;emspHeadings&amp;nbsp;are' \
-        '&nbsp;dropped&nbsp;and&amp;nbspconverted&nbsp;to&nbsp;bold&lt;/h5&gt;'
+        "<b><b>'information'</b></b>\r\n&lt;em&gt;&amp;quot;This is in" \
+        "&nbsp;Italic&amp;quot&lt;/em&gt;&lt;br/&gt;&lt;h5&gt;&amp;" \
+        "emsp;&amp;emspHeadings&amp;nbsp;are&nbsp;dropped&nbsp;and" \
+        "&amp;nbspconverted&nbsp;to&nbsp;bold&lt;/h5&gt;"

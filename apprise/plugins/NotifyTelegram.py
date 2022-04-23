@@ -105,9 +105,6 @@ class NotifyTelegram(NotifyBase):
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 4096
 
-    # Allow the title to support HTML character sets
-    title_format = NotifyFormat.HTML
-
     # Telegram is limited to sending a maximum of 100 requests per second.
     request_rate_per_sec = 0.001
 
@@ -172,6 +169,49 @@ class NotifyTelegram(NotifyBase):
             'key': 'document',
         },
     )
+
+    # Telegram's HTML support doesn't like having HTML escaped
+    # characters passed into it.  to handle this situation, we need to
+    # search the body for these sequences and convert them to the
+    # output the user expected
+    __telegram_escape_html_dict = {
+        # New Lines
+        re.compile(r'<\s*/?br\s*/?>\r*\n?', re.I): '\r\n',
+        re.compile(r'<\s*/(br|p|div|li)[^>]*>\r*\n?', re.I): '\r\n',
+
+        # The following characters can be altered to become supported
+        re.compile(r'<\s*pre[^>]*>', re.I): '<code>',
+        re.compile(r'<\s*/pre[^>]*>', re.I): '</code>',
+
+        # the following tags are not supported
+        re.compile(
+            r'<\s*(br|p|div|span|body|script|meta|html|font'
+            r'|label|iframe|li|ol|ul|source|script)[^>]*>', re.I): '',
+
+        re.compile(
+            r'<\s*/(span|body|script|meta|html|font'
+            r'|label|iframe|ol|ul|source|script)[^>]*>', re.I): '',
+
+        # Italic
+        re.compile(r'<\s*(caption|em)[^>]*>', re.I): '<i>',
+        re.compile(r'<\s*/(caption|em)[^>]*>', re.I): '</i>',
+
+        # Bold
+        re.compile(r'<\s*(h[1-6]|title|strong)[^>]*>', re.I): '<b>',
+        re.compile(r'<\s*/(h[1-6]|title|strong)[^>]*>', re.I): '</b>',
+
+        # HTML Spaces (&nbsp;) and tabs (&emsp;) aren't supported
+        # See https://core.telegram.org/bots/api#html-style
+        re.compile(r'\&nbsp;?', re.I): ' ',
+
+        # Tabs become 3 spaces
+        re.compile(r'\&emsp;?', re.I): '   ',
+
+        # Some characters get re-escaped by the Telegram upstream
+        # service so we need to convert these back,
+        re.compile(r'\&apos;?', re.I): '\'',
+        re.compile(r'\&quot;?', re.I): '"',
+    }
 
     # Define our template tokens
     template_tokens = dict(NotifyBase.template_tokens, **{
@@ -548,59 +588,21 @@ class NotifyTelegram(NotifyBase):
         if self.notify_format == NotifyFormat.MARKDOWN:
             payload['parse_mode'] = 'MARKDOWN'
 
-            payload['text'] = '{}{}'.format(
-                '# {}\r\n'.format(title) if title else '',
-                body,
-            )
+            payload['text'] = '**{}**\r\n{}'\
+                .format(title, body) if title else body
 
         elif self.notify_format == NotifyFormat.HTML:
+
             # Use Telegram's HTML mode
             payload['parse_mode'] = 'HTML'
-
-            # Telegram's HTML support doesn't like having HTML escaped
-            # characters passed into it.  to handle this situation, we need to
-            # search the body for these sequences and convert them to the
-            # output the user expected
-            telegram_escape_html_dict = {
-                # HTML Spaces (&nbsp;) and tabs (&emsp;) aren't supported
-                # See https://core.telegram.org/bots/api#html-style
-                r'\&nbsp;?': ' ',
-
-                # Tabs become 3 spaces
-                r'\&emsp;?': '   ',
-
-                # Some characters get re-escaped by the Telegram upstream
-                # service so we need to convert these back,
-                r'\&apos;?': '\'',
-                r'\&quot;?': '"',
-
-                # the following tags are not supported
-                r'<[ \t]*/?(br|p|div|span|body|script|meta|html|font'
-                r'|label|iframe|li|ol|ul)[^>]*>': '',
-
-                # The following characters can be altered to become supported
-                r'<[ \t]*pre[^>]*>': '<code>',
-                r'<[ \t]*/pre[^>]*>': '</code>',
-
-                # Bold
-                r'<[ \t]*(h[0-9]+|title|strong)[^>]*>': '<b>',
-                r'<[ \t]*/(h[0-9]+|title|strong)[^>]*>': '</b>',
-
-                # Italic
-                r'<[ \t]*(caption|em)[^>]*>': '<i>',
-                r'<[ \t]*/(caption|em)[^>]*>': '</i>',
-            }
-
-            for k, v in telegram_escape_html_dict.items():
-                body = re.sub(k, v, body, re.I)
+            for r, v in self.__telegram_escape_html_dict.items():
+                body = r.sub(v, body, re.I)
                 if title:
-                    title = re.sub(k, v, title, re.I)
+                    title = r.sub(v, title, re.I)
 
-            # prepare our payload based on HTML or TEXT
-            payload['text'] = '{}{}'.format(
-                '<b>{}</b>\r\n'.format(title) if title else '',
-                body,
-            )
+            # Prepare our payload based on HTML or TEXT
+            payload['text'] = '<b>{}</b>\r\n{}'\
+                .format(title, body) if title else body
 
         else:  # self.notify_format == NotifyFormat.TEXT:
             # Use Telegram's HTML mode
@@ -612,6 +614,7 @@ class NotifyTelegram(NotifyBase):
                 # entity blocks (< and >) when displaying text
                 r'>': '&gt;',
                 r'<': '&lt;',
+                r'\&': '&amp;',
             }
 
             # Create a regular expression from the dictionary keys
@@ -631,10 +634,8 @@ class NotifyTelegram(NotifyBase):
                         mo.string[mo.start():mo.end()]], title)
 
             # prepare our payload based on HTML or TEXT
-            payload['text'] = '{}{}'.format(
-                '<b>{}</b>\r\n'.format(title) if title else '',
-                body,
-            )
+            payload['text'] = '<b>{}</b>\r\n{}'\
+                .format(title, body) if title else body
 
         # Create a copy of the chat_ids list
         targets = list(self.targets)
