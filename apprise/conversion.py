@@ -36,7 +36,8 @@ else:
     from html.parser import HTMLParser
 
 
-def convert_between(from_format, to_format, body, title=None):
+def convert_between(from_format, to_format, body, title=None,
+                    title_format=NotifyFormat.TEXT):
     """
     Converts between different notification formats. If no conversion exists,
     or the selected one fails, the original text will be returned.
@@ -60,27 +61,31 @@ def convert_between(from_format, to_format, body, title=None):
         title = '' if not title else title
 
     convert = converters.get((from_format, to_format))
-    title, body = convert(title=title, body=body) \
+    title, body = convert(title=title, body=body, title_format=title_format) \
         if convert is not None else (title, body)
 
     return (title, body)
 
 
-def markdown_to_html(body, title=None):
+def markdown_to_html(body, title=None, title_format=None):
     """
     Handle Markdown conversions
     """
 
+    if title_format == NotifyFormat.HTML and title:
+        # perform conversion if otherwise told to do so
+        title = markdown(title)
+
     return (
         # Title
-        '' if not title else markdown(title),
+        '' if not title else title,
 
         # Body
         markdown(body),
     )
 
 
-def text_to_html(body, title=None):
+def text_to_html(body, title=None, title_format=None):
     """
     Converts a notification body from plain text to HTML.
     """
@@ -124,7 +129,7 @@ def text_to_html(body, title=None):
                 lambda x: re_map[x.group()], body)))
 
 
-def html_to_text(body, title=None):
+def html_to_text(body, title=None, title_format=None):
     """
     Converts a notification body from HTML to plain text.
     """

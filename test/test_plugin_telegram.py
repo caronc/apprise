@@ -407,7 +407,7 @@ def test_plugin_telegram_general(mock_post):
 
     # Test our payload
     assert payload['text'] == \
-        '<b>special characters</b>\r\n<p>\'"This can\'t\t\r\nfail us"\'</p>'
+        '<b>special characters</b>\r\n\'"This can\'t\t\r\nfail us"\''
 
     # Test sending attachments
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
@@ -629,10 +629,10 @@ def test_plugin_telegram_formating_py3(mock_post):
 
     # Test that everything is escaped properly in a TEXT mode
     assert payload['text'] == \
-        '<b>🚨 Change detected for &lt;i&gt;Apprise Test Title&lt;/i&gt;</b>' \
-        '\r\n&lt;a href="http://localhost"&gt;&lt;i&gt;Apprise Body Title' \
-        '&lt;/i&gt;&lt;/a&gt; had &lt;a href="http://127.0.0.1"&gt;a change' \
-        '&lt;/a&gt;'
+        '<b>🚨 Change detected&nbsp;for&nbsp;&lt;i&gt;Apprise&nbsp;Test' \
+        '&nbsp;Title&lt;/i&gt;</b>\r\n&lt;a href="http://localhost"&gt;' \
+        '&lt;i&gt;Apprise Body&nbsp;Title&lt;/i&gt;&lt;/a&gt;&nbsp;had' \
+        '&nbsp;&lt;a&nbsp;href="http://127.0.0.1"&gt;a&nbsp;change&lt;/a&gt;'
 
     # Reset our values
     mock_post.reset_mock()
@@ -716,9 +716,9 @@ def test_plugin_telegram_formating_py3(mock_post):
 
     # Test that everything is escaped properly in a HTML mode
     assert payload['text'] == \
-        '<b><p>🚨 Change detected for <em>Apprise Test Title</em></p></b>' \
-        '\r\n<p><em><a href="http://localhost">Apprise Body Title</a></em> ' \
-        'had <a href="http://127.0.0.1">a change</a></p>'
+        '<b>🚨 Change detected for <i>Apprise Test Title</i></b>\r\n<i>' \
+        '<a href="http://localhost">Apprise Body Title</a></i> ' \
+        'had <a href="http://127.0.0.1">a change</a>'
 
 
 @pytest.mark.skipif(sys.version_info.major >= 3, reason="Requires Python 2.x+")
@@ -809,11 +809,11 @@ def test_plugin_telegram_formating_py2(mock_post):
 
     # Test that everything is escaped properly in a TEXT mode
     assert payload['text'].encode('utf-8') == \
-        '<b>\xf0\x9f\x9a\xa8 Change detected for &lt;i&gt;' \
-        'Apprise Test Title&lt;/i&gt;</b>\r\n' \
-        '&lt;a href="http://localhost"&gt;&lt;i&gt;' \
-        'Apprise Body Title&lt;/i&gt;&lt;/a&gt; had &lt;a ' \
-        'href="http://127.0.0.1"&gt;a change&lt;/a&gt;'
+        '<b>\xf0\x9f\x9a\xa8 Change detected&nbsp;for&nbsp;' \
+        '&lt;i&gt;Apprise&nbsp;Test&nbsp;Title&lt;/i&gt;</b>\r\n' \
+        '&lt;a href="http://localhost"&gt;&lt;i&gt;Apprise Body&nbsp;' \
+        'Title&lt;/i&gt;&lt;/a&gt;&nbsp;had&nbsp;&lt;a&nbsp;' \
+        'href="http://127.0.0.1"&gt;a&nbsp;change&lt;/a&gt;'
 
     # Reset our values
     mock_post.reset_mock()
@@ -897,10 +897,9 @@ def test_plugin_telegram_formating_py2(mock_post):
 
     # Test that everything is escaped properly in a HTML mode
     assert payload['text'].encode('utf-8') == \
-        '<b><p>\xf0\x9f\x9a\xa8 Change detected for ' \
-        '<em>Apprise Test Title</em></p></b>\r\n<p><em>' \
-        '<a href="http://localhost">Apprise Body Title</a></em>' \
-        ' had <a href="http://127.0.0.1">a change</a></p>'
+        '<b>\xf0\x9f\x9a\xa8 Change detected for <i>Apprise Test Title</i>' \
+        '</b>\r\n<i><a href="http://localhost">Apprise Body Title</a></i> ' \
+        'had <a href="http://127.0.0.1">a change</a>'
 
     # Reset our values
     mock_post.reset_mock()
@@ -951,3 +950,90 @@ def test_plugin_telegram_formating_py2(mock_post):
         '<b>\xd7\x9b\xd7\x95\xd7\xaa\xd7\xa8\xd7\xaa '\
         '\xd7\xa0\xd7\xa4\xd7\x9c\xd7\x90\xd7\x94</b>\r\n[_[\xd7\x96\xd7\x95 '\
         '\xd7\x94\xd7\x95\xd7\x93\xd7\xa2\xd7\x94](http://localhost)_'
+
+
+@mock.patch('requests.post')
+def test_plugin_telegram_html_formatting(mock_post):
+    """
+    NotifyTelegram() HTML Formatting
+
+    """
+    # on't send anything other than <b>, <i>, <a>,<code> and <pre>
+
+    # Disable Throttling to speed testing
+    plugins.NotifyTelegram.request_rate_per_sec = 0
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = '{}'
+
+    # Simple success response
+    mock_post.return_value.content = dumps({
+        "ok": True,
+        "result": [{
+            "update_id": 645421321,
+            "message": {
+                "message_id": 2,
+                "from": {
+                    "id": 532389719,
+                    "is_bot": False,
+                    "first_name": "Chris",
+                    "language_code": "en-US"
+                },
+                "chat": {
+                    "id": 532389719,
+                    "first_name": "Chris",
+                    "type": "private"
+                },
+                "date": 1519694394,
+                "text": "/start",
+                "entities": [{
+                    "offset": 0,
+                    "length": 6,
+                    "type": "bot_command",
+                }],
+            }},
+        ],
+    })
+    mock_post.return_value.status_code = requests.codes.ok
+
+    aobj = Apprise()
+    aobj.add('tgram://123456789:abcdefg_hijklmnop/')
+
+    assert len(aobj) == 1
+
+    assert isinstance(aobj[0], plugins.NotifyTelegram)
+
+    # Test our HTML Conversion
+    title = '<title>&apos;information&apos</title>'
+    body = '<em>&quot;This is in Italic&quot</em><br/>' \
+           '<h5>&emsp;&emspHeadings&nbsp;are dropped and' \
+           '&nbspconverted to bold</h5>'
+
+    assert aobj.notify(title=title, body=body, body_format=NotifyFormat.HTML)
+
+    # 1 call to look up bot owner, and second for notification
+    assert mock_post.call_count == 2
+
+    payload = loads(mock_post.call_args_list[1][1]['data'])
+
+    # Test that everything is escaped properly in a HTML mode
+    assert payload['text'] == \
+        '<b><b>\'information\'</b></b>\r\n<i>"This is in Italic"</i>' \
+        '<b>      Headings are dropped and converted to bold</b>'
+
+    mock_post.reset_mock()
+
+    assert aobj.notify(title=title, body=body, body_format=NotifyFormat.TEXT)
+
+    # owner has already been looked up, so only one call is made
+    assert mock_post.call_count == 1
+
+    payload = loads(mock_post.call_args_list[0][1]['data'])
+
+    assert payload['text'] == \
+        '<b>&lt;title&gt;&amp;apos;information&amp;apos&lt;/title&gt;</b>' \
+        '\r\n&lt;em&gt;&amp;quot;This is in&nbsp;Italic&amp;quot&lt;/em&gt;' \
+        '&lt;br/&gt;&lt;h5&gt;&amp;emsp;&amp;emspHeadings&amp;nbsp;are' \
+        '&nbsp;dropped&nbsp;and&amp;nbspconverted&nbsp;to&nbsp;bold&lt;/h5&gt;'
