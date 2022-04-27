@@ -701,7 +701,7 @@ def test_plugin_telegram_formating_py3(mock_post):
     body = '_[Apprise Body Title](http://localhost)_' \
            ' had [a change](http://127.0.0.2)'
 
-    # HTML forced by the command line, but MARKDOWN spacified as
+    # HTML forced by the command line, but MARKDOWN specified as
     # upstream mode
     assert aobj.notify(
         title=title, body=body, body_format=NotifyFormat.MARKDOWN)
@@ -739,7 +739,7 @@ def test_plugin_telegram_formating_py3(mock_post):
     body = '_[Apprise Body Title](http://localhost)_' \
            ' had [a change](http://127.0.0.2)'
 
-    # MARKDOWN forced by the command line, but TEXT spacified as
+    # MARKDOWN forced by the command line, but TEXT specified as
     # upstream mode
     assert aobj.notify(
         title=title, body=body, body_format=NotifyFormat.TEXT)
@@ -757,6 +757,39 @@ def test_plugin_telegram_formating_py3(mock_post):
     # Test that everything is escaped properly in a HTML mode
     assert payload['text'] == \
         '_[Apprise Body Title](http://localhost)_ had ' \
+        '[a change](http://127.0.0.2)'
+
+    # Reset our values
+    mock_post.reset_mock()
+
+    # Upstream to use HTML but input specified as Markdown
+    aobj = Apprise()
+    aobj.add('tgram://987654321:abcdefg_hijklmnop/?format=markdown')
+    assert len(aobj) == 1
+
+    # Set an actual title this time
+    title = '# A Great Title'
+    body = '_[Apprise Body Title](http://localhost)_' \
+           ' had [a change](http://127.0.0.2)'
+
+    # MARKDOWN forced by the command line, but TEXT specified as
+    # upstream mode
+    assert aobj.notify(
+        title=title, body=body, body_format=NotifyFormat.TEXT)
+
+    # Test our calls
+    assert mock_post.call_count == 2
+
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.telegram.org/bot987654321:abcdefg_hijklmnop/getUpdates'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://api.telegram.org/bot987654321:abcdefg_hijklmnop/sendMessage'
+
+    payload = loads(mock_post.call_args_list[1][1]['data'])
+
+    # Test that everything is escaped properly in a HTML mode
+    assert payload['text'] == \
+        '# A Great Title\r\n_[Apprise Body Title](http://localhost)_ had ' \
         '[a change](http://127.0.0.2)'
 
 
@@ -919,7 +952,7 @@ def test_plugin_telegram_formating_py2(mock_post):
     aobj.add('tgram://987654321:abcdefg_hijklmnop/?format=html')
     assert len(aobj) == 1
 
-    # HTML forced by the command line, but MARKDOWN spacified as
+    # HTML forced by the command line, but MARKDOWN specified as
     # upstream mode
     assert aobj.notify(
         title=title, body=body, body_format=NotifyFormat.MARKDOWN)
@@ -1008,7 +1041,7 @@ def test_plugin_telegram_formating_py2(mock_post):
     body = '_[Apprise Body Title](http://localhost)_' \
            ' had [a change](http://127.0.0.2)'
 
-    # MARKDOWN forced by the command line, but TEXT spacified as
+    # MARKDOWN forced by the command line, but TEXT specified as
     # upstream mode
     assert aobj.notify(
         title=title, body=body, body_format=NotifyFormat.TEXT)
@@ -1026,6 +1059,39 @@ def test_plugin_telegram_formating_py2(mock_post):
     # Test that everything is escaped properly in a HTML mode
     assert payload['text'] == \
         '_[Apprise Body Title](http://localhost)_ had ' \
+        '[a change](http://127.0.0.2)'
+
+    # Reset our values
+    mock_post.reset_mock()
+
+    # Upstream to use HTML but input specified as Markdown
+    aobj = Apprise()
+    aobj.add('tgram://987654321:abcdefg_hijklmnop/?format=markdown')
+    assert len(aobj) == 1
+
+    # Set an actual title this time
+    title = '# A Great Title'
+    body = '_[Apprise Body Title](http://localhost)_' \
+           ' had [a change](http://127.0.0.2)'
+
+    # MARKDOWN forced by the command line, but TEXT specified as
+    # upstream mode
+    assert aobj.notify(
+        title=title, body=body, body_format=NotifyFormat.TEXT)
+
+    # Test our calls
+    assert mock_post.call_count == 2
+
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.telegram.org/bot987654321:abcdefg_hijklmnop/getUpdates'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://api.telegram.org/bot987654321:abcdefg_hijklmnop/sendMessage'
+
+    payload = loads(mock_post.call_args_list[1][1]['data'])
+
+    # Test that everything is escaped properly in a HTML mode
+    assert payload['text'] == \
+        '# A Great Title\r\n_[Apprise Body Title](http://localhost)_ had ' \
         '[a change](http://127.0.0.2)'
 
 
