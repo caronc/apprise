@@ -722,6 +722,43 @@ def test_plugin_telegram_formating_py3(mock_post):
         '</b></b>\r\n<i><a href="http://localhost">Apprise Body Title</a>' \
         '</i> had <a href="http://127.0.0.2">a change</a>\r\n'
 
+    # Now we'll test an edge case where a title was defined, but after
+    # processing it, it was determiend there really wasn't anything there
+    # at all at the end of the day.
+
+    # Reset our values
+    mock_post.reset_mock()
+
+    # Upstream to use HTML but input specified as Markdown
+    aobj = Apprise()
+    aobj.add('tgram://987654321:abcdefg_hijklmnop/?format=markdown')
+    assert len(aobj) == 1
+
+    # Now test our MARKDOWN Handling (no title defined... not really anyway)
+    title = '# '
+    body = '_[Apprise Body Title](http://localhost)_' \
+           ' had [a change](http://127.0.0.2)'
+
+    # MARKDOWN forced by the command line, but TEXT spacified as
+    # upstream mode
+    assert aobj.notify(
+        title=title, body=body, body_format=NotifyFormat.TEXT)
+
+    # Test our calls
+    assert mock_post.call_count == 2
+
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.telegram.org/bot987654321:abcdefg_hijklmnop/getUpdates'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://api.telegram.org/bot987654321:abcdefg_hijklmnop/sendMessage'
+
+    payload = loads(mock_post.call_args_list[1][1]['data'])
+
+    # Test that everything is escaped properly in a HTML mode
+    assert payload['text'] == \
+        '_[Apprise Body Title](http://localhost)_ had ' \
+        '[a change](http://127.0.0.2)'
+
 
 @pytest.mark.skipif(sys.version_info.major >= 3, reason="Requires Python 2.x+")
 @mock.patch('requests.post')
@@ -953,6 +990,43 @@ def test_plugin_telegram_formating_py2(mock_post):
         '<b>\xd7\x9b\xd7\x95\xd7\xaa\xd7\xa8\xd7\xaa '\
         '\xd7\xa0\xd7\xa4\xd7\x9c\xd7\x90\xd7\x94</b>\r\n[_[\xd7\x96\xd7\x95 '\
         '\xd7\x94\xd7\x95\xd7\x93\xd7\xa2\xd7\x94](http://localhost)_'
+
+    # Now we'll test an edge case where a title was defined, but after
+    # processing it, it was determiend there really wasn't anything there
+    # at all at the end of the day.
+
+    # Reset our values
+    mock_post.reset_mock()
+
+    # Upstream to use HTML but input specified as Markdown
+    aobj = Apprise()
+    aobj.add('tgram://987654321:abcdefg_hijklmnop/?format=markdown')
+    assert len(aobj) == 1
+
+    # Now test our MARKDOWN Handling (no title defined... not really anyway)
+    title = '# '
+    body = '_[Apprise Body Title](http://localhost)_' \
+           ' had [a change](http://127.0.0.2)'
+
+    # MARKDOWN forced by the command line, but TEXT spacified as
+    # upstream mode
+    assert aobj.notify(
+        title=title, body=body, body_format=NotifyFormat.TEXT)
+
+    # Test our calls
+    assert mock_post.call_count == 2
+
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.telegram.org/bot987654321:abcdefg_hijklmnop/getUpdates'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://api.telegram.org/bot987654321:abcdefg_hijklmnop/sendMessage'
+
+    payload = loads(mock_post.call_args_list[1][1]['data'])
+
+    # Test that everything is escaped properly in a HTML mode
+    assert payload['text'] == \
+        '_[Apprise Body Title](http://localhost)_ had ' \
+        '[a change](http://127.0.0.2)'
 
 
 @mock.patch('requests.post')

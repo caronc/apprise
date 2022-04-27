@@ -344,8 +344,6 @@ class NotifyBase(BASE_OBJECT):
                 body = '<{open_tag}>{title}</{close_tag}>' \
                     '<br />\r\n{body}'.format(
                         open_tag=self.default_html_tag_id,
-                        # We only escape our title if the source provided was
-                        # of TEXT formatting
                         title=title,
                         close_tag=self.default_html_tag_id,
                         body=body)
