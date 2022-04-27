@@ -105,6 +105,9 @@ class NotifyTelegram(NotifyBase):
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 4096
 
+    # Title is to be part of body
+    title_maxlen = 0
+
     # Telegram is limited to sending a maximum of 100 requests per second.
     request_rate_per_sec = 0.001
 
@@ -545,7 +548,7 @@ class NotifyTelegram(NotifyBase):
         return 0
 
     def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
-             **kwargs):
+             body_format=None, **kwargs):
         """
         Perform Telegram Notification
         """
@@ -588,54 +591,43 @@ class NotifyTelegram(NotifyBase):
         if self.notify_format == NotifyFormat.MARKDOWN:
             payload['parse_mode'] = 'MARKDOWN'
 
-            payload['text'] = '**{}**\r\n{}'\
-                .format(title, body) if title else body
+            payload['text'] = body
 
-        elif self.notify_format == NotifyFormat.HTML:
+        else:  # HTML
 
             # Use Telegram's HTML mode
             payload['parse_mode'] = 'HTML'
             for r, v in self.__telegram_escape_html_dict.items():
                 body = r.sub(v, body, re.I)
-                if title:
-                    title = r.sub(v, title, re.I)
 
             # Prepare our payload based on HTML or TEXT
-            payload['text'] = '<b>{}</b>\r\n{}'\
-                .format(title, body) if title else body
+            payload['text'] = body
 
-        else:  # self.notify_format == NotifyFormat.TEXT:
-            # Use Telegram's HTML mode
-            payload['parse_mode'] = 'HTML'
+        # else:  # self.notify_format == NotifyFormat.TEXT:
+        #     # Use Telegram's HTML mode
+        #     payload['parse_mode'] = 'HTML'
 
-            # Further html escaping required...
-            telegram_escape_text_dict = {
-                # We need to escape characters that conflict with html
-                # entity blocks (< and >) when displaying text
-                r'>': '&gt;',
-                r'<': '&lt;',
-                r'\&': '&amp;',
-            }
+        #     # Further html escaping required...
+        #     telegram_escape_text_dict = {
+        #         # We need to escape characters that conflict with html
+        #         # entity blocks (< and >) when displaying text
+        #         r'>': '&gt;',
+        #         r'<': '&lt;',
+        #         r'\&': '&amp;',
+        #     }
 
-            # Create a regular expression from the dictionary keys
-            text_regex = re.compile("(%s)" % "|".join(
-                map(re.escape, telegram_escape_text_dict.keys())).lower(),
-                re.I)
+        #     # Create a regular expression from the dictionary keys
+        #     text_regex = re.compile("(%s)" % "|".join(
+        #         map(re.escape, telegram_escape_text_dict.keys())).lower(),
+        #         re.I)
 
-            # For each match, look-up corresponding value in dictionary
-            body = text_regex.sub(  # pragma: no branch
-                lambda mo: telegram_escape_text_dict[
-                    mo.string[mo.start():mo.end()]], body)
+        #     # For each match, look-up corresponding value in dictionary
+        #     body = text_regex.sub(  # pragma: no branch
+        #         lambda mo: telegram_escape_text_dict[
+        #             mo.string[mo.start():mo.end()]], body)
 
-            if title:
-                # For each match, look-up corresponding value in dictionary
-                title = text_regex.sub(  # pragma: no branch
-                    lambda mo: telegram_escape_text_dict[
-                        mo.string[mo.start():mo.end()]], title)
-
-            # prepare our payload based on HTML or TEXT
-            payload['text'] = '<b>{}</b>\r\n{}'\
-                .format(title, body) if title else body
+        #     # prepare our payload based on HTML or TEXT
+        #     payload['text'] = body
 
         # Create a copy of the chat_ids list
         targets = list(self.targets)

@@ -403,7 +403,7 @@ def test_plugin_telegram_general(mock_post):
 
     # Test our payload
     assert payload['text'] == \
-        '<b>special characters</b>\r\n\'"This can\'t\t\r\nfail us"\''
+        '<b>special characters</b>\r\n\'"This can\'t\t\r\nfail us"\'\r\n'
 
     # Test sending attachments
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
@@ -625,10 +625,11 @@ def test_plugin_telegram_formating_py3(mock_post):
 
     # Test that everything is escaped properly in a TEXT mode
     assert payload['text'] == \
-        '<b>🚨 Change detected for <i>Apprise Test Title</i></b>' \
-        '\r\n&lt;a href="http://localhost"&gt;&lt;i&gt;Apprise ' \
-        'Body&nbsp;Title&lt;/i&gt;&lt;/a&gt;&nbsp;had&nbsp;&lt;a' \
-        '&nbsp;href="http://127.0.0.1"&gt;a&nbsp;change&lt;/a&gt;'
+        '<b>🚨 Change detected&nbsp;for&nbsp;&lt;i&gt;Apprise&nbsp;' \
+        'Test&nbsp;Title&lt;/i&gt;</b>\r\n&lt;a&nbsp;href=' \
+        '"http://localhost"&gt;&lt;i&gt;Apprise&nbsp;Body&nbsp;Title&lt;' \
+        '/i&gt;&lt;/a&gt;&nbsp;had&nbsp;&lt;a&nbsp;href=&quot;http://' \
+        '127.0.0.1&quot;&gt;a&nbsp;change&lt;/a&gt;'
 
     # Reset our values
     mock_post.reset_mock()
@@ -717,9 +718,9 @@ def test_plugin_telegram_formating_py3(mock_post):
 
     # Test that everything is escaped properly in a HTML mode
     assert payload['text'] == \
-        '<b>🚨 Another Change detected for <i>Apprise Test Title</i>' \
-        '</b>\r\n<i><a href="http://localhost">Apprise Body Title</a>' \
-        '</i> had <a href="http://127.0.0.2">a change</a>'
+        '<b><b>🚨 Another Change detected for <i>Apprise Test Title</i>' \
+        '</b></b>\r\n<i><a href="http://localhost">Apprise Body Title</a>' \
+        '</i> had <a href="http://127.0.0.2">a change</a>\r\n'
 
 
 @pytest.mark.skipif(sys.version_info.major >= 3, reason="Requires Python 2.x+")
@@ -810,11 +811,11 @@ def test_plugin_telegram_formating_py2(mock_post):
 
     # Test that everything is escaped properly in a TEXT mode
     assert payload['text'].encode('utf-8') == \
-        '<b>\xf0\x9f\x9a\xa8 Change detected&nbsp;for&nbsp;' \
-        '&lt;i&gt;Apprise&nbsp;Test&nbsp;Title&lt;/i&gt;</b>\r\n' \
-        '&lt;a href="http://localhost"&gt;&lt;i&gt;Apprise Body&nbsp;' \
-        'Title&lt;/i&gt;&lt;/a&gt;&nbsp;had&nbsp;&lt;a&nbsp;' \
-        'href="http://127.0.0.1"&gt;a&nbsp;change&lt;/a&gt;'
+        '<b>\xf0\x9f\x9a\xa8 Change detected&nbsp;for&nbsp;&lt;i&gt;' \
+        'Apprise&nbsp;Test&nbsp;Title&lt;/i&gt;</b>\r\n&lt;a&nbsp;' \
+        'href="http://localhost"&gt;&lt;i&gt;Apprise&nbsp;Body&nbsp;' \
+        'Title&lt;/i&gt;&lt;/a&gt;&nbsp;had&nbsp;&lt;a&nbsp;href=&quot;' \
+        'http://127.0.0.1&quot;&gt;a&nbsp;change&lt;/a&gt;'
 
     # Reset our values
     mock_post.reset_mock()
@@ -898,9 +899,10 @@ def test_plugin_telegram_formating_py2(mock_post):
 
     # Test that everything is escaped properly in a HTML mode
     assert payload['text'].encode('utf-8') == \
-        '<b>\xf0\x9f\x9a\xa8 Change detected for <i>Apprise Test Title</i>' \
-        '</b>\r\n<i><a href="http://localhost">Apprise Body Title</a></i> ' \
-        'had <a href="http://127.0.0.1">a change</a>'
+        '<b><b>\xf0\x9f\x9a\xa8 Change detected for ' \
+        '<i>Apprise Test Title</i></b></b>\r\n<i>' \
+        '<a href="http://localhost">Apprise Body Title</a>'\
+        '</i> had <a href="http://127.0.0.1">a change</a>\r\n'
 
     # Reset our values
     mock_post.reset_mock()
@@ -1034,7 +1036,8 @@ def test_plugin_telegram_html_formatting(mock_post):
     payload = loads(mock_post.call_args_list[0][1]['data'])
 
     assert payload['text'] == \
-        "<b><b>'information'</b></b>\r\n&lt;em&gt;&amp;quot;This is in" \
-        "&nbsp;Italic&amp;quot&lt;/em&gt;&lt;br/&gt;&lt;h5&gt;&amp;" \
-        "emsp;&amp;emspHeadings&amp;nbsp;are&nbsp;dropped&nbsp;and" \
-        "&amp;nbspconverted&nbsp;to&nbsp;bold&lt;/h5&gt;"
+        '<b>&lt;title&gt;&amp;apos;information&amp;apos&lt;/title&gt;</b>' \
+        '\r\n&lt;em&gt;&amp;quot;This is in&nbsp;Italic&amp;quot&lt;/em' \
+        '&gt;&lt;br/&gt;&lt;h5&gt;&amp;emsp;&amp;emspHeadings&amp;nbsp;' \
+        'are&nbsp;dropped&nbsp;and&amp;nbspconverted&nbsp;to&nbsp;bold&lt;' \
+        '/h5&gt;'

@@ -28,6 +28,7 @@ import re
 import six
 from markdown import markdown
 from .common import NotifyFormat
+from .URLBase import URLBase
 
 if six.PY2:
     from HTMLParser import HTMLParser
@@ -69,36 +70,7 @@ def text_to_html(content):
     Converts specified content from plain text to HTML.
     """
 
-    # Basic TEXT to HTML format map; supports keys only
-    re_map = {
-        # Support Ampersand
-        r'&': '&amp;',
-
-        # Spaces to &nbsp; for formatting purposes since
-        # multiple spaces are treated as one an this may
-        # not be the callers intention
-        r' ': '&nbsp;',
-
-        # Tab support
-        r'\t': '&nbsp;&nbsp;&nbsp;',
-
-        # Greater than and Less than Characters
-        r'>': '&gt;',
-        r'<': '&lt;',
-    }
-
-    # Compile our map
-    re_table = re.compile(
-        r'(' + '|'.join(
-            map(re.escape, re_map.keys())) + r')',
-        re.IGNORECASE,
-    )
-
-    # Execute our map against our content in addition to
-    # swapping out new lines and replacing them with <br/>
-    return re.sub(
-        r'\r*\n', '<br/>\n',
-        re_table.sub(lambda x: re_map[x.group()], content))
+    return URLBase.escape_html(content)
 
 
 def html_to_text(content):

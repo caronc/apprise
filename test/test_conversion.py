@@ -32,7 +32,7 @@ import logging
 logging.disable(logging.CRITICAL)
 
 
-def test_html_to_text():
+def test_conversion_html_to_text():
     """conversion: Test HTML to plain text
     """
 
@@ -134,3 +134,16 @@ def test_html_to_text():
     with pytest.raises(TypeError):
         # Invalid input
         assert to_html(object)
+
+
+def test_conversion_text_to():
+    """conversion: Test Text to all types
+    """
+
+    response = convert_between(
+        NotifyFormat.TEXT, NotifyFormat.HTML,
+        "<title>Test Message</title><body>Body</body>")
+
+    assert response == \
+        '&lt;title&gt;Test&nbsp;Message&lt;/title&gt;&lt;body&gt;Body&lt;'\
+        '/body&gt;'

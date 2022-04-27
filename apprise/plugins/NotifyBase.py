@@ -346,12 +346,12 @@ class NotifyBase(BASE_OBJECT):
                         open_tag=self.default_html_tag_id,
                         # We only escape our title if the source provided was
                         # of TEXT formatting
-                        title=self.escape_html(title)
-                        if body_format == NotifyFormat.TEXT else title,
+                        title=title,
                         close_tag=self.default_html_tag_id,
                         body=body)
 
-            elif self.notify_format == NotifyFormat.MARKDOWN:
+            elif self.notify_format == NotifyFormat.MARKDOWN and \
+                    body_format == NotifyFormat.TEXT:
                 # Content is appended to body as markdown
                 title = title.lstrip('\r\n \t\v\f#-')
                 if title:
