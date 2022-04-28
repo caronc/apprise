@@ -71,14 +71,14 @@ setup(
     url='https://github.com/caronc/apprise',
     keywords='Push Notifications Alerts Email AWS SES SNS Boxcar ClickSend '
         'DAPNET Dingtalk Discord Dbus Emby Faast FCM Flock Gitter Gnome '
-        'Google Chat Gotify Growl Home Assistant IFTTT Join Kavenegar KODI '
-        'Kumulos LaMetric MacOS Mailgun Matrix Mattermost MessageBird MQTT '
-        'MSG91 Nexmo Nextcloud NextcloudTalk Notica Notifico Ntfy Office365 '
-        'OneSignal Opsgenie ParsePlatform PopcornNotify Prowl PushBullet '
-        'Pushjet Pushed Pushover PushSafer Reddit Rocket.Chat Ryver SendGrid '
-        'ServerChan Signal SimplePush Sinch Slack SMTP2Go SparkPost Spontit '
-        'Streamlabs Stride Syslog Techulus Telegram Twilio Twist Twitter XBMC '
-        'MSTeams Microsoft Windows Webex CLI API',
+        'Google Chat Gotify Growl Guilded Home Assistant IFTTT Join Kavenegar '
+        'KODI Kumulos LaMetric MacOS Mailgun Matrix Mattermost MessageBird '
+        'MQTT MSG91 Nexmo Nextcloud NextcloudTalk Notica Notifico Ntfy '
+        'Office365 OneSignal Opsgenie ParsePlatform PopcornNotify Prowl '
+        'PushBullet Pushjet Pushed Pushover PushSafer Reddit Rocket.Chat '
+        'Ryver SendGrid ServerChan Signal SimplePush Sinch Slack SMTP2Go '
+        'SparkPost Spontit Streamlabs Stride Syslog Techulus Telegram Twilio '
+        'Twist Twitter XBMC MSTeams Microsoft Windows Webex CLI API',
     author='Chris Caron',
     author_email='lead2gold@gmail.com',
     packages=find_packages(),
