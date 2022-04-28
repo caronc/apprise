@@ -43,6 +43,7 @@ from .AppriseLocale import AppriseLocale
 from .config.ConfigBase import ConfigBase
 from .plugins.NotifyBase import NotifyBase
 
+
 from . import plugins
 from . import __version__
 
@@ -542,11 +543,23 @@ class Apprise(object):
             # determined we need to notify the service it's associated with
             if server.notify_format not in conversion_body_map:
                 # Perform Conversion
-                (conversion_title_map[server.notify_format],
-                 conversion_body_map[server.notify_format]) = \
+                conversion_body_map[server.notify_format] = \
                     convert_between(
-                        body_format, server.notify_format, body=body,
-                        title=title, title_format=server.title_format)
+                        body_format, server.notify_format, content=body)
+
+                # Prepare our title
+                conversion_title_map[server.notify_format] = \
+                    '' if not title else title
+
+                # Tidy Title IF required (hence it will become part of the
+                # body)
+                if server.title_maxlen <= 0 and \
+                        conversion_title_map[server.notify_format]:
+
+                    conversion_title_map[server.notify_format] = \
+                        convert_between(
+                            body_format, server.notify_format,
+                            content=conversion_title_map[server.notify_format])
 
                 if interpret_escapes:
                     #
@@ -587,14 +600,6 @@ class Apprise(object):
                 if six.PY2:
                     # Python 2.7 strings must be encoded as utf-8 for
                     # consistency across all platforms
-                    if conversion_title_map[server.notify_format] and \
-                            isinstance(
-                                conversion_title_map[server.notify_format],
-                                unicode):  # noqa: F821
-                        conversion_title_map[server.notify_format] = \
-                            conversion_title_map[server.notify_format]\
-                            .encode('utf-8')
-
                     if conversion_body_map[server.notify_format] and \
                             isinstance(
                                 conversion_body_map[server.notify_format],
@@ -603,12 +608,21 @@ class Apprise(object):
                             conversion_body_map[server.notify_format]\
                             .encode('utf-8')
 
+                    if conversion_title_map[server.notify_format] and \
+                            isinstance(
+                                conversion_title_map[server.notify_format],
+                                unicode):  # noqa: F821
+                        conversion_title_map[server.notify_format] = \
+                            conversion_title_map[server.notify_format]\
+                            .encode('utf-8')
+
             yield handler(
                 server,
                 body=conversion_body_map[server.notify_format],
                 title=conversion_title_map[server.notify_format],
                 notify_type=notify_type,
-                attach=attach
+                attach=attach,
+                body_format=body_format,
             )
 
     def details(self, lang=None, show_requirements=False, show_disabled=False):

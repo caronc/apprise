@@ -702,7 +702,7 @@ def parse_url(url, default_schema='http', verify_host=True, strict_port=False):
 
     # Port Parsing
     pmatch = re.search(
-        r'^(?P<host>([[0-9a-f:]+]|[^:]+)):(?P<port>[^:]*)$',
+        r'^(?P<host>(\[[0-9a-f:]+\]|[^:]+)):(?P<port>[^:]*)$',
         result['host'])
 
     if pmatch:

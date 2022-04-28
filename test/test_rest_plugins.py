@@ -386,3 +386,57 @@ def test_notify_overflow_split():
         _body = chunk.get('body')
         assert bulk[offset: len(_body) + offset] == _body
         offset += len(_body)
+
+
+def test_notify_overflow_general():
+    """
+    API: Overflow General Testing
+
+    """
+
+    #
+    # A little preparation
+    #
+
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.request_rate_per_sec = 0
+
+    #
+    # First Test: Truncated Title
+    #
+    class TestMarkdownNotification(NotifyBase):
+
+        # Force our title to wrap
+        title_maxlen = 0
+
+        # Default Notify Format
+        notify_format = NotifyFormat.MARKDOWN
+
+        def __init__(self, *args, **kwargs):
+            super(TestMarkdownNotification, self).__init__(**kwargs)
+
+        def notify(self, *args, **kwargs):
+            # Pretend everything is okay
+            return True
+
+    # Load our object
+    obj = TestMarkdownNotification()
+    assert obj is not None
+
+    # A bad header
+    title = " # "
+    body = "**Test Body**"
+
+    chunks = obj._apply_overflow(body=body, title=title)
+    assert len(chunks) == 1
+    # whitspace is trimmed
+    assert '#\r\n**Test Body**' == chunks[0].get('body')
+    assert chunks[0].get('title') == ""
+
+    # If we know our input is text however, we perform manipulation
+    chunks = obj._apply_overflow(
+        body=body, title=title, body_format=NotifyFormat.TEXT)
+    assert len(chunks) == 1
+    # Our title get's stripped off since it's not of valid markdown
+    assert body == chunks[0].get('body')
+    assert chunks[0].get('title') == ""
