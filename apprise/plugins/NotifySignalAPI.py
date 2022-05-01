@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2020 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2022 Chris Caron <lead2gold@gmail.com>
 # All rights reserved.
 #
 # This code is licensed under the MIT License.
@@ -23,6 +23,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import re
 import requests
 from json import dumps
 
@@ -33,6 +34,10 @@ from ..utils import parse_phone_no
 from ..utils import parse_bool
 from ..URLBase import PrivacyMode
 from ..AppriseLocale import gettext_lazy as _
+
+
+GROUP_REGEX = re.compile(
+    r'^\s*((\@|\%40)?(group\.)|\@|\%40)(?P<group>[a-z0-9_-]+)', re.I)
 
 
 class NotifySignalAPI(NotifyBase):
@@ -113,6 +118,13 @@ class NotifySignalAPI(NotifyBase):
             'regex': (r'^[0-9\s)(+-]+$', 'i'),
             'map_to': 'targets',
         },
+        'target_channel': {
+            'name': _('Target Group ID'),
+            'type': 'string',
+            'prefix': '@',
+            'regex': (r'^[a-z0-9_-]+$', 'i'),
+            'map_to': 'targets',
+        },
         'targets': {
             'name': _('Targets'),
             'type': 'list:string',
@@ -173,16 +185,25 @@ class NotifySignalAPI(NotifyBase):
             for target in parse_phone_no(targets):
                 # Validate targets and drop bad ones:
                 result = is_phone_no(target)
-                if not result:
-                    self.logger.warning(
-                        'Dropped invalid phone # '
-                        '({}) specified.'.format(target),
-                    )
-                    self.invalid_targets.append(target)
+                if result:
+                    # store valid phone number
+                    self.targets.append('+{}'.format(result['full']))
                     continue
 
-                # store valid phone number
-                self.targets.append('+{}'.format(result['full']))
+                result = GROUP_REGEX.match(target)
+                if result:
+                    # Just store group information
+                    self.targets.append(
+                        'group.{}'.format(result.group('group')))
+                    continue
+
+                self.logger.warning(
+                    'Dropped invalid phone/group '
+                    '({}) specified.'.format(target),
+                )
+                self.invalid_targets.append(target)
+                continue
+
         else:
             # Send a message to ourselves
             self.targets.append(self.source)
@@ -209,6 +230,20 @@ class NotifySignalAPI(NotifyBase):
             'Content-Type': 'application/json',
         }
 
+        # Format defined here:
+        #   https://bbernhard.github.io/signal-cli-rest-api\
+        #       /#/Messages/post_v2_send
+        # Example:
+        # {
+        #   "base64_attachments": [
+        #     "string"
+        #   ],
+        #   "message": "string",
+        #   "number": "string",
+        #   "recipients": [
+        #     "string"
+        #   ]
+        # }
         # Prepare our payload
         payload = {
             'message': "{}{}".format(
@@ -339,7 +374,11 @@ class NotifySignalAPI(NotifyBase):
             targets = self.invalid_targets
 
         else:
-            targets = list(self.targets)
+            # append @ to non-phone number entries as they are groups
+            # Remove group. prefix as well
+            targets = \
+                ['@{}'.format(x[6:]) if x[0] != '+'
+                 else x for x in self.targets]
 
         return '{schema}://{auth}{hostname}{port}/{src}/{dst}?{params}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
@@ -350,7 +389,7 @@ class NotifySignalAPI(NotifyBase):
                  else ':{}'.format(self.port),
             src=self.source,
             dst='/'.join(
-                [NotifySignalAPI.quote(x, safe='') for x in targets]),
+                [NotifySignalAPI.quote(x, safe='@+') for x in targets]),
             params=NotifySignalAPI.urlencode(params),
         )
 

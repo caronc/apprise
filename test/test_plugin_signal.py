@@ -70,6 +70,18 @@ apprise_url_tests = (
         'instance': plugins.NotifySignalAPI,
     }),
 
+    ('signal://localhost:8082/+{}/@group.abcd/'.format('2' * 11), {
+        # a valid group
+        'instance': plugins.NotifySignalAPI,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'signal://localhost:8082/+{}/@abcd'.format('2' * 11),
+    }),
+    ('signal://localhost:8080/+{}/group.abcd/'.format('1' * 11), {
+        # another valid group (without @ symbol)
+        'instance': plugins.NotifySignalAPI,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'signal://localhost:8080/+{}/@abcd'.format('1' * 11),
+    }),
     ('signal://localhost:8080/?from={}&to={},{}'.format(
         '1' * 11, '2' * 11, '3' * 11), {
         # use get args to acomplish the same thing
@@ -203,10 +215,13 @@ def test_plugin_signal_test_based_on_feedback(mock_post):
     title = "My Title"
 
     aobj = Apprise()
-    aobj.add('signal://10.0.0.112:8080/+12512222222/+12513333333')
+    aobj.add(
+        'signal://10.0.0.112:8080/+12512222222/+12513333333/'
+        '12514444444?batch=yes')
 
     assert aobj.notify(title=title, body=body)
 
+    # If a batch, there is only 1 post
     assert mock_post.call_count == 1
 
     details = mock_post.call_args_list[0]
@@ -214,4 +229,67 @@ def test_plugin_signal_test_based_on_feedback(mock_post):
     payload = loads(details[1]['data'])
     assert payload['message'] == 'My Title\r\ntest body'
     assert payload['number'] == "+12512222222"
-    assert payload['recipients'] == ["+12513333333"]
+    assert len(payload['recipients']) == 2
+    assert "+12513333333" in payload['recipients']
+    # The + is appended
+    assert "+12514444444" in payload['recipients']
+
+    # Reset our test and turn batch mode off
+    mock_post.reset_mock()
+
+    aobj = Apprise()
+    aobj.add(
+        'signal://10.0.0.112:8080/+12512222222/+12513333333/'
+        '12514444444?batch=no')
+
+    assert aobj.notify(title=title, body=body)
+
+    # If a batch, there is only 1 post
+    assert mock_post.call_count == 2
+
+    details = mock_post.call_args_list[0]
+    assert details[0][0] == 'http://10.0.0.112:8080/v2/send'
+    payload = loads(details[1]['data'])
+    assert payload['message'] == 'My Title\r\ntest body'
+    assert payload['number'] == "+12512222222"
+    assert len(payload['recipients']) == 1
+    assert "+12513333333" in payload['recipients']
+
+    details = mock_post.call_args_list[1]
+    assert details[0][0] == 'http://10.0.0.112:8080/v2/send'
+    payload = loads(details[1]['data'])
+    assert payload['message'] == 'My Title\r\ntest body'
+    assert payload['number'] == "+12512222222"
+    assert len(payload['recipients']) == 1
+
+    # The + is appended
+    assert "+12514444444" in payload['recipients']
+
+    mock_post.reset_mock()
+
+    # Test group names
+    aobj = Apprise()
+    aobj.add(
+        'signal://10.0.0.112:8080/+12513333333/@group1/@group2/'
+        '12514444444?batch=yes')
+
+    assert aobj.notify(title=title, body=body)
+
+    # If a batch, there is only 1 post
+    assert mock_post.call_count == 1
+
+    details = mock_post.call_args_list[0]
+    assert details[0][0] == 'http://10.0.0.112:8080/v2/send'
+    payload = loads(details[1]['data'])
+    assert payload['message'] == 'My Title\r\ntest body'
+    assert payload['number'] == "+12513333333"
+    assert len(payload['recipients']) == 3
+    assert "+12514444444" in payload['recipients']
+    # our groups
+    assert "group.group1" in payload['recipients']
+    assert "group.group2" in payload['recipients']
+    # Groups are stored properly
+    assert '/@group1' in aobj[0].url()
+    assert '/@group2' in aobj[0].url()
+    # Our target phone number is also in the path
+    assert '/+12514444444' in aobj[0].url()
