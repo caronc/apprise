@@ -96,7 +96,9 @@ class HTMLConverter(HTMLParser, object):
                   'div', 'td', 'th', 'code', 'pre', 'label', 'li',)
 
     # the folowing tags ignore any internal text
-    IGNORE_TAGS = ('style', 'link', 'meta', 'title', 'html', 'head', 'script')
+    IGNORE_TAGS = (
+        'form', 'input', 'textarea', 'select', 'ul', 'ol', 'style', 'link',
+        'meta', 'title', 'html', 'head', 'script')
 
     # Condense Whitespace
     WS_TRIM = re.compile(r'[\s]+', re.DOTALL | re.MULTILINE)
