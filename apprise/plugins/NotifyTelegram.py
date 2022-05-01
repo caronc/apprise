@@ -177,44 +177,85 @@ class NotifyTelegram(NotifyBase):
     # characters passed into it.  to handle this situation, we need to
     # search the body for these sequences and convert them to the
     # output the user expected
-    __telegram_escape_html_dict = {
-        # New Lines
-        re.compile(r'<\s*/?br\s*/?>\r*\n?', re.I): '\r\n',
-        re.compile(r'<\s*/(br|p|div|li)[^>]*>\r*\n?', re.I): '\r\n',
-
-        # The following characters can be altered to become supported
-        re.compile(r'<\s*pre[^>]*>', re.I): '<code>',
-        re.compile(r'<\s*/pre[^>]*>', re.I): '</code>',
+    __telegram_escape_html_entries = (
+        # Comments
+        (re.compile(
+            r'\s*<!.+?-->\s*',
+            (re.I | re.M | re.S)), '', {}),
 
         # the following tags are not supported
-        re.compile(
-            r'<\s*(br|p|div|span|body|script|meta|html|font'
-            r'|label|iframe|li|ol|ul|source|script)[^>]*>', re.I): '',
+        (re.compile(
+            r'\s*<\s*(!?DOCTYPE|p|div|span|body|script|link|'
+            r'meta|html|font|head|label|form|input|textarea|select|iframe|'
+            r'source|script)([^a-z0-9>][^>]*)?>\s*',
+            (re.I | re.M | re.S)), '', {}),
 
-        re.compile(
-            r'<\s*/(span|body|script|meta|html|font'
-            r'|label|iframe|ol|ul|source|script)[^>]*>', re.I): '',
-
-        # Italic
-        re.compile(r'<\s*(caption|em)[^>]*>', re.I): '<i>',
-        re.compile(r'<\s*/(caption|em)[^>]*>', re.I): '</i>',
+        # All closing tags to be removed are put here
+        (re.compile(
+            r'\s*<\s*/(span|body|script|meta|html|font|head|'
+            r'label|form|input|textarea|select|ol|ul|link|'
+            r'iframe|source|script)([^a-z0-9>][^>]*)?>\s*',
+            (re.I | re.M | re.S)), '', {}),
 
         # Bold
-        re.compile(r'<\s*(h[1-6]|title|strong)[^>]*>', re.I): '<b>',
-        re.compile(r'<\s*/(h[1-6]|title|strong)[^>]*>', re.I): '</b>',
+        (re.compile(
+            r'<\s*(strong)([^a-z0-9>][^>]*)?>',
+            (re.I | re.M | re.S)), '<b>', {}),
+        (re.compile(
+            r'<\s*/\s*(strong)([^a-z0-9>][^>]*)?>',
+            (re.I | re.M | re.S)), '</b>', {}),
+        (re.compile(
+            r'\s*<\s*(h[1-6]|title)([^a-z0-9>][^>]*)?>\s*',
+            (re.I | re.M | re.S)), '{}<b>', {'html': '\r\n'}),
+        (re.compile(
+            r'\s*<\s*/\s*(h[1-6]|title)([^a-z0-9>][^>]*)?>\s*',
+            (re.I | re.M | re.S)),
+            '</b>{}', {'html': '<br/>'}),
+
+        # Italic
+        (re.compile(
+            r'<\s*(caption|em)([^a-z0-9>][^>]*)?>',
+            (re.I | re.M | re.S)), '<i>', {}),
+        (re.compile(
+            r'<\s*/\s*(caption|em)([^a-z0-9>][^>]*)?>',
+            (re.I | re.M | re.S)), '</i>', {}),
+
+        # Bullet Lists
+        (re.compile(
+            r'<\s*li([^a-z0-9>][^>]*)?>\s*',
+            (re.I | re.M | re.S)), ' -', {}),
+
+        # convert pre tags to code (supported by Telegram)
+        (re.compile(
+            r'<\s*pre([^a-z0-9>][^>]*)?>',
+            (re.I | re.M | re.S)), '{}<code>', {'html': '\r\n'}),
+        (re.compile(
+            r'<\s*/\s*pre([^a-z0-9>][^>]*)?>',
+            (re.I | re.M | re.S)), '</code>{}', {'html': '\r\n'}),
+
+        # New Lines
+        (re.compile(
+            r'\s*<\s*/?\s*(ol|ul|br|hr)\s*/?>\s*',
+            (re.I | re.M | re.S)), '\r\n', {}),
+        (re.compile(
+            r'\s*<\s*/\s*(br|p|hr|li|div)([^a-z0-9>][^>]*)?>\s*',
+            (re.I | re.M | re.S)), '\r\n', {}),
 
         # HTML Spaces (&nbsp;) and tabs (&emsp;) aren't supported
         # See https://core.telegram.org/bots/api#html-style
-        re.compile(r'\&nbsp;?', re.I): ' ',
+        (re.compile(r'\&nbsp;?', re.I), ' ', {}),
 
         # Tabs become 3 spaces
-        re.compile(r'\&emsp;?', re.I): '   ',
+        (re.compile(r'\&emsp;?', re.I), '   ', {}),
 
         # Some characters get re-escaped by the Telegram upstream
         # service so we need to convert these back,
-        re.compile(r'\&apos;?', re.I): '\'',
-        re.compile(r'\&quot;?', re.I): '"',
-    }
+        (re.compile(r'\&apos;?', re.I), '\'', {}),
+        (re.compile(r'\&quot;?', re.I), '"', {}),
+
+        # New line cleanup
+        (re.compile(r'\r*\n[\r\n]+', re.I), '\r\n', {}),
+    )
 
     # Define our template tokens
     template_tokens = dict(NotifyBase.template_tokens, **{
@@ -597,37 +638,18 @@ class NotifyTelegram(NotifyBase):
 
             # Use Telegram's HTML mode
             payload['parse_mode'] = 'HTML'
-            for r, v in self.__telegram_escape_html_dict.items():
-                body = r.sub(v, body, re.I)
+            for r, v, m in self.__telegram_escape_html_entries:
+
+                if 'html' in m:
+                    # Handle special cases where we need to alter new lines
+                    # for presentation purposes
+                    v = v.format(m['html'] if body_format in (
+                        NotifyFormat.HTML, NotifyFormat.MARKDOWN) else '')
+
+                body = r.sub(v, body)
 
             # Prepare our payload based on HTML or TEXT
             payload['text'] = body
-
-        # else:  # self.notify_format == NotifyFormat.TEXT:
-        #     # Use Telegram's HTML mode
-        #     payload['parse_mode'] = 'HTML'
-
-        #     # Further html escaping required...
-        #     telegram_escape_text_dict = {
-        #         # We need to escape characters that conflict with html
-        #         # entity blocks (< and >) when displaying text
-        #         r'>': '&gt;',
-        #         r'<': '&lt;',
-        #         r'\&': '&amp;',
-        #     }
-
-        #     # Create a regular expression from the dictionary keys
-        #     text_regex = re.compile("(%s)" % "|".join(
-        #         map(re.escape, telegram_escape_text_dict.keys())).lower(),
-        #         re.I)
-
-        #     # For each match, look-up corresponding value in dictionary
-        #     body = text_regex.sub(  # pragma: no branch
-        #         lambda mo: telegram_escape_text_dict[
-        #             mo.string[mo.start():mo.end()]], body)
-
-        #     # prepare our payload based on HTML or TEXT
-        #     payload['text'] = body
 
         # Create a copy of the chat_ids list
         targets = list(self.targets)

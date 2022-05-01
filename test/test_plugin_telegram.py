@@ -625,11 +625,10 @@ def test_plugin_telegram_formating_py3(mock_post):
 
     # Test that everything is escaped properly in a TEXT mode
     assert payload['text'] == \
-        '<b>🚨 Change detected&nbsp;for&nbsp;&lt;i&gt;Apprise&nbsp;' \
-        'Test&nbsp;Title&lt;/i&gt;</b>\r\n&lt;a&nbsp;href=' \
-        '"http://localhost"&gt;&lt;i&gt;Apprise&nbsp;Body&nbsp;Title&lt;' \
-        '/i&gt;&lt;/a&gt;&nbsp;had&nbsp;&lt;a&nbsp;href=&quot;http://' \
-        '127.0.0.1&quot;&gt;a&nbsp;change&lt;/a&gt;'
+        '<b>🚨 Change detected for &lt;i&gt;Apprise Test Title&lt;/i&gt;' \
+        '</b>\r\n&lt;a href="http://localhost"&gt;&lt;i&gt;' \
+        'Apprise Body Title&lt;/i&gt;&lt;/a&gt; had &lt;' \
+        'a href="http://127.0.0.1"&gt;a change&lt;/a&gt;'
 
     # Reset our values
     mock_post.reset_mock()
@@ -718,8 +717,9 @@ def test_plugin_telegram_formating_py3(mock_post):
 
     # Test that everything is escaped properly in a HTML mode
     assert payload['text'] == \
-        '<b><b>🚨 Another Change detected for <i>Apprise Test Title</i>' \
-        '</b></b>\r\n<i><a href="http://localhost">Apprise Body Title</a>' \
+        '<b>\r\n<b>🚨 Another Change detected for ' \
+        '<i>Apprise Test Title</i></b>\r\n</b>\r\n<i>' \
+        '<a href="http://localhost">Apprise Body Title</a>' \
         '</i> had <a href="http://127.0.0.2">a change</a>\r\n'
 
     # Now we'll test an edge case where a title was defined, but after
@@ -881,11 +881,11 @@ def test_plugin_telegram_formating_py2(mock_post):
 
     # Test that everything is escaped properly in a TEXT mode
     assert payload['text'].encode('utf-8') == \
-        '<b>\xf0\x9f\x9a\xa8 Change detected&nbsp;for&nbsp;&lt;i&gt;' \
-        'Apprise&nbsp;Test&nbsp;Title&lt;/i&gt;</b>\r\n&lt;a&nbsp;' \
-        'href="http://localhost"&gt;&lt;i&gt;Apprise&nbsp;Body&nbsp;' \
-        'Title&lt;/i&gt;&lt;/a&gt;&nbsp;had&nbsp;&lt;a&nbsp;href=&quot;' \
-        'http://127.0.0.1&quot;&gt;a&nbsp;change&lt;/a&gt;'
+        '<b>\xf0\x9f\x9a\xa8 Change detected for &lt;i&gt;' \
+        'Apprise Test Title&lt;/i&gt;</b>\r\n&lt;' \
+        'a href="http://localhost"&gt;&lt;i&gt;Apprise Body Title' \
+        '&lt;/i&gt;&lt;/a&gt; had &lt;a href="http://127.0.0.1"' \
+        '&gt;a change&lt;/a&gt;'
 
     # Reset our values
     mock_post.reset_mock()
@@ -969,9 +969,9 @@ def test_plugin_telegram_formating_py2(mock_post):
 
     # Test that everything is escaped properly in a HTML mode
     assert payload['text'].encode('utf-8') == \
-        '<b><b>\xf0\x9f\x9a\xa8 Change detected for ' \
-        '<i>Apprise Test Title</i></b></b>\r\n<i>' \
-        '<a href="http://localhost">Apprise Body Title</a>'\
+        '<b>\r\n<b>\xf0\x9f\x9a\xa8 Change detected for ' \
+        '<i>Apprise Test Title</i></b>\r\n</b>\r\n<i>' \
+        '<a href="http://localhost">Apprise Body Title</a>' \
         '</i> had <a href="http://127.0.0.1">a change</a>\r\n'
 
     # Reset our values
@@ -1163,8 +1163,8 @@ def test_plugin_telegram_html_formatting(mock_post):
 
     # Test that everything is escaped properly in a HTML mode
     assert payload['text'] == \
-        '<b><b>\'information\'</b></b>\r\n<i>"This is in Italic"' \
-        '</i>\r\n<b>      Headings are dropped and converted to bold</b>'
+        '<b>\r\n<b>\'information\'</b>\r\n</b>\r\n<i>"This is in Italic"' \
+        '</i>\r\n<b>      Headings are dropped and converted to bold</b>\r\n'
 
     mock_post.reset_mock()
 
@@ -1177,7 +1177,28 @@ def test_plugin_telegram_html_formatting(mock_post):
 
     assert payload['text'] == \
         '<b>&lt;title&gt;&amp;apos;information&amp;apos&lt;/title&gt;</b>' \
-        '\r\n&lt;em&gt;&amp;quot;This is in&nbsp;Italic&amp;quot&lt;/em' \
-        '&gt;&lt;br/&gt;&lt;h5&gt;&amp;emsp;&amp;emspHeadings&amp;nbsp;' \
-        'are&nbsp;dropped&nbsp;and&amp;nbspconverted&nbsp;to&nbsp;bold&lt;' \
-        '/h5&gt;'
+        '\r\n&lt;em&gt;&amp;quot;This is in Italic&amp;quot&lt;/em&gt;&lt;' \
+        'br/&gt;&lt;h5&gt;&amp;emsp;&amp;emspHeadings&amp;nbsp;are ' \
+        'dropped and&amp;nbspconverted to bold&lt;/h5&gt;'
+
+    # Lest test more complex HTML examples now
+    mock_post.reset_mock()
+
+    test_file_01 = os.path.join(
+        TEST_VAR_DIR, '01_test_example.html')
+    with open(test_file_01) as html_file:
+        assert aobj.notify(
+            body=html_file.read(), body_format=NotifyFormat.HTML)
+
+    # owner has already been looked up, so only one call is made
+    assert mock_post.call_count == 1
+
+    payload = loads(mock_post.call_args_list[0][1]['data'])
+    assert payload['text'] == \
+        '\r\n<b>Bootstrap 101 Template</b>\r\n<b>My Title</b>\r\n' \
+        '<b>Heading 1</b>\r\n-Bullet 1\r\n-Bullet 2\r\n-Bullet 3\r\n' \
+        '-Bullet 1\r\n-Bullet 2\r\n-Bullet 3\r\n<b>Heading 2</b>\r\n' \
+        'A div entry\r\nA div entry\r\n<code>A pre entry</code>\r\n' \
+        '<b>Heading 3</b>\r\n<b>Heading 4</b>\r\n<b>Heading 5</b>\r\n' \
+        '<b>Heading 6</b>\r\nA set of text\r\n' \
+        'Another line after the set of text\r\nMore text\r\nlabel'
