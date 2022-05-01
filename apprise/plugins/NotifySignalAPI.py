@@ -26,6 +26,7 @@
 import re
 import requests
 from json import dumps
+import base64
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
@@ -210,7 +211,8 @@ class NotifySignalAPI(NotifyBase):
 
         return
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
+             **kwargs):
         """
         Perform Signal API Notification
         """
@@ -223,6 +225,30 @@ class NotifySignalAPI(NotifyBase):
 
         # error tracking (used for function return)
         has_error = False
+
+        attachments = []
+        if attach:
+            for attachment in attach:
+                # Perform some simple error checking
+                if not attachment:
+                    # We could not access the attachment
+                    self.logger.error(
+                        'Could not access attachment {}.'.format(
+                            attachment.url(privacy=True)))
+                    return False
+
+                try:
+                    with open(attachment.path, 'rb') as f:
+                        # Prepare our Attachment in Base64
+                        attachments.append(
+                            base64.b64encode(f.read()).decode('utf-8'))
+
+                except (OSError, IOError) as e:
+                    self.logger.warning(
+                        'An I/O error occurred while reading {}.'.format(
+                            attachment.name if attachment else 'attachment'))
+                    self.logger.debug('I/O Exception: %s' % str(e))
+                    return False
 
         # Prepare our headers
         headers = {
@@ -252,6 +278,10 @@ class NotifySignalAPI(NotifyBase):
             "number": self.source,
             "recipients": []
         }
+
+        if attachments:
+            # Store our attachments
+            payload['base64_attachments'] = attachments
 
         # Determine Authentication
         auth = None

@@ -22,6 +22,8 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
+import os
+import sys
 from json import loads
 import mock
 import pytest
@@ -29,10 +31,15 @@ import requests
 from apprise import plugins
 from apprise import Apprise
 from helpers import AppriseURLTester
+from apprise import AppriseAttachment
+from apprise import NotifyType
 
 # Disable logging for a cleaner testing output
 import logging
 logging.disable(logging.CRITICAL)
+
+# Attachment Directory
+TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), 'var')
 
 # Our Testing URLs
 apprise_url_tests = (
@@ -293,3 +300,75 @@ def test_plugin_signal_test_based_on_feedback(mock_post):
     assert '/@group2' in aobj[0].url()
     # Our target phone number is also in the path
     assert '/+12514444444' in aobj[0].url()
+
+
+@mock.patch('requests.post')
+def test_notify_signal_plugin_attachments(mock_post):
+    """
+    NotifySignalAPI() Attachments
+
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.request_rate_per_sec = 0
+
+    okay_response = requests.Request()
+    okay_response.status_code = requests.codes.ok
+    okay_response.content = ""
+
+    # Assign our mock object our return value
+    mock_post.return_value = okay_response
+
+    obj = Apprise.instantiate(
+        'signal://10.0.0.112:8080/+12512222222/+12513333333/'
+        '12514444444?batch=no')
+    assert isinstance(obj, plugins.NotifySignalAPI)
+
+    # Test Valid Attachment
+    path = os.path.join(TEST_VAR_DIR, 'apprise-test.gif')
+    attach = AppriseAttachment(path)
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=attach) is True
+
+    # Test invalid attachment
+    path = os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=path) is False
+
+    # Get a appropriate "builtin" module name for pythons 2/3.
+    if sys.version_info.major >= 3:
+        builtin_open_function = 'builtins.open'
+
+    else:
+        builtin_open_function = '__builtin__.open'
+
+    # Test Valid Attachment (load 3)
+    path = (
+        os.path.join(TEST_VAR_DIR, 'apprise-test.gif'),
+        os.path.join(TEST_VAR_DIR, 'apprise-test.gif'),
+        os.path.join(TEST_VAR_DIR, 'apprise-test.gif'),
+    )
+    attach = AppriseAttachment(path)
+
+    # Return our good configuration
+    mock_post.side_effect = None
+    mock_post.return_value = okay_response
+    with mock.patch(builtin_open_function, side_effect=OSError()):
+        # We can't send the message we can't open the attachment for reading
+        assert obj.notify(
+            body='body', title='title', notify_type=NotifyType.INFO,
+            attach=attach) is False
+
+    # test the handling of our batch modes
+    obj = Apprise.instantiate(
+        'signal://10.0.0.112:8080/+12512222222/+12513333333/'
+        '12514444444?batch=yes')
+    assert isinstance(obj, plugins.NotifySignalAPI)
+
+    # Now send an attachment normally without issues
+    mock_post.reset_mock()
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=attach) is True
+    assert mock_post.call_count == 1

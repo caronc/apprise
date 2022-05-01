@@ -284,8 +284,7 @@ class NotifyXML(NotifyBase):
 
                 try:
                     with open(attachment.path, 'rb') as f:
-                        # Output must be in a DataURL format (that's what
-                        # PushSafer calls it):
+                        # Prepare our Attachment in Base64
                         entry = \
                             '<Attachment filename="{}" mimetype="{}">'.format(
                                 NotifyXML.escape_html(
