@@ -55,6 +55,11 @@ apprise_url_tests = (
     ('zulip://....@apprise/{}'.format('a' * 32), {
         'instance': TypeError,
     }),
+    # Valid everything - botname with a dash
+    ('zulip://bot-name@apprise/{}'.format('a' * 32), {
+        'instance': plugins.NotifyZulip,
+        'privacy_url': 'zulip://bot-name@apprise/a...a/',
+    }),
     # Valid everything - no target so default is used
     ('zulip://botname@apprise/{}'.format('a' * 32), {
         'instance': plugins.NotifyZulip,
