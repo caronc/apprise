@@ -1379,3 +1379,10 @@ def apply_template(template, app_mode=TemplateType.RAW, **kwargs):
     # to drop the '{{' and '}}' surrounding our match so that we can
     # re-index it back into our list
     return mask_r.sub(lambda x: fn(kwargs[x.group()[2:-2].strip()]), template)
+
+
+def remove_suffix(value, suffix):
+    """
+    Removes a suffix from the end of a string.
+    """
+    return value[:-len(suffix)] if value.endswith(suffix) else value

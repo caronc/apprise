@@ -63,10 +63,11 @@ from ..common import NotifyType
 from ..utils import parse_list
 from ..utils import validate_regex
 from ..utils import is_email
+from ..utils import remove_suffix
 from ..AppriseLocale import gettext_lazy as _
 
 # A Valid Bot Name
-VALIDATE_BOTNAME = re.compile(r'(?P<name>[A-Z0-9_]{1,32})(-bot)?', re.I)
+VALIDATE_BOTNAME = re.compile(r'(?P<name>[A-Z0-9_-]{1,32})', re.I)
 
 # Organization required as part of the API request
 VALIDATE_ORG = re.compile(
@@ -122,7 +123,7 @@ class NotifyZulip(NotifyBase):
         'botname': {
             'name': _('Bot Name'),
             'type': 'string',
-            'regex': (r'^[A-Z0-9_]{1,32}(-bot)?$', 'i'),
+            'regex': (r'^[A-Z0-9_-]{1,32}$', 'i'),
         },
         'organization': {
             'name': _('Organization'),
@@ -183,7 +184,9 @@ class NotifyZulip(NotifyBase):
                 raise TypeError
 
             # The botname
-            self.botname = match.group('name')
+            botname = match.group('name')
+            botname = remove_suffix(botname, '-bot')
+            self.botname = botname
 
         except (TypeError, AttributeError):
             msg = 'The Zulip botname specified ({}) is invalid.'\
