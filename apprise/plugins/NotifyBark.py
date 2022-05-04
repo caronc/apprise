@@ -25,17 +25,13 @@
 #
 # API: https://github.com/Finb/bark-server/blob/master/docs/API_V2.md#python
 #
-import re
 import six
 import requests
-from json import loads
-from json import dumps
-from itertools import chain
+import json
 
 from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyImageSize
-from ..common import NotifyFormat
 from ..common import NotifyType
 from ..utils import parse_list
 from ..utils import parse_bool
@@ -77,6 +73,7 @@ BARK_SOUNDS = (
     "typewriters.caf",
     "update.caf",
 )
+
 
 # Supported Level Entries
 class NotifyBarkLevel(object):
@@ -205,7 +202,8 @@ class NotifyBark(NotifyBase):
     })
 
     def __init__(self, targets=None, include_image=True, sound=None,
-                 category=None, group=None, level=None, click=None, **kwargs):
+                 category=None, group=None, level=None, click=None,
+                 badge=None, **kwargs):
         """
         Initialize Notify Bark Object
         """
@@ -221,7 +219,8 @@ class NotifyBark(NotifyBase):
             self.notify_url += ':%d' % self.port
 
         # Assign our category
-        self.category = category if isinstance(category, six.string_types) else None
+        self.category = \
+            category if isinstance(category, six.string_types) else None
 
         # Assign our group
         self.group = group if isinstance(group, six.string_types) else None
@@ -328,6 +327,9 @@ class NotifyBark(NotifyBase):
         if self.group:
             payload['group'] = self.group
 
+        auth = None
+        if self.user:
+            auth = (self.user, self.password)
 
         # Create a copy of the targets
         targets = list(self.targets)
@@ -338,7 +340,7 @@ class NotifyBark(NotifyBase):
 
             payload['device_key'] = target
             self.logger.debug('Bark POST URL: %s (cert_verify=%r)' % (
-                url, self.verify_certificate,
+                self.notify_url, self.verify_certificate,
             ))
             self.logger.debug('Bark Payload: %s' % str(payload))
 
@@ -346,8 +348,8 @@ class NotifyBark(NotifyBase):
             self.throttle()
             try:
                 r = requests.post(
-                    url,
-                    data=payload,
+                    self.notify_url,
+                    data=json.dumps(payload),
                     headers=headers,
                     auth=auth,
                     verify=self.verify_certificate,
@@ -390,7 +392,6 @@ class NotifyBark(NotifyBase):
 
         return not has_error
 
-
     def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
@@ -426,13 +427,13 @@ class NotifyBark(NotifyBase):
         auth = ''
         if self.user and self.password:
             auth = '{user}:{password}@'.format(
-                user=NotifyXML.quote(self.user, safe=''),
+                user=NotifyBark.quote(self.user, safe=''),
                 password=self.pprint(
                     self.password, privacy, mode=PrivacyMode.Secret, safe=''),
             )
         elif self.user:
             auth = '{user}@'.format(
-                user=NotifyXML.quote(self.user, safe=''),
+                user=NotifyBark.quote(self.user, safe=''),
             )
 
         default_port = 443 if self.secure else 80
@@ -444,7 +445,7 @@ class NotifyBark(NotifyBase):
             hostname=self.host,
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
-            targets=targets='/'.join(
+            targets='/'.join(
                 [NotifyBark.quote('{}'.format(x)) for x in self.targets]),
             params=NotifyBark.urlencode(params),
         )
