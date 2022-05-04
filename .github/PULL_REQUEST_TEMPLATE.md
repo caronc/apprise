@@ -7,7 +7,7 @@
 <!-- This section is only applicable if you're adding a new service -->
 * [ ] apprise/plugins/Notify<!--ServiceName goes here-->.py
 * [ ] setup.py
-    - add new service into the `keywords` section of the `setup()` declaration
+    - add new service into the `KEYWORDS` file located in the root directory
 * [ ] README.md
     - add entry for new service to table (as a quick reference)
 * [ ] packaging/redhat/python-apprise.spec
@@ -19,3 +19,27 @@
 * [ ] There is no commented out code in this PR.
 * [ ] No lint errors (use `flake8`)
 * [ ] 100% test coverage
+
+## Testing
+<!-- If this your code is testable by other users of the program
+      it would be really helpful to define this here -->
+Anyone can help test this source code as follows:
+```bash
+# Create a virtual environment to work in as follows:
+python3 -m venv apprise
+
+# Change into our new directory
+cd apprise
+
+# Activate our virtual environment
+source bin/activate
+
+# Install the branch
+pip install git+https://github.com/caronc/apprise.git@<this.branch-name>
+
+# Be sure you're running your Signal API Server and query it like so
+apprise -t "Test Title" -b "Test Message" \
+  <apprise url related to ticket>
+
+```
+
