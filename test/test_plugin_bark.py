@@ -54,6 +54,65 @@ apprise_url_tests = (
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'bark://192.168.0.6:8081/',
     }),
+    ('bark://user@192.168.0.6:8081/device_key', {
+        # Everything is okay (test with user)
+        'instance': plugins.NotifyBark,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'bark://user@192.168.0.6:8081/',
+    }),
+    ('bark://192.168.0.6:8081/device_key/?sound=invalid', {
+        # bad sound, but we go ahead anyway
+        'instance': plugins.NotifyBark,
+    }),
+    ('bark://192.168.0.6:8081/device_key/?sound=alarm', {
+        # alarm.caf sound loaded
+        'instance': plugins.NotifyBark,
+    }),
+    ('bark://192.168.0.6:8081/device_key/?sound=NOiR.cAf', {
+        # noir.caf sound loaded
+        'instance': plugins.NotifyBark,
+    }),
+    ('bark://192.168.0.6:8081/device_key/?badge=100', {
+        # set badge
+        'instance': plugins.NotifyBark,
+    }),
+    ('barks://192.168.0.6:8081/device_key/?badge=invalid', {
+        # set invalid badge
+        'instance': plugins.NotifyBark,
+    }),
+    ('barks://192.168.0.6:8081/device_key/?badge=-12', {
+        # set invalid badge
+        'instance': plugins.NotifyBark,
+    }),
+    ('bark://192.168.0.6:8081/device_key/?category=apprise', {
+        # set category
+        'instance': plugins.NotifyBark,
+    }),
+    ('bark://192.168.0.6:8081/device_key/?image=no', {
+        # do not display image
+        'instance': plugins.NotifyBark,
+    }),
+    ('bark://192.168.0.6:8081/device_key/?group=apprise', {
+        # set group
+        'instance': plugins.NotifyBark,
+    }),
+    ('bark://192.168.0.6:8081/device_key/?level=invalid', {
+        # bad level, but we go ahead anyway
+        'instance': plugins.NotifyBark,
+    }),
+    ('bark://192.168.0.6:8081/?to=device_key', {
+        # test use of to= argument
+        'instance': plugins.NotifyBark,
+    }),
+    ('bark://192.168.0.6:8081/device_key/?click=http://localhost', {
+        # Our click link
+        'instance': plugins.NotifyBark,
+    }),
+    ('bark://192.168.0.6:8081/device_key/?level=active', {
+        # active level
+        'instance': plugins.NotifyBark,
+    }),
     ('bark://user:pass@192.168.0.5:8086/device_key/device_key2/', {
         # Everything is okay
         'instance': plugins.NotifyBark,

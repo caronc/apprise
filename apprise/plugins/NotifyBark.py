@@ -168,13 +168,11 @@ class NotifyBark(NotifyBase):
             'name': _('Sound'),
             'type': 'choice:string',
             'values': BARK_SOUNDS,
-            'default': None,
         },
         'level': {
             'name': _('Level'),
             'type': 'choice:string',
             'values': BARK_LEVELS,
-            'default': None,
         },
         'click': {
             'name': _('Click'),
@@ -186,7 +184,7 @@ class NotifyBark(NotifyBase):
             'min': 0,
         },
         'category': {
-            'name': _('Sound'),
+            'name': _('Category'),
             'type': 'string',
         },
         'group': {
@@ -240,6 +238,8 @@ class NotifyBark(NotifyBase):
             #  - We accept both the integer form as well as a string
             #    representation
             self.badge = int(badge)
+            if self.badge < 0:
+                raise ValueError()
 
         except TypeError:
             # NoneType means use Default; this is an okay exception
