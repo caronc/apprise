@@ -274,7 +274,7 @@ class NotifyNtfy(NotifyBase):
             self.logger.warning('There are no ntfy topics to notify')
             return False
 
-        # Create a copy of the subreddits list
+        # Create a copy of the topics
         topics = list(self.topics)
         while len(topics) > 0:
             # Retrieve our topic
