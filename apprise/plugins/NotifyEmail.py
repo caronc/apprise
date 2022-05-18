@@ -91,21 +91,6 @@ EMAIL_TEMPLATES = (
         },
     ),
 
-    # Pronto Mail
-    (
-        'Pronto Mail',
-        re.compile(
-            r'^((?P<label>[^+]+)\+)?(?P<id>[^@]+)@'
-            r'(?P<domain>prontomail\.com)$', re.I),
-        {
-            'port': 465,
-            'smtp_host': 'secure.emailsrvr.com',
-            'secure': True,
-            'secure_mode': SecureMailMode.STARTTLS,
-            'login_type': (WebBaseLogin.EMAIL, )
-        },
-    ),
-
     # Yandex
     (
         'Yandex',
