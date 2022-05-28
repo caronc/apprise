@@ -125,9 +125,6 @@ apprise_url_tests = (
     ('xmls://user:pass@localhost:8080', {
         'instance': plugins.NotifyXML,
     }),
-    ('xml://localhost:8080/path?-HeaderKey=HeaderValue', {
-        'instance': plugins.NotifyXML,
-    }),
     ('xml://user:pass@localhost:8081', {
         'instance': plugins.NotifyXML,
         # force a failure

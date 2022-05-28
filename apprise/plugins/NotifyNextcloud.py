@@ -331,13 +331,10 @@ class NotifyNextcloud(NotifyBase):
             results['version'] = \
                 NotifyNextcloud.unquote(results['qsd']['version'])
 
-        # Add our headers that the user can potentially over-ride if they
-        # wish to to our returned result set
-        results['headers'] = results['qsd+']
-        if results['qsd-']:
-            results['headers'].update(results['qsd-'])
-            NotifyBase.logger.deprecate(
-                "minus (-) based Nextcloud header tokens are being "
-                " removed; use the plus (+) symbol instead.")
+        # Add our headers that the user can potentially over-ride if they wish
+        # to to our returned result set and tidy entries by unquoting them
+        results['headers'] = {
+            NotifyNextcloud.unquote(x): NotifyNextcloud.unquote(y)
+            for x, y in results['qsd+'].items()}
 
         return results

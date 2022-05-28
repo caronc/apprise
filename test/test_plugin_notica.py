@@ -110,10 +110,6 @@ apprise_url_tests = (
     ('notica://localhost:8080//%s/?+HeaderKey=HeaderValue' % ('7' * 6), {
         'instance': plugins.NotifyNotica,
     }),
-    # Test Depricated Header overrides
-    ('notica://localhost:8080//%s/?-HeaderKey=HeaderValue' % ('7' * 6), {
-        'instance': plugins.NotifyNotica,
-    }),
     ('notica://%s' % ('c' * 6), {
         'instance': plugins.NotifyNotica,
         # force a failure

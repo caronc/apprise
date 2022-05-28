@@ -339,18 +339,10 @@ class NotifyAppriseAPI(NotifyBase):
             return results
 
         # Add our headers that the user can potentially over-ride if they wish
-        # to to our returned result set
-        results['headers'] = results['qsd+']
-        if results['qsd-']:
-            results['headers'].update(results['qsd-'])
-            NotifyBase.logger.deprecate(
-                "minus (-) based Apprise API header tokens are being "
-                " removed; use the plus (+) symbol instead.")
-
-        # Tidy our header entries by unquoting them
+        # to to our returned result set and tidy entries by unquoting them
         results['headers'] = \
             {NotifyAppriseAPI.unquote(x): NotifyAppriseAPI.unquote(y)
-             for x, y in results['headers'].items()}
+             for x, y in results['qsd+'].items()}
 
         # Support the passing of tags in the URL
         if 'tags' in results['qsd'] and len(results['qsd']['tags']):

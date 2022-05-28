@@ -901,13 +901,6 @@ class NotifyEmail(NotifyBase):
             # Extract from name to associate with from address
             results['from_name'] = NotifyEmail.unquote(results['qsd']['name'])
 
-        if 'timeout' in results['qsd'] and len(results['qsd']['timeout']):
-            # Deprecated in favor of cto= flag
-            NotifyBase.logger.deprecate(
-                "timeout= argument is deprecated; use cto= instead.")
-            results['qsd']['cto'] = results['qsd']['timeout']
-            del results['qsd']['timeout']
-
         # Store SMTP Host if specified
         if 'smtp' in results['qsd'] and len(results['qsd']['smtp']):
             # Extract the smtp server
