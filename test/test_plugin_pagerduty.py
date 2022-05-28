@@ -82,7 +82,7 @@ apprise_url_tests = (
         # class/group testing
         'instance': plugins.NotifyPagerDuty,
     }),
-    ('pagerduty://?routingkey=r&apikey=a&source=s&component=c'
+    ('pagerduty://?integrationkey=r&apikey=a&source=s&component=c'
         '&group=g&class=c', {
             # all parameters
             'instance': plugins.NotifyPagerDuty}),

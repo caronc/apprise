@@ -94,9 +94,9 @@ class NotifyPagerDuty(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{routing_key}@{apikey}',
-        '{schema}://{routing_key}@{apikey}/{source}',
-        '{schema}://{routing_key}@{apikey}/{source}/{component}',
+        '{schema}://{integration_key}@{apikey}',
+        '{schema}://{integration_key}@{apikey}/{source}',
+        '{schema}://{integration_key}@{apikey}/{source}/{component}',
     )
 
     # Define our template tokens
@@ -109,7 +109,7 @@ class NotifyPagerDuty(NotifyBase):
             'required': True
         },
         # Optional but triggers V2 API
-        'routingkey': {
+        'integrationkey': {
             'name': _('Routing Key'),
             'type': 'string',
             'private': True,
@@ -152,15 +152,15 @@ class NotifyPagerDuty(NotifyBase):
 
     # Define any kwargs we're using
     template_kwargs = {
-        'custom': {
+        'details': {
             'name': _('Custom Details'),
             'prefix': '+',
         },
     }
 
-    def __init__(self, apikey, routingkey=None, source=None, component=None,
-                 group=None, class_id=None, include_image=True, custom=None,
-                 **kwargs):
+    def __init__(self, apikey, integrationkey=None, source=None,
+                 component=None, group=None, class_id=None,
+                 include_image=True, details=None, **kwargs):
         """
         Initialize Pager Duty Object
         """
@@ -177,11 +177,11 @@ class NotifyPagerDuty(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        self.routing_key = validate_regex(
-            routingkey, *self.template_tokens['routingkey']['regex'])
-        if not self.routing_key:
+        self.integration_key = validate_regex(
+            integrationkey, *self.template_tokens['integrationkey']['regex'])
+        if not self.integration_key:
             msg = 'An invalid Pager Duty Routing Key ' \
-                  '({}) was specified.'.format(routingkey)
+                  '({}) was specified.'.format(integrationkey)
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -218,10 +218,10 @@ class NotifyPagerDuty(NotifyBase):
         # Store Group if specified
         self.group = group if group else None
 
-        self.custom = {}
-        if custom:
-            # Store our extra custom
-            self.custom.update(custom)
+        self.details = {}
+        if details:
+            # Store our extra details
+            self.details.update(details)
 
         # Display our Apprise Image
         self.include_image = include_image
@@ -242,8 +242,8 @@ class NotifyPagerDuty(NotifyBase):
 
         # Prepare our persistent_notification.create payload
         payload = {
-            # Define our routing key
-            'routing_key': self.routing_key,
+            # Define our integration key
+            'integration_key': self.integration_key,
 
             # Prepare our payload
             'payload': {
@@ -277,10 +277,10 @@ class NotifyPagerDuty(NotifyBase):
                 'alt': notify_type,
             }
 
-        if self.custom:
+        if self.details:
             payload['payload']['custom_details'] = {}
             # Apply any provided custom details
-            for k, v in self.custom.items():
+            for k, v in self.details.items():
                 payload['payload']['custom_details'][k] = v
 
         self.logger.debug('Pager Duty POST URL: %s (cert_verify=%r)' % (
@@ -347,19 +347,20 @@ class NotifyPagerDuty(NotifyBase):
             params['group'] = self.group
 
         # Append our custom entries our parameters
-        params.update({'+{}'.format(k): v for k, v in self.custom.items()})
+        params.update({'+{}'.format(k): v for k, v in self.details.items()})
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        url = '{schema}://{routing_key}@{apikey}/' \
+        url = '{schema}://{integration_key}@{apikey}/' \
               '{source}/{component}?{params}'
 
         return url.format(
             schema=self.secure_protocol,
             # never encode hostname since we're expecting it to be a valid one
-            routing_key=self.pprint(
-                self.routing_key, privacy, mode=PrivacyMode.Secret, safe=''),
+            integration_key=self.pprint(
+                self.integration_key, privacy, mode=PrivacyMode.Secret,
+                safe=''),
             apikey=self.pprint(
                 self.apikey, privacy, mode=PrivacyMode.Secret, safe=''),
             source=self.pprint(
@@ -389,13 +390,14 @@ class NotifyPagerDuty(NotifyBase):
         else:
             results['apikey'] = NotifyPagerDuty.unquote(results['host'])
 
-        # The 'routingkey' makes it easier to use yaml configuration
-        if 'routingkey' in results['qsd'] and \
-                len(results['qsd']['routingkey']):
-            results['routingkey'] = \
-                NotifyPagerDuty.unquote(results['qsd']['routingkey'])
+        # The 'integrationkey' makes it easier to use yaml configuration
+        if 'integrationkey' in results['qsd'] and \
+                len(results['qsd']['integrationkey']):
+            results['integrationkey'] = \
+                NotifyPagerDuty.unquote(results['qsd']['integrationkey'])
         else:
-            results['routingkey'] = NotifyPagerDuty.unquote(results['user'])
+            results['integrationkey'] = \
+                NotifyPagerDuty.unquote(results['user'])
 
         if 'group' in results['qsd'] and len(results['qsd']['group']):
             results['group'] = \
@@ -422,10 +424,10 @@ class NotifyPagerDuty(NotifyBase):
         else:
             results['component'] = fullpath.pop(0) if fullpath else None
 
-        # Add our custom key/value pairs that the user can potentially
+        # Add our custom details key/value pairs that the user can potentially
         # over-ride if they wish to to our returned result set and tidy
         # entries by unquoting them
-        results['custom'] = {
+        results['details'] = {
             NotifyPagerDuty.unquote(x): NotifyPagerDuty.unquote(y)
             for x, y in results['qsd+'].items()}
 
