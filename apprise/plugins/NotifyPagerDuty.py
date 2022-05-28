@@ -186,23 +186,23 @@ class NotifyPagerDuty(NotifyBase):
             raise TypeError(msg)
 
         # An Optional Source
-        self.source = self.template_args['source']['default']
+        self.source = self.template_tokens['source']['default']
         if source:
             self.source = validate_regex(
-                source, *self.template_args['source']['regex'])
+                source, *self.template_tokens['source']['regex'])
             if not self.source:
                 msg = 'An invalid Pager Duty Notification Source ' \
                       '({}) was specified.'.format(source)
                 self.logger.warning(msg)
                 raise TypeError(msg)
         else:
-            self.component = self.template_args['source']['default']
+            self.component = self.template_tokens['source']['default']
 
         # An Optional Component
-        self.component = self.template_args['component']['default']
+        self.component = self.template_tokens['component']['default']
         if component:
             self.component = validate_regex(
-                component, *self.template_args['component']['regex'])
+                component, *self.template_tokens['component']['regex'])
             if not self.component:
                 msg = 'An invalid Pager Duty Notification Source ' \
                       '({}) was specified.'.format(component)
@@ -210,7 +210,7 @@ class NotifyPagerDuty(NotifyBase):
                 raise TypeError(msg)
 
         else:
-            self.component = self.template_args['component']['default']
+            self.component = self.template_tokens['component']['default']
 
         # Store Class ID if specified
         self.class_id = class_id if class_id else None
