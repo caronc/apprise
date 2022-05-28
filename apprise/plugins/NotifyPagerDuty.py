@@ -94,9 +94,9 @@ class NotifyPagerDuty(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{integration_key}@{apikey}',
-        '{schema}://{integration_key}@{apikey}/{source}',
-        '{schema}://{integration_key}@{apikey}/{source}/{component}',
+        '{schema}://{integrationkey}@{apikey}',
+        '{schema}://{integrationkey}@{apikey}/{source}',
+        '{schema}://{integrationkey}@{apikey}/{source}/{component}',
     )
 
     # Define our template tokens
@@ -115,10 +115,6 @@ class NotifyPagerDuty(NotifyBase):
             'private': True,
             'regex': (r'^[a-z0-9_-]+$', 'i'),
         },
-    })
-
-    # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
         'source': {
             # Optional Source Identifier (preferably a FQDN)
             'name': _('Source'),
@@ -133,6 +129,10 @@ class NotifyPagerDuty(NotifyBase):
             'regex': (r'^[a-z0-9._-]+$', 'i'),
             'default': 'Notification',
         },
+    })
+
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
         'group': {
             'name': _('Group'),
             'type': 'string',
