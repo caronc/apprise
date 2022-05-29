@@ -105,7 +105,6 @@ class NotifyPagerDuty(NotifyBase):
             'name': _('API Key'),
             'type': 'string',
             'private': True,
-            'regex': (r'^[a-z0-9_-]+$', 'i'),
             'required': True
         },
         # Optional but triggers V2 API
@@ -113,20 +112,18 @@ class NotifyPagerDuty(NotifyBase):
             'name': _('Routing Key'),
             'type': 'string',
             'private': True,
-            'regex': (r'^[a-z0-9_-]+$', 'i'),
+            'required': True
         },
         'source': {
             # Optional Source Identifier (preferably a FQDN)
             'name': _('Source'),
             'type': 'string',
-            'regex': (r'^[a-z0-9._-]+$', 'i'),
             'default': 'Apprise',
         },
         'component': {
             # Optional Component Identifier
             'name': _('Component'),
             'type': 'string',
-            'regex': (r'^[a-z0-9._-]+$', 'i'),
             'default': 'Notification',
         },
     })
@@ -141,6 +138,10 @@ class NotifyPagerDuty(NotifyBase):
             'name': _('Class'),
             'type': 'string',
             'map_to': 'class_id',
+        },
+        'click': {
+            'name': _('Click'),
+            'type': 'string',
         },
         'image': {
             'name': _('Include Image'),
@@ -160,7 +161,7 @@ class NotifyPagerDuty(NotifyBase):
 
     def __init__(self, apikey, integrationkey=None, source=None,
                  component=None, group=None, class_id=None,
-                 include_image=True, details=None, **kwargs):
+                 include_image=True, click=None, details=None, **kwargs):
         """
         Initialize Pager Duty Object
         """
@@ -169,16 +170,14 @@ class NotifyPagerDuty(NotifyBase):
         self.fullpath = kwargs.get('fullpath', '')
 
         # Long-Lived Access token (generated from User Profile)
-        self.apikey = validate_regex(
-            apikey, *self.template_tokens['apikey']['regex'])
+        self.apikey = validate_regex(apikey)
         if not self.apikey:
             msg = 'An invalid Pager Duty API Key ' \
                   '({}) was specified.'.format(apikey)
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        self.integration_key = validate_regex(
-            integrationkey, *self.template_tokens['integrationkey']['regex'])
+        self.integration_key = validate_regex(integrationkey)
         if not self.integration_key:
             msg = 'An invalid Pager Duty Routing Key ' \
                   '({}) was specified.'.format(integrationkey)
@@ -188,8 +187,7 @@ class NotifyPagerDuty(NotifyBase):
         # An Optional Source
         self.source = self.template_tokens['source']['default']
         if source:
-            self.source = validate_regex(
-                source, *self.template_tokens['source']['regex'])
+            self.source = validate_regex(source)
             if not self.source:
                 msg = 'An invalid Pager Duty Notification Source ' \
                       '({}) was specified.'.format(source)
@@ -201,10 +199,9 @@ class NotifyPagerDuty(NotifyBase):
         # An Optional Component
         self.component = self.template_tokens['component']['default']
         if component:
-            self.component = validate_regex(
-                component, *self.template_tokens['component']['regex'])
+            self.component = validate_regex(component)
             if not self.component:
-                msg = 'An invalid Pager Duty Notification Source ' \
+                msg = 'An invalid Pager Duty Notification Component ' \
                       '({}) was specified.'.format(component)
                 self.logger.warning(msg)
                 raise TypeError(msg)
@@ -212,11 +209,14 @@ class NotifyPagerDuty(NotifyBase):
         else:
             self.component = self.template_tokens['component']['default']
 
+        # A clickthrough option for notifications
+        self.click = click
+
         # Store Class ID if specified
-        self.class_id = class_id if class_id else None
+        self.class_id = class_id
 
         # Store Group if specified
-        self.group = group if group else None
+        self.group = group
 
         self.details = {}
         if details:
@@ -243,7 +243,7 @@ class NotifyPagerDuty(NotifyBase):
         # Prepare our persistent_notification.create payload
         payload = {
             # Define our integration key
-            'integration_key': self.integration_key,
+            'routing_key': self.integration_key,
 
             # Prepare our payload
             'payload': {
@@ -258,7 +258,8 @@ class NotifyPagerDuty(NotifyBase):
                 # Our Alerting Source/Component
                 'source': self.source,
                 'component': self.component,
-            }
+            },
+            'client': self.app_id,
         }
 
         if self.group:
@@ -267,15 +268,20 @@ class NotifyPagerDuty(NotifyBase):
         if self.class_id:
             payload['payload']['class'] = self.class_id
 
+        if self.click:
+            payload['links'] = [{
+                "href": self.click,
+            }]
+
         # Acquire our image url if configured to do so
         image_url = None if not self.include_image else \
             self.image_url(notify_type)
 
         if image_url:
-            payload['images'] = {
+            payload['images'] = [{
                 'src': image_url,
                 'alt': notify_type,
-            }
+            }]
 
         if self.details:
             payload['payload']['custom_details'] = {}
@@ -346,6 +352,9 @@ class NotifyPagerDuty(NotifyBase):
         if self.group:
             params['group'] = self.group
 
+        if self.click is not None:
+            params['click'] = self.click
+
         # Append our custom entries our parameters
         params.update({'+{}'.format(k): v for k, v in self.details.items()})
 
@@ -398,6 +407,9 @@ class NotifyPagerDuty(NotifyBase):
         else:
             results['integrationkey'] = \
                 NotifyPagerDuty.unquote(results['user'])
+
+        if 'click' in results['qsd'] and len(results['qsd']['click']):
+            results['click'] = NotifyPagerDuty.unquote(results['qsd']['click'])
 
         if 'group' in results['qsd'] and len(results['qsd']['group']):
             results['group'] = \

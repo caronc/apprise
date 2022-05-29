@@ -32,26 +32,26 @@ logging.disable(logging.CRITICAL)
 # Our Testing URLs
 apprise_url_tests = (
     ('pagerduty://', {
-        # No Access Token or Routing Key specified
+        # No Access Token or Integration/Routing Key specified
         'instance': TypeError,
     }),
-    ('pagerduty://a!b_d@a!bd_/', {
-        # invalid Access Token
+    ('pagerduty://%20@%20/', {
+        # invalid Access Token and Integration/Routing Key
         'instance': TypeError,
     }),
-    ('pagerduty://a!bd!/', {
-        # invalid Access Token; no Routing Key
+    ('pagerduty://%20/', {
+        # invalid Access Token; no Integration/Routing Key
         'instance': TypeError,
     }),
-    ('pagerduty://d!ef@abcd/', {
-        # Invalid Routing Key (but valid Access Token)
+    ('pagerduty://%20@abcd/', {
+        # Invalid Integration/Routing Key (but valid Access Token)
         'instance': TypeError,
     }),
-    ('pagerduty://myroutekey@myapikey/!invalidsource', {
+    ('pagerduty://myroutekey@myapikey/%20', {
         # bad source
         'instance': TypeError,
     }),
-    ('pagerduty://myroutekey@myapikey/mysource/!mycomponent', {
+    ('pagerduty://myroutekey@myapikey/mysource/%20', {
         # bad component
         'instance': TypeError,
     }),
@@ -83,7 +83,7 @@ apprise_url_tests = (
         'instance': plugins.NotifyPagerDuty,
     }),
     ('pagerduty://?integrationkey=r&apikey=a&source=s&component=c'
-        '&group=g&class=c', {
+        '&group=g&class=c&click=http://localhost', {
             # all parameters
             'instance': plugins.NotifyPagerDuty}),
     ('pagerduty://somerkey@someapikey/bizzare/code', {
