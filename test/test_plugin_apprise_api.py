@@ -132,7 +132,7 @@ apprise_url_tests = (
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'apprises://user:****@localhost:8080/m...5/',
     }),
-    ('apprises://localhost:8080/path?-HeaderKey=HeaderValue', {
+    ('apprises://localhost:8080/path?+HeaderKey=HeaderValue', {
         'instance': plugins.NotifyAppriseAPI,
     }),
     ('apprise://localhost/%s' % ('a' * 32), {
