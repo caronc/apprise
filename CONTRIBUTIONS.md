@@ -24,3 +24,6 @@ The contributors have been listed in chronological order:
 
 * Andreas Motl <andreas@getkotori.org>
   * Mar 2020 - Fix XMPP Support
+
+* Joey Espinosa <@particledecay>
+  * Apr 3rd 2022 - Added Ntfy Support
