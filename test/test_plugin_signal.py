@@ -112,6 +112,11 @@ apprise_url_tests = (
         # use get args to acomplish the same thing (use source instead of from)
         'instance': plugins.NotifySignalAPI,
     }),
+    ('signals://user:password@localhost/{}/{}'.format('1' * 11, '3' * 11), {
+        'instance': plugins.NotifySignalAPI,
+        # Test that a 201 response code is still accepted
+        'requests_response_code': 201,
+    }),
     ('signals://localhost/{}/{}/{}?batch=True'.format(
         '1' * 11, '3' * 11, '4' * 11), {
             # test batch mode

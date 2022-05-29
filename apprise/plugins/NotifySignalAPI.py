@@ -320,7 +320,8 @@ class NotifySignalAPI(NotifyBase):
                     verify=self.verify_certificate,
                     timeout=self.request_timeout,
                 )
-                if r.status_code != requests.codes.ok:
+                if r.status_code not in (
+                        requests.codes.ok, requests.codes.created):
                     # We had a problem
                     status_str = \
                         NotifySignalAPI.http_response_code_lookup(
