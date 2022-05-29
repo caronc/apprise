@@ -53,6 +53,10 @@ apprise_url_tests = (
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'line://****/target?',
     }),
+    ('line://token/target?image=no', {
+        # minimum requirements met; no icon display
+        'instance': plugins.NotifyLine,
+    }),
     ('line://?token=token&to=target1', {
         # minimum requirements met
         'instance': plugins.NotifyLine,

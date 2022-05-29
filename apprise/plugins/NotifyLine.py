@@ -35,6 +35,7 @@ from ..common import NotifyType
 from ..common import NotifyImageSize
 from ..utils import validate_regex
 from ..utils import parse_list
+from ..utils import parse_bool
 from ..AppriseLocale import gettext_lazy as _
 
 
@@ -101,9 +102,15 @@ class NotifyLine(NotifyBase):
         'to': {
             'alias_of': 'targets',
         },
+        'image': {
+            'name': _('Include Image'),
+            'type': 'bool',
+            'default': True,
+            'map_to': 'include_image',
+        },
     })
 
-    def __init__(self, token, targets=None, **kwargs):
+    def __init__(self, token, targets=None, include_image=True, **kwargs):
         """
         Initialize Line Object
         """
@@ -116,6 +123,9 @@ class NotifyLine(NotifyBase):
                   '({}) was specified.'.format(token)
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        # Display our Apprise Image
+        self.include_image = include_image
 
         self.targets = parse_list(targets)
         return
@@ -147,9 +157,20 @@ class NotifyLine(NotifyBase):
                 {
                     "type": "text",
                     "text": body,
+                    "sender": {
+                        "name": self.app_id,
+                    }
+
                 }
             ]
         }
+
+        # Acquire our image url if configured to do so
+        image_url = None if not self.include_image else \
+            self.image_url(notify_type)
+
+        if image_url:
+            payload["messages"][0]["sender"]["iconUrl"] = image_url
 
         # Create a copy of the target list
         targets = list(self.targets)
@@ -214,12 +235,15 @@ class NotifyLine(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Initialize our parameters
-        params = self.url_parameters(privacy=privacy, *args, **kwargs)
+        # Define any URL parameters
+        params = {
+            'image': 'yes' if self.include_image else 'no',
+        }
 
-        url = '{schema}://{token}/{targets}?{params}'
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        return url.format(
+        return '{schema}://{token}/{targets}?{params}'.format(
             schema=self.secure_protocol,
             # never encode hostname since we're expecting it to be a valid one
             token=self.pprint(
@@ -251,6 +275,10 @@ class NotifyLine(NotifyBase):
 
         # Get unquoted entries
         results['targets'] = NotifyLine.split_path(results['fullpath'])
+
+        # Include images with our message
+        results['include_image'] = \
+            parse_bool(results['qsd'].get('image', True))
 
         # Support the 'to' variable so that we can support rooms this way too
         # The 'to' makes it easier to use yaml configuration
