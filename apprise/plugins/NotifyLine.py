@@ -22,6 +22,8 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
+#
+# API Docs: https://developers.line.biz/en/reference/messaging-api/
 
 import requests
 import re
@@ -62,6 +64,9 @@ class NotifyLine(NotifyBase):
 
     # We don't support titles for Line notifications
     title_maxlen = 0
+
+    # Maximum body length is 5000
+    body_maxlen = 5000
 
     # Allows the user to specify the NotifyImageSize object; this is supported
     # through the webhook
