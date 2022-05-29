@@ -167,8 +167,6 @@ class NotifyPagerDuty(NotifyBase):
         """
         super(NotifyPagerDuty, self).__init__(**kwargs)
 
-        self.fullpath = kwargs.get('fullpath', '')
-
         # Long-Lived Access token (generated from User Profile)
         self.apikey = validate_regex(apikey)
         if not self.apikey:
