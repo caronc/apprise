@@ -83,7 +83,7 @@ apprise_url_tests = (
         'instance': plugins.NotifyPagerDuty,
     }),
     ('pagerduty://?integrationkey=r&apikey=a&source=s&component=c'
-        '&group=g&class=c&click=http://localhost', {
+        '&group=g&class=c&image=no&click=http://localhost', {
             # all parameters
             'instance': plugins.NotifyPagerDuty}),
     ('pagerduty://somerkey@someapikey/bizzare/code', {

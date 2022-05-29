@@ -343,7 +343,9 @@ class NotifyPagerDuty(NotifyBase):
         """
 
         # Define any URL parameters
-        params = {}
+        params = {
+            'image': 'yes' if self.include_image else 'no',
+        }
         if self.class_id:
             params['class'] = self.class_id
 
