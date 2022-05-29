@@ -6,8 +6,8 @@
 ## New Service Completion Status
 <!-- This section is only applicable if you're adding a new service -->
 * [ ] apprise/plugins/Notify<!--ServiceName goes here-->.py
-* [ ] setup.py
-    - add new service into the `KEYWORDS` file located in the root directory
+* [ ] KEYWORDS
+    - add new service into this file (alphabetically).
 * [ ] README.md
     - add entry for new service to table (as a quick reference)
 * [ ] packaging/redhat/python-apprise.spec
