@@ -37,7 +37,7 @@ source bin/activate
 # Install the branch
 pip install git+https://github.com/caronc/apprise.git@<this.branch-name>
 
-# Be sure you're running your Signal API Server and query it like so
+# Test out the changes with the following command:
 apprise -t "Test Title" -b "Test Message" \
   <apprise url related to ticket>
 
