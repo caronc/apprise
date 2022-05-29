@@ -112,6 +112,9 @@ apprise_url_tests = (
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'forms://user:****@localhost:8080',
     }),
+    ('form://localhost:8080/path?+HeaderKey=HeaderValue', {
+        'instance': plugins.NotifyForm,
+    }),
     ('form://user:pass@localhost:8081', {
         'instance': plugins.NotifyForm,
         # force a failure
