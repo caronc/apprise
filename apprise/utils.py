@@ -294,7 +294,7 @@ def is_uuid(uuid):
     return True if match else False
 
 
-def is_phone_no(phone, min_len=11):
+def is_phone_no(phone, min_len=10):
     """Determine if the specified entry is a phone number
 
     Args:

@@ -39,7 +39,7 @@ apprise_url_tests = (
         # We failed to identify any valid authentication
         'instance': TypeError,
     }),
-    ('clicksend://user:pass@{}/{}/{}'.format('1' * 10, '2' * 15, 'a' * 13), {
+    ('clicksend://user:pass@{}/{}/{}'.format('1' * 9, '2' * 15, 'a' * 13), {
         # invalid target numbers; we'll fail to notify anyone
         'instance': plugins.NotifyClickSend,
         'notify_response': False,

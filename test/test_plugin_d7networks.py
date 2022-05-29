@@ -39,7 +39,7 @@ apprise_url_tests = (
         # We failed to identify any valid authentication
         'instance': TypeError,
     }),
-    ('d7sms://user:pass@{}/{}/{}'.format('1' * 10, '2' * 15, 'a' * 13), {
+    ('d7sms://user:pass@{}/{}/{}'.format('1' * 9, '2' * 15, 'a' * 13), {
         # No valid targets to notify
         'instance': plugins.NotifyD7Networks,
         # Since there are no targets specified we expect a False return on
