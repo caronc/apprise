@@ -337,18 +337,10 @@ class NotifyEnigma2(NotifyBase):
             return results
 
         # Add our headers that the user can potentially over-ride if they wish
-        # to to our returned result set
-        results['headers'] = results['qsd+']
-        if results['qsd-']:
-            results['headers'].update(results['qsd-'])
-            NotifyBase.logger.deprecate(
-                "minus (-) based Enigma header tokens are being "
-                " removed; use the plus (+) symbol instead.")
-
-        # Tidy our header entries by unquoting them
+        # to to our returned result set and tidy entries by unquoting them
         results['headers'] = {
             NotifyEnigma2.unquote(x): NotifyEnigma2.unquote(y)
-            for x, y in results['headers'].items()}
+            for x, y in results['qsd+'].items()}
 
         # Save timeout value (if specified)
         if 'timeout' in results['qsd'] and len(results['qsd']['timeout']):

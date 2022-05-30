@@ -96,7 +96,7 @@ apprise_url_tests = (
     ('nclouds://user:pass@localhost:8080/admin/', {
         'instance': plugins.NotifyNextcloud,
     }),
-    ('ncloud://localhost:8080/admin?-HeaderKey=HeaderValue', {
+    ('ncloud://localhost:8080/admin?+HeaderKey=HeaderValue', {
         'instance': plugins.NotifyNextcloud,
     }),
     ('ncloud://user:pass@localhost:8081/admin', {

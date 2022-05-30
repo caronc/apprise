@@ -85,7 +85,7 @@ apprise_url_tests = (
         'instance': plugins.NotifyNextcloudTalk,
         'requests_response_code': requests.codes.created,
     }),
-    ('nctalk://user:pass@localhost:8080/roomid?-HeaderKey=HeaderValue', {
+    ('nctalk://user:pass@localhost:8080/roomid?+HeaderKey=HeaderValue', {
         'instance': plugins.NotifyNextcloudTalk,
         'requests_response_code': requests.codes.created,
     }),

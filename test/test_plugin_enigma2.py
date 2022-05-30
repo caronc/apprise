@@ -144,7 +144,7 @@ apprise_url_tests = (
             'result': True
         },
     }),
-    ('enigma2://localhost:8080/path?-HeaderKey=HeaderValue', {
+    ('enigma2://localhost:8080/path?+HeaderKey=HeaderValue', {
         'instance': plugins.NotifyEnigma2,
         'requests_response_text': {
             'result': True

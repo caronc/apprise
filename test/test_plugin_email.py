@@ -114,18 +114,6 @@ TEST_URLS = (
         'instance': plugins.NotifyEmail,
     }),
     (
-        'mailtos://user:pass@example.com?smtp=smtp.example.com&timeout=5'
-        '&name=l2g&from=noreply@example.com', {
-            'instance': plugins.NotifyEmail,
-        },
-    ),
-    ('mailto://user:pass@example.com?timeout=invalid.entry', {
-        'instance': plugins.NotifyEmail,
-    }),
-    ('mailto://user:pass@example.com?timeout=invalid.entry', {
-        'instance': plugins.NotifyEmail,
-    }),
-    (
         'mailto://user:pass@example.com:2525?user=l2g@example.com'
         '&pass=l2g@apprise!is!Awesome', {
             'instance': plugins.NotifyEmail,

@@ -100,7 +100,7 @@ apprise_url_tests = (
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'jsons://user:****@localhost:8080',
     }),
-    ('json://localhost:8080/path?-HeaderKey=HeaderValue', {
+    ('json://localhost:8080/path?+HeaderKey=HeaderValue', {
         'instance': plugins.NotifyJSON,
     }),
     ('json://user:pass@localhost:8081', {
