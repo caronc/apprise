@@ -250,14 +250,14 @@ class NotifyPagerDuty(NotifyBase):
                 # Set our severity
                 'severity': PAGERDUTY_SEVERITY_MAP[notify_type],
 
-                # Our Event Action
-                'event_action': self.event_action,
 
                 # Our Alerting Source/Component
                 'source': self.source,
                 'component': self.component,
             },
             'client': self.app_id,
+            # Our Event Action
+            'event_action': self.event_action,
         }
 
         if self.group:
