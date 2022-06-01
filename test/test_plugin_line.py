@@ -46,14 +46,18 @@ apprise_url_tests = (
         'notify_response': False,
 
     }),
-    ('line://token/target', {
+    ('line://token=/target', {
         # minimum requirements met
         'instance': plugins.NotifyLine,
 
         # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'line://****/target?',
+        'privacy_url': 'line://****/t...t?',
     }),
     ('line://token/target?image=no', {
+        # minimum requirements met; no icon display
+        'instance': plugins.NotifyLine,
+    }),
+    ('line://a/very/long/token=/target?image=no', {
         # minimum requirements met; no icon display
         'instance': plugins.NotifyLine,
     }),
@@ -62,7 +66,7 @@ apprise_url_tests = (
         'instance': plugins.NotifyLine,
 
         # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'line://****/target1?',
+        'privacy_url': 'line://****/t...1?',
     }),
     ('line://token/target', {
         'instance': plugins.NotifyLine,

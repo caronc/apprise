@@ -127,7 +127,12 @@ class NotifyLine(NotifyBase):
         # Display our Apprise Image
         self.include_image = include_image
 
+        # Set up our targets
         self.targets = parse_list(targets)
+
+        # A dictionary of cached users
+        self.__cached_users = dict()
+
         return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
@@ -137,7 +142,7 @@ class NotifyLine(NotifyBase):
 
         if len(self.targets) == 0:
             # There were no services to notify
-            self.logger.warning('There were no D7 Networks targets to notify.')
+            self.logger.warning('There were no Line targets to notify.')
             return False
 
         # error tracking (used for function return)
@@ -176,6 +181,7 @@ class NotifyLine(NotifyBase):
         targets = list(self.targets)
         while len(targets):
             target = targets.pop(0)
+
             payload['to'] = target
 
             self.logger.debug('Line POST URL: %s (cert_verify=%r)' % (
@@ -249,7 +255,7 @@ class NotifyLine(NotifyBase):
             token=self.pprint(
                 self.token, privacy, mode=PrivacyMode.Secret, safe=''),
             targets='/'.join(
-                [NotifyLine.quote(x, safe='') for x in self.targets]),
+                [self.pprint(x, privacy, safe='') for x in self.targets]),
             params=NotifyLine.urlencode(params),
         )
 
@@ -266,6 +272,9 @@ class NotifyLine(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
+        # Get unquoted entries
+        results['targets'] = NotifyLine.split_path(results['fullpath'])
+
         # The 'token' makes it easier to use yaml configuration
         if 'token' in results['qsd'] and len(results['qsd']['token']):
             results['token'] = \
@@ -273,8 +282,18 @@ class NotifyLine(NotifyBase):
         else:
             results['token'] = NotifyLine.unquote(results['host'])
 
-        # Get unquoted entries
-        results['targets'] = NotifyLine.split_path(results['fullpath'])
+            # Line Long Lived Tokens included forward slashes in them.
+            # As a result we need to parse further into our path and look
+            # for the entry that ends in an equal symbol.
+            if not results['token'].endswith('='):
+                for index, entry in enumerate(
+                        list(results['targets']), start=1):
+                    if entry.endswith('='):
+                        # Found
+                        results['token'] += \
+                            '/' + '/'.join(results['targets'][0:index])
+                        results['targets'] = results['targets'][index:]
+                        break
 
         # Include images with our message
         results['include_image'] = \
