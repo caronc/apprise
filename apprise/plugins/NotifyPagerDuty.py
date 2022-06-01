@@ -62,6 +62,25 @@ PAGERDUTY_SEVERITY_MAP = {
 }
 
 
+# Priorities
+class PagerDutyRegion(object):
+    US = 'us'
+    EU = 'eu'
+
+
+# SparkPost APIs
+PAGERDUTY_API_LOOKUP = {
+    PagerDutyRegion.US: 'https://events.pagerduty.com/v2/enqueue',
+    PagerDutyRegion.EU: 'https://events.eu.pagerduty.com/v2/enqueue',
+}
+
+# A List of our regions we can use for verification
+PAGERDUTY_REGIONS = (
+    PagerDutyRegion.US,
+    PagerDutyRegion.EU,
+)
+
+
 class NotifyPagerDuty(NotifyBase):
     """
     A wrapper for Pager Duty Notifications
@@ -76,9 +95,6 @@ class NotifyPagerDuty(NotifyBase):
     # Secure Protocol
     secure_protocol = 'pagerduty'
 
-    # The URL refererenced for remote Notifications
-    notify_url = 'https://events.pagerduty.com/v2/enqueue'
-
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_pagerduty'
 
@@ -91,6 +107,9 @@ class NotifyPagerDuty(NotifyBase):
 
     # Our event action type
     event_action = 'trigger'
+
+    # The default region to use if one isn't otherwise specified
+    default_region = PagerDutyRegion.US
 
     # Define object templates
     templates = (
@@ -143,6 +162,13 @@ class NotifyPagerDuty(NotifyBase):
             'name': _('Click'),
             'type': 'string',
         },
+        'region': {
+            'name': _('Region Name'),
+            'type': 'choice:string',
+            'values': PAGERDUTY_REGIONS,
+            'default': PagerDutyRegion.US,
+            'map_to': 'region_name',
+        },
         'image': {
             'name': _('Include Image'),
             'type': 'bool',
@@ -161,7 +187,8 @@ class NotifyPagerDuty(NotifyBase):
 
     def __init__(self, apikey, integrationkey=None, source=None,
                  component=None, group=None, class_id=None,
-                 include_image=True, click=None, details=None, **kwargs):
+                 include_image=True, click=None, details=None,
+                 region_name=None, **kwargs):
         """
         Initialize Pager Duty Object
         """
@@ -203,9 +230,23 @@ class NotifyPagerDuty(NotifyBase):
                       '({}) was specified.'.format(component)
                 self.logger.warning(msg)
                 raise TypeError(msg)
-
         else:
             self.component = self.template_tokens['component']['default']
+
+        # Store our region
+        try:
+            self.region_name = self.default_region \
+                if region_name is None else region_name.lower()
+
+            if self.region_name not in PAGERDUTY_REGIONS:
+                # allow the outer except to handle this common response
+                raise
+        except:
+            # Invalid region specified
+            msg = 'The PagerDuty region specified ({}) is invalid.' \
+                  .format(region_name)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         # A clickthrough option for notifications
         self.click = click
@@ -287,8 +328,11 @@ class NotifyPagerDuty(NotifyBase):
             for k, v in self.details.items():
                 payload['payload']['custom_details'][k] = v
 
+        # Prepare our URL based on region
+        url = PAGERDUTY_API_LOOKUP[self.region_name]
+
         self.logger.debug('Pager Duty POST URL: %s (cert_verify=%r)' % (
-            self.notify_url, self.verify_certificate,
+            url, self.verify_certificate,
         ))
         self.logger.debug('Pager Duty Payload: %s' % str(payload))
 
@@ -297,7 +341,7 @@ class NotifyPagerDuty(NotifyBase):
 
         try:
             r = requests.post(
-                self.notify_url,
+                self.url,
                 data=dumps(payload),
                 headers=headers,
                 verify=self.verify_certificate,
@@ -344,6 +388,7 @@ class NotifyPagerDuty(NotifyBase):
 
         # Define any URL parameters
         params = {
+            'region': self.region_name,
             'image': 'yes' if self.include_image else 'no',
         }
         if self.class_id:
@@ -442,6 +487,11 @@ class NotifyPagerDuty(NotifyBase):
         results['details'] = {
             NotifyPagerDuty.unquote(x): NotifyPagerDuty.unquote(y)
             for x, y in results['qsd+'].items()}
+
+        if 'region' in results['qsd'] and len(results['qsd']['region']):
+            # Extract from name to associate with from address
+            results['region_name'] = \
+                NotifyPagerDuty.unquote(results['qsd']['region'])
 
         # Include images with our message
         results['include_image'] = \

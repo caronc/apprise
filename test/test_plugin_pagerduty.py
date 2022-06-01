@@ -55,6 +55,10 @@ apprise_url_tests = (
         # bad component
         'instance': TypeError,
     }),
+    ('pagerduty://myroutekey@myapikey?region=invalid', {
+        # invalid region
+        'instance': TypeError,
+    }),
     ('pagerduty://myroutekey@myapikey', {
         # minimum requirements met
         'instance': plugins.NotifyPagerDuty,
@@ -64,6 +68,10 @@ apprise_url_tests = (
     }),
     ('pagerduty://myroutekey@myapikey?image=no', {
         # minimum requirements met and disable images
+        'instance': plugins.NotifyPagerDuty,
+    }),
+    ('pagerduty://myroutekey@myapikey?region=eu', {
+        # european region
         'instance': plugins.NotifyPagerDuty,
     }),
     # Custom values
