@@ -564,19 +564,25 @@ class NotifyPushover(NotifyBase):
         # Set our priority
         if 'priority' in results['qsd'] and len(results['qsd']['priority']):
             _map = {
+                # Keep for backwards compatibility
                 'l': PushoverPriority.LOW,
                 'm': PushoverPriority.MODERATE,
                 'n': PushoverPriority.NORMAL,
                 'h': PushoverPriority.HIGH,
                 'e': PushoverPriority.EMERGENCY,
-            }
-            try:
-                results['priority'] = \
-                    _map[results['qsd']['priority'][0].lower()]
 
-            except KeyError:
-                # No priority was set
-                pass
+                # Entries to additionally support (so more like PushOver's API
+                '-2': PushoverPriority.LOW,
+                '-1': PushoverPriority.MODERATE,
+                '0': PushoverPriority.NORMAL,
+                '1': PushoverPriority.HIGH,
+                '2': PushoverPriority.EMERGENCY,
+            }
+            priority = results['qsd']['priority'][0].lower()
+            results['priority'] = \
+                next((
+                    v for k, v in _map.items() if priority.startswith(k)),
+                    NotifyPushover.template_args['priority']['default'])
 
         # Retrieve all of our targets
         results['targets'] = NotifyPushover.split_path(results['fullpath'])
