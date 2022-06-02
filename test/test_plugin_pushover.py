@@ -115,6 +115,10 @@ apprise_url_tests = (
     ('pover://%s@%s?priority=emergency' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
     }),
+    # API Key + emergency(2) priority setting (via numeric value
+    ('pover://%s@%s?priority=2' % ('u' * 30, 'a' * 30), {
+        'instance': plugins.NotifyPushover,
+    }),
     # API Key + emergency priority setting with retry and expire
     ('pover://%s@%s?priority=emergency&%s&%s' % ('u' * 30,
                                                  'a' * 30,
