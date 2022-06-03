@@ -571,14 +571,14 @@ class NotifyPushover(NotifyBase):
                 'h': PushoverPriority.HIGH,
                 'e': PushoverPriority.EMERGENCY,
 
-                # Entries to additionally support (so more like PushOver's API
+                # Entries to additionally support (so more like PushOver's API)
                 '-2': PushoverPriority.LOW,
                 '-1': PushoverPriority.MODERATE,
                 '0': PushoverPriority.NORMAL,
                 '1': PushoverPriority.HIGH,
                 '2': PushoverPriority.EMERGENCY,
             }
-            priority = results['qsd']['priority'][0].lower()
+            priority = results['qsd']['priority'].lower()
             results['priority'] = \
                 next((
                     v for k, v in _map.items() if priority.startswith(k)),
