@@ -6,9 +6,9 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: apprise 0.9.8.3\n"
+"Project-Id-Version: apprise 0.9.9\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2022-04-28 19:16-0400\n"
+"POT-Creation-Date: 2022-06-02 20:20-0400\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -98,6 +98,9 @@ msgstr ""
 msgid "Avatar URL"
 msgstr ""
 
+msgid "Badge"
+msgstr ""
+
 msgid "Batch Mode"
 msgstr ""
 
@@ -122,7 +125,13 @@ msgstr ""
 msgid "Carbon Copy"
 msgstr ""
 
+msgid "Category"
+msgstr ""
+
 msgid "Channels"
+msgstr ""
+
+msgid "Class"
 msgstr ""
 
 msgid "Click"
@@ -132,6 +141,9 @@ msgid "Client ID"
 msgstr ""
 
 msgid "Client Secret"
+msgstr ""
+
+msgid "Component"
 msgstr ""
 
 msgid "Consumer Key"
@@ -144,6 +156,9 @@ msgid "Country"
 msgstr ""
 
 msgid "Currency"
+msgstr ""
+
+msgid "Custom Details"
 msgstr ""
 
 msgid "Custom Icon"
@@ -290,6 +305,9 @@ msgstr ""
 msgid "Language"
 msgstr ""
 
+msgid "Level"
+msgstr ""
+
 msgid "Local File"
 msgstr ""
 
@@ -427,6 +445,9 @@ msgstr ""
 msgid "Route"
 msgstr ""
 
+msgid "Routing Key"
+msgstr ""
+
 msgid "SMTP Server"
 msgstr ""
 
@@ -470,6 +491,9 @@ msgid "Sound"
 msgstr ""
 
 msgid "Sound Link"
+msgstr ""
+
+msgid "Source"
 msgstr ""
 
 msgid "Source Email"
@@ -524,6 +548,9 @@ msgid "Target Encoded ID"
 msgstr ""
 
 msgid "Target Escalation"
+msgstr ""
+
+msgid "Target Group ID"
 msgstr ""
 
 msgid "Target JID"

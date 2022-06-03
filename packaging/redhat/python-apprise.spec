@@ -59,7 +59,7 @@ SMTP2Go, Spontit, SparkPost, Super Toasty, Streamlabs, Stride, Syslog,
 Techulus Push, Telegram, Twilio, Twitter, Twist, XBMC, XMPP, Webex Teams}
 
 Name:           python-%{pypi_name}
-Version:        0.9.8.3
+Version:        0.9.9
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        MIT
@@ -237,13 +237,16 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 %endif
 
 %changelog
+* Thu Jun  2 2022 Chris Caron <lead2gold@gmail.com> - 0.9.9-1
+- Updated to v0.9.9
+
 * Thu Apr 28 2022 Chris Caron <lead2gold@gmail.com> - 0.9.8.3-1
 - Updated to v0.9.8.3
 
 * Sat Apr 23 2022 Chris Caron <lead2gold@gmail.com> - 0.9.8.2-1
 - Updated to v0.9.8.2
 
-* Tue Apr 18 2022 Chris Caron <lead2gold@gmail.com> - 0.9.8.1-1
+* Tue Apr 19 2022 Chris Caron <lead2gold@gmail.com> - 0.9.8.1-1
 - Updated to v0.9.8.1
 
 * Mon Apr 18 2022 Chris Caron <lead2gold@gmail.com> - 0.9.8-1
