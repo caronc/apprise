@@ -50,7 +50,7 @@ it easy to access:
 Apprise API, AWS SES, AWS SNS, Bark, Boxcar, ClickSend, DAPNET, DingTalk,
 Discord, E-Mail, Emby, Faast, FCM, Flock, Gitter, Google Chat, Gotify, Growl,
 Guilded, Home Assistant, IFTTT, Join, Kavenegar, KODI, Kumulos, LaMetric,
-MacOSX, Mailgun, Mattermost, Matrix, Microsoft Windows, Microsoft Teams,
+Line, MacOSX, Mailgun, Mattermost, Matrix, Microsoft Windows, Microsoft Teams,
 MessageBird, MQTT, MSG91, MyAndroid, Nexmo, Nextcloud, NextcloudTalk, Notica,
 Notifico, ntfy, Office365, OneSignal, Opsgenie, PagerDuty, ParsePlatform,
 PopcornNotify, Prowl, Pushalot, PushBullet, Pushjet, Pushover, PushSafer,
