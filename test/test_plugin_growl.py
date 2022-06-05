@@ -330,9 +330,9 @@ def test_plugin_growl_config_files(mock_gntp):
     content = """
     urls:
       - growl://pass@growl.server:
-          - priority: -1
+          - priority: -2
             tag: growl_int low
-          - priority: "-1"
+          - priority: "-2"
             tag: growl_str_int low
           - priority: low
             tag: growl_str low
@@ -344,7 +344,7 @@ def test_plugin_growl_config_files(mock_gntp):
       - growl://pass@growl.server:
           - priority: 2
             tag: growl_int emerg
-          - priority: 2
+          - priority: "2"
             tag: growl_str_int emerg
           - priority: emergency
             tag: growl_str emerg
@@ -373,7 +373,13 @@ def test_plugin_growl_config_files(mock_gntp):
     assert len(ac.servers()) == 7
     assert len(aobj) == 7
     assert len([x for x in aobj.find(tag='low')]) == 3
+    for s in aobj.find(tag='low'):
+        assert s.priority == GrowlPriority.LOW
+
     assert len([x for x in aobj.find(tag='emerg')]) == 3
+    for s in aobj.find(tag='emerg'):
+        assert s.priority == GrowlPriority.EMERGENCY
+
     assert len([x for x in aobj.find(tag='growl_str')]) == 2
     assert len([x for x in aobj.find(tag='growl_str_int')]) == 2
     assert len([x for x in aobj.find(tag='growl_int')]) == 2

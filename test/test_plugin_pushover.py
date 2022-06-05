@@ -381,9 +381,9 @@ def test_plugin_pushover_config_files(mock_post):
     content = """
     urls:
       - pover://USER@TOKEN:
-          - priority: -1
+          - priority: -2
             tag: pushover_int low
-          - priority: "-1"
+          - priority: "-2"
             tag: pushover_str_int low
           - priority: low
             tag: pushover_str low
@@ -395,7 +395,7 @@ def test_plugin_pushover_config_files(mock_post):
       - pover://USER2@TOKEN2:
           - priority: 2
             tag: pushover_int emerg
-          - priority: 2
+          - priority: "2"
             tag: pushover_str_int emerg
           - priority: emergency
             tag: pushover_str emerg
@@ -424,7 +424,13 @@ def test_plugin_pushover_config_files(mock_post):
     assert len(ac.servers()) == 7
     assert len(aobj) == 7
     assert len([x for x in aobj.find(tag='low')]) == 3
+    for s in aobj.find(tag='low'):
+        assert s.priority == PushoverPriority.LOW
+
     assert len([x for x in aobj.find(tag='emerg')]) == 3
+    for s in aobj.find(tag='emerg'):
+        assert s.priority == PushoverPriority.EMERGENCY
+
     assert len([x for x in aobj.find(tag='pushover_str')]) == 2
     assert len([x for x in aobj.find(tag='pushover_str_int')]) == 2
     assert len([x for x in aobj.find(tag='pushover_int')]) == 2
