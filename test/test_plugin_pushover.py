@@ -30,7 +30,9 @@ import pytest
 from json import dumps
 from apprise import Apprise
 from apprise import NotifyType
+from apprise import AppriseConfig
 from apprise import AppriseAttachment
+from apprise.plugins.NotifyPushover import PushoverPriority
 from apprise import plugins
 from helpers import AppriseURLTester
 
@@ -194,7 +196,7 @@ def test_plugin_pushover_attachments(mock_post, tmpdir):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
+    plugins.NotifyPushover.request_rate_per_sec = 0
 
     # Initialize some generic (but valid) tokens
     user_key = 'u' * 30
@@ -303,15 +305,14 @@ def test_plugin_pushover_attachments(mock_post, tmpdir):
         assert obj.send(body="test") is False
 
 
-@mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_pushover_edge_cases(mock_post, mock_get):
+def test_plugin_pushover_edge_cases(mock_post):
     """
     NotifyPushover() Edge Cases
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
+    plugins.NotifyPushover.request_rate_per_sec = 0
 
     # No token
     with pytest.raises(TypeError):
@@ -327,10 +328,8 @@ def test_plugin_pushover_edge_cases(mock_post, mock_get):
     devices = 'device1,device2,,,,%s' % invalid_device
 
     # Prepare Mock
-    mock_get.return_value = requests.Request()
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.ok
-    mock_get.return_value.status_code = requests.codes.ok
 
     # No webhook id specified
     with pytest.raises(TypeError):
@@ -372,3 +371,64 @@ def test_plugin_pushover_edge_cases(mock_post, mock_get):
 
     with pytest.raises(TypeError):
         plugins.NotifyPushover(user_key="abcd", token="  ")
+
+
+@mock.patch('requests.post')
+def test_plugin_pushover_config_files(mock_post):
+    """
+    NotifyPushover() Config File Cases
+    """
+    content = """
+    urls:
+      - pover://USER@TOKEN:
+          - priority: -1
+            tag: pushover_int low
+          - priority: "-1"
+            tag: pushover_str_int low
+          - priority: low
+            tag: pushover_str low
+
+          # This will take on moderate (default) priority
+          - priority: invalid
+            tag: pushover_invalid
+
+      - pover://USER2@TOKEN2:
+          - priority: 2
+            tag: pushover_int emerg
+          - priority: 2
+            tag: pushover_str_int emerg
+          - priority: emergency
+            tag: pushover_str emerg
+    """
+
+    # Disable Throttling to speed testing
+    plugins.NotifyPushover.request_rate_per_sec = 0
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    # Create ourselves a config object
+    ac = AppriseConfig()
+    assert ac.add_config(content=content) is True
+
+    aobj = Apprise()
+
+    # Add our configuration
+    aobj.add(ac)
+
+    # We should be able to read our 7 servers from that
+    # 3x low
+    # 3x emerg
+    # 1x invalid (so takes on normal priority)
+    assert len(ac.servers()) == 7
+    assert len(aobj) == 7
+    assert len([x for x in aobj.find(tag='low')]) == 3
+    assert len([x for x in aobj.find(tag='emerg')]) == 3
+    assert len([x for x in aobj.find(tag='pushover_str')]) == 2
+    assert len([x for x in aobj.find(tag='pushover_str_int')]) == 2
+    assert len([x for x in aobj.find(tag='pushover_int')]) == 2
+
+    assert len([x for x in aobj.find(tag='pushover_invalid')]) == 1
+    assert next(aobj.find(tag='pushover_invalid')).priority == \
+        PushoverPriority.NORMAL
