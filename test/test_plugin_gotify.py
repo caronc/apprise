@@ -22,9 +22,12 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
+import mock
 import pytest
 import requests
+import apprise
 from apprise import plugins
+from apprise.plugins.NotifyGotify import GotifyPriority
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -119,3 +122,73 @@ def test_plugin_gotify_edge_cases():
     # Whitespace also acts as an invalid token value
     with pytest.raises(TypeError):
         plugins.NotifyGotify(token="   ")
+
+
+@mock.patch('requests.post')
+def test_plugin_gotify_config_files(mock_post):
+    """
+    NotifyGotify() Config File Cases
+    """
+    content = """
+    urls:
+      - gotify://hostname/%s:
+          - priority: 0
+            tag: gotify_int low
+          - priority: "0"
+            tag: gotify_str_int low
+          # We want to make sure our '1' does not match the '10' entry
+          - priority: "1"
+            tag: gotify_str_int low
+          - priority: low
+            tag: gotify_str low
+
+          # This will take on moderate (default) priority
+          - priority: invalid
+            tag: gotify_invalid
+
+      - gotify://hostname/%s:
+          - priority: 10
+            tag: gotify_int emerg
+          - priority: "10"
+            tag: gotify_str_int emerg
+          - priority: emergency
+            tag: gotify_str emerg
+    """ % ('a' * 16, 'b' * 16)
+
+    # Disable Throttling to speed testing
+    plugins.NotifyGotify.request_rate_per_sec = 0
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    # Create ourselves a config object
+    ac = apprise.AppriseConfig()
+    assert ac.add_config(content=content) is True
+
+    aobj = apprise.Apprise()
+
+    # Add our configuration
+    aobj.add(ac)
+
+    # We should be able to read our 8 servers from that
+    # 4x low
+    # 3x emerg
+    # 1x invalid (so takes on normal priority)
+    assert len(ac.servers()) == 8
+    assert len(aobj) == 8
+    assert len([x for x in aobj.find(tag='low')]) == 4
+    for s in aobj.find(tag='low'):
+        assert s.priority == GotifyPriority.LOW
+
+    assert len([x for x in aobj.find(tag='emerg')]) == 3
+    for s in aobj.find(tag='emerg'):
+        assert s.priority == GotifyPriority.EMERGENCY
+
+    assert len([x for x in aobj.find(tag='gotify_str')]) == 2
+    assert len([x for x in aobj.find(tag='gotify_str_int')]) == 3
+    assert len([x for x in aobj.find(tag='gotify_int')]) == 2
+
+    assert len([x for x in aobj.find(tag='gotify_invalid')]) == 1
+    assert next(aobj.find(tag='gotify_invalid')).priority == \
+        GotifyPriority.NORMAL
