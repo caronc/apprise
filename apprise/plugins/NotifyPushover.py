@@ -102,13 +102,14 @@ PUSHOVER_SOUNDS = (
     PushoverSound.NONE,
 )
 
-PUSHOVER_PRIORITIES = (
-    PushoverPriority.LOW,
-    PushoverPriority.MODERATE,
-    PushoverPriority.NORMAL,
-    PushoverPriority.HIGH,
-    PushoverPriority.EMERGENCY,
-)
+PUSHOVER_PRIORITIES = {
+    # Note: This also acts as a reverse lookup mapping
+    PushoverPriority.LOW: 'low',
+    PushoverPriority.MODERATE: 'moderate',
+    PushoverPriority.NORMAL: 'normal',
+    PushoverPriority.HIGH: 'high',
+    PushoverPriority.EMERGENCY: 'emergency',
+}
 
 PUSHOVER_PRIORITY_MAP = {
     # Maps against string 'low'
@@ -531,19 +532,12 @@ class NotifyPushover(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        _map = {
-            PushoverPriority.LOW: 'low',
-            PushoverPriority.MODERATE: 'moderate',
-            PushoverPriority.NORMAL: 'normal',
-            PushoverPriority.HIGH: 'high',
-            PushoverPriority.EMERGENCY: 'emergency',
-        }
-
         # Define any URL parameters
         params = {
             'priority':
-                _map[self.template_args['priority']['default']]
-                if self.priority not in _map else _map[self.priority],
+                PUSHOVER_PRIORITIES[self.template_args['priority']['default']]
+                if self.priority not in PUSHOVER_PRIORITIES
+                else PUSHOVER_PRIORITIES[self.priority],
         }
 
         # Only add expire and retry for emergency messages,

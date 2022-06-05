@@ -54,13 +54,34 @@ class GrowlPriority(object):
     EMERGENCY = 2
 
 
-GROWL_PRIORITIES = (
-    GrowlPriority.LOW,
-    GrowlPriority.MODERATE,
-    GrowlPriority.NORMAL,
-    GrowlPriority.HIGH,
-    GrowlPriority.EMERGENCY,
-)
+GROWL_PRIORITIES = {
+    # Note: This also acts as a reverse lookup mapping
+    GrowlPriority.LOW: 'low',
+    GrowlPriority.MODERATE: 'moderate',
+    GrowlPriority.NORMAL: 'normal',
+    GrowlPriority.HIGH: 'high',
+    GrowlPriority.EMERGENCY: 'emergency',
+}
+
+GROWL_PRIORITY_MAP = {
+    # Maps against string 'low'
+    'l': GrowlPriority.LOW,
+    # Maps against string 'moderate'
+    'm': GrowlPriority.MODERATE,
+    # Maps against string 'normal'
+    'n': GrowlPriority.NORMAL,
+    # Maps against string 'high'
+    'h': GrowlPriority.HIGH,
+    # Maps against string 'emergency'
+    'e': GrowlPriority.EMERGENCY,
+
+    # Entries to additionally support (so more like Growl's API)
+    '-2': GrowlPriority.LOW,
+    '-1': GrowlPriority.MODERATE,
+    '0': GrowlPriority.NORMAL,
+    '1': GrowlPriority.HIGH,
+    '2': GrowlPriority.EMERGENCY,
+}
 
 
 class NotifyGrowl(NotifyBase):
@@ -172,11 +193,12 @@ class NotifyGrowl(NotifyBase):
             self.port = self.default_port
 
         # The Priority of the message
-        if priority not in GROWL_PRIORITIES:
-            self.priority = GrowlPriority.NORMAL
-
-        else:
-            self.priority = priority
+        self.priority = NotifyGrowl.template_args['priority']['default'] \
+            if not priority else \
+            next((
+                v for k, v in GROWL_PRIORITY_MAP.items()
+                if str(priority).startswith(k)),
+                NotifyGrowl.template_args['priority']['default'])
 
         # Our Registered object
         self.growl = None
@@ -318,21 +340,14 @@ class NotifyGrowl(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        _map = {
-            GrowlPriority.LOW: 'low',
-            GrowlPriority.MODERATE: 'moderate',
-            GrowlPriority.NORMAL: 'normal',
-            GrowlPriority.HIGH: 'high',
-            GrowlPriority.EMERGENCY: 'emergency',
-        }
-
         # Define any URL parameters
         params = {
             'image': 'yes' if self.include_image else 'no',
             'sticky': 'yes' if self.sticky else 'no',
             'priority':
-                _map[GrowlPriority.NORMAL] if self.priority not in _map
-                else _map[self.priority],
+                GROWL_PRIORITIES[self.template_args['priority']['default']]
+                if self.priority not in GROWL_PRIORITIES
+                else GROWL_PRIORITIES[self.priority],
             'version': self.version,
         }
 
@@ -384,33 +399,10 @@ class NotifyGrowl(NotifyBase):
                 )
                 pass
 
+        # Set our priority
         if 'priority' in results['qsd'] and len(results['qsd']['priority']):
-            _map = {
-                # Letter Assignments
-                'l': GrowlPriority.LOW,
-                'm': GrowlPriority.MODERATE,
-                'n': GrowlPriority.NORMAL,
-                'h': GrowlPriority.HIGH,
-                'e': GrowlPriority.EMERGENCY,
-                'lo': GrowlPriority.LOW,
-                'me': GrowlPriority.MODERATE,
-                'no': GrowlPriority.NORMAL,
-                'hi': GrowlPriority.HIGH,
-                'em': GrowlPriority.EMERGENCY,
-                # Support 3rd Party Documented Scale
-                '-2': GrowlPriority.LOW,
-                '-1': GrowlPriority.MODERATE,
-                '0': GrowlPriority.NORMAL,
-                '1': GrowlPriority.HIGH,
-                '2': GrowlPriority.EMERGENCY,
-            }
-            try:
-                results['priority'] = \
-                    _map[results['qsd']['priority'][0:2].lower()]
-
-            except KeyError:
-                # No priority was set
-                pass
+            results['priority'] = \
+                NotifyGrowl.unquote(results['qsd']['priority'])
 
         # Because of the URL formatting, the password is actually where the
         # username field is. For this reason, we just preform this small hack
