@@ -22,9 +22,12 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
+import mock
 import pytest
 import requests
+from apprise.plugins.NotifyProwl import ProwlPriority
 from apprise import plugins
+import apprise
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -140,3 +143,70 @@ def test_plugin_prowl_edge_cases():
         plugins.NotifyProwl(apikey='abcd', providerkey=object())
     with pytest.raises(TypeError):
         plugins.NotifyProwl(apikey='abcd', providerkey='  ')
+
+
+@mock.patch('requests.post')
+def test_plugin_prowl_config_files(mock_post):
+    """
+    NotifyProwl() Config File Cases
+    """
+    content = """
+    urls:
+      - prowl://%s:
+          - priority: -2
+            tag: prowl_int low
+          - priority: "-2"
+            tag: prowl_str_int low
+          - priority: low
+            tag: prowl_str low
+
+          # This will take on moderate (default) priority
+          - priority: invalid
+            tag: prowl_invalid
+
+      - prowl://%s:
+          - priority: 2
+            tag: prowl_int emerg
+          - priority: "2"
+            tag: prowl_str_int emerg
+          - priority: emergency
+            tag: prowl_str emerg
+    """ % ('a' * 40, 'b' * 40)
+
+    # Disable Throttling to speed testing
+    plugins.NotifyProwl.request_rate_per_sec = 0
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    # Create ourselves a config object
+    ac = apprise.AppriseConfig()
+    assert ac.add_config(content=content) is True
+
+    aobj = apprise.Apprise()
+
+    # Add our configuration
+    aobj.add(ac)
+
+    # We should be able to read our 7 servers from that
+    # 3x low
+    # 3x emerg
+    # 1x invalid (so takes on normal priority)
+    assert len(ac.servers()) == 7
+    assert len(aobj) == 7
+    assert len([x for x in aobj.find(tag='low')]) == 3
+    for s in aobj.find(tag='low'):
+        assert s.priority == ProwlPriority.LOW
+
+    assert len([x for x in aobj.find(tag='emerg')]) == 3
+    for s in aobj.find(tag='emerg'):
+        assert s.priority == ProwlPriority.EMERGENCY
+
+    assert len([x for x in aobj.find(tag='prowl_str')]) == 2
+    assert len([x for x in aobj.find(tag='prowl_str_int')]) == 2
+    assert len([x for x in aobj.find(tag='prowl_int')]) == 2
+
+    assert len([x for x in aobj.find(tag='prowl_invalid')]) == 1
+    assert next(aobj.find(tag='prowl_invalid')).priority == \
+        ProwlPriority.NORMAL

@@ -28,12 +28,9 @@ import mock
 import requests
 import pytest
 from json import dumps
-from apprise import Apprise
-from apprise import NotifyType
-from apprise import AppriseConfig
-from apprise import AppriseAttachment
 from apprise.plugins.NotifyPushover import PushoverPriority
 from apprise import plugins
+import apprise
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -218,10 +215,11 @@ def test_plugin_pushover_attachments(mock_post, tmpdir):
     mock_post.return_value = response
 
     # prepare our attachment
-    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
+    attach = apprise.AppriseAttachment(
+        os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
 
     # Instantiate our object
-    obj = Apprise.instantiate(
+    obj = apprise.Apprise.instantiate(
         'pover://{}@{}/'.format(user_key, api_token))
     assert isinstance(obj, plugins.NotifyPushover)
 
@@ -253,7 +251,7 @@ def test_plugin_pushover_attachments(mock_post, tmpdir):
     image = tmpdir.mkdir("pover_image").join("test.jpg")
     image.write('a' * plugins.NotifyPushover.attach_max_size_bytes)
 
-    attach = AppriseAttachment.instantiate(str(image))
+    attach = apprise.AppriseAttachment.instantiate(str(image))
     assert obj.notify(body="test", attach=attach) is True
 
     # Test our call count
@@ -265,16 +263,17 @@ def test_plugin_pushover_attachments(mock_post, tmpdir):
     mock_post.reset_mock()
 
     # Add 1 more byte to the file (putting it over the limit)
-    image.write('a' * (plugins.NotifyPushover.attach_max_size_bytes + 1))
+    image.write(
+        'a' * (plugins.NotifyPushover.attach_max_size_bytes + 1))
 
-    attach = AppriseAttachment.instantiate(str(image))
+    attach = apprise.AppriseAttachment.instantiate(str(image))
     assert obj.notify(body="test", attach=attach) is False
 
     # Test our call count
     assert mock_post.call_count == 0
 
     # Test case when file is missing
-    attach = AppriseAttachment.instantiate(
+    attach = apprise.AppriseAttachment.instantiate(
         'file://{}?cache=False'.format(str(image)))
     os.unlink(str(image))
     assert obj.notify(
@@ -286,13 +285,14 @@ def test_plugin_pushover_attachments(mock_post, tmpdir):
     # Test unsuported files:
     image = tmpdir.mkdir("pover_unsupported").join("test.doc")
     image.write('a' * 256)
-    attach = AppriseAttachment.instantiate(str(image))
+    attach = apprise.AppriseAttachment.instantiate(str(image))
 
     # Content is silently ignored
     assert obj.notify(body="test", attach=attach) is True
 
     # prepare our attachment
-    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
+    attach = apprise.AppriseAttachment(
+        os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
 
     # Throw an exception on the first call to requests.post()
     for side_effect in (requests.RequestException(), OSError(), bad_response):
@@ -343,7 +343,7 @@ def test_plugin_pushover_edge_cases(mock_post):
     # This call fails because there is 1 invalid device
     assert obj.notify(
         body='body', title='title',
-        notify_type=NotifyType.INFO) is False
+        notify_type=apprise.NotifyType.INFO) is False
 
     obj = plugins.NotifyPushover(user_key=user_key, token=token)
     assert isinstance(obj, plugins.NotifyPushover) is True
@@ -353,9 +353,11 @@ def test_plugin_pushover_edge_cases(mock_post):
 
     # This call succeeds because all of the devices are valid
     assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO) is True
+        body='body', title='title',
+        notify_type=apprise.NotifyType.INFO) is True
 
-    obj = plugins.NotifyPushover(user_key=user_key, token=token, targets=set())
+    obj = plugins.NotifyPushover(
+        user_key=user_key, token=token, targets=set())
     assert isinstance(obj, plugins.NotifyPushover) is True
     # Default is to send to all devices, so there will be a
     # device defined here
@@ -409,10 +411,10 @@ def test_plugin_pushover_config_files(mock_post):
     mock_post.return_value.status_code = requests.codes.ok
 
     # Create ourselves a config object
-    ac = AppriseConfig()
+    ac = apprise.AppriseConfig()
     assert ac.add_config(content=content) is True
 
-    aobj = Apprise()
+    aobj = apprise.Apprise()
 
     # Add our configuration
     aobj.add(ac)
