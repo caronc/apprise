@@ -150,7 +150,7 @@ class NotifyProwl(NotifyBase):
             if not priority else \
             next((
                 v for k, v in PROWL_PRIORITY_MAP.items()
-                if str(priority).startswith(k)),
+                if str(priority).lower().startswith(k)),
                 NotifyProwl.template_args['priority']['default'])
 
         # API Key (associated with project)

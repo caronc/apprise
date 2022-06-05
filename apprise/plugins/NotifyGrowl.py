@@ -197,7 +197,7 @@ class NotifyGrowl(NotifyBase):
             if not priority else \
             next((
                 v for k, v in GROWL_PRIORITY_MAP.items()
-                if str(priority).startswith(k)),
+                if str(priority).lower().startswith(k)),
                 NotifyGrowl.template_args['priority']['default'])
 
         # Our Registered object

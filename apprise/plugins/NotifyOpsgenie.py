@@ -277,7 +277,7 @@ class NotifyOpsgenie(NotifyBase):
             if not priority else \
             next((
                 v for k, v in OPSGENIE_PRIORITY_MAP.items()
-                if str(priority).startswith(k)),
+                if str(priority).lower().startswith(k)),
                 NotifyOpsgenie.template_args['priority']['default'])
 
         # Store our region

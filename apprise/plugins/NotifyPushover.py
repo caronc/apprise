@@ -290,7 +290,7 @@ class NotifyPushover(NotifyBase):
             if not priority else \
             next((
                 v for k, v in PUSHOVER_PRIORITY_MAP.items()
-                if str(priority).startswith(k)),
+                if str(priority).lower().startswith(k)),
                 NotifyPushover.template_args['priority']['default'])
 
         # The following are for emergency alerts
