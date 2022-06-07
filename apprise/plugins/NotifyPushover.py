@@ -535,9 +535,9 @@ class NotifyPushover(NotifyBase):
         # Define any URL parameters
         params = {
             'priority':
-                PUSHOVER_PRIORITIES[self.template_args['priority']['default']]
+                str(PUSHOVER_PRIORITIES[self.template_args['priority']['default']]
                 if self.priority not in PUSHOVER_PRIORITIES
-                else PUSHOVER_PRIORITIES[self.priority],
+                else PUSHOVER_PRIORITIES[self.priority]),
         }
 
         # Only add expire and retry for emergency messages,

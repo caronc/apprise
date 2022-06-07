@@ -273,10 +273,10 @@ class NotifyGotify(NotifyBase):
 
         # Define any URL parameters
         params = {
-            'priority': str(
+            'priority':
                 GOTIFY_PRIORITIES[self.template_args['priority']['default']]
                 if self.priority not in GOTIFY_PRIORITIES
-                else GOTIFY_PRIORITIES[self.priority]),
+                else GOTIFY_PRIORITIES[self.priority],
         }
 
         # Extend our parameters

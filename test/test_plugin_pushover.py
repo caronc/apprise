@@ -440,3 +440,6 @@ def test_plugin_pushover_config_files(mock_post):
     assert len([x for x in aobj.find(tag='pushover_invalid')]) == 1
     assert next(aobj.find(tag='pushover_invalid')).priority == \
         PushoverPriority.NORMAL
+
+    # Notifications work
+    assert aobj.notify(title="title", body="body") is True
