@@ -63,10 +63,22 @@ class DapnetPriority(object):
     EMERGENCY = 1
 
 
-DAPNET_PRIORITIES = (
-    DapnetPriority.NORMAL,
-    DapnetPriority.EMERGENCY,
-)
+DAPNET_PRIORITIES = {
+    DapnetPriority.NORMAL: 'normal',
+    DapnetPriority.EMERGENCY: 'emergency',
+}
+
+
+DAPNET_PRIORITY_MAP = {
+    # Maps against string 'normal'
+    'n': DapnetPriority.NORMAL,
+    # Maps against string 'emergency'
+    'e': DapnetPriority.EMERGENCY,
+
+    # Entries to additionally support (so more like Dapnet's API)
+    '0': DapnetPriority.NORMAL,
+    '1': DapnetPriority.EMERGENCY,
+}
 
 
 class NotifyDapnet(NotifyBase):
@@ -172,11 +184,14 @@ class NotifyDapnet(NotifyBase):
         # Parse our targets
         self.targets = list()
 
-        # get the emergency prio setting
-        if priority not in DAPNET_PRIORITIES:
-            self.priority = self.template_args['priority']['default']
-        else:
-            self.priority = priority
+        # The Priority of the message
+        self.priority = int(
+            NotifyDapnet.template_args['priority']['default']
+            if priority is None else
+            next((
+                v for k, v in DAPNET_PRIORITY_MAP.items()
+                if str(priority).lower().startswith(k)),
+                NotifyDapnet.template_args['priority']['default']))
 
         if not (self.user and self.password):
             msg = 'A Dapnet user/pass was not provided.'
@@ -201,8 +216,7 @@ class NotifyDapnet(NotifyBase):
                 )
                 continue
 
-            # Store callsign without SSID and
-            # ignore duplicates
+            # Store callsign without SSID and ignore duplicates
             if result['callsign'] not in self.targets:
                 self.targets.append(result['callsign'])
 
@@ -230,10 +244,6 @@ class NotifyDapnet(NotifyBase):
         # error tracking (used for function return)
         has_error = False
 
-        # prepare the emergency mode
-        emergency_mode = True \
-            if self.priority == DapnetPriority.EMERGENCY else False
-
         # Create a copy of the targets list
         targets = list(self.targets)
 
@@ -244,7 +254,7 @@ class NotifyDapnet(NotifyBase):
                 'text': body,
                 'callSignNames': targets[index:index + batch_size],
                 'transmitterGroupNames': self.txgroups,
-                'emergency': emergency_mode,
+                'emergency': (self.priority == DapnetPriority.EMERGENCY),
             }
 
             self.logger.debug('DAPNET POST URL: %s' % self.notify_url)
@@ -305,15 +315,11 @@ class NotifyDapnet(NotifyBase):
         """
 
         # Define any URL parameters
-        _map = {
-            DapnetPriority.NORMAL: 'normal',
-            DapnetPriority.EMERGENCY: 'emergency',
-        }
-
-        # Define any URL parameters
         params = {
-            'priority': 'normal' if self.priority not in _map
-            else _map[self.priority],
+            'priority':
+                DAPNET_PRIORITIES[self.template_args['priority']['default']]
+                if self.priority not in DAPNET_PRIORITIES
+                else DAPNET_PRIORITIES[self.priority],
             'batch': 'yes' if self.batch else 'no',
             'txgroups': ','.join(self.txgroups),
         }
@@ -361,25 +367,10 @@ class NotifyDapnet(NotifyBase):
             results['targets'] += \
                 NotifyDapnet.parse_list(results['qsd']['to'])
 
-        # Check for priority
+        # Set our priority
         if 'priority' in results['qsd'] and len(results['qsd']['priority']):
-            _map = {
-                # Letter Assignments
-                'n': DapnetPriority.NORMAL,
-                'e': DapnetPriority.EMERGENCY,
-                'no': DapnetPriority.NORMAL,
-                'em': DapnetPriority.EMERGENCY,
-                # Numeric assignments
-                '0': DapnetPriority.NORMAL,
-                '1': DapnetPriority.EMERGENCY,
-            }
-            try:
-                results['priority'] = \
-                    _map[results['qsd']['priority'][0:2].lower()]
-
-            except KeyError:
-                # No priority was set
-                pass
+            results['priority'] = \
+                NotifyDapnet.unquote(results['qsd']['priority'])
 
         # Check for one or multiple transmitter groups (comma separated)
         # and split them up, when necessary

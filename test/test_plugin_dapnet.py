@@ -25,7 +25,10 @@
 # Disable logging for a cleaner testing output
 import logging
 import requests
+import mock
 
+import apprise
+from apprise.plugins.NotifyDapnet import DapnetPriority
 from apprise import plugins
 from helpers import AppriseURLTester
 
@@ -129,3 +132,72 @@ def test_plugin_dapnet_urls():
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+@mock.patch('requests.post')
+def test_plugin_dapnet_config_files(mock_post):
+    """
+    NotifyDapnet() Config File Cases
+    """
+    content = """
+    urls:
+      - dapnet://user:pass@DF1ABC:
+          - priority: 0
+            tag: dapnet_int normal
+          - priority: "0"
+            tag: dapnet_str_int normal
+          - priority: normal
+            tag: dapnet_str normal
+
+          # This will take on normal (default) priority
+          - priority: invalid
+            tag: dapnet_invalid
+
+      - dapnet://user1:pass2@DF1ABC:
+          - priority: 1
+            tag: dapnet_int emerg
+          - priority: "1"
+            tag: dapnet_str_int emerg
+          - priority: emergency
+            tag: dapnet_str emerg
+    """
+
+    # Disable Throttling to speed testing
+    plugins.NotifyDapnet.request_rate_per_sec = 0
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.created
+
+    # Create ourselves a config object
+    ac = apprise.AppriseConfig()
+    assert ac.add_config(content=content) is True
+
+    aobj = apprise.Apprise()
+
+    # Add our configuration
+    aobj.add(ac)
+
+    # We should be able to read our 7 servers from that
+    # 4x normal (invalid + 3 exclusivly specified to be so)
+    # 3x emerg
+    assert len(ac.servers()) == 7
+    assert len(aobj) == 7
+    assert len([x for x in aobj.find(tag='normal')]) == 3
+    for s in aobj.find(tag='normal'):
+        assert s.priority == DapnetPriority.NORMAL
+
+    assert len([x for x in aobj.find(tag='emerg')]) == 3
+    for s in aobj.find(tag='emerg'):
+        assert s.priority == DapnetPriority.EMERGENCY
+
+    assert len([x for x in aobj.find(tag='dapnet_str')]) == 2
+    assert len([x for x in aobj.find(tag='dapnet_str_int')]) == 2
+    assert len([x for x in aobj.find(tag='dapnet_int')]) == 2
+
+    assert len([x for x in aobj.find(tag='dapnet_invalid')]) == 1
+    assert next(aobj.find(tag='dapnet_invalid')).priority == \
+        DapnetPriority.NORMAL
+
+    # Notifications work
+    assert aobj.notify(title="title", body="body") is True

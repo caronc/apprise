@@ -390,7 +390,7 @@ def test_plugin_pushover_config_files(mock_post):
           - priority: low
             tag: pushover_str low
 
-          # This will take on moderate (default) priority
+          # This will take on normal (default) priority
           - priority: invalid
             tag: pushover_invalid
 
