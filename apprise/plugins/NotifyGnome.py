@@ -66,11 +66,30 @@ class GnomeUrgency(object):
     HIGH = 2
 
 
-GNOME_URGENCIES = (
-    GnomeUrgency.LOW,
-    GnomeUrgency.NORMAL,
-    GnomeUrgency.HIGH,
-)
+GNOME_URGENCIES = {
+    GnomeUrgency.LOW: 'low',
+    GnomeUrgency.NORMAL: 'normal',
+    GnomeUrgency.HIGH: 'high',
+}
+
+
+GNOME_URGENCY_MAP = {
+    # Maps against string 'low'
+    'l': GnomeUrgency.LOW,
+    # Maps against string 'moderate'
+    'm': GnomeUrgency.LOW,
+    # Maps against string 'normal'
+    'n': GnomeUrgency.NORMAL,
+    # Maps against string 'high'
+    'h': GnomeUrgency.HIGH,
+    # Maps against string 'emergency'
+    'e': GnomeUrgency.HIGH,
+
+    # Entries to additionally support (so more like Gnome's API)
+    '0': GnomeUrgency.LOW,
+    '1': GnomeUrgency.NORMAL,
+    '2': GnomeUrgency.HIGH,
+}
 
 
 class NotifyGnome(NotifyBase):
@@ -126,6 +145,12 @@ class NotifyGnome(NotifyBase):
             'values': GNOME_URGENCIES,
             'default': GnomeUrgency.NORMAL,
         },
+        'priority': {
+            # Apprise uses 'priority' everywhere; it's just a nice consistent
+            # feel to be able to use it here as well. Just map the
+            # value back to 'priority'
+            'alias_of': 'urgency',
+        },
         'image': {
             'name': _('Include Image'),
             'type': 'bool',
@@ -142,11 +167,13 @@ class NotifyGnome(NotifyBase):
         super(NotifyGnome, self).__init__(**kwargs)
 
         # The urgency of the message
-        if urgency not in GNOME_URGENCIES:
-            self.urgency = self.template_args['urgency']['default']
-
-        else:
-            self.urgency = urgency
+        self.urgency = int(
+            NotifyGnome.template_args['urgency']['default']
+            if urgency is None else
+            next((
+                v for k, v in GNOME_URGENCY_MAP.items()
+                if str(urgency).lower().startswith(k)),
+                NotifyGnome.template_args['urgency']['default']))
 
         # Track whether or not we want to send an image with our notification
         # or not.
@@ -205,17 +232,13 @@ class NotifyGnome(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        _map = {
-            GnomeUrgency.LOW: 'low',
-            GnomeUrgency.NORMAL: 'normal',
-            GnomeUrgency.HIGH: 'high',
-        }
-
         # Define any URL parameters
         params = {
             'image': 'yes' if self.include_image else 'no',
-            'urgency': 'normal' if self.urgency not in _map
-                       else _map[self.urgency],
+            'urgency':
+                GNOME_URGENCIES[self.template_args['urgency']['default']]
+                if self.urgency not in GNOME_URGENCIES
+                else GNOME_URGENCIES[self.urgency],
         }
 
         # Extend our parameters
@@ -243,23 +266,13 @@ class NotifyGnome(NotifyBase):
 
         # Gnome supports urgency, but we we also support the keyword priority
         # so that it is consistent with some of the other plugins
-        urgency = results['qsd'].get('urgency', results['qsd'].get('priority'))
-        if urgency and len(urgency):
-            _map = {
-                '0': GnomeUrgency.LOW,
-                'l': GnomeUrgency.LOW,
-                'n': GnomeUrgency.NORMAL,
-                '1': GnomeUrgency.NORMAL,
-                'h': GnomeUrgency.HIGH,
-                '2': GnomeUrgency.HIGH,
-            }
+        if 'priority' in results['qsd'] and len(results['qsd']['priority']):
+            # We intentionally store the priority in the urgency section
+            results['urgency'] = \
+                NotifyGnome.unquote(results['qsd']['priority'])
 
-            try:
-                # Attempt to index/retrieve our urgency
-                results['urgency'] = _map[urgency[0].lower()]
-
-            except KeyError:
-                # No priority was set
-                pass
+        if 'urgency' in results['qsd'] and len(results['qsd']['urgency']):
+            results['urgency'] = \
+                NotifyGnome.unquote(results['qsd']['urgency'])
 
         return results
