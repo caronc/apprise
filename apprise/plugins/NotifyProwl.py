@@ -40,13 +40,34 @@ class ProwlPriority(object):
     EMERGENCY = 2
 
 
-PROWL_PRIORITIES = (
-    ProwlPriority.LOW,
-    ProwlPriority.MODERATE,
-    ProwlPriority.NORMAL,
-    ProwlPriority.HIGH,
-    ProwlPriority.EMERGENCY,
-)
+PROWL_PRIORITIES = {
+    # Note: This also acts as a reverse lookup mapping
+    ProwlPriority.LOW: 'low',
+    ProwlPriority.MODERATE: 'moderate',
+    ProwlPriority.NORMAL: 'normal',
+    ProwlPriority.HIGH: 'high',
+    ProwlPriority.EMERGENCY: 'emergency',
+}
+
+PROWL_PRIORITY_MAP = {
+    # Maps against string 'low'
+    'l': ProwlPriority.LOW,
+    # Maps against string 'moderate'
+    'm': ProwlPriority.MODERATE,
+    # Maps against string 'normal'
+    'n': ProwlPriority.NORMAL,
+    # Maps against string 'high'
+    'h': ProwlPriority.HIGH,
+    # Maps against string 'emergency'
+    'e': ProwlPriority.EMERGENCY,
+
+    # Entries to additionally support (so more like Prowl's API)
+    '-2': ProwlPriority.LOW,
+    '-1': ProwlPriority.MODERATE,
+    '0': ProwlPriority.NORMAL,
+    '1': ProwlPriority.HIGH,
+    '2': ProwlPriority.EMERGENCY,
+}
 
 # Provide some known codes Prowl uses and what they translate to:
 PROWL_HTTP_ERROR_MAP = {
@@ -124,11 +145,13 @@ class NotifyProwl(NotifyBase):
         """
         super(NotifyProwl, self).__init__(**kwargs)
 
-        if priority not in PROWL_PRIORITIES:
-            self.priority = self.template_args['priority']['default']
-
-        else:
-            self.priority = priority
+        # The Priority of the message
+        self.priority = NotifyProwl.template_args['priority']['default'] \
+            if not priority else \
+            next((
+                v for k, v in PROWL_PRIORITY_MAP.items()
+                if str(priority).lower().startswith(k)),
+                NotifyProwl.template_args['priority']['default'])
 
         # API Key (associated with project)
         self.apikey = validate_regex(
@@ -229,18 +252,12 @@ class NotifyProwl(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        _map = {
-            ProwlPriority.LOW: 'low',
-            ProwlPriority.MODERATE: 'moderate',
-            ProwlPriority.NORMAL: 'normal',
-            ProwlPriority.HIGH: 'high',
-            ProwlPriority.EMERGENCY: 'emergency',
-        }
-
         # Define any URL parameters
         params = {
-            'priority': 'normal' if self.priority not in _map
-                        else _map[self.priority],
+            'priority':
+                PROWL_PRIORITIES[self.template_args['priority']['default']]
+                if self.priority not in PROWL_PRIORITIES
+                else PROWL_PRIORITIES[self.priority],
         }
 
         # Extend our parameters
@@ -276,32 +293,9 @@ class NotifyProwl(NotifyBase):
         except IndexError:
             pass
 
+        # Set our priority
         if 'priority' in results['qsd'] and len(results['qsd']['priority']):
-            _map = {
-                # Letter Assignments
-                'l': ProwlPriority.LOW,
-                'm': ProwlPriority.MODERATE,
-                'n': ProwlPriority.NORMAL,
-                'h': ProwlPriority.HIGH,
-                'e': ProwlPriority.EMERGENCY,
-                'lo': ProwlPriority.LOW,
-                'me': ProwlPriority.MODERATE,
-                'no': ProwlPriority.NORMAL,
-                'hi': ProwlPriority.HIGH,
-                'em': ProwlPriority.EMERGENCY,
-                # Support 3rd Party Documented Scale
-                '-2': ProwlPriority.LOW,
-                '-1': ProwlPriority.MODERATE,
-                '0': ProwlPriority.NORMAL,
-                '1': ProwlPriority.HIGH,
-                '2': ProwlPriority.EMERGENCY,
-            }
-            try:
-                results['priority'] = \
-                    _map[results['qsd']['priority'][0:2].lower()]
-
-            except KeyError:
-                # No priority was set
-                pass
+            results['priority'] = \
+                NotifyProwl.unquote(results['qsd']['priority'])
 
         return results

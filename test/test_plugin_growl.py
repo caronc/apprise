@@ -28,6 +28,7 @@ import mock
 import six
 import pytest
 import apprise
+from apprise.plugins.NotifyGrowl import GrowlPriority
 
 try:
     from gntp import errors
@@ -317,3 +318,72 @@ def test_plugin_growl_general(mock_gntp):
             print('%s / %s' % (url, str(e)))
             assert exception is not None
             assert isinstance(e, exception)
+
+
+@pytest.mark.skipif(
+    'gntp' not in sys.modules, reason="Requires gntp")
+@mock.patch('gntp.notifier.GrowlNotifier')
+def test_plugin_growl_config_files(mock_gntp):
+    """
+    NotifyGrowl() Config File Cases
+    """
+    content = """
+    urls:
+      - growl://pass@growl.server:
+          - priority: -2
+            tag: growl_int low
+          - priority: "-2"
+            tag: growl_str_int low
+          - priority: low
+            tag: growl_str low
+
+          # This will take on moderate (default) priority
+          - priority: invalid
+            tag: growl_invalid
+
+      - growl://pass@growl.server:
+          - priority: 2
+            tag: growl_int emerg
+          - priority: "2"
+            tag: growl_str_int emerg
+          - priority: emergency
+            tag: growl_str emerg
+    """
+
+    # Disable Throttling to speed testing
+    apprise.plugins.NotifyGrowl.request_rate_per_sec = 0
+
+    mock_notifier = mock.Mock()
+    mock_gntp.return_value = mock_notifier
+    mock_notifier.notify.return_value = True
+
+    # Create ourselves a config object
+    ac = apprise.AppriseConfig()
+    assert ac.add_config(content=content) is True
+
+    aobj = apprise.Apprise()
+
+    # Add our configuration
+    aobj.add(ac)
+
+    # We should be able to read our 7 servers from that
+    # 3x low
+    # 3x emerg
+    # 1x invalid (so takes on normal priority)
+    assert len(ac.servers()) == 7
+    assert len(aobj) == 7
+    assert len([x for x in aobj.find(tag='low')]) == 3
+    for s in aobj.find(tag='low'):
+        assert s.priority == GrowlPriority.LOW
+
+    assert len([x for x in aobj.find(tag='emerg')]) == 3
+    for s in aobj.find(tag='emerg'):
+        assert s.priority == GrowlPriority.EMERGENCY
+
+    assert len([x for x in aobj.find(tag='growl_str')]) == 2
+    assert len([x for x in aobj.find(tag='growl_str_int')]) == 2
+    assert len([x for x in aobj.find(tag='growl_int')]) == 2
+
+    assert len([x for x in aobj.find(tag='growl_invalid')]) == 1
+    assert next(aobj.find(tag='growl_invalid')).priority == \
+        GrowlPriority.NORMAL

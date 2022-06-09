@@ -49,13 +49,37 @@ class GotifyPriority(object):
     EMERGENCY = 10
 
 
-GOTIFY_PRIORITIES = (
-    GotifyPriority.LOW,
-    GotifyPriority.MODERATE,
-    GotifyPriority.NORMAL,
-    GotifyPriority.HIGH,
-    GotifyPriority.EMERGENCY,
-)
+GOTIFY_PRIORITIES = {
+    # Note: This also acts as a reverse lookup mapping
+    GotifyPriority.LOW: 'low',
+    GotifyPriority.MODERATE: 'moderate',
+    GotifyPriority.NORMAL: 'normal',
+    GotifyPriority.HIGH: 'high',
+    GotifyPriority.EMERGENCY: 'emergency',
+}
+
+GOTIFY_PRIORITY_MAP = {
+    # Maps against string 'low'
+    'l': GotifyPriority.LOW,
+    # Maps against string 'moderate'
+    'm': GotifyPriority.MODERATE,
+    # Maps against string 'normal'
+    'n': GotifyPriority.NORMAL,
+    # Maps against string 'high'
+    'h': GotifyPriority.HIGH,
+    # Maps against string 'emergency'
+    'e': GotifyPriority.EMERGENCY,
+
+    # Entries to additionally support (so more like Gotify's API)
+    '10': GotifyPriority.EMERGENCY,
+    # ^ 10 needs to be checked before '1' below or it will match the wrong
+    # priority
+    '0': GotifyPriority.LOW, '1': GotifyPriority.LOW, '2': GotifyPriority.LOW,
+    '3': GotifyPriority.MODERATE, '4': GotifyPriority.MODERATE,
+    '5': GotifyPriority.NORMAL, '6': GotifyPriority.NORMAL,
+    '7': GotifyPriority.NORMAL,
+    '8': GotifyPriority.HIGH, '9': GotifyPriority.HIGH,
+}
 
 
 class NotifyGotify(NotifyBase):
@@ -144,11 +168,14 @@ class NotifyGotify(NotifyBase):
         # prepare our fullpath
         self.fullpath = kwargs.get('fullpath', '/')
 
-        if priority not in GOTIFY_PRIORITIES:
-            self.priority = GotifyPriority.NORMAL
-
-        else:
-            self.priority = priority
+        # The Priority of the message
+        self.priority = int(
+            NotifyGotify.template_args['priority']['default']
+            if priority is None else
+            next((
+                v for k, v in GOTIFY_PRIORITY_MAP.items()
+                if str(priority).lower().startswith(k)),
+                NotifyGotify.template_args['priority']['default']))
 
         if self.secure:
             self.schema = 'https'
@@ -246,7 +273,10 @@ class NotifyGotify(NotifyBase):
 
         # Define any URL parameters
         params = {
-            'priority': self.priority,
+            'priority':
+                GOTIFY_PRIORITIES[self.template_args['priority']['default']]
+                if self.priority not in GOTIFY_PRIORITIES
+                else GOTIFY_PRIORITIES[self.priority],
         }
 
         # Extend our parameters
@@ -294,20 +324,9 @@ class NotifyGotify(NotifyBase):
         results['fullpath'] = \
             '/' if not entries else '/{}/'.format('/'.join(entries))
 
+        # Set our priority
         if 'priority' in results['qsd'] and len(results['qsd']['priority']):
-            _map = {
-                'l': GotifyPriority.LOW,
-                'm': GotifyPriority.MODERATE,
-                'n': GotifyPriority.NORMAL,
-                'h': GotifyPriority.HIGH,
-                'e': GotifyPriority.EMERGENCY,
-            }
-            try:
-                results['priority'] = \
-                    _map[results['qsd']['priority'][0].lower()]
-
-            except KeyError:
-                # No priority was set
-                pass
+            results['priority'] = \
+                NotifyGotify.unquote(results['qsd']['priority'])
 
         return results

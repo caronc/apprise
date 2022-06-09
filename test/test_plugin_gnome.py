@@ -29,6 +29,7 @@ import sys
 import types
 import pytest
 import apprise
+from apprise.plugins.NotifyGnome import GnomeUrgency
 
 try:
     # Python v3.4+
@@ -188,6 +189,75 @@ def test_plugin_gnome_general():
     assert obj.urgency == 2
     assert obj.notify(title='title', body='body',
                       notify_type=apprise.NotifyType.INFO) is True
+
+    # Test configuration parsing
+    content = """
+    urls:
+      - gnome://:
+          - priority: 0
+            tag: gnome_int low
+          - priority: "0"
+            tag: gnome_str_int low
+          - priority: low
+            tag: gnome_str low
+          - urgency: 0
+            tag: gnome_int low
+          - urgency: "0"
+            tag: gnome_str_int low
+          - urgency: low
+            tag: gnome_str low
+
+          # These will take on normal (default) urgency
+          - priority: invalid
+            tag: gnome_invalid
+          - urgency: invalid
+            tag: gnome_invalid
+
+      - gnome://:
+          - priority: 2
+            tag: gnome_int high
+          - priority: "2"
+            tag: gnome_str_int high
+          - priority: high
+            tag: gnome_str high
+          - urgency: 2
+            tag: gnome_int high
+          - urgency: "2"
+            tag: gnome_str_int high
+          - urgency: high
+            tag: gnome_str high
+    """
+
+    # Create ourselves a config object
+    ac = apprise.AppriseConfig()
+    assert ac.add_config(content=content) is True
+
+    aobj = apprise.Apprise()
+
+    # Add our configuration
+    aobj.add(ac)
+
+    # We should be able to read our 14 servers from that
+    # 6x low
+    # 6x high
+    # 2x invalid (so takes on normal urgency)
+    assert len(ac.servers()) == 14
+    assert len(aobj) == 14
+    assert len([x for x in aobj.find(tag='low')]) == 6
+    for s in aobj.find(tag='low'):
+        assert s.urgency == GnomeUrgency.LOW
+
+    assert len([x for x in aobj.find(tag='high')]) == 6
+    for s in aobj.find(tag='high'):
+        assert s.urgency == GnomeUrgency.HIGH
+
+    assert len([x for x in aobj.find(tag='gnome_str')]) == 4
+    assert len([x for x in aobj.find(tag='gnome_str_int')]) == 4
+    assert len([x for x in aobj.find(tag='gnome_int')]) == 4
+
+    assert len([x for x in aobj.find(tag='gnome_invalid')]) == 2
+    for s in aobj.find(tag='gnome_invalid'):
+        assert s.urgency == GnomeUrgency.NORMAL
 
     # Test our loading of our icon exception; it will still allow the
     # notification to be sent

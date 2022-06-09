@@ -51,6 +51,7 @@ if 'dbus' not in sys.modules:
     pytest.skip("Skipping dbus-python based tests", allow_module_level=True)
 
 from dbus import DBusException  # noqa E402
+from apprise.plugins.NotifyDBus import DBusUrgency  # noqa E402
 
 
 @mock.patch('dbus.SessionBus')
@@ -265,13 +266,78 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True
 
-    obj = apprise.Apprise.instantiate(
-        'dbus://_/?x=invalid&y=invalid', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyDBus) is True
-    assert isinstance(obj.url(), six.string_types) is True
-    assert obj.notify(
-        title='title', body='body',
-        notify_type=apprise.NotifyType.INFO) is True
+    with pytest.raises(TypeError):
+        obj = apprise.Apprise.instantiate(
+            'dbus://_/?x=invalid&y=invalid', suppress_exceptions=False)
+
+    # Test configuration parsing
+    content = """
+    urls:
+      - dbus://:
+          - priority: 0
+            tag: dbus_int low
+          - priority: "0"
+            tag: dbus_str_int low
+          - priority: low
+            tag: dbus_str low
+          - urgency: 0
+            tag: dbus_int low
+          - urgency: "0"
+            tag: dbus_str_int low
+          - urgency: low
+            tag: dbus_str low
+
+          # These will take on normal (default) urgency
+          - priority: invalid
+            tag: dbus_invalid
+          - urgency: invalid
+            tag: dbus_invalid
+
+      - dbus://:
+          - priority: 2
+            tag: dbus_int high
+          - priority: "2"
+            tag: dbus_str_int high
+          - priority: high
+            tag: dbus_str high
+          - urgency: 2
+            tag: dbus_int high
+          - urgency: "2"
+            tag: dbus_str_int high
+          - urgency: high
+            tag: dbus_str high
+    """
+
+    # Create ourselves a config object
+    ac = apprise.AppriseConfig()
+    assert ac.add_config(content=content) is True
+
+    aobj = apprise.Apprise()
+
+    # Add our configuration
+    aobj.add(ac)
+
+    # We should be able to read our 14 servers from that
+    # 6x low
+    # 6x high
+    # 2x invalid (so takes on normal urgency)
+    assert len(ac.servers()) == 14
+    assert len(aobj) == 14
+    assert len([x for x in aobj.find(tag='low')]) == 6
+    for s in aobj.find(tag='low'):
+        assert s.urgency == DBusUrgency.LOW
+
+    assert len([x for x in aobj.find(tag='high')]) == 6
+    for s in aobj.find(tag='high'):
+        assert s.urgency == DBusUrgency.HIGH
+
+    assert len([x for x in aobj.find(tag='dbus_str')]) == 4
+    assert len([x for x in aobj.find(tag='dbus_str_int')]) == 4
+    assert len([x for x in aobj.find(tag='dbus_int')]) == 4
+
+    assert len([x for x in aobj.find(tag='dbus_invalid')]) == 2
+    for s in aobj.find(tag='dbus_invalid'):
+        assert s.urgency == DBusUrgency.NORMAL
 
     # If our underlining object throws for whatever rea on, we will
     # gracefully fail

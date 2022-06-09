@@ -927,6 +927,14 @@ class ConfigBase(URLBase):
                 # Grab our first item
                 _results = results.pop(0)
 
+                if _results['schema'] not in plugins.SCHEMA_MAP:
+                    # the arguments are invalid or can not be used.
+                    ConfigBase.logger.warning(
+                        'An invalid Apprise schema ({}) in YAML configuration '
+                        'entry #{}, item #{}'
+                        .format(_results['schema'], no + 1, entry))
+                    continue
+
                 # tag is a special keyword that is managed by Apprise object.
                 # The below ensures our tags are set correctly
                 if 'tag' in _results:
@@ -958,6 +966,7 @@ class ConfigBase(URLBase):
                 # Prepare our Asset Object
                 _results['asset'] = asset
 
+                # Now we generate our plugin
                 try:
                     # Attempt to create an instance of our plugin using the
                     # parsed URL information
@@ -1088,7 +1097,7 @@ class ConfigBase(URLBase):
 
             # Detect if we're dealign with a list or not
             is_list = re.search(
-                r'^(list|choice):.*',
+                r'^list:.*',
                 meta.get('type'),
                 re.IGNORECASE)
 

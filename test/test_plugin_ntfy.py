@@ -26,11 +26,11 @@ import os
 import json
 import mock
 import requests
-from apprise import Apprise
 from apprise import plugins
-from apprise import NotifyType
+import apprise
 from helpers import AppriseURLTester
-from apprise import AppriseAttachment
+
+from apprise.plugins.NotifyNtfy import NtfyPriority
 
 # Disable logging for a cleaner testing output
 import logging
@@ -157,10 +157,6 @@ apprise_url_tests = (
         'instance': plugins.NotifyNtfy,
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
-    # Invalid Priority
-    ('ntfy://localhost/topic1/?priority=invalid', {
-        'instance': TypeError,
-    }),
     # A topic and port identifier
     ('ntfy://user:pass@localhost:8080/topic/', {
         'instance': plugins.NotifyNtfy,
@@ -258,7 +254,7 @@ def test_plugin_ntfy_attachments(mock_post):
     mock_post.reset_mock()
 
     # Prepare our object
-    obj = Apprise.instantiate(
+    obj = apprise.Apprise.instantiate(
         'ntfy://user:pass@localhost:8080/topic')
 
     # Send a good attachment
@@ -278,10 +274,11 @@ def test_plugin_ntfy_attachments(mock_post):
     mock_post.reset_mock()
 
     # prepare our attachment
-    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
+    attach = apprise.AppriseAttachment(
+        os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
 
     # Prepare our object
-    obj = Apprise.instantiate(
+    obj = apprise.Apprise.instantiate(
         'ntfy://user:pass@localhost:8084/topic')
 
     # Send a good attachment
@@ -333,14 +330,15 @@ def test_plugin_ntfy_attachments(mock_post):
 
     # An invalid attachment will cause a failure
     path = os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
-    attach = AppriseAttachment(path)
+    attach = apprise.AppriseAttachment(path)
     assert obj.notify(body="test", attach=attach) is False
 
     # Test our call count
     assert mock_post.call_count == 0
 
     # prepare our attachment
-    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
+    attach = apprise.AppriseAttachment(
+        os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
 
     # Throw an exception on the first call to requests.post()
     mock_post.return_value = None
@@ -414,7 +412,8 @@ def test_plugin_custom_ntfy_edge_cases(mock_post):
     assert 'topic1' in instance.topics
 
     assert instance.notify(
-        body='body', title='title', notify_type=NotifyType.INFO) is True
+        body='body', title='title',
+        notify_type=apprise.NotifyType.INFO) is True
 
     # Test our call count
     assert mock_post.call_count == 1
@@ -426,3 +425,75 @@ def test_plugin_custom_ntfy_edge_cases(mock_post):
     assert response['title'] == 'title'
     assert response['attach'] == 'http://example.com/file.jpg'
     assert response['filename'] == 'smoke.jpg'
+
+
+@mock.patch('requests.post')
+@mock.patch('requests.get')
+def test_plugin_ntfy_config_files(mock_post, mock_get):
+    """
+    NotifyNtfy() Config File Cases
+    """
+    content = """
+    urls:
+      - ntfy://localhost/topic1:
+          - priority: 1
+            tag: ntfy_int min
+          - priority: "1"
+            tag: ntfy_str_int min
+          - priority: min
+            tag: ntfy_str min
+
+          # This will take on normal (default) priority
+          - priority: invalid
+            tag: ntfy_invalid
+
+      - ntfy://localhost/topic2:
+          - priority: 5
+            tag: ntfy_int max
+          - priority: "5"
+            tag: ntfy_str_int max
+          - priority: emergency
+            tag: ntfy_str max
+          - priority: max
+            tag: ntfy_str max
+    """
+
+    # Disable Throttling to speed testing
+    plugins.NotifyNtfy.request_rate_per_sec = 0
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_get.return_value = requests.Request()
+    mock_get.return_value.status_code = requests.codes.ok
+
+    # Create ourselves a config object
+    ac = apprise.AppriseConfig()
+    assert ac.add_config(content=content) is True
+
+    aobj = apprise.Apprise()
+
+    # Add our configuration
+    aobj.add(ac)
+
+    # We should be able to read our 8 servers from that
+    # 3x min
+    # 4x max
+    # 1x invalid (so takes on normal priority)
+    assert len(ac.servers()) == 8
+    assert len(aobj) == 8
+    assert len([x for x in aobj.find(tag='min')]) == 3
+    for s in aobj.find(tag='min'):
+        assert s.priority == NtfyPriority.MIN
+
+    assert len([x for x in aobj.find(tag='max')]) == 4
+    for s in aobj.find(tag='max'):
+        assert s.priority == NtfyPriority.MAX
+
+    assert len([x for x in aobj.find(tag='ntfy_str')]) == 3
+    assert len([x for x in aobj.find(tag='ntfy_str_int')]) == 2
+    assert len([x for x in aobj.find(tag='ntfy_int')]) == 2
+
+    assert len([x for x in aobj.find(tag='ntfy_invalid')]) == 1
+    assert next(aobj.find(tag='ntfy_invalid')).priority == \
+        NtfyPriority.NORMAL

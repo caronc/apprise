@@ -71,13 +71,34 @@ class JoinPriority(object):
     EMERGENCY = 2
 
 
-JOIN_PRIORITIES = (
-    JoinPriority.LOW,
-    JoinPriority.MODERATE,
-    JoinPriority.NORMAL,
-    JoinPriority.HIGH,
-    JoinPriority.EMERGENCY,
-)
+JOIN_PRIORITIES = {
+    # Note: This also acts as a reverse lookup mapping
+    JoinPriority.LOW: 'low',
+    JoinPriority.MODERATE: 'moderate',
+    JoinPriority.NORMAL: 'normal',
+    JoinPriority.HIGH: 'high',
+    JoinPriority.EMERGENCY: 'emergency',
+}
+
+JOIN_PRIORITY_MAP = {
+    # Maps against string 'low'
+    'l': JoinPriority.LOW,
+    # Maps against string 'moderate'
+    'm': JoinPriority.MODERATE,
+    # Maps against string 'normal'
+    'n': JoinPriority.NORMAL,
+    # Maps against string 'high'
+    'h': JoinPriority.HIGH,
+    # Maps against string 'emergency'
+    'e': JoinPriority.EMERGENCY,
+
+    # Entries to additionally support (so more like Join's API)
+    '-2': JoinPriority.LOW,
+    '-1': JoinPriority.MODERATE,
+    '0': JoinPriority.NORMAL,
+    '1': JoinPriority.HIGH,
+    '2': JoinPriority.EMERGENCY,
+}
 
 
 class NotifyJoin(NotifyBase):
@@ -189,11 +210,13 @@ class NotifyJoin(NotifyBase):
             raise TypeError(msg)
 
         # The Priority of the message
-        if priority not in JOIN_PRIORITIES:
-            self.priority = self.template_args['priority']['default']
-
-        else:
-            self.priority = priority
+        self.priority = int(
+            NotifyJoin.template_args['priority']['default']
+            if priority is None else
+            next((
+                v for k, v in JOIN_PRIORITY_MAP.items()
+                if str(priority).lower().startswith(k)),
+                NotifyJoin.template_args['priority']['default']))
 
         # Prepare a list of targets to store entries into
         self.targets = list()
@@ -324,19 +347,12 @@ class NotifyJoin(NotifyBase):
         """
         Returns the URL built dynamically based on specified arguments.
         """
-        _map = {
-            JoinPriority.LOW: 'low',
-            JoinPriority.MODERATE: 'moderate',
-            JoinPriority.NORMAL: 'normal',
-            JoinPriority.HIGH: 'high',
-            JoinPriority.EMERGENCY: 'emergency',
-        }
-
         # Define any URL parameters
         params = {
             'priority':
-                _map[self.template_args['priority']['default']]
-                if self.priority not in _map else _map[self.priority],
+                JOIN_PRIORITIES[self.template_args['priority']['default']]
+                if self.priority not in JOIN_PRIORITIES
+                else JOIN_PRIORITIES[self.priority],
             'image': 'yes' if self.include_image else 'no',
         }
 
@@ -371,20 +387,8 @@ class NotifyJoin(NotifyBase):
 
         # Set our priority
         if 'priority' in results['qsd'] and len(results['qsd']['priority']):
-            _map = {
-                'l': JoinPriority.LOW,
-                'm': JoinPriority.MODERATE,
-                'n': JoinPriority.NORMAL,
-                'h': JoinPriority.HIGH,
-                'e': JoinPriority.EMERGENCY,
-            }
-            try:
-                results['priority'] = \
-                    _map[results['qsd']['priority'][0].lower()]
-
-            except KeyError:
-                # No priority was set
-                pass
+            results['priority'] = \
+                NotifyJoin.unquote(results['qsd']['priority'])
 
         # Our Devices
         results['targets'] = list()

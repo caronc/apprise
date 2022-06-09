@@ -102,13 +102,34 @@ PUSHOVER_SOUNDS = (
     PushoverSound.NONE,
 )
 
-PUSHOVER_PRIORITIES = (
-    PushoverPriority.LOW,
-    PushoverPriority.MODERATE,
-    PushoverPriority.NORMAL,
-    PushoverPriority.HIGH,
-    PushoverPriority.EMERGENCY,
-)
+PUSHOVER_PRIORITIES = {
+    # Note: This also acts as a reverse lookup mapping
+    PushoverPriority.LOW: 'low',
+    PushoverPriority.MODERATE: 'moderate',
+    PushoverPriority.NORMAL: 'normal',
+    PushoverPriority.HIGH: 'high',
+    PushoverPriority.EMERGENCY: 'emergency',
+}
+
+PUSHOVER_PRIORITY_MAP = {
+    # Maps against string 'low'
+    'l': PushoverPriority.LOW,
+    # Maps against string 'moderate'
+    'm': PushoverPriority.MODERATE,
+    # Maps against string 'normal'
+    'n': PushoverPriority.NORMAL,
+    # Maps against string 'high'
+    'h': PushoverPriority.HIGH,
+    # Maps against string 'emergency'
+    'e': PushoverPriority.EMERGENCY,
+
+    # Entries to additionally support (so more like Pushover's API)
+    '-2': PushoverPriority.LOW,
+    '-1': PushoverPriority.MODERATE,
+    '0': PushoverPriority.NORMAL,
+    '1': PushoverPriority.HIGH,
+    '2': PushoverPriority.EMERGENCY,
+}
 
 # Extend HTTP Error Messages
 PUSHOVER_HTTP_ERROR_MAP = {
@@ -265,11 +286,13 @@ class NotifyPushover(NotifyBase):
             raise TypeError(msg)
 
         # The Priority of the message
-        if priority not in PUSHOVER_PRIORITIES:
-            self.priority = self.template_args['priority']['default']
-
-        else:
-            self.priority = priority
+        self.priority = int(
+            NotifyPushover.template_args['priority']['default']
+            if priority is None else
+            next((
+                v for k, v in PUSHOVER_PRIORITY_MAP.items()
+                if str(priority).lower().startswith(k)),
+                NotifyPushover.template_args['priority']['default']))
 
         # The following are for emergency alerts
         if self.priority == PushoverPriority.EMERGENCY:
@@ -510,19 +533,12 @@ class NotifyPushover(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        _map = {
-            PushoverPriority.LOW: 'low',
-            PushoverPriority.MODERATE: 'moderate',
-            PushoverPriority.NORMAL: 'normal',
-            PushoverPriority.HIGH: 'high',
-            PushoverPriority.EMERGENCY: 'emergency',
-        }
-
         # Define any URL parameters
         params = {
             'priority':
-                _map[self.template_args['priority']['default']]
-                if self.priority not in _map else _map[self.priority],
+                PUSHOVER_PRIORITIES[self.template_args['priority']['default']]
+                if self.priority not in PUSHOVER_PRIORITIES
+                else PUSHOVER_PRIORITIES[self.priority],
         }
 
         # Only add expire and retry for emergency messages,
@@ -563,26 +579,8 @@ class NotifyPushover(NotifyBase):
 
         # Set our priority
         if 'priority' in results['qsd'] and len(results['qsd']['priority']):
-            _map = {
-                # Keep for backwards compatibility
-                'l': PushoverPriority.LOW,
-                'm': PushoverPriority.MODERATE,
-                'n': PushoverPriority.NORMAL,
-                'h': PushoverPriority.HIGH,
-                'e': PushoverPriority.EMERGENCY,
-
-                # Entries to additionally support (so more like PushOver's API)
-                '-2': PushoverPriority.LOW,
-                '-1': PushoverPriority.MODERATE,
-                '0': PushoverPriority.NORMAL,
-                '1': PushoverPriority.HIGH,
-                '2': PushoverPriority.EMERGENCY,
-            }
-            priority = results['qsd']['priority'].lower()
             results['priority'] = \
-                next((
-                    v for k, v in _map.items() if priority.startswith(k)),
-                    NotifyPushover.template_args['priority']['default'])
+                NotifyPushover.unquote(results['qsd']['priority'])
 
         # Retrieve all of our targets
         results['targets'] = NotifyPushover.split_path(results['fullpath'])

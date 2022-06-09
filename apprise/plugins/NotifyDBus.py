@@ -115,12 +115,30 @@ class DBusUrgency(object):
     HIGH = 2
 
 
-# Define our urgency levels
-DBUS_URGENCIES = (
-    DBusUrgency.LOW,
-    DBusUrgency.NORMAL,
-    DBusUrgency.HIGH,
-)
+DBUS_URGENCIES = {
+    # Note: This also acts as a reverse lookup mapping
+    DBusUrgency.LOW: 'low',
+    DBusUrgency.NORMAL: 'normal',
+    DBusUrgency.HIGH: 'high',
+}
+
+DBUS_URGENCY_MAP = {
+    # Maps against string 'low'
+    'l': DBusUrgency.LOW,
+    # Maps against string 'moderate'
+    'm': DBusUrgency.LOW,
+    # Maps against string 'normal'
+    'n': DBusUrgency.NORMAL,
+    # Maps against string 'high'
+    'h': DBusUrgency.HIGH,
+    # Maps against string 'emergency'
+    'e': DBusUrgency.HIGH,
+
+    # Entries to additionally support (so more like DBus's API)
+    '0': DBusUrgency.LOW,
+    '1': DBusUrgency.NORMAL,
+    '2': DBusUrgency.HIGH,
+}
 
 
 class NotifyDBus(NotifyBase):
@@ -182,6 +200,12 @@ class NotifyDBus(NotifyBase):
             'values': DBUS_URGENCIES,
             'default': DBusUrgency.NORMAL,
         },
+        'priority': {
+            # Apprise uses 'priority' everywhere; it's just a nice consistent
+            # feel to be able to use it here as well. Just map the
+            # value back to 'priority'
+            'alias_of': 'urgency',
+        },
         'x': {
             'name': _('X-Axis'),
             'type': 'int',
@@ -223,15 +247,29 @@ class NotifyDBus(NotifyBase):
             raise TypeError(msg)
 
         # The urgency of the message
-        if urgency not in DBUS_URGENCIES:
-            self.urgency = DBusUrgency.NORMAL
-
-        else:
-            self.urgency = urgency
+        self.urgency = int(
+            NotifyDBus.template_args['urgency']['default']
+            if urgency is None else
+            next((
+                v for k, v in DBUS_URGENCY_MAP.items()
+                if str(urgency).lower().startswith(k)),
+                NotifyDBus.template_args['urgency']['default']))
 
         # Our x/y axis settings
-        self.x_axis = x_axis if isinstance(x_axis, int) else None
-        self.y_axis = y_axis if isinstance(y_axis, int) else None
+        if x_axis or y_axis:
+            try:
+                self.x_axis = int(x_axis)
+                self.y_axis = int(y_axis)
+
+            except (TypeError, ValueError):
+                # Invalid x/y values specified
+                msg = 'The x,y coordinates specified ({},{}) are invalid.'\
+                    .format(x_axis, y_axis)
+                self.logger.warning(msg)
+                raise TypeError(msg)
+        else:
+            self.x_axis = None
+            self.y_axis = None
 
         # Track whether or not we want to send an image with our notification
         # or not.
@@ -343,17 +381,13 @@ class NotifyDBus(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        _map = {
-            DBusUrgency.LOW: 'low',
-            DBusUrgency.NORMAL: 'normal',
-            DBusUrgency.HIGH: 'high',
-        }
-
         # Define any URL parameters
         params = {
             'image': 'yes' if self.include_image else 'no',
-            'urgency': 'normal' if self.urgency not in _map
-                       else _map[self.urgency],
+            'urgency':
+                DBUS_URGENCIES[self.template_args['urgency']['default']]
+                if self.urgency not in DBUS_URGENCIES
+                else DBUS_URGENCIES[self.urgency],
         }
 
         # Extend our parameters
@@ -389,38 +423,20 @@ class NotifyDBus(NotifyBase):
 
         # DBus supports urgency, but we we also support the keyword priority
         # so that it is consistent with some of the other plugins
-        urgency = results['qsd'].get('urgency', results['qsd'].get('priority'))
-        if urgency and len(urgency):
-            _map = {
-                '0': DBusUrgency.LOW,
-                'l': DBusUrgency.LOW,
-                'n': DBusUrgency.NORMAL,
-                '1': DBusUrgency.NORMAL,
-                'h': DBusUrgency.HIGH,
-                '2': DBusUrgency.HIGH,
-            }
+        if 'priority' in results['qsd'] and len(results['qsd']['priority']):
+            # We intentionally store the priority in the urgency section
+            results['urgency'] = \
+                NotifyDBus.unquote(results['qsd']['priority'])
 
-            try:
-                # Attempt to index/retrieve our urgency
-                results['urgency'] = _map[urgency[0].lower()]
-
-            except KeyError:
-                # No priority was set
-                pass
+        if 'urgency' in results['qsd'] and len(results['qsd']['urgency']):
+            results['urgency'] = \
+                NotifyDBus.unquote(results['qsd']['urgency'])
 
         # handle x,y coordinates
-        try:
-            results['x_axis'] = int(results['qsd'].get('x'))
+        if 'x' in results['qsd'] and len(results['qsd']['x']):
+            results['x_axis'] = NotifyDBus.unquote(results['qsd'].get('x'))
 
-        except (TypeError, ValueError):
-            # No x was set
-            pass
-
-        try:
-            results['y_axis'] = int(results['qsd'].get('y'))
-
-        except (TypeError, ValueError):
-            # No y was set
-            pass
+        if 'y' in results['qsd'] and len(results['qsd']['y']):
+            results['y_axis'] = NotifyDBus.unquote(results['qsd'].get('y'))
 
         return results

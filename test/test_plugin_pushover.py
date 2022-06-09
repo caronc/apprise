@@ -28,10 +28,9 @@ import mock
 import requests
 import pytest
 from json import dumps
-from apprise import Apprise
-from apprise import NotifyType
-from apprise import AppriseAttachment
+from apprise.plugins.NotifyPushover import PushoverPriority
 from apprise import plugins
+import apprise
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -194,7 +193,7 @@ def test_plugin_pushover_attachments(mock_post, tmpdir):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
+    plugins.NotifyPushover.request_rate_per_sec = 0
 
     # Initialize some generic (but valid) tokens
     user_key = 'u' * 30
@@ -216,10 +215,11 @@ def test_plugin_pushover_attachments(mock_post, tmpdir):
     mock_post.return_value = response
 
     # prepare our attachment
-    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
+    attach = apprise.AppriseAttachment(
+        os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
 
     # Instantiate our object
-    obj = Apprise.instantiate(
+    obj = apprise.Apprise.instantiate(
         'pover://{}@{}/'.format(user_key, api_token))
     assert isinstance(obj, plugins.NotifyPushover)
 
@@ -251,7 +251,7 @@ def test_plugin_pushover_attachments(mock_post, tmpdir):
     image = tmpdir.mkdir("pover_image").join("test.jpg")
     image.write('a' * plugins.NotifyPushover.attach_max_size_bytes)
 
-    attach = AppriseAttachment.instantiate(str(image))
+    attach = apprise.AppriseAttachment.instantiate(str(image))
     assert obj.notify(body="test", attach=attach) is True
 
     # Test our call count
@@ -263,16 +263,17 @@ def test_plugin_pushover_attachments(mock_post, tmpdir):
     mock_post.reset_mock()
 
     # Add 1 more byte to the file (putting it over the limit)
-    image.write('a' * (plugins.NotifyPushover.attach_max_size_bytes + 1))
+    image.write(
+        'a' * (plugins.NotifyPushover.attach_max_size_bytes + 1))
 
-    attach = AppriseAttachment.instantiate(str(image))
+    attach = apprise.AppriseAttachment.instantiate(str(image))
     assert obj.notify(body="test", attach=attach) is False
 
     # Test our call count
     assert mock_post.call_count == 0
 
     # Test case when file is missing
-    attach = AppriseAttachment.instantiate(
+    attach = apprise.AppriseAttachment.instantiate(
         'file://{}?cache=False'.format(str(image)))
     os.unlink(str(image))
     assert obj.notify(
@@ -284,13 +285,14 @@ def test_plugin_pushover_attachments(mock_post, tmpdir):
     # Test unsuported files:
     image = tmpdir.mkdir("pover_unsupported").join("test.doc")
     image.write('a' * 256)
-    attach = AppriseAttachment.instantiate(str(image))
+    attach = apprise.AppriseAttachment.instantiate(str(image))
 
     # Content is silently ignored
     assert obj.notify(body="test", attach=attach) is True
 
     # prepare our attachment
-    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
+    attach = apprise.AppriseAttachment(
+        os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
 
     # Throw an exception on the first call to requests.post()
     for side_effect in (requests.RequestException(), OSError(), bad_response):
@@ -303,15 +305,14 @@ def test_plugin_pushover_attachments(mock_post, tmpdir):
         assert obj.send(body="test") is False
 
 
-@mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_pushover_edge_cases(mock_post, mock_get):
+def test_plugin_pushover_edge_cases(mock_post):
     """
     NotifyPushover() Edge Cases
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
+    plugins.NotifyPushover.request_rate_per_sec = 0
 
     # No token
     with pytest.raises(TypeError):
@@ -327,10 +328,8 @@ def test_plugin_pushover_edge_cases(mock_post, mock_get):
     devices = 'device1,device2,,,,%s' % invalid_device
 
     # Prepare Mock
-    mock_get.return_value = requests.Request()
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.ok
-    mock_get.return_value.status_code = requests.codes.ok
 
     # No webhook id specified
     with pytest.raises(TypeError):
@@ -344,7 +343,7 @@ def test_plugin_pushover_edge_cases(mock_post, mock_get):
     # This call fails because there is 1 invalid device
     assert obj.notify(
         body='body', title='title',
-        notify_type=NotifyType.INFO) is False
+        notify_type=apprise.NotifyType.INFO) is False
 
     obj = plugins.NotifyPushover(user_key=user_key, token=token)
     assert isinstance(obj, plugins.NotifyPushover) is True
@@ -354,9 +353,11 @@ def test_plugin_pushover_edge_cases(mock_post, mock_get):
 
     # This call succeeds because all of the devices are valid
     assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO) is True
+        body='body', title='title',
+        notify_type=apprise.NotifyType.INFO) is True
 
-    obj = plugins.NotifyPushover(user_key=user_key, token=token, targets=set())
+    obj = plugins.NotifyPushover(
+        user_key=user_key, token=token, targets=set())
     assert isinstance(obj, plugins.NotifyPushover) is True
     # Default is to send to all devices, so there will be a
     # device defined here
@@ -372,3 +373,73 @@ def test_plugin_pushover_edge_cases(mock_post, mock_get):
 
     with pytest.raises(TypeError):
         plugins.NotifyPushover(user_key="abcd", token="  ")
+
+
+@mock.patch('requests.post')
+def test_plugin_pushover_config_files(mock_post):
+    """
+    NotifyPushover() Config File Cases
+    """
+    content = """
+    urls:
+      - pover://USER@TOKEN:
+          - priority: -2
+            tag: pushover_int low
+          - priority: "-2"
+            tag: pushover_str_int low
+          - priority: low
+            tag: pushover_str low
+
+          # This will take on normal (default) priority
+          - priority: invalid
+            tag: pushover_invalid
+
+      - pover://USER2@TOKEN2:
+          - priority: 2
+            tag: pushover_int emerg
+          - priority: "2"
+            tag: pushover_str_int emerg
+          - priority: emergency
+            tag: pushover_str emerg
+    """
+
+    # Disable Throttling to speed testing
+    plugins.NotifyPushover.request_rate_per_sec = 0
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    # Create ourselves a config object
+    ac = apprise.AppriseConfig()
+    assert ac.add_config(content=content) is True
+
+    aobj = apprise.Apprise()
+
+    # Add our configuration
+    aobj.add(ac)
+
+    # We should be able to read our 7 servers from that
+    # 3x low
+    # 3x emerg
+    # 1x invalid (so takes on normal priority)
+    assert len(ac.servers()) == 7
+    assert len(aobj) == 7
+    assert len([x for x in aobj.find(tag='low')]) == 3
+    for s in aobj.find(tag='low'):
+        assert s.priority == PushoverPriority.LOW
+
+    assert len([x for x in aobj.find(tag='emerg')]) == 3
+    for s in aobj.find(tag='emerg'):
+        assert s.priority == PushoverPriority.EMERGENCY
+
+    assert len([x for x in aobj.find(tag='pushover_str')]) == 2
+    assert len([x for x in aobj.find(tag='pushover_str_int')]) == 2
+    assert len([x for x in aobj.find(tag='pushover_int')]) == 2
+
+    assert len([x for x in aobj.find(tag='pushover_invalid')]) == 1
+    assert next(aobj.find(tag='pushover_invalid')).priority == \
+        PushoverPriority.NORMAL
+
+    # Notifications work
+    assert aobj.notify(title="title", body="body") is True

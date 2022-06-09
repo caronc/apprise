@@ -31,9 +31,9 @@ import pytest
 from apprise import NotifyFormat
 from apprise import ConfigFormat
 from apprise import ContentIncludeMode
-from apprise.Apprise import Apprise
-from apprise.AppriseConfig import AppriseConfig
-from apprise.AppriseAsset import AppriseAsset
+from apprise import Apprise
+from apprise import AppriseConfig
+from apprise import AppriseAsset
 from apprise.config.ConfigBase import ConfigBase
 from apprise.plugins.NotifyBase import NotifyBase
 

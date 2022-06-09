@@ -86,6 +86,39 @@ NTFY_PRIORITIES = (
     NtfyPriority.MIN,
 )
 
+NTFY_PRIORITY_MAP = {
+    # Maps against string 'low' but maps to Moderate to avoid
+    # conflicting with actual ntfy mappings
+    'l': NtfyPriority.LOW,
+    # Maps against string 'moderate'
+    'mo': NtfyPriority.LOW,
+    # Maps against string 'normal'
+    'n': NtfyPriority.NORMAL,
+    # Maps against string 'high'
+    'h': NtfyPriority.HIGH,
+    # Maps against string 'emergency'
+    'e': NtfyPriority.MAX,
+
+    # Entries to additionally support (so more like Ntfy's API)
+    # Maps against string 'min'
+    'mi': NtfyPriority.MIN,
+    # Maps against string 'max'
+    'ma': NtfyPriority.MAX,
+    # Maps against string 'default'
+    'd': NtfyPriority.NORMAL,
+
+    # support 1-5 values as well
+    '1': NtfyPriority.MIN,
+    # Maps against string 'moderate'
+    '2': NtfyPriority.LOW,
+    # Maps against string 'normal'
+    '3': NtfyPriority.NORMAL,
+    # Maps against string 'high'
+    '4': NtfyPriority.HIGH,
+    # Maps against string 'emergency'
+    '5': NtfyPriority.MAX,
+}
+
 
 class NotifyNtfy(NotifyBase):
     """
@@ -237,18 +270,13 @@ class NotifyNtfy(NotifyBase):
         # An email to forward notifications to
         self.email = email
 
-        # The priority of the message
-
-        if priority is None:
-            self.priority = self.template_args['priority']['default']
-        else:
-            self.priority = priority
-
-        if self.priority not in NTFY_PRIORITIES:
-            msg = 'An invalid ntfy Priority ({}) was specified.'.format(
-                priority)
-            self.logger.warning(msg)
-            raise TypeError(msg)
+        # The Priority of the message
+        self.priority = NotifyNtfy.template_args['priority']['default'] \
+            if not priority else \
+            next((
+                v for k, v in NTFY_PRIORITY_MAP.items()
+                if str(priority).lower().startswith(k)),
+                NotifyNtfy.template_args['priority']['default'])
 
         # Any optional tags to attach to the notification
         self.__tags = parse_list(tags)
@@ -565,31 +593,10 @@ class NotifyNtfy(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
+        # Set our priority
         if 'priority' in results['qsd'] and len(results['qsd']['priority']):
-            _map = {
-                # Supported lookups
-                'mi': NtfyPriority.MIN,
-                '1': NtfyPriority.MIN,
-                'l': NtfyPriority.LOW,
-                '2': NtfyPriority.LOW,
-                'n': NtfyPriority.NORMAL,  # support normal keyword
-                'd': NtfyPriority.NORMAL,  # default keyword
-                '3': NtfyPriority.NORMAL,
-                'h': NtfyPriority.HIGH,
-                '4': NtfyPriority.HIGH,
-                'ma': NtfyPriority.MAX,
-                '5': NtfyPriority.MAX,
-            }
-            try:
-                # pretty-format (and update short-format)
-                results['priority'] = \
-                    _map[results['qsd']['priority'][0:2].lower()]
-
-            except KeyError:
-                # Pass along what was set so it can be handed during
-                # initialization
-                results['priority'] = str(results['qsd']['priority'])
-                pass
+            results['priority'] = \
+                NotifyNtfy.unquote(results['qsd']['priority'])
 
         if 'attach' in results['qsd'] and len(results['qsd']['attach']):
             results['attach'] = NotifyNtfy.unquote(results['qsd']['attach'])
