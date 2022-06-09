@@ -25,9 +25,11 @@
 import mock
 import pytest
 import requests
+import apprise
 from apprise import plugins
 from apprise import NotifyType
 from helpers import AppriseURLTester
+from apprise.plugins.NotifyJoin import JoinPriority
 
 # Disable logging for a cleaner testing output
 import logging
@@ -166,3 +168,73 @@ def test_plugin_join_edge_cases(mock_post, mock_get):
     # Test notifications without a body or a title; nothing to send
     # so we return False
     p.notify(body=None, title=None, notify_type=NotifyType.INFO) is False
+
+
+@mock.patch('requests.post')
+def test_plugin_join_config_files(mock_post):
+    """
+    NotifyJoin() Config File Cases
+    """
+    content = """
+    urls:
+      - join://%s@%s:
+          - priority: -2
+            tag: join_int low
+          - priority: "-2"
+            tag: join_str_int low
+          - priority: low
+            tag: join_str low
+
+          # This will take on normal (default) priority
+          - priority: invalid
+            tag: join_invalid
+
+      - join://%s@%s:
+          - priority: 2
+            tag: join_int emerg
+          - priority: "2"
+            tag: join_str_int emerg
+          - priority: emergency
+            tag: join_str emerg
+    """ % ('a' * 32, 'b' * 32, 'c' * 32, 'd' * 32)
+
+    # Disable Throttling to speed testing
+    plugins.NotifyJoin.request_rate_per_sec = 0
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    # Create ourselves a config object
+    ac = apprise.AppriseConfig()
+    assert ac.add_config(content=content) is True
+
+    aobj = apprise.Apprise()
+
+    # Add our configuration
+    aobj.add(ac)
+
+    # We should be able to read our 7 servers from that
+    # 3x low
+    # 3x emerg
+    # 1x invalid (so takes on normal priority)
+    assert len(ac.servers()) == 7
+    assert len(aobj) == 7
+    assert len([x for x in aobj.find(tag='low')]) == 3
+    for s in aobj.find(tag='low'):
+        assert s.priority == JoinPriority.LOW
+
+    assert len([x for x in aobj.find(tag='emerg')]) == 3
+    for s in aobj.find(tag='emerg'):
+        assert s.priority == JoinPriority.EMERGENCY
+
+    assert len([x for x in aobj.find(tag='join_str')]) == 2
+    assert len([x for x in aobj.find(tag='join_str_int')]) == 2
+    assert len([x for x in aobj.find(tag='join_int')]) == 2
+
+    assert len([x for x in aobj.find(tag='join_invalid')]) == 1
+    assert next(aobj.find(tag='join_invalid')).priority == \
+        JoinPriority.NORMAL
+
+    # Notifications work
+    assert aobj.notify(title="title", body="body") is True

@@ -286,12 +286,13 @@ class NotifyPushover(NotifyBase):
             raise TypeError(msg)
 
         # The Priority of the message
-        self.priority = NotifyPushover.template_args['priority']['default'] \
-            if not priority else \
+        self.priority = int(
+            NotifyPushover.template_args['priority']['default']
+            if priority is None else
             next((
                 v for k, v in PUSHOVER_PRIORITY_MAP.items()
                 if str(priority).lower().startswith(k)),
-                NotifyPushover.template_args['priority']['default'])
+                NotifyPushover.template_args['priority']['default']))
 
         # The following are for emergency alerts
         if self.priority == PushoverPriority.EMERGENCY:
@@ -535,9 +536,9 @@ class NotifyPushover(NotifyBase):
         # Define any URL parameters
         params = {
             'priority':
-                str(PUSHOVER_PRIORITIES[self.template_args['priority']['default']]
+                PUSHOVER_PRIORITIES[self.template_args['priority']['default']]
                 if self.priority not in PUSHOVER_PRIORITIES
-                else PUSHOVER_PRIORITIES[self.priority]),
+                else PUSHOVER_PRIORITIES[self.priority],
         }
 
         # Only add expire and retry for emergency messages,
