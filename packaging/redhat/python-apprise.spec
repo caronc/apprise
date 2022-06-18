@@ -56,7 +56,8 @@ Notifico, ntfy, Office365, OneSignal, Opsgenie, PagerDuty, ParsePlatform,
 PopcornNotify, Prowl, Pushalot, PushBullet, Pushjet, Pushover, PushSafer,
 Reddit, Rocket.Chat, SendGrid, ServerChan, Signal, SimplePush, Sinch, Slack,
 SMTP2Go, Spontit, SparkPost, Super Toasty, Streamlabs, Stride, Syslog,
-Techulus Push, Telegram, Twilio, Twitter, Twist, XBMC, XMPP, Webex Teams}
+Techulus Push, Telegram, Twilio, Twitter, Twist, XBMC, XMPP, Vonage, Webex
+Teams}
 
 Name:           python-%{pypi_name}
 Version:        0.9.9
