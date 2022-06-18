@@ -821,6 +821,34 @@ def test_plugin_telegram_formating_py3(mock_post):
         'Test Message Body\r\n' \
         'ok\r\n'
 
+    # Reset our values
+    mock_post.reset_mock()
+
+    # Now test that <br/> is correctly escaped as it would have been via the
+    # CLI mode where the body_format is TEXT
+    title = 'Test Message Title'
+    body = 'Test Message Body <br/> ok</br>'
+
+    aobj = Apprise()
+    aobj.add('tgram://1234:aaaaaaaaa/-1123456245134')
+    assert len(aobj) == 1
+
+    assert aobj.notify(
+        title=title, body=body, body_format=NotifyFormat.TEXT)
+
+    # Test our calls
+    assert mock_post.call_count == 1
+
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.telegram.org/bot1234:aaaaaaaaa/sendMessage'
+
+    payload = loads(mock_post.call_args_list[0][1]['data'])
+
+    # Test that everything is escaped properly in a HTML mode
+    assert payload['text'] == \
+        '<b>Test Message Title</b>\r\n' \
+        'Test Message Body &lt;br/&gt; ok&lt;/br&gt;'
+
 
 @pytest.mark.skipif(sys.version_info.major >= 3, reason="Requires Python 2.x+")
 @mock.patch('requests.post')
@@ -1151,6 +1179,31 @@ def test_plugin_telegram_formating_py2(mock_post):
         '</b>\r\n' \
         'Test Message Body\r\n' \
         'ok\r\n'
+
+    # Now test that <br/> is correctly escaped as it would have been via the
+    # CLI mode where the body_format is TEXT
+    title = 'Test Message Title'
+    body = 'Test Message Body <br/> ok</br>'
+
+    aobj = Apprise()
+    aobj.add('tgram://1234:aaaaaaaaa/-1123456245134')
+    assert len(aobj) == 1
+
+    assert aobj.notify(
+        title=title, body=body, body_format=NotifyFormat.TEXT)
+
+    # Test our calls
+    assert mock_post.call_count == 1
+
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.telegram.org/bot1234:aaaaaaaaa/sendMessage'
+
+    payload = loads(mock_post.call_args_list[0][1]['data'])
+
+    # Test that everything is escaped properly in a HTML mode
+    assert payload['text'] == \
+        '<b>Test Message Title</b>\r\n' \
+        'Test Message Body &lt;br/&gt; ok&lt;/br&gt;'
 
 
 @mock.patch('requests.post')
