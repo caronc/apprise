@@ -288,7 +288,8 @@ class NotifyVonage(NotifyBase):
                     continue
 
                 else:
-                    self.logger.info('Sent Vonage notification to %s.' % target)
+                    self.logger.info(
+                        'Sent Vonage notification to %s.' % target)
 
             except requests.RequestException as e:
                 self.logger.warning(
