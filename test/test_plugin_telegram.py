@@ -792,6 +792,35 @@ def test_plugin_telegram_formating_py3(mock_post):
         '# A Great Title\r\n_[Apprise Body Title](http://localhost)_ had ' \
         '[a change](http://127.0.0.2)'
 
+    # Reset our values
+    mock_post.reset_mock()
+
+    # Now test that <br/> is correctly escaped
+    title = 'Test Message Title'
+    body = 'Test Message Body <br/> ok</br>'
+
+    aobj = Apprise()
+    aobj.add('tgram://1234:aaaaaaaaa/-1123456245134')
+    assert len(aobj) == 1
+
+    assert aobj.notify(
+        title=title, body=body, body_format=NotifyFormat.MARKDOWN)
+
+    # Test our calls
+    assert mock_post.call_count == 1
+
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.telegram.org/bot1234:aaaaaaaaa/sendMessage'
+
+    payload = loads(mock_post.call_args_list[0][1]['data'])
+
+    # Test that everything is escaped properly in a HTML mode
+    assert payload['text'] == \
+        '<b>Test Message Title\r\n' \
+        '</b>\r\n' \
+        'Test Message Body\r\n' \
+        'ok\r\n'
+
 
 @pytest.mark.skipif(sys.version_info.major >= 3, reason="Requires Python 2.x+")
 @mock.patch('requests.post')
@@ -1093,6 +1122,35 @@ def test_plugin_telegram_formating_py2(mock_post):
     assert payload['text'] == \
         '# A Great Title\r\n_[Apprise Body Title](http://localhost)_ had ' \
         '[a change](http://127.0.0.2)'
+
+    # Reset our values
+    mock_post.reset_mock()
+
+    # Now test that <br/> is correctly escaped
+    title = 'Test Message Title'
+    body = 'Test Message Body <br/> ok</br>'
+
+    aobj = Apprise()
+    aobj.add('tgram://1234:aaaaaaaaa/-1123456245134')
+    assert len(aobj) == 1
+
+    assert aobj.notify(
+        title=title, body=body, body_format=NotifyFormat.MARKDOWN)
+
+    # Test our calls
+    assert mock_post.call_count == 1
+
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.telegram.org/bot1234:aaaaaaaaa/sendMessage'
+
+    payload = loads(mock_post.call_args_list[0][1]['data'])
+
+    # Test that everything is escaped properly in a HTML mode
+    assert payload['text'] == \
+        '<b>Test Message Title\r\n' \
+        '</b>\r\n' \
+        'Test Message Body\r\n' \
+        'ok\r\n'
 
 
 @mock.patch('requests.post')
