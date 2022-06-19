@@ -6,7 +6,7 @@
 cryptography
 
 # Provides xmpp:// support
-slixmpp; python_version >= '3.7'
+slixmpp >= 1.8.2; python_version >= '3.7'
 
 # Provides growl:// support
 gntp

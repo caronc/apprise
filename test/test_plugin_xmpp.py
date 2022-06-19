@@ -207,10 +207,14 @@ def test_plugin_xmpp_general(tmpdir):
         with mock.patch('slixmpp.ClientXMPP') as mock_stream:
             client_stream = mock.Mock()
             client_stream.connect.return_value = False
+            client_stream.is_connected.return_value = False
             mock_stream.return_value = client_stream
 
-            # test notifications
-            assert obj.notify(
+            aobj = apprise.Apprise()
+            assert aobj.add(url) is True
+
+            # test notification
+            assert aobj.notify(
                 title='title', body='body',
                 notify_type=apprise.NotifyType.INFO) is False
 
@@ -299,6 +303,7 @@ def test_plugin_xmpp_slixmpp_callbacks():
     with mock.patch('slixmpp.ClientXMPP') as mock_stream:
         client_stream = mock.Mock()
         client_stream.send_message.return_value = True
+        client_stream.is_connected.return_value = True
         mock_stream.return_value = client_stream
 
         adapter = apprise.plugins.SliXmppAdapter(**kwargs)
@@ -313,16 +318,19 @@ def test_plugin_xmpp_slixmpp_callbacks():
 
     # Now we'll do a test with no one to notify
     kwargs['targets'] = []
-    adapter = apprise.plugins.SliXmppAdapter(**kwargs)
-    assert isinstance(adapter, apprise.plugins.SliXmppAdapter)
-
-    # success flag should be back to a False state
-    assert adapter.success is False
 
     with mock.patch('slixmpp.ClientXMPP') as mock_stream:
         client_stream = mock.Mock()
+        client_stream.is_connected.return_value = True
         client_stream.send_message.return_value = True
         mock_stream.return_value = client_stream
+
+        adapter = apprise.plugins.SliXmppAdapter(**kwargs)
+        assert isinstance(adapter, apprise.plugins.SliXmppAdapter)
+
+        # success flag should be back to a False state
+        assert adapter.success is False
+
         adapter.session_start()
         # success flag changes to True
         assert adapter.success is True
