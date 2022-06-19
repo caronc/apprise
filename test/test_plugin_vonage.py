@@ -35,6 +35,72 @@ logging.disable(logging.CRITICAL)
 
 # Our Testing URLs
 apprise_url_tests = (
+    ('vonage://', {
+        # No API Key specified
+        'instance': TypeError,
+    }),
+    ('vonage://:@/', {
+        # invalid Auth key
+        'instance': TypeError,
+    }),
+    ('vonage://AC{}@12345678'.format('a' * 8), {
+        # Just a key provided
+        'instance': TypeError,
+    }),
+    ('vonage://AC{}:{}@{}'.format('a' * 8, 'b' * 16, '3' * 9), {
+        # key and secret provided and from but invalid from no
+        'instance': TypeError,
+    }),
+    ('vonage://AC{}:{}@{}/?ttl=0'.format('b' * 8, 'c' * 16, '3' * 11), {
+        # Invalid ttl defined
+        'instance': TypeError,
+    }),
+    ('vonage://AC{}:{}@{}'.format('d' * 8, 'e' * 16, 'a' * 11), {
+        # Invalid source number
+        'instance': TypeError,
+    }),
+    ('vonage://AC{}:{}@{}/123/{}/abcd/'.format(
+        'f' * 8, 'g' * 16, '3' * 11, '9' * 15), {
+        # valid everything but target numbers
+        'instance': plugins.NotifyVonage,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'vonage://A...f:****@',
+    }),
+    ('vonage://AC{}:{}@{}'.format('h' * 8, 'i' * 16, '5' * 11), {
+        # using phone no with no target - we text ourselves in
+        # this case
+        'instance': plugins.NotifyVonage,
+    }),
+    ('vonage://_?key=AC{}&secret={}&from={}'.format(
+        'a' * 8, 'b' * 16, '5' * 11), {
+        # use get args to acomplish the same thing
+        'instance': plugins.NotifyVonage,
+    }),
+    ('vonage://_?key=AC{}&secret={}&source={}'.format(
+        'a' * 8, 'b' * 16, '5' * 11), {
+        # use get args to acomplish the same thing (use source instead of from)
+        'instance': plugins.NotifyVonage,
+    }),
+    ('vonage://_?key=AC{}&secret={}&from={}&to={}'.format(
+        'a' * 8, 'b' * 16, '5' * 11, '7' * 13), {
+        # use to=
+        'instance': plugins.NotifyVonage,
+    }),
+    ('vonage://AC{}:{}@{}'.format('a' * 8, 'b' * 16, '6' * 11), {
+        'instance': plugins.NotifyVonage,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('vonage://AC{}:{}@{}'.format('a' * 8, 'b' * 16, '6' * 11), {
+        'instance': plugins.NotifyVonage,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    # Nexmo Backwards Support
     ('nexmo://', {
         # No API Key specified
         'instance': TypeError,
@@ -62,39 +128,39 @@ apprise_url_tests = (
     ('nexmo://AC{}:{}@{}/123/{}/abcd/'.format(
         'f' * 8, 'g' * 16, '3' * 11, '9' * 15), {
         # valid everything but target numbers
-        'instance': plugins.NotifyNexmo,
+        'instance': plugins.NotifyVonage,
 
         # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'nexmo://A...f:****@',
+        'privacy_url': 'vonage://A...f:****@',
     }),
     ('nexmo://AC{}:{}@{}'.format('h' * 8, 'i' * 16, '5' * 11), {
         # using phone no with no target - we text ourselves in
         # this case
-        'instance': plugins.NotifyNexmo,
+        'instance': plugins.NotifyVonage,
     }),
     ('nexmo://_?key=AC{}&secret={}&from={}'.format(
         'a' * 8, 'b' * 16, '5' * 11), {
         # use get args to acomplish the same thing
-        'instance': plugins.NotifyNexmo,
+        'instance': plugins.NotifyVonage,
     }),
     ('nexmo://_?key=AC{}&secret={}&source={}'.format(
         'a' * 8, 'b' * 16, '5' * 11), {
         # use get args to acomplish the same thing (use source instead of from)
-        'instance': plugins.NotifyNexmo,
+        'instance': plugins.NotifyVonage,
     }),
     ('nexmo://_?key=AC{}&secret={}&from={}&to={}'.format(
         'a' * 8, 'b' * 16, '5' * 11, '7' * 13), {
         # use to=
-        'instance': plugins.NotifyNexmo,
+        'instance': plugins.NotifyVonage,
     }),
     ('nexmo://AC{}:{}@{}'.format('a' * 8, 'b' * 16, '6' * 11), {
-        'instance': plugins.NotifyNexmo,
+        'instance': plugins.NotifyVonage,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('nexmo://AC{}:{}@{}'.format('a' * 8, 'b' * 16, '6' * 11), {
-        'instance': plugins.NotifyNexmo,
+        'instance': plugins.NotifyVonage,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -102,9 +168,9 @@ apprise_url_tests = (
 )
 
 
-def test_plugin_nexmo_urls():
+def test_plugin_vonage_urls():
     """
-    NotifyNexmo() Apprise URLs
+    NotifyVonage() Apprise URLs
 
     """
 
@@ -113,9 +179,9 @@ def test_plugin_nexmo_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_nexmo_edge_cases(mock_post):
+def test_plugin_vonage_edge_cases(mock_post):
     """
-    NotifyNexmo() Edge Cases
+    NotifyVonage() Edge Cases
 
     """
     # Disable Throttling to speed testing
@@ -135,17 +201,17 @@ def test_plugin_nexmo_edge_cases(mock_post):
 
     # No apikey specified
     with pytest.raises(TypeError):
-        plugins.NotifyNexmo(apikey=None, secret=secret, source=source)
+        plugins.NotifyVonage(apikey=None, secret=secret, source=source)
 
     with pytest.raises(TypeError):
-        plugins.NotifyNexmo(apikey="  ", secret=secret, source=source)
+        plugins.NotifyVonage(apikey="  ", secret=secret, source=source)
 
     # No secret specified
     with pytest.raises(TypeError):
-        plugins.NotifyNexmo(apikey=apikey, secret=None, source=source)
+        plugins.NotifyVonage(apikey=apikey, secret=None, source=source)
 
     with pytest.raises(TypeError):
-        plugins.NotifyNexmo(apikey=apikey, secret="  ", source=source)
+        plugins.NotifyVonage(apikey=apikey, secret="  ", source=source)
 
     # a error response
     response.status_code = 400
@@ -156,7 +222,7 @@ def test_plugin_nexmo_edge_cases(mock_post):
     mock_post.return_value = response
 
     # Initialize our object
-    obj = plugins.NotifyNexmo(
+    obj = plugins.NotifyVonage(
         apikey=apikey, secret=secret, source=source)
 
     # We will fail with the above error code
