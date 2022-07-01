@@ -30,6 +30,7 @@ import requests
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
 from ..common import NotifyFormat
+from ..conversion import convert_between
 from ..utils import parse_list
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
@@ -366,6 +367,10 @@ class NotifyPushover(NotifyBase):
 
             if self.notify_format == NotifyFormat.HTML:
                 # https://pushover.net/api#html
+                payload['html'] = 1
+            elif self.notify_format == NotifyFormat.MARKDOWN:
+                payload['message'] = convert_between(
+                    NotifyFormat.MARKDOWN, NotifyFormat.HTML, body)
                 payload['html'] = 1
 
             if self.priority == PushoverPriority.EMERGENCY:
