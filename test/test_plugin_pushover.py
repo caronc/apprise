@@ -106,6 +106,10 @@ apprise_url_tests = (
     ('pover://%s@%s?priority=high&format=html' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
     }),
+    # API Key + priority setting + markdown mode
+    ('pover://%s@%s?priority=high&format=markdown' % ('u' * 30, 'a' * 30), {
+        'instance': plugins.NotifyPushover,
+    }),
     # API Key + invalid priority setting
     ('pover://%s@%s?priority=invalid' % ('u' * 30, 'a' * 30), {
         'instance': plugins.NotifyPushover,
