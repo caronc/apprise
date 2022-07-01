@@ -70,7 +70,8 @@ def text_to_html(content):
     Converts specified content from plain text to HTML.
     """
 
-    return URLBase.escape_html(content)
+    # First eliminate any carriage returns
+    return URLBase.escape_html(content, convert_new_lines=True)
 
 
 def html_to_text(content):

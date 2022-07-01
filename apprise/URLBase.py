@@ -359,7 +359,7 @@ class URLBase(object):
                 .replace(u' ', u'&nbsp;')
 
         if convert_new_lines:
-            return escaped.replace(u'\n', u'&lt;br/&gt;')
+            return escaped.replace(u'\n', u'<br/>')
 
         return escaped
 
