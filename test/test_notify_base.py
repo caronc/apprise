@@ -183,7 +183,7 @@ def test_notify_base():
 
     assert NotifyBase.escape_html(
         "<content>'\t \n</content>", convert_new_lines=True) == \
-        '&lt;content&gt;&apos;&emsp;&nbsp;&lt;br/&gt;&lt;/content&gt;'
+        '&lt;content&gt;&apos;&emsp;&nbsp;<br/>&lt;/content&gt;'
 
     # Test invalid data
     assert NotifyBase.split_path(None) == []
