@@ -728,3 +728,33 @@ def test_plugin_email_dict_variations():
         'password': 'abd123',
         'host': 'example.com'}, suppress_exceptions=False)
     assert isinstance(obj, plugins.NotifyEmail) is True
+
+
+def test_plugin_email_url_parsing():
+    """
+    NotifyEmail() Test email url parsing
+
+    """
+    # Test variations of username required to be an email address
+    # user@example.com
+    results = plugins.NotifyEmail.parse_url(
+        'mailtos://user:pass123@hotmail.com'
+        '?to=user2@yahoo.com&name=test%20name')
+    assert isinstance(results, dict)
+    assert 'test name' in results['from_name']
+    assert 'user' in results['user']
+    assert 'hotmail.com' in results['host']
+    assert 'pass123' in results['password']
+    assert 'user2@yahoo.com' in results['targets']
+
+    # The below switches the `name` with the `to` to verify the results
+    # are the same
+    results = plugins.NotifyEmail.parse_url(
+        'mailtos://user:pass123@hotmail.com'
+        '?name=test%20name&to=user2@yahoo.com')
+    assert isinstance(results, dict)
+    assert 'test name' in results['from_name']
+    assert 'user' in results['user']
+    assert 'hotmail.com' in results['host']
+    assert 'pass123' in results['password']
+    assert 'user2@yahoo.com' in results['targets']
