@@ -25,14 +25,18 @@
 
 import re
 import six
+import sys
 import json
 import contextlib
 import os
+import hashlib
 from itertools import chain
 from os.path import expanduser
 from functools import reduce
 from .common import MATCH_ALL_TAG
 from .common import MATCH_ALWAYS_TAG
+from .common import CUSTOM_PLUGIN_MAP
+from .logger import logger
 
 try:
     # Python 2.7
@@ -40,11 +44,55 @@ try:
     from urllib import quote
     from urlparse import urlparse
 
+    import imp
+
+    def import_module(path, name):
+        """
+        Load our module based on path
+        """
+        return imp.load_source(name, path)
+
+
 except ImportError:
     # Python 3.x
     from urllib.parse import unquote
     from urllib.parse import quote
     from urllib.parse import urlparse
+
+    try:
+        # Python v3.5+
+        import importlib.util
+
+        def import_module(path, name):
+            """
+            Load our module based on path
+            """
+            spec = importlib.util.spec_from_file_location(name, path)
+            try:
+                module = importlib.util.module_from_spec(spec)
+                sys.modules[name] = module
+                spec.loader.exec_module(module)
+            except:
+                # module isn't loadable
+                del sys.modules[name]
+                module = None
+            return module
+
+    except ImportError:
+        # Python v3.3 and v3.4
+        from importlib.machinery import SourceFileLoader
+
+        def import_module(path, name):
+            """
+            Load our module based on path
+            """
+            module = SourceFileLoader(name, path).load_module()
+            return module
+
+
+# Hash of all paths previously scanned so we don't waste effort/overhead doing
+# it again
+PATHS_PREVIOUSLY_SCANNED = set()
 
 # URL Indexing Table for returns via parse_url()
 # The below accepts and scans for:
@@ -106,6 +154,9 @@ NOTIFY_CUSTOM_COLON_TOKENS = re.compile(r'^:(?P<key>.*)\s*')
 
 # Used for attempting to acquire the schema if the URL can't be parsed.
 GET_SCHEMA_RE = re.compile(r'\s*(?P<schema>[a-z0-9]{2,9})://.*$', re.I)
+
+# Used for validating that a provided entry is indeed a schema
+IS_SCHEMA_RE = re.compile(r'\s*(?P<schema>[a-z0-9]{2,9})(://.*)?$', re.I)
 
 # Regular expression based and expanded from:
 # http://www.regular-expressions.info/email.html
@@ -1386,3 +1437,134 @@ def remove_suffix(value, suffix):
     Removes a suffix from the end of a string.
     """
     return value[:-len(suffix)] if value.endswith(suffix) else value
+
+
+def module_detection(paths, pypath='apprise.plugins'):
+    """
+    Iterates over a defined path for apprise decorators to load such as
+    @notify.
+
+    """
+
+    # A simple restriction that we don't allow periods in the filename at all
+    # so it can't be hidden (Linux OS's) and it won't conflict with Python
+    # path naming.  This also prevents us from loading any python file that
+    # starts with an underscore or dash
+    # We allow __init__.py as well
+    module_re = re.compile(
+        r'^(?P<name>[_a-z0-9][a-z0-9_-]*)(\.py)?$', re.I)
+
+    if isinstance(paths, six.string_types):
+        paths = [paths, ]
+
+    if not paths or not isinstance(paths, (tuple, list)):
+        # We're done
+        return
+
+    def _import_module(path):
+        # Since our plugin name can conflict (as a module) with another
+        # we want to generate random strings to avoid steping on
+        # another's namespace
+        module_name = hashlib.sha1(path.encode('utf-8')).hexdigest()
+        module_pyname = "{prefix}.{name}".format(
+            prefix='apprise.custom.module', name=module_name)
+
+        # Prepare a reverse map so that our decorators can register itself with
+        # as elements are found.
+        CUSTOM_PLUGIN_MAP[module_pyname] = {
+            'path': path,
+            'name': module_name,
+
+            # We'll save our module after it has deemed to be loaded
+            'module': None,
+
+            # A mapping of all of the plugins loaded that contains the
+            # @notify decorator. These elements get populated as they're
+            # loaded.
+            #
+            # The format will look like:
+            #  'schema': {
+            #     'name': 'Custom schema name',
+            #     'fn_name': 'name_of_function_decorator_was_found_on',
+            #     'url': 'schema://any/additional/info/found/on/url'
+            #     'plugin': <CustomNotifyWrapperPlugin>
+            #  }
+            #
+            # Note that the <CustomNotifyWrapperPlugin>
+            'notify': {},
+        }
+
+        module = import_module(path, module_pyname)
+        if not module:
+            # No problem, we can't use this object
+            logger.warning('Failed to load module: %s', _path)
+            # Do not keep our failed entry
+            del CUSTOM_PLUGIN_MAP[module_pyname]
+            return
+
+        logger.debug(
+            'Loaded custom module: %s (name=%s)',
+            _path, module_name)
+
+        # Save our module to our map
+        CUSTOM_PLUGIN_MAP[module_pyname]['module'] = module
+
+        # Print our loaded modules if any
+        if CUSTOM_PLUGIN_MAP[module_pyname]['notify']:
+            for schema, meta in \
+                    CUSTOM_PLUGIN_MAP[module_pyname]['notify'].items():
+                logger.info('Loaded custom notification: %s://', schema)
+        else:
+            # do not keep empty entries
+            del CUSTOM_PLUGIN_MAP[module_pyname]
+
+        return
+
+    for _path in paths:
+        path = os.path.abspath(os.path.expanduser(_path))
+        if path in PATHS_PREVIOUSLY_SCANNED or not os.path.exists(path):
+            # We're done as we've already scanned this
+            continue
+
+        # Store our path as a way of hashing it has been handled
+        PATHS_PREVIOUSLY_SCANNED.add(path)
+
+        if os.path.isdir(path) and not \
+                os.path.isfile(os.path.join(path, '__init__.py')):
+
+            logger.debug('Scanning for decorators in: %s', path)
+            for entry in os.listdir(path):
+                re_match = module_re.match(entry)
+                if not re_match:
+                    # keep going
+                    logger.trace('Plugin Scan: Ignoring %s', entry)
+                    continue
+
+                cur_path = os.path.join(path, entry)
+                if os.path.isdir(cur_path):
+                    # Update our path
+                    cur_path = os.path.join(path, entry, '__init__.py')
+                    if not os.path.isfile(cur_path):
+                        logger.trace(
+                            'Plugin Scan: Ignoring %s',
+                            os.path.join(path, entry))
+                        continue
+
+                # Load our module
+                _import_module(cur_path)
+
+        else:
+            # directly load as is
+            re_match = module_re.match(os.path.basename(path))
+            if not re_match:
+                # keep going
+                logger.trace('Plugin Scan: Ignoring %s', path)
+                continue
+
+            if os.path.isdir(path):
+                # This logic is safe to apply because we already validated
+                # the directories state above
+                path = os.path.join(path, '__init__.py')
+
+            # Load our module
+            _import_module(path)

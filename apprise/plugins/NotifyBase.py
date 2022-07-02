@@ -59,6 +59,15 @@ class NotifyBase(BASE_OBJECT):
     # enabled.
     enabled = True
 
+    # The category allows for parent inheritance of this object to alter
+    # this when it's function/use is intended to behave differently. The
+    # following category types exist:
+    #
+    #  native: Is a native plugin written/stored in `apprise/plugins/Notify*`
+    #  custom: Is a custom plugin written/stored in a users plugin directory
+    #          that they loaded at execution time.
+    category = 'native'
+
     # Some plugins may require additional packages above what is provided
     # already by Apprise.
     #

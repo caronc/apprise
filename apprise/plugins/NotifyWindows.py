@@ -203,9 +203,9 @@ class NotifyWindows(NotifyBase):
 
             self.logger.info('Sent Windows notification.')
 
-        except Exception:
+        except Exception as e:
             self.logger.warning('Failed to send Windows notification.')
-            self.logger.exception('Windows Exception')
+            self.logger.debug('Windows Exception: {}', str(e))
             return False
 
         return True

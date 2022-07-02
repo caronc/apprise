@@ -30,6 +30,7 @@ from os.path import dirname
 from os.path import isfile
 from os.path import abspath
 from .common import NotifyType
+from .utils import module_detection
 
 
 class AppriseAsset(object):
@@ -38,6 +39,10 @@ class AppriseAsset(object):
     information and details that can be used by Apprise such as providing
     an alternate location to where images/icons can be found and the
     URL masks.
+
+    Any variable that starts with an underscore (_) can only be initialized
+    by this class manually and will/can not be parsed from a configuration
+    file.
 
     """
     # Application Identifier
@@ -132,6 +137,10 @@ class AppriseAsset(object):
     # that you leave this option as is otherwise.
     secure_logging = True
 
+    # Optionally specify one or more path to attempt to scan for Python modules
+    # By default, no paths are scanned.
+    __plugin_paths = []
+
     # All internal/system flags are prefixed with an underscore (_)
     # These can only be initialized using Python libraries and are not picked
     # up from (yaml) configuration files (if set)
@@ -146,7 +155,7 @@ class AppriseAsset(object):
     # A unique identifer we can use to associate our calling source
     _uid = str(uuid4())
 
-    def __init__(self, **kwargs):
+    def __init__(self, plugin_paths=None, **kwargs):
         """
         Asset Initialization
 
@@ -159,6 +168,10 @@ class AppriseAsset(object):
                     'An invalid key {} was specified.'.format(key))
 
             setattr(self, key, value)
+
+        if plugin_paths:
+            # Load any decorated modules if defined
+            module_detection(plugin_paths)
 
     def color(self, notify_type, color_type=None):
         """

@@ -57,6 +57,8 @@ from .AppriseAsset import AppriseAsset
 from .AppriseConfig import AppriseConfig
 from .AppriseAttachment import AppriseAttachment
 
+from . import decorators
+
 # Inherit our logging with our additional entries added to it
 from .logger import logging
 from .logger import logger
@@ -77,6 +79,9 @@ __all__ = [
     'ContentIncludeMode', 'CONTENT_INCLUDE_MODES',
     'ContentLocation', 'CONTENT_LOCATIONS',
     'PrivacyMode',
+
+    # Decorator
+    'decorators',
 
     # Logging
     'logging', 'logger', 'LogCapture',

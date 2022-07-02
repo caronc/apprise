@@ -35,7 +35,6 @@ from .utils import parse_list
 from .utils import parse_urls
 from .utils import cwe312_url
 from .logger import logger
-
 from .AppriseAsset import AppriseAsset
 from .AppriseConfig import AppriseConfig
 from .AppriseAttachment import AppriseAttachment
@@ -485,7 +484,7 @@ class Apprise(object):
 
         if len(self) == 0:
             # Nothing to notify
-            msg = "There are service(s) to notify"
+            msg = "There are no service(s) to notify"
             logger.error(msg)
             raise TypeError(msg)
 
@@ -650,7 +649,10 @@ class Apprise(object):
                 'service_url': getattr(plugin, 'service_url', None),
                 'setup_url': getattr(plugin, 'setup_url', None),
                 # Placeholder - populated below
-                'details': None
+                'details': None,
+                # Differentiat between what is a custom loaded plugin and
+                # which is native.
+                'category': getattr(plugin, 'category', None)
             }
 
             # Standard protocol(s) should be None or a tuple

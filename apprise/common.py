@@ -23,6 +23,10 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+# we mirror our base purely for the ability to reset everything; this
+# is generally only used in testing and should not be used by developers
+CUSTOM_PLUGIN_MAP = {}
+
 
 class NotifyType(object):
     """

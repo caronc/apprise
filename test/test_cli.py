@@ -27,6 +27,7 @@ import re
 import mock
 import requests
 import json
+from inspect import cleandoc
 from os.path import dirname
 from os.path import join
 from apprise import cli
@@ -476,10 +477,10 @@ def test_apprise_cli_nux_env(tmpdir):
         ])
         assert result.exit_code == 0
 
-    with mock.patch('apprise.cli.DEFAULT_SEARCH_PATHS', []):
+    with mock.patch('apprise.cli.DEFAULT_CONFIG_PATHS', []):
         with environ(APPRISE_URLS="      "):
             # An empty string is not valid and therefore not loaded so the
-            # below fails. We override the DEFAULT_SEARCH_PATHS because we
+            # below fails. We override the DEFAULT_CONFIG_PATHS because we
             # don't want to detect ones loaded on the machine running the unit
             # tests
             result = runner.invoke(cli.main, [
@@ -519,11 +520,11 @@ def test_apprise_cli_nux_env(tmpdir):
         ])
         assert result.exit_code == 0
 
-    with mock.patch('apprise.cli.DEFAULT_SEARCH_PATHS', []):
+    with mock.patch('apprise.cli.DEFAULT_CONFIG_PATHS', []):
         with environ(APPRISE_CONFIG="      "):
             # We will fail to send the notification as no path was
             # specified.
-            # We override the DEFAULT_SEARCH_PATHS because we don't
+            # We override the DEFAULT_CONFIG_PATHS because we don't
             # want to detect ones loaded on the machine running the unit tests
             result = runner.invoke(cli.main, [
                 '-b', 'my message',
@@ -596,9 +597,108 @@ def test_apprise_cli_nux_env(tmpdir):
     assert result.exit_code == 0
 
 
+@mock.patch('requests.post')
+def test_apprise_cli_plugin_loading(mock_post, tmpdir):
+    """
+    CLI: --plugin-path (-P)
+
+    """
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    runner = CliRunner()
+
+    ##DEBUG# Test a path that has no files to load in it
+    ##DEBUGresult = runner.invoke(cli.main, [
+    ##DEBUG    '--plugin-path', join(str(tmpdir), 'invalid_path'),
+    ##DEBUG    '-b', 'test\nbody',
+    ##DEBUG    'json://localhost',
+    ##DEBUG])
+    ##DEBUG# The path is silently loaded but fails... it's okay because the
+    ##DEBUG# notification we're choosing to notify does exist
+    ##DEBUGassert result.exit_code == 0
+
+    ##DEBUG# Test our current existing path that has no entries in it
+    ##DEBUGresult = runner.invoke(cli.main, [
+    ##DEBUG    '--plugin-path', str(tmpdir),
+    ##DEBUG    '-b', 'test\nbody',
+    ##DEBUG    'json://localhost',
+    ##DEBUG])
+    ##DEBUG# The path is silently loaded but fails... it's okay because the
+    ##DEBUG# notification we're choosing to notify does exist
+    ##DEBUGassert result.exit_code == 0
+
+    ##DEBUG# Prepare ourselves a file to work with
+    ##DEBUGnotify_hook_a = tmpdir.join('myhook01.py')
+    ##DEBUGnotify_hook_a.write(cleandoc("""
+    ##DEBUGraise ImportError
+    ##DEBUG"""))
+
+    ##DEBUGresult = runner.invoke(cli.main, [
+    ##DEBUG    '--plugin-path', str(notify_hook_a),
+    ##DEBUG    '-b', 'test\nbody',
+    ##DEBUG    # A custom hook:
+    ##DEBUG    'clihook://',
+    ##DEBUG])
+    ##DEBUG# It doesn't exist so it will fail
+    ##DEBUG# meanwhile we would have failed to load the myhook path
+    ##DEBUGassert result.exit_code == 1
+
+    # Prepare ourselves a file to work with
+    notify_hook_b = tmpdir.mkdir('goodmodule').join('__init__.py')
+    notify_hook_b.write(cleandoc("""
+    from apprise.decorators import notify
+    
+    # We want to trigger on anyone who configures a call to clihook://
+    @notify(on="clihook")
+    def mywrapper(body, title, notify_type, *args, **kwargs):
+        # A simple test - print to screen
+        print("{}: {} - {}".format(notify_type, title, body))
+
+        # No return (so a return of None) get's translated to True
+    """))
+
+    result = runner.invoke(cli.main, [
+        '--plugin-path', str(tmpdir),
+        '-b', 'test body',
+        # A custom hook:
+        'clihook://',
+    ])
+
+    # We can detect the goodmodule (which has an __init__.py in it)
+    # so we'll load okay
+    assert result.exit_code == 0
+
+    result = runner.invoke(cli.main, [
+        '--plugin-path', str(notify_hook_b),
+        '-b', 'test body',
+        # A custom hook:
+        'clihook://',
+    ])
+
+    # Absolute path to __init__.py is okay
+    assert result.exit_code == 0
+
+    result = runner.invoke(cli.main, [
+        '--plugin-path', dirname(str(notify_hook_b)),
+        '-b', 'test body',
+        # A custom hook:
+        'clihook://',
+    ])
+
+    # Now we succeed to load our module when pointed to it only because
+    # an __init__.py is found on the inside of it
+    assert result.exit_code == 0
+
+    # we can verify that it prepares our message
+    assert result.stdout.strip() == 'info:  - test body'
+
+
+
 def test_apprise_cli_details(tmpdir):
     """
-    API: Apprise() Disabled Plugin States
+    CLI: --details (-l)
 
     """
 
