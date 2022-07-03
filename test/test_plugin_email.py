@@ -728,3 +728,15 @@ def test_plugin_email_dict_variations():
         'password': 'abd123',
         'host': 'example.com'}, suppress_exceptions=False)
     assert isinstance(obj, plugins.NotifyEmail) is True
+
+    results = plugins.NotifyEmail.parse_url(
+        'mailtos://abc:password@xyz.cn:465?smtp=smtp.exmail.qq.com&mode=ssl')
+    assert isinstance(results, dict)
+    obj = Apprise.instantiate(results)
+    assert obj.secure_mode == 'ssl'
+    assert obj.smtp_host == 'smtp.exmail.qq.com'
+    assert obj.user == 'abc'
+    assert obj.password == 'password'
+    assert obj.host == 'xyz.cn'
+    assert obj.port == 465
+    assert obj.secure is True
