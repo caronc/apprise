@@ -796,8 +796,8 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     # are the same; it also verfies that the mode gets changed to SSL
     # instead of STARTTLS
     results = plugins.NotifyEmail.parse_url(
-        'mailtos://user:pass123@hotmail.com'
-        '?name=test%20name&to=user2@yahoo.com&mode=ssl')
+        'mailtos://user:pass123@hotmail.com?smtp=override.com'
+        '&name=test%20name&to=user2@yahoo.com&mode=ssl')
     assert isinstance(results, dict)
     assert 'test name' == results['from_name']
     assert 'user' == results['user']
@@ -833,3 +833,4 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
         'mailtos://user:pass123@hotmail.com/user2%40yahoo.com')
     # Test that our template over-ride worked
     assert 'mode=ssl' in obj.url()
+    assert 'smtp=override.com' in obj.url()
