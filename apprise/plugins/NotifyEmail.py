@@ -534,8 +534,7 @@ class NotifyEmail(NotifyBase):
             )
 
         # Apply any defaults based on certain known configurations
-        self.NotifyEmailDefaults(
-            smtp_host=smtp_host, secure_mode=secure_mode, **kwargs)
+        self.NotifyEmailDefaults(secure_mode=secure_mode, **kwargs)
 
         # if there is still no smtp_host then we fall back to the hostname
         if not self.smtp_host:
@@ -543,8 +542,7 @@ class NotifyEmail(NotifyBase):
 
         return
 
-    def NotifyEmailDefaults(self, secure_mode=None, port=None, smtp_host=None,
-                            **kwargs):
+    def NotifyEmailDefaults(self, secure_mode=None, port=None, **kwargs):
         """
         A function that prefills defaults based on the email
         it was provided.
@@ -577,6 +575,11 @@ class NotifyEmail(NotifyBase):
                 self.secure = EMAIL_TEMPLATES[i][2]\
                     .get('secure', self.secure)
 
+                # The SMTP Host check is already done above; if it was
+                # specified we wouldn't even reach this part of the code.
+                self.smtp_host = EMAIL_TEMPLATES[i][2]\
+                    .get('smtp_host', self.smtp_host)
+
                 # The following can be over-ridden if defined manually in the
                 # Apprise URL.  Otherwise they take on the template value
                 if not port:
@@ -585,13 +588,6 @@ class NotifyEmail(NotifyBase):
                 if not secure_mode:
                     self.secure_mode = EMAIL_TEMPLATES[i][2]\
                         .get('secure_mode', self.secure_mode)
-                if not smtp_host:
-                    self.smtp_host = EMAIL_TEMPLATES[i][2]\
-                        .get('smtp_host', self.smtp_host)
-
-                if self.smtp_host is None:
-                    # default to our host
-                    self.smtp_host = self.host
 
                 # Adjust email login based on the defined usertype. If no entry
                 # was specified, then we default to having them all set (which
