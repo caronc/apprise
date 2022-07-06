@@ -728,3 +728,110 @@ def test_plugin_email_dict_variations():
         'password': 'abd123',
         'host': 'example.com'}, suppress_exceptions=False)
     assert isinstance(obj, plugins.NotifyEmail) is True
+
+
+@mock.patch('smtplib.SMTP_SSL')
+@mock.patch('smtplib.SMTP')
+def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
+    """
+    NotifyEmail() Test email url parsing
+
+    """
+
+    # Disable Throttling to speed testing
+    plugins.NotifyEmail.request_rate_per_sec = 0
+
+    response = mock.Mock()
+    mock_smtp_ssl.return_value = response
+    mock_smtp.return_value = response
+
+    # Test variations of username required to be an email address
+    # user@example.com; we also test an over-ride port on a template driven
+    # mailto:// entry
+    results = plugins.NotifyEmail.parse_url(
+        'mailtos://user:pass123@hotmail.com:444'
+        '?to=user2@yahoo.com&name=test%20name')
+    assert isinstance(results, dict)
+    assert 'test name' == results['from_name']
+    assert 'user' == results['user']
+    assert 444 == results['port']
+    assert 'hotmail.com' == results['host']
+    assert 'pass123' == results['password']
+    assert 'user2@yahoo.com' in results['targets']
+
+    obj = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(obj, plugins.NotifyEmail) is True
+
+    assert mock_smtp.call_count == 0
+    assert mock_smtp_ssl.call_count == 0
+    assert obj.notify("test") is True
+    assert mock_smtp.call_count == 1
+    assert mock_smtp_ssl.call_count == 0
+    assert response.starttls.call_count == 1
+    assert response.login.call_count == 1
+    assert response.sendmail.call_count == 1
+    # Store our Sent Arguments
+    # Syntax is:
+    #  sendmail(from_addr, to_addrs, msg, mail_options=(), rcpt_options=())
+    #             [0]        [1]     [2]
+    _from = response.sendmail.call_args[0][0]
+    _to = response.sendmail.call_args[0][1]
+    _msg = response.sendmail.call_args[0][2]
+    assert _from == 'user@hotmail.com'
+    assert isinstance(_to, list)
+    assert len(_to) == 1
+    assert _to[0] == 'user2@yahoo.com'
+    assert _msg.endswith('test')
+
+    # Our URL port was over-ridden (on template) to use 444
+    # We can verify that this was correctly saved
+    assert obj.url().startswith(
+        'mailtos://user:pass123@hotmail.com:444/user2%40yahoo.com')
+    assert 'mode=starttls' in obj.url()
+    assert 'smtp=smtp-mail.outlook.com' in obj.url()
+
+    mock_smtp.reset_mock()
+    response.reset_mock()
+
+    # The below switches the `name` with the `to` to verify the results
+    # are the same; it also verfies that the mode gets changed to SSL
+    # instead of STARTTLS
+    results = plugins.NotifyEmail.parse_url(
+        'mailtos://user:pass123@hotmail.com?smtp=override.com'
+        '&name=test%20name&to=user2@yahoo.com&mode=ssl')
+    assert isinstance(results, dict)
+    assert 'test name' == results['from_name']
+    assert 'user' == results['user']
+    assert 'hotmail.com' == results['host']
+    assert 'pass123' == results['password']
+    assert 'user2@yahoo.com' in results['targets']
+    assert 'ssl' == results['secure_mode']
+    obj = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(obj, plugins.NotifyEmail) is True
+
+    assert mock_smtp.call_count == 0
+    assert mock_smtp_ssl.call_count == 0
+    assert obj.notify("test") is True
+    assert mock_smtp.call_count == 0
+    assert mock_smtp_ssl.call_count == 1
+    assert response.starttls.call_count == 0
+    assert response.login.call_count == 1
+    assert response.sendmail.call_count == 1
+    # Store our Sent Arguments
+    # Syntax is:
+    #  sendmail(from_addr, to_addrs, msg, mail_options=(), rcpt_options=())
+    #             [0]        [1]     [2]
+    _from = response.sendmail.call_args[0][0]
+    _to = response.sendmail.call_args[0][1]
+    _msg = response.sendmail.call_args[0][2]
+    assert _from == 'user@hotmail.com'
+    assert isinstance(_to, list)
+    assert len(_to) == 1
+    assert _to[0] == 'user2@yahoo.com'
+    assert _msg.endswith('test')
+
+    assert obj.url().startswith(
+        'mailtos://user:pass123@hotmail.com/user2%40yahoo.com')
+    # Test that our template over-ride worked
+    assert 'mode=ssl' in obj.url()
+    assert 'smtp=override.com' in obj.url()
