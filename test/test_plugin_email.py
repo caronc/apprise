@@ -788,6 +788,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert obj.url().startswith(
         'mailtos://user:pass123@hotmail.com:444/user2%40yahoo.com')
     assert 'mode=starttls' in obj.url()
+    assert 'smtp=smtp-mail.outlook.com' in obj.url()
 
     mock_smtp.reset_mock()
     response.reset_mock()

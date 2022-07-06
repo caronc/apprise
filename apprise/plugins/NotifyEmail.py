@@ -534,7 +534,8 @@ class NotifyEmail(NotifyBase):
             )
 
         # Apply any defaults based on certain known configurations
-        self.NotifyEmailDefaults(secure_mode=secure_mode, **kwargs)
+        self.NotifyEmailDefaults(
+            smtp_host=smtp_host, secure_mode=secure_mode, **kwargs)
 
         # if there is still no smtp_host then we fall back to the hostname
         if not self.smtp_host:
