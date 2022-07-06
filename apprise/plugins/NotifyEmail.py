@@ -426,9 +426,6 @@ class NotifyEmail(NotifyBase):
             else:
                 self.port = self.default_port
 
-        # Default Secure Mode Applied
-        self.secure_mode = self.default_secure_mode
-
         # Acquire Email 'To'
         self.targets = list()
 
@@ -473,6 +470,16 @@ class NotifyEmail(NotifyBase):
         # Now detect the SMTP Server
         self.smtp_host = \
             smtp_host if isinstance(smtp_host, six.string_types) else ''
+
+        # Now detect secure mode
+        self.secure_mode = self.default_secure_mode \
+            if not isinstance(secure_mode, six.string_types) \
+            else secure_mode.lower()
+        if self.secure_mode not in SECURE_MODES:
+            msg = 'The secure mode specified ({}) is invalid.'\
+                  .format(secure_mode)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         if targets:
             # Validate recipients (to:) and drop bad ones:
@@ -527,18 +534,7 @@ class NotifyEmail(NotifyBase):
             )
 
         # Apply any defaults based on certain known configurations
-        self.NotifyEmailDefaults(**kwargs)
-
-        # Now detect secure mode
-        if isinstance(secure_mode, six.string_types):
-            # Force over-ride if manually specified
-            self.secure_mode = secure_mode.lower()
-
-        if self.secure_mode not in SECURE_MODES:
-            msg = 'The secure mode specified ({}) is invalid.'\
-                  .format(secure_mode)
-            self.logger.warning(msg)
-            raise TypeError(msg)
+        self.NotifyEmailDefaults(secure_mode=secure_mode, **kwargs)
 
         # if there is still no smtp_host then we fall back to the hostname
         if not self.smtp_host:
@@ -546,7 +542,8 @@ class NotifyEmail(NotifyBase):
 
         return
 
-    def NotifyEmailDefaults(self,  port=None, **kwargs):
+    def NotifyEmailDefaults(self, secure_mode=None, port=None, smtp_host=None,
+                            **kwargs):
         """
         A function that prefills defaults based on the email
         it was provided.
@@ -575,15 +572,21 @@ class NotifyEmail(NotifyBase):
                     'Applying %s Defaults' %
                     EMAIL_TEMPLATES[i][0],
                 )
+                # the secure flag can not be altered if defined in the template
+                self.secure = EMAIL_TEMPLATES[i][2]\
+                    .get('secure', self.secure)
+
+                # The following can be over-ridden if defined manually in the
+                # Apprise URL.  Otherwise they take on the template value
                 if not port:
                     self.port = EMAIL_TEMPLATES[i][2]\
                         .get('port', self.port)
-                self.secure = EMAIL_TEMPLATES[i][2]\
-                    .get('secure', self.secure)
-                self.secure_mode = EMAIL_TEMPLATES[i][2]\
-                    .get('secure_mode', self.secure_mode)
-                self.smtp_host = EMAIL_TEMPLATES[i][2]\
-                    .get('smtp_host', self.smtp_host)
+                if not secure_mode:
+                    self.secure_mode = EMAIL_TEMPLATES[i][2]\
+                        .get('secure_mode', self.secure_mode)
+                if not smtp_host:
+                    self.smtp_host = EMAIL_TEMPLATES[i][2]\
+                        .get('smtp_host', self.smtp_host)
 
                 if self.smtp_host is None:
                     # default to our host

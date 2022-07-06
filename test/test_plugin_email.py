@@ -783,6 +783,8 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert _to[0] == 'user2@yahoo.com'
     assert _msg.endswith('test')
 
+    # Our URL port was over-ridden (on template) to use 444
+    # We can verify that this was correctly saved
     assert obj.url().startswith(
         'mailtos://user:pass123@hotmail.com:444/user2%40yahoo.com')
     assert 'mode=starttls' in obj.url()
@@ -829,4 +831,5 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
 
     assert obj.url().startswith(
         'mailtos://user:pass123@hotmail.com/user2%40yahoo.com')
+    # Test that our template over-ride worked
     assert 'mode=ssl' in obj.url()
