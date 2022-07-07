@@ -424,7 +424,7 @@ class Apprise(object):
 
         except TypeError:
             # No notifications sent, and there was an internal error.
-            return py3compat.asyncio.toasyncwrap(False)
+            return py3compat.asyncio.toasyncwrapvalue(False)
 
         else:
             if len(coroutines) > 0:
@@ -433,7 +433,7 @@ class Apprise(object):
 
             else:
                 # No notifications sent.
-                return py3compat.asyncio.toasyncwrap(None)
+                return py3compat.asyncio.toasyncwrapvalue(None)
 
     @staticmethod
     def _notifyhandler(server, **kwargs):
@@ -470,7 +470,7 @@ class Apprise(object):
             # Send the notification immediately, and wrap the result in a
             # coroutine.
             status = Apprise._notifyhandler(server, **kwargs)
-            return py3compat.asyncio.toasyncwrap(status)
+            return py3compat.asyncio.toasyncwrapvalue(status)
 
     def _notifyall(self, handler, body, title='', notify_type=NotifyType.INFO,
                    body_format=None, tag=MATCH_ALL_TAG, match_always=True,
