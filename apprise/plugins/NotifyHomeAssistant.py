@@ -107,7 +107,7 @@ class NotifyHomeAssistant(NotifyBase):
             # Optional Unique Notification ID
             'name': _('Notification ID'),
             'type': 'string',
-            'regex': (r'^[a-f0-9_-]+$', 'i'),
+            'regex': (r'^[a-z0-9_-]+$', 'i'),
         },
     })
 
