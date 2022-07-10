@@ -31,7 +31,7 @@ from os.path import dirname
 from apprise.AppriseAttachment import AppriseAttachment
 from apprise.AppriseAsset import AppriseAsset
 from apprise.attachment.AttachBase import AttachBase
-from apprise.attachment import SCHEMA_MAP as ATTACH_SCHEMA_MAP
+from apprise.common import ATTACHMENT_SCHEMA_MAP
 from apprise.attachment import __load_matrix
 from apprise.common import ContentLocation
 
@@ -275,7 +275,7 @@ def test_apprise_attachment_instantiate():
             raise TypeError()
 
     # Store our bad attachment type in our schema map
-    ATTACH_SCHEMA_MAP['bad'] = BadAttachType
+    ATTACHMENT_SCHEMA_MAP['bad'] = BadAttachType
 
     with pytest.raises(TypeError):
         AppriseAttachment.instantiate(

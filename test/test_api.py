@@ -45,7 +45,7 @@ from apprise import URLBase
 from apprise import PrivacyMode
 from apprise.AppriseLocale import LazyTranslation
 
-from apprise.plugins import SCHEMA_MAP
+from apprise import common
 from apprise.plugins import __load_matrix
 from apprise.plugins import __reset_matrix
 from apprise.utils import parse_list
@@ -219,10 +219,10 @@ def apprise_test(do_notify):
             return NotifyBase.parse_url(url, verify_host=False)
 
     # Store our bad notification in our schema map
-    SCHEMA_MAP['bad'] = BadNotification
+    common.NOTIFY_SCHEMA_MAP['bad'] = BadNotification
 
     # Store our good notification in our schema map
-    SCHEMA_MAP['good'] = GoodNotification
+    common.NOTIFY_SCHEMA_MAP['good'] = GoodNotification
 
     # Just to explain what is happening here, we would have parsed the
     # url properly but failed when we went to go and create an instance
@@ -322,13 +322,13 @@ def apprise_test(do_notify):
             return ''
 
     # Store our bad notification in our schema map
-    SCHEMA_MAP['throw'] = ThrowNotification
+    common.NOTIFY_SCHEMA_MAP['throw'] = ThrowNotification
 
     # Store our good notification in our schema map
-    SCHEMA_MAP['fail'] = FailNotification
+    common.NOTIFY_SCHEMA_MAP['fail'] = FailNotification
 
     # Store our good notification in our schema map
-    SCHEMA_MAP['runtime'] = RuntimeNotification
+    common.NOTIFY_SCHEMA_MAP['runtime'] = RuntimeNotification
 
     for async_mode in (True, False):
         # Create an Asset object
@@ -356,7 +356,7 @@ def apprise_test(do_notify):
             # Support URL
             return ''
 
-    SCHEMA_MAP['throw'] = ThrowInstantiateNotification
+    common.NOTIFY_SCHEMA_MAP['throw'] = ThrowInstantiateNotification
 
     # Reset our object
     a.clear()
@@ -700,9 +700,9 @@ def test_apprise_schemas(tmpdir):
         secure_protocol = 'markdowns'
 
     # Store our notifications into our schema map
-    SCHEMA_MAP['text'] = TextNotification
-    SCHEMA_MAP['html'] = HtmlNotification
-    SCHEMA_MAP['markdown'] = MarkDownNotification
+    common.NOTIFY_SCHEMA_MAP['text'] = TextNotification
+    common.NOTIFY_SCHEMA_MAP['html'] = HtmlNotification
+    common.NOTIFY_SCHEMA_MAP['markdown'] = MarkDownNotification
 
     schemas = URLBase.schemas(TextNotification)
     assert isinstance(schemas, set) is True
@@ -787,9 +787,9 @@ def test_apprise_notify_formats(tmpdir):
             return ''
 
     # Store our notifications into our schema map
-    SCHEMA_MAP['text'] = TextNotification
-    SCHEMA_MAP['html'] = HtmlNotification
-    SCHEMA_MAP['markdown'] = MarkDownNotification
+    common.NOTIFY_SCHEMA_MAP['text'] = TextNotification
+    common.NOTIFY_SCHEMA_MAP['html'] = HtmlNotification
+    common.NOTIFY_SCHEMA_MAP['markdown'] = MarkDownNotification
 
     # Test Markdown; the above calls the markdown because our good://
     # defined plugin above was defined to default to HTML which triggers
@@ -995,7 +995,7 @@ def test_apprise_disabled_plugins():
             # Pretend everything is okay (so we don't break other tests)
             return True
 
-    SCHEMA_MAP['na01'] = TestDisabled01Notification
+    common.NOTIFY_SCHEMA_MAP['na01'] = TestDisabled01Notification
 
     class TestDisabled02Notification(NotifyBase):
         """
@@ -1020,7 +1020,7 @@ def test_apprise_disabled_plugins():
             # Pretend everything is okay (so we don't break other tests)
             return True
 
-    SCHEMA_MAP['na02'] = TestDisabled02Notification
+    common.NOTIFY_SCHEMA_MAP['na02'] = TestDisabled02Notification
 
     # Create our Apprise instance
     a = Apprise()
@@ -1078,7 +1078,7 @@ def test_apprise_disabled_plugins():
             # Pretend everything is okay (so we don't break other tests)
             return True
 
-    SCHEMA_MAP['good'] = TesEnabled01Notification
+    common.NOTIFY_SCHEMA_MAP['good'] = TesEnabled01Notification
 
     # The last thing we'll simulate is a case where the plugin is just
     # disabled at a later time long into it's life.  this is just to allow
@@ -1218,7 +1218,7 @@ def test_apprise_details():
             return True
 
     # Store our good detail notification in our schema map
-    SCHEMA_MAP['details'] = TestDetailNotification
+    common.NOTIFY_SCHEMA_MAP['details'] = TestDetailNotification
 
     # This is a made up class that is just used to verify
     class TestReq01Notification(NotifyBase):
@@ -1243,7 +1243,7 @@ def test_apprise_details():
             # Pretend everything is okay (so we don't break other tests)
             return True
 
-    SCHEMA_MAP['req01'] = TestReq01Notification
+    common.NOTIFY_SCHEMA_MAP['req01'] = TestReq01Notification
 
     # This is a made up class that is just used to verify
     class TestReq02Notification(NotifyBase):
@@ -1273,7 +1273,7 @@ def test_apprise_details():
             # Pretend everything is okay (so we don't break other tests)
             return True
 
-    SCHEMA_MAP['req02'] = TestReq02Notification
+    common.NOTIFY_SCHEMA_MAP['req02'] = TestReq02Notification
 
     # This is a made up class that is just used to verify
     class TestReq03Notification(NotifyBase):
@@ -1299,7 +1299,7 @@ def test_apprise_details():
             # Pretend everything is okay (so we don't break other tests)
             return True
 
-    SCHEMA_MAP['req03'] = TestReq03Notification
+    common.NOTIFY_SCHEMA_MAP['req03'] = TestReq03Notification
 
     # This is a made up class that is just used to verify
     class TestReq04Notification(NotifyBase):
@@ -1319,7 +1319,7 @@ def test_apprise_details():
             # Pretend everything is okay (so we don't break other tests)
             return True
 
-    SCHEMA_MAP['req04'] = TestReq04Notification
+    common.NOTIFY_SCHEMA_MAP['req04'] = TestReq04Notification
 
     # This is a made up class that is just used to verify
     class TestReq05Notification(NotifyBase):
@@ -1341,7 +1341,7 @@ def test_apprise_details():
             # Pretend everything is okay (so we don't break other tests)
             return True
 
-    SCHEMA_MAP['req05'] = TestReq05Notification
+    common.NOTIFY_SCHEMA_MAP['req05'] = TestReq05Notification
 
     # Create our Apprise instance
     a = Apprise()
@@ -1707,14 +1707,16 @@ def test_apprise_details_plugin_verification():
         if six.PY2:
             # inspect our object
             # getargspec() is deprecated in Python v3
-            spec = inspect.getargspec(SCHEMA_MAP[protocols[0]].__init__)
+            spec = inspect.getargspec(
+                common.NOTIFY_SCHEMA_MAP[protocols[0]].__init__)
 
             function_args = \
                 (set(parse_list(spec.keywords)) - set(['kwargs'])) \
                 | (set(spec.args) - set(['self'])) | valid_kwargs
         else:
             # Python v3+ uses getfullargspec()
-            spec = inspect.getfullargspec(SCHEMA_MAP[protocols[0]].__init__)
+            spec = inspect.getfullargspec(
+                common.NOTIFY_SCHEMA_MAP[protocols[0]].__init__)
 
             function_args = \
                 (set(parse_list(spec.varkw)) - set(['kwargs'])) \
@@ -1729,7 +1731,8 @@ def test_apprise_details_plugin_verification():
                 raise AssertionError(
                     '{}.__init__() expects a {}=None entry according to '
                     'template configuration'
-                    .format(SCHEMA_MAP[protocols[0]].__name__, arg))
+                    .format(
+                        common.NOTIFY_SCHEMA_MAP[protocols[0]].__name__, arg))
 
         # Iterate over all of the function arguments and make sure that
         # it maps back to a key
@@ -1739,7 +1742,8 @@ def test_apprise_details_plugin_verification():
                 raise AssertionError(
                     '{}.__init__({}) found but not defined in the '
                     'template configuration'
-                    .format(SCHEMA_MAP[protocols[0]].__name__, arg))
+                    .format(
+                        common.NOTIFY_SCHEMA_MAP[protocols[0]].__name__, arg))
 
         # Iterate over our map_to_aliases and make sure they were defined in
         # either the as a token or arg

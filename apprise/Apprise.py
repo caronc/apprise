@@ -26,9 +26,7 @@
 import os
 import six
 from itertools import chain
-from .common import NotifyType
-from .common import MATCH_ALL_TAG
-from .common import MATCH_ALWAYS_TAG
+from . import common
 from .conversion import convert_between
 from .utils import is_exclusive_match
 from .utils import parse_list
@@ -140,7 +138,7 @@ class Apprise(object):
             # We already have our result set
             results = url
 
-            if results.get('schema') not in plugins.SCHEMA_MAP:
+            if results.get('schema') not in common.NOTIFY_SCHEMA_MAP:
                 # schema is a mandatory dictionary item as it is the only way
                 # we can index into our loaded plugins
                 logger.error('Dictionary does not include a "schema" entry.')
@@ -163,7 +161,7 @@ class Apprise(object):
                 type(url))
             return None
 
-        if not plugins.SCHEMA_MAP[results['schema']].enabled:
+        if not common.NOTIFY_SCHEMA_MAP[results['schema']].enabled:
             #
             # First Plugin Enable Check (Pre Initialization)
             #
@@ -183,12 +181,13 @@ class Apprise(object):
             try:
                 # Attempt to create an instance of our plugin using the parsed
                 # URL information
-                plugin = plugins.SCHEMA_MAP[results['schema']](**results)
+                plugin = common.NOTIFY_SCHEMA_MAP[results['schema']](**results)
 
                 # Create log entry of loaded URL
                 logger.debug(
                     'Loaded {} URL: {}'.format(
-                        plugins.SCHEMA_MAP[results['schema']].service_name,
+                        common.
+                        NOTIFY_SCHEMA_MAP[results['schema']].service_name,
                         plugin.url(privacy=asset.secure_logging)))
 
             except Exception:
@@ -199,14 +198,15 @@ class Apprise(object):
                 # the arguments are invalid or can not be used.
                 logger.error(
                     'Could not load {} URL: {}'.format(
-                        plugins.SCHEMA_MAP[results['schema']].service_name,
+                        common.
+                        NOTIFY_SCHEMA_MAP[results['schema']].service_name,
                         loggable_url))
                 return None
 
         else:
             # Attempt to create an instance of our plugin using the parsed
             # URL information but don't wrap it in a try catch
-            plugin = plugins.SCHEMA_MAP[results['schema']](**results)
+            plugin = common.NOTIFY_SCHEMA_MAP[results['schema']](**results)
 
         if not plugin.enabled:
             #
@@ -304,7 +304,7 @@ class Apprise(object):
         """
         self.servers[:] = []
 
-    def find(self, tag=MATCH_ALL_TAG, match_always=True):
+    def find(self, tag=common.MATCH_ALL_TAG, match_always=True):
         """
         Returns an list of all servers matching against the tag specified.
 
@@ -322,7 +322,7 @@ class Apprise(object):
 
         # A match_always flag allows us to pick up on our 'any' keyword
         # and notify these services under all circumstances
-        match_always = MATCH_ALWAYS_TAG if match_always else None
+        match_always = common.MATCH_ALWAYS_TAG if match_always else None
 
         # Iterate over our loaded plugins
         for entry in self.servers:
@@ -337,13 +337,14 @@ class Apprise(object):
             for server in servers:
                 # Apply our tag matching based on our defined logic
                 if is_exclusive_match(
-                        logic=tag, data=server.tags, match_all=MATCH_ALL_TAG,
+                        logic=tag, data=server.tags,
+                        match_all=common.MATCH_ALL_TAG,
                         match_always=match_always):
                     yield server
         return
 
-    def notify(self, body, title='', notify_type=NotifyType.INFO,
-               body_format=None, tag=MATCH_ALL_TAG, match_always=True,
+    def notify(self, body, title='', notify_type=common.NotifyType.INFO,
+               body_format=None, tag=common.MATCH_ALL_TAG, match_always=True,
                attach=None, interpret_escapes=None):
         """
         Send a notification to all of the plugins previously loaded.
@@ -471,9 +472,10 @@ class Apprise(object):
             status = Apprise._notifyhandler(server, **kwargs)
             return py3compat.asyncio.toasyncwrapvalue(status)
 
-    def _notifyall(self, handler, body, title='', notify_type=NotifyType.INFO,
-                   body_format=None, tag=MATCH_ALL_TAG, match_always=True,
-                   attach=None, interpret_escapes=None):
+    def _notifyall(self, handler, body, title='',
+                   notify_type=common.NotifyType.INFO, body_format=None,
+                   tag=common.MATCH_ALL_TAG, match_always=True, attach=None,
+                   interpret_escapes=None):
         """
         Creates notifications for all of the plugins loaded.
 
@@ -640,7 +642,7 @@ class Apprise(object):
             'asset': self.asset.details(),
         }
 
-        for plugin in set(plugins.SCHEMA_MAP.values()):
+        for plugin in set(common.NOTIFY_SCHEMA_MAP.values()):
             # Iterate over our hashed plugins and dynamically build details on
             # their status:
 

@@ -54,6 +54,25 @@ from dbus import DBusException  # noqa E402
 from apprise.plugins.NotifyDBus import DBusUrgency  # noqa E402
 
 
+def _reload():
+    """
+    The following libraries need to be reloaded to prevent
+     TypeError: super(type, obj): obj must be an instance or subtype of type
+     This is better explained in this StackOverflow post:
+        https://stackoverflow.com/questions/31363311/\
+          any-way-to-manually-fix-operation-of-\
+             super-after-ipython-reload-avoiding-ty
+
+    """
+    reload(sys.modules['apprise.common'])
+    reload(sys.modules['apprise.attachment'])
+    reload(sys.modules['apprise.config'])
+    reload(sys.modules['apprise.plugins.NotifyDBus'])
+    reload(sys.modules['apprise.plugins'])
+    reload(sys.modules['apprise.Apprise'])
+    reload(sys.modules['apprise'])
+
+
 @mock.patch('dbus.SessionBus')
 @mock.patch('dbus.Interface')
 @mock.patch('dbus.ByteArray')
@@ -125,17 +144,7 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
     mock_mainloop.glib.DBusGMainLoop.side_effect = None
     mock_mainloop.glib.NativeMainLoop.side_effect = None
 
-    # The following libraries need to be reloaded to prevent
-    #  TypeError: super(type, obj): obj must be an instance or subtype of type
-    #  This is better explained in this StackOverflow post:
-    #     https://stackoverflow.com/questions/31363311/\
-    #       any-way-to-manually-fix-operation-of-\
-    #          super-after-ipython-reload-avoiding-ty
-    #
-    reload(sys.modules['apprise.plugins.NotifyDBus'])
-    reload(sys.modules['apprise.plugins'])
-    reload(sys.modules['apprise.Apprise'])
-    reload(sys.modules['apprise'])
+    _reload()
 
     # Create our instance (identify all supported types)
     obj = apprise.Apprise.instantiate('dbus://', suppress_exceptions=False)
@@ -376,18 +385,7 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
 
     # Emulate require_version function:
     gi.require_version.side_effect = ImportError()
-
-    # The following libraries need to be reloaded to prevent
-    #  TypeError: super(type, obj): obj must be an instance or subtype of type
-    #  This is better explained in this StackOverflow post:
-    #     https://stackoverflow.com/questions/31363311/\
-    #       any-way-to-manually-fix-operation-of-\
-    #          super-after-ipython-reload-avoiding-ty
-    #
-    reload(sys.modules['apprise.plugins.NotifyDBus'])
-    reload(sys.modules['apprise.plugins'])
-    reload(sys.modules['apprise.Apprise'])
-    reload(sys.modules['apprise'])
+    _reload()
 
     # Create our instance
     obj = apprise.Apprise.instantiate('glib://', suppress_exceptions=False)
@@ -416,18 +414,7 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
 
     # Emulate require_version function:
     gi.require_version.side_effect = ValueError()
-
-    # The following libraries need to be reloaded to prevent
-    #  TypeError: super(type, obj): obj must be an instance or subtype of type
-    #  This is better explained in this StackOverflow post:
-    #     https://stackoverflow.com/questions/31363311/\
-    #       any-way-to-manually-fix-operation-of-\
-    #          super-after-ipython-reload-avoiding-ty
-    #
-    reload(sys.modules['apprise.plugins.NotifyDBus'])
-    reload(sys.modules['apprise.plugins'])
-    reload(sys.modules['apprise.Apprise'])
-    reload(sys.modules['apprise'])
+    _reload()
 
     # Create our instance
     obj = apprise.Apprise.instantiate('glib://', suppress_exceptions=False)
@@ -447,10 +434,7 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
     sys.modules['dbus'] = compile('raise ImportError()', 'dbus', 'exec')
 
     # Reload our modules
-    reload(sys.modules['apprise.plugins.NotifyDBus'])
-    reload(sys.modules['apprise.plugins'])
-    reload(sys.modules['apprise.Apprise'])
-    reload(sys.modules['apprise'])
+    _reload()
 
     # We can no longer instantiate an instance because dbus has been
     # officialy marked unavailable and thus the module is marked
@@ -462,7 +446,4 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
     # let's just put our old configuration back:
     sys.modules['dbus'] = _session_bus
     # Reload our modules
-    reload(sys.modules['apprise.plugins.NotifyDBus'])
-    reload(sys.modules['apprise.plugins'])
-    reload(sys.modules['apprise.Apprise'])
-    reload(sys.modules['apprise'])
+    _reload()

@@ -33,9 +33,7 @@ import hashlib
 from itertools import chain
 from os.path import expanduser
 from functools import reduce
-from .common import MATCH_ALL_TAG
-from .common import MATCH_ALWAYS_TAG
-from .common import CUSTOM_PLUGIN_MAP
+from . import common
 from .logger import logger
 
 try:
@@ -71,11 +69,17 @@ except ImportError:
             try:
                 module = importlib.util.module_from_spec(spec)
                 sys.modules[name] = module
+
                 spec.loader.exec_module(module)
-            except:
+            except Exception as e:
                 # module isn't loadable
                 del sys.modules[name]
                 module = None
+
+                logger.debug(
+                    'Custom module exception raised from %s (name=%s) %s',
+                    path, name, str(e))
+
             return module
 
     except ImportError:
@@ -1049,8 +1053,8 @@ def parse_list(*args):
     return sorted([x for x in filter(bool, list(set(result)))])
 
 
-def is_exclusive_match(logic, data, match_all=MATCH_ALL_TAG,
-                       match_always=MATCH_ALWAYS_TAG):
+def is_exclusive_match(logic, data, match_all=common.MATCH_ALL_TAG,
+                       match_always=common.MATCH_ALWAYS_TAG):
     """
 
     The data variable should always be a set of strings that the logic can be
@@ -1439,7 +1443,7 @@ def remove_suffix(value, suffix):
     return value[:-len(suffix)] if value.endswith(suffix) else value
 
 
-def module_detection(paths, pypath='apprise.plugins'):
+def module_detection(paths, cache=True):
     """
     Iterates over a defined path for apprise decorators to load such as
     @notify.
@@ -1452,14 +1456,14 @@ def module_detection(paths, pypath='apprise.plugins'):
     # starts with an underscore or dash
     # We allow __init__.py as well
     module_re = re.compile(
-        r'^(?P<name>[_a-z0-9][a-z0-9_-]*)(\.py)?$', re.I)
+        r'^(?P<name>[_a-z0-9][a-z0-9._-]*)(\.py)?$', re.I)
 
     if isinstance(paths, six.string_types):
         paths = [paths, ]
 
     if not paths or not isinstance(paths, (tuple, list)):
         # We're done
-        return
+        return None
 
     def _import_module(path):
         # Since our plugin name can conflict (as a module) with another
@@ -1471,7 +1475,7 @@ def module_detection(paths, pypath='apprise.plugins'):
 
         # Prepare a reverse map so that our decorators can register itself with
         # as elements are found.
-        CUSTOM_PLUGIN_MAP[module_pyname] = {
+        common.NOTIFY_CUSTOM_MODULE_MAP[module_pyname] = {
             'path': path,
             'name': module_name,
 
@@ -1482,7 +1486,7 @@ def module_detection(paths, pypath='apprise.plugins'):
             # @notify decorator. These elements get populated as they're
             # loaded.
             #
-            # The format will look like:
+            # The content can be found in the notify: subsection
             #  'schema': {
             #     'name': 'Custom schema name',
             #     'fn_name': 'name_of_function_decorator_was_found_on',
@@ -1490,34 +1494,37 @@ def module_detection(paths, pypath='apprise.plugins'):
             #     'plugin': <CustomNotifyWrapperPlugin>
             #  }
             #
-            # Note that the <CustomNotifyWrapperPlugin>
+            # Note: that the <CustomNotifyWrapperPlugin> inherits from
+            #       NotifyBase
             'notify': {},
         }
 
         module = import_module(path, module_pyname)
         if not module:
             # No problem, we can't use this object
-            logger.warning('Failed to load module: %s', _path)
+            logger.warning('Failed to load custom module: %s', _path)
             # Do not keep our failed entry
-            del CUSTOM_PLUGIN_MAP[module_pyname]
-            return
+            del common.NOTIFY_CUSTOM_MODULE_MAP[module_pyname]
+            return None
 
         logger.debug(
             'Loaded custom module: %s (name=%s)',
             _path, module_name)
 
         # Save our module to our map
-        CUSTOM_PLUGIN_MAP[module_pyname]['module'] = module
+        common.NOTIFY_CUSTOM_MODULE_MAP[module_pyname]['module'] = module
 
         # Print our loaded modules if any
-        if CUSTOM_PLUGIN_MAP[module_pyname]['notify']:
+        if common.NOTIFY_CUSTOM_MODULE_MAP[module_pyname]['notify']:
             for schema, meta in \
-                    CUSTOM_PLUGIN_MAP[module_pyname]['notify'].items():
+                    common.\
+                    NOTIFY_CUSTOM_MODULE_MAP[module_pyname]['notify'].items():
                 logger.info('Loaded custom notification: %s://', schema)
         else:
             # do not keep empty entries
-            del CUSTOM_PLUGIN_MAP[module_pyname]
+            del common.NOTIFY_CUSTOM_MODULE_MAP[module_pyname]
 
+        # end of _import_module()
         return
 
     for _path in paths:
@@ -1540,19 +1547,22 @@ def module_detection(paths, pypath='apprise.plugins'):
                     logger.trace('Plugin Scan: Ignoring %s', entry)
                     continue
 
-                cur_path = os.path.join(path, entry)
-                if os.path.isdir(cur_path):
+                new_path = os.path.join(path, entry)
+                if os.path.isdir(new_path):
                     # Update our path
-                    cur_path = os.path.join(path, entry, '__init__.py')
-                    if not os.path.isfile(cur_path):
+                    new_path = os.path.join(path, entry, '__init__.py')
+                    if not os.path.isfile(new_path):
                         logger.trace(
                             'Plugin Scan: Ignoring %s',
                             os.path.join(path, entry))
                         continue
 
-                # Load our module
-                _import_module(cur_path)
+                if new_path not in PATHS_PREVIOUSLY_SCANNED:
+                    # Load our module
+                    _import_module(new_path)
 
+                    # Add our subdir path
+                    PATHS_PREVIOUSLY_SCANNED.add(new_path)
         else:
             # directly load as is
             re_match = module_re.match(os.path.basename(path))

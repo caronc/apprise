@@ -23,11 +23,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 from ..plugins.NotifyBase import NotifyBase
-from ..common import NotifyType
-from ..common import CUSTOM_PLUGIN_MAP
 from ..utils import IS_SCHEMA_RE
 from ..utils import parse_url
-from .. import plugins
+from .. import common
 from ..logger import logger
 import inspect
 
@@ -95,18 +93,20 @@ class CustomNotifyPlugin(NotifyBase):
             logger.warning(msg)
             return None
 
+        # Acquire our plugin name
+        plugin_name = re_match.group('schema').lower()
+
         # Keep a default set of arguments to apply to all called references
-        default_args = parse_url(url, verify_host=False)
-        if default_args['schema'] in plugins.SCHEMA_MAP:
+        default_args = parse_url(
+            url, default_schema=plugin_name, verify_host=False)
+
+        if plugin_name in common.NOTIFY_SCHEMA_MAP:
             # we're already handling this object
             msg = 'The schema ({}) is already defined and could not be ' \
                 'loaded from custom notify function {}.' \
                 .format(url, send_func.__name__)
             logger.warning(msg)
             return None
-
-        # Acquire our plugin name
-        plugin_name = re_match.group('schema').lower()
 
         # We define our own custom wrapper class so that we can initialize
         # some key default configuration values allowing calls to our
@@ -131,8 +131,8 @@ class CustomNotifyPlugin(NotifyBase):
             # Update our default arguments
             __default_args = default_args
 
-            def send(self, body, title='', notify_type=NotifyType.INFO, *args,
-                     **kwargs):
+            def send(self, body, title='', notify_type=common.NotifyType.INFO,
+                     *args, **kwargs):
                 """
                 Our send() call which triggers our hook
                 """
@@ -161,32 +161,35 @@ class CustomNotifyPlugin(NotifyBase):
                     # Unhandled Exception
                     self.logger.warning(
                         'An exception occured sending a %s notification.',
-                        plugins.SCHEMA_MAP[self.secure_protocol].service_name)
+                        common.
+                        NOTIFY_SCHEMA_MAP[self.secure_protocol].service_name)
                     self.logger.debug(
                         '%s Exception: %s',
-                        plugins.SCHEMA_MAP[self.secure_protocol], str(e))
+                        common.NOTIFY_SCHEMA_MAP[self.secure_protocol], str(e))
                     return False
 
                 if response:
                     self.logger.info(
                         'Sent %s notification.',
-                        plugins.SCHEMA_MAP[self.secure_protocol].service_name)
+                        common.
+                        NOTIFY_SCHEMA_MAP[self.secure_protocol].service_name)
                 else:
                     self.logger.warning(
                         'Failed to send %s notification.',
-                        plugins.SCHEMA_MAP[self.secure_protocol].service_name)
+                        common.
+                        NOTIFY_SCHEMA_MAP[self.secure_protocol].service_name)
                 return response
 
         # Store our plugin
-        plugins.SCHEMA_MAP[plugin_name] = CustomNotifyPluginWrapper
+        common.NOTIFY_SCHEMA_MAP[plugin_name] = CustomNotifyPluginWrapper
 
         # Update our custom plugin map
         module_name = str(send_func.__module__)
-        CUSTOM_PLUGIN_MAP[module_name]['services'][plugin_name] = {
+        common.NOTIFY_CUSTOM_MODULE_MAP[module_name]['notify'][plugin_name] = {
             'name': CustomNotifyPluginWrapper.service_name,
             'fn_name': send_func.__name__,
             'url': url,
             'plugin': CustomNotifyPluginWrapper,
         }
 
-        return plugins.SCHEMA_MAP[plugin_name]
+        return common.NOTIFY_SCHEMA_MAP[plugin_name]

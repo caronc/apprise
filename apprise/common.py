@@ -23,9 +23,28 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+
 # we mirror our base purely for the ability to reset everything; this
 # is generally only used in testing and should not be used by developers
-CUSTOM_PLUGIN_MAP = {}
+# It is also used as a means of preventing a module from being reloaded
+# in the event it already exists
+NOTIFY_MODULE_MAP = {}
+
+# Maintains a mapping of all of the Notification services
+NOTIFY_SCHEMA_MAP = {}
+
+# This contains a mapping of all plugins dynamicaly loaded at runtime from
+# external modules such as the @notify decorator
+#
+# The elements here will be additionally added to the NOTIFY_SCHEMA_MAP if
+# there is no conflict otherwise.
+NOTIFY_CUSTOM_MODULE_MAP = {}
+
+# Maintains a mapping of all configuration schema's supported
+CONFIG_SCHEMA_MAP = {}
+
+# Maintains a mapping of all attachment schema's supported
+ATTACHMENT_SCHEMA_MAP = {}
 
 
 class NotifyType(object):

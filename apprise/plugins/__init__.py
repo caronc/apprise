@@ -41,15 +41,13 @@ from ..common import NotifyImageSize
 from ..common import NOTIFY_IMAGE_SIZES
 from ..common import NotifyType
 from ..common import NOTIFY_TYPES
+from .. import common
 from ..utils import parse_list
 from ..utils import cwe312_url
 from ..utils import GET_SCHEMA_RE
 from ..logger import logger
 from ..AppriseLocale import gettext_lazy as _
 from ..AppriseLocale import LazyTranslation
-
-# Maintains a mapping of all of the Notification services
-SCHEMA_MAP = {}
 
 __all__ = [
     # Reference
@@ -62,10 +60,6 @@ __all__ = [
     # Tokenizer
     'url_to_dict',
 ]
-
-# we mirror our base purely for the ability to reset everything; this
-# is generally only used in testing and should not be used by developers
-MODULE_MAP = {}
 
 
 # Load our Lookup Matrix
@@ -109,12 +103,12 @@ def __load_matrix(path=abspath(dirname(__file__)), name='apprise.plugins'):
             # Filter out non-notification modules
             continue
 
-        elif plugin_name in MODULE_MAP:
+        elif plugin_name in common.NOTIFY_MODULE_MAP:
             # we're already handling this object
             continue
 
         # Add our plugin name to our module map
-        MODULE_MAP[plugin_name] = {
+        common.NOTIFY_MODULE_MAP[plugin_name] = {
             'plugin': plugin,
             'module': module,
         }
@@ -150,16 +144,16 @@ def __load_matrix(path=abspath(dirname(__file__)), name='apprise.plugins'):
 
         # map our schema to our plugin
         for schema in schemas:
-            if schema in SCHEMA_MAP:
+            if schema in common.NOTIFY_SCHEMA_MAP:
                 logger.error(
                     "Notification schema ({}) mismatch detected - {} to {}"
-                    .format(schema, SCHEMA_MAP[schema], plugin))
+                    .format(schema, common.NOTIFY_SCHEMA_MAP[schema], plugin))
                 continue
 
             # Assign plugin
-            SCHEMA_MAP[schema] = plugin
+            common.NOTIFY_SCHEMA_MAP[schema] = plugin
 
-    return SCHEMA_MAP
+    return common.NOTIFY_SCHEMA_MAP
 
 
 # Reset our Lookup Matrix
@@ -170,10 +164,10 @@ def __reset_matrix():
     """
 
     # Reset our schema map
-    SCHEMA_MAP.clear()
+    common.NOTIFY_SCHEMA_MAP.clear()
 
     # Iterate over our module map so we can clear out our __all__ and globals
-    for plugin_name in MODULE_MAP.keys():
+    for plugin_name in common.NOTIFY_MODULE_MAP.keys():
         # Clear out globals
         del globals()[plugin_name]
 
@@ -181,7 +175,7 @@ def __reset_matrix():
         __all__.remove(plugin_name)
 
     # Clear out our module map
-    MODULE_MAP.clear()
+    common.NOTIFY_MODULE_MAP.clear()
 
 
 # Dynamically build our schema base
@@ -550,14 +544,14 @@ def url_to_dict(url, secure_logging=True):
 
     # Ensure our schema is always in lower case
     schema = schema.group('schema').lower()
-    if schema not in SCHEMA_MAP:
+    if schema not in common.NOTIFY_SCHEMA_MAP:
         # Give the user the benefit of the doubt that the user may be using
         # one of the URLs provided to them by their notification service.
         # Before we fail for good, just scan all the plugins that support the
         # native_url() parse function
         results = \
             next((r['plugin'].parse_native_url(_url)
-                  for r in MODULE_MAP.values()
+                  for r in common.NOTIFY_MODULE_MAP.values()
                   if r['plugin'].parse_native_url(_url) is not None),
                  None)
 
@@ -572,14 +566,14 @@ def url_to_dict(url, secure_logging=True):
     else:
         # Parse our url details of the server object as dictionary
         # containing all of the information parsed from our URL
-        results = SCHEMA_MAP[schema].parse_url(_url)
+        results = common.NOTIFY_SCHEMA_MAP[schema].parse_url(_url)
         if not results:
             logger.error('Unparseable {} URL {}'.format(
-                SCHEMA_MAP[schema].service_name, loggable_url))
+                common.NOTIFY_SCHEMA_MAP[schema].service_name, loggable_url))
             return None
 
         logger.trace('{} URL {} unpacked as:{}{}'.format(
-            SCHEMA_MAP[schema].service_name, url,
+            common.NOTIFY_SCHEMA_MAP[schema].service_name, url,
             os.linesep, os.linesep.join(
                 ['{}="{}"'.format(k, v) for k, v in results.items()])))
 
