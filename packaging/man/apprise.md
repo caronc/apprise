@@ -33,6 +33,14 @@ The Apprise options are as follows:
   `-a`, `--attach=`<ATTACH-URL>:
   Specify one or more file attachment locations.
 
+  `-P`, `--plugin-path=`<PLUGIN-PATH>:
+  Specify a path to scan for custom notification plugin support.
+  You can create your own notification by simply creating a Python file
+  that contains the `@notify("schema")` decorator.
+
+  You can optioanly chose to specify more then one **--plugin-path** (**-P**)
+  to increase the modules included.
+
   `-n`, `--notification-type=`<TYPE>:
   Specify the message type (default=info). Possible values are "info",
   "success", "failure", and "warning".
@@ -134,6 +142,32 @@ Include an attachment:
     $ apprise -vv -t "School Assignment" -b "See attached" \
        --attach=Documents/FinalReport.docx
 
+## CUSTOM PLUGIN/NOTIFICATIONS
+Apprise can additionally allow you to define your own custom **schema://**
+entries that you can trigger on and call services you've defined.
+
+By default **apprise** looks in the following local locations for custom plugin
+files and loads them:
+
+    ~/.apprise/plugins
+    ~/.config/apprise/plugins
+
+Simply create your own python file with the following bare minimum content in
+it:
+    from apprise.decorators import notify
+
+    # This example assumes you want your function to trigger on foobar://
+    # references:
+    @notify(on="foobar")
+    def my_wrapper(body, title, notify_type, *args, **kwargs):
+    
+         <define your custom code here>
+    
+         # Return True or None if you want your call to report a success
+         # back to the callling service.  Otherwise return False if you want
+         # to let the calling service know it failed.
+         return True
+
 ## CONFIGURATION
 
 A configuration file can be in the format of either **TEXT** or **YAML** where
@@ -149,10 +183,15 @@ command line and all of them will be loaded.  You can also point your configurat
 a cloud location (by referencing `http://` or `https://`. By default **apprise** looks
 in the following local locations for configuration files and loads them:
 
-    $ ~/.apprise
-    $ ~/.apprise.yml
-    $ ~/.config/apprise
-    $ ~/.config/apprise.yml
+    ~/.apprise
+    ~/.apprise.yml
+    ~/.config/apprise
+    ~/.config/apprise.yml
+
+    ~/.apprise/apprise
+    ~/.apprise/apprise.yaml
+    ~/.config/apprise/apprise
+    ~/.config/apprise/apprise.yaml
 
 If a default configuration file is referenced in any way by the **apprise**
 tool, you no longer need to provide it a Service URL.  Usage of the **apprise**

@@ -166,12 +166,18 @@ uptime | apprise -vv \
 ### Configuration Files
 No one wants to put their credentials out for everyone to see on the command line.  No problem: *apprise* also supports configuration files.  It can handle both a specific [YAML format](https://github.com/caronc/apprise/wiki/config_yaml) or a very simple [TEXT format](https://github.com/caronc/apprise/wiki/config_text). You can also pull these configuration files via an HTTP query too! You can read more about the expected structure of the configuration files [here](https://github.com/caronc/apprise/wiki/config).
 ```bash
-# By default if no url or configuration is specified aprise will attempt to load
-# configuration files (if present):
+# By default if no url or configuration is specified apprise will attempt to load
+# configuration files (if present) from:
 #  ~/.apprise
 #  ~/.apprise.yml
 #  ~/.config/apprise
 #  ~/.config/apprise.yml
+
+# Also a subdirectory handling allows you to leverage plugins
+#  ~/.apprise/apprise
+#  ~/.apprise/apprise.yml
+#  ~/.config/apprise/apprise
+#  ~/.config/apprise/apprise.yml
 
 # Windows users can store their default configuration files here:
 #  %APPDATA%/Apprise/apprise
@@ -209,6 +215,49 @@ apprise -vv --title 'system crash' \
         --attach /var/log/myprogram.log \
         --attach /var/debug/core.2345 \
         --tag devteam
+```
+
+### Loading Custom Notifications/Hooks
+To create your own custom `schema://` to hook on to and trigger your own code.
+Simply just include the `@notify` decorator and wrap your own function.
+```python
+from apprise.decorators import notify
+
+# The below assumes you want to catch foobar:// calls:
+@notify(on="foobar")
+def my_custom_notification_wrapper(body, title, notify_type, *args, **kwargs):
+    """My custom notification function that triggers on all foobar:// calls
+    """
+    # Write all of your code here... as an example...
+    print("{}: {} - {}".format(notify_type.upper(), title, body))
+
+    # when you're done, you don't have to return anything.
+    # However returning True/False is a way to back back your status.
+    # Returning nothing (None by default) is interpreted as a Success
+```
+
+Once you've defined your custom hook, you just need to tell Apprise where it is at runtime.
+```bash
+# By default if no plugin path is specified apprise will attempt to load
+# plugin files (if present) from:
+#  ~/.apprise/apprise/plugisn
+#  ~/.config/apprise/plugins
+
+# Windows users can store their default plugin files here:
+#  %APPDATA%/Apprise/plugins
+#  %LOCALAPPDATA%/Apprise/plugins
+
+# If you placed your plugin file within one of the directories already defined
+# above, then your call simply needs to look like:
+apprise -vv --title 'custom override' \
+        --body 'the body of my message' \
+        foobar:\\
+
+# However you can over-ride the path like so
+apprise -vv --title 'custom override' \
+        --body 'the body of my message' \
+        --plugin-path /path/to/my/plugin.py \
+        foobar:\\
 ```
 
 ## Developers
@@ -341,6 +390,50 @@ apobj.notify(
     body='Hey guys, check out these!',
     attach=attach,
 )
+```
+
+### Loading Custom Notifications/Hooks
+By default, no plugins are loaded at all for those building with the API.
+It's at the developers discretion to load custom modules. But should you choose to do so, it's as easy
+as including the path reference in the `AppriseAsset()` object during the initialization of your `Apprise()` instance.
+
+For example:
+```python
+from apprise import Apprise
+from apprise import AppriseAsset
+
+# Prepare your Asset Object so that you can enable the Custom Plugins to be loaded for your
+# instance of Apprise...
+asset = AppriseAsset(plugin_paths="/path/to/scan")
+
+# OR You can also generate scan more then one file too:
+asset = AppriseAsset(
+    plugin_paths=[
+        # Iterate over all python libraries found in the root of the specified
+        # path. This is NOT a recursive (directory) scan; only the first level
+        # is parsed. HOWEVER, if a directory containing an __init__.py is
+        # found, it will be included in the load.
+        "/dir/containing/many/python/libraries",
+
+        # An absolute path to a plugin.py to exclusively load
+        "/path/to/plugin.py",
+
+        # if you point to a directory that has an __init__.py file found in
+        # it, then only that file is loaded (it's similar to point to a
+        # absolute .py file. Hence, there is no (level 1) scanning at all
+        # within the directory specified.
+        "/path/to/dir/library"
+)
+
+# Now that we've got our asset, we just work with our Apprise object as we normally do
+aobj = Apprise(asset=asset)
+
+# If our new custom `foobar://` library was loaded (presuming we prepared one like
+# in the examples above).  then you would be able to safely add it into Apprise at this point
+aobj.add('foobar://')
+
+# Send our notification out through our foobar://
+aobj.notify("test")
 ```
 
 ## Want To Learn More?
