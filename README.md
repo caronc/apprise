@@ -164,7 +164,7 @@ uptime | apprise -vv \
 ```
 
 ### Configuration Files
-No one wants to put their credentials out for everyone to see on the command line.  No problem *apprise* also supports configuration files.  It can handle both a specific [YAML format](https://github.com/caronc/apprise/wiki/config_yaml) or a very simple [TEXT format](https://github.com/caronc/apprise/wiki/config_text). You can also pull these configuration files via an HTTP query too! You can read more about the expected structure of the configuration files [here](https://github.com/caronc/apprise/wiki/config).
+No one wants to put their credentials out for everyone to see on the command line.  No problem: *apprise* also supports configuration files.  It can handle both a specific [YAML format](https://github.com/caronc/apprise/wiki/config_yaml) or a very simple [TEXT format](https://github.com/caronc/apprise/wiki/config_text). You can also pull these configuration files via an HTTP query too! You can read more about the expected structure of the configuration files [here](https://github.com/caronc/apprise/wiki/config).
 ```bash
 # By default if no url or configuration is specified aprise will attempt to load
 # configuration files (if present):
