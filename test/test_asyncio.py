@@ -112,7 +112,7 @@ def test_apprise_asyncio_runtime_error():
         asyncio.set_event_loop(loop)
 
 
-@pytest.mark.skipif(sys.version_info.major <= 2 or sys.version_info <= (3, 6),
+@pytest.mark.skipif(sys.version_info.major <= 2 or sys.version_info < (3, 7),
                     reason="Requires Python 3.7+")
 def test_apprise_works_in_async_loop():
     """
