@@ -63,7 +63,20 @@ def tosync(cor, debug=False):
     """
 
     if ASYNCIO_RUN_SUPPORT:
-        return asyncio.run(cor, debug=debug)
+        try:
+            loop = asyncio.get_running_loop()
+
+        except RuntimeError:
+            # There is no existing event loop, so we can start our own.
+            return asyncio.run(cor, debug=debug)
+
+        else:
+            # Enable debug mode
+            loop.set_debug(debug)
+
+            # Run the coroutine and wait for the result.
+            task = loop.create_task(cor)
+            return asyncio.ensure_future(task, loop=loop)
 
     else:
         # The Deprecated Way (<= Python v3.6)
@@ -85,12 +98,20 @@ def tosync(cor, debug=False):
         return loop.run_until_complete(cor)
 
 
-async def toasyncwrap(v):  # noqa: E999
+async def toasyncwrapvalue(v):  # noqa: E999
     """
     Create a coroutine that, when run, returns the provided value.
     """
 
     return v
+
+
+async def toasyncwrap(fn):  # noqa: E999
+    """
+    Create a coroutine that, when run, executes the provided function.
+    """
+
+    return fn()
 
 
 class AsyncNotifyBase(URLBase):
