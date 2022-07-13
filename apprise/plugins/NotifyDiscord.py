@@ -128,6 +128,12 @@ class NotifyDiscord(NotifyBase):
             'name': _('Avatar URL'),
             'type': 'string',
         },
+        # Send a message to the specified thread within a webhook's channel.
+        # The thread will automatically be unarchived.
+        'thread': {
+            'name': _('Thread ID'),
+            'type': 'string',
+        },
         'footer': {
             'name': _('Display Footer'),
             'type': 'bool',
@@ -153,7 +159,7 @@ class NotifyDiscord(NotifyBase):
 
     def __init__(self, webhook_id, webhook_token, tts=False, avatar=True,
                  footer=False, footer_logo=True, include_image=False,
-                 fields=True, avatar_url=None, **kwargs):
+                 fields=True, avatar_url=None, thread=None, **kwargs):
         """
         Initialize Discord Object
 
@@ -193,6 +199,9 @@ class NotifyDiscord(NotifyBase):
 
         # Use Fields
         self.fields = fields
+
+        # Specified Thread ID
+        self.thread_id = thread
 
         # Avatar URL
         # This allows a user to provide an over-ride to the otherwise
@@ -273,6 +282,9 @@ class NotifyDiscord(NotifyBase):
             # not markdown
             payload['content'] = \
                 body if not title else "{}\r\n{}".format(title, body)
+
+        if self.thread_id:
+            payload['thread_id'] = self.thread_id
 
         if self.avatar and (image_url or self.avatar_url):
             payload['avatar_url'] = \
@@ -447,6 +459,9 @@ class NotifyDiscord(NotifyBase):
         if self.avatar_url:
             params['avatar_url'] = self.avatar_url
 
+        if self.thread_id:
+            params['thread'] = self.thread_id
+
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
@@ -514,6 +529,13 @@ class NotifyDiscord(NotifyBase):
         if 'avatar_url' in results['qsd']:
             results['avatar_url'] = \
                 NotifyDiscord.unquote(results['qsd']['avatar_url'])
+
+        # Extract thread id if it was specified
+        if 'thread' in results['qsd']:
+            results['thread'] = \
+                NotifyDiscord.unquote(results['qsd']['thread'])
+
+        return results
 
         return results
 
