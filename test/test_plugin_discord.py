@@ -113,6 +113,12 @@ apprise_url_tests = (
         'instance': plugins.NotifyDiscord,
         'requests_response_code': requests.codes.no_content,
     }),
+    # Thread ID
+    ('discord://%s/%s?format=markdown&thread=abc123' % (
+        'i' * 24, 't' * 64), {
+            'instance': plugins.NotifyDiscord,
+            'requests_response_code': requests.codes.no_content,
+    }),
     ('discord://%s/%s?format=text' % ('i' * 24, 't' * 64), {
         'instance': plugins.NotifyDiscord,
         'requests_response_code': requests.codes.no_content,
