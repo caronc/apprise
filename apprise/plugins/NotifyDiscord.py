@@ -537,8 +537,6 @@ class NotifyDiscord(NotifyBase):
 
         return results
 
-        return results
-
     @staticmethod
     def parse_native_url(url):
         """
