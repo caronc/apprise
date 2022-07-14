@@ -49,8 +49,15 @@ try:
         """
         Load our module based on path
         """
-        return imp.load_source(name, path)
+        try:
+            return imp.load_source(name, path)
 
+        except Exception as e:
+            logger.debug(
+                'Custom module exception raised from %s (name=%s) %s',
+                path, name, str(e))
+
+        return None
 
 except ImportError:
     # Python 3.5+
@@ -1585,7 +1592,7 @@ def module_detection(paths, cache=True):
     # starts with an underscore or dash
     # We allow __init__.py as well
     module_re = re.compile(
-        r'^(?P<name>[_a-z0-9][a-z0-9._-]*)(\.py)?$', re.I)
+        r'^(?P<name>[_a-z0-9][a-z0-9._-]+)?(\.py)?$', re.I)
 
     if isinstance(paths, six.string_types):
         paths = [paths, ]
@@ -1683,7 +1690,8 @@ def module_detection(paths, cache=True):
 
             # directly load as is
             re_match = module_re.match(os.path.basename(path))
-            if not re_match:
+            # must be a match and must have a .py extension
+            if not re_match or not re_match.group(1):
                 # keep going
                 logger.trace('Plugin Scan: Ignoring %s', path)
                 continue

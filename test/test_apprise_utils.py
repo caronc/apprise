@@ -26,6 +26,7 @@
 from __future__ import print_function
 import re
 import os
+import sys
 import six
 from inspect import cleandoc
 try:
@@ -42,6 +43,11 @@ from apprise import common
 # Disable logging for a cleaner testing output
 import logging
 logging.disable(logging.CRITICAL)
+
+# Ensure we don't create .pyc files for these tests
+sys.dont_write_bytecode = True
+# Python v2.x support requires an environment variable
+os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 
 
 def test_parse_qsd():
@@ -2193,10 +2199,24 @@ def test_module_detection(tmpdir):
     assert 'valid2' in common.NOTIFY_SCHEMA_MAP
     assert 'valid3' in common.NOTIFY_SCHEMA_MAP
 
-    # Reset our variables before we leave
+    # Reset our variables for the next test
     del common.NOTIFY_SCHEMA_MAP['valid1']
     del common.NOTIFY_SCHEMA_MAP['valid2']
     del common.NOTIFY_SCHEMA_MAP['valid3']
+    utils.PATHS_PREVIOUSLY_SCANNED.clear()
+    common.NOTIFY_CUSTOM_MODULE_MAP.clear()
+
+    # Now test the handling of just bad data entirely
+    notify_hook_g_base = tmpdir.mkdir('g')
+    notify_hook_g = notify_hook_g_base.join('binary.py')
+    with open(str(notify_hook_g), 'wb') as fout:
+        fout.write(os.urandom(512))
+
+    utils.module_detection([str(notify_hook_g)])
+    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 1
+    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 0
+
+    # Reset our variables before we leave
     utils.PATHS_PREVIOUSLY_SCANNED.clear()
     common.NOTIFY_CUSTOM_MODULE_MAP.clear()
 
