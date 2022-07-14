@@ -138,7 +138,7 @@ def test_apprise_works_in_async_loop():
             return NotifyBase.parse_url(url, verify_host=False)
 
     # Store our good notification in our schema map
-    SCHEMA_MAP['good'] = GoodNotification
+    NOTIFY_SCHEMA_MAP['good'] = GoodNotification
 
     # Create ourselves an Apprise object
     a = Apprise()

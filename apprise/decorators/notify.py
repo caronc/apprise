@@ -67,15 +67,14 @@ def notify(on, name=None):
         Instantiate our custom (notification) plugin
         """
 
-        # Generate
-        plugin = CustomNotifyPlugin.instantiate_plugin(
-            url=on, send_func=func, name=name)
+        try:
+            # Generate
+            CustomNotifyPlugin.instantiate_plugin(
+                url=on, send_func=func, name=name)
 
-        if plugin:
-            setattr(func, 'activated', True)
-            setattr(func, 'notify_plugin', plugin)
-        else:
-            setattr(func, 'activated', False)
+        except ValueError:
+            # Do nothing
+            pass
 
         return func
 

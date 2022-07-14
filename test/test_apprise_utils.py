@@ -27,6 +27,7 @@ from __future__ import print_function
 import re
 import os
 import six
+from inspect import cleandoc
 try:
     # Python 2.7
     from urllib import unquote
@@ -36,6 +37,7 @@ except ImportError:
     from urllib.parse import unquote
 
 from apprise import utils
+from apprise import common
 
 # Disable logging for a cleaner testing output
 import logging
@@ -64,7 +66,7 @@ def test_parse_qsd():
     assert len(result['qsd:']) == 0
 
 
-def test_parse_url():
+def test_parse_url_general():
     "utils: parse_url() testing """
 
     result = utils.parse_url('http://hostname')
@@ -493,6 +495,23 @@ def test_parse_url():
     assert result['qsd+'] == {}
     assert result['qsd:'] == {}
 
+    result = utils.parse_url(
+        'HTTPS://hostname/a/path/ending/with/slash/?key=value',
+    )
+    assert result['schema'] == 'https'
+    assert result['host'] == 'hostname'
+    assert result['port'] is None
+    assert result['user'] is None
+    assert result['password'] is None
+    assert result['fullpath'] == '/a/path/ending/with/slash/'
+    assert result['path'] == '/a/path/ending/with/slash/'
+    assert result['query'] is None
+    assert result['url'] == 'https://hostname/a/path/ending/with/slash/'
+    assert result['qsd'] == {'key': 'value'}
+    assert result['qsd-'] == {}
+    assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
+
     # Handle garbage
     assert utils.parse_url(None) is None
 
@@ -672,6 +691,408 @@ def test_parse_url():
     assert result['qsd-'] == {}
     assert result['qsd+'] == {}
     assert result['qsd:'] == {}
+
+
+def test_parse_url_simple():
+    "utils: parse_url() testing """
+
+    result = utils.parse_url('http://hostname', simple=True)
+    assert len(result) == 3
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname'
+    assert result['url'] == 'http://hostname'
+
+    result = utils.parse_url('http://hostname/', simple=True)
+    assert len(result) == 5
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname'
+    assert result['fullpath'] == '/'
+    assert result['path'] == '/'
+    assert result['url'] == 'http://hostname/'
+
+    # colon after hostname without port number is no good
+    assert utils.parse_url('http://hostname:', simple=True) is None
+
+    # An invalid port
+    result = utils.parse_url(
+        'http://hostname:invalid', verify_host=False, strict_port=True,
+        simple=True)
+    assert len(result) == 4
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname'
+    assert result['port'] == 'invalid'
+    assert result['url'] == 'http://hostname:invalid'
+
+    # However if we don't verify the host, it is okay
+    result = utils.parse_url(
+        'http://hostname:', verify_host=False, simple=True)
+    assert len(result) == 3
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname:'
+    assert result['url'] == 'http://hostname:'
+
+    # A port of Zero is not valid with strict port checking
+    assert utils.parse_url(
+        'http://hostname:0', strict_port=True, simple=True) is None
+
+    # Without strict port checking however, it is okay
+    result = utils.parse_url(
+        'http://hostname:0', strict_port=False, simple=True)
+    assert len(result) == 4
+    assert result['schema'] == 'http'
+    assert result['port'] == 0
+    assert result['host'] == 'hostname'
+    assert result['url'] == 'http://hostname:0'
+
+    # A negative port is not valid
+    assert utils.parse_url(
+        'http://hostname:-92', strict_port=True, simple=True) is None
+    result = utils.parse_url(
+        'http://hostname:-92', verify_host=False, strict_port=True,
+        simple=True)
+    assert len(result) == 4
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname'
+    assert result['port'] == -92
+    assert result['url'] == 'http://hostname:-92'
+
+    # A port that is too large is not valid
+    assert utils.parse_url(
+        'http://hostname:65536', strict_port=True, simple=True) is None
+
+    # This is an accetable port (the maximum)
+    result = utils.parse_url(
+        'http://hostname:65535', strict_port=True, simple=True)
+    assert len(result) == 4
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname'
+    assert result['port'] == 65535
+    assert result['url'] == 'http://hostname:65535'
+
+    # This is an accetable port (the maximum)
+    result = utils.parse_url(
+        'http://hostname:1', strict_port=True, simple=True)
+    assert len(result) == 4
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname'
+    assert result['port'] == 1
+    assert result['url'] == 'http://hostname:1'
+
+    # A port that was identfied as a string is invalid
+    assert utils.parse_url(
+        'http://hostname:invalid', strict_port=True, simple=True) is None
+    result = utils.parse_url(
+        'http://hostname:invalid', verify_host=False, strict_port=True,
+        simple=True)
+    assert len(result) == 4
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname'
+    assert result['port'] == 'invalid'
+    assert result['url'] == 'http://hostname:invalid'
+
+    result = utils.parse_url(
+        'http://hostname:invalid', verify_host=False, strict_port=False,
+        simple=True)
+    assert len(result) == 3
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname:invalid'
+    assert result['url'] == 'http://hostname:invalid'
+
+    result = utils.parse_url(
+        'http://hostname:invalid?key=value&-minuskey=mvalue',
+        verify_host=False, strict_port=False, simple=True)
+    assert len(result) == 4
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname:invalid'
+    assert result['url'] == 'http://hostname:invalid'
+    assert isinstance(result['qsd'], dict)
+    assert len(result['qsd']) == 2
+    assert unquote(result['qsd']['-minuskey']) == 'mvalue'
+    assert unquote(result['qsd']['key']) == 'value'
+
+    # Handling of floats
+    assert utils.parse_url(
+        'http://hostname:4.2', strict_port=True, simple=True) is None
+    result = utils.parse_url(
+        'http://hostname:4.2', verify_host=False, strict_port=True,
+        simple=True)
+    assert len(result) == 4
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname'
+    assert result['port'] == '4.2'
+    assert result['url'] == 'http://hostname:4.2'
+
+    # A Port of zero is not acceptable for a regular hostname
+    assert utils.parse_url(
+        'http://hostname:0', strict_port=True, simple=True) is None
+
+    # No host verification (zero is an acceptable port when this is the case
+    result = utils.parse_url(
+        'http://hostname:0', verify_host=False, simple=True)
+    assert len(result) == 4
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname'
+    assert result['port'] == 0
+    assert result['url'] == 'http://hostname:0'
+
+    result = utils.parse_url(
+        'http://[2001:db8:002a:3256:adfe:05c0:0003:0006]:8080',
+        verify_host=False, simple=True)
+    assert len(result) == 4
+    assert result['schema'] == 'http'
+    assert result['host'] == '[2001:db8:002a:3256:adfe:05c0:0003:0006]'
+    assert result['port'] == 8080
+    assert result['url'] == \
+        'http://[2001:db8:002a:3256:adfe:05c0:0003:0006]:8080'
+
+    result = utils.parse_url(
+        'http://hostname:0', verify_host=False, strict_port=True, simple=True)
+    assert len(result) == 4
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname'
+    assert result['port'] == 0
+    assert result['url'] == 'http://hostname:0'
+
+    result = utils.parse_url('http://hostname/?-KeY=Value', simple=True)
+    assert len(result) == 6
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname'
+    assert result['fullpath'] == '/'
+    assert result['path'] == '/'
+    assert result['url'] == 'http://hostname/'
+    assert '-key' in result['qsd']
+    assert unquote(result['qsd']['-key']) == 'Value'
+
+    result = utils.parse_url('http://hostname/?+KeY=Value', simple=True)
+    assert len(result) == 6
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname'
+    assert result['fullpath'] == '/'
+    assert result['path'] == '/'
+    assert result['url'] == 'http://hostname/'
+    assert '+key' in result['qsd']
+    assert result['qsd']['+key'] == 'Value'
+
+    result = utils.parse_url('http://hostname/?:kEy=vALUE', simple=True)
+    assert len(result) == 6
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname'
+    assert result['fullpath'] == '/'
+    assert result['path'] == '/'
+    assert result['url'] == 'http://hostname/'
+    assert ':key' in result['qsd']
+    assert result['qsd'][':key'] == 'vALUE'
+
+    result = utils.parse_url(
+        'http://hostname/?+KeY=ValueA&-kEy=ValueB&KEY=Value%20+C&:colon=y',
+        simple=True)
+    assert len(result) == 6
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname'
+    assert result['fullpath'] == '/'
+    assert result['path'] == '/'
+    assert result['url'] == 'http://hostname/'
+    assert '+key' in result['qsd']
+    assert '-key' in result['qsd']
+    assert ':colon' in result['qsd']
+    assert result['qsd'][':colon'] == 'y'
+    assert result['qsd']['key'] == 'Value  C'
+    assert result['qsd']['+key'] == 'ValueA'
+    assert result['qsd']['-key'] == 'ValueB'
+
+    result = utils.parse_url('http://hostname////', simple=True)
+    assert len(result) == 5
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname'
+    assert result['fullpath'] == '/'
+    assert result['path'] == '/'
+    assert result['url'] == 'http://hostname/'
+
+    result = utils.parse_url('http://hostname:40////', simple=True)
+    assert len(result) == 6
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname'
+    assert result['port'] == 40
+    assert result['fullpath'] == '/'
+    assert result['path'] == '/'
+    assert result['url'] == 'http://hostname:40/'
+
+    result = utils.parse_url('HTTP://HoStNaMe:40/test.php', simple=True)
+    assert len(result) == 7
+    assert result['schema'] == 'http'
+    assert result['host'] == 'HoStNaMe'
+    assert result['port'] == 40
+    assert result['fullpath'] == '/test.php'
+    assert result['path'] == '/'
+    assert result['query'] == 'test.php'
+    assert result['url'] == 'http://HoStNaMe:40/test.php'
+
+    result = utils.parse_url('HTTPS://user@hostname/test.py', simple=True)
+    assert len(result) == 7
+    assert result['schema'] == 'https'
+    assert result['host'] == 'hostname'
+    assert result['user'] == 'user'
+    assert result['fullpath'] == '/test.py'
+    assert result['path'] == '/'
+    assert result['query'] == 'test.py'
+    assert result['url'] == 'https://user@hostname/test.py'
+
+    result = utils.parse_url(
+        '  HTTPS://///user@@@hostname///test.py  ', simple=True)
+    assert len(result) == 7
+    assert result['schema'] == 'https'
+    assert result['host'] == 'hostname'
+    assert result['user'] == 'user'
+    assert result['fullpath'] == '/test.py'
+    assert result['path'] == '/'
+    assert result['query'] == 'test.py'
+    assert result['url'] == 'https://user@hostname/test.py'
+
+    result = utils.parse_url(
+        'HTTPS://user:password@otherHost/full///path/name/',
+        simple=True,
+    )
+    assert len(result) == 7
+    assert result['schema'] == 'https'
+    assert result['host'] == 'otherHost'
+    assert result['user'] == 'user'
+    assert result['password'] == 'password'
+    assert result['fullpath'] == '/full/path/name/'
+    assert result['path'] == '/full/path/name/'
+    assert result['url'] == 'https://user:password@otherHost/full/path/name/'
+
+    # Handle garbage
+    assert utils.parse_url(None) is None
+
+    result = utils.parse_url(
+        'mailto://user:password@otherHost/lead2gold@gmail.com' +
+        '?from=test@test.com&name=Chris%20Caron&format=text',
+        simple=True,
+    )
+    assert len(result) == 9
+    assert result['schema'] == 'mailto'
+    assert result['host'] == 'otherHost'
+    assert result['user'] == 'user'
+    assert result['password'] == 'password'
+    assert unquote(result['fullpath']) == '/lead2gold@gmail.com'
+    assert result['path'] == '/'
+    assert unquote(result['query']) == 'lead2gold@gmail.com'
+    assert unquote(result['url']) == \
+        'mailto://user:password@otherHost/lead2gold@gmail.com'
+    assert len(result['qsd']) == 3
+    assert 'name' in result['qsd']
+    assert unquote(result['qsd']['name']) == 'Chris Caron'
+    assert 'from' in result['qsd']
+    assert unquote(result['qsd']['from']) == 'test@test.com'
+    assert 'format' in result['qsd']
+    assert unquote(result['qsd']['format']) == 'text'
+
+    # Test Passwords with question marks ?; not supported
+    result = utils.parse_url(
+        'http://user:pass.with.?question@host',
+        simple=True
+    )
+    assert result is None
+
+    # just hostnames
+    result = utils.parse_url(
+        'nuxref.com', simple=True,
+    )
+    assert len(result) == 3
+    assert result['schema'] == 'http'
+    assert result['host'] == 'nuxref.com'
+    assert result['url'] == 'http://nuxref.com'
+
+    # just host and path
+    result = utils.parse_url('invalid/host', simple=True)
+    assert len(result) == 6
+    assert result['schema'] == 'http'
+    assert result['host'] == 'invalid'
+    assert result['fullpath'] == '/host'
+    assert result['path'] == '/'
+    assert result['query'] == 'host'
+    assert result['url'] == 'http://invalid/host'
+
+    # just all out invalid
+    assert utils.parse_url('?', simple=True) is None
+    assert utils.parse_url('/', simple=True) is None
+
+    # Test some illegal strings
+    result = utils.parse_url(object, verify_host=False, simple=True)
+    assert result is None
+    result = utils.parse_url(None, verify_host=False, simple=True)
+    assert result is None
+
+    # Just a schema; invalid host
+    result = utils.parse_url('test://', simple=True)
+    assert result is None
+
+    # Do it again without host validation
+    result = utils.parse_url('test://', verify_host=False, simple=True)
+    assert len(result) == 2
+    assert result['schema'] == 'test'
+    assert result['url'] == 'test://'
+
+    result = utils.parse_url('testhostname', simple=True)
+    assert len(result) == 3
+    assert result['schema'] == 'http'
+    assert result['host'] == 'testhostname'
+    # The default_schema kicks in here
+    assert result['url'] == 'http://testhostname'
+
+    result = utils.parse_url(
+        'example.com', default_schema='unknown', simple=True)
+    assert len(result) == 3
+    assert result['schema'] == 'unknown'
+    assert result['host'] == 'example.com'
+    # The default_schema kicks in here
+    assert result['url'] == 'unknown://example.com'
+
+    # An empty string without a hostame is still valid if verify_host is set
+    result = utils.parse_url('', verify_host=False, simple=True)
+    assert len(result) == 2
+    assert result['schema'] == 'http'
+    # The default_schema kicks in here
+    assert result['url'] == 'http://'
+
+    # A messed up URL
+    result = utils.parse_url('test://:@/', verify_host=False, simple=True)
+    assert len(result) == 6
+    assert result['schema'] == 'test'
+    assert result['user'] == ''
+    assert result['password'] == ''
+    assert result['fullpath'] == '/'
+    assert result['path'] == '/'
+    assert result['url'] == 'test://:@/'
+
+    result = utils.parse_url(
+        'crazy://:@//_/@^&/jack.json', verify_host=False, simple=True)
+    assert len(result) == 7
+    assert result['schema'] == 'crazy'
+    assert result['user'] == ''
+    assert result['password'] == ''
+    assert unquote(result['fullpath']) == '/_/@^&/jack.json'
+    assert unquote(result['path']) == '/_/@^&/'
+    assert result['query'] == 'jack.json'
+    assert unquote(result['url']) == 'crazy://:@/_/@^&/jack.json'
+
+
+def test_url_assembly():
+    """
+    "utils: url_assembly() testing """
+
+    url = 'schema://user:password@hostname:port/path/?key=value'
+    assert utils.url_assembly(**utils.parse_url(url, verify_host=False)) == url
+
+    # Same URL without trailing slash after path
+    url = 'schema://user:password@hostname:port/path?key=value'
+    assert utils.url_assembly(**utils.parse_url(url, verify_host=False)) == url
+
+    url = 'schema://user@hostname:port/path?key=value'
+    assert utils.url_assembly(**utils.parse_url(url, verify_host=False)) == url
+
+    url = 'schema://hostname:10/a/file.php'
+    assert utils.url_assembly(**utils.parse_url(url, verify_host=False)) == url
 
 
 def test_parse_bool():
@@ -1456,6 +1877,48 @@ def test_parse_urls():
     assert len(results) == 0
 
 
+def test_dict_full_update():
+    """utils: dict_full_update() testing """
+    dict_1 = {
+        'a': 1,
+        'b': 2,
+        'c': 3,
+        'd': {
+            'z': 27,
+            'y': 26,
+            'x': 25,
+        }
+    }
+
+    dict_2 = {
+        'd': {
+            'x': 'updated',
+            'w': 24,
+        },
+        'c': 'updated',
+        'e': 5,
+    }
+    utils.dict_full_update(dict_1, dict_2)
+    # Dictionary 2 is untouched
+    assert len(dict_2) == 3
+    assert dict_2['c'] == 'updated'
+    assert dict_2['d']['w'] == 24
+    assert dict_2['d']['x'] == 'updated'
+    assert dict_2['e'] == 5
+
+    # Dictionary 3 however has entries from Dict 2 applied
+    # without disrupting entries that were not matched.
+    assert len(dict_1) == 5
+    assert dict_1['a'] == 1
+    assert dict_1['b'] == 2
+    assert dict_1['c'] == 'updated'
+    assert dict_1['d']['w'] == 24
+    assert dict_1['d']['x'] == 'updated'
+    assert dict_1['d']['y'] == 26
+    assert dict_1['d']['z'] == 27
+    assert dict_1['e'] == 5
+
+
 def test_parse_list():
     """utils: parse_list() testing """
 
@@ -1497,6 +1960,245 @@ def test_parse_list():
         '.divx', '.wmv', '.iso', '.mkv', '.mov', '.mpg', '.avi', '.vob',
         '.xvid', '.mpeg', '.mp4',
     ])
+
+
+def test_module_detection(tmpdir):
+    """utils: test_module_detection() testing
+    """
+
+    # Clear our working variables so they don't obstruct with the tests here
+    utils.PATHS_PREVIOUSLY_SCANNED.clear()
+    common.NOTIFY_CUSTOM_MODULE_MAP.clear()
+
+    # Test case where we load invalid data
+    utils.module_detection(None)
+
+    # Invalid data does not load anything
+    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 0
+    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 0
+
+    # Prepare ourselves a file to work with
+    notify_hook_a_base = tmpdir.mkdir('a')
+    notify_hook_a = notify_hook_a_base.join('hook.py')
+    notify_hook_a.write(cleandoc("""
+    from apprise.decorators import notify
+
+    @notify(on="clihook")
+    def mywrapper(body, title, notify_type, *args, **kwargs):
+        pass
+    """))
+
+    # Not previously loaded
+    assert 'clihook' not in common.NOTIFY_SCHEMA_MAP
+
+    # load entry by string
+    utils.module_detection(str(notify_hook_a))
+
+    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 1
+    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 1
+
+    # Now loaded
+    assert 'clihook' in common.NOTIFY_SCHEMA_MAP
+
+    # load entry by array
+    utils.module_detection([str(notify_hook_a)])
+
+    # No changes to our path
+    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 1
+    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 1
+
+    # Reset our variables for the next test
+    utils.PATHS_PREVIOUSLY_SCANNED.clear()
+    common.NOTIFY_CUSTOM_MODULE_MAP.clear()
+    del common.NOTIFY_SCHEMA_MAP['clihook']
+
+    # Hidden files are ignored
+    notify_hook_b_base = tmpdir.mkdir('b')
+    notify_hook_b = notify_hook_b_base.join('.hook.py')
+    notify_hook_b.write(cleandoc("""
+    from apprise.decorators import notify
+
+    # this is in a hidden file so it will not load
+    @notify(on="hidden")
+    def mywrapper(body, title, notify_type, *args, **kwargs):
+        pass
+    """))
+
+    assert 'hidden' not in common.NOTIFY_SCHEMA_MAP
+
+    utils.module_detection([str(notify_hook_b)])
+
+    # Verify that it did not load
+    assert 'hidden' not in common.NOTIFY_SCHEMA_MAP
+
+    # Path was scanned; nothing loaded
+    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 1
+    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 0
+
+    # Reset our variables for the next test
+    utils.PATHS_PREVIOUSLY_SCANNED.clear()
+    common.NOTIFY_CUSTOM_MODULE_MAP.clear()
+
+    # modules with no hooks found are ignored
+    notify_hook_c_base = tmpdir.mkdir('c')
+    notify_hook_c = notify_hook_c_base.join('empty.py')
+    notify_hook_c.write("")
+
+    utils.module_detection([str(notify_hook_c)])
+
+    # File was found, no custom modules
+    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 1
+    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 0
+
+    # A new path scanned
+    utils.module_detection([str(notify_hook_c_base)])
+    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 2
+    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 0
+
+    # Even if we correct our empty file; the fact the directory has been
+    # scanned and failed to load (same with file), it won't be loaded
+    # a second time. This is intentional since module_detection() get's
+    # called for every AppriseAsset() object creation.  This prevents us
+    # from reloading conent over and over again wasting resources
+    assert 'valid1' not in common.NOTIFY_SCHEMA_MAP
+    notify_hook_c.write(cleandoc("""
+    from apprise.decorators import notify
+
+    # this is a good hook but burried in hidden directory which won't
+    # be accessed unless the file is pointed to via absolute path
+    @notify(on="valid1")
+    def mywrapper(body, title, notify_type, *args, **kwargs):
+        pass
+    """))
+
+    utils.module_detection([str(notify_hook_c_base)])
+    assert 'valid1' not in common.NOTIFY_SCHEMA_MAP
+    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 2
+    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 0
+
+    # Even by absolute path...
+    utils.module_detection([str(notify_hook_c)])
+    assert 'valid1' not in common.NOTIFY_SCHEMA_MAP
+    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 2
+    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 0
+
+    # However we can bypass the cache if we really want to
+    utils.module_detection([str(notify_hook_c_base)], cache=False)
+    assert 'valid1' in common.NOTIFY_SCHEMA_MAP
+    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 2
+    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 1
+
+    # Bypassing it twice causes the module to load twice (not very efficient)
+    # However we can bypass the cache if we really want to
+    utils.module_detection([str(notify_hook_c_base)], cache=False)
+    assert 'valid1' in common.NOTIFY_SCHEMA_MAP
+    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 2
+    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 1
+
+    # Reset our variables for the next test
+    del common.NOTIFY_SCHEMA_MAP['valid1']
+    utils.PATHS_PREVIOUSLY_SCANNED.clear()
+    common.NOTIFY_CUSTOM_MODULE_MAP.clear()
+
+    notify_hook_d = notify_hook_c_base.join('.ignore.py')
+    notify_hook_d.write("")
+    notify_hook_e_base = notify_hook_c_base.mkdir('.ignore')
+    notify_hook_e = notify_hook_e_base.join('__init__.py')
+    notify_hook_e.write(cleandoc("""
+    from apprise.decorators import notify
+
+    # this is a good hook but burried in hidden directory which won't
+    # be accessed unless the file is pointed to via absolute path
+    @notify(on="valid2")
+    def mywrapper(body, title, notify_type, *args, **kwargs):
+        pass
+    """))
+
+    # Try to load our base directory again; this time we search by the
+    # directory; the only edge case we're testing here is it will not
+    # even look at the .ignore.py file found since it is invalid
+    utils.module_detection([str(notify_hook_c_base)])
+    assert 'valid1' in common.NOTIFY_SCHEMA_MAP
+    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 2
+    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 1
+
+    # Reset our variables for the next test
+    del common.NOTIFY_SCHEMA_MAP['valid1']
+    utils.PATHS_PREVIOUSLY_SCANNED.clear()
+    common.NOTIFY_CUSTOM_MODULE_MAP.clear()
+
+    # Try to load our base directory again
+    utils.module_detection([str(notify_hook_c)])
+    assert 'valid1' in common.NOTIFY_SCHEMA_MAP
+
+    # Hidden directories are not scanned
+    assert 'valid2' not in common.NOTIFY_SCHEMA_MAP
+
+    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 1
+    assert str(notify_hook_c) in utils.PATHS_PREVIOUSLY_SCANNED
+    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 1
+
+    # However a direct reference to the hidden directory is okay
+    utils.module_detection([str(notify_hook_e_base)])
+
+    # We loaded our module
+    assert 'valid2' in common.NOTIFY_SCHEMA_MAP
+    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 3
+    assert str(notify_hook_c) in utils.PATHS_PREVIOUSLY_SCANNED
+    assert str(notify_hook_e_base) in utils.PATHS_PREVIOUSLY_SCANNED
+    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 2
+
+    # Reset our variables for the next test
+    del common.NOTIFY_SCHEMA_MAP['valid1']
+    del common.NOTIFY_SCHEMA_MAP['valid2']
+    utils.PATHS_PREVIOUSLY_SCANNED.clear()
+    common.NOTIFY_CUSTOM_MODULE_MAP.clear()
+
+    assert 'valid1' not in common.NOTIFY_SCHEMA_MAP
+    assert 'valid2' not in common.NOTIFY_SCHEMA_MAP
+    assert 'valid3' not in common.NOTIFY_SCHEMA_MAP
+    notify_hook_f_base = tmpdir.mkdir('f')
+    notify_hook_f = notify_hook_f_base.join('invalid.py')
+    notify_hook_f.write(cleandoc("""
+    from apprise.decorators import notify
+
+    # A very invalid hook type... on should not be None
+    @notify(on=None)
+    def mywrapper(body, title, notify_type, *args, **kwargs):
+        pass
+
+    # An invalid name
+    @notify(on='valid1', name=None)
+    def mywrapper(body, title, notify_type, *args, **kwargs):
+        pass
+
+    # Another invalid name (so it's ignored)
+    @notify(on='valid2', name=object)
+    def mywrapper(body, title, notify_type, *args, **kwargs):
+        pass
+
+    # Simply put... the name has to be a string to be referenced
+    # however this will still be loaded
+    @notify(on='valid3', name=4)
+    def mywrapper(body, title, notify_type, *args, **kwargs):
+        pass
+
+    """))
+
+    utils.module_detection([str(notify_hook_f)])
+
+    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 1
+    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 1
+    assert 'valid1' in common.NOTIFY_SCHEMA_MAP
+    assert 'valid2' in common.NOTIFY_SCHEMA_MAP
+    assert 'valid3' in common.NOTIFY_SCHEMA_MAP
+
+    # Reset our variables before we leave
+    del common.NOTIFY_SCHEMA_MAP['valid1']
+    del common.NOTIFY_SCHEMA_MAP['valid2']
+    del common.NOTIFY_SCHEMA_MAP['valid3']
+    utils.PATHS_PREVIOUSLY_SCANNED.clear()
+    common.NOTIFY_CUSTOM_MODULE_MAP.clear()
 
 
 def test_exclusive_match():
@@ -1842,11 +2544,11 @@ def test_cwe312_url():
     assert utils.cwe312_url(
         'gitter://b5637831f563aa846bb5b2c27d8fe8f633b8f026'
         '/apprise/?pass=abc123') == \
-        'gitter://b...6/apprise?pass=a...3'
+        'gitter://b...6/apprise/?pass=a...3'
 
     assert utils.cwe312_url(
         'slack://mybot@xoxb-43598234231-3248932482278-BZK5Wj15B9mPh1RkShJoCZ44'
         '/lead2gold@gmail.com') == 'slack://mybot@x...4/l...m'
     assert utils.cwe312_url(
         'slack://test@B4QP3WWB4/J3QWT41JM/XIl2ffpqXkzkwMXrJdevi7W3/'
-        '#random') == 'slack://test@B...4/J...M/X...3'
+        '#random') == 'slack://test@B...4/J...M/X...3/'

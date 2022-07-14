@@ -27,9 +27,11 @@ System Administrators and DevOps who wish to send a notification now no longer n
 [![PyPi](https://img.shields.io/pypi/dm/apprise.svg?style=flat-square)](https://pypi.org/project/apprise/)
 
 ## Supported Notifications
+
 The section identifies all of the services supported by this library. [Check out the wiki for more information on the supported modules here](https://github.com/caronc/apprise/wiki).
 
 ### Popular Notification Services
+
 The table below identifies the services this tool supports and some example service urls you need to use in order to take advantage of it. Click on any of the services listed below to get more details on how you can configure Apprise to access them.
 
 | Notification Service | Service ID | Default Port | Example Syntax |
@@ -101,6 +103,7 @@ The table below identifies the services this tool supports and some example serv
 
 
 ### SMS Notification Support
+
 | Notification Service | Service ID | Default Port | Example Syntax |
 | -------------------- | ---------- | ------------ | -------------- |
 | [AWS SNS](https://github.com/caronc/apprise/wiki/Notify_sns)  | sns://   | (TCP) 443   | sns://AccessKeyID/AccessSecretKey/RegionName/+PhoneNo<br/>sns://AccessKeyID/AccessSecretKey/RegionName/+PhoneNo1/+PhoneNo2/+PhoneNoN<br/>sns://AccessKeyID/AccessSecretKey/RegionName/Topic<br/>sns://AccessKeyID/AccessSecretKey/RegionName/Topic1/Topic2/TopicN
@@ -111,11 +114,13 @@ The table below identifies the services this tool supports and some example serv
 | [Kavenegar](https://github.com/caronc/apprise/wiki/Notify_kavenegar) | kavenegar://  | (TCP) 443   | kavenegar://ApiKey/ToPhoneNo<br/>kavenegar://FromPhoneNo@ApiKey/ToPhoneNo<br/>kavenegar://ApiKey/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN
 | [MessageBird](https://github.com/caronc/apprise/wiki/Notify_messagebird) | msgbird://  | (TCP) 443   | msgbird://ApiKey/FromPhoneNo<br/>msgbird://ApiKey/FromPhoneNo/ToPhoneNo<br/>msgbird://ApiKey/FromPhoneNo/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
 | [MSG91](https://github.com/caronc/apprise/wiki/Notify_msg91) | msg91://  | (TCP) 443   | msg91://AuthKey/ToPhoneNo<br/>msg91://SenderID@AuthKey/ToPhoneNo<br/>msg91://AuthKey/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
+| [Signal API](https://github.com/caronc/apprise/wiki/Notify_signal) | signal://  or signals:// | (TCP) 80 or 443  | signal://hostname:port/FromPhoneNo<br/>signal://hostname:port/FromPhoneNo/ToPhoneNo<br/>signal://hostname:port/FromPhoneNo/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
 | [Sinch](https://github.com/caronc/apprise/wiki/Notify_sinch) | sinch://  | (TCP) 443   | sinch://ServicePlanId:ApiToken@FromPhoneNo<br/>sinch://ServicePlanId:ApiToken@FromPhoneNo/ToPhoneNo<br/>sinch://ServicePlanId:ApiToken@FromPhoneNo/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/<br/>sinch://ServicePlanId:ApiToken@ShortCode/ToPhoneNo<br/>sinch://ServicePlanId:ApiToken@ShortCode/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
 | [Twilio](https://github.com/caronc/apprise/wiki/Notify_twilio) | twilio://  | (TCP) 443   | twilio://AccountSid:AuthToken@FromPhoneNo<br/>twilio://AccountSid:AuthToken@FromPhoneNo/ToPhoneNo<br/>twilio://AccountSid:AuthToken@FromPhoneNo/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/<br/>twilio://AccountSid:AuthToken@FromPhoneNo/ToPhoneNo?apikey=Key<br/>twilio://AccountSid:AuthToken@ShortCode/ToPhoneNo<br/>twilio://AccountSid:AuthToken@ShortCode/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
 | [Vonage](https://github.com/caronc/apprise/wiki/Notify_nexmo) (formerly Nexmo) | nexmo://  | (TCP) 443   | nexmo://ApiKey:ApiSecret@FromPhoneNo<br/>nexmo://ApiKey:ApiSecret@FromPhoneNo/ToPhoneNo<br/>nexmo://ApiKey:ApiSecret@FromPhoneNo/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
 
 ## Desktop Notification Support
+
 | Notification Service | Service ID | Default Port | Example Syntax |
 | -------------------- | ---------- | ------------ | -------------- |
 | [Linux DBus Notifications](https://github.com/caronc/apprise/wiki/Notify_dbus)  | dbus://<br />qt://<br />glib://<br />kde://  | n/a  | dbus://<br />qt://<br />glib://<br />kde://
@@ -124,6 +129,7 @@ The table below identifies the services this tool supports and some example serv
 | [Windows Notifications](https://github.com/caronc/apprise/wiki/Notify_windows) | windows://    |        n/a          | windows://
 
 ### Email Support
+
 | Service ID | Default Port | Example Syntax |
 | ---------- | ------------ | -------------- |
 | [mailto://](https://github.com/caronc/apprise/wiki/Notify_email)  |  (TCP) 25    | mailto://userid:pass@domain.com<br />mailto://domain.com?user=userid&pass=password<br/>mailto://domain.com:2525?user=userid&pass=password<br />mailto://user@gmail.com&pass=password<br />mailto://mySendingUsername:mySendingPassword@example.com?to=receivingAddress@example.com<br />mailto://userid:password@example.com?smtp=mail.example.com&from=noreply@example.com&name=no%20reply
@@ -132,6 +138,7 @@ The table below identifies the services this tool supports and some example serv
 Apprise have some email services built right into it (such as yahoo, fastmail, hotmail, gmail, etc) that greatly simplify the mailto:// service.  See more details [here](https://github.com/caronc/apprise/wiki/Notify_email).
 
 ### Custom Notifications
+
 | Post Method          | Service ID | Default Port | Example Syntax |
 | -------------------- | ---------- | ------------ | -------------- |
 | [Form](https://github.com/caronc/apprise/wiki/Notify_Custom_Form)       | form:// or form://   | (TCP) 80 or 443 | form://hostname<br />form://user@hostname<br />form://user:password@hostname:port<br />form://hostname/a/path/to/post/to
@@ -139,11 +146,14 @@ Apprise have some email services built right into it (such as yahoo, fastmail, h
 | [XML](https://github.com/caronc/apprise/wiki/Notify_Custom_XML)         | xml:// or xmls://   | (TCP) 80 or 443 | xml://hostname<br />xml://user@hostname<br />xml://user:password@hostname:port<br />xml://hostname/a/path/to/post/to
 
 ## Installation
+
 The easiest way is to install this package is from pypi:
 ```bash
 pip install apprise
 ```
+
 ## Command Line
+
 A small command line tool is also provided with this package called *apprise*. If you know the server url's you wish to notify, you can simply provide them all on the command line and send your notifications that way:
 ```bash
 # Send a notification to as many servers as you want
@@ -164,7 +174,8 @@ uptime | apprise -vv \
 ```
 
 ### Configuration Files
-No one wants to put their credentials out for everyone to see on the command line.  No problem: *apprise* also supports configuration files.  It can handle both a specific [YAML format](https://github.com/caronc/apprise/wiki/config_yaml) or a very simple [TEXT format](https://github.com/caronc/apprise/wiki/config_text). You can also pull these configuration files via an HTTP query too! You can read more about the expected structure of the configuration files [here](https://github.com/caronc/apprise/wiki/config).
+
+No one wants to put their credentials out for everyone to see on the command line.  No problem *apprise* also supports configuration files.  It can handle both a specific [YAML format](https://github.com/caronc/apprise/wiki/config_yaml) or a very simple [TEXT format](https://github.com/caronc/apprise/wiki/config_text). You can also pull these configuration files via an HTTP query too! You can read more about the expected structure of the configuration files [here](https://github.com/caronc/apprise/wiki/config).
 ```bash
 # By default if no url or configuration is specified apprise will attempt to load
 # configuration files (if present) from:
@@ -201,6 +212,7 @@ apprise -vv -t 'my title' -b 'my notification body' \
 ```
 
 ### Attaching Files
+
 Apprise also supports file attachments too! Specify as many attachments to a notification as you want.
 ```bash
 # Send a funny image you found on the internet to a colleague:
@@ -218,8 +230,9 @@ apprise -vv --title 'system crash' \
 ```
 
 ### Loading Custom Notifications/Hooks
-To create your own custom `schema://` to hook on to and trigger your own code.
-Simply just include the `@notify` decorator and wrap your own function.
+
+To create your own custom `schema://` hook so that you can trigger your own custom code,
+simply include the `@notify` decorator to wrap your function.
 ```python
 from apprise.decorators import notify
 
@@ -261,6 +274,7 @@ apprise -vv --title 'custom override' \
 ```
 
 ## Developers
+
 To send a notification from within your python application, just do the following:
 ```python
 import apprise
@@ -284,6 +298,7 @@ apobj.notify(
 ```
 
 ### Configuration Files
+
 Developers need access to configuration files too. The good news is their use just involves declaring another object (called *AppriseConfig*) that the *Apprise* object can ingest.  You can also freely mix and match config and notification entries as often as you wish! You can read more about the expected structure of the configuration files [here](https://github.com/caronc/apprise/wiki/config).
 ```python
 import apprise
@@ -336,6 +351,7 @@ apobj.notify(
 ```
 
 ### Attaching Files
+
 Attachments are very easy to send using the Apprise API:
 ```python
 import apprise
@@ -393,6 +409,7 @@ apobj.notify(
 ```
 
 ### Loading Custom Notifications/Hooks
+
 By default, no plugins are loaded at all for those building with the API.
 It's at the developers discretion to load custom modules. But should you choose to do so, it's as easy
 as including the path reference in the `AppriseAsset()` object during the initialization of your `Apprise()` instance.
@@ -437,6 +454,7 @@ aobj.notify("test")
 ```
 
 ## Want To Learn More?
+
 If you're interested in reading more about this and other methods on how to customize your own notifications, please check out the following links:
 * 📣 [Using the CLI](https://github.com/caronc/apprise/wiki/CLI_Usage)
 * 🛠️ [Development API](https://github.com/caronc/apprise/wiki/Development_API)

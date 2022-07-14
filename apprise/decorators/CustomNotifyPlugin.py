@@ -22,9 +22,12 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
+import six
 from ..plugins.NotifyBase import NotifyBase
-from ..utils import IS_SCHEMA_RE
+from ..utils import URL_DETAILS_RE
 from ..utils import parse_url
+from ..utils import url_assembly
+from ..utils import dict_full_update
 from .. import common
 from ..logger import logger
 import inspect
@@ -51,7 +54,7 @@ class CustomNotifyPlugin(NotifyBase):
 
     # Our default arguments will get populated after we're instatiated by the
     # wrapper class
-    __default_args = {}
+    _default_args = {}
 
     def __init__(self, **kwargs):
         """
@@ -61,7 +64,11 @@ class CustomNotifyPlugin(NotifyBase):
         super(CustomNotifyPlugin, self).__init__(**kwargs)
 
         # Apply our updates based on what was parsed
-        self.__default_args.update(kwargs)
+        dict_full_update(self._default_args, kwargs)
+
+        # Update our arguments (applying them to what we originally)
+        # initialized as
+        self._default_args['url'] = url_assembly(**self._default_args)
 
     @staticmethod
     def parse_url(url):
@@ -69,7 +76,7 @@ class CustomNotifyPlugin(NotifyBase):
         Parses the URL and returns arguments retrieved
 
         """
-        return NotifyBase.parse_url(url, verify_host=False)
+        return parse_url(url, verify_host=False, simple=True)
 
     def url(self, privacy=False, *args, **kwargs):
         """
@@ -84,9 +91,14 @@ class CustomNotifyPlugin(NotifyBase):
         parsed from the provided URL into our supported matrix structure.
         """
 
-        # Validate that our schema is okay
+        if not isinstance(url, six.string_types):
+            msg = 'An invalid custom notify url/schema ({}) provided in ' \
+                'function {}.'.format(url, send_func.__name__)
+            logger.warning(msg)
+            return None
 
-        re_match = IS_SCHEMA_RE.match(url)
+        # Validate that our schema is okay
+        re_match = URL_DETAILS_RE.match(url)
         if not re_match:
             msg = 'An invalid custom notify url/schema ({}) provided in ' \
                 'function {}.'.format(url, send_func.__name__)
@@ -96,9 +108,12 @@ class CustomNotifyPlugin(NotifyBase):
         # Acquire our plugin name
         plugin_name = re_match.group('schema').lower()
 
+        if not re_match.group('base'):
+            url = '{}://'.format(plugin_name)
+
         # Keep a default set of arguments to apply to all called references
         default_args = parse_url(
-            url, default_schema=plugin_name, verify_host=False)
+            url, default_schema=plugin_name, verify_host=False, simple=True)
 
         if plugin_name in common.NOTIFY_SCHEMA_MAP:
             # we're already handling this object
@@ -115,7 +130,8 @@ class CustomNotifyPlugin(NotifyBase):
         class CustomNotifyPluginWrapper(CustomNotifyPlugin):
 
             # Our Service Name
-            service_name = name if name else 'Custom - {}'.format(plugin_name)
+            service_name = name if isinstance(name, six.string_types) \
+                and name else 'Custom - {}'.format(plugin_name)
 
             # Store our matched schema
             secure_protocol = plugin_name
@@ -129,7 +145,7 @@ class CustomNotifyPlugin(NotifyBase):
             __send = staticmethod(send_func)
 
             # Update our default arguments
-            __default_args = default_args
+            _default_args = default_args
 
             def send(self, body, title='', notify_type=common.NotifyType.INFO,
                      *args, **kwargs):
@@ -142,7 +158,7 @@ class CustomNotifyPlugin(NotifyBase):
                     # Enforce a boolean response
                     result = self.__send(
                         body, title, notify_type, *args,
-                        meta=self.__default_args, **kwargs)
+                        meta=self._default_args, **kwargs)
 
                     if result is None:
                         # The wrapper did not define a return (or returned
@@ -180,16 +196,32 @@ class CustomNotifyPlugin(NotifyBase):
                         NOTIFY_SCHEMA_MAP[self.secure_protocol].service_name)
                 return response
 
-        # Store our plugin
+        # Store our plugin into our core map file
         common.NOTIFY_SCHEMA_MAP[plugin_name] = CustomNotifyPluginWrapper
 
         # Update our custom plugin map
-        module_name = str(send_func.__module__)
-        common.NOTIFY_CUSTOM_MODULE_MAP[module_name]['notify'][plugin_name] = {
-            'name': CustomNotifyPluginWrapper.service_name,
-            'fn_name': send_func.__name__,
-            'url': url,
-            'plugin': CustomNotifyPluginWrapper,
-        }
+        module_pyname = str(send_func.__module__)
+        if module_pyname not in common.NOTIFY_CUSTOM_MODULE_MAP:
+            # Support non-dynamic includes as well...
+            common.NOTIFY_CUSTOM_MODULE_MAP[module_pyname] = {
+                'path': inspect.getfile(send_func),
 
+                # Initialize our template
+                'notify': {},
+            }
+
+        common.\
+            NOTIFY_CUSTOM_MODULE_MAP[module_pyname]['notify'][plugin_name] = {
+                # Our Serivice Description (for API and CLI --details view)
+                'name': CustomNotifyPluginWrapper.service_name,
+                # The name of the send function the @notify decorator wrapped
+                'fn_name': send_func.__name__,
+                # The URL that was provided in the @notify decorator call
+                # associated with the 'on='
+                'url': url,
+                # The Initialized Plugin that was generated based on the above
+                # parameters
+                'plugin': CustomNotifyPluginWrapper}
+
+        # return our plugin
         return common.NOTIFY_SCHEMA_MAP[plugin_name]

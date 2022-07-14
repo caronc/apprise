@@ -25,43 +25,14 @@
 
 import os
 import six
-import sys
 import mock
+from helpers import module_reload
 
 import apprise
-
-try:
-    # Python v3.4+
-    from importlib import reload
-except ImportError:
-    try:
-        # Python v3.0-v3.3
-        from imp import reload
-    except ImportError:
-        # Python v2.7
-        pass
 
 # Disable logging for a cleaner testing output
 import logging
 logging.disable(logging.CRITICAL)
-
-
-def _reload():
-    """
-    The following libraries need to be reloaded to prevent
-     TypeError: super(type, obj): obj must be an instance or subtype of type
-     This is better explained in this StackOverflow post:
-        https://stackoverflow.com/questions/31363311/\
-          any-way-to-manually-fix-operation-of-\
-             super-after-ipython-reload-avoiding-ty
-    """
-    reload(sys.modules['apprise.common'])
-    reload(sys.modules['apprise.attachment'])
-    reload(sys.modules['apprise.config'])
-    reload(sys.modules['apprise.plugins.NotifyMacOSX'])
-    reload(sys.modules['apprise.plugins'])
-    reload(sys.modules['apprise.Apprise'])
-    reload(sys.modules['apprise'])
 
 
 @mock.patch('subprocess.Popen')
@@ -89,7 +60,7 @@ def test_plugin_macosx_general(mock_macver, mock_system, mock_popen, tmpdir):
     mock_popen.return_value = mock_cmd_response
 
     # Ensure our enviroment is loaded with this configuration
-    _reload()
+    module_reload('NotifyMacOSX')
 
     # Point our object to our new temporary existing file
     apprise.plugins.NotifyMacOSX.notify_paths = (str(script), )
@@ -159,7 +130,7 @@ def test_plugin_macosx_general(mock_macver, mock_system, mock_popen, tmpdir):
 
     # Test case where we simply aren't on a mac
     mock_system.return_value = 'Linux'
-    _reload()
+    module_reload('NotifyMacOSX')
 
     # Point our object to our new temporary existing file
     apprise.plugins.NotifyMacOSX.notify_paths = (str(script), )
@@ -174,7 +145,7 @@ def test_plugin_macosx_general(mock_macver, mock_system, mock_popen, tmpdir):
 
     # Now we must be Mac OS v10.8 or higher...
     mock_macver.return_value = ('10.7', ('', '', ''), '')
-    _reload()
+    module_reload('NotifyMacOSX')
 
     # Point our object to our new temporary existing file
     apprise.plugins.NotifyMacOSX.notify_paths = (str(script), )
@@ -185,7 +156,7 @@ def test_plugin_macosx_general(mock_macver, mock_system, mock_popen, tmpdir):
 
     # A newer environment to test edge case where this is tested
     mock_macver.return_value = ('9.12', ('', '', ''), '')
-    _reload()
+    module_reload('NotifyMacOSX')
 
     # Point our object to our new temporary existing file
     apprise.plugins.NotifyMacOSX.notify_paths = (str(script), )

@@ -23,7 +23,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 from .rest import AppriseURLTester
+from .module import module_reload
 
 __all__ = [
     'AppriseURLTester',
+    'module_reload',
 ]

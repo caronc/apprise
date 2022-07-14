@@ -365,6 +365,7 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
             click.echo()
 
         sys.exit(0)
+        # end if details()
 
     # The priorities of what is accepted are parsed in order below:
     #    1. URLs by command line

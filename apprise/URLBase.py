@@ -34,16 +34,15 @@ try:
     # Python 2.7
     from urllib import unquote as _unquote
     from urllib import quote as _quote
-    from urllib import urlencode as _urlencode
 
 except ImportError:
     # Python 3.x
     from urllib.parse import unquote as _unquote
     from urllib.parse import quote as _quote
-    from urllib.parse import urlencode as _urlencode
 
 from .AppriseLocale import gettext_lazy as _
 from .AppriseAsset import AppriseAsset
+from .utils import urlencode
 from .utils import parse_url
 from .utils import parse_bool
 from .utils import parse_list
@@ -497,17 +496,8 @@ class URLBase(object):
         Returns:
             str: The escaped parameters returned as a string
         """
-        # Tidy query by eliminating any records set to None
-        _query = {k: v for (k, v) in query.items() if v is not None}
-        try:
-            # Python v3.x
-            return _urlencode(
-                _query, doseq=doseq, safe=safe, encoding=encoding,
-                errors=errors)
-
-        except TypeError:
-            # Python v2.7
-            return _urlencode(_query)
+        return urlencode(
+            query, doseq=doseq, safe=safe, encoding=encoding, errors=errors)
 
     @staticmethod
     def split_path(path, unquote=True):

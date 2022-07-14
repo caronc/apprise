@@ -41,6 +41,7 @@ try:
     from urllib import unquote
     from urllib import quote
     from urlparse import urlparse
+    from urllib import urlencode as _urlencode
 
     import imp
 
@@ -52,47 +53,39 @@ try:
 
 
 except ImportError:
-    # Python 3.x
+    # Python 3.5+
     from urllib.parse import unquote
     from urllib.parse import quote
     from urllib.parse import urlparse
+    from urllib.parse import urlencode as _urlencode
 
-    try:
-        # Python v3.5+
-        import importlib.util
+    import importlib.util
 
-        def import_module(path, name):
-            """
-            Load our module based on path
-            """
-            spec = importlib.util.spec_from_file_location(name, path)
-            try:
-                module = importlib.util.module_from_spec(spec)
-                sys.modules[name] = module
+    def import_module(path, name):
+        """
+        Load our module based on path
+        """
+        # if path.endswith('test_module_detection0/a/hook.py'):
+        #     import pdb
+        #     pdb.set_trace()
 
-                spec.loader.exec_module(module)
-            except Exception as e:
-                # module isn't loadable
-                del sys.modules[name]
-                module = None
+        spec = importlib.util.spec_from_file_location(name, path)
+        try:
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[name] = module
 
-                logger.debug(
-                    'Custom module exception raised from %s (name=%s) %s',
-                    path, name, str(e))
+            spec.loader.exec_module(module)
 
-            return module
+        except Exception as e:
+            # module isn't loadable
+            del sys.modules[name]
+            module = None
 
-    except ImportError:
-        # Python v3.3 and v3.4
-        from importlib.machinery import SourceFileLoader
+            logger.debug(
+                'Custom module exception raised from %s (name=%s) %s',
+                path, name, str(e))
 
-        def import_module(path, name):
-            """
-            Load our module based on path
-            """
-            module = SourceFileLoader(name, path).load_module()
-            return module
-
+        return module
 
 # Hash of all paths previously scanned so we don't waste effort/overhead doing
 # it again
@@ -160,7 +153,11 @@ NOTIFY_CUSTOM_COLON_TOKENS = re.compile(r'^:(?P<key>.*)\s*')
 GET_SCHEMA_RE = re.compile(r'\s*(?P<schema>[a-z0-9]{2,9})://.*$', re.I)
 
 # Used for validating that a provided entry is indeed a schema
-IS_SCHEMA_RE = re.compile(r'\s*(?P<schema>[a-z0-9]{2,9})(://.*)?$', re.I)
+# this is slightly different then the GET_SCHEMA_RE above which
+# insists the schema is only valid with a :// entry.  this one
+# extrapolates the individual entries
+URL_DETAILS_RE = re.compile(
+    r'\s*(?P<schema>[a-z0-9]{2,9})(://(?P<base>.*))?$', re.I)
 
 # Regular expression based and expanded from:
 # http://www.regular-expressions.info/email.html
@@ -532,16 +529,14 @@ def tidy_path(path):
     # Windows
     path = TIDY_WIN_PATH_RE.sub('\\1', path.strip())
     # Linux
-    path = TIDY_NUX_PATH_RE.sub('\\1', path.strip())
+    path = TIDY_NUX_PATH_RE.sub('\\1', path)
 
-    # Linux Based Trim
-    path = TIDY_NUX_TRIM_RE.sub('\\1', path.strip())
-    # Windows Based Trim
-    path = expanduser(TIDY_WIN_TRIM_RE.sub('\\1', path.strip()))
+    # Windows Based (final) Trim
+    path = expanduser(TIDY_WIN_TRIM_RE.sub('\\1', path))
     return path
 
 
-def parse_qsd(qs):
+def parse_qsd(qs, simple=False):
     """
     Query String Dictionary Builder
 
@@ -560,6 +555,9 @@ def parse_qsd(qs):
 
     This function returns a result object that fits with the apprise
     expected parameters (populating the 'qsd' portion of the dictionary
+
+    if simple is set to true, then a ONE dictionary is returned and is not
+    sub-parsed for additional elements
     """
 
     # Our return result set:
@@ -575,7 +573,7 @@ def parse_qsd(qs):
         'qsd+': {},
         'qsd-': {},
         'qsd:': {},
-    }
+    } if not simple else {'qsd': {}}
 
     pairs = [s2 for s1 in qs.split('&') for s2 in s1.split(';')]
     for name_value in pairs:
@@ -602,6 +600,10 @@ def parse_qsd(qs):
         # content is always made lowercase for easy indexing
         result['qsd'][key.lower().strip()] = val
 
+        if simple:
+            # move along
+            continue
+
         # Check for tokens that start with a addition/plus symbol (+)
         k = NOTIFY_CUSTOM_ADD_TOKENS.match(key)
         if k is not None:
@@ -623,7 +625,8 @@ def parse_qsd(qs):
     return result
 
 
-def parse_url(url, default_schema='http', verify_host=True, strict_port=False):
+def parse_url(url, default_schema='http', verify_host=True, strict_port=False,
+              simple=False):
     """A function that greatly simplifies the parsing of a url
     specified by the end user.
 
@@ -645,6 +648,39 @@ def parse_url(url, default_schema='http', verify_host=True, strict_port=False):
      The function returns a simple dictionary with all of
      the parsed content within it and returns 'None' if the
      content could not be extracted.
+
+     The output of 'http://hostname' would look like:
+        {
+          'schema': 'http',
+          'url': 'http://hostname',
+          'host': 'hostname',
+
+          'user': None,
+          'password': None,
+          'port': None,
+          'fullpath': None,
+          'path': None,
+          'query': None,
+
+          'qsd': {},
+
+          'qsd+': {},
+          'qsd-': {},
+          'qsd:': {}
+        }
+
+     The simple switch cleans the dictionary response to only include the
+     fields that were detected.
+
+     The output of 'http://hostname' with the simple flag set would look like:
+        {
+          'schema': 'http',
+          'url': 'http://hostname',
+          'host': 'hostname',
+        }
+
+     If the URL can't be parsed then None is returned
+
     """
 
     if not isinstance(url, six.string_types):
@@ -683,7 +719,7 @@ def parse_url(url, default_schema='http', verify_host=True, strict_port=False):
         'qsd+': {},
         'qsd-': {},
         'qsd:': {},
-    }
+    } if not simple else {}
 
     qsdata = ''
     match = VALID_URL_RE.search(url)
@@ -703,7 +739,7 @@ def parse_url(url, default_schema='http', verify_host=True, strict_port=False):
     # Parse Query Arugments ?val=key&key=val
     # while ensuring that all keys are lowercase
     if qsdata:
-        result.update(parse_qsd(qsdata))
+        result.update(parse_qsd(qsdata, simple=simple))
 
     # Now do a proper extraction of data; http:// is just substitued in place
     # to allow urlparse() to function as expected, we'll swap this back to the
@@ -726,8 +762,12 @@ def parse_url(url, default_schema='http', verify_host=True, strict_port=False):
         pass
 
     if not result['fullpath']:
-        # Default
-        result['fullpath'] = None
+        if not simple:
+            # Default
+            result['fullpath'] = None
+        else:
+            # Remove entry
+            del result['fullpath']
 
     else:
         # Using full path, extract query from path
@@ -735,7 +775,11 @@ def parse_url(url, default_schema='http', verify_host=True, strict_port=False):
         result['path'] = match.group('path')
         result['query'] = match.group('query')
         if not result['query']:
-            result['query'] = None
+            if not simple:
+                result['query'] = None
+            else:
+                del result['query']
+
     try:
         (result['user'], result['host']) = \
             re.split(r'[@]+', result['host'])[:2]
@@ -745,7 +789,7 @@ def parse_url(url, default_schema='http', verify_host=True, strict_port=False):
         # and it's already assigned
         pass
 
-    if result['user'] is not None:
+    if result.get('user') is not None:
         try:
             (result['user'], result['password']) = \
                 re.split(r'[:]+', result['user'])[:2]
@@ -779,6 +823,9 @@ def parse_url(url, default_schema='http', verify_host=True, strict_port=False):
                 # Invalid Host Specified
                 return None
 
+    # Acquire our port (if defined)
+    _port = result.get('port')
+
     if verify_host:
         # Verify and Validate our hostname
         result['host'] = is_hostname(result['host'])
@@ -788,15 +835,14 @@ def parse_url(url, default_schema='http', verify_host=True, strict_port=False):
             return None
 
         # Max port is 65535 and min is 1
-        if isinstance(result['port'], int) and not ((
+        if isinstance(_port, int) and not ((
             not strict_port or (
-                strict_port and
-                result['port'] > 0 and result['port'] <= 65535))):
+                strict_port and _port > 0 and _port <= 65535))):
 
             # An invalid port was specified
             return None
 
-    elif pmatch and not isinstance(result['port'], int):
+    elif pmatch and not isinstance(_port, int):
         if strict_port:
             # Store port
             result['port'] = pmatch.group('port').strip()
@@ -809,25 +855,33 @@ def parse_url(url, default_schema='http', verify_host=True, strict_port=False):
 
     # Re-assemble cleaned up version of the url
     result['url'] = '%s://' % result['schema']
-    if isinstance(result['user'], six.string_types):
+    if isinstance(result.get('user'), six.string_types):
         result['url'] += result['user']
 
-        if isinstance(result['password'], six.string_types):
+        if isinstance(result.get('password'), six.string_types):
             result['url'] += ':%s@' % result['password']
 
         else:
             result['url'] += '@'
     result['url'] += result['host']
 
-    if result['port'] is not None:
+    if result.get('port') is not None:
         try:
             result['url'] += ':%d' % result['port']
 
         except TypeError:
             result['url'] += ':%s' % result['port']
 
-    if result['fullpath']:
+    elif 'port' in result and simple:
+        # Eliminate empty fields
+        del result['port']
+
+    if result.get('fullpath'):
         result['url'] += result['fullpath']
+
+    if simple and not result['host']:
+        # simple mode does not carry over empty host names
+        del result['host']
 
     return result
 
@@ -1013,6 +1067,81 @@ def parse_urls(*args, **kwargs):
             result += parse_urls(*arg, store_unparseable=store_unparseable)
 
     return result
+
+
+def url_assembly(**kwargs):
+    """
+    This function reverses the parse_url() function by taking in the provided
+    result set and re-assembling a URL
+
+    """
+    # Determine Authentication
+    auth = ''
+    if kwargs.get('user') is not None and \
+            kwargs.get('password') is not None:
+
+        auth = '{user}:{password}@'.format(
+            user=quote(kwargs.get('user'), safe=''),
+            password=quote(kwargs.get('password'), safe=''),
+        )
+
+    elif kwargs.get('user') is not None:
+        auth = '{user}@'.format(
+            user=quote(kwargs.get('user'), safe=''),
+        )
+
+    return '{schema}://{auth}{hostname}{port}{fullpath}{params}'.format(
+        schema='' if not kwargs.get('schema') else kwargs.get('schema'),
+        auth=auth,
+        # never encode hostname since we're expecting it to be a valid one
+        hostname='' if not kwargs.get('host') else kwargs.get('host', ''),
+        port='' if not kwargs.get('port')
+        else ':{}'.format(kwargs.get('port')),
+        fullpath=quote(kwargs.get('fullpath', ''), safe='/'),
+        params='' if not kwargs.get('qsd')
+        else '?{}'.format(urlencode(kwargs.get('qsd'))),
+    )
+
+
+def urlencode(query, doseq=False, safe='', encoding=None, errors=None):
+    """Convert a mapping object or a sequence of two-element tuples
+
+    Wrapper to Python's unquote while remaining compatible with both
+    Python 2 & 3 since the reference to this function changed between
+    versions.
+
+    The resulting string is a series of key=value pairs separated by '&'
+    characters, where both key and value are quoted using the quote()
+    function.
+
+    Note: If the dictionary entry contains an entry that is set to None
+          it is not included in the final result set. If you want to
+          pass in an empty variable, set it to an empty string.
+
+    Args:
+        query (str): The dictionary to encode
+        doseq (:obj:`bool`, optional): Handle sequences
+        safe (:obj:`str`): non-ascii characters and URI specific ones that
+            you do not wish to escape (if detected). Setting this string
+            to an empty one causes everything to be escaped.
+        encoding (:obj:`str`, optional): encoding type
+        errors (:obj:`str`, errors): how to handle invalid character found
+            in encoded string (defined by encoding)
+
+    Returns:
+        str: The escaped parameters returned as a string
+    """
+    # Tidy query by eliminating any records set to None
+    _query = {k: v for (k, v) in query.items() if v is not None}
+    try:
+        # Python v3.x
+        return _urlencode(
+            _query, doseq=doseq, safe=safe, encoding=encoding,
+            errors=errors)
+
+    except TypeError:
+        # Python v2.7
+        return _urlencode(_query)
 
 
 def parse_list(*args):
@@ -1473,63 +1602,41 @@ def module_detection(paths, cache=True):
         module_pyname = "{prefix}.{name}".format(
             prefix='apprise.custom.module', name=module_name)
 
-        # Prepare a reverse map so that our decorators can register itself with
-        # as elements are found.
-        common.NOTIFY_CUSTOM_MODULE_MAP[module_pyname] = {
-            'path': path,
-            'name': module_name,
-
-            # We'll save our module after it has deemed to be loaded
-            'module': None,
-
-            # A mapping of all of the plugins loaded that contains the
-            # @notify decorator. These elements get populated as they're
-            # loaded.
-            #
-            # The content can be found in the notify: subsection
-            #  'schema': {
-            #     'name': 'Custom schema name',
-            #     'fn_name': 'name_of_function_decorator_was_found_on',
-            #     'url': 'schema://any/additional/info/found/on/url'
-            #     'plugin': <CustomNotifyWrapperPlugin>
-            #  }
-            #
-            # Note: that the <CustomNotifyWrapperPlugin> inherits from
-            #       NotifyBase
-            'notify': {},
-        }
-
+        # Load our module
         module = import_module(path, module_pyname)
         if not module:
             # No problem, we can't use this object
             logger.warning('Failed to load custom module: %s', _path)
-            # Do not keep our failed entry
-            del common.NOTIFY_CUSTOM_MODULE_MAP[module_pyname]
+            if module_pyname in common.NOTIFY_CUSTOM_MODULE_MAP:
+                # Do not keep our failed entry
+                del common.NOTIFY_CUSTOM_MODULE_MAP[module_pyname]
             return None
 
-        logger.debug(
-            'Loaded custom module: %s (name=%s)',
-            _path, module_name)
-
-        # Save our module to our map
-        common.NOTIFY_CUSTOM_MODULE_MAP[module_pyname]['module'] = module
-
         # Print our loaded modules if any
-        if common.NOTIFY_CUSTOM_MODULE_MAP[module_pyname]['notify']:
-            for schema, meta in \
-                    common.\
-                    NOTIFY_CUSTOM_MODULE_MAP[module_pyname]['notify'].items():
+        if module_pyname in common.NOTIFY_CUSTOM_MODULE_MAP:
+            logger.debug(
+                'Loaded custom module: %s (name=%s)',
+                _path, module_name)
+
+            for schema, meta in common.\
+                    NOTIFY_CUSTOM_MODULE_MAP[module_pyname]['notify']\
+                    .items():
+
                 logger.info('Loaded custom notification: %s://', schema)
         else:
-            # do not keep empty entries
-            del common.NOTIFY_CUSTOM_MODULE_MAP[module_pyname]
+            # The code reaches here if we successfully loaded the Python
+            # module but no hooks/triggers were found. So we can safely
+            # just remove/ignore this entry
+            del sys.modules[module_pyname]
+            return None
 
         # end of _import_module()
-        return
+        return None
 
     for _path in paths:
         path = os.path.abspath(os.path.expanduser(_path))
-        if path in PATHS_PREVIOUSLY_SCANNED or not os.path.exists(path):
+        if (cache and path in PATHS_PREVIOUSLY_SCANNED) \
+                or not os.path.exists(path):
             # We're done as we've already scanned this
             continue
 
@@ -1539,7 +1646,7 @@ def module_detection(paths, cache=True):
         if os.path.isdir(path) and not \
                 os.path.isfile(os.path.join(path, '__init__.py')):
 
-            logger.debug('Scanning for decorators in: %s', path)
+            logger.debug('Scanning for custom plugins in: %s', path)
             for entry in os.listdir(path):
                 re_match = module_re.match(entry)
                 if not re_match:
@@ -1557,13 +1664,23 @@ def module_detection(paths, cache=True):
                             os.path.join(path, entry))
                         continue
 
-                if new_path not in PATHS_PREVIOUSLY_SCANNED:
+                if not cache or \
+                        (cache and new_path not in PATHS_PREVIOUSLY_SCANNED):
                     # Load our module
                     _import_module(new_path)
 
                     # Add our subdir path
                     PATHS_PREVIOUSLY_SCANNED.add(new_path)
         else:
+            if os.path.isdir(path):
+                # This logic is safe to apply because we already validated
+                # the directories state above; update our path
+                path = os.path.join(path, '__init__.py')
+                if cache and path in PATHS_PREVIOUSLY_SCANNED:
+                    continue
+
+                PATHS_PREVIOUSLY_SCANNED.add(path)
+
             # directly load as is
             re_match = module_re.match(os.path.basename(path))
             if not re_match:
@@ -1571,10 +1688,27 @@ def module_detection(paths, cache=True):
                 logger.trace('Plugin Scan: Ignoring %s', path)
                 continue
 
-            if os.path.isdir(path):
-                # This logic is safe to apply because we already validated
-                # the directories state above
-                path = os.path.join(path, '__init__.py')
-
             # Load our module
             _import_module(path)
+
+        return None
+
+
+def dict_full_update(dict1, dict2):
+    """
+    Takes 2 dictionaries (dict1 and dict2) that contain sub-dictionaries and
+    gracefully merges them into dict1.
+
+    This is similar to: dict1.update(dict2) except that internal dictionaries
+    are also recursively applied.
+    """
+    def _merge(dict1, dict2):
+        for k in dict2:
+            if k in dict1 and isinstance(dict1[k], dict) \
+                    and isinstance(dict2[k], dict):
+                _merge(dict1[k], dict2[k])
+            else:
+                dict1[k] = dict2[k]
+
+    _merge(dict1, dict2)
+    return

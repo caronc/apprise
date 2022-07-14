@@ -38,6 +38,28 @@ NOTIFY_SCHEMA_MAP = {}
 #
 # The elements here will be additionally added to the NOTIFY_SCHEMA_MAP if
 # there is no conflict otherwise.
+# The structure looks like the following:
+# Module path, e.g. /usr/share/apprise/plugins/my_notify_hook.py
+# {
+#   'path': path,
+#
+#   'notify': {
+#     'schema': {
+#       'name': 'Custom schema name',
+#       'fn_name': 'name_of_function_decorator_was_found_on',
+#       'url': 'schema://any/additional/info/found/on/url'
+#       'plugin': <CustomNotifyWrapperPlugin>
+#    },
+#     'schema2': {
+#       'name': 'Custom schema name',
+#       'fn_name': 'name_of_function_decorator_was_found_on',
+#       'url': 'schema://any/additional/info/found/on/url'
+#       'plugin': <CustomNotifyWrapperPlugin>
+#    }
+#  }
+#
+# Note: that the <CustomNotifyWrapperPlugin> inherits from
+#       NotifyBase
 NOTIFY_CUSTOM_MODULE_MAP = {}
 
 # Maintains a mapping of all configuration schema's supported

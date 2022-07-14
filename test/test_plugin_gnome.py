@@ -29,41 +29,12 @@ import sys
 import types
 import pytest
 import apprise
+from helpers import module_reload
 from apprise.plugins.NotifyGnome import GnomeUrgency
-
-try:
-    # Python v3.4+
-    from importlib import reload
-except ImportError:
-    try:
-        # Python v3.0-v3.3
-        from imp import reload
-    except ImportError:
-        # Python v2.7
-        pass
 
 # Disable logging for a cleaner testing output
 import logging
 logging.disable(logging.CRITICAL)
-
-
-def _reload():
-    """
-    The following libraries need to be reloaded to prevent
-     TypeError: super(type, obj): obj must be an instance or subtype of type
-     This is better explained in this StackOverflow post:
-        https://stackoverflow.com/questions/31363311/\
-          any-way-to-manually-fix-operation-of-\
-             super-after-ipython-reload-avoiding-ty
-
-    """
-    reload(sys.modules['apprise.common'])
-    reload(sys.modules['apprise.attachment'])
-    reload(sys.modules['apprise.config'])
-    reload(sys.modules['apprise.plugins.NotifyGnome'])
-    reload(sys.modules['apprise.plugins'])
-    reload(sys.modules['apprise.Apprise'])
-    reload(sys.modules['apprise'])
 
 
 @pytest.mark.skipif(sys.version_info.major <= 2, reason="Requires Python 3.x+")
@@ -84,7 +55,7 @@ def test_plugin_gnome_general():
         # for the purpose of testing and capture the handling of the
         # library when it is missing
         del sys.modules[gi_name]
-        _reload()
+        module_reload('NotifyGnome')
 
     # We need to fake our gnome environment for testing purposes since
     # the gi library isn't available in Travis CI
@@ -119,7 +90,7 @@ def test_plugin_gnome_general():
     notify_obj.show.return_value = True
     mock_notify.new.return_value = notify_obj
     mock_pixbuf.new_from_file.return_value = True
-    _reload()
+    module_reload('NotifyGnome')
 
     # Create our instance
     obj = apprise.Apprise.instantiate('gnome://', suppress_exceptions=False)
@@ -301,7 +272,7 @@ def test_plugin_gnome_general():
 
     # Emulate require_version function:
     gi.require_version.side_effect = ValueError()
-    _reload()
+    module_reload('NotifyGnome')
 
     # We can now no longer load our instance
     # The object internally is marked disabled
