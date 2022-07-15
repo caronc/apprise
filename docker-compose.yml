@@ -1,0 +1,43 @@
+version: "3.3"
+services:
+  test.py27:
+    build:
+      context: .
+      dockerfile: Dockerfile.py27
+    volumes:
+      - ./:/apprise
+
+  test.py35:
+    build:
+      context: .
+      dockerfile: Dockerfile.py35
+    volumes:
+      - ./:/apprise
+
+  test.py310:
+    build:
+      context: .
+      dockerfile: Dockerfile.py310
+    volumes:
+      - ./:/apprise
+
+# Connect to web and create a new project using the manage script
+# -> docker-compose run --rm test.py27 bash
+# bin/apprise -
+# bin/checkdone.sh
+#
+# Run a set of tests for just a certain section
+#  docker-compose run --rm test.py27 bin/test.sh fcm
+#
+# Or just run all the tsts in python 2.7
+#  docker-compose run --rm test.py27 bin/test.sh
+#
+# Want to run the whole test suite:
+#
+# [ -f .coverage ] && rm -f .coverage
+# docker-compose run --rm test.py27 coverage run --append -m pytest -vv
+# docker-compose run --rm test.py35 coverage run --append -m pytest -vv
+# docker-compose run --rm test.py310 coverage run --append -m pytest -vv
+#
+# # Now produce a report
+# docker-compose run --rm test.py310 coverage report --show-missing
