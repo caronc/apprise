@@ -2061,24 +2061,32 @@ def test_module_detection(tmpdir):
     assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 2
     assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 0
 
+    def create_hook(tdir, cache=True, on="valid1"):
+        """
+        Just a temporary hook creation tool for writing a working notify hook
+        """
+        tdir.write(cleandoc("""
+        from apprise.decorators import notify
+
+        # this is a good hook but burried in hidden directory which won't
+        # be accessed unless the file is pointed to via absolute path
+        @notify(on="{}")
+        def mywrapper(body, title, notify_type, *args, **kwargs):
+            pass
+        """.format(on)))
+
+        utils.module_detection([str(tdir)], cache=cache)
+
+    create_hook(notify_hook_c, on='valid1')
+    assert 'valid1' not in common.NOTIFY_SCHEMA_MAP
+
     # Even if we correct our empty file; the fact the directory has been
     # scanned and failed to load (same with file), it won't be loaded
     # a second time. This is intentional since module_detection() get's
     # called for every AppriseAsset() object creation.  This prevents us
     # from reloading conent over and over again wasting resources
     assert 'valid1' not in common.NOTIFY_SCHEMA_MAP
-    notify_hook_c.write(cleandoc("""
-    from apprise.decorators import notify
-
-    # this is a good hook but burried in hidden directory which won't
-    # be accessed unless the file is pointed to via absolute path
-    @notify(on="valid1")
-    def mywrapper(body, title, notify_type, *args, **kwargs):
-        pass
-    """))
-
-    utils.module_detection([str(notify_hook_c_base)])
-    assert 'valid1' not in common.NOTIFY_SCHEMA_MAP
+    utils.module_detection([str(notify_hook_c)])
     assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 2
     assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 0
 
@@ -2101,7 +2109,53 @@ def test_module_detection(tmpdir):
     assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 2
     assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 1
 
+    # If you update the module (corrupting it in the process and reload)
+    notify_hook_c.write(cleandoc("""
+    raise ValueError
+    """))
+
+    # Force no cache to cause the file to be replaced
+    utils.module_detection([str(notify_hook_c_base)], cache=False)
+
+    # Our valid entry is no longer loaded
+    assert 'valid1' not in common.NOTIFY_SCHEMA_MAP
+
+    # No change to scanned paths
+    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 2
+    # The previously loaded module is now gone
+    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 0
+
+    # Reload our valid1 entry
+    create_hook(notify_hook_c, on='valid1', cache=False)
+    assert 'valid1' in common.NOTIFY_SCHEMA_MAP
+    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 2
+    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 1
+
+    # Prepare an empty file
+    notify_hook_c.write("")
+    utils.module_detection([str(notify_hook_c_base)], cache=False)
+
+    # Our valid entry is no longer loaded
+    assert 'valid1' not in common.NOTIFY_SCHEMA_MAP
+    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 2
+    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 0
+
+    # Now reload our module again (this time rather then an exception, the
+    # module is read back and swaps `valid1` for `valid2`
+    create_hook(notify_hook_c, on='valid1', cache=False)
+    assert 'valid1' in common.NOTIFY_SCHEMA_MAP
+    assert 'valid2' not in common.NOTIFY_SCHEMA_MAP
+    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 2
+    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 1
+
+    create_hook(notify_hook_c, on='valid2', cache=False)
+    assert 'valid1' not in common.NOTIFY_SCHEMA_MAP
+    assert 'valid2' in common.NOTIFY_SCHEMA_MAP
+    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 2
+    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 1
+
     # Reset our variables for the next test
+    create_hook(notify_hook_c, on='valid1', cache=False)
     del common.NOTIFY_SCHEMA_MAP['valid1']
     utils.PATHS_PREVIOUSLY_SCANNED.clear()
     common.NOTIFY_CUSTOM_MODULE_MAP.clear()
@@ -2151,11 +2205,36 @@ def test_module_detection(tmpdir):
     assert 'valid2' in common.NOTIFY_SCHEMA_MAP
     assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 3
     assert str(notify_hook_c) in utils.PATHS_PREVIOUSLY_SCANNED
+    assert str(notify_hook_e) in utils.PATHS_PREVIOUSLY_SCANNED
     assert str(notify_hook_e_base) in utils.PATHS_PREVIOUSLY_SCANNED
     assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 2
 
     # Reset our variables for the next test
     del common.NOTIFY_SCHEMA_MAP['valid1']
+    del common.NOTIFY_SCHEMA_MAP['valid2']
+    utils.PATHS_PREVIOUSLY_SCANNED.clear()
+    common.NOTIFY_CUSTOM_MODULE_MAP.clear()
+
+    # Load our file directly
+    assert 'valid2' not in common.NOTIFY_SCHEMA_MAP
+    utils.module_detection([str(notify_hook_e)])
+
+    # Now we have it loaded as expected
+    assert 'valid2' in common.NOTIFY_SCHEMA_MAP
+    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 1
+    assert str(notify_hook_e) in utils.PATHS_PREVIOUSLY_SCANNED
+    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 1
+
+    # however if we try to load the base directory where the __init__.py
+    # was already loaded from, it will not change anything
+    utils.module_detection([str(notify_hook_e_base)])
+    assert 'valid2' in common.NOTIFY_SCHEMA_MAP
+    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 2
+    assert str(notify_hook_e) in utils.PATHS_PREVIOUSLY_SCANNED
+    assert str(notify_hook_e_base) in utils.PATHS_PREVIOUSLY_SCANNED
+    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 1
+
+    # Tidy up for the next test
     del common.NOTIFY_SCHEMA_MAP['valid2']
     utils.PATHS_PREVIOUSLY_SCANNED.clear()
     common.NOTIFY_CUSTOM_MODULE_MAP.clear()

@@ -1609,14 +1609,22 @@ def module_detection(paths, cache=True):
         module_pyname = "{prefix}.{name}".format(
             prefix='apprise.custom.module', name=module_name)
 
+        if module_pyname in common.NOTIFY_CUSTOM_MODULE_MAP:
+            # First clear out existing entries
+            for schema in common.\
+                    NOTIFY_CUSTOM_MODULE_MAP[module_pyname]['notify'] \
+                    .keys():
+                # Remove any mapped modules to this file
+                del common.NOTIFY_SCHEMA_MAP[schema]
+
+            # Reset
+            del common.NOTIFY_CUSTOM_MODULE_MAP[module_pyname]
+
         # Load our module
         module = import_module(path, module_pyname)
         if not module:
             # No problem, we can't use this object
             logger.warning('Failed to load custom module: %s', _path)
-            if module_pyname in common.NOTIFY_CUSTOM_MODULE_MAP:
-                # Do not keep our failed entry
-                del common.NOTIFY_CUSTOM_MODULE_MAP[module_pyname]
             return None
 
         # Print our loaded modules if any

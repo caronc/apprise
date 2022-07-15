@@ -158,14 +158,13 @@ it:
 
     # This example assumes you want your function to trigger on foobar://
     # references:
-    @notify(on="foobar")
+    @notify(on="foobar", name="My Custom Notification")
     def my_wrapper(body, title, notify_type, *args, **kwargs):
     
          <define your custom code here>
-    
-         # Return True or None if you want your call to report a success
-         # back to the callling service.  Otherwise return False if you want
-         # to let the calling service know it failed.
+   
+    		# Returning True/False is a way to relay your status back to Apprise.
+    		# Returning nothing (None by default) is always interpreted as a Success
          return True
 
 ## CONFIGURATION

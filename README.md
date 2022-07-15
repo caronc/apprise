@@ -26,11 +26,31 @@ System Administrators and DevOps who wish to send a notification now no longer n
 [![CodeCov Status](https://codecov.io/github/caronc/apprise/branch/master/graph/badge.svg)](https://codecov.io/github/caronc/apprise)
 [![PyPi](https://img.shields.io/pypi/dm/apprise.svg?style=flat-square)](https://pypi.org/project/apprise/)
 
-## Supported Notifications
+# Table of Contents
+<!--ts-->
+* [Supported Notifications](#supported-notifications)
+  * [Productivity Based Notifications](#productivity-based-notifications)
+  * [SMS Notifications](#sms-notifications)
+  * [Desktop Notifications](#desktop-notifications)
+  * [Email Notifications](#email-notifications)
+  * [Custom Notifications](#custom-notifications)
+* [Installation](#installation)
+* [Command Line Usage](#command-line-usage)
+  * [Configuration Files](#cli-configuration-files)
+  * [File Attachments](#cli-file-attachments)
+  * [Loading Custom Notifications/Hooks](#cli-loading-custom-notificationshooks)
+* [Developer API Usage](#developer-api-usage)
+  * [Configuration Files](#api-configuration-files)
+  * [File Attachments](#api-file-attachments)
+  * [Loading Custom Notifications/Hooks](#api-loading-custom-notificationshooks)
+* [More Supported Links and Documentation](#want-to-learn-more)
+<!--te-->
+
+# Supported Notifications
 
 The section identifies all of the services supported by this library. [Check out the wiki for more information on the supported modules here](https://github.com/caronc/apprise/wiki).
 
-### Popular Notification Services
+## Productivity Based Notifications
 
 The table below identifies the services this tool supports and some example service urls you need to use in order to take advantage of it. Click on any of the services listed below to get more details on how you can configure Apprise to access them.
 
@@ -101,8 +121,7 @@ The table below identifies the services this tool supports and some example serv
 | [Webex Teams (Cisco)](https://github.com/caronc/apprise/wiki/Notify_wxteams) | wxteams://  | (TCP) 443   | wxteams://Token
 | [Zulip Chat](https://github.com/caronc/apprise/wiki/Notify_zulip) | zulip://  | (TCP) 443   | zulip://botname@Organization/Token<br />zulip://botname@Organization/Token/Stream<br />zulip://botname@Organization/Token/Email
 
-
-### SMS Notification Support
+## SMS Notifications
 
 | Notification Service | Service ID | Default Port | Example Syntax |
 | -------------------- | ---------- | ------------ | -------------- |
@@ -119,7 +138,7 @@ The table below identifies the services this tool supports and some example serv
 | [Twilio](https://github.com/caronc/apprise/wiki/Notify_twilio) | twilio://  | (TCP) 443   | twilio://AccountSid:AuthToken@FromPhoneNo<br/>twilio://AccountSid:AuthToken@FromPhoneNo/ToPhoneNo<br/>twilio://AccountSid:AuthToken@FromPhoneNo/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/<br/>twilio://AccountSid:AuthToken@FromPhoneNo/ToPhoneNo?apikey=Key<br/>twilio://AccountSid:AuthToken@ShortCode/ToPhoneNo<br/>twilio://AccountSid:AuthToken@ShortCode/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
 | [Vonage](https://github.com/caronc/apprise/wiki/Notify_nexmo) (formerly Nexmo) | nexmo://  | (TCP) 443   | nexmo://ApiKey:ApiSecret@FromPhoneNo<br/>nexmo://ApiKey:ApiSecret@FromPhoneNo/ToPhoneNo<br/>nexmo://ApiKey:ApiSecret@FromPhoneNo/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
 
-## Desktop Notification Support
+## Desktop Notifications
 
 | Notification Service | Service ID | Default Port | Example Syntax |
 | -------------------- | ---------- | ------------ | -------------- |
@@ -128,7 +147,7 @@ The table below identifies the services this tool supports and some example serv
 | [MacOS X Notifications](https://github.com/caronc/apprise/wiki/Notify_macosx) | macosx://    |        n/a          | macosx://
 | [Windows Notifications](https://github.com/caronc/apprise/wiki/Notify_windows) | windows://    |        n/a          | windows://
 
-### Email Support
+## Email Notifications
 
 | Service ID | Default Port | Example Syntax |
 | ---------- | ------------ | -------------- |
@@ -137,7 +156,7 @@ The table below identifies the services this tool supports and some example serv
 
 Apprise have some email services built right into it (such as yahoo, fastmail, hotmail, gmail, etc) that greatly simplify the mailto:// service.  See more details [here](https://github.com/caronc/apprise/wiki/Notify_email).
 
-### Custom Notifications
+## Custom Notifications
 
 | Post Method          | Service ID | Default Port | Example Syntax |
 | -------------------- | ---------- | ------------ | -------------- |
@@ -145,16 +164,29 @@ Apprise have some email services built right into it (such as yahoo, fastmail, h
 | [JSON](https://github.com/caronc/apprise/wiki/Notify_Custom_JSON)       | json:// or jsons://   | (TCP) 80 or 443 | json://hostname<br />json://user@hostname<br />json://user:password@hostname:port<br />json://hostname/a/path/to/post/to
 | [XML](https://github.com/caronc/apprise/wiki/Notify_Custom_XML)         | xml:// or xmls://   | (TCP) 80 or 443 | xml://hostname<br />xml://user@hostname<br />xml://user:password@hostname:port<br />xml://hostname/a/path/to/post/to
 
-## Installation
+# Installation
 
 The easiest way is to install this package is from pypi:
 ```bash
 pip install apprise
 ```
 
-## Command Line
+Apprise is also packaged as an RPM and available through [EPEL](https://docs.fedoraproject.org/en-US/epel/) supporting CentOS, Redhat, Rocky, Oracle Linux, etc.
+```bash
+# Follow instructions on https://docs.fedoraproject.org/en-US/epel
+# to get your system connected up to EPEL and then:
+# Redhat/CentOS 7.x users
+yum install apprise
 
-A small command line tool is also provided with this package called *apprise*. If you know the server url's you wish to notify, you can simply provide them all on the command line and send your notifications that way:
+# Redhat/CentOS 8.x+ and/or Fedora Users
+dnf install apprise
+```
+
+You can also check out the [Graphical version of Apprise](https://github.com/caronc/apprise-api) to centralize your configuration and notifications through a managable webpage.
+
+# Command Line Usage
+
+A small command line interface (CLI) tool is also provided with this package called *apprise*. If you know the server url's you wish to notify, you can simply provide them all on the command line and send your notifications that way:
 ```bash
 # Send a notification to as many servers as you want
 # as you can easily chain one after another (the -vv provides some
@@ -173,7 +205,7 @@ uptime | apprise -vv \
    'discord:///4174216298/JHMHI8qBe7bk2ZwO5U711o3dV_js'
 ```
 
-### Configuration Files
+## CLI Configuration Files
 
 No one wants to put their credentials out for everyone to see on the command line.  No problem *apprise* also supports configuration files.  It can handle both a specific [YAML format](https://github.com/caronc/apprise/wiki/config_yaml) or a very simple [TEXT format](https://github.com/caronc/apprise/wiki/config_text). You can also pull these configuration files via an HTTP query too! You can read more about the expected structure of the configuration files [here](https://github.com/caronc/apprise/wiki/config).
 ```bash
@@ -211,7 +243,7 @@ apprise -vv -t 'my title' -b 'my notification body' \
    --config=https://localhost/my/apprise/config
 ```
 
-### Attaching Files
+## CLI File Attachments
 
 Apprise also supports file attachments too! Specify as many attachments to a notification as you want.
 ```bash
@@ -229,34 +261,34 @@ apprise -vv --title 'system crash' \
         --tag devteam
 ```
 
-### Loading Custom Notifications/Hooks
+## CLI Loading Custom Notifications/Hooks
 
 To create your own custom `schema://` hook so that you can trigger your own custom code,
 simply include the `@notify` decorator to wrap your function.
 ```python
 from apprise.decorators import notify
-
+#
 # The below assumes you want to catch foobar:// calls:
-@notify(on="foobar")
+#
+@notify(on="foobar", name="My Custom Foobar Plugin")
 def my_custom_notification_wrapper(body, title, notify_type, *args, **kwargs):
     """My custom notification function that triggers on all foobar:// calls
     """
     # Write all of your code here... as an example...
     print("{}: {} - {}".format(notify_type.upper(), title, body))
 
-    # when you're done, you don't have to return anything.
-    # However returning True/False is a way to back back your status.
-    # Returning nothing (None by default) is interpreted as a Success
+    # Returning True/False is a way to relay your status back to Apprise.
+    # Returning nothing (None by default) is always interpreted as a Success
 ```
 
 Once you've defined your custom hook, you just need to tell Apprise where it is at runtime.
 ```bash
 # By default if no plugin path is specified apprise will attempt to load
-# plugin files (if present) from:
-#  ~/.apprise/apprise/plugisn
+# all plugin files (if present) from the following directory paths:
+#  ~/.apprise/apprise/plugins
 #  ~/.config/apprise/plugins
 
-# Windows users can store their default plugin files here:
+# Windows users can store their default plugin files in these directories:
 #  %APPDATA%/Apprise/plugins
 #  %LOCALAPPDATA%/Apprise/plugins
 
@@ -273,7 +305,7 @@ apprise -vv --title 'custom override' \
         foobar:\\
 ```
 
-## Developers
+# Developer API Usage
 
 To send a notification from within your python application, just do the following:
 ```python
@@ -297,7 +329,7 @@ apobj.notify(
 )
 ```
 
-### Configuration Files
+## API Configuration Files
 
 Developers need access to configuration files too. The good news is their use just involves declaring another object (called *AppriseConfig*) that the *Apprise* object can ingest.  You can also freely mix and match config and notification entries as often as you wish! You can read more about the expected structure of the configuration files [here](https://github.com/caronc/apprise/wiki/config).
 ```python
@@ -350,7 +382,7 @@ apobj.notify(
 )
 ```
 
-### Attaching Files
+## API File Attachments
 
 Attachments are very easy to send using the Apprise API:
 ```python
@@ -408,28 +440,29 @@ apobj.notify(
 )
 ```
 
-### Loading Custom Notifications/Hooks
+## API Loading Custom Notifications/Hooks
 
-By default, no plugins are loaded at all for those building with the API.
+By default, no custom plugins are loaded at all for those building from within the Apprise API.
 It's at the developers discretion to load custom modules. But should you choose to do so, it's as easy
-as including the path reference in the `AppriseAsset()` object during the initialization of your `Apprise()` instance.
+as including the path reference in the `AppriseAsset()` object prior to the initialization of your `Apprise()`
+instance.
 
 For example:
 ```python
 from apprise import Apprise
 from apprise import AppriseAsset
 
-# Prepare your Asset Object so that you can enable the Custom Plugins to be loaded for your
-# instance of Apprise...
+# Prepare your Asset object so that you can enable the custom plugins to
+# be loaded for your instance of Apprise...
 asset = AppriseAsset(plugin_paths="/path/to/scan")
 
 # OR You can also generate scan more then one file too:
 asset = AppriseAsset(
     plugin_paths=[
-        # Iterate over all python libraries found in the root of the specified
-        # path. This is NOT a recursive (directory) scan; only the first level
-        # is parsed. HOWEVER, if a directory containing an __init__.py is
-        # found, it will be included in the load.
+        # Iterate over all python libraries found in the root of the
+        # specified path. This is NOT a recursive (directory) scan; only
+        # the first level is parsed. HOWEVER, if a directory containing
+        # an __init__.py is found, it will be included in the load.
         "/dir/containing/many/python/libraries",
 
         # An absolute path to a plugin.py to exclusively load
@@ -442,18 +475,20 @@ asset = AppriseAsset(
         "/path/to/dir/library"
 )
 
-# Now that we've got our asset, we just work with our Apprise object as we normally do
+# Now that we've got our asset, we just work with our Apprise object as we
+# normally do
 aobj = Apprise(asset=asset)
 
-# If our new custom `foobar://` library was loaded (presuming we prepared one like
-# in the examples above).  then you would be able to safely add it into Apprise at this point
+# If our new custom `foobar://` library was loaded (presuming we prepared
+# one like in the examples above).  then you would be able to safely add it
+# into Apprise at this point
 aobj.add('foobar://')
 
 # Send our notification out through our foobar://
 aobj.notify("test")
 ```
 
-## Want To Learn More?
+# Want To Learn More?
 
 If you're interested in reading more about this and other methods on how to customize your own notifications, please check out the following links:
 * 📣 [Using the CLI](https://github.com/caronc/apprise/wiki/CLI_Usage)
