@@ -31,7 +31,7 @@ import requests
 from apprise.common import ConfigFormat
 from apprise.config.ConfigHTTP import ConfigHTTP
 from apprise.plugins.NotifyBase import NotifyBase
-from apprise.plugins import SCHEMA_MAP
+from apprise.common import NOTIFY_SCHEMA_MAP
 
 # Disable logging for a cleaner testing output
 import logging
@@ -74,7 +74,7 @@ def test_config_http(mock_post):
             return ''
 
     # Store our good notification in our schema map
-    SCHEMA_MAP['good'] = GoodNotification
+    NOTIFY_SCHEMA_MAP['good'] = GoodNotification
 
     # Our default content
     default_content = """taga,tagb=good://server01"""

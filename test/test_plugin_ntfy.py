@@ -398,11 +398,11 @@ def test_plugin_custom_ntfy_edge_cases(mock_post):
     assert results['password'] is None
     assert results['port'] is None
     assert results['host'] == 'localhost'
-    assert results['fullpath'] == '/topic1'
-    assert results['path'] == '/'
-    assert results['query'] == 'topic1'
+    assert results['fullpath'] == '/topic1/'
+    assert results['path'] == '/topic1/'
+    assert results['query'] is None
     assert results['schema'] == 'ntfy'
-    assert results['url'] == 'ntfy://localhost/topic1'
+    assert results['url'] == 'ntfy://localhost/topic1/'
     assert results['attach'] == 'http://example.com/file.jpg'
     assert results['filename'] == 'smoke.jpg'
 

@@ -53,6 +53,7 @@ from ...common import NotifyType
 from ...utils import validate_regex
 from ...utils import parse_list
 from ...utils import parse_bool
+from ...utils import dict_full_update
 from ...common import NotifyImageSize
 from ...AppriseAttachment import AppriseAttachment
 from ...AppriseLocale import gettext_lazy as _
@@ -450,17 +451,9 @@ class NotifyFCM(NotifyBase):
                         "FCM recipient %s parsed as a device token",
                         recipient)
 
-            #
-            # Apply our priority configuration (if set)
-            #
-            def merge(d1, d2):
-                for k in d2:
-                    if k in d1 and isinstance(d1[k], dict) \
-                            and isinstance(d2[k], dict):
-                        merge(d1[k], d2[k])
-                    else:
-                        d1[k] = d2[k]
-            merge(payload, self.priority.payload())
+            # A more advanced dict.update() that recursively includes
+            # sub-dictionaries as well
+            dict_full_update(payload, self.priority.payload())
 
             self.logger.debug(
                 'FCM %s POST URL: %s (cert_verify=%r)',

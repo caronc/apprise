@@ -32,6 +32,7 @@ import os
 import re
 
 from os.path import isfile
+from os.path import exists
 from os.path import expanduser
 from os.path import expandvars
 
@@ -40,6 +41,7 @@ from . import NotifyFormat
 from . import Apprise
 from . import AppriseAsset
 from . import AppriseConfig
+
 from .utils import parse_list
 from .common import NOTIFY_TYPES
 from .common import NOTIFY_FORMATS
@@ -60,21 +62,40 @@ DEFAULT_RECURSION_DEPTH = 1
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 
 # Define our default configuration we use if nothing is otherwise specified
-DEFAULT_SEARCH_PATHS = (
+DEFAULT_CONFIG_PATHS = (
+    # Legacy Path Support
     '~/.apprise',
     '~/.apprise.yml',
     '~/.config/apprise',
     '~/.config/apprise.yml',
+
+    # Plugin Support Extended Directory Search Paths
+    '~/.apprise/apprise',
+    '~/.apprise/apprise.yml',
+    '~/.config/apprise/apprise',
+    '~/.config/apprise/apprise.yml',
+)
+
+# Define our paths to search for plugins
+DEFAULT_PLUGIN_PATHS = (
+    '~/.apprise/plugins',
+    '~/.config/apprise/plugins',
 )
 
 # Detect Windows
 if platform.system() == 'Windows':
-    # Default Search Path for Windows Users
-    DEFAULT_SEARCH_PATHS = (
+    # Default Config Search Path for Windows Users
+    DEFAULT_CONFIG_PATHS = (
         expandvars('%APPDATA%/Apprise/apprise'),
         expandvars('%APPDATA%/Apprise/apprise.yml'),
         expandvars('%LOCALAPPDATA%/Apprise/apprise'),
         expandvars('%LOCALAPPDATA%/Apprise/apprise.yml'),
+    )
+
+    # Default Plugin Search Path for Windows Users
+    DEFAULT_PLUGIN_PATHS = (
+        expandvars('%APPDATA%/Apprise/plugins'),
+        expandvars('%LOCALAPPDATA%/Apprise/plugins'),
     )
 
 
@@ -107,6 +128,9 @@ def print_version_msg():
 @click.option('--title', '-t', default=None, type=str,
               help='Specify the message title. This field is complete '
               'optional.')
+@click.option('--plugin-path', '-P', default=None, type=str, multiple=True,
+              metavar='PLUGIN_PATH',
+              help='Specify one or more plugin paths to scan.')
 @click.option('--config', '-c', default=None, type=str, multiple=True,
               metavar='CONFIG_URL',
               help='Specify one or more configuration locations.')
@@ -158,7 +182,7 @@ def print_version_msg():
                 metavar='SERVER_URL [SERVER_URL2 [SERVER_URL3]]',)
 def main(body, title, config, attach, urls, notification_type, theme, tag,
          input_format, dry_run, recursion_depth, verbose, disable_async,
-         details, interpret_escapes, debug, version):
+         details, interpret_escapes, plugin_path, debug, version):
     """
     Send a notification to all of the specified servers identified by their
     URLs the content provided within the title, body and notification-type.
@@ -232,6 +256,12 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
         # issue.  For consistency, we also return a 2
         sys.exit(2)
 
+    if not plugin_path:
+        # Prepare a default set of plugin path
+        plugin_path = \
+            next((path for path in DEFAULT_PLUGIN_PATHS
+                 if exists(expanduser(path))), None)
+
     # Prepare our asset
     asset = AppriseAsset(
         # Our body format
@@ -248,6 +278,9 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
         # incase there are problems in the future where it's better that
         # everything run sequentially/syncronously instead.
         async_mode=disable_async is not True,
+
+        # Load our plugins
+        plugin_paths=plugin_path,
     )
 
     # Create our Apprise object
@@ -284,11 +317,18 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
                             '{}://'.format(protocols[0]),
                             entry['details']['templates'][x])
 
+            fg = "green" if entry['enabled'] else "red"
+            if entry['category'] == 'custom':
+                # Identify these differently
+                fg = "cyan"
+                # Flip the enable switch so it forces the requirements
+                # to be displayed
+                entry['enabled'] = False
+
             click.echo(click.style(
                 '{} {:<30} '.format(
                     '+' if entry['enabled'] else '-',
-                    str(entry['service_name'])),
-                fg="green" if entry['enabled'] else "red", bold=True),
+                    str(entry['service_name'])), fg=fg, bold=True),
                 nl=(not entry['enabled'] or len(protocols) == 1))
 
             if not entry['enabled']:
@@ -307,8 +347,9 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
                         click.echo('     - ' + req)
 
                 # new line padding between entries
-                click.echo()
-                continue
+                if entry['category'] == 'native':
+                    click.echo()
+                    continue
 
             if len(protocols) > 1:
                 click.echo('| Schema(s): {}'.format(
@@ -324,6 +365,7 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
             click.echo()
 
         sys.exit(0)
+        # end if details()
 
     # The priorities of what is accepted are parsed in order below:
     #    1. URLs by command line
@@ -372,13 +414,14 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
         a.add(AppriseConfig(
             paths=os.environ['APPRISE_CONFIG'].strip(),
             asset=asset, recursion=recursion_depth))
+
     else:
         # Load default configuration
         a.add(AppriseConfig(
-            paths=[f for f in DEFAULT_SEARCH_PATHS if isfile(expanduser(f))],
+            paths=[f for f in DEFAULT_CONFIG_PATHS if isfile(expanduser(f))],
             asset=asset, recursion=recursion_depth))
 
-    if len(a) == 0:
+    if len(a) == 0 and not urls:
         logger.error(
             'You must specify at least one server URL or populated '
             'configuration file.')

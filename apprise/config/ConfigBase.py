@@ -30,17 +30,14 @@ import yaml
 import time
 
 from .. import plugins
+from .. import common
 from ..AppriseAsset import AppriseAsset
 from ..URLBase import URLBase
-from ..common import ConfigFormat
-from ..common import CONFIG_FORMATS
-from ..common import ContentIncludeMode
 from ..utils import GET_SCHEMA_RE
 from ..utils import parse_list
 from ..utils import parse_bool
 from ..utils import parse_urls
 from ..utils import cwe312_url
-from . import SCHEMA_MAP
 
 # Test whether token is valid or not
 VALID_TOKEN = re.compile(
@@ -57,7 +54,7 @@ class ConfigBase(URLBase):
 
     # The default expected configuration format unless otherwise
     # detected by the sub-modules
-    default_config_format = ConfigFormat.TEXT
+    default_config_format = common.ConfigFormat.TEXT
 
     # This is only set if the user overrides the config format on the URL
     # this should always initialize itself as None
@@ -70,7 +67,7 @@ class ConfigBase(URLBase):
 
     # By default all configuration is not includable using the 'include'
     # line found in configuration files.
-    allow_cross_includes = ContentIncludeMode.NEVER
+    allow_cross_includes = common.ContentIncludeMode.NEVER
 
     # the config path manages the handling of relative include
     config_path = os.getcwd()
@@ -142,7 +139,7 @@ class ConfigBase(URLBase):
             # Store the enforced config format
             self.config_format = kwargs.get('format').lower()
 
-            if self.config_format not in CONFIG_FORMATS:
+            if self.config_format not in common.CONFIG_FORMATS:
                 # Simple error checking
                 err = 'An invalid config format ({}) was specified.'.format(
                     self.config_format)
@@ -230,7 +227,7 @@ class ConfigBase(URLBase):
                     schema = schema.group('schema').lower()
 
                     # Some basic validation
-                    if schema not in SCHEMA_MAP:
+                    if schema not in common.CONFIG_SCHEMA_MAP:
                         ConfigBase.logger.warning(
                             'Unsupported include schema {}.'.format(schema))
                         continue
@@ -241,7 +238,7 @@ class ConfigBase(URLBase):
 
                 # Parse our url details of the server object as dictionary
                 # containing all of the information parsed from our URL
-                results = SCHEMA_MAP[schema].parse_url(url)
+                results = common.CONFIG_SCHEMA_MAP[schema].parse_url(url)
                 if not results:
                     # Failed to parse the server URL
                     self.logger.warning(
@@ -249,12 +246,13 @@ class ConfigBase(URLBase):
                     continue
 
                 # Handle cross inclusion based on allow_cross_includes rules
-                if (SCHEMA_MAP[schema].allow_cross_includes ==
-                        ContentIncludeMode.STRICT
+                if (common.CONFIG_SCHEMA_MAP[schema].allow_cross_includes ==
+                        common.ContentIncludeMode.STRICT
                         and schema not in self.schemas()
                         and not self.insecure_includes) or \
-                        SCHEMA_MAP[schema].allow_cross_includes == \
-                        ContentIncludeMode.NEVER:
+                        common.CONFIG_SCHEMA_MAP[schema] \
+                        .allow_cross_includes == \
+                        common.ContentIncludeMode.NEVER:
 
                     # Prevent the loading if insecure base protocols
                     ConfigBase.logger.warning(
@@ -280,7 +278,8 @@ class ConfigBase(URLBase):
                 try:
                     # Attempt to create an instance of our plugin using the
                     # parsed URL information
-                    cfg_plugin = SCHEMA_MAP[results['schema']](**results)
+                    cfg_plugin = \
+                        common.CONFIG_SCHEMA_MAP[results['schema']](**results)
 
                 except Exception as e:
                     # the arguments are invalid or can not be used.
@@ -379,7 +378,7 @@ class ConfigBase(URLBase):
         # Allow overriding the default config format
         if 'format' in results['qsd']:
             results['format'] = results['qsd'].get('format')
-            if results['format'] not in CONFIG_FORMATS:
+            if results['format'] not in common.CONFIG_FORMATS:
                 URLBase.logger.warning(
                     'Unsupported format specified {}'.format(
                         results['format']))
@@ -457,14 +456,14 @@ class ConfigBase(URLBase):
 
             # Attempt to detect configuration
             if result.group('yaml'):
-                config_format = ConfigFormat.YAML
+                config_format = common.ConfigFormat.YAML
                 ConfigBase.logger.debug(
                     'Detected YAML configuration '
                     'based on line {}.'.format(line))
                 break
 
             elif result.group('text'):
-                config_format = ConfigFormat.TEXT
+                config_format = common.ConfigFormat.TEXT
                 ConfigBase.logger.debug(
                     'Detected TEXT configuration '
                     'based on line {}.'.format(line))
@@ -472,7 +471,7 @@ class ConfigBase(URLBase):
 
             # If we reach here, we have a comment entry
             # Adjust default format to TEXT
-            config_format = ConfigFormat.TEXT
+            config_format = common.ConfigFormat.TEXT
 
         return config_format
 
@@ -493,7 +492,7 @@ class ConfigBase(URLBase):
                 ConfigBase.logger.error('Could not detect configuration')
                 return (list(), list())
 
-        if config_format not in CONFIG_FORMATS:
+        if config_format not in common.CONFIG_FORMATS:
             # Invalid configuration type specified
             ConfigBase.logger.error(
                 'An invalid configuration format ({}) was specified'.format(
@@ -618,7 +617,7 @@ class ConfigBase(URLBase):
             try:
                 # Attempt to create an instance of our plugin using the
                 # parsed URL information
-                plugin = plugins.SCHEMA_MAP[results['schema']](**results)
+                plugin = common.NOTIFY_SCHEMA_MAP[results['schema']](**results)
 
                 # Create log entry of loaded URL
                 ConfigBase.logger.debug(
@@ -881,7 +880,7 @@ class ConfigBase(URLBase):
                                 del entries['schema']
 
                             # support our special tokens (if they're present)
-                            if schema in plugins.SCHEMA_MAP:
+                            if schema in common.NOTIFY_SCHEMA_MAP:
                                 entries = ConfigBase._special_token_handler(
                                     schema, entries)
 
@@ -893,7 +892,7 @@ class ConfigBase(URLBase):
 
                 elif isinstance(tokens, dict):
                     # support our special tokens (if they're present)
-                    if schema in plugins.SCHEMA_MAP:
+                    if schema in common.NOTIFY_SCHEMA_MAP:
                         tokens = ConfigBase._special_token_handler(
                             schema, tokens)
 
@@ -927,7 +926,7 @@ class ConfigBase(URLBase):
                 # Grab our first item
                 _results = results.pop(0)
 
-                if _results['schema'] not in plugins.SCHEMA_MAP:
+                if _results['schema'] not in common.NOTIFY_SCHEMA_MAP:
                     # the arguments are invalid or can not be used.
                     ConfigBase.logger.warning(
                         'An invalid Apprise schema ({}) in YAML configuration '
@@ -970,7 +969,8 @@ class ConfigBase(URLBase):
                 try:
                     # Attempt to create an instance of our plugin using the
                     # parsed URL information
-                    plugin = plugins.SCHEMA_MAP[_results['schema']](**_results)
+                    plugin = common.\
+                        NOTIFY_SCHEMA_MAP[_results['schema']](**_results)
 
                     # Create log entry of loaded URL
                     ConfigBase.logger.debug(
@@ -1023,7 +1023,7 @@ class ConfigBase(URLBase):
         # Create a copy of our dictionary
         tokens = tokens.copy()
 
-        for kw, meta in plugins.SCHEMA_MAP[schema]\
+        for kw, meta in common.NOTIFY_SCHEMA_MAP[schema]\
                 .template_kwargs.items():
 
             # Determine our prefix:
@@ -1068,7 +1068,7 @@ class ConfigBase(URLBase):
         # This function here allows these mappings to take place within the
         # YAML file as independant arguments.
         class_templates = \
-            plugins.details(plugins.SCHEMA_MAP[schema])
+            plugins.details(common.NOTIFY_SCHEMA_MAP[schema])
 
         for key in list(tokens.keys()):
 

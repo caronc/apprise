@@ -29,9 +29,7 @@ import re
 from os import listdir
 from os.path import dirname
 from os.path import abspath
-
-# Maintains a mapping of all of the attachment services
-SCHEMA_MAP = {}
+from ..common import ATTACHMENT_SCHEMA_MAP
 
 __all__ = []
 
@@ -91,28 +89,28 @@ def __load_matrix(path=abspath(dirname(__file__)), name='apprise.attachment'):
         # Load protocol(s) if defined
         proto = getattr(plugin, 'protocol', None)
         if isinstance(proto, six.string_types):
-            if proto not in SCHEMA_MAP:
-                SCHEMA_MAP[proto] = plugin
+            if proto not in ATTACHMENT_SCHEMA_MAP:
+                ATTACHMENT_SCHEMA_MAP[proto] = plugin
 
         elif isinstance(proto, (set, list, tuple)):
             # Support iterables list types
             for p in proto:
-                if p not in SCHEMA_MAP:
-                    SCHEMA_MAP[p] = plugin
+                if p not in ATTACHMENT_SCHEMA_MAP:
+                    ATTACHMENT_SCHEMA_MAP[p] = plugin
 
         # Load secure protocol(s) if defined
         protos = getattr(plugin, 'secure_protocol', None)
         if isinstance(protos, six.string_types):
-            if protos not in SCHEMA_MAP:
-                SCHEMA_MAP[protos] = plugin
+            if protos not in ATTACHMENT_SCHEMA_MAP:
+                ATTACHMENT_SCHEMA_MAP[protos] = plugin
 
         if isinstance(protos, (set, list, tuple)):
             # Support iterables list types
             for p in protos:
-                if p not in SCHEMA_MAP:
-                    SCHEMA_MAP[p] = plugin
+                if p not in ATTACHMENT_SCHEMA_MAP:
+                    ATTACHMENT_SCHEMA_MAP[p] = plugin
 
-    return SCHEMA_MAP
+    return ATTACHMENT_SCHEMA_MAP
 
 
 # Dynamically build our schema base

@@ -37,8 +37,8 @@ from apprise import AppriseAsset
 from apprise.config.ConfigBase import ConfigBase
 from apprise.plugins.NotifyBase import NotifyBase
 
-from apprise.config import SCHEMA_MAP as CONFIG_SCHEMA_MAP
-from apprise.plugins import SCHEMA_MAP as NOTIFY_SCHEMA_MAP
+from apprise.common import CONFIG_SCHEMA_MAP
+from apprise.common import NOTIFY_SCHEMA_MAP
 from apprise.config import __load_matrix
 from apprise.config.ConfigFile import ConfigFile
 

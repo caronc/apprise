@@ -34,7 +34,7 @@ from os.path import getsize
 from apprise.attachment.AttachHTTP import AttachHTTP
 from apprise import AppriseAttachment
 from apprise.plugins.NotifyBase import NotifyBase
-from apprise.plugins import SCHEMA_MAP
+from apprise.common import NOTIFY_SCHEMA_MAP
 from apprise.common import ContentLocation
 
 # Disable logging for a cleaner testing output
@@ -128,7 +128,7 @@ def test_attach_http(mock_get):
             return ''
 
     # Store our good notification in our schema map
-    SCHEMA_MAP['good'] = GoodNotification
+    NOTIFY_SCHEMA_MAP['good'] = GoodNotification
 
     # Temporary path
     path = join(TEST_VAR_DIR, 'apprise-test.gif')

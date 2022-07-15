@@ -29,9 +29,7 @@ from os import listdir
 from os.path import dirname
 from os.path import abspath
 from ..logger import logger
-
-# Maintains a mapping of all of the configuration services
-SCHEMA_MAP = {}
+from ..common import CONFIG_SCHEMA_MAP
 
 __all__ = []
 
@@ -113,16 +111,16 @@ def __load_matrix(path=abspath(dirname(__file__)), name='apprise.config'):
 
         # map our schema to our plugin
         for schema in schemas:
-            if schema in SCHEMA_MAP:
+            if schema in CONFIG_SCHEMA_MAP:
                 logger.error(
                     "Config schema ({}) mismatch detected - {} to {}"
-                    .format(schema, SCHEMA_MAP[schema], plugin))
+                    .format(schema, CONFIG_SCHEMA_MAP[schema], plugin))
                 continue
 
             # Assign plugin
-            SCHEMA_MAP[schema] = plugin
+            CONFIG_SCHEMA_MAP[schema] = plugin
 
-    return SCHEMA_MAP
+    return CONFIG_SCHEMA_MAP
 
 
 # Dynamically build our schema base

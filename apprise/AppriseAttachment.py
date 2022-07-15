@@ -31,6 +31,7 @@ from .AppriseAsset import AppriseAsset
 from .logger import logger
 from .common import ContentLocation
 from .common import CONTENT_LOCATIONS
+from .common import ATTACHMENT_SCHEMA_MAP
 from .utils import GET_SCHEMA_RE
 
 
@@ -225,13 +226,13 @@ class AppriseAttachment(object):
             schema = schema.group('schema').lower()
 
             # Some basic validation
-            if schema not in attachment.SCHEMA_MAP:
+            if schema not in ATTACHMENT_SCHEMA_MAP:
                 logger.warning('Unsupported schema {}.'.format(schema))
                 return None
 
         # Parse our url details of the server object as dictionary containing
         # all of the information parsed from our URL
-        results = attachment.SCHEMA_MAP[schema].parse_url(url)
+        results = ATTACHMENT_SCHEMA_MAP[schema].parse_url(url)
 
         if not results:
             # Failed to parse the server URL
@@ -251,7 +252,7 @@ class AppriseAttachment(object):
                 # Attempt to create an instance of our plugin using the parsed
                 # URL information
                 attach_plugin = \
-                    attachment.SCHEMA_MAP[results['schema']](**results)
+                    ATTACHMENT_SCHEMA_MAP[results['schema']](**results)
 
             except Exception:
                 # the arguments are invalid or can not be used.
@@ -261,7 +262,7 @@ class AppriseAttachment(object):
         else:
             # Attempt to create an instance of our plugin using the parsed
             # URL information but don't wrap it in a try catch
-            attach_plugin = attachment.SCHEMA_MAP[results['schema']](**results)
+            attach_plugin = ATTACHMENT_SCHEMA_MAP[results['schema']](**results)
 
         return attach_plugin
 
