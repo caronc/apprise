@@ -305,6 +305,8 @@ apprise -vv --title 'custom override' \
         foobar:\\
 ```
 
+You can read more about creating your own custom notifications and/or hooks [here](https://github.com/caronc/apprise/wiki/decorator_notify).
+
 # Developer API Usage
 
 To send a notification from within your python application, just do the following:
@@ -488,6 +490,8 @@ aobj.add('foobar://')
 aobj.notify("test")
 ```
 
+You can read more about creating your own custom notifications and/or hooks [here](https://github.com/caronc/apprise/wiki/decorator_notify).
+
 # Want To Learn More?
 
 If you're interested in reading more about this and other methods on how to customize your own notifications, please check out the following links:
@@ -495,6 +499,7 @@ If you're interested in reading more about this and other methods on how to cust
 * 🛠️ [Development API](https://github.com/caronc/apprise/wiki/Development_API)
 * 🔧 [Troubleshooting](https://github.com/caronc/apprise/wiki/Troubleshooting)
 * ⚙️ [Configuration File Help](https://github.com/caronc/apprise/wiki/config)
+* ⚡ [Create Your Own Custom Notifications](https://github.com/caronc/apprise/wiki/decorator_notify)
 * 🌎 [Apprise API/Web Interface](https://github.com/caronc/apprise-api)
 * 🎉 [Showcase](https://github.com/caronc/apprise/wiki/showcase)
 
