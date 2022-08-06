@@ -863,3 +863,30 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
         'mailtos://user:pass123@hotmail.com')
     obj = Apprise.instantiate(results, suppress_exceptions=False)
     assert isinstance(obj, plugins.NotifyEmail) is True
+
+    #
+    # Test Port Over-Riding
+    #
+    results = plugins.NotifyEmail.parse_url(
+        "mailtos://abc:password@xyz.cn:465?"
+        "smtp=smtp.exmail.qq.com&mode=ssl")
+    obj = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(obj, plugins.NotifyEmail) is True
+
+    # Verify our over-rides are in place
+    assert obj.smtp_host == 'smtp.exmail.qq.com'
+    assert obj.port == 465
+    assert obj.from_addr == 'abc@xyz.cn'
+    assert obj.secure_mode == 'ssl'
+
+    results = plugins.NotifyEmail.parse_url(
+        "mailtos://abc:password@xyz.cn?"
+        "smtp=smtp.exmail.qq.com&mode=ssl&port=465")
+    obj = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(obj, plugins.NotifyEmail) is True
+
+    # Verify our over-rides are in place
+    assert obj.smtp_host == 'smtp.exmail.qq.com'
+    assert obj.port == 465
+    assert obj.from_addr == 'abc@xyz.cn'
+    assert obj.secure_mode == 'ssl'
