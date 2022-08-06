@@ -677,6 +677,9 @@ class URLBase(object):
         if 'cto' in results['qsd']:
             results['socket_connect_timeout'] = results['qsd']['cto']
 
+        if 'port' in results['qsd']:
+            results['port'] = results['qsd']['port']
+
         return results
 
     @staticmethod
