@@ -109,7 +109,7 @@ def test_plugin_windows_mocked():
     #
     for mod in list(sys.modules.keys()):
         if mod.startswith('apprise.'):
-            del(sys.modules[mod])
+            del sys.modules[mod]
     reload(apprise)
 
     # Create our instance

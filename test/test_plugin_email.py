@@ -382,7 +382,7 @@ def test_plugin_email(mock_smtp, mock_smtpssl):
 
         except Exception as e:
             # Handle our exception
-            if(instance is None):
+            if instance is None:
                 raise
 
             if not isinstance(e, instance):
