@@ -59,7 +59,7 @@ SMTP2Go, Spontit, SparkPost, Super Toasty, Streamlabs, Stride, Syslog,
 Techulus Push, Telegram, Twilio, Twitter, Twist, XBMC, Vonage, Webex Teams}
 
 Name:           python-%{pypi_name}
-Version:        0.9.9
+Version:        1.0.0
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        MIT
@@ -69,6 +69,10 @@ Source0:        %{url}/archive/v%{version}/%{pypi_name}-%{version}.tar.gz
 # correctly handle test coverage.  It also removes reference to a
 # extra check not supported in py.test in EPEL7 builds
 Patch0:         %{pypi_name}-rhel7-support.patch
+# CentOS/Rocky 7 and 8 ship with Click v6.7 which does not support the .stdout
+# directive used in the unit testing.  This patch just makes it so our package
+# continues to be compatible with these linux distributions
+Patch1:         %{pypi_name}-click67-support.patch
 BuildArch:      noarch
 
 %description %{common_description}
@@ -174,6 +178,11 @@ BuildRequires: python%{python3_pkgversion}-pytest-runner
 rm -f apprise/py3compat/asyncio.py
 %endif
 
+%if 0%{?rhel} && 0%{?rhel} <= 8
+# click v6.7 unit testing support
+%patch1 -p1
+%endif
+
 %build
 %if 0%{?with_python2}
 %py2_build
@@ -234,6 +243,15 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 %endif
 
 %changelog
+* Sat Aug  6 2022 Chris Caron <lead2gold@gmail.com> - 1.0.0-1
+- Updated to v1.0.0
+
+* Fri Jul 22 2022 Fedora Release Engineering <releng@fedoraproject.org> - 0.9.9-3
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_37_Mass_Rebuild
+
+* Wed Jun 15 2022 Python Maint <python-maint@redhat.com> - 0.9.9-2
+- Rebuilt for Python 3.11
+
 * Thu Jun  2 2022 Chris Caron <lead2gold@gmail.com> - 0.9.9-1
 - Updated to v0.9.9
 

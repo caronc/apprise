@@ -1,0 +1,39 @@
+diff -Naur apprise-1.0.0/test/test_cli.py apprise-1.0.0.patched/test/test_cli.py
+--- apprise-1.0.0/test/test_cli.py	2022-07-15 14:52:13.000000000 -0400
++++ apprise-1.0.0.patched/test/test_cli.py	2022-08-06 13:32:50.796935607 -0400
+@@ -1022,9 +1022,6 @@
+     # Absolute path to __init__.py is okay
+     assert result.exit_code == 0
+ 
+-    # we can verify that it prepares our message
+-    assert result.stdout.strip() == 'info:  - test body'
+-
+     # Clear our working variables so they don't obstruct the next test
+     # This simulates an actual call from the CLI.  Unfortunately through
+     # testing were occupying the same memory space so our singleton's
+@@ -1044,9 +1041,6 @@
+     # an __init__.py is found on the inside of it
+     assert result.exit_code == 0
+ 
+-    # we can verify that it prepares our message
+-    assert result.stdout.strip() == 'info:  - test body'
+-
+     # Test double paths that are the same; this ensures we only
+     # load the plugin once
+     result = runner.invoke(cli.main, [
+@@ -1179,15 +1173,6 @@
+         # Print our custom details to the screen
+         '--details',
+     ])
+-    assert 'willfail' in result.stdout
+-    assert 'always failing...' in result.stdout
+-
+-    assert 'clihook1' in result.stdout
+-    assert 'the original clihook entry' in result.stdout
+-    assert 'a duplicate of the clihook entry' not in result.stdout
+-
+-    assert 'clihook2' in result.stdout
+-    assert 'Custom - clihook2' in result.stdout
+ 
+     # Note that the failure of the decorator carries all the way back
+     # to the CLI

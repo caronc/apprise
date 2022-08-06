@@ -1,6 +1,6 @@
-diff -Naur apprise-0.9.6/test/helpers/rest.py apprise-0.9.6.patched/test/helpers/rest.py
---- apprise-0.9.6/test/helpers/rest.py	2021-12-01 20:00:27.000000000 -0500
-+++ apprise-0.9.6.patched/test/helpers/rest.py	2021-12-02 15:05:54.957547670 -0500
+diff -Naur apprise-1.0.0/test/helpers/rest.py apprise-1.0.0.patched/test/helpers/rest.py
+--- apprise-1.0.0/test/helpers/rest.py	2022-07-01 11:37:34.000000000 -0400
++++ apprise-1.0.0.patched/test/helpers/rest.py	2022-08-06 13:30:29.187325564 -0400
 @@ -54,8 +54,6 @@
              0, 'requests.RequestException() not handled'),
          requests.HTTPError(
@@ -10,9 +10,9 @@ diff -Naur apprise-0.9.6/test/helpers/rest.py apprise-0.9.6.patched/test/helpers
          requests.TooManyRedirects(
              0, 'requests.TooManyRedirects() not handled'),
      )
-diff -Naur apprise-0.9.6/test/test_attach_http.py apprise-0.9.6.patched/test/test_attach_http.py
---- apprise-0.9.6/test/test_attach_http.py	2021-12-01 20:00:27.000000000 -0500
-+++ apprise-0.9.6.patched/test/test_attach_http.py	2021-12-02 15:05:48.165575030 -0500
+diff -Naur apprise-1.0.0/test/test_attach_http.py apprise-1.0.0.patched/test/test_attach_http.py
+--- apprise-1.0.0/test/test_attach_http.py	2022-07-15 14:52:13.000000000 -0400
++++ apprise-1.0.0.patched/test/test_attach_http.py	2022-08-06 13:30:29.188325562 -0400
 @@ -51,8 +51,6 @@
          0, 'requests.RequestException() not handled'),
      requests.HTTPError(
@@ -22,9 +22,9 @@ diff -Naur apprise-0.9.6/test/test_attach_http.py apprise-0.9.6.patched/test/tes
      requests.TooManyRedirects(
          0, 'requests.TooManyRedirects() not handled'),
  
-diff -Naur apprise-0.9.6/test/test_config_http.py apprise-0.9.6.patched/test/test_config_http.py
---- apprise-0.9.6/test/test_config_http.py	2021-12-01 20:00:27.000000000 -0500
-+++ apprise-0.9.6.patched/test/test_config_http.py	2021-12-02 15:06:01.927519591 -0500
+diff -Naur apprise-1.0.0/test/test_config_http.py apprise-1.0.0.patched/test/test_config_http.py
+--- apprise-1.0.0/test/test_config_http.py	2022-07-15 14:52:13.000000000 -0400
++++ apprise-1.0.0.patched/test/test_config_http.py	2022-08-06 13:30:29.188325562 -0400
 @@ -46,8 +46,6 @@
          0, 'requests.RequestException() not handled'),
      requests.HTTPError(
@@ -34,10 +34,10 @@ diff -Naur apprise-0.9.6/test/test_config_http.py apprise-0.9.6.patched/test/tes
      requests.TooManyRedirects(
          0, 'requests.TooManyRedirects() not handled'),
  )
-diff -Naur apprise-0.9.6/test/test_plugin_glib.py apprise-0.9.6.patched/test/test_plugin_glib.py
---- apprise-0.9.6/test/test_plugin_glib.py	2021-12-01 20:00:27.000000000 -0500
-+++ apprise-0.9.6.patched/test/test_plugin_glib.py	2021-12-02 15:06:40.823362895 -0500
-@@ -48,7 +48,7 @@
+diff -Naur apprise-1.0.0/test/test_plugin_glib.py apprise-1.0.0.patched/test/test_plugin_glib.py
+--- apprise-1.0.0/test/test_plugin_glib.py	2022-07-15 14:52:13.000000000 -0400
++++ apprise-1.0.0.patched/test/test_plugin_glib.py	2022-08-06 13:30:29.189325559 -0400
+@@ -49,7 +49,7 @@
  
  if 'dbus' not in sys.modules:
      # Environment doesn't allow for dbus
@@ -45,4 +45,4 @@ diff -Naur apprise-0.9.6/test/test_plugin_glib.py apprise-0.9.6.patched/test/tes
 +    pytest.skip("Skipping dbus-python based tests")
  
  from dbus import DBusException  # noqa E402
- 
+ from apprise.plugins.NotifyDBus import DBusUrgency  # noqa E402
