@@ -111,7 +111,7 @@ EMAIL_TEMPLATES = (
         'Microsoft Hotmail',
         re.compile(
             r'^((?P<label>[^+]+)\+)?(?P<id>[^@]+)@'
-            r'(?P<domain>(hotmail|live)\.com)$', re.I),
+            r'(?P<domain>(outlook|hotmail|live)\.com(\.au)?)$', re.I),
         {
             'port': 587,
             'smtp_host': 'smtp-mail.outlook.com',

@@ -835,3 +835,31 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     # Test that our template over-ride worked
     assert 'mode=ssl' in obj.url()
     assert 'smtp=override.com' in obj.url()
+
+    mock_smtp.reset_mock()
+    response.reset_mock()
+
+    #
+    # Test outlook/hotmail lookups
+    #
+    results = plugins.NotifyEmail.parse_url(
+        'mailtos://user:pass123@outlook.com')
+    obj = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(obj, plugins.NotifyEmail) is True
+    assert obj.smtp_host == 'smtp-mail.outlook.com'
+
+    results = plugins.NotifyEmail.parse_url(
+        'mailtos://user:pass123@outlook.com.au')
+    obj = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(obj, plugins.NotifyEmail) is True
+    assert obj.smtp_host == 'smtp-mail.outlook.com'
+
+    results = plugins.NotifyEmail.parse_url(
+        'mailtos://user:pass123@live.com')
+    obj = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(obj, plugins.NotifyEmail) is True
+
+    results = plugins.NotifyEmail.parse_url(
+        'mailtos://user:pass123@hotmail.com')
+    obj = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(obj, plugins.NotifyEmail) is True
