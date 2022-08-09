@@ -186,7 +186,7 @@ You can also check out the [Graphical version of Apprise](https://github.com/car
 
 # Command Line Usage
 
-A small command line interface (CLI) tool is also provided with this package called *apprise*. If you know the server url's you wish to notify, you can simply provide them all on the command line and send your notifications that way:
+A small command line interface (CLI) tool is also provided with this package called *apprise*. If you know the server urls you wish to notify, you can simply provide them all on the command line and send your notifications that way:
 ```bash
 # Send a notification to as many servers as you want
 # as you can easily chain one after another (the -vv provides some
@@ -373,12 +373,12 @@ apobj.notify(
     tag='admin',
 )
 
-# If you want to notify absolutely everything (reguardless of whether
+# If you want to notify absolutely everything (regardless of whether
 # it's been tagged or not), just use the reserved tag of 'all':
 apobj.notify(
     body='send a notification to our admin group',
     title='Attention Admins',
-    # notify absolutely everything loaded, reguardless on wether
+    # notify absolutely everything loaded, regardless on wether
     # it has a tag associated with it or not:
     tag='all',
 )
@@ -405,8 +405,8 @@ apobj.notify(
 
 # Send a web based attachment too! In the below example, we connect to a home
 # security camera and send a live image to an email. By default remote web
-# content is cached but for a security camera, we might want to call notify
-# again later in our code so we want our last image retrieved to expire(in
+# content is cached, but for a security camera we might want to call notify
+# again later in our code, so we want our last image retrieved to expire(in
 # this case after 3 seconds).
 apobj.notify(
     title='Latest security image',
@@ -424,7 +424,7 @@ apobj = apprise.Apprise()
 # Add at least one service you want to notify
 apobj.add('mailto://myuser:mypass@hotmail.com')
 
-# Now add all of the entries we're intrested in:
+# Now add all of the entries we're interested in:
 attach = (
     # ?name= allows us to rename the actual jpeg as found on the site
     # to be another name when sent to our receipient(s)
@@ -475,6 +475,7 @@ asset = AppriseAsset(
         # absolute .py file. Hence, there is no (level 1) scanning at all
         # within the directory specified.
         "/path/to/dir/library"
+    ]
 )
 
 # Now that we've got our asset, we just work with our Apprise object as we
