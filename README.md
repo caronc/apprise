@@ -475,6 +475,7 @@ asset = AppriseAsset(
         # absolute .py file. Hence, there is no (level 1) scanning at all
         # within the directory specified.
         "/path/to/dir/library"
+    ]
 )
 
 # Now that we've got our asset, we just work with our Apprise object as we
