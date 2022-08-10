@@ -329,10 +329,10 @@ class NotifyPagerDuty(NotifyBase):
                 payload['payload']['custom_details'][k] = v
 
         # Prepare our URL based on region
-        url = PAGERDUTY_API_LOOKUP[self.region_name]
+        notify_url = PAGERDUTY_API_LOOKUP[self.region_name]
 
         self.logger.debug('Pager Duty POST URL: %s (cert_verify=%r)' % (
-            url, self.verify_certificate,
+            notify_url, self.verify_certificate,
         ))
         self.logger.debug('Pager Duty Payload: %s' % str(payload))
 
@@ -341,7 +341,7 @@ class NotifyPagerDuty(NotifyBase):
 
         try:
             r = requests.post(
-                self.url,
+                notify_url,
                 data=dumps(payload),
                 headers=headers,
                 verify=self.verify_certificate,
