@@ -381,9 +381,6 @@ class NotifyOpsgenie(NotifyBase):
         # Initialize our has_error flag
         has_error = False
 
-        # We want to manually set the title onto the body if specified
-        title_body = body if not title else '{}: {}'.format(title, body)
-
         # Create a copy ouf our details object
         details = self.details.copy()
         if 'type' not in details:
@@ -392,7 +389,7 @@ class NotifyOpsgenie(NotifyBase):
         # Prepare our payload
         payload = {
             'source': self.app_desc,
-            'message': title_body,
+            'message': title,
             'description': body,
             'details': details,
             'priority': 'P{}'.format(self.priority),
