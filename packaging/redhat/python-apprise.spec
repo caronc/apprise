@@ -60,7 +60,7 @@ Techulus Push, Telegram, Twilio, Twitter, Twist, XBMC, Vonage, Webex Teams}
 
 Name:           python-%{pypi_name}
 Version:        1.0.0
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        MIT
 URL:            https://github.com/caronc/%{pypi_name}
@@ -161,7 +161,7 @@ Requires: python%{python3_pkgversion}-cryptography
 Requires: python%{python3_pkgversion}-yaml
 
 %if %{with tests}
-%if 0%{?fedora} >= 37 || 0%{?rhel} >= 9
+%if 0%{?rhel} >= 9
 # Do not import python3-mock
 %else
 # python-mock switched to unittest.mock
@@ -188,11 +188,14 @@ rm -f apprise/py3compat/asyncio.py
 %patch1 -p1
 %endif
 
-%if 0%{?fedora} >= 37 || 0%{?rhel} >= 9
-# Nothing to do
+%if 0%{?rhel} >= 9
+# Nothing to do under normal circumstances; this line here allows legacy
+# copies of Apprise to still build against this one
+find test -type f -name '*.py' -exec \
+   sed -i -e 's|^import mock|from unittest import mock|g' {} \;
 %else
 # support python-mock (remain backwards compatible with older distributions)
-find text -type f -name '*.py' -exec \
+find test -type f -name '*.py' -exec \
    sed -i -e 's|^from unittest import mock|import mock|g' {} \;
 %endif
 
@@ -256,6 +259,9 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 %endif
 
 %changelog
+* Wed Aug 31 2022 Chris Caron <lead2gold@gmail.com> - 1.0.0-2
+- Rebuilt for RHEL9 Support
+
 * Sat Aug  6 2022 Chris Caron <lead2gold@gmail.com> - 1.0.0-1
 - Updated to v1.0.0
 
