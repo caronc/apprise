@@ -26,7 +26,14 @@
 import sys
 import six
 import io
-import mock
+try:
+    # Python 3.x
+    from unittest import mock
+
+except ImportError:
+    # Python 2.7
+    import mock
+
 import pytest
 from apprise import NotifyFormat
 from apprise import ConfigFormat

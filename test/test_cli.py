@@ -24,7 +24,14 @@
 # THE SOFTWARE.
 from __future__ import print_function
 import re
-import mock
+try:
+    # Python 3.x
+    from unittest import mock
+
+except ImportError:
+    # Python 2.7
+    import mock
+
 import requests
 import json
 from inspect import cleandoc

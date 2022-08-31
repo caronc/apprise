@@ -26,7 +26,14 @@
 import six
 import time
 import pytest
-import mock
+try:
+    # Python 3.x
+    from unittest import mock
+
+except ImportError:
+    # Python 2.7
+    import mock
+
 import requests
 from apprise.common import ConfigFormat
 from apprise.config.ConfigHTTP import ConfigHTTP
