@@ -287,7 +287,7 @@ class NotifySMSEagle(NotifyBase):
             "responsetype": 'extended',
 
             # Message Simulation
-            "test": 1,
+            "test": 0,
         }
 
         # Apply our authentication
