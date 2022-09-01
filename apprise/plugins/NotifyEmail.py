@@ -397,9 +397,10 @@ class NotifyEmail(NotifyBase):
             'default': SecureMailMode.STARTTLS,
             'map_to': 'secure_mode',
         },
-        'reply_to': {
+        'reply': {
             'name': _('Reply To'),
             'type': 'list:string',
+            'map_to': 'reply_to',
         },
     })
 
@@ -474,6 +475,10 @@ class NotifyEmail(NotifyBase):
         # Set our from name
         self.from_name = from_name if from_name else result['name']
 
+        # Store our lookup
+        self.names[self.from_addr] = \
+            self.from_name if self.from_name else False
+
         # Now detect the SMTP Server
         self.smtp_host = \
             smtp_host if isinstance(smtp_host, six.string_types) else ''
@@ -539,6 +544,10 @@ class NotifyEmail(NotifyBase):
                 'Dropped invalid Blind Carbon Copy email '
                 '({}) specified.'.format(recipient),
             )
+
+        if not reply_to:
+            # Add ourselves to the Reply-To directive
+            self.reply_to.add(self.from_addr)
 
         # Validate recipients (reply-to:) and drop bad ones:
         for recipient in parse_emails(reply_to):
@@ -788,15 +797,21 @@ class NotifyEmail(NotifyBase):
                     (from_name if from_name else False, self.from_addr))
                 base['To'] = formataddr((to_name, to_addr))
 
-            base['Message-ID'] = make_msgid(domain=self.smtp_host)
+            try:
+                base['Message-ID'] = make_msgid(domain=self.smtp_host)
+
+            except TypeError:
+                # Python v2.x Support (no domain keyword)
+                base['Message-ID'] = make_msgid()
+
             base['Date'] = \
                 datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S +0000")
             base['X-Application'] = self.app_id
 
             if cc:
                 base['Cc'] = ','.join(cc)
-            if reply_to:
-                base['Reply-To'] = ','.join(reply_to)
+
+            base['Reply-To'] = ','.join(reply_to)
 
             # bind the socket variable to the current namespace
             socket = None
@@ -888,6 +903,12 @@ class NotifyEmail(NotifyBase):
                 ['{}{}'.format(
                     '' if not e not in self.names
                     else '{}:'.format(self.names[e]), e) for e in self.bcc])
+
+        # Handle our Reply-To Addresses
+        params['reply'] = ','.join(
+            ['{}{}'.format(
+                '' if not e not in self.names
+                else '{}:'.format(self.names[e]), e) for e in self.reply_to])
 
         # pull email suffix from username (if present)
         user = None if not self.user else self.user.split('@')[0]
@@ -984,8 +1005,8 @@ class NotifyEmail(NotifyBase):
             results['bcc'] = results['qsd']['bcc']
 
         # Handle Reply To Addresses
-        if 'reply_to' in results['qsd'] and len(results['qsd']['reply_to']):
-            results['reply_to'] = results['qsd']['reply_to']
+        if 'reply' in results['qsd'] and len(results['qsd']['reply']):
+            results['reply_to'] = results['qsd']['reply']
 
         results['from_addr'] = from_addr
         results['smtp_host'] = smtp_host

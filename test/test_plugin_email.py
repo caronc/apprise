@@ -163,14 +163,14 @@ TEST_URLS = (
     (
         # Test Reply To
         'mailtos://user:pass@example.com?smtp=smtp.example.com'
-        '&name=l2g&reply_to=test@example.com,test2@example.com', {
+        '&name=l2g&reply=test@example.com,test2@example.com', {
             'instance': plugins.NotifyEmail,
         },
     ),
     (
         # Test Reply To with bad email
         'mailtos://user:pass@example.com?smtp=smtp.example.com'
-        '&name=l2g&reply_to=test@example.com,@', {
+        '&name=l2g&reply=test@example.com,@', {
             'instance': plugins.NotifyEmail,
         },
     ),
@@ -247,7 +247,7 @@ TEST_URLS = (
     ('mailto://user:pass@localhost/?cc=test2@,$@!/', {
         'instance': plugins.NotifyEmail,
     }),
-    ('mailto://user:pass@localhost/?reply_to=test2@,$@!/', {
+    ('mailto://user:pass@localhost/?reply=test2@,$@!/', {
         'instance': plugins.NotifyEmail,
     }),
 )
