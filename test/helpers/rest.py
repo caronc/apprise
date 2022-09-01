@@ -26,7 +26,14 @@ import re
 import os
 import six
 import requests
-import mock
+try:
+    # Python 3.x
+    from unittest import mock
+
+except ImportError:
+    # Python 2.7
+    import mock
+
 from json import dumps
 from random import choice
 from string import ascii_uppercase as str_alpha

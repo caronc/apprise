@@ -24,7 +24,14 @@
 # THE SOFTWARE.
 
 import six
-import mock
+try:
+    # Python 3.x
+    from unittest import mock
+
+except ImportError:
+    # Python 2.7
+    import mock
+
 from apprise.config.ConfigFile import ConfigFile
 from apprise.plugins.NotifyBase import NotifyBase
 from apprise.AppriseAsset import AppriseAsset

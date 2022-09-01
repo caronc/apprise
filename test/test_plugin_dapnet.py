@@ -25,7 +25,14 @@
 # Disable logging for a cleaner testing output
 import logging
 import requests
-import mock
+try:
+    # Python 3.x
+    from unittest import mock
+
+except ImportError:
+    # Python 2.7
+    import mock
+
 
 import apprise
 from apprise.plugins.NotifyDapnet import DapnetPriority

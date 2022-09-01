@@ -27,7 +27,14 @@ import os
 import six
 import sys
 import pytest
-import mock
+try:
+    # Python 3.x
+    from unittest import mock
+
+except ImportError:
+    # Python 2.7
+    import mock
+
 import requests
 from json import dumps
 from json import loads

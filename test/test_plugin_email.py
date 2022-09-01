@@ -26,7 +26,14 @@
 import os
 import re
 import six
-import mock
+try:
+    # Python 3.x
+    from unittest import mock
+
+except ImportError:
+    # Python 2.7
+    import mock
+
 import smtplib
 from email.header import decode_header
 
