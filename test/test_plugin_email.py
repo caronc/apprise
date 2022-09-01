@@ -160,6 +160,20 @@ TEST_URLS = (
             'instance': plugins.NotifyEmail,
         },
     ),
+    (
+        # Test Reply To
+        'mailtos://user:pass@example.com?smtp=smtp.example.com'
+        '&name=l2g&reply_to=test@example.com,test2@example.com', {
+            'instance': plugins.NotifyEmail,
+        },
+    ),
+    (
+        # Test Reply To with bad email
+        'mailtos://user:pass@example.com?smtp=smtp.example.com'
+        '&name=l2g&reply_to=test@example.com,@', {
+            'instance': plugins.NotifyEmail,
+        },
+    ),
     # headers
     ('mailto://user:pass@localhost.localdomain'
         '?+X-Customer-Campaign-ID=Apprise', {
@@ -231,6 +245,9 @@ TEST_URLS = (
         'instance': plugins.NotifyEmail,
     }),
     ('mailto://user:pass@localhost/?cc=test2@,$@!/', {
+        'instance': plugins.NotifyEmail,
+    }),
+    ('mailto://user:pass@localhost/?reply_to=test2@,$@!/', {
         'instance': plugins.NotifyEmail,
     }),
 )
@@ -788,7 +805,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert isinstance(_to, list)
     assert len(_to) == 1
     assert _to[0] == 'user2@yahoo.com'
-    assert _msg.endswith('test')
+    assert _msg.split('\n')[-3] == 'test'
 
     # Our URL port was over-ridden (on template) to use 444
     # We can verify that this was correctly saved
@@ -835,7 +852,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert isinstance(_to, list)
     assert len(_to) == 1
     assert _to[0] == 'user2@yahoo.com'
-    assert _msg.endswith('test')
+    assert _msg.split('\n')[-3] == 'test'
 
     assert obj.url().startswith(
         'mailtos://user:pass123@hotmail.com/user2%40yahoo.com')

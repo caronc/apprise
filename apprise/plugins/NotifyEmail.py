@@ -724,7 +724,9 @@ class NotifyEmail(NotifyBase):
             if bcc:
                 self.logger.debug('Email Bcc: {}'.format(', '.join(bcc)))
             if reply_to:
-                self.logger.debug('Email Reply-To: {}'.format(', '.join(reply_to)))
+                self.logger.debug(
+                    'Email Reply-To: {}'.format(', '.join(reply_to))
+                )
             self.logger.debug('Login ID: {}'.format(self.user))
             self.logger.debug(
                 'Delivery: {}:{}'.format(self.smtp_host, self.port))
