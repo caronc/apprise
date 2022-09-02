@@ -38,10 +38,9 @@ from datetime import datetime
 
 from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
-from ..common import NotifyFormat
-from ..common import NotifyType
-from ..utils import is_email
-from ..utils import parse_emails
+from ..common import NotifyFormat, NotifyType
+from ..conversion import convert_between
+from ..utils import is_email, parse_emails
 from ..AppriseLocale import gettext_lazy as _
 
 # Globally Default encoding mode set to Quoted Printable.
@@ -656,12 +655,6 @@ class NotifyEmail(NotifyBase):
             return None
         return 'utf-8' if not all(ord(c) < 128 for c in input_string) else None
 
-    def _html2text(self, html):
-        """
-        Poor conversion implementation of HTML to text
-        """
-        return re.sub(r'(\s*<.*?>\s*)+', ' ', html)
-
     def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
              **kwargs):
         """
@@ -743,7 +736,10 @@ class NotifyEmail(NotifyBase):
             # Prepare Email Message
             if self.notify_format == NotifyFormat.HTML:
                 base = MIMEMultipart("alternative")
-                base.attach(MIMEText(self._html2text(body), 'plain', 'utf-8'))
+                base.attach(MIMEText(
+                    convert_between(NotifyFormat.HTML, NotifyFormat.TEXT, body),
+                    'plain', 'utf-8')
+                )
                 base.attach(MIMEText(body, 'html', 'utf-8'))
             else:
                 base = MIMEText(body, 'plain', 'utf-8')
