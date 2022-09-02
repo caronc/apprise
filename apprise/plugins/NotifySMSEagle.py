@@ -302,12 +302,6 @@ class NotifySMSEagle(NotifyBase):
         Perform SMSEagle Notification
         """
 
-        if not self.token:
-            # No authentication was provided
-            self.logger.warning(
-                'There was no authentication provided for the SMSEagle API.')
-            return False
-
         if not self.target_groups and not self.target_phones \
                 and not self.target_contacts:
             # There were no services to notify
