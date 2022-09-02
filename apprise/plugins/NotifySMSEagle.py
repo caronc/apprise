@@ -31,6 +31,7 @@ from itertools import chain
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
+from ..utils import validate_regex
 from ..utils import is_phone_no
 from ..utils import parse_phone_no
 from ..utils import parse_bool
@@ -60,11 +61,9 @@ SMSEAGLE_PRIORITY_MAP = {
     # short for 'normal'
     'normal': SMSEaglePriority.NORMAL,
     # short for 'high'
+    '+': SMSEaglePriority.HIGH,
     'high': SMSEaglePriority.HIGH,
 }
-
-# Identify the priority ou want to designate as the fall back
-DEFAULT_PRIORITY = "normal"
 
 
 class NotifySMSEagle(NotifyBase):
@@ -181,6 +180,7 @@ class NotifySMSEagle(NotifyBase):
             'name': _('Priority'),
             'type': 'choice:int',
             'values': SMSEAGLE_PRIORITIES,
+            'default': SMSEaglePriority.NORMAL,
         },
     })
 
@@ -211,8 +211,14 @@ class NotifySMSEagle(NotifyBase):
         # Used for URL generation afterwards only
         self.invalid_targets = list()
 
-        # We always use a token if provided, otherwise we use the user/pass
-        self.token = self.user if not token else token
+        # We always use a token if provided
+        self.token = validate_regex(self.user if not token else token)
+        if not self.token:
+            msg = \
+                'An invalid SMSEagle Access Token ({}) was specified.'.format(
+                    self.user if not token else token)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         #
         # Priority
@@ -225,7 +231,7 @@ class NotifySMSEagle(NotifyBase):
 
         except TypeError:
             # NoneType means use Default; this is an okay exception
-            self.priority = None
+            self.priority = self.template_args['priority']['default']
 
         except ValueError:
             # Input is a string; attempt to get the lookup from our
@@ -236,19 +242,19 @@ class NotifySMSEagle(NotifyBase):
             # low, lo, l (for low);
             # normal, norma, norm, nor, no, n (for normal)
             # ... etc
-            match = next((key for key in SMSEAGLE_PRIORITY_MAP.keys()
-                         if key.startswith(priority)), None) \
+            result = next((key for key in SMSEAGLE_PRIORITY_MAP.keys()
+                          if key.startswith(priority)), None) \
                 if priority else None
 
             # Now test to see if we got a match
-            if not match:
+            if not result:
                 msg = 'An invalid SMSEagle priority ' \
                       '({}) was specified.'.format(priority)
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
             # store our successfully looked up priority
-            self.priority = SMSEAGLE_PRIORITY_MAP[match]
+            self.priority = SMSEAGLE_PRIORITY_MAP[result]
 
         if self.priority is not None and \
                 self.priority not in SMSEAGLE_PRIORITY_MAP.values():
@@ -260,7 +266,8 @@ class NotifySMSEagle(NotifyBase):
         # Validate our targerts
         for target in parse_phone_no(targets):
             # Validate targets and drop bad ones:
-            result = is_phone_no(target)
+            # Allow 9 digit numbers (without country code)
+            result = is_phone_no(target, min_len=9)
             if result:
                 # store valid phone number
                 self.target_phones.append(
@@ -366,7 +373,7 @@ class NotifySMSEagle(NotifyBase):
             "unicode": 1,
 
             # sms or mms (if attachment)
-            "messge_type": 'sms',
+            "message_type": 'sms',
 
             # Response Types:
             #  simple: format response as simple object with one result field
@@ -406,6 +413,7 @@ class NotifySMSEagle(NotifyBase):
                 'target': 'contactname',
             },
         }
+
         for category in notify_by.keys():
 
             # Create a copy of our template
@@ -530,12 +538,13 @@ class NotifySMSEagle(NotifyBase):
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
+        default_priority = self.template_args['priority']['default']
         if self.priority is not None:
             # Store our priority; but only if it was specified
             params['priority'] = \
                 next((key for key, value in SMSEAGLE_PRIORITY_MAP.items()
                       if value == self.priority),
-                     DEFAULT_PRIORITY)  # pragma: no cover
+                     default_priority)  # pragma: no cover
 
         # Default port handling
         default_port = 443 if self.secure else 80
@@ -543,13 +552,13 @@ class NotifySMSEagle(NotifyBase):
         return '{schema}://{token}@{hostname}{port}/{targets}?{params}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             token=self.pprint(
-                self.token, privacy, mode=PrivacyMode.Secret, safe='#@'),
+                self.token, privacy, mode=PrivacyMode.Secret, safe=''),
             # never encode hostname since we're expecting it to be a valid one
             hostname=self.host,
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
             targets='/'.join(
-                [NotifySMSEagle.quote(x) for x in chain(
+                [NotifySMSEagle.quote(x, safe='#@') for x in chain(
                     # Pass phones directly as is
                     self.target_phones,
                     # Contacts
