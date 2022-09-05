@@ -737,7 +737,8 @@ class NotifyEmail(NotifyBase):
             if self.notify_format == NotifyFormat.HTML:
                 base = MIMEMultipart("alternative")
                 base.attach(MIMEText(
-                    convert_between(NotifyFormat.HTML, NotifyFormat.TEXT, body),
+                    convert_between(
+                        NotifyFormat.HTML, NotifyFormat.TEXT, body),
                     'plain', 'utf-8')
                 )
                 base.attach(MIMEText(body, 'html', 'utf-8'))
