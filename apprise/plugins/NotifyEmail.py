@@ -29,7 +29,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
-from email.utils import formataddr
+from email.utils import formataddr, make_msgid
 from email.header import Header
 from email import charset
 
@@ -38,10 +38,9 @@ from datetime import datetime
 
 from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
-from ..common import NotifyFormat
-from ..common import NotifyType
-from ..utils import is_email
-from ..utils import parse_emails
+from ..common import NotifyFormat, NotifyType
+from ..conversion import convert_between
+from ..utils import is_email, parse_emails
 from ..AppriseLocale import gettext_lazy as _
 
 # Globally Default encoding mode set to Quoted Printable.
@@ -397,6 +396,11 @@ class NotifyEmail(NotifyBase):
             'default': SecureMailMode.STARTTLS,
             'map_to': 'secure_mode',
         },
+        'reply': {
+            'name': _('Reply To'),
+            'type': 'list:string',
+            'map_to': 'reply_to',
+        },
     })
 
     # Define any kwargs we're using
@@ -409,7 +413,7 @@ class NotifyEmail(NotifyBase):
 
     def __init__(self, smtp_host=None, from_name=None,
                  from_addr=None, secure_mode=None, targets=None, cc=None,
-                 bcc=None, headers=None, **kwargs):
+                 bcc=None, reply_to=None, headers=None, **kwargs):
         """
         Initialize Email Object
 
@@ -434,6 +438,9 @@ class NotifyEmail(NotifyBase):
 
         # Acquire Blind Carbon Copies
         self.bcc = set()
+
+        # Acquire Reply To
+        self.reply_to = set()
 
         # For tracking our email -> name lookups
         self.names = {}
@@ -466,6 +473,10 @@ class NotifyEmail(NotifyBase):
 
         # Set our from name
         self.from_name = from_name if from_name else result['name']
+
+        # Store our lookup
+        self.names[self.from_addr] = \
+            self.from_name if self.from_name else False
 
         # Now detect the SMTP Server
         self.smtp_host = \
@@ -530,6 +541,26 @@ class NotifyEmail(NotifyBase):
 
             self.logger.warning(
                 'Dropped invalid Blind Carbon Copy email '
+                '({}) specified.'.format(recipient),
+            )
+
+        if not reply_to:
+            # Add ourselves to the Reply-To directive
+            self.reply_to.add(self.from_addr)
+
+        # Validate recipients (reply-to:) and drop bad ones:
+        for recipient in parse_emails(reply_to):
+            email = is_email(recipient)
+            if email:
+                self.reply_to.add(email['full_email'])
+
+                # Index our name (if one exists)
+                self.names[email['full_email']] = \
+                    email['name'] if email['name'] else False
+                continue
+
+            self.logger.warning(
+                'Dropped invalid Reply To email '
                 '({}) specified.'.format(recipient),
             )
 
@@ -612,6 +643,18 @@ class NotifyEmail(NotifyBase):
 
                 break
 
+    def _get_charset(self, input_string):
+        """
+        Get utf-8 charset if non ascii string only
+
+        Encode an ascii string to utf-8 is bad for email deliverability
+        because some anti-spam gives a bad score for that
+        like SUBJ_EXCESS_QP flag on Rspamd
+        """
+        if not input_string:
+            return None
+        return 'utf-8' if not all(ord(c) < 128 for c in input_string) else None
+
     def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
              **kwargs):
         """
@@ -642,6 +685,9 @@ class NotifyEmail(NotifyBase):
             # Strip target out of bcc list if in To
             bcc = (self.bcc - set([to_addr]))
 
+            # Strip target out of reply_to list if in To
+            reply_to = (self.reply_to - set([to_addr]))
+
             try:
                 # Format our cc addresses to support the Name field
                 cc = [formataddr(
@@ -653,6 +699,11 @@ class NotifyEmail(NotifyBase):
                     (self.names.get(addr, False), addr), charset='utf-8')
                     for addr in bcc]
 
+                # Format our reply-to addresses to support the Name field
+                reply_to = [formataddr(
+                    (self.names.get(addr, False), addr), charset='utf-8')
+                    for addr in reply_to]
+
             except TypeError:
                 # Python v2.x Support (no charset keyword)
                 # Format our cc addresses to support the Name field
@@ -663,6 +714,10 @@ class NotifyEmail(NotifyBase):
                 bcc = [formataddr(  # pragma: no branch
                     (self.names.get(addr, False), addr)) for addr in bcc]
 
+                # Format our reply-to addresses to support the Name field
+                reply_to = [formataddr(  # pragma: no branch
+                    (self.names.get(addr, False), addr)) for addr in reply_to]
+
             self.logger.debug(
                 'Email From: {} <{}>'.format(from_name, self.from_addr))
             self.logger.debug('Email To: {}'.format(to_addr))
@@ -670,45 +725,29 @@ class NotifyEmail(NotifyBase):
                 self.logger.debug('Email Cc: {}'.format(', '.join(cc)))
             if bcc:
                 self.logger.debug('Email Bcc: {}'.format(', '.join(bcc)))
+            if reply_to:
+                self.logger.debug(
+                    'Email Reply-To: {}'.format(', '.join(reply_to))
+                )
             self.logger.debug('Login ID: {}'.format(self.user))
             self.logger.debug(
                 'Delivery: {}:{}'.format(self.smtp_host, self.port))
 
             # Prepare Email Message
             if self.notify_format == NotifyFormat.HTML:
-                content = MIMEText(body, 'html', 'utf-8')
-
+                base = MIMEMultipart("alternative")
+                base.attach(MIMEText(
+                    convert_between(
+                        NotifyFormat.HTML, NotifyFormat.TEXT, body),
+                    'plain', 'utf-8')
+                )
+                base.attach(MIMEText(body, 'html', 'utf-8'))
             else:
-                content = MIMEText(body, 'plain', 'utf-8')
-
-            base = MIMEMultipart() if attach else content
-
-            # Apply any provided custom headers
-            for k, v in self.headers.items():
-                base[k] = Header(v, 'utf-8')
-
-            base['Subject'] = Header(title, 'utf-8')
-            try:
-                base['From'] = formataddr(
-                    (from_name if from_name else False, self.from_addr),
-                    charset='utf-8')
-                base['To'] = formataddr((to_name, to_addr), charset='utf-8')
-
-            except TypeError:
-                # Python v2.x Support (no charset keyword)
-                base['From'] = formataddr(
-                    (from_name if from_name else False, self.from_addr))
-                base['To'] = formataddr((to_name, to_addr))
-
-            base['Cc'] = ','.join(cc)
-            base['Date'] = \
-                datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S +0000")
-            base['X-Application'] = self.app_id
+                base = MIMEText(body, 'plain', 'utf-8')
 
             if attach:
-                # First attach our body to our content as the first element
-                base.attach(content)
-
+                mixed = MIMEMultipart("mixed")
+                mixed.attach(base)
                 # Now store our attachments
                 for attachment in attach:
                     if not attachment:
@@ -735,8 +774,41 @@ class NotifyEmail(NotifyBase):
                             'attachment; filename="{}"'.format(
                                 Header(attachment.name, 'utf-8')),
                         )
+                        mixed.attach(app)
+                base = mixed
 
-                        base.attach(app)
+            # Apply any provided custom headers
+            for k, v in self.headers.items():
+                base[k] = Header(v, self._get_charset(v))
+
+            base['Subject'] = Header(title, self._get_charset(title))
+            try:
+                base['From'] = formataddr(
+                    (from_name if from_name else False, self.from_addr),
+                    charset='utf-8')
+                base['To'] = formataddr((to_name, to_addr), charset='utf-8')
+
+            except TypeError:
+                # Python v2.x Support (no charset keyword)
+                base['From'] = formataddr(
+                    (from_name if from_name else False, self.from_addr))
+                base['To'] = formataddr((to_name, to_addr))
+
+            try:
+                base['Message-ID'] = make_msgid(domain=self.smtp_host)
+
+            except TypeError:
+                # Python v2.x Support (no domain keyword)
+                base['Message-ID'] = make_msgid()
+
+            base['Date'] = \
+                datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S +0000")
+            base['X-Application'] = self.app_id
+
+            if cc:
+                base['Cc'] = ','.join(cc)
+
+            base['Reply-To'] = ','.join(reply_to)
 
             # bind the socket variable to the current namespace
             socket = None
@@ -828,6 +900,12 @@ class NotifyEmail(NotifyBase):
                 ['{}{}'.format(
                     '' if not e not in self.names
                     else '{}:'.format(self.names[e]), e) for e in self.bcc])
+
+        # Handle our Reply-To Addresses
+        params['reply'] = ','.join(
+            ['{}{}'.format(
+                '' if not e not in self.names
+                else '{}:'.format(self.names[e]), e) for e in self.reply_to])
 
         # pull email suffix from username (if present)
         user = None if not self.user else self.user.split('@')[0]
@@ -922,6 +1000,10 @@ class NotifyEmail(NotifyBase):
         # Handle Blind Carbon Copy Addresses
         if 'bcc' in results['qsd'] and len(results['qsd']['bcc']):
             results['bcc'] = results['qsd']['bcc']
+
+        # Handle Reply To Addresses
+        if 'reply' in results['qsd'] and len(results['qsd']['reply']):
+            results['reply_to'] = results['qsd']['reply']
 
         results['from_addr'] = from_addr
         results['smtp_host'] = smtp_host
