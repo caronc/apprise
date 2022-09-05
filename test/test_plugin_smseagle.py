@@ -539,6 +539,50 @@ def test_plugin_smseagle_result_set(mock_post):
 
 
 @mock.patch('requests.post')
+def test_notify_smseagle_plugin_result_list(mock_post):
+    """
+    NotifySMSEagle() Result List Response
+
+    """
+    # Disable Throttling to speed testing
+    plugins.NotifyBase.request_rate_per_sec = 0
+
+    okay_response = requests.Request()
+    okay_response.status_code = requests.codes.ok
+    # We want to test the case where the `result` set returned is a list
+    okay_response.content = dumps({
+        "result": [{
+            "message_id": "748",
+            "status": "ok"
+        }]})
+
+    # Assign our mock object our return value
+    mock_post.return_value = okay_response
+
+    obj = Apprise.instantiate('smseagle://token@127.0.0.1/12222222/')
+    assert isinstance(obj, plugins.NotifySMSEagle)
+
+    # We should successfully handle the list
+    assert obj.notify("test") is True
+
+    # However if one of the elements in the list is bad
+    okay_response.content = dumps({
+        "result": [{
+            "message_id": "748",
+            "status": "ok"
+        }, {
+            "message_id": "749",
+            "status": "error"
+        }]})
+
+    # Assign our mock object our return value
+    mock_post.return_value = okay_response
+
+    # We should now fail
+    assert obj.notify("test") is False
+
+
+@mock.patch('requests.post')
 def test_notify_smseagle_plugin_attachments(mock_post):
     """
     NotifySMSEagle() Attachments

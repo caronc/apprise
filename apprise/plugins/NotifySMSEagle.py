@@ -484,7 +484,7 @@ class NotifySMSEagle(NotifyBase):
                             (isinstance(content.get('result'), dict) and
                              content['result'].get('status') != 'ok') or \
                             (isinstance(content.get('result'), list) and
-                             next((False for entry in content.get('result')
+                             next((True for entry in content.get('result')
                                    if isinstance(entry, dict) and
                                    entry.get('status') != 'ok'), False
                                   )  # pragma: no cover
