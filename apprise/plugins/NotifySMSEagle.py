@@ -408,16 +408,20 @@ class NotifySMSEagle(NotifyBase):
             },
         }
 
-        for category in notify_by.keys():
-
+        # categories separated into a tuple since notify_by.keys()
+        # returns an unpredicable list in Python 2.7 which causes
+        # tests to fail every so often
+        for category in ('phone', 'group', 'contact'):
             # Create a copy of our template
             payload = {
                 'method': notify_by[category]['method'],
                 'params': {
                     notify_by[category]['target']: None,
-                    **params_template,
                 },
             }
+
+            # Apply Template
+            payload['params'].update(params_template)
 
             # Set our Message
             payload["params"]["message"] = "{}{}".format(
@@ -455,18 +459,36 @@ class NotifySMSEagle(NotifyBase):
                         content = loads(r.content)
 
                         # Store our status
-                        status_str = content['result']
+                        status_str = str(content['result'])
 
-                    except (AttributeError, TypeError, ValueError):
+                    except (AttributeError, TypeError, ValueError, KeyError):
                         # ValueError = r.content is Unparsable
                         # TypeError = r.content is None
                         # AttributeError = r is None
+                        # KeyError = 'result' is not found in result
                         content = {}
 
-                    if not isinstance(content.get('result'), dict) or \
-                            content['result'].get('status') != 'ok' or \
-                            r.status_code not in (
-                            requests.codes.ok, requests.codes.created):
+                    # The result set can be a list such as:
+                    #   b'{"result":[{"message_id":4753,"status":"ok"}]}'
+                    #
+                    # It can also just be as a dictionary:
+                    #   b'{"result":{"message_id":4753,"status":"ok"}}'
+                    #
+                    # The below code handles both cases only only fails if a
+                    # non-ok value was returned
+
+                    if r.status_code not in (
+                            requests.codes.ok, requests.codes.created) or \
+                            not isinstance(content.get('result'),
+                                           (dict, list)) or \
+                            (isinstance(content.get('result'), dict) and
+                             content['result'].get('status') != 'ok') or \
+                            (isinstance(content.get('result'), list) and
+                             next((False for entry in content.get('result')
+                                   if isinstance(entry, dict) and
+                                   entry.get('status') != 'ok'), False
+                                  )  # pragma: no cover
+                             ):
 
                         # We had a problem
                         status_str = content.get('result') \
