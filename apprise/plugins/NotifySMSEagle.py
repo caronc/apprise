@@ -430,7 +430,7 @@ class NotifySMSEagle(NotifyBase):
 
             if attachments:
                 # Store our attachments
-                payload['params']['messge_type'] = 'mms'
+                payload['params']['message_type'] = 'mms'
                 payload['params']['attachments'] = attachments
 
             targets = getattr(self, 'target_{}s'.format(category))
