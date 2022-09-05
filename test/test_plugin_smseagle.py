@@ -669,7 +669,7 @@ def test_notify_smseagle_plugin_attachments(mock_post):
     assert "+12513333333" in params['to'].split(',')
     assert "12514444444" in params['to'].split(',')
 
-    assert params.get('message_type') == 'sms'
+    assert params.get('message_type') == 'mms'
     assert params.get('responsetype') == 'extended'
     assert params.get('access_token') == 'token'
     assert params.get('highpriority') == 0
