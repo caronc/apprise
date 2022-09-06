@@ -544,10 +544,6 @@ class NotifyEmail(NotifyBase):
                 '({}) specified.'.format(recipient),
             )
 
-        if not reply_to:
-            # Add ourselves to the Reply-To directive
-            self.reply_to.add(self.from_addr)
-
         # Validate recipients (reply-to:) and drop bad ones:
         for recipient in parse_emails(reply_to):
             email = is_email(recipient)
@@ -699,10 +695,11 @@ class NotifyEmail(NotifyBase):
                     (self.names.get(addr, False), addr), charset='utf-8')
                     for addr in bcc]
 
-                # Format our reply-to addresses to support the Name field
-                reply_to = [formataddr(
-                    (self.names.get(addr, False), addr), charset='utf-8')
-                    for addr in reply_to]
+                if reply_to:
+                    # Format our reply-to addresses to support the Name field
+                    reply_to = [formataddr(
+                        (self.names.get(addr, False), addr), charset='utf-8')
+                        for addr in reply_to]
 
             except TypeError:
                 # Python v2.x Support (no charset keyword)
@@ -714,9 +711,11 @@ class NotifyEmail(NotifyBase):
                 bcc = [formataddr(  # pragma: no branch
                     (self.names.get(addr, False), addr)) for addr in bcc]
 
-                # Format our reply-to addresses to support the Name field
-                reply_to = [formataddr(  # pragma: no branch
-                    (self.names.get(addr, False), addr)) for addr in reply_to]
+                if reply_to:
+                    # Format our reply-to addresses to support the Name field
+                    reply_to = [formataddr(  # pragma: no branch
+                        (self.names.get(addr, False), addr))
+                        for addr in reply_to]
 
             self.logger.debug(
                 'Email From: {} <{}>'.format(from_name, self.from_addr))
@@ -808,7 +807,8 @@ class NotifyEmail(NotifyBase):
             if cc:
                 base['Cc'] = ','.join(cc)
 
-            base['Reply-To'] = ','.join(reply_to)
+            if reply_to:
+                base['Reply-To'] = ','.join(reply_to)
 
             # bind the socket variable to the current namespace
             socket = None
@@ -901,11 +901,13 @@ class NotifyEmail(NotifyBase):
                     '' if not e not in self.names
                     else '{}:'.format(self.names[e]), e) for e in self.bcc])
 
-        # Handle our Reply-To Addresses
-        params['reply'] = ','.join(
-            ['{}{}'.format(
-                '' if not e not in self.names
-                else '{}:'.format(self.names[e]), e) for e in self.reply_to])
+        if self.reply_to:
+            # Handle our Reply-To Addresses
+            params['reply'] = ','.join(
+                ['{}{}'.format(
+                    '' if not e not in self.names
+                    else '{}:'.format(self.names[e]), e)
+                    for e in self.reply_to])
 
         # pull email suffix from username (if present)
         user = None if not self.user else self.user.split('@')[0]
