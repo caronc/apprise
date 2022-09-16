@@ -859,6 +859,8 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     # Test that our template over-ride worked
     assert 'mode=ssl' in obj.url()
     assert 'smtp=override.com' in obj.url()
+    # No reply address specified
+    assert 'reply=' not in obj.url()
 
     mock_smtp.reset_mock()
     response.reset_mock()
@@ -871,22 +873,30 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     obj = Apprise.instantiate(results, suppress_exceptions=False)
     assert isinstance(obj, plugins.NotifyEmail) is True
     assert obj.smtp_host == 'smtp-mail.outlook.com'
+    # No entries in the reply_to
+    assert not obj.reply_to
 
     results = plugins.NotifyEmail.parse_url(
         'mailtos://user:pass123@outlook.com.au')
     obj = Apprise.instantiate(results, suppress_exceptions=False)
     assert isinstance(obj, plugins.NotifyEmail) is True
     assert obj.smtp_host == 'smtp-mail.outlook.com'
+    # No entries in the reply_to
+    assert not obj.reply_to
 
     results = plugins.NotifyEmail.parse_url(
         'mailtos://user:pass123@live.com')
     obj = Apprise.instantiate(results, suppress_exceptions=False)
     assert isinstance(obj, plugins.NotifyEmail) is True
+    # No entries in the reply_to
+    assert not obj.reply_to
 
     results = plugins.NotifyEmail.parse_url(
         'mailtos://user:pass123@hotmail.com')
     obj = Apprise.instantiate(results, suppress_exceptions=False)
     assert isinstance(obj, plugins.NotifyEmail) is True
+    # No entries in the reply_to
+    assert not obj.reply_to
 
     #
     # Test Port Over-Riding
@@ -902,6 +912,8 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert obj.port == 465
     assert obj.from_addr == 'abc@xyz.cn'
     assert obj.secure_mode == 'ssl'
+    # No entries in the reply_to
+    assert not obj.reply_to
 
     results = plugins.NotifyEmail.parse_url(
         "mailtos://abc:password@xyz.cn?"
@@ -914,3 +926,21 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert obj.port == 465
     assert obj.from_addr == 'abc@xyz.cn'
     assert obj.secure_mode == 'ssl'
+    # No entries in the reply_to
+    assert not obj.reply_to
+
+    #
+    # Test Reply-To Email
+    #
+    results = plugins.NotifyEmail.parse_url(
+        "mailtos://user:pass@example.com?reply=noreply@example.com")
+    obj = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(obj, plugins.NotifyEmail) is True
+    # Verify our over-rides are in place
+    assert obj.smtp_host == 'example.com'
+    assert obj.from_addr == 'user@example.com'
+    assert obj.secure_mode == 'starttls'
+    assert obj.url().startswith(
+        'mailtos://user:pass@example.com')
+    # Test that our template over-ride worked
+    assert 'reply=noreply%40example.com' in obj.url()
