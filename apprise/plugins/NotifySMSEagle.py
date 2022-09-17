@@ -90,7 +90,9 @@ class NotifySMSEagle(NotifyBase):
     notify_path = '/jsonrpc/sms'
 
     # The maxumum length of the text message
-    body_maxlen = 160
+    # The actual limit is 160 but SMSEagle looks after the handling
+    # of large messages in it's upstream service
+    body_maxlen = 1200
 
     # The maximum targets to include when doing batch transfers
     default_batch_size = 10
