@@ -208,13 +208,12 @@ class NotifyBark(NotifyBase):
         super(NotifyBark, self).__init__(**kwargs)
 
         # Prepare our URL
-        self.notify_url = '%s://%s/push' % (
+        self.notify_url = '%s://%s%s/push' % (
             'https' if self.secure else 'http',
             self.host,
+            ':{}'.format(self.port)
+            if (self.port and isinstance(self.port, int)) else '',
         )
-
-        if isinstance(self.port, int):
-            self.notify_url += ':%d' % self.port
 
         # Assign our category
         self.category = \
