@@ -381,8 +381,8 @@ class NotifyOpsgenie(NotifyBase):
         # Initialize our has_error flag
         has_error = False
 
-        # We want to manually set the title onto the body if specified
-        title_body = body if not title else '{}: {}'.format(title, body)
+        # Use body if title not set
+        title_body = body if not title else body
 
         # Create a copy ouf our details object
         details = self.details.copy()
@@ -402,7 +402,7 @@ class NotifyOpsgenie(NotifyBase):
         # limitation
         if len(payload['message']) > self.opsgenie_body_minlen:
             payload['message'] = '{}...'.format(
-                body[:self.opsgenie_body_minlen - 3])
+                title_body[:self.opsgenie_body_minlen - 3])
 
         if self.__tags:
             payload['tags'] = self.__tags
