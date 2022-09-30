@@ -432,24 +432,25 @@ class NotifyPushover(NotifyBase):
                         attach.mimetype,
                         attach.url(privacy=True)))
 
-                return True
+                attach = None
 
-            # If we get here, we're dealing with a supported image.
-            # Verify that the filesize is okay though.
-            file_size = len(attach)
-            if not (file_size > 0
-                    and file_size <= self.attach_max_size_bytes):
+            else:
+                # If we get here, we're dealing with a supported image.
+                # Verify that the filesize is okay though.
+                file_size = len(attach)
+                if not (file_size > 0
+                        and file_size <= self.attach_max_size_bytes):
 
-                # File size is no good
-                self.logger.warning(
-                    'Pushover attachment size ({}B) exceeds limit: {}'
-                    .format(file_size, attach.url(privacy=True)))
+                    # File size is no good
+                    self.logger.warning(
+                        'Pushover attachment size ({}B) exceeds limit: {}'
+                        .format(file_size, attach.url(privacy=True)))
 
-                return False
+                    return False
 
-            self.logger.debug(
-                'Posting Pushover attachment {}'.format(
-                    attach.url(privacy=True)))
+                self.logger.debug(
+                    'Posting Pushover attachment {}'.format(
+                        attach.url(privacy=True)))
 
         # Default Header
         headers = {
