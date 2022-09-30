@@ -25,7 +25,14 @@
 
 import os
 import sys
-import mock
+try:
+    # Python 3.x
+    from unittest import mock
+
+except ImportError:
+    # Python 2.7
+    import mock
+
 import requests
 from helpers import AppriseURLTester
 from apprise import plugins

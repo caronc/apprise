@@ -131,7 +131,13 @@ class HTMLConverter(HTMLParser, object):
             #
             # This is required since the unescape() nbsp; with \xa0 when
             # using Python 2.7
-            self.converted = self.converted.replace(u'\xa0', u' ')
+            try:
+                self.converted = self.converted.replace(u'\xa0', u' ')
+
+            except UnicodeDecodeError:
+                # Python v2.7 isn't the greatest for handling unicode
+                self.converted = \
+                    self.converted.decode('utf-8').replace(u'\xa0', u' ')
 
     def _finalize(self, result):
         """

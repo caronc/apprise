@@ -38,7 +38,7 @@ from ..AppriseLocale import gettext_lazy as _
 
 
 GROUP_REGEX = re.compile(
-    r'^\s*((\@|\%40)?(group\.)|\@|\%40)(?P<group>[a-z0-9_-]+)', re.I)
+    r'^\s*((\@|\%40)?(group\.)|\@|\%40)(?P<group>[a-z0-9_=-]+)', re.I)
 
 
 class NotifySignalAPI(NotifyBase):
@@ -123,7 +123,7 @@ class NotifySignalAPI(NotifyBase):
             'name': _('Target Group ID'),
             'type': 'string',
             'prefix': '@',
-            'regex': (r'^[a-z0-9_-]+$', 'i'),
+            'regex': (r'^[a-z0-9_=-]+$', 'i'),
             'map_to': 'targets',
         },
         'targets': {

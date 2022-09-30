@@ -23,7 +23,14 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 import json
-import mock
+try:
+    # Python 3.x
+    from unittest import mock
+
+except ImportError:
+    # Python 2.7
+    import mock
+
 import requests
 from apprise import plugins
 from helpers import AppriseURLTester

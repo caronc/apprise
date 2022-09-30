@@ -26,7 +26,14 @@
 import os
 import re
 import six
-import mock
+try:
+    # Python 3.x
+    from unittest import mock
+
+except ImportError:
+    # Python 2.7
+    import mock
+
 import smtplib
 from email.header import decode_header
 
@@ -153,6 +160,20 @@ TEST_URLS = (
             'instance': plugins.NotifyEmail,
         },
     ),
+    (
+        # Test Reply To
+        'mailtos://user:pass@example.com?smtp=smtp.example.com'
+        '&name=l2g&reply=test@example.com,test2@example.com', {
+            'instance': plugins.NotifyEmail,
+        },
+    ),
+    (
+        # Test Reply To with bad email
+        'mailtos://user:pass@example.com?smtp=smtp.example.com'
+        '&name=l2g&reply=test@example.com,@', {
+            'instance': plugins.NotifyEmail,
+        },
+    ),
     # headers
     ('mailto://user:pass@localhost.localdomain'
         '?+X-Customer-Campaign-ID=Apprise', {
@@ -224,6 +245,9 @@ TEST_URLS = (
         'instance': plugins.NotifyEmail,
     }),
     ('mailto://user:pass@localhost/?cc=test2@,$@!/', {
+        'instance': plugins.NotifyEmail,
+    }),
+    ('mailto://user:pass@localhost/?reply=test2@,$@!/', {
         'instance': plugins.NotifyEmail,
     }),
 )
@@ -781,7 +805,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert isinstance(_to, list)
     assert len(_to) == 1
     assert _to[0] == 'user2@yahoo.com'
-    assert _msg.endswith('test')
+    assert _msg.split('\n')[-3] == 'test'
 
     # Our URL port was over-ridden (on template) to use 444
     # We can verify that this was correctly saved
@@ -828,13 +852,15 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert isinstance(_to, list)
     assert len(_to) == 1
     assert _to[0] == 'user2@yahoo.com'
-    assert _msg.endswith('test')
+    assert _msg.split('\n')[-3] == 'test'
 
     assert obj.url().startswith(
         'mailtos://user:pass123@hotmail.com/user2%40yahoo.com')
     # Test that our template over-ride worked
     assert 'mode=ssl' in obj.url()
     assert 'smtp=override.com' in obj.url()
+    # No reply address specified
+    assert 'reply=' not in obj.url()
 
     mock_smtp.reset_mock()
     response.reset_mock()
@@ -847,22 +873,30 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     obj = Apprise.instantiate(results, suppress_exceptions=False)
     assert isinstance(obj, plugins.NotifyEmail) is True
     assert obj.smtp_host == 'smtp-mail.outlook.com'
+    # No entries in the reply_to
+    assert not obj.reply_to
 
     results = plugins.NotifyEmail.parse_url(
         'mailtos://user:pass123@outlook.com.au')
     obj = Apprise.instantiate(results, suppress_exceptions=False)
     assert isinstance(obj, plugins.NotifyEmail) is True
     assert obj.smtp_host == 'smtp-mail.outlook.com'
+    # No entries in the reply_to
+    assert not obj.reply_to
 
     results = plugins.NotifyEmail.parse_url(
         'mailtos://user:pass123@live.com')
     obj = Apprise.instantiate(results, suppress_exceptions=False)
     assert isinstance(obj, plugins.NotifyEmail) is True
+    # No entries in the reply_to
+    assert not obj.reply_to
 
     results = plugins.NotifyEmail.parse_url(
         'mailtos://user:pass123@hotmail.com')
     obj = Apprise.instantiate(results, suppress_exceptions=False)
     assert isinstance(obj, plugins.NotifyEmail) is True
+    # No entries in the reply_to
+    assert not obj.reply_to
 
     #
     # Test Port Over-Riding
@@ -878,6 +912,8 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert obj.port == 465
     assert obj.from_addr == 'abc@xyz.cn'
     assert obj.secure_mode == 'ssl'
+    # No entries in the reply_to
+    assert not obj.reply_to
 
     results = plugins.NotifyEmail.parse_url(
         "mailtos://abc:password@xyz.cn?"
@@ -890,3 +926,21 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert obj.port == 465
     assert obj.from_addr == 'abc@xyz.cn'
     assert obj.secure_mode == 'ssl'
+    # No entries in the reply_to
+    assert not obj.reply_to
+
+    #
+    # Test Reply-To Email
+    #
+    results = plugins.NotifyEmail.parse_url(
+        "mailtos://user:pass@example.com?reply=noreply@example.com")
+    obj = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(obj, plugins.NotifyEmail) is True
+    # Verify our over-rides are in place
+    assert obj.smtp_host == 'example.com'
+    assert obj.from_addr == 'user@example.com'
+    assert obj.secure_mode == 'starttls'
+    assert obj.url().startswith(
+        'mailtos://user:pass@example.com')
+    # Test that our template over-ride worked
+    assert 'reply=noreply%40example.com' in obj.url()

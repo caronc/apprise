@@ -55,12 +55,13 @@ MessageBird, MQTT, MSG91, MyAndroid, Nexmo, Nextcloud, NextcloudTalk, Notica,
 Notifico, ntfy, Office365, OneSignal, Opsgenie, PagerDuty, ParsePlatform,
 PopcornNotify, Prowl, Pushalot, PushBullet, Pushjet, Pushover, PushSafer,
 Reddit, Rocket.Chat, SendGrid, ServerChan, Signal, SimplePush, Sinch, Slack,
-SMTP2Go, Spontit, SparkPost, Super Toasty, Streamlabs, Stride, Syslog,
-Techulus Push, Telegram, Twilio, Twitter, Twist, XBMC, Vonage, Webex Teams}
+SMSEagle, SMTP2Go, Spontit, SparkPost, Super Toasty, Streamlabs, Stride,
+Syslog, Techulus Push, Telegram, Twilio, Twitter, Twist, XBMC, Vonage, Webex
+Teams}
 
 Name:           python-%{pypi_name}
 Version:        1.0.0
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        MIT
 URL:            https://github.com/caronc/%{pypi_name}
@@ -161,7 +162,12 @@ Requires: python%{python3_pkgversion}-cryptography
 Requires: python%{python3_pkgversion}-yaml
 
 %if %{with tests}
+%if 0%{?rhel} >= 9
+# Do not import python3-mock
+%else
+# python-mock switched to unittest.mock
 BuildRequires: python%{python3_pkgversion}-mock
+%endif
 BuildRequires: python%{python3_pkgversion}-pytest
 BuildRequires: python%{python3_pkgversion}-pytest-runner
 %endif
@@ -181,6 +187,17 @@ rm -f apprise/py3compat/asyncio.py
 %if 0%{?rhel} && 0%{?rhel} <= 8
 # click v6.7 unit testing support
 %patch1 -p1
+%endif
+
+%if 0%{?rhel} >= 9
+# Nothing to do under normal circumstances; this line here allows legacy
+# copies of Apprise to still build against this one
+find test -type f -name '*.py' -exec \
+   sed -i -e 's|^import mock|from unittest import mock|g' {} \;
+%else
+# support python-mock (remain backwards compatible with older distributions)
+find test -type f -name '*.py' -exec \
+   sed -i -e 's|^from unittest import mock|import mock|g' {} \;
 %endif
 
 %build
@@ -243,6 +260,9 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 %endif
 
 %changelog
+* Wed Aug 31 2022 Chris Caron <lead2gold@gmail.com> - 1.0.0-2
+- Rebuilt for RHEL9 Support
+
 * Sat Aug  6 2022 Chris Caron <lead2gold@gmail.com> - 1.0.0-1
 - Updated to v1.0.0
 

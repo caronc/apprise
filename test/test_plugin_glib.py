@@ -26,7 +26,14 @@
 import re
 import six
 import pytest
-import mock
+try:
+    # Python 3.x
+    from unittest import mock
+
+except ImportError:
+    # Python 2.7
+    import mock
+
 import sys
 import types
 import apprise
