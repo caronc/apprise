@@ -1,6 +1,6 @@
 language: python
 
-dist: xenial
+dist: focal
 
 addons:
   apt:
