@@ -218,6 +218,8 @@ def test_plugin_fcm_urls():
 
 @pytest.mark.skipif(
     'cryptography' not in sys.modules, reason="Requires cryptography")
+@pytest.mark.skipif(
+    hasattr(sys, "pypy_version_info"), reason="Does not work reliably on PyPy")
 @mock.patch('requests.post')
 def test_plugin_fcm_general_legacy(mock_post):
     """
