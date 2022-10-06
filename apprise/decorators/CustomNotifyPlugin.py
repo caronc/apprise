@@ -52,24 +52,6 @@ class CustomNotifyPlugin(NotifyBase):
         '{schema}://',
     )
 
-    def __init__(self, **kwargs):
-        """
-        Our initialization
-
-        """
-        # Our default arguments will get populated after we're instatiated by
-        # the wrapper class
-        self._default_args = {}
-
-        super(CustomNotifyPlugin, self).__init__(**kwargs)
-
-        # Apply our updates based on what was parsed
-        dict_full_update(self._default_args, kwargs)
-
-        # Update our arguments (applying them to what we originally)
-        # initialized as
-        self._default_args['url'] = url_assembly(**self._default_args)
-
     @staticmethod
     def parse_url(url):
         """
@@ -112,7 +94,7 @@ class CustomNotifyPlugin(NotifyBase):
             url = '{}://'.format(plugin_name)
 
         # Keep a default set of arguments to apply to all called references
-        default_args = parse_url(
+        base_args = parse_url(
             url, default_schema=plugin_name, verify_host=False, simple=True)
 
         if plugin_name in common.NOTIFY_SCHEMA_MAP:
@@ -145,7 +127,25 @@ class CustomNotifyPlugin(NotifyBase):
             __send = staticmethod(send_func)
 
             # Update our default arguments
-            _default_args = default_args
+            _base_args = base_args
+
+            def __init__(self, **kwargs):
+                """
+                Our initialization
+
+                """
+                #  init parent
+                super(CustomNotifyPluginWrapper, self).__init__(**kwargs)
+
+                self._default_args = {}
+
+                # Apply our updates based on what was parsed
+                dict_full_update(self._default_args, self._base_args)
+                dict_full_update(self._default_args, kwargs)
+
+                # Update our arguments (applying them to what we originally)
+                # initialized as
+                self._default_args['url'] = url_assembly(**self._default_args)
 
             def send(self, body, title='', notify_type=common.NotifyType.INFO,
                      *args, **kwargs):
