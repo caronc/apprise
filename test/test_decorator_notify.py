@@ -369,6 +369,11 @@ def test_notify_multi_instance_decoration(tmpdir):
 
     assert len(verify_obj) == 2
 
+    # Python 3.6 does not nessisarily return list in order
+    # So let's be sure it's sorted by the user id field to make the remaining
+    # checks on this test easy
+    verify_obj = sorted(verify_obj, key=lambda x: x['meta']['user'])
+
     # Our content was populated after the notify() call
     obj = verify_obj[0]
     assert obj['body'] == "Hello World"
