@@ -26,6 +26,7 @@ from os.path import dirname
 from os.path import join
 from apprise.decorators import notify
 from apprise import Apprise
+from apprise import AppriseConfig
 from apprise import AppriseAsset
 from apprise import AppriseAttachment
 from apprise import common
@@ -308,3 +309,140 @@ def test_notify_complex_decoration():
 
     # Tidy
     del common.NOTIFY_SCHEMA_MAP['utiltest']
+
+
+def test_notify_multi_instance_decoration(tmpdir):
+    """decorators: Test multi-instance @notify
+    """
+
+    # Verify our schema we're about to declare doesn't already exist
+    # in our schema map:
+    assert 'multi' not in common.NOTIFY_SCHEMA_MAP
+
+    verify_obj = []
+
+    # Define a function here on the spot
+    @notify(on="multi", name="Apprise @notify Decorator Testing")
+    def my_inline_notify_wrapper(
+            body, title, notify_type, attach, meta, *args, **kwargs):
+
+        # Track what is added
+        verify_obj.append({
+            'body': body,
+            'title': title,
+            'notify_type': notify_type,
+            'attach': attach,
+            'meta': meta,
+            'args': args,
+            'kwargs': kwargs,
+        })
+
+    # Now after our hook being inline... it's been loaded
+    assert 'multi' in common.NOTIFY_SCHEMA_MAP
+
+    # Prepare our config
+    t = tmpdir.mkdir("multi-test").join("apprise.yml")
+    t.write("""urls:
+    - multi://user1:pass@hostname
+    - multi://user2:pass2@hostname
+    """)
+
+    # Create ourselves a config object
+    ac = AppriseConfig(paths=str(t))
+
+    # Create ourselves an apprise object
+    aobj = Apprise()
+
+    # Add our configuration
+    aobj.add(ac)
+
+    # The number of configuration files that exist
+    assert len(ac) == 1
+
+    # no notifications are loaded
+    assert len(ac.servers()) == 2
+
+    # Nothing stored yet in our object
+    assert len(verify_obj) == 0
+
+    assert aobj.notify("Hello World", title="My Title") is True
+
+    assert len(verify_obj) == 2
+
+    # Python 3.6 does not nessisarily return list in order
+    # So let's be sure it's sorted by the user id field to make the remaining
+    # checks on this test easy
+    verify_obj = sorted(verify_obj, key=lambda x: x['meta']['user'])
+
+    # Our content was populated after the notify() call
+    obj = verify_obj[0]
+    assert obj['body'] == "Hello World"
+    assert obj['title'] == "My Title"
+    assert obj['notify_type'] == common.NotifyType.INFO
+
+    meta = obj['meta']
+    assert isinstance(meta, dict)
+
+    # No format was defined
+    assert 'body_format' in obj['kwargs']
+    assert obj['kwargs']['body_format'] is None
+
+    # The meta argument allows us to further parse the URL parameters
+    # specified
+    assert isinstance(obj['kwargs'], dict)
+
+    assert 'asset' in meta
+    assert isinstance(meta['asset'], AppriseAsset)
+
+    assert 'tag' in meta
+    assert isinstance(meta['tag'], set)
+
+    assert len(meta) == 7
+    # We carry all of our default arguments from the @notify's initialization
+    assert meta['schema'] == 'multi'
+    assert meta['host'] == 'hostname'
+    assert meta['user'] == 'user1'
+    assert meta['password'] == 'pass'
+
+    # Verify our URL is correct
+    assert meta['url'] == 'multi://user1:pass@hostname'
+
+    #
+    # Now verify our second URL saved correct
+    #
+
+    # Our content was populated after the notify() call
+    obj = verify_obj[1]
+    assert obj['body'] == "Hello World"
+    assert obj['title'] == "My Title"
+    assert obj['notify_type'] == common.NotifyType.INFO
+
+    meta = obj['meta']
+    assert isinstance(meta, dict)
+
+    # No format was defined
+    assert 'body_format' in obj['kwargs']
+    assert obj['kwargs']['body_format'] is None
+
+    # The meta argument allows us to further parse the URL parameters
+    # specified
+    assert isinstance(obj['kwargs'], dict)
+
+    assert 'asset' in meta
+    assert isinstance(meta['asset'], AppriseAsset)
+
+    assert 'tag' in meta
+    assert isinstance(meta['tag'], set)
+
+    assert len(meta) == 7
+    # We carry all of our default arguments from the @notify's initialization
+    assert meta['schema'] == 'multi'
+    assert meta['host'] == 'hostname'
+    assert meta['user'] == 'user2'
+    assert meta['password'] == 'pass2'
+
+    # Verify our URL is correct
+    assert meta['url'] == 'multi://user2:pass2@hostname'
+
+    # Tidy
+    del common.NOTIFY_SCHEMA_MAP['multi']
