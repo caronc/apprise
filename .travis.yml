@@ -41,6 +41,10 @@ install:
   - if [[ $TOXENV != 'bare' ]]; then pip install -r all-plugin-requirements.txt; fi
   # pypy and bare installs do not include dbus-python
   - if [[ $TOXENV != 'bare' ]] && [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then travis_retry pip install dbus-python; fi
+  # Python 3.7 importlib-metadata becomes incompatible with flake8 unless we use
+  # a version that still supports EntryPoints.get(); tox.ini updated to not call flake; this was
+  # the only way around the Travis CI Builder issues
+  - if [[ $TOXENV == 'py37' ]]; then pip uninstall --yes flake8; fi
 
 # run tests
 script:
