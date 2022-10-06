@@ -20,10 +20,14 @@ matrix:
     - python: "3.9-dev"
       env: TOXENV=py39-dev
     # PyPy Environments
-    - python: "pypy2.7-6.0"
-      env: TOXENV=pypy
-    - python: "pypy3.5-7.0"
-      env: TOXENV=pypy3
+    - python: "pypy3.6-7.3.3"
+      env: TOXENV=pypy36
+    - python: "pypy3.7-7.3.9"
+      env: TOXENV=pypy37
+    - python: "pypy3.8-7.3.9"
+      env: TOXENV=pypy38
+    - python: "pypy3.9-7.3.9"
+      env: TOXENV=pypy39
     # An extra environment where additional packages are not installed
     - python: "3.9"
       env:
