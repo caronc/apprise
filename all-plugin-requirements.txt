@@ -3,7 +3,7 @@
 #
 
 # Provides fcm:// and spush://
-cryptography
+cryptography<3.4
 
 # Provides growl:// support
 gntp
