@@ -52,15 +52,15 @@ class CustomNotifyPlugin(NotifyBase):
         '{schema}://',
     )
 
-    # Our default arguments will get populated after we're instatiated by the
-    # wrapper class
-    _default_args = {}
-
     def __init__(self, **kwargs):
         """
         Our initialization
 
         """
+        # Our default arguments will get populated after we're instatiated by
+        # the wrapper class
+        self._default_args = {}
+
         super(CustomNotifyPlugin, self).__init__(**kwargs)
 
         # Apply our updates based on what was parsed
