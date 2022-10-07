@@ -93,12 +93,6 @@ Requires: python%{python3_pkgversion}-cryptography
 Requires: python%{python3_pkgversion}-yaml
 
 %if %{with tests}
-%if 0%{?rhel} >= 9
-# Do not import python3-mock
-%else
-# python-mock switched to unittest.mock
-BuildRequires: python%{python3_pkgversion}-mock
-%endif
 BuildRequires: python%{python3_pkgversion}-pytest
 BuildRequires: python%{python3_pkgversion}-pytest-runner
 %endif
@@ -110,17 +104,6 @@ BuildRequires: python%{python3_pkgversion}-pytest-runner
 %if 0%{?rhel} && 0%{?rhel} <= 8
 # Rocky/RHEL 8 click v6.7 unit testing support
 %patch0 -p1
-%endif
-
-%if 0%{?rhel} >= 9
-# Nothing to do under normal circumstances; this line here allows legacy
-# copies of Apprise to still build against this one
-find test -type f -name '*.py' -exec \
-   sed -i -e 's|^import mock|from unittest import mock|g' {} \;
-%else
-# support python-mock (remain backwards compatible with older distributions)
-find test -type f -name '*.py' -exec \
-   sed -i -e 's|^from unittest import mock|import mock|g' {} \;
 %endif
 
 %build

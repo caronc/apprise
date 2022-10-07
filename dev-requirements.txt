@@ -1,6 +1,5 @@
 coverage
 flake8
-mock; python_version=='2.7'
 pytest
 pytest-cov
 tox
