@@ -24,6 +24,7 @@
 # THE SOFTWARE.
 
 import os
+import warnings
 from itertools import chain
 from . import common
 from .conversion import convert_between
@@ -386,7 +387,12 @@ class Apprise:
         (This is omitted to preserve syntax compatibility with Python 2.)
 
         The arguments are identical to those of Apprise.notify().
+
+        # TODO: Add `async` keyword.
         """
+        warnings.warn("A future version of Apprise will add the `async` "
+                      "keyword to `async_notify`. Please make sure your code "
+                      "will correctly `await` the returned future.")
 
         try:
             coroutines = list(
