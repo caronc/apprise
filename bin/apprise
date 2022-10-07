@@ -41,20 +41,20 @@ from os.path import dirname
 
 # First assume we might be in the ./bin directory
 sys.path.insert(
-    0, join(dirname(dirname(abspath(__file__)))))  # noqa
+    0, join(dirname(dirname(abspath(__file__)))))
 
 # The user might have copied the apprise script back one directory
 # so support this too..
 sys.path.insert(
-    0, join(dirname(abspath(__file__))))  # noqa
+    0, join(dirname(abspath(__file__))))
 
 # We can also use the current directory we're standing in as a last
 # resort
-sys.path.insert(0, join(getcwd()))  # noqa
+sys.path.insert(0, join(getcwd()))
 
 # Apprise tool now importable
-from apprise.cli import main
-import logging
+from apprise.cli import main  # noqa E402
+import logging  # noqa E402
 
 
 if __name__ == "__main__":

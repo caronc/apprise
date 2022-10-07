@@ -473,10 +473,10 @@ class Apprise:
             raise TypeError(msg)
 
         try:
-            if title and isinstance(title, bytes):  # noqa: F821
+            if title and isinstance(title, bytes):
                 title = title.decode(self.asset.encoding)
 
-            if body and isinstance(body, bytes):  # noqa: F821
+            if body and isinstance(body, bytes):
                 body = body.decode(self.asset.encoding)
 
         except UnicodeDecodeError:
