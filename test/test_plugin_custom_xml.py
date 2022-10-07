@@ -277,7 +277,7 @@ def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
         assert new_results[k] == results[k]
 
     # Test our data set for our key/value pair
-    assert re.search('<Version>[1-9]+\.[0-9]+</Version>', details[1]['data'])
+    assert re.search(r'<Version>[1-9]+\.[0-9]+</Version>', details[1]['data'])
     assert re.search('<MessageType>info</MessageType>', details[1]['data'])
     assert re.search('<Subject>title</Subject>', details[1]['data'])
     # Custom entry Message acts as Over-ride and kicks in here
