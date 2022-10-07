@@ -113,7 +113,7 @@ def test_config_file_exceptions(tmpdir):
     cf = ConfigFile(path=str(t), format='text')
 
     # Internal Exception would have been thrown and this would fail
-    with mock.patch('io.open', side_effect=OSError):
+    with mock.patch('builtins.open', side_effect=OSError):
         assert cf.read() is None
 
     # handle case where the file is to large for what was expected:

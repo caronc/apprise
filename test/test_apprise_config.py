@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import sys
-import io
 import pytest
 from unittest import mock
 from apprise import NotifyFormat
@@ -150,7 +149,7 @@ def test_apprise_config(tmpdir):
 
     # Write our content to our file
     t = tmpdir.mkdir("internationalization").join("apprise")
-    with io.open(str(t), 'wb') as f:
+    with open(str(t), 'wb') as f:
         f.write(istr.encode('latin-1'))
 
     # Create ourselves a config object

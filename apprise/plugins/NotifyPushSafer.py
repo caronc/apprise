@@ -23,8 +23,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-# We use io because it allows us to test the open() call
-import io
 import base64
 import requests
 from json import loads
@@ -565,7 +563,7 @@ class NotifyPushSafer(NotifyBase):
                         attachment.url(privacy=True)))
 
                 try:
-                    with io.open(attachment.path, 'rb') as f:
+                    with open(attachment.path, 'rb') as f:
                         # Output must be in a DataURL format (that's what
                         # PushSafer calls it):
                         attachment = (

@@ -29,7 +29,6 @@
 #  2. Click Generate New Private Key, then confirm by clicking Generate Key.
 #  3. Securely store the JSON file containing the key.
 
-import io
 import requests
 import base64
 import json
@@ -114,7 +113,7 @@ class GoogleOAuth:
         self.__access_token_expiry = datetime.utcnow()
 
         try:
-            with io.open(path, mode="r", encoding=self.encoding) as fp:
+            with open(path, mode="r", encoding=self.encoding) as fp:
                 self.content = json.loads(fp.read())
 
         except (OSError, IOError):

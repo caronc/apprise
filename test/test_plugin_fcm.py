@@ -29,7 +29,6 @@
 # - Legacy API (v1) -> OAuth
 # - https://firebase.google.com/docs/cloud-messaging/migrate-v1
 
-import io
 import os
 import sys
 from unittest import mock
@@ -370,7 +369,7 @@ def test_plugin_fcm_general_oauth(mock_post):
     obj = Apprise.instantiate(
         'fcm://mock-project-id/device/?keyfile={}'.format(str(path)))
 
-    with mock.patch('io.open', side_effect=OSError):
+    with mock.patch('builtins.open', side_effect=OSError):
         # we'll fail as a result
         assert obj.notify("test") is False
 
@@ -606,7 +605,7 @@ def test_plugin_fcm_keyfile_parse(mock_post):
 
     # Now we test a case where we can't access the file we've been pointed to:
     oauth = GoogleOAuth()
-    with mock.patch('io.open', side_effect=OSError):
+    with mock.patch('builtins.open', side_effect=OSError):
         # We will fail to retrieve our Access Token
         assert oauth.load(path) is False
         assert oauth.access_token is None
@@ -711,7 +710,7 @@ def test_plugin_fcm_keyfile_missing_entries_parse(tmpdir):
 
     # Prepare a base keyfile reference to use
     path = os.path.join(PRIVATE_KEYFILE_DIR, 'service_account.json')
-    with io.open(path, mode="r", encoding='utf-8') as fp:
+    with open(path, mode="r", encoding='utf-8') as fp:
         content = json.loads(fp.read())
 
     path = tmpdir.join('fcm_keyfile.json')
