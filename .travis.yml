@@ -35,11 +35,18 @@ matrix:
 
 install:
   - pip install babel
+
   # Use up-to-date versions of tox, pip, virtualenv, and wheel.
   - pip install --upgrade tox pip virtualenv wheel
+
+  # cryptography 3.3 is the last one not needing a Rust toolchain. Let's use it for PyPy.
+  - if [[ $TOXENV == 'pypy'* ]]; then pip install "cryptography<3.4"; fi
+
+  # Install project dependencies.
   - pip install codecov
   - pip install -r dev-requirements.txt
   - pip install -r requirements.txt
+
   # bare installs do not include extra package dependencies
   - if [[ $TOXENV != 'bare' ]]; then pip install -r all-plugin-requirements.txt; fi
   # pypy and bare installs do not include dbus-python
