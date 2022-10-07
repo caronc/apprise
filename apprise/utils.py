@@ -906,16 +906,11 @@ def parse_bool(arg, default=False):
     return bool(arg)
 
 
-def parse_phone_no(*args, **kwargs):
+def parse_phone_no(*args, store_unparseable=True, **kwargs):
     """
     Takes a string containing phone numbers separated by comma's and/or spaces
     and returns a list.
     """
-
-    # for Python 2.7 support, store_unparsable is not in the url above
-    # as just parse_emails(*args, store_unparseable=True) since it is
-    # an invalid syntax.  This is the workaround to be backards compatible:
-    store_unparseable = kwargs.get('store_unparseable', True)
 
     result = []
     for arg in args:
@@ -943,16 +938,11 @@ def parse_phone_no(*args, **kwargs):
     return result
 
 
-def parse_call_sign(*args, **kwargs):
+def parse_call_sign(*args, store_unparseable=True, **kwargs):
     """
     Takes a string containing ham radio call signs separated by
     comma and/or spacesand returns a list.
     """
-
-    # for Python 2.7 support, store_unparsable is not in the url above
-    # as just parse_emails(*args, store_unparseable=True) since it is
-    # an invalid syntax.  This is the workaround to be backards compatible:
-    store_unparseable = kwargs.get('store_unparseable', True)
 
     result = []
     for arg in args:
@@ -980,16 +970,11 @@ def parse_call_sign(*args, **kwargs):
     return result
 
 
-def parse_emails(*args, **kwargs):
+def parse_emails(*args, store_unparseable=True, **kwargs):
     """
     Takes a string containing emails separated by comma's and/or spaces and
     returns a list.
     """
-
-    # for Python 2.7 support, store_unparsable is not in the url above
-    # as just parse_emails(*args, store_unparseable=True) since it is
-    # an invalid syntax.  This is the workaround to be backards compatible:
-    store_unparseable = kwargs.get('store_unparseable', True)
 
     result = []
     for arg in args:
@@ -1016,16 +1001,11 @@ def parse_emails(*args, **kwargs):
     return result
 
 
-def parse_urls(*args, **kwargs):
+def parse_urls(*args, store_unparseable=True, **kwargs):
     """
     Takes a string containing URLs separated by comma's and/or spaces and
     returns a list.
     """
-
-    # for Python 2.7 support, store_unparsable is not in the url above
-    # as just parse_urls(*args, store_unparseable=True) since it is
-    # an invalid syntax.  This is the workaround to be backards compatible:
-    store_unparseable = kwargs.get('store_unparseable', True)
 
     result = []
     for arg in args:

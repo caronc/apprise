@@ -265,21 +265,6 @@ def test_plugin_twist_auth(mock_post, mock_get):
     # Calling logout on an object already logged out
     obj.logout()
 
-    # Force a token (to imply we've logged in)
-    obj.token = 'abc'
-
-    mock_post.return_value.status_code = requests.codes.ok
-    mock_get.return_value.status_code = requests.codes.ok
-
-    # Test Python v3.5 LookupError Bug: https://bugs.python.org/issue29288
-    mock_post.side_effect = LookupError()
-    mock_get.side_effect = LookupError()
-    obj.access_token = 'abc'
-    obj.user_id = '123'
-
-    # Tidy object
-    del obj
-
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')

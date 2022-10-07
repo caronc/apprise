@@ -539,18 +539,6 @@ class Apprise:
                             .encode('ascii', 'backslashreplace')\
                             .decode('unicode-escape')
 
-                    except UnicodeDecodeError:  # pragma: no cover
-                        # This occurs using a very old version of Python 2.7
-                        # such as the one that ships with CentOS/RedHat 7.x
-                        # (v2.7.5).
-                        conversion_body_map[server.notify_format] = \
-                            conversion_body_map[server.notify_format] \
-                            .decode('string_escape')
-
-                        conversion_title_map[server.notify_format] = \
-                            conversion_title_map[server.notify_format] \
-                            .decode('string_escape')
-
                     except AttributeError:
                         # Must be of string type
                         msg = 'Failed to escape message body'

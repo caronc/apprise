@@ -969,8 +969,7 @@ def test_apprise_cli_plugin_loading(mock_post, tmpdir):
     # We can find our new hook loaded in our NOTIFY_SCHEMA_MAP now...
     assert 'clihook' in NOTIFY_SCHEMA_MAP
 
-    # Store our key after parsing it as a list (this makes this test backwards
-    # compatible with Python 2.x
+    # Capture our key for reference
     key = [k for k in NOTIFY_CUSTOM_MODULE_MAP.keys()][0]
 
     assert len(NOTIFY_CUSTOM_MODULE_MAP[key]['notify']) == 1
@@ -1132,8 +1131,7 @@ def test_apprise_cli_plugin_loading(mock_post, tmpdir):
     assert 'clihook1' in NOTIFY_SCHEMA_MAP
     assert 'clihook2' in NOTIFY_SCHEMA_MAP
 
-    # Store our key after parsing it as a list (this makes this test backwards
-    # compatible with Python 2.x
+    # Capture our key for reference
     key = [k for k in NOTIFY_CUSTOM_MODULE_MAP.keys()][0]
 
     assert len(NOTIFY_CUSTOM_MODULE_MAP[key]['notify']) == 3

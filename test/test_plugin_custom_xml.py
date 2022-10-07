@@ -23,7 +23,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 import os
-import sys
 import re
 from unittest import mock
 
@@ -192,13 +191,6 @@ def test_notify_xml_plugin_attachments(mock_post):
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=path) is False
 
-    # Get a appropriate "builtin" module name for pythons 2/3.
-    if sys.version_info.major >= 3:
-        builtin_open_function = 'builtins.open'
-
-    else:
-        builtin_open_function = '__builtin__.open'
-
     # Test Valid Attachment (load 3)
     path = (
         os.path.join(TEST_VAR_DIR, 'apprise-test.gif'),
@@ -210,7 +202,7 @@ def test_notify_xml_plugin_attachments(mock_post):
     # Return our good configuration
     mock_post.side_effect = None
     mock_post.return_value = okay_response
-    with mock.patch(builtin_open_function, side_effect=OSError()):
+    with mock.patch('builtins.open', side_effect=OSError()):
         # We can't send the message we can't open the attachment for reading
         assert obj.notify(
             body='body', title='title', notify_type=NotifyType.INFO,
