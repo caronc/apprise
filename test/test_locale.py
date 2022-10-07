@@ -162,7 +162,7 @@ def test_detect_language_windows_users():
         # Detect french language
         assert AppriseLocale.AppriseLocale.detect_language() == 'fr'
 
-    # The following unsets all enviroment vaiables and sets LC_CTYPE
+    # The following unsets all environment variables and sets LC_CTYPE
     # This was causing Python 2.7 to internally parse UTF-8 as an invalid
     # locale and throw an uncaught ValueError; Python v2 support has been
     # dropped, but just to ensure this issue does not come back, we keep

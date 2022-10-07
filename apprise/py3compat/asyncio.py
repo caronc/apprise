@@ -129,11 +129,11 @@ class AsyncNotifyBase(URLBase):
                 None, partial(self.notify, *args, **kwargs))
 
         except TypeError:
-            # These our our internally thrown notifications
+            # These are our internally thrown notifications
             pass
 
         except Exception:
-            # A catch all so we don't have to abort early
+            # A catch-all so we don't have to abort early
             # just because one of our plugins has a bug in it.
             logger.exception("Notification Exception")
 

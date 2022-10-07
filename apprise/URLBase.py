@@ -361,7 +361,7 @@ class URLBase:
         encoding and errors parameters specify how to decode percent-encoded
         sequences.
 
-        Wrapper to Python's unquote while remaining compatible with both
+        Wrapper to Python's `unquote` while remaining compatible with both
         Python 2 & 3 since the reference to this function changed between
         versions.
 
@@ -387,7 +387,7 @@ class URLBase:
         """ Replaces single character non-ascii characters and URI specific
         ones by their %xx code.
 
-        Wrapper to Python's unquote while remaining compatible with both
+        Wrapper to Python's `quote` while remaining compatible with both
         Python 2 & 3 since the reference to this function changed between
         versions.
 
@@ -451,7 +451,7 @@ class URLBase:
     def urlencode(query, doseq=False, safe='', encoding=None, errors=None):
         """Convert a mapping object or a sequence of two-element tuples
 
-        Wrapper to Python's unquote while remaining compatible with both
+        Wrapper to Python's `urlencode` while remaining compatible with both
         Python 2 & 3 since the reference to this function changed between
         versions.
 

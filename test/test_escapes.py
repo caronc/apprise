@@ -33,7 +33,7 @@ import apprise
 @mock.patch('requests.post')
 def test_apprise_interpret_escapes(mock_post):
     """
-    API: Apprise() interpret-escapse tests
+    API: Apprise() interpret-escape tests
     """
 
     # Prepare Mock
@@ -124,7 +124,7 @@ def test_apprise_interpret_escapes(mock_post):
 @mock.patch('requests.post')
 def test_apprise_escaping(mock_post):
     """
-    API: Apprise() Python v3.x escaping
+    API: Apprise() escaping tests
 
     """
     a = apprise.Apprise()

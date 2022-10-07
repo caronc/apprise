@@ -35,9 +35,8 @@ matrix:
 
 install:
   - pip install babel
-  # upgrade tox, pip, and virtualenv so Python 3.6 will build crytography:
-  # https://travis-ci.community/t/pip-install-cryptography-fails-on-py36/11233
   - pip install -U tox pip virtualenv
+  # Use up-to-date versions of tox, pip, virtualenv, and wheel.
   - pip install codecov
   - pip install -r dev-requirements.txt
   - pip install -r requirements.txt
@@ -45,10 +44,11 @@ install:
   - if [[ $TOXENV != 'bare' ]]; then pip install -r all-plugin-requirements.txt; fi
   # pypy and bare installs do not include dbus-python
   - if [[ $TOXENV != 'bare' ]] && [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then travis_retry pip install dbus-python; fi
-  # Python 3.7 importlib-metadata becomes incompatible with flake8 unless we use
-  # a version that still supports EntryPoints.get(); tox.ini updated to not call flake; this was
-  # the only way around the Travis CI Builder issues
   - if [[ $TOXENV == 'py37' ]]; then pip uninstall --yes flake8; fi
+
+  # Fix/workaround: Python 3.7 importlib-metadata becomes incompatible with flake8,
+  #                 unless we use a version that still supports EntryPoints.get().
+  #                 `tox.ini` has been updated to not call flake8 on Python 3.7.
 
 # run tests
 script:

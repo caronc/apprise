@@ -1133,7 +1133,7 @@ def parse_list(*args):
     #
     # filter() eliminates any empty entries
     #
-    # Since Python v3 returns a filter (iterator) where-as Python v2 returned
+    # Since Python v3 returns a filter (iterator) whereas Python v2 returned
     # a list, we need to change it into a list object to remain compatible with
     # both distribution types.
     # TODO: Review after dropping support for Python 2.

@@ -292,7 +292,7 @@ class AppriseURLTester:
             print('%s AssertionError' % url)
             raise
 
-        # Tidy our object and allow any possible defined deconstructors to
+        # Tidy our object and allow any possible defined destructors to
         # be executed.
         del obj
 

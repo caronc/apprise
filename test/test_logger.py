@@ -72,7 +72,7 @@ def test_apprise_logger():
 
 def test_apprise_log_memory_captures():
     """
-    API: Apprise() Python v3 Log Captures
+    API: Apprise() Log Memory Captures
 
     """
 
@@ -214,7 +214,7 @@ def test_apprise_log_memory_captures():
 
 def test_apprise_log_file_captures(tmpdir):
     """
-    API: Apprise() Python v3 Logfile Captures
+    API: Apprise() Log File Captures
 
     """
 

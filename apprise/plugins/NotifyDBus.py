@@ -161,7 +161,7 @@ class NotifyDBus(NotifyBase):
     service_url = 'http://www.freedesktop.org/Software/dbus/'
 
     # The default protocols
-    # Python 3 keys() does not return a list object, it's it's own dict_keys()
+    # Python 3 keys() does not return a list object, it is its own dict_keys()
     # object if we were to reference, we wouldn't be backwards compatible with
     # Python v2.  So converting the result set back into a list makes us
     # compatible

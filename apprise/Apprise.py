@@ -306,7 +306,7 @@ class Apprise:
 
     def find(self, tag=common.MATCH_ALL_TAG, match_always=True):
         """
-        Returns an list of all servers matching against the tag specified.
+        Returns a list of all servers matching against the tag specified.
 
         """
 
@@ -347,14 +347,14 @@ class Apprise:
                body_format=None, tag=common.MATCH_ALL_TAG, match_always=True,
                attach=None, interpret_escapes=None):
         """
-        Send a notification to all of the plugins previously loaded.
+        Send a notification to all the plugins previously loaded.
 
         If the body_format specified is NotifyFormat.MARKDOWN, it will
         be converted to HTML if the Notification type expects this.
 
         if the tag is specified (either a string or a set/list/tuple
         of strings), then only the notifications flagged with that
-        tagged value are notified.  By default all added services
+        tagged value are notified.  By default, all added services
         are notified (tag=MATCH_ALL_TAG)
 
         This function returns True if all notifications were successfully
@@ -363,7 +363,7 @@ class Apprise:
         simply having empty configuration files that were read.
 
         Attach can contain a list of attachment URLs.  attach can also be
-        represented by a an AttachBase() (or list of) object(s). This
+        represented by an AttachBase() (or list of) object(s). This
         identifies the products you wish to notify
 
         Set interpret_escapes to True if you want to pre-escape a string
@@ -382,7 +382,7 @@ class Apprise:
 
     def async_notify(self, *args, **kwargs):
         """
-        Send a notification to all of the plugins previously loaded, for
+        Send a notification to all the plugins previously loaded, for
         asynchronous callers. This method is an async method that should be
         awaited on, even if it is missing the async keyword in its signature.
         (This is omitted to preserve syntax compatibility with Python 2.)
@@ -455,7 +455,7 @@ class Apprise:
                    tag=common.MATCH_ALL_TAG, match_always=True, attach=None,
                    interpret_escapes=None):
         """
-        Creates notifications for all of the plugins loaded.
+        Creates notifications for all the plugins loaded.
 
         Returns a generator that calls handler for each notification. The first
         and only argument supplied to handler is the server, and the keyword

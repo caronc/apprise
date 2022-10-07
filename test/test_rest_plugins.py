@@ -307,8 +307,7 @@ def test_notify_overflow_split():
         # Test title max length
         title_maxlen = title_len
 
-        # Enforce a body length
-        # Wrap in int() so Python v3 doesn't convert the response into a float
+        # Enforce a body length. Make sure it's an int.
         body_maxlen = int(body_len / 4)
 
         def __init__(self, *args, **kwargs):
@@ -345,8 +344,7 @@ def test_notify_overflow_split():
         # Enforce no title
         title_maxlen = 0
 
-        # Enforce a body length based on the title
-        # Wrap in int() so Python v3 doesn't convert the response into a float
+        # Enforce a body length based on the title. Make sure it's an int.
         body_maxlen = int(title_len / 4)
 
         def __init__(self, *args, **kwargs):

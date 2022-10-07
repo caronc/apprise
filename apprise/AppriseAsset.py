@@ -107,8 +107,8 @@ class AppriseAsset:
     # - NotifyFormat.HTML
     # - None
     #
-    # If no format is specified (hence None), then no special pre-formating
-    # actions will take place during a notificaton. This has been and always
+    # If no format is specified (hence None), then no special pre-formatting
+    # actions will take place during a notification. This has been and always
     # will be the default.
     body_format = None
 

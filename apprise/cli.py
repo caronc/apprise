@@ -272,10 +272,10 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
         # Set the theme
         theme=theme,
 
-        # Async mode is only used for Python v3+ and allows a user to send
-        # all of their notifications asyncronously.  This was made an option
-        # incase there are problems in the future where it's better that
-        # everything run sequentially/syncronously instead.
+        # Async mode allows a user to send all of their notifications
+        # asynchronously. This was made an option incase there are problems
+        # in the future where it is better that everything runs sequentially/
+        # synchronously instead.
         async_mode=disable_async is not True,
 
         # Load our plugins

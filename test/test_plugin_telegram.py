@@ -537,10 +537,9 @@ def test_plugin_telegram_general(mock_post):
 
 
 @mock.patch('requests.post')
-def test_plugin_telegram_formating(mock_post):
+def test_plugin_telegram_formatting(mock_post):
     """
-    NotifyTelegram() Python v3+ Formatting Tests
-
+    NotifyTelegram() formatting tests
     """
 
     # Disable Throttling to speed testing

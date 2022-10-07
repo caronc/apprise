@@ -49,7 +49,7 @@ from ..AppriseLocale import gettext_lazy as _
 
 
 class NotificoFormat:
-    # Resets all formating
+    # Resets all formatting
     Reset = '\x0F'
 
     # Formatting
