@@ -44,11 +44,11 @@ install:
   - if [[ $TOXENV != 'bare' ]]; then pip install -r all-plugin-requirements.txt; fi
   # pypy and bare installs do not include dbus-python
   - if [[ $TOXENV != 'bare' ]] && [[ $TRAVIS_PYTHON_VERSION != 'pypy'* ]]; then travis_retry pip install dbus-python; fi
-  - if [[ $TOXENV == 'py37' ]]; then pip uninstall --yes flake8; fi
 
   # Fix/workaround: Python 3.7 importlib-metadata becomes incompatible with flake8,
   #                 unless we use a version that still supports EntryPoints.get().
   #                 `tox.ini` has been updated to not call flake8 on Python 3.7.
+  - if [[ $TOXENV == 'py37' || $TOXENV == 'pypy37' ]]; then pip uninstall --yes flake8; fi
 
 # run tests
 script:
