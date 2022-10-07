@@ -25,7 +25,6 @@
 
 import re
 import os
-import six
 import requests
 from tempfile import NamedTemporaryFile
 from .AttachBase import AttachBase
@@ -67,7 +66,7 @@ class AttachHTTP(AttachBase):
         self.schema = 'https' if self.secure else 'http'
 
         self.fullpath = kwargs.get('fullpath')
-        if not isinstance(self.fullpath, six.string_types):
+        if not isinstance(self.fullpath, str):
             self.fullpath = '/'
 
         self.headers = {}

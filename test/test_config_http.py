@@ -23,7 +23,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import six
 import time
 import pytest
 from unittest import mock
@@ -116,8 +115,8 @@ def test_config_http(mock_post):
     results = ConfigHTTP.parse_url('http://user:pass@localhost?+key=value')
     assert isinstance(results, dict)
     ch = ConfigHTTP(**results)
-    assert isinstance(ch.url(), six.string_types) is True
-    assert isinstance(ch.read(), six.string_types) is True
+    assert isinstance(ch.url(), str) is True
+    assert isinstance(ch.read(), str) is True
 
     # one entry added
     assert len(ch) == 1
@@ -125,8 +124,8 @@ def test_config_http(mock_post):
     results = ConfigHTTP.parse_url('http://localhost:8080/path/')
     assert isinstance(results, dict)
     ch = ConfigHTTP(**results)
-    assert isinstance(ch.url(), six.string_types) is True
-    assert isinstance(ch.read(), six.string_types) is True
+    assert isinstance(ch.url(), str) is True
+    assert isinstance(ch.read(), str) is True
 
     # one entry added
     assert len(ch) == 1
@@ -137,16 +136,16 @@ def test_config_http(mock_post):
     # Cache Handling; cache each request for 30 seconds
     results = ConfigHTTP.parse_url('http://localhost:8080/path/?cache=30')
     assert mock_post.call_count == 0
-    assert isinstance(ch.url(), six.string_types) is True
+    assert isinstance(ch.url(), str) is True
 
     assert isinstance(results, dict)
     ch = ConfigHTTP(**results)
     assert mock_post.call_count == 0
 
-    assert isinstance(ch.url(), six.string_types) is True
+    assert isinstance(ch.url(), str) is True
     assert mock_post.call_count == 0
 
-    assert isinstance(ch.read(), six.string_types) is True
+    assert isinstance(ch.read(), str) is True
     assert mock_post.call_count == 1
 
     # Clear all our mock counters
@@ -204,7 +203,7 @@ def test_config_http(mock_post):
     # Invalid cache
     results = ConfigHTTP.parse_url('http://localhost:8080/path/?cache=False')
     assert isinstance(results, dict)
-    assert isinstance(ch.url(), six.string_types) is True
+    assert isinstance(ch.url(), str) is True
 
     results = ConfigHTTP.parse_url('http://localhost:8080/path/?cache=-10')
     assert isinstance(results, dict)
@@ -214,8 +213,8 @@ def test_config_http(mock_post):
     results = ConfigHTTP.parse_url('http://user@localhost?format=text')
     assert isinstance(results, dict)
     ch = ConfigHTTP(**results)
-    assert isinstance(ch.url(), six.string_types) is True
-    assert isinstance(ch.read(), six.string_types) is True
+    assert isinstance(ch.url(), str) is True
+    assert isinstance(ch.read(), str) is True
 
     # one entry added
     assert len(ch) == 1
@@ -223,8 +222,8 @@ def test_config_http(mock_post):
     results = ConfigHTTP.parse_url('https://localhost')
     assert isinstance(results, dict)
     ch = ConfigHTTP(**results)
-    assert isinstance(ch.url(), six.string_types) is True
-    assert isinstance(ch.read(), six.string_types) is True
+    assert isinstance(ch.url(), str) is True
+    assert isinstance(ch.read(), str) is True
 
     # one entry added
     assert len(ch) == 1
@@ -259,7 +258,7 @@ def test_config_http(mock_post):
 
     # Test a buffer size limit reach
     ch.max_buffer_size = len(dummy_response.text)
-    assert isinstance(ch.read(), six.string_types) is True
+    assert isinstance(ch.read(), str) is True
 
     # Test YAML detection
     yaml_supported_types = (
@@ -268,7 +267,7 @@ def test_config_http(mock_post):
     for st in yaml_supported_types:
         dummy_response.headers['Content-Type'] = st
         ch.default_config_format = None
-        assert isinstance(ch.read(), six.string_types) is True
+        assert isinstance(ch.read(), str) is True
         # Set to YAML
         assert ch.default_config_format == ConfigFormat.YAML
 
@@ -278,7 +277,7 @@ def test_config_http(mock_post):
     for st in text_supported_types:
         dummy_response.headers['Content-Type'] = st
         ch.default_config_format = None
-        assert isinstance(ch.read(), six.string_types) is True
+        assert isinstance(ch.read(), str) is True
         # Set to TEXT
         assert ch.default_config_format == ConfigFormat.TEXT
 
@@ -288,14 +287,14 @@ def test_config_http(mock_post):
     for st in ukwn_supported_types:
         dummy_response.headers['Content-Type'] = st
         ch.default_config_format = None
-        assert isinstance(ch.read(), six.string_types) is True
+        assert isinstance(ch.read(), str) is True
         # Remains unchanged
         assert ch.default_config_format is None
 
     # When the entry is missing; we handle this too
     del dummy_response.headers['Content-Type']
     ch.default_config_format = None
-    assert isinstance(ch.read(), six.string_types) is True
+    assert isinstance(ch.read(), str) is True
     # Remains unchanged
     assert ch.default_config_format is None
 
@@ -315,16 +314,16 @@ def test_config_http(mock_post):
     # Our content is still within the limits, so we're okay
     dummy_response.headers['Content-Length'] = 'garbage'
 
-    assert isinstance(ch.read(), six.string_types) is True
+    assert isinstance(ch.read(), str) is True
 
     dummy_response.headers['Content-Length'] = 'None'
     # Our content is still within the limits, so we're okay
-    assert isinstance(ch.read(), six.string_types) is True
+    assert isinstance(ch.read(), str) is True
 
     # Handle cases where the content length is exactly at our limit
     dummy_response.text = 'a' * ch.max_buffer_size
     # This is acceptable
-    assert isinstance(ch.read(), six.string_types) is True
+    assert isinstance(ch.read(), str) is True
 
     # If we are over our limit though..
     dummy_response.text = 'b' * (ch.max_buffer_size + 1)

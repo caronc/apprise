@@ -26,7 +26,6 @@
 from __future__ import print_function
 import re
 import sys
-import six
 import pytest
 import requests
 from unittest import mock
@@ -142,12 +141,12 @@ def apprise_test(do_notify):
     assert len(a) == 2
 
     # We can retrieve elements from our list too by reference:
-    assert isinstance(a[0].url(), six.string_types) is True
+    assert isinstance(a[0].url(), str) is True
 
     # We can iterate over our list too:
     count = 0
     for o in a:
-        assert isinstance(o.url(), six.string_types) is True
+        assert isinstance(o.url(), str) is True
         count += 1
     # verify that we did indeed iterate over each element
     assert len(a) == count
@@ -1353,7 +1352,7 @@ def test_apprise_details():
         assert 'details' in entry['requirements']
         assert 'packages_required' in entry['requirements']
         assert 'packages_recommended' in entry['requirements']
-        assert isinstance(entry['requirements']['details'], six.string_types)
+        assert isinstance(entry['requirements']['details'], str)
         assert isinstance(entry['requirements']['packages_required'], list)
         assert isinstance(entry['requirements']['packages_recommended'], list)
 
@@ -1380,7 +1379,7 @@ def test_apprise_details():
         assert 'details' in entry['requirements']
         assert 'packages_required' in entry['requirements']
         assert 'packages_recommended' in entry['requirements']
-        assert isinstance(entry['requirements']['details'], six.string_types)
+        assert isinstance(entry['requirements']['details'], str)
         assert isinstance(entry['requirements']['packages_required'], list)
         assert isinstance(entry['requirements']['packages_recommended'], list)
 
@@ -1475,7 +1474,7 @@ def test_apprise_details_plugin_verification():
         # A Service Name MUST be defined
         assert 'service_name' in entry
         assert isinstance(
-            entry['service_name'], (six.string_types, LazyTranslation))
+            entry['service_name'], (str, LazyTranslation))
 
         # Acquire our protocols
         protocols = parse_list(
@@ -1504,10 +1503,10 @@ def test_apprise_details_plugin_verification():
                 if 'alias_of' not in arg:
                     # Minimum requirement of an argument
                     assert 'name' in arg
-                    assert isinstance(arg['name'], six.string_types)
+                    assert isinstance(arg['name'], str)
 
                     assert 'type' in arg
-                    assert isinstance(arg['type'], six.string_types)
+                    assert isinstance(arg['type'], str)
                     assert is_valid_type_re.match(arg['type']) is not None
 
                     if 'min' in arg:
@@ -1532,7 +1531,7 @@ def test_apprise_details_plugin_verification():
                         assert isinstance(arg['required'], bool)
 
                     if 'prefix' in arg:
-                        assert isinstance(arg['prefix'], six.string_types)
+                        assert isinstance(arg['prefix'], str)
                         if section == 'kwargs':
                             # The only acceptable prefix types for kwargs
                             assert arg['prefix'] in (':', '+', '-')
@@ -1543,7 +1542,7 @@ def test_apprise_details_plugin_verification():
 
                     if 'map_to' in arg:
                         # must be a string
-                        assert isinstance(arg['map_to'], six.string_types)
+                        assert isinstance(arg['map_to'], str)
                         # Track our map_to object
                         map_to_entries.add(arg['map_to'])
 
@@ -1578,9 +1577,9 @@ def test_apprise_details_plugin_verification():
                         # Regex must ALWAYS be in the format (regex, option)
                         assert isinstance(arg['regex'], (tuple, list))
                         assert len(arg['regex']) == 2
-                        assert isinstance(arg['regex'][0], six.string_types)
+                        assert isinstance(arg['regex'][0], str)
                         assert arg['regex'][1] is None or isinstance(
-                            arg['regex'][1], six.string_types)
+                            arg['regex'][1], str)
 
                         # Compile the regular expression to verify that it is
                         # valid
@@ -1609,10 +1608,10 @@ def test_apprise_details_plugin_verification():
 
                     # must be a string
                     assert isinstance(
-                        arg['alias_of'], (six.string_types, list, tuple, set))
+                        arg['alias_of'], (str, list, tuple, set))
 
                     aliases = [arg['alias_of']] \
-                        if isinstance(arg['alias_of'], six.string_types) \
+                        if isinstance(arg['alias_of'], str) \
                         else arg['alias_of']
 
                     for alias_of in aliases:
@@ -1664,7 +1663,7 @@ def test_apprise_details_plugin_verification():
                             #      'alias_of': ('apitoken', 'webtoken'),
                             #    },
                             # }
-                            if isinstance(arg['alias_of'], six.string_types):
+                            if isinstance(arg['alias_of'], str):
                                 assert len(entry['details'][section][key]) == 1
                             else:  # is tuple,list, or set
                                 assert len(entry['details'][section][key]) == 2

@@ -22,7 +22,6 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
-import six
 from ..plugins.NotifyBase import NotifyBase
 from ..utils import URL_DETAILS_RE
 from ..utils import parse_url
@@ -73,7 +72,7 @@ class CustomNotifyPlugin(NotifyBase):
         parsed from the provided URL into our supported matrix structure.
         """
 
-        if not isinstance(url, six.string_types):
+        if not isinstance(url, str):
             msg = 'An invalid custom notify url/schema ({}) provided in ' \
                 'function {}.'.format(url, send_func.__name__)
             logger.warning(msg)
@@ -112,7 +111,7 @@ class CustomNotifyPlugin(NotifyBase):
         class CustomNotifyPluginWrapper(CustomNotifyPlugin):
 
             # Our Service Name
-            service_name = name if isinstance(name, six.string_types) \
+            service_name = name if isinstance(name, str) \
                 and name else 'Custom - {}'.format(plugin_name)
 
             # Store our matched schema

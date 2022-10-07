@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import os
-import six
 from unittest import mock
 
 from helpers import module_reload
@@ -71,7 +70,7 @@ def test_plugin_macosx_general(mock_macver, mock_system, mock_popen, tmpdir):
     assert isinstance(obj, apprise.plugins.NotifyMacOSX) is True
 
     # Test url() call
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
 
     # test notifications
     assert obj.notify(title='title', body='body',
@@ -90,7 +89,7 @@ def test_plugin_macosx_general(mock_macver, mock_system, mock_popen, tmpdir):
     obj = apprise.Apprise.instantiate(
         'macosx://_/?image=False', suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyMacOSX) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert obj.notify(title='title', body='body',
                       notify_type=apprise.NotifyType.INFO) is True
 
@@ -99,7 +98,7 @@ def test_plugin_macosx_general(mock_macver, mock_system, mock_popen, tmpdir):
         'macosx://_/?sound=default', suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyMacOSX) is True
     assert obj.sound == 'default'
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert obj.notify(title='title', body='body',
                       notify_type=apprise.NotifyType.INFO) is True
 

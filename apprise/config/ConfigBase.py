@@ -25,7 +25,6 @@
 
 import os
 import re
-import six
 import yaml
 import time
 
@@ -135,7 +134,7 @@ class ConfigBase(URLBase):
             self.encoding = kwargs.get('encoding')
 
         if 'format' in kwargs \
-                and isinstance(kwargs['format'], six.string_types):
+                and isinstance(kwargs['format'], str):
             # Store the enforced config format
             self.config_format = kwargs.get('format').lower()
 
@@ -180,7 +179,7 @@ class ConfigBase(URLBase):
         # config plugin to load the data source and return unparsed content
         # None is returned if there was an error or simply no data
         content = self.read(**kwargs)
-        if not isinstance(content, six.string_types):
+        if not isinstance(content, str):
             # Set the time our content was cached at
             self._cached_time = time.time()
 
@@ -704,7 +703,7 @@ class ConfigBase(URLBase):
 
                 if not (hasattr(asset, k) and
                         isinstance(getattr(asset, k),
-                                   (bool, six.string_types))):
+                                   (bool, str))):
 
                     # We can't set a function or non-string set value
                     ConfigBase.logger.warning(
@@ -715,7 +714,7 @@ class ConfigBase(URLBase):
                     # Convert to an empty string
                     v = ''
 
-                if (isinstance(v, (bool, six.string_types))
+                if (isinstance(v, (bool, str))
                         and isinstance(getattr(asset, k), bool)):
 
                     # If the object in the Asset is a boolean, then
@@ -723,7 +722,7 @@ class ConfigBase(URLBase):
                     # match that.
                     setattr(asset, k, parse_bool(v))
 
-                elif isinstance(v, six.string_types):
+                elif isinstance(v, str):
                     # Set our asset object with the new value
                     setattr(asset, k, v.strip())
 
@@ -738,7 +737,7 @@ class ConfigBase(URLBase):
         global_tags = set()
 
         tags = result.get('tag', None)
-        if tags and isinstance(tags, (list, tuple, six.string_types)):
+        if tags and isinstance(tags, (list, tuple, str)):
             # Store any preset tags
             global_tags = set(parse_list(tags))
 
@@ -746,7 +745,7 @@ class ConfigBase(URLBase):
         # include root directive
         #
         includes = result.get('include', None)
-        if isinstance(includes, six.string_types):
+        if isinstance(includes, str):
             # Support a single inline string or multiple ones separated by a
             # comma and/or space
             includes = parse_urls(includes)
@@ -758,7 +757,7 @@ class ConfigBase(URLBase):
         # Iterate over each config URL
         for no, url in enumerate(includes):
 
-            if isinstance(url, six.string_types):
+            if isinstance(url, str):
                 # Support a single inline string or multiple ones separated by
                 # a comma and/or space
                 configs.extend(parse_urls(url))
@@ -786,7 +785,7 @@ class ConfigBase(URLBase):
             loggable_url = url if not asset.secure_logging \
                 else cwe312_url(url)
 
-            if isinstance(url, six.string_types):
+            if isinstance(url, str):
                 # We're just a simple URL string...
                 schema = GET_SCHEMA_RE.match(url)
                 if schema is None:
@@ -1108,7 +1107,7 @@ class ConfigBase(URLBase):
                     r'^(choice:)?string',
                     meta.get('type'),
                     re.IGNORECASE) \
-                    and not isinstance(value, six.string_types):
+                    and not isinstance(value, str):
 
                 # Ensure our format is as expected
                 value = str(value)

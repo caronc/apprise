@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import re
-import six
 from unittest import mock
 
 import requests
@@ -187,7 +186,7 @@ def test_attach_http(mock_get):
         'http://user:pass@localhost/apprise.gif?dl=1&cache=300')
     assert isinstance(results, dict)
     attachment = AttachHTTP(**results)
-    assert isinstance(attachment.url(), six.string_types) is True
+    assert isinstance(attachment.url(), str) is True
 
     # Test that our extended variables are passed along
     assert mock_get.call_count == 0
@@ -204,7 +203,7 @@ def test_attach_http(mock_get):
         'http://user:pass@localhost/apprise.gif?+key=value&cache=True')
     assert isinstance(results, dict)
     attachment = AttachHTTP(**results)
-    assert isinstance(attachment.url(), six.string_types) is True
+    assert isinstance(attachment.url(), str) is True
     # No mime-type and/or filename over-ride was specified, so therefore it
     # won't show up in the generated URL
     assert re.search(r'[?&]mime=', attachment.url()) is None
@@ -217,7 +216,7 @@ def test_attach_http(mock_get):
         'http://localhost:3000/noname.gif?name=usethis.jpg&mime=image/jpeg')
     assert isinstance(results, dict)
     attachment = AttachHTTP(**results)
-    assert isinstance(attachment.url(), six.string_types) is True
+    assert isinstance(attachment.url(), str) is True
     # both mime and name over-ridden
     assert re.search(r'[?&]mime=image%2Fjpeg', attachment.url())
     assert re.search(r'[?&]name=usethis.jpg', attachment.url())
@@ -251,7 +250,7 @@ def test_attach_http(mock_get):
     results = AttachHTTP.parse_url('http://localhost')
     assert isinstance(results, dict)
     attachment = AttachHTTP(**results)
-    assert isinstance(attachment.url(), six.string_types) is True
+    assert isinstance(attachment.url(), str) is True
     # No mime-type and/or filename over-ride was specified, so therefore it
     # won't show up in the generated URL
     assert re.search(r'[?&]mime=', attachment.url()) is None
@@ -273,7 +272,7 @@ def test_attach_http(mock_get):
     attachment = AttachHTTP(**results)
     # we can not download this attachment
     assert not attachment
-    assert isinstance(attachment.url(), six.string_types) is True
+    assert isinstance(attachment.url(), str) is True
     # No mime-type and/or filename over-ride was specified, so therefore it
     # won't show up in the generated URL
     assert re.search(r'[?&]mime=', attachment.url()) is None
@@ -292,7 +291,7 @@ def test_attach_http(mock_get):
     results = AttachHTTP.parse_url('http://localhost/no-length.gif')
     assert isinstance(results, dict)
     attachment = AttachHTTP(**results)
-    assert isinstance(attachment.url(), six.string_types) is True
+    assert isinstance(attachment.url(), str) is True
     # No mime-type and/or filename over-ride was specified, so therefore it
     # won't show up in the generated URL
     assert re.search(r'[?&]mime=', attachment.url()) is None
@@ -320,7 +319,7 @@ def test_attach_http(mock_get):
     results = AttachHTTP.parse_url('http://user@localhost/ignore-filename.gif')
     assert isinstance(results, dict)
     attachment = AttachHTTP(**results)
-    assert isinstance(attachment.url(), six.string_types) is True
+    assert isinstance(attachment.url(), str) is True
     # No mime-type and/or filename over-ride was specified, so therefore it
     # won't show up in the generated URL
     assert re.search(r'[?&]mime=', attachment.url()) is None
@@ -341,7 +340,7 @@ def test_attach_http(mock_get):
     attachment = AttachHTTP(**results)
     # we can not download this attachment
     assert not attachment
-    assert isinstance(attachment.url(), six.string_types) is True
+    assert isinstance(attachment.url(), str) is True
     # No mime-type and/or filename over-ride was specified, so therefore it
     # won't show up in the generated URL
     assert re.search(r'[?&]mime=', attachment.url()) is None
@@ -355,7 +354,7 @@ def test_attach_http(mock_get):
     results = AttachHTTP.parse_url('http://user@localhost')
     assert isinstance(results, dict)
     attachment = AttachHTTP(**results)
-    assert isinstance(attachment.url(), six.string_types) is True
+    assert isinstance(attachment.url(), str) is True
     # No mime-type and/or filename over-ride was specified, so therefore it
     # won't show up in the generated URL
     assert re.search(r'[?&]mime=', attachment.url()) is None
@@ -375,7 +374,7 @@ def test_attach_http(mock_get):
     results = AttachHTTP.parse_url('http://localhost/invalid-length.gif')
     assert isinstance(results, dict)
     attachment = AttachHTTP(**results)
-    assert isinstance(attachment.url(), six.string_types) is True
+    assert isinstance(attachment.url(), str) is True
     # No mime-type and/or filename over-ride was specified, so therefore it
     # won't show up in the generated URL
     assert re.search(r'[?&]mime=', attachment.url()) is None
@@ -393,7 +392,7 @@ def test_attach_http(mock_get):
     attachment = AttachHTTP(**results)
     # we can not download this attachment
     assert attachment
-    assert isinstance(attachment.url(), six.string_types) is True
+    assert isinstance(attachment.url(), str) is True
     # No mime-type and/or filename over-ride was specified, so therefore it
     # won't show up in the generated URL
     assert re.search(r'[?&]mime=', attachment.url()) is None

@@ -23,7 +23,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import six
 import ctypes
 import locale
 import contextlib
@@ -179,7 +178,7 @@ class AppriseLocale:
         """
         # We want to only use the 2 character version of this language
         # hence en_CA becomes en, en_US becomes en.
-        if not isinstance(lang, six.string_types):
+        if not isinstance(lang, str):
             if detect_fallback is False:
                 # no detection enabled; we're done
                 return None

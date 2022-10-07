@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import re
-import six
 import requests
 import hmac
 from json import dumps
@@ -181,7 +180,7 @@ class NotifyBoxcar(NotifyBase):
             self.tags.append(DEFAULT_TAG)
             targets = []
 
-        elif isinstance(targets, six.string_types):
+        elif isinstance(targets, str):
             targets = [x for x in filter(bool, TAGS_LIST_DELIM.split(
                 targets,
             ))]

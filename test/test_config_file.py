@@ -23,7 +23,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import six
 from unittest import mock
 
 from apprise.config.ConfigFile import ConfigFile
@@ -58,7 +57,7 @@ def test_config_file(tmpdir):
     # one entry added
     assert len(cf) == 1
 
-    assert isinstance(cf.url(), six.string_types) is True
+    assert isinstance(cf.url(), str) is True
 
     # Verify that we're using the same asset
     assert cf[0].asset is asset
@@ -96,8 +95,8 @@ def test_config_file(tmpdir):
         'file://{}?cache=30'.format(str(t)))
     assert isinstance(results, dict)
     cf = ConfigFile(**results)
-    assert isinstance(cf.url(), six.string_types) is True
-    assert isinstance(cf.read(), six.string_types) is True
+    assert isinstance(cf.url(), str) is True
+    assert isinstance(cf.read(), str) is True
 
 
 def test_config_file_exceptions(tmpdir):

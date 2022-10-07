@@ -23,7 +23,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import six
 import re
 
 from os import listdir
@@ -88,7 +87,7 @@ def __load_matrix(path=abspath(dirname(__file__)), name='apprise.attachment'):
 
         # Load protocol(s) if defined
         proto = getattr(plugin, 'protocol', None)
-        if isinstance(proto, six.string_types):
+        if isinstance(proto, str):
             if proto not in ATTACHMENT_SCHEMA_MAP:
                 ATTACHMENT_SCHEMA_MAP[proto] = plugin
 
@@ -100,7 +99,7 @@ def __load_matrix(path=abspath(dirname(__file__)), name='apprise.attachment'):
 
         # Load secure protocol(s) if defined
         protos = getattr(plugin, 'secure_protocol', None)
-        if isinstance(protos, six.string_types):
+        if isinstance(protos, str):
             if protos not in ATTACHMENT_SCHEMA_MAP:
                 ATTACHMENT_SCHEMA_MAP[protos] = plugin
 

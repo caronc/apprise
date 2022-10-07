@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import re
-import six
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
@@ -480,11 +479,11 @@ class NotifyEmail(NotifyBase):
 
         # Now detect the SMTP Server
         self.smtp_host = \
-            smtp_host if isinstance(smtp_host, six.string_types) else ''
+            smtp_host if isinstance(smtp_host, str) else ''
 
         # Now detect secure mode
         self.secure_mode = self.default_secure_mode \
-            if not isinstance(secure_mode, six.string_types) \
+            if not isinstance(secure_mode, str) \
             else secure_mode.lower()
         if self.secure_mode not in SECURE_MODES:
             msg = 'The secure mode specified ({}) is invalid.'\

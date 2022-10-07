@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import os
-import six
 import pytest
 import requests
 from json import dumps
@@ -282,10 +281,10 @@ def test_plugin_telegram_general(mock_post):
     mock_post.return_value.content = '{}'
 
     # test url call
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
 
     # test privacy version of url
-    assert isinstance(obj.url(privacy=True), six.string_types) is True
+    assert isinstance(obj.url(privacy=True), str) is True
     assert obj.url(privacy=True).startswith('tgram://1...p/') is True
 
     # Test that we can load the string we generate back:

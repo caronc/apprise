@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import os
-import six
 from unittest import mock
 
 import pytest
@@ -256,7 +255,7 @@ def test_plugin_twitter_general(mock_post, mock_get):
         targets=screen_name)
 
     assert isinstance(obj, plugins.NotifyTwitter) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
 
     # apprise room was found
     assert obj.send(body="test") is True

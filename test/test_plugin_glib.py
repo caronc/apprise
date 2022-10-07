@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import re
-import six
 import pytest
 from unittest import mock
 
@@ -119,19 +118,19 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
     # Create our instance (identify all supported types)
     obj = apprise.Apprise.instantiate('dbus://', suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyDBus) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert obj.url().startswith('dbus://_/')
     obj = apprise.Apprise.instantiate('kde://', suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyDBus) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert obj.url().startswith('kde://_/')
     obj = apprise.Apprise.instantiate('qt://', suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyDBus) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert obj.url().startswith('qt://_/')
     obj = apprise.Apprise.instantiate('glib://', suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyDBus) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert obj.url().startswith('glib://_/')
     obj.duration = 0
 
@@ -159,7 +158,7 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
     obj = apprise.Apprise.instantiate(
         'dbus://_/?image=True', suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyDBus) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert obj.url().startswith('dbus://_/')
     assert re.search('image=yes', obj.url())
 
@@ -170,7 +169,7 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
     obj = apprise.Apprise.instantiate(
         'dbus://_/?image=False', suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyDBus) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert obj.url().startswith('dbus://_/')
     assert re.search('image=no', obj.url())
 
@@ -182,7 +181,7 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
     obj = apprise.Apprise.instantiate(
         'dbus://_/?priority=invalid', suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyDBus) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True
@@ -190,7 +189,7 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
     obj = apprise.Apprise.instantiate(
         'dbus://_/?priority=high', suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyDBus) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True
@@ -198,7 +197,7 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
     obj = apprise.Apprise.instantiate(
         'dbus://_/?priority=2', suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyDBus) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True
@@ -207,7 +206,7 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
     obj = apprise.Apprise.instantiate(
         'dbus://_/?urgency=invalid', suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyDBus) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True
@@ -215,7 +214,7 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
     obj = apprise.Apprise.instantiate(
         'dbus://_/?urgency=high', suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyDBus) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True
@@ -223,7 +222,7 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
     obj = apprise.Apprise.instantiate(
         'dbus://_/?urgency=2', suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyDBus) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True
@@ -231,7 +230,7 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
     obj = apprise.Apprise.instantiate(
         'dbus://_/?urgency=', suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyDBus) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True
@@ -240,7 +239,7 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
     obj = apprise.Apprise.instantiate(
         'dbus://_/?x=5&y=5', suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyDBus) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True
@@ -363,7 +362,7 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
     obj.duration = 0
 
     # Test url() call
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
 
     # Our notification succeeds even though the gi library was not loaded
     assert obj.notify(
@@ -392,7 +391,7 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
     obj.duration = 0
 
     # Test url() call
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
 
     # Our notification succeeds even though the gi library was not loaded
     assert obj.notify(

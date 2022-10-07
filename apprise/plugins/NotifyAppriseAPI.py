@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import re
-import six
 import requests
 from json import dumps
 
@@ -137,7 +136,7 @@ class NotifyAppriseAPI(NotifyBase):
         super(NotifyAppriseAPI, self).__init__(**kwargs)
 
         self.fullpath = kwargs.get('fullpath')
-        if not isinstance(self.fullpath, six.string_types):
+        if not isinstance(self.fullpath, str):
             self.fullpath = '/'
 
         self.token = validate_regex(

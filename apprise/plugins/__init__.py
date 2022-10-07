@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import os
-import six
 import re
 import copy
 
@@ -212,7 +211,7 @@ def _sanitize_token(tokens, default_delimiter):
 
         if 'regex' in tokens[key]:
             # Verify that we are a tuple; convert strings to tuples
-            if isinstance(tokens[key]['regex'], six.string_types):
+            if isinstance(tokens[key]['regex'], str):
                 # Default tuple setup
                 tokens[key]['regex'] = \
                     (tokens[key]['regex'], None)
@@ -453,7 +452,7 @@ def requirements(plugin):
 
     # Get our required packages
     _req_packages = plugin.requirements.get('packages_required')
-    if isinstance(_req_packages, six.string_types):
+    if isinstance(_req_packages, str):
         # Convert to list
         _req_packages = [_req_packages]
 
@@ -465,7 +464,7 @@ def requirements(plugin):
 
     # Get our recommended packages
     _opt_packages = plugin.requirements.get('packages_recommended')
-    if isinstance(_opt_packages, six.string_types):
+    if isinstance(_opt_packages, str):
         # Convert to list
         _opt_packages = [_opt_packages]
 

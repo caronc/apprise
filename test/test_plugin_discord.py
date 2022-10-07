@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import os
-import six
 from unittest import mock
 
 import pytest
@@ -205,7 +204,7 @@ def test_plugin_discord_general(mock_post):
         footer=True, thumbnail=False)
 
     # Test that we get a string response
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
 
     # This call includes an image with it's payload:
     assert obj.notify(
@@ -234,7 +233,7 @@ def test_plugin_discord_general(mock_post):
 
     desc, results = obj.extract_markdown_sections(test_markdown)
     # we have a description
-    assert isinstance(desc, six.string_types) is True
+    assert isinstance(desc, str) is True
     assert desc.startswith('A section of text that has no header at the top.')
     assert desc.endswith('string.')
 
@@ -259,7 +258,7 @@ def test_plugin_discord_general(mock_post):
     desc, results = obj.extract_markdown_sections(test_markdown)
     assert isinstance(results, list) is True
     # No desc details filled out
-    assert isinstance(desc, six.string_types) is True
+    assert isinstance(desc, str) is True
     assert not desc
 
     # We should have 5 sections (since there are 5 headers identified above)
@@ -319,7 +318,7 @@ def test_plugin_discord_general(mock_post):
     assert len(results) == 0
 
     # No desc details filled out
-    assert isinstance(desc, six.string_types) is True
+    assert isinstance(desc, str) is True
     assert not desc
 
     # String without Heading
@@ -330,7 +329,7 @@ def test_plugin_discord_general(mock_post):
     assert len(results) == 0
 
     # No desc details filled out
-    assert isinstance(desc, six.string_types) is True
+    assert isinstance(desc, str) is True
     assert desc == 'Just a string without any header entries.\n' + \
         'A second line'
 

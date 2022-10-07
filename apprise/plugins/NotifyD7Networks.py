@@ -30,7 +30,6 @@
 # (both user and password) from the API Details section from within your
 # account profile area:  https://d7networks.com/accounts/profile/
 
-import six
 import requests
 import base64
 from json import dumps
@@ -192,7 +191,7 @@ class NotifyD7Networks(NotifyBase):
 
         # Setup our source address (if defined)
         self.source = None \
-            if not isinstance(source, six.string_types) else source.strip()
+            if not isinstance(source, str) else source.strip()
 
         if not (self.user and self.password):
             msg = 'A D7 Networks user/pass was not provided.'

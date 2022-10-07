@@ -28,7 +28,6 @@
 # - https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.rst
 #
 import re
-import six
 import requests
 from markdown import markdown
 from json import dumps
@@ -263,7 +262,7 @@ class NotifyMatrix(NotifyBase):
 
         # Setup our mode
         self.mode = self.template_args['mode']['default'] \
-            if not isinstance(mode, six.string_types) else mode.lower()
+            if not isinstance(mode, str) else mode.lower()
         if self.mode and self.mode not in MATRIX_WEBHOOK_MODES:
             msg = 'The mode specified ({}) is invalid.'.format(mode)
             self.logger.warning(msg)
@@ -271,7 +270,7 @@ class NotifyMatrix(NotifyBase):
 
         # Setup our message type
         self.msgtype = self.template_args['msgtype']['default'] \
-            if not isinstance(msgtype, six.string_types) else msgtype.lower()
+            if not isinstance(msgtype, str) else msgtype.lower()
         if self.msgtype and self.msgtype not in MATRIX_MESSAGE_TYPES:
             msg = 'The msgtype specified ({}) is invalid.'.format(msgtype)
             self.logger.warning(msg)
@@ -762,7 +761,7 @@ class NotifyMatrix(NotifyBase):
             # We can't join a room if we're not logged in
             return None
 
-        if not isinstance(room, six.string_types):
+        if not isinstance(room, str):
             # Not a supported string
             return None
 
@@ -850,7 +849,7 @@ class NotifyMatrix(NotifyBase):
             # We can't create a room if we're not logged in
             return None
 
-        if not isinstance(room, six.string_types):
+        if not isinstance(room, str):
             # Not a supported string
             return None
 
@@ -930,7 +929,7 @@ class NotifyMatrix(NotifyBase):
             # We can't get a room id if we're not logged in
             return None
 
-        if not isinstance(room, six.string_types):
+        if not isinstance(room, str):
             # Not a supported string
             return None
 

@@ -26,7 +26,6 @@
 # See https://developer.twitter.com/en/docs/direct-messages/\
 #           sending-and-receiving/api-reference/new-event.html
 import re
-import six
 import requests
 from copy import deepcopy
 from datetime import datetime
@@ -223,7 +222,7 @@ class NotifyTwitter(NotifyBase):
 
         # Store our webhook mode
         self.mode = None \
-            if not isinstance(mode, six.string_types) else mode.lower()
+            if not isinstance(mode, str) else mode.lower()
 
         # Set Cache Flag
         self.cache = cache

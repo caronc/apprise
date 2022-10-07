@@ -23,7 +23,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import six
 from unittest import mock
 
 import requests
@@ -142,7 +141,7 @@ def test_plugin_nextcloudtalk_edge_cases(mock_post):
     obj = plugins.NotifyNextcloudTalk(
         host="localhost", user="admin", password="pass", targets="roomid")
     assert isinstance(obj, plugins.NotifyNextcloudTalk) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
 
     # An empty body
     assert obj.send(body="") is True

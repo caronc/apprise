@@ -31,7 +31,6 @@
 # - https://github.com/E2OpenPlugins/e2openplugin-OpenWebif/wiki/\
 #       OpenWebif-API-documentation#message
 
-import six
 import requests
 from json import loads
 
@@ -169,7 +168,7 @@ class NotifyEnigma2(NotifyBase):
             self.timeout = self.template_args['timeout']['default']
 
         self.fullpath = kwargs.get('fullpath')
-        if not isinstance(self.fullpath, six.string_types):
+        if not isinstance(self.fullpath, str):
             self.fullpath = '/'
 
         self.headers = {}

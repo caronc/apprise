@@ -44,7 +44,6 @@
 #   - https://www.reddit.com/dev/api/
 #   - https://www.reddit.com/dev/api/#POST_api_submit
 #   - https://github.com/reddit-archive/reddit/wiki/API
-import six
 import requests
 from json import loads
 from datetime import timedelta
@@ -271,7 +270,7 @@ class NotifyReddit(NotifyBase):
         self.__access_token_expiry = datetime.utcnow()
 
         self.kind = kind.strip().lower() \
-            if isinstance(kind, six.string_types) \
+            if isinstance(kind, str) \
             else self.template_args['kind']['default']
 
         if self.kind not in REDDIT_MESSAGE_KINDS:

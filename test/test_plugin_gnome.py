@@ -23,7 +23,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import six
 import sys
 import types
 from unittest import mock
@@ -102,7 +101,7 @@ def test_plugin_gnome_general():
     assert obj.enabled is True
 
     # Test url() call
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
 
     # test notifications
     assert obj.notify(title='title', body='body',

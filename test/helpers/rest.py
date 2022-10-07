@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 import re
 import os
-import six
 import requests
 from unittest import mock
 
@@ -145,7 +144,7 @@ class AppriseURLTester:
         # Allow us to force the server response text to be something other then
         # the defaults
         requests_response_text = meta.get('requests_response_text')
-        if not isinstance(requests_response_text, six.string_types):
+        if not isinstance(requests_response_text, str):
             # Convert to string
             requests_response_text = dumps(requests_response_text)
 
@@ -236,11 +235,11 @@ class AppriseURLTester:
 
             # We loaded okay; now lets make sure we can reverse
             # this url
-            assert isinstance(obj.url(), six.string_types) is True
+            assert isinstance(obj.url(), str) is True
 
             # Test url() with privacy=True
             assert isinstance(
-                obj.url(privacy=True), six.string_types) is True
+                obj.url(privacy=True), str) is True
 
             # Some Simple Invalid Instance Testing
             assert instance.parse_url(None) is None
@@ -340,7 +339,7 @@ class AppriseURLTester:
         # Allow us to force the server response text to be something other then
         # the defaults
         requests_response_text = meta.get('requests_response_text')
-        if not isinstance(requests_response_text, six.string_types):
+        if not isinstance(requests_response_text, str):
             # Convert to string
             requests_response_text = dumps(requests_response_text)
 

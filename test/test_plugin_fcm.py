@@ -31,7 +31,6 @@
 
 import io
 import os
-import six
 import sys
 from unittest import mock
 
@@ -794,7 +793,7 @@ def test_plugin_fcm_colors():
 
     # Asset colors
     instance = FCMColorManager('yes')
-    assert isinstance(instance.get(), six.string_types)
+    assert isinstance(instance.get(), str)
     # Output: #rrggbb
     assert len(instance.get()) == 7
     # Starts with has symbol
@@ -808,7 +807,7 @@ def test_plugin_fcm_colors():
 
     # Custom color
     instance = FCMColorManager('#A2B3A4')
-    assert isinstance(instance.get(), six.string_types)
+    assert isinstance(instance.get(), str)
     assert instance.get() == '#a2b3a4'
     assert bool(instance) is True
     # str() response does not include hashtag
@@ -816,7 +815,7 @@ def test_plugin_fcm_colors():
 
     # Custom color (no hashtag)
     instance = FCMColorManager('A2B3A4')
-    assert isinstance(instance.get(), six.string_types)
+    assert isinstance(instance.get(), str)
     # Hashtag is always part of output
     assert instance.get() == '#a2b3a4'
     assert bool(instance) is True
@@ -825,7 +824,7 @@ def test_plugin_fcm_colors():
 
     # Custom color (no hashtag) but only using 3 letter rgb values
     instance = FCMColorManager('AC4')
-    assert isinstance(instance.get(), six.string_types)
+    assert isinstance(instance.get(), str)
     # Hashtag is always part of output
     assert instance.get() == '#aacc44'
     assert bool(instance) is True

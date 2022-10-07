@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import re
-import six
 from .logger import logger
 from time import sleep
 from datetime import datetime
@@ -338,7 +337,7 @@ class URLBase:
         Returns:
             str: The escaped html
         """
-        if not isinstance(html, six.string_types) or not html:
+        if not isinstance(html, str) or not html:
             return ''
 
         # Escape HTML
@@ -437,7 +436,7 @@ class URLBase:
             # Return 4 Asterisks
             return '****'
 
-        if not isinstance(content, six.string_types) or not content:
+        if not isinstance(content, str) or not content:
             # Nothing more to do
             return ''
 
@@ -690,13 +689,13 @@ class URLBase:
 
         for key in ('protocol', 'secure_protocol'):
             schema = getattr(self, key, None)
-            if isinstance(schema, six.string_types):
+            if isinstance(schema, str):
                 schemas.add(schema)
 
             elif isinstance(schema, (set, list, tuple)):
                 # Support iterables list types
                 for s in schema:
-                    if isinstance(s, six.string_types):
+                    if isinstance(s, str):
                         schemas.add(s)
 
         return schemas

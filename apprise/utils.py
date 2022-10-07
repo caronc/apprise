@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import re
-import six
 import sys
 import json
 import contextlib
@@ -667,7 +666,7 @@ def parse_url(url, default_schema='http', verify_host=True, strict_port=False,
 
     """
 
-    if not isinstance(url, six.string_types):
+    if not isinstance(url, str):
         # Simple error checking
         return None
 
@@ -839,10 +838,10 @@ def parse_url(url, default_schema='http', verify_host=True, strict_port=False,
 
     # Re-assemble cleaned up version of the url
     result['url'] = '%s://' % result['schema']
-    if isinstance(result.get('user'), six.string_types):
+    if isinstance(result.get('user'), str):
         result['url'] += result['user']
 
-        if isinstance(result.get('password'), six.string_types):
+        if isinstance(result.get('password'), str):
             result['url'] += ':%s@' % result['password']
 
         else:
@@ -877,7 +876,7 @@ def parse_bool(arg, default=False):
     If the content could not be parsed, then the default is returned.
     """
 
-    if isinstance(arg, six.string_types):
+    if isinstance(arg, str):
         # no = no - False
         # of = short for off - False
         # 0  = int for False
@@ -920,7 +919,7 @@ def parse_phone_no(*args, **kwargs):
 
     result = []
     for arg in args:
-        if isinstance(arg, six.string_types) and arg:
+        if isinstance(arg, str) and arg:
             _result = PHONE_NO_DETECTION_RE.findall(arg)
             if _result:
                 result += _result
@@ -957,7 +956,7 @@ def parse_call_sign(*args, **kwargs):
 
     result = []
     for arg in args:
-        if isinstance(arg, six.string_types) and arg:
+        if isinstance(arg, str) and arg:
             _result = CALL_SIGN_DETECTION_RE.findall(arg)
             if _result:
                 result += _result
@@ -994,7 +993,7 @@ def parse_emails(*args, **kwargs):
 
     result = []
     for arg in args:
-        if isinstance(arg, six.string_types) and arg:
+        if isinstance(arg, str) and arg:
             _result = EMAIL_DETECTION_RE.findall(arg)
             if _result:
                 result += _result
@@ -1030,7 +1029,7 @@ def parse_urls(*args, **kwargs):
 
     result = []
     for arg in args:
-        if isinstance(arg, six.string_types) and arg:
+        if isinstance(arg, str) and arg:
             _result = URL_DETECTION_RE.findall(arg)
             if _result:
                 result += _result
@@ -1145,7 +1144,7 @@ def parse_list(*args):
 
     result = []
     for arg in args:
-        if isinstance(arg, six.string_types):
+        if isinstance(arg, str):
             result += re.split(STRING_DELIMITERS, arg)
 
         elif isinstance(arg, (set, list, tuple)):
@@ -1182,7 +1181,7 @@ def is_exclusive_match(logic, data, match_all=common.MATCH_ALL_TAG,
     to all specified logic searches.
     """
 
-    if isinstance(logic, six.string_types):
+    if isinstance(logic, str):
         # Update our logic to support our delimiters
         logic = set(parse_list(logic))
 
@@ -1205,7 +1204,7 @@ def is_exclusive_match(logic, data, match_all=common.MATCH_ALL_TAG,
 
     # Every entry here will be or'ed with the next
     for entry in logic:
-        if not isinstance(entry, (six.string_types, list, tuple, set)):
+        if not isinstance(entry, (str, list, tuple, set)):
             # Garbage entry in our logic found
             return False
 
@@ -1271,7 +1270,7 @@ def validate_regex(value, regex=r'[^\s]+', flags=re.I, strip=True, fmt=None):
             'x': re.X,
         }
 
-        if isinstance(flags, six.string_types):
+        if isinstance(flags, str):
             # Convert a string of regular expression flags into their
             # respected integer (expected) Python values and perform
             # a bit-wise or on each match found:
@@ -1339,7 +1338,7 @@ def cwe312_word(word, force=False, advanced=True, threshold=5):
         # A Numerical Character (1234... etc)
         NUMERIC = 'n'
 
-    if not (isinstance(word, six.string_types) and word.strip()):
+    if not (isinstance(word, str) and word.strip()):
         # not a password if it's not something we even support
         return word
 
@@ -1565,7 +1564,7 @@ def module_detection(paths, cache=True):
     module_re = re.compile(
         r'^(?P<name>[_a-z0-9][a-z0-9._-]+)?(\.py)?$', re.I)
 
-    if isinstance(paths, six.string_types):
+    if isinstance(paths, str):
         paths = [paths, ]
 
     if not paths or not isinstance(paths, (tuple, list)):

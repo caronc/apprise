@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import sys
-import six
 import types
 import pytest
 from importlib import reload
@@ -107,7 +106,7 @@ def test_plugin_windows_mocked():
     obj.duration = 0
 
     # Test URL functionality
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
 
     # Check that it found our mocked environments
     assert obj.enabled is True
@@ -123,7 +122,7 @@ def test_plugin_windows_mocked():
     obj = apprise.Apprise.instantiate(
         'windows://_/?image=True', suppress_exceptions=False)
     obj.duration = 0
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True
@@ -131,14 +130,14 @@ def test_plugin_windows_mocked():
     obj = apprise.Apprise.instantiate(
         'windows://_/?image=False', suppress_exceptions=False)
     obj.duration = 0
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True
 
     obj = apprise.Apprise.instantiate(
         'windows://_/?duration=1', suppress_exceptions=False)
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     # loads okay
     assert obj.duration == 1
     assert obj.notify(
@@ -208,7 +207,7 @@ def test_plugin_windows_native(
     obj.duration = 0
 
     # Test URL functionality
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
 
     # Check that it found our mocked environments
     assert obj.enabled is True
@@ -224,7 +223,7 @@ def test_plugin_windows_native(
     obj = apprise.Apprise.instantiate(
         'windows://_/?image=True', suppress_exceptions=False)
     obj.duration = 0
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True
@@ -232,14 +231,14 @@ def test_plugin_windows_native(
     obj = apprise.Apprise.instantiate(
         'windows://_/?image=False', suppress_exceptions=False)
     obj.duration = 0
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True
 
     obj = apprise.Apprise.instantiate(
         'windows://_/?duration=1', suppress_exceptions=False)
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True

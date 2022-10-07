@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import sys
-import six
 import io
 import pytest
 from unittest import mock
@@ -102,7 +101,7 @@ def test_apprise_config(tmpdir):
     assert len(ac.servers()) == 4
 
     # Get our URL back
-    assert isinstance(ac[0].url(), six.string_types)
+    assert isinstance(ac[0].url(), str)
 
     # Test cases where our URL is invalid
     t = tmpdir.mkdir("strange-lines").join("apprise")
@@ -180,7 +179,7 @@ def test_apprise_config(tmpdir):
     assert len(ac.servers()) == 1
 
     # Get our URL back
-    assert isinstance(ac[0].url(), six.string_types)
+    assert isinstance(ac[0].url(), str)
 
     # pop an entry from our list
     assert isinstance(ac.pop(0), ConfigBase) is True
@@ -318,7 +317,7 @@ def test_apprise_add_config():
     assert len(ac.servers()) == 3
 
     # Get our URL back
-    assert isinstance(ac[0].url(), six.string_types)
+    assert isinstance(ac[0].url(), str)
 
     # Test invalid content
     assert ac.add_config(content=object()) is False

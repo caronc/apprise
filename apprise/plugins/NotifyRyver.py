@@ -32,7 +32,6 @@
 #  These are important <---^----------------------------------------^
 #
 import re
-import six
 import requests
 from json import dumps
 
@@ -152,7 +151,7 @@ class NotifyRyver(NotifyBase):
 
         # Store our webhook mode
         self.mode = None \
-            if not isinstance(mode, six.string_types) else mode.lower()
+            if not isinstance(mode, str) else mode.lower()
 
         if self.mode not in RYVER_WEBHOOK_MODES:
             msg = 'The Ryver webhook mode specified ({}) is invalid.' \

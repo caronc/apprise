@@ -34,7 +34,6 @@
 #   ntfy://ntfy.local.domain/?priority=max
 import re
 import requests
-import six
 from json import loads
 from json import dumps
 from os.path import basename
@@ -247,7 +246,7 @@ class NotifyNtfy(NotifyBase):
 
         # Prepare our mode
         self.mode = mode.strip().lower() \
-            if isinstance(mode, six.string_types) \
+            if isinstance(mode, str) \
             else self.template_args['mode']['default']
 
         if self.mode not in NTFY_MODES:

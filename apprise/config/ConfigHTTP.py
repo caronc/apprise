@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import re
-import six
 import requests
 from .ConfigBase import ConfigBase
 from ..common import ConfigFormat
@@ -81,7 +80,7 @@ class ConfigHTTP(ConfigBase):
         self.schema = 'https' if self.secure else 'http'
 
         self.fullpath = kwargs.get('fullpath')
-        if not isinstance(self.fullpath, six.string_types):
+        if not isinstance(self.fullpath, str):
             self.fullpath = '/'
 
         self.headers = {}

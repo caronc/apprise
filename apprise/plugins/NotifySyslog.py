@@ -23,7 +23,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 import os
-import six
 import syslog
 import socket
 
@@ -217,7 +216,7 @@ class NotifySyslog(NotifyBase):
                     self.template_tokens['facility']['default']]
 
         self.mode = self.template_args['mode']['default'] \
-            if not isinstance(mode, six.string_types) else mode.lower()
+            if not isinstance(mode, str) else mode.lower()
 
         if self.mode not in SYSLOG_MODES:
             msg = 'The mode specified ({}) is invalid.'.format(mode)

@@ -31,7 +31,6 @@
 # https://firebase.google.com/docs/reference/fcm/rest/v1/\
 #       projects.messages#androidnotification
 import re
-import six
 from ...utils import parse_bool
 from ...common import NotifyType
 from ...AppriseAsset import AppriseAsset
@@ -63,7 +62,7 @@ class FCMColorManager:
 
         # Prepare our color
         self.color = color
-        if isinstance(color, six.string_types):
+        if isinstance(color, str):
             self.color = self.__color_rgb.match(color)
             if self.color:
                 # Store our RGB value as #rrggbb
@@ -116,4 +115,4 @@ class FCMColorManager:
         True is returned if a color was loaded
         """
         return True if self.color is True or \
-            isinstance(self.color, six.string_types) else False
+            isinstance(self.color, str) else False

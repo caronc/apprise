@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import re
-import six
 import requests
 
 from .NotifyBase import NotifyBase
@@ -280,7 +279,7 @@ class NotifyPushover(NotifyBase):
 
         # Setup our sound
         self.sound = NotifyPushover.default_pushover_sound \
-            if not isinstance(sound, six.string_types) else sound.lower()
+            if not isinstance(sound, str) else sound.lower()
         if self.sound and self.sound not in PUSHOVER_SOUNDS:
             msg = 'The sound specified ({}) is invalid.'.format(sound)
             self.logger.warning(msg)

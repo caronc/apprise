@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import os
-import six
 from itertools import chain
 from . import common
 from .conversion import convert_between
@@ -123,7 +122,7 @@ class Apprise:
         # Prepare our Asset Object
         asset = asset if isinstance(asset, AppriseAsset) else AppriseAsset()
 
-        if isinstance(url, six.string_types):
+        if isinstance(url, str):
             # Acquire our url tokens
             results = plugins.url_to_dict(
                 url, secure_logging=asset.secure_logging)
@@ -246,7 +245,7 @@ class Apprise:
             # prepare default asset
             asset = self.asset
 
-        if isinstance(servers, six.string_types):
+        if isinstance(servers, str):
             # build our server list
             servers = parse_urls(servers)
             if len(servers) == 0:
@@ -274,7 +273,7 @@ class Apprise:
                 self.servers.append(_server)
                 continue
 
-            elif not isinstance(_server, (six.string_types, dict)):
+            elif not isinstance(_server, (str, dict)):
                 logger.error(
                     "An invalid notification (type={}) was specified.".format(
                         type(_server)))
@@ -610,12 +609,12 @@ class Apprise:
 
             # Standard protocol(s) should be None or a tuple
             protocols = getattr(plugin, 'protocol', None)
-            if isinstance(protocols, six.string_types):
+            if isinstance(protocols, str):
                 protocols = (protocols, )
 
             # Secure protocol(s) should be None or a tuple
             secure_protocols = getattr(plugin, 'secure_protocol', None)
-            if isinstance(secure_protocols, six.string_types):
+            if isinstance(secure_protocols, str):
                 secure_protocols = (secure_protocols, )
 
             # Add our protocol details to our content

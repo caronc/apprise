@@ -26,7 +26,6 @@
 import click
 import logging
 import platform
-import six
 import sys
 import os
 import re
@@ -296,11 +295,11 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
         for entry in plugins:
             protocols = [] if not entry['protocols'] else \
                 [p for p in entry['protocols']
-                 if isinstance(p, six.string_types)]
+                 if isinstance(p, str)]
             protocols.extend(
                 [] if not entry['secure_protocols'] else
                 [p for p in entry['secure_protocols']
-                 if isinstance(p, six.string_types)])
+                 if isinstance(p, str)])
 
             if len(protocols) == 1:
                 # Simplify view by swapping {schema} with the single

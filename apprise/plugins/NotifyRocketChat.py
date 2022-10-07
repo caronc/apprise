@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import re
-import six
 import requests
 from json import loads
 from json import dumps
@@ -218,7 +217,7 @@ class NotifyRocketChat(NotifyBase):
 
         # Authentication mode
         self.mode = None \
-            if not isinstance(mode, six.string_types) \
+            if not isinstance(mode, str) \
             else mode.lower()
 
         if self.mode and self.mode not in ROCKETCHAT_AUTH_MODES:

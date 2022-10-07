@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import os
-import six
 from unittest import mock
 
 import pytest
@@ -221,7 +220,7 @@ def test_plugin_office365_general(mock_post):
     assert isinstance(obj, plugins.NotifyOffice365)
 
     # Test our URL generation
-    assert isinstance(obj.url(), six.string_types)
+    assert isinstance(obj.url(), str)
 
     # Test our notification
     assert obj.notify(title='title', body='test') is True
@@ -242,7 +241,7 @@ def test_plugin_office365_general(mock_post):
     assert isinstance(obj, plugins.NotifyOffice365)
 
     # Test our URL generation
-    assert isinstance(obj.url(), six.string_types)
+    assert isinstance(obj.url(), str)
 
     # Test our notification
     assert obj.notify(title='title', body='test') is True

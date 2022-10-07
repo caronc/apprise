@@ -25,7 +25,6 @@
 #
 # API: https://github.com/Finb/bark-server/blob/master/docs/API_V2.md#python
 #
-import six
 import requests
 import json
 
@@ -217,10 +216,10 @@ class NotifyBark(NotifyBase):
 
         # Assign our category
         self.category = \
-            category if isinstance(category, six.string_types) else None
+            category if isinstance(category, str) else None
 
         # Assign our group
-        self.group = group if isinstance(group, six.string_types) else None
+        self.group = group if isinstance(group, str) else None
 
         # Initialize device list
         self.targets = parse_list(targets)

@@ -23,8 +23,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import six
-
 from . import attachment
 from . import URLBase
 from .AppriseAsset import AppriseAsset
@@ -143,7 +141,7 @@ class AppriseAttachment:
             self.attachments.append(attachments)
             return True
 
-        elif isinstance(attachments, six.string_types):
+        elif isinstance(attachments, str):
             # Save our path
             attachments = (attachments, )
 
@@ -162,7 +160,7 @@ class AppriseAttachment:
                 return_status = False
                 continue
 
-            if isinstance(_attachment, six.string_types):
+            if isinstance(_attachment, str):
                 logger.debug("Loading attachment: {}".format(_attachment))
                 # Instantiate ourselves an object, this function throws or
                 # returns None if it fails

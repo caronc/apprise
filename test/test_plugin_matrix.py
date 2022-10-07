@@ -23,7 +23,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import six
 from unittest import mock
 
 import requests
@@ -223,25 +222,25 @@ def test_plugin_matrix_general(mock_post, mock_get):
     # Variation Initializations
     obj = plugins.NotifyMatrix(host='host', targets='#abcd')
     assert isinstance(obj, plugins.NotifyMatrix) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     # Registration successful
     assert obj.send(body="test") is True
 
     obj = plugins.NotifyMatrix(host='host', user='user', targets='#abcd')
     assert isinstance(obj, plugins.NotifyMatrix) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     # Registration successful
     assert obj.send(body="test") is True
 
     obj = plugins.NotifyMatrix(host='host', password='passwd', targets='#abcd')
     assert isinstance(obj, plugins.NotifyMatrix) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     # A username gets automatically generated in these cases
     assert obj.send(body="test") is True
 
     obj = plugins.NotifyMatrix(
         host='host', user='user', password='passwd', targets='#abcd')
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert isinstance(obj, plugins.NotifyMatrix) is True
     # Registration Successful
     assert obj.send(body="test") is True
@@ -250,7 +249,7 @@ def test_plugin_matrix_general(mock_post, mock_get):
     kwargs = plugins.NotifyMatrix.parse_url(
         'matrix://user:passwd@hostname/#abcd?format=html')
     obj = plugins.NotifyMatrix(**kwargs)
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert isinstance(obj, plugins.NotifyMatrix) is True
     obj.send(body="test") is True
     obj.send(title="title", body="test") is True
@@ -258,7 +257,7 @@ def test_plugin_matrix_general(mock_post, mock_get):
     kwargs = plugins.NotifyMatrix.parse_url(
         'matrix://user:passwd@hostname/#abcd/#abcd:localhost?format=markdown')
     obj = plugins.NotifyMatrix(**kwargs)
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert isinstance(obj, plugins.NotifyMatrix) is True
     obj.send(body="test") is True
     obj.send(title="title", body="test") is True
@@ -266,7 +265,7 @@ def test_plugin_matrix_general(mock_post, mock_get):
     kwargs = plugins.NotifyMatrix.parse_url(
         'matrix://user:passwd@hostname/#abcd/!abcd:localhost?format=text')
     obj = plugins.NotifyMatrix(**kwargs)
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert isinstance(obj, plugins.NotifyMatrix) is True
     obj.send(body="test") is True
     obj.send(title="title", body="test") is True
@@ -275,7 +274,7 @@ def test_plugin_matrix_general(mock_post, mock_get):
     kwargs = plugins.NotifyMatrix.parse_url(
         'matrix://user:passwd@hostname/#abcd?msgtype=notice')
     obj = plugins.NotifyMatrix(**kwargs)
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert isinstance(obj, plugins.NotifyMatrix) is True
     obj.send(body="test") is True
     obj.send(title="title", body="test") is True

@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import os
-import six
 from unittest import mock
 
 import pytest
@@ -299,7 +298,7 @@ def test_plugin_slack_oauth_access_token(mock_post):
     # Variation Initializations
     obj = plugins.NotifySlack(access_token=token, targets='#apprise')
     assert isinstance(obj, plugins.NotifySlack) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
 
     # apprise room was found
     assert obj.send(body="test") is True
@@ -462,7 +461,7 @@ def test_plugin_slack_send_by_email(mock_get, mock_post):
     # Variation Initializations
     obj = plugins.NotifySlack(access_token=token, targets='user@gmail.com')
     assert isinstance(obj, plugins.NotifySlack) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
 
     # No calls made yet
     assert mock_post.call_count == 0
@@ -518,7 +517,7 @@ def test_plugin_slack_send_by_email(mock_get, mock_post):
     # Variation Initializations
     obj = plugins.NotifySlack(access_token=token, targets='user@gmail.com')
     assert isinstance(obj, plugins.NotifySlack) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
 
     # No calls made yet
     assert mock_post.call_count == 0
@@ -552,7 +551,7 @@ def test_plugin_slack_send_by_email(mock_get, mock_post):
     # Variation Initializations
     obj = plugins.NotifySlack(access_token=token, targets='user@gmail.com')
     assert isinstance(obj, plugins.NotifySlack) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
 
     # No calls made yet
     assert mock_post.call_count == 0
@@ -586,7 +585,7 @@ def test_plugin_slack_send_by_email(mock_get, mock_post):
     # Variation Initializations
     obj = plugins.NotifySlack(access_token=token, targets='user@gmail.com')
     assert isinstance(obj, plugins.NotifySlack) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
 
     # No calls made yet
     assert mock_post.call_count == 0
@@ -630,7 +629,7 @@ def test_plugin_slack_send_by_email(mock_get, mock_post):
     # Variation Initializations
     obj = plugins.NotifySlack(access_token=token, targets='user@gmail.com')
     assert isinstance(obj, plugins.NotifySlack) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
 
     # No calls made yet
     assert mock_post.call_count == 0

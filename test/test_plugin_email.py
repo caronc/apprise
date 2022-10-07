@@ -25,7 +25,6 @@
 
 import os
 import re
-import six
 from unittest import mock
 
 import smtplib
@@ -324,11 +323,11 @@ def test_plugin_email(mock_smtp, mock_smtpssl):
 
             if isinstance(obj, plugins.NotifyBase):
                 # We loaded okay; now lets make sure we can reverse this url
-                assert isinstance(obj.url(), six.string_types) is True
+                assert isinstance(obj.url(), str) is True
 
                 # Test url() with privacy=True
                 assert isinstance(
-                    obj.url(privacy=True), six.string_types) is True
+                    obj.url(privacy=True), str) is True
 
                 # Some Simple Invalid Instance Testing
                 assert instance.parse_url(None) is None

@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import re
-import six
 import requests
 import base64
 
@@ -157,11 +156,11 @@ class NotifyXML(NotifyBase):
 </soapenv:Envelope>"""
 
         self.fullpath = kwargs.get('fullpath')
-        if not isinstance(self.fullpath, six.string_types):
+        if not isinstance(self.fullpath, str):
             self.fullpath = ''
 
         self.method = self.template_args['method']['default'] \
-            if not isinstance(method, six.string_types) else method.upper()
+            if not isinstance(method, str) else method.upper()
 
         if self.method not in METHODS:
             msg = 'The method specified ({}) is invalid.'.format(method)

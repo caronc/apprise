@@ -23,7 +23,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import six
 import pytest
 from unittest import mock
 
@@ -168,7 +167,7 @@ def test_plugin_gitter_general(mock_post, mock_get):
     # Variation Initializations
     obj = plugins.NotifyGitter(token=token, targets='apprise')
     assert isinstance(obj, plugins.NotifyGitter) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
 
     # apprise room was found
     assert obj.send(body="test") is True
@@ -251,7 +250,7 @@ def test_plugin_gitter_general(mock_post, mock_get):
     # Variation Initializations
     obj = plugins.NotifyGitter(token=token, targets='apprise')
     assert isinstance(obj, plugins.NotifyGitter) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     # apprise room was not found
     assert obj.send(body="test") is False
 
