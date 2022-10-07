@@ -165,6 +165,7 @@ class NotifyDBus(NotifyBase):
     # object if we were to reference, we wouldn't be backwards compatible with
     # Python v2.  So converting the result set back into a list makes us
     # compatible
+    # TODO: Review after dropping support for Python 2.
     protocol = list(MAINLOOP_MAP.keys())
 
     # A URL that takes you to the setup/help of the specific protocol

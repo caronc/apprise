@@ -46,6 +46,7 @@ from . import __version__
 
 # Python v3+ support code made importable, so it can remain backwards
 # compatible with Python v2
+# TODO: Review after dropping support for Python 2.
 from . import py3compat
 
 
