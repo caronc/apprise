@@ -35,8 +35,8 @@ matrix:
 
 install:
   - pip install babel
-  - pip install -U tox pip virtualenv
   # Use up-to-date versions of tox, pip, virtualenv, and wheel.
+  - pip install --upgrade tox pip virtualenv wheel
   - pip install codecov
   - pip install -r dev-requirements.txt
   - pip install -r requirements.txt
