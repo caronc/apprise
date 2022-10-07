@@ -33,13 +33,7 @@ import io
 import os
 import six
 import sys
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
+from unittest import mock
 
 import pytest
 import requests
@@ -60,12 +54,6 @@ except ImportError:
     # No problem; there is no cryptography support
     pass
 
-try:
-    from json.decoder import JSONDecodeError
-
-except ImportError:
-    # Python v2.7 Backwards Compatibility support
-    JSONDecodeError = ValueError
 
 # Disable logging for a cleaner testing output
 import logging

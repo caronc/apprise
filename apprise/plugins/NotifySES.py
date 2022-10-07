@@ -89,13 +89,7 @@ from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.utils import formataddr
 from email.header import Header
-try:
-    # Python v3.x
-    from urllib.parse import quote
-
-except ImportError:
-    # Python v2.x
-    from urllib import quote
+from urllib.parse import quote
 
 from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
@@ -395,26 +389,15 @@ class NotifySES(NotifyBase):
             # Strip target out of bcc list if in To
             bcc = (self.bcc - set([to_addr]))
 
-            try:
-                # Format our cc addresses to support the Name field
-                cc = [formataddr(
-                    (self.names.get(addr, False), addr), charset='utf-8')
-                    for addr in cc]
+            # Format our cc addresses to support the Name field
+            cc = [formataddr(
+                (self.names.get(addr, False), addr), charset='utf-8')
+                for addr in cc]
 
-                # Format our bcc addresses to support the Name field
-                bcc = [formataddr(
-                    (self.names.get(addr, False), addr), charset='utf-8')
-                    for addr in bcc]
-
-            except TypeError:
-                # Python v2.x Support (no charset keyword)
-                # Format our cc addresses to support the Name field
-                cc = [formataddr(  # pragma: no branch
-                    (self.names.get(addr, False), addr)) for addr in cc]
-
-                # Format our bcc addresses to support the Name field
-                bcc = [formataddr(  # pragma: no branch
-                    (self.names.get(addr, False), addr)) for addr in bcc]
+            # Format our bcc addresses to support the Name field
+            bcc = [formataddr(
+                (self.names.get(addr, False), addr), charset='utf-8')
+                for addr in bcc]
 
             self.logger.debug('Email From: {} <{}>'.format(
                 quote(reply_to[0], ' '),
@@ -436,23 +419,14 @@ class NotifySES(NotifyBase):
             # Create a Multipart container if there is an attachment
             base = MIMEMultipart() if attach else content
 
+            # TODO: Deduplicate with `NotifyEmail`?
             base['Subject'] = Header(title, 'utf-8')
-            try:
-                base['From'] = formataddr(
-                    (from_name if from_name else False, self.from_addr),
-                    charset='utf-8')
-                base['To'] = formataddr((to_name, to_addr), charset='utf-8')
-                if reply_to[1] != self.from_addr:
-                    base['Reply-To'] = formataddr(reply_to, charset='utf-8')
-
-            except TypeError:
-                # Python v2.x Support (no charset keyword)
-                base['From'] = formataddr(
-                    (from_name if from_name else False, self.from_addr))
-                base['To'] = formataddr((to_name, to_addr))
-                if reply_to[1] != self.from_addr:
-                    base['Reply-To'] = formataddr(reply_to)
-
+            base['From'] = formataddr(
+                (from_name if from_name else False, self.from_addr),
+                charset='utf-8')
+            base['To'] = formataddr((to_name, to_addr), charset='utf-8')
+            if reply_to[1] != self.from_addr:
+                base['Reply-To'] = formataddr(reply_to, charset='utf-8')
             base['Cc'] = ','.join(cc)
             base['Date'] = \
                 datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S +0000")

@@ -23,37 +23,20 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import pytest
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
-
 import sys
 import six
 import types
-import apprise
+import pytest
+from importlib import reload
+from unittest import mock
 
-try:
-    # Python v3.4+
-    from importlib import reload
-except ImportError:
-    try:
-        # Python v3.0-v3.3
-        from imp import reload
-    except ImportError:
-        # Python v2.7
-        pass
+import apprise
 
 # Disable logging for a cleaner testing output
 import logging
 logging.disable(logging.CRITICAL)
 
 
-@pytest.mark.skipif(sys.version_info.major <= 2, reason="Requires Python 3.x+")
 @pytest.mark.skipif((
     'win32api' in sys.modules or
     'win32con' in sys.modules or

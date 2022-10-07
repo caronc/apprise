@@ -50,7 +50,7 @@ from ..URLBase import PrivacyMode
 from ..attachment.AttachBase import AttachBase
 
 
-class NtfyMode(object):
+class NtfyMode:
     """
     Define ntfy Notification Modes
     """
@@ -67,7 +67,7 @@ NTFY_MODES = (
 )
 
 
-class NtfyPriority(object):
+class NtfyPriority:
     """
     Ntfy Priority Definitions
     """

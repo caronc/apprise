@@ -24,13 +24,7 @@
 # THE SOFTWARE.
 from __future__ import print_function
 import re
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
+from unittest import mock
 
 import requests
 import json
@@ -47,17 +41,8 @@ from apprise.utils import environ
 from apprise.plugins import __load_matrix
 from apprise.plugins import __reset_matrix
 
+from importlib import reload
 
-try:
-    # Python v3.4+
-    from importlib import reload
-except ImportError:
-    try:
-        # Python v3.0-v3.3
-        from imp import reload
-    except ImportError:
-        # Python v2.7
-        pass
 
 # Disable logging for a cleaner testing output
 import logging

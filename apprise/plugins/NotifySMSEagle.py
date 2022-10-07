@@ -47,7 +47,7 @@ CONTACT_REGEX = re.compile(
 
 
 # Priorities
-class SMSEaglePriority(object):
+class SMSEaglePriority:
     NORMAL = 0
     HIGH = 1
 

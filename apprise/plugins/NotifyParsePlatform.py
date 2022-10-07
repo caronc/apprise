@@ -40,7 +40,7 @@ TARGET_LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
 
 
 # Priorities
-class ParsePlatformDevice(object):
+class ParsePlatformDevice:
     # All Devices
     ALL = 'all'
 

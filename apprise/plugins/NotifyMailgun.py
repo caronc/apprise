@@ -74,7 +74,7 @@ MAILGUN_HTTP_ERROR_MAP = {
 
 
 # Priorities
-class MailgunRegion(object):
+class MailgunRegion:
     US = 'us'
     EU = 'eu'
 
@@ -383,17 +383,9 @@ class NotifyMailgun(NotifyBase):
 
                     return False
 
-        try:
-            reply_to = formataddr(
-                (self.from_name if self.from_name else False,
-                 self.from_addr), charset='utf-8')
-
-        except TypeError:
-            # Python v2.x Support (no charset keyword)
-            # Format our cc addresses to support the Name field
-            reply_to = formataddr(
-                (self.from_name if self.from_name else False,
-                 self.from_addr))
+        reply_to = formataddr(
+            (self.from_name if self.from_name else False,
+             self.from_addr), charset='utf-8')
 
         # Prepare our payload
         payload = {
@@ -461,33 +453,17 @@ class NotifyMailgun(NotifyBase):
                 # Strip target out of bcc list if in To
                 bcc = (bcc - set([to_addr[1]]))
 
-                try:
-                    # Prepare our to
-                    to.append(formataddr(to_addr, charset='utf-8'))
-
-                except TypeError:
-                    # Python v2.x Support (no charset keyword)
-                    # Format our cc addresses to support the Name field
-
-                    # Prepare our to
-                    to.append(formataddr(to_addr))
+                # Prepare our `to`
+                to.append(formataddr(to_addr, charset='utf-8'))
 
             # Prepare our To
             payload['to'] = ','.join(to)
 
             if cc:
-                try:
-                    # Format our cc addresses to support the Name field
-                    payload['cc'] = ','.join([formataddr(
-                        (self.names.get(addr, False), addr), charset='utf-8')
-                        for addr in cc])
-
-                except TypeError:
-                    # Python v2.x Support (no charset keyword)
-                    # Format our cc addresses to support the Name field
-                    payload['cc'] = ','.join([formataddr(  # pragma: no branch
-                        (self.names.get(addr, False), addr))
-                        for addr in cc])
+                # Format our cc addresses to support the Name field
+                payload['cc'] = ','.join([formataddr(
+                    (self.names.get(addr, False), addr), charset='utf-8')
+                    for addr in cc])
 
             # Format our bcc addresses to support the Name field
             if bcc:

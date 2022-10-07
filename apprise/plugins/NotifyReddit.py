@@ -66,7 +66,7 @@ REDDIT_HTTP_ERROR_MAP = {
 }
 
 
-class RedditMessageKind(object):
+class RedditMessageKind:
     """
     Define the kinds of messages supported
     """

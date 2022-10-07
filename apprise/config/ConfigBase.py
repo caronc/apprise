@@ -817,10 +817,7 @@ class ConfigBase(URLBase):
                 # can at least tell the end user what entries were ignored
                 # due to errors
 
-                if six.PY2:
-                    it = url.iteritems()
-                else:  # six.PY3
-                    it = iter(url.items())
+                it = iter(url.items())
 
                 # Track the URL to-load
                 _url = None
@@ -870,10 +867,7 @@ class ConfigBase(URLBase):
 
                         # We are a url string with additional unescaped options
                         if isinstance(entries, dict):
-                            if six.PY2:
-                                _url, tokens = next(url.iteritems())
-                            else:  # six.PY3
-                                _url, tokens = next(iter(url.items()))
+                            _url, tokens = next(iter(url.items()))
 
                             # Tags you just can't over-ride
                             if 'schema' in entries:
@@ -1167,19 +1161,8 @@ class ConfigBase(URLBase):
 
     def __bool__(self):
         """
-        Allows the Apprise object to be wrapped in an Python 3.x based 'if
-        statement'.  True is returned if our content was downloaded correctly.
-        """
-        if not isinstance(self._cached_servers, list):
-            # Generate ourselves a list of content we can pull from
-            self.servers()
-
-        return True if self._cached_servers else False
-
-    def __nonzero__(self):
-        """
-        Allows the Apprise object to be wrapped in an Python 2.x based 'if
-        statement'.  True is returned if our content was downloaded correctly.
+        Allows the Apprise object to be wrapped in an 'if statement'.
+        True is returned if our content was downloaded correctly.
         """
         if not isinstance(self._cached_servers, list):
             # Generate ourselves a list of content we can pull from

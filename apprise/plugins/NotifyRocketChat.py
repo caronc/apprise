@@ -54,7 +54,7 @@ RC_HTTP_ERROR_MAP = {
 LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
 
 
-class RocketChatAuthMode(object):
+class RocketChatAuthMode:
     """
     The Chat Authentication mode is detected
     """

@@ -36,7 +36,7 @@ from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
 
-class PushSaferSound(object):
+class PushSaferSound:
     """
     Defines all of the supported PushSafe sounds
     """
@@ -248,7 +248,7 @@ PUSHSAFER_SOUND_MAP = {
 
 
 # Priorities
-class PushSaferPriority(object):
+class PushSaferPriority:
     LOW = -2
     MODERATE = -1
     NORMAL = 0
@@ -282,7 +282,7 @@ DEFAULT_PRIORITY = "normal"
 
 
 # Vibrations
-class PushSaferVibration(object):
+class PushSaferVibration:
     """
     Defines the acceptable vibration settings for notification
     """

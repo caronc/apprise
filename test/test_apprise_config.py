@@ -26,15 +26,8 @@
 import sys
 import six
 import io
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
-
 import pytest
+from unittest import mock
 from apprise import NotifyFormat
 from apprise import ConfigFormat
 from apprise import ContentIncludeMode
@@ -155,10 +148,6 @@ def test_apprise_config(tmpdir):
     istr = """
         # Iñtërnâtiônàlization Testing
         windows://"""
-
-    if six.PY2:
-        # decode string into unicode
-        istr = istr.decode('utf-8')
 
     # Write our content to our file
     t = tmpdir.mkdir("internationalization").join("apprise")
@@ -1012,13 +1001,13 @@ def test_configmatrix_dynamic_importing(tmpdir):
     # Test no app_id
     base.join('ConfigBadFile1.py').write(
         """
-class ConfigBadFile1(object):
+class ConfigBadFile1:
     pass""")
 
     # No class of the same name
     base.join('ConfigBadFile2.py').write(
         """
-class BadClassName(object):
+class BadClassName:
     pass""")
 
     # Exception thrown

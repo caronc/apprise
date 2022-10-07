@@ -41,7 +41,7 @@ from ..common import NotifyType
 from ..AppriseLocale import gettext_lazy as _
 
 
-class Enigma2MessageType(object):
+class Enigma2MessageType:
     # Defines the Enigma2 notification types Apprise can map to
     INFO = 1
     WARNING = 2

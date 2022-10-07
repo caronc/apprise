@@ -367,14 +367,7 @@ class AttachBase(URLBase):
 
     def __bool__(self):
         """
-        Allows the Apprise object to be wrapped in an Python 3.x based 'if
-        statement'.  True is returned if our content was downloaded correctly.
-        """
-        return True if self.path else False
-
-    def __nonzero__(self):
-        """
-        Allows the Apprise object to be wrapped in an Python 2.x based 'if
-        statement'.  True is returned if our content was downloaded correctly.
+        Allows the Apprise object to be wrapped in an based 'if statement'.
+        True is returned if our content was downloaded correctly.
         """
         return True if self.path else False

@@ -36,63 +36,40 @@ from functools import reduce
 from . import common
 from .logger import logger
 
-try:
-    # Python 2.7
-    from urllib import unquote
-    from urllib import quote
-    from urlparse import urlparse
-    from urllib import urlencode as _urlencode
+from urllib.parse import unquote
+from urllib.parse import quote
+from urllib.parse import urlparse
+from urllib.parse import urlencode as _urlencode
 
-    import imp
+import importlib.util
 
-    def import_module(path, name):
-        """
-        Load our module based on path
-        """
-        try:
-            return imp.load_source(name, path)
 
-        except Exception as e:
-            logger.debug(
-                'Custom module exception raised from %s (name=%s) %s',
-                path, name, str(e))
+def import_module(path, name):
+    """
+    Load our module based on path
+    """
+    # if path.endswith('test_module_detection0/a/hook.py'):
+    #     import pdb
+    #     pdb.set_trace()
 
-        return None
+    spec = importlib.util.spec_from_file_location(name, path)
+    try:
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
 
-except ImportError:
-    # Python 3.5+
-    from urllib.parse import unquote
-    from urllib.parse import quote
-    from urllib.parse import urlparse
-    from urllib.parse import urlencode as _urlencode
+        spec.loader.exec_module(module)
 
-    import importlib.util
+    except Exception as e:
+        # module isn't loadable
+        del sys.modules[name]
+        module = None
 
-    def import_module(path, name):
-        """
-        Load our module based on path
-        """
-        # if path.endswith('test_module_detection0/a/hook.py'):
-        #     import pdb
-        #     pdb.set_trace()
+        logger.debug(
+            'Custom module exception raised from %s (name=%s) %s',
+            path, name, str(e))
 
-        spec = importlib.util.spec_from_file_location(name, path)
-        try:
-            module = importlib.util.module_from_spec(spec)
-            sys.modules[name] = module
+    return module
 
-            spec.loader.exec_module(module)
-
-        except Exception as e:
-            # module isn't loadable
-            del sys.modules[name]
-            module = None
-
-            logger.debug(
-                'Custom module exception raised from %s (name=%s) %s',
-                path, name, str(e))
-
-        return module
 
 # Hash of all paths previously scanned so we don't waste effort/overhead doing
 # it again
@@ -226,7 +203,7 @@ UUID4_RE = re.compile(
 REGEX_VALIDATE_LOOKUP = {}
 
 
-class TemplateType(object):
+class TemplateType:
     """
     Defines the different template types we can perform parsing on
     """
@@ -1140,15 +1117,9 @@ def urlencode(query, doseq=False, safe='', encoding=None, errors=None):
     """
     # Tidy query by eliminating any records set to None
     _query = {k: v for (k, v) in query.items() if v is not None}
-    try:
-        # Python v3.x
-        return _urlencode(
-            _query, doseq=doseq, safe=safe, encoding=encoding,
-            errors=errors)
-
-    except TypeError:
-        # Python v2.7
-        return _urlencode(_query)
+    return _urlencode(
+        _query, doseq=doseq, safe=safe, encoding=encoding,
+        errors=errors)
 
 
 def parse_list(*args):
@@ -1355,7 +1326,7 @@ def cwe312_word(word, force=False, advanced=True, threshold=5):
     reached, then content is considered secret
     """
 
-    class Variance(object):
+    class Variance:
         """
         A Simple List of Possible Character Variances
         """

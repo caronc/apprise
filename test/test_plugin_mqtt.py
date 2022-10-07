@@ -23,19 +23,12 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
-
 import re
 import sys
 import ssl
-import six
 import pytest
+from unittest import mock
+
 import apprise
 
 # Disable logging for a cleaner testing output
@@ -232,21 +225,12 @@ def test_plugin_mqtt_general(mock_client):
     assert isinstance(obj, apprise.plugins.NotifyMQTT)
     _mock_client.connect.return_value = None
 
-    if six.PY2:
-        # Python v2.7 does not support the ConnectionError exception
-        for side_effect in (ValueError, ssl.CertificateError):
-            _mock_client.connect.side_effect = side_effect
-            assert obj.notify(body="test=test") is False
-
-    else:
-        for side_effect in (
-                ValueError,
-                # Python 2.7 doesn't recognize ConnectionError so for that
-                # reason we stick a noqa entry here...
-                ConnectionError,  # noqa: F821
-                ssl.CertificateError):
-            _mock_client.connect.side_effect = side_effect
-            assert obj.notify(body="test=test") is False
+    for side_effect in (
+            ValueError,
+            ConnectionError,
+            ssl.CertificateError):
+        _mock_client.connect.side_effect = side_effect
+        assert obj.notify(body="test=test") is False
 
     # Restore our values
     _mock_client.connect.side_effect = None

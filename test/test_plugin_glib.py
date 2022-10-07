@@ -26,29 +26,14 @@
 import re
 import six
 import pytest
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
+from unittest import mock
 
 import sys
 import types
 import apprise
 from helpers import module_reload
+from importlib import reload
 
-try:
-    # Python v3.4+
-    from importlib import reload
-except ImportError:
-    try:
-        # Python v3.0-v3.3
-        from imp import reload
-    except ImportError:
-        # Python v2.7
-        pass
 
 # Disable logging for a cleaner testing output
 import logging
@@ -122,10 +107,6 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
     reload(sys.modules['apprise.plugins.NotifyDBus'])
     mock_mainloop.qt.DBusQtMainLoop.side_effect = None
 
-    # Python v2.x
-    mock_mainloop.glib.DBusGMainLoop.return_value = True
-    mock_mainloop.glib.DBusGMainLoop.side_effect = ImportError()
-    # Python 3.x
     mock_mainloop.glib.NativeMainLoop.return_value = True
     mock_mainloop.glib.NativeMainLoop.side_effect = ImportError()
     sys.modules['dbus.mainloop.glib'] = mock_mainloop.glib

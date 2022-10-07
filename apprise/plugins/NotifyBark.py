@@ -76,7 +76,7 @@ BARK_SOUNDS = (
 
 
 # Supported Level Entries
-class NotifyBarkLevel(object):
+class NotifyBarkLevel:
     """
     Defines the Bark Level options
     """

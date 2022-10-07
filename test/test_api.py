@@ -29,13 +29,7 @@ import sys
 import six
 import pytest
 import requests
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
+from unittest import mock
 
 from os.path import dirname
 from os.path import join
@@ -58,18 +52,13 @@ from apprise.plugins import __reset_matrix
 from apprise.utils import parse_list
 import inspect
 
+# Sending notifications requires the coroutines to be awaited, so we need to
+# wrap the original function when mocking it.
+import apprise.py3compat.asyncio as py3aio
+
 # Disable logging for a cleaner testing output
 import logging
 logging.disable(logging.CRITICAL)
-
-# Sending notifications requires the coroutines to be awaited, so we need to
-# wrap the original function when mocking it. But don't import for Python 2.
-if not six.PY2:
-    import apprise.py3compat.asyncio as py3aio
-else:
-    class py3aio:
-        def notify():
-            pass
 
 # Attachment Directory
 TEST_VAR_DIR = join(dirname(__file__), 'var')
@@ -86,7 +75,6 @@ def test_apprise():
     apprise_test(do_notify)
 
 
-@pytest.mark.skipif(sys.version_info.major <= 2, reason="Requires Python 3.x+")
 def test_apprise_async():
     """
     API: Apprise() object asynchronous methods
@@ -547,7 +535,6 @@ def test_apprise_tagging(mock_post, mock_get):
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-@pytest.mark.skipif(sys.version_info.major <= 2, reason="Requires Python 3.x+")
 def test_apprise_tagging_async(mock_post, mock_get):
     """
     API: Apprise() object tagging functionality asynchronous methods
@@ -669,7 +656,6 @@ def apprise_tagging_test(mock_post, mock_get, do_notify):
         tag=[(object, ), ]) is None
 
 
-@pytest.mark.skipif(sys.version_info.major <= 2, reason="Requires Python 3.x+")
 def test_apprise_schemas(tmpdir):
     """
     API: Apprise().schema() tests
@@ -918,20 +904,11 @@ def test_apprise_asset(tmpdir):
         must_exist=True) is not None
 
     # Test case where we can't access the image file
-    if sys.version_info.major <= 2:
-        # Python v2.x
-        with mock.patch('__builtin__.open', side_effect=OSError()):
-            assert a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is None
+    with mock.patch('builtins.open', side_effect=OSError()):
+        assert a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is None
 
-        # Our content is retrivable again
-        assert a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is not None
-    else:
-        # Python >= v3.x
-        with mock.patch('builtins.open', side_effect=OSError()):
-            assert a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is None
-
-        # Our content is retrivable again
-        assert a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is not None
+    # Our content is retrivable again
+    assert a.image_raw(NotifyType.INFO, NotifyImageSize.XY_256) is not None
 
     # Disable all image references
     a = AppriseAsset(image_path_mask=False, image_url_mask=False)
@@ -1711,23 +1688,12 @@ def test_apprise_details_plugin_verification():
                                     (tuple, set, list),
                                 )
 
-        if six.PY2:
-            # inspect our object
-            # getargspec() is deprecated in Python v3
-            spec = inspect.getargspec(
-                common.NOTIFY_SCHEMA_MAP[protocols[0]].__init__)
+        spec = inspect.getfullargspec(
+            common.NOTIFY_SCHEMA_MAP[protocols[0]].__init__)
 
-            function_args = \
-                (set(parse_list(spec.keywords)) - set(['kwargs'])) \
-                | (set(spec.args) - set(['self'])) | valid_kwargs
-        else:
-            # Python v3+ uses getfullargspec()
-            spec = inspect.getfullargspec(
-                common.NOTIFY_SCHEMA_MAP[protocols[0]].__init__)
-
-            function_args = \
-                (set(parse_list(spec.varkw)) - set(['kwargs'])) \
-                | (set(spec.args) - set(['self'])) | valid_kwargs
+        function_args = \
+            (set(parse_list(spec.varkw)) - set(['kwargs'])) \
+            | (set(spec.args) - set(['self'])) | valid_kwargs
 
         # Iterate over our map_to_entries and make sure that everything
         # maps to a function argument
@@ -1790,7 +1756,6 @@ def test_apprise_details_plugin_verification():
                 assert arg in defined_tokens
 
 
-@pytest.mark.skipif(sys.version_info.major <= 2, reason="Requires Python 3.x+")
 @mock.patch('requests.post')
 @mock.patch('apprise.py3compat.asyncio.notify', wraps=py3aio.notify)
 def test_apprise_async_mode(mock_async_notify, mock_post, tmpdir):
@@ -1902,13 +1867,13 @@ def test_notify_matrix_dynamic_importing(tmpdir):
     # Test no app_id
     base.join('NotifyBadFile1.py').write(
         """
-class NotifyBadFile1(object):
+class NotifyBadFile1:
     pass""")
 
     # No class of the same name
     base.join('NotifyBadFile2.py').write(
         """
-class BadClassName(object):
+class BadClassName:
     pass""")
 
     # Exception thrown

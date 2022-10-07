@@ -35,7 +35,7 @@ from .common import ATTACHMENT_SCHEMA_MAP
 from .utils import GET_SCHEMA_RE
 
 
-class AppriseAttachment(object):
+class AppriseAttachment:
     """
     Our Apprise Attachment File Manager
 
@@ -296,15 +296,8 @@ class AppriseAttachment(object):
 
     def __bool__(self):
         """
-        Allows the Apprise object to be wrapped in an Python 3.x based 'if
-        statement'.  True is returned if at least one service has been loaded.
-        """
-        return True if self.attachments else False
-
-    def __nonzero__(self):
-        """
-        Allows the Apprise object to be wrapped in an Python 2.x based 'if
-        statement'.  True is returned if at least one service has been loaded.
+        Allows the Apprise object to be wrapped in an 'if statement'.
+        True is returned if at least one service has been loaded.
         """
         return True if self.attachments else False
 

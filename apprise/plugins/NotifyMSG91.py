@@ -41,7 +41,7 @@ from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
 
-class MSG91Route(object):
+class MSG91Route:
     """
     Transactional SMS Routes
     route=1 for promotional, route=4 for transactional SMS.
@@ -57,7 +57,7 @@ MSG91_ROUTES = (
 )
 
 
-class MSG91Country(object):
+class MSG91Country:
     """
     Optional value that can be specified on the MSG91 api
     """

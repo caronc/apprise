@@ -46,7 +46,7 @@ from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
 
-class SinchRegion(object):
+class SinchRegion:
     """
     Defines the Sinch Server Regions
     """

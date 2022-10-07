@@ -32,7 +32,7 @@ from ..AppriseLocale import gettext_lazy as _
 
 
 # Priorities
-class ProwlPriority(object):
+class ProwlPriority:
     LOW = -2
     MODERATE = -1
     NORMAL = 0

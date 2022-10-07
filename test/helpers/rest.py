@@ -26,13 +26,7 @@ import re
 import os
 import six
 import requests
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
+from unittest import mock
 
 from json import dumps
 from random import choice
@@ -51,7 +45,7 @@ import logging
 logging.disable(logging.CRITICAL)
 
 
-class AppriseURLTester(object):
+class AppriseURLTester:
 
     # Some exception handling we'll use
     req_exceptions = (

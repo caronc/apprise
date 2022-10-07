@@ -60,7 +60,7 @@ try:
         from dbus.mainloop.glib import DBusGMainLoop
         LOOP_GLIB = DBusGMainLoop()
 
-    except ImportError:
+    except ImportError:  # pragma: no cover
         # No problem
         pass
 
@@ -109,7 +109,7 @@ MAINLOOP_MAP = {
 
 
 # Urgencies
-class DBusUrgency(object):
+class DBusUrgency:
     LOW = 0
     NORMAL = 1
     HIGH = 2

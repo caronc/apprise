@@ -379,13 +379,13 @@ def test_attachment_matrix_dynamic_importing(tmpdir):
     # Test no app_id
     base.join('AttachBadFile1.py').write(
         """
-class AttachBadFile1(object):
+class AttachBadFile1:
     pass""")
 
     # No class of the same name
     base.join('AttachBadFile2.py').write(
         """
-class BadClassName(object):
+class BadClassName:
     pass""")
 
     # Exception thrown

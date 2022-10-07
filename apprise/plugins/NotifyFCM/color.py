@@ -37,7 +37,7 @@ from ...common import NotifyType
 from ...AppriseAsset import AppriseAsset
 
 
-class FCMColorManager(object):
+class FCMColorManager:
     """
     A Simple object to accept either a boolean value
       - True: Use colors provided by Apprise
@@ -112,16 +112,8 @@ class FCMColorManager(object):
 
     def __bool__(self):
         """
-        Allows this object to be wrapped in an Python 3.x based 'if
-        statement'.  True is returned if a color was loaded
-        """
-        return True if self.color is True or \
-            isinstance(self.color, six.string_types) else False
-
-    def __nonzero__(self):
-        """
-        Allows this object to be wrapped in an Python 2.x based 'if
-        statement'.  True is returned if a color was loaded
+        Allows this object to be wrapped in an 'if statement'.
+        True is returned if a color was loaded
         """
         return True if self.color is True or \
             isinstance(self.color, six.string_types) else False

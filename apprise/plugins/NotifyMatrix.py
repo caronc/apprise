@@ -67,7 +67,7 @@ IS_ROOM_ID = re.compile(
     r'(?P<home_server>[a-z0-9.-]+))?\s*$', re.I)
 
 
-class MatrixMessageType(object):
+class MatrixMessageType:
     """
     The Matrix Message types
     """
@@ -82,7 +82,7 @@ MATRIX_MESSAGE_TYPES = (
 )
 
 
-class MatrixWebhookMode(object):
+class MatrixWebhookMode:
     # Webhook Mode is disabled
     DISABLED = "off"
 

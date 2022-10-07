@@ -47,7 +47,7 @@ from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
 
-class NoticaMode(object):
+class NoticaMode:
     """
     Tracks if we're accessing the notica upstream server or a locally hosted
     one.

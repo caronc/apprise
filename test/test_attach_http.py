@@ -25,13 +25,7 @@
 
 import re
 import six
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
+from unittest import mock
 
 import requests
 import mimetypes
@@ -140,7 +134,7 @@ def test_attach_http(mock_get):
     # Temporary path
     path = join(TEST_VAR_DIR, 'apprise-test.gif')
 
-    class DummyResponse(object):
+    class DummyResponse:
         """
         A dummy response used to manage our object
         """

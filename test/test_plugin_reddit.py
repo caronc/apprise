@@ -25,16 +25,9 @@
 
 import six
 import requests
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
-
 from apprise import plugins
 from helpers import AppriseURLTester
+from unittest import mock
 
 from json import dumps
 from datetime import datetime

@@ -44,7 +44,7 @@ VALIDATE_DEVICE = re.compile(r'^[a-z0-9_]{1,25}$', re.I)
 
 
 # Priorities
-class PushoverPriority(object):
+class PushoverPriority:
     LOW = -2
     MODERATE = -1
     NORMAL = 0
@@ -53,7 +53,7 @@ class PushoverPriority(object):
 
 
 # Sounds
-class PushoverSound(object):
+class PushoverSound:
     PUSHOVER = 'pushover'
     BIKE = 'bike'
     BUGLE = 'bugle'

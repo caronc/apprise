@@ -74,7 +74,7 @@ except ImportError:
     # cryptography is the dependency of the .oauth library
 
     # Create a dummy object for init() call to work
-    class GoogleOAuth(object):
+    class GoogleOAuth:
         pass
 
 

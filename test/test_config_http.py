@@ -26,13 +26,7 @@
 import six
 import time
 import pytest
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
+from unittest import mock
 
 import requests
 from apprise.common import ConfigFormat
@@ -86,7 +80,7 @@ def test_config_http(mock_post):
     # Our default content
     default_content = """taga,tagb=good://server01"""
 
-    class DummyResponse(object):
+    class DummyResponse:
         """
         A dummy response used to manage our object
         """

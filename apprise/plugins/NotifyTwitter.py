@@ -45,7 +45,7 @@ from ..attachment.AttachBase import AttachBase
 IS_USER = re.compile(r'^\s*@?(?P<user>[A-Z0-9_]+)$', re.I)
 
 
-class TwitterMessageMode(object):
+class TwitterMessageMode:
     """
     Twitter Message Mode
     """

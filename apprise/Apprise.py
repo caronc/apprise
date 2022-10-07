@@ -44,13 +44,12 @@ from .plugins.NotifyBase import NotifyBase
 from . import plugins
 from . import __version__
 
-# Python v3+ support code made importable so it can remain backwards
+# Python v3+ support code made importable, so it can remain backwards
 # compatible with Python v2
 from . import py3compat
-ASYNCIO_SUPPORT = not six.PY2
 
 
-class Apprise(object):
+class Apprise:
     """
     Our Notification Manager
 
@@ -370,41 +369,15 @@ class Apprise(object):
         such as turning a \n into an actual new line, etc.
         """
 
-        if ASYNCIO_SUPPORT:
-            return py3compat.asyncio.tosync(
-                self.async_notify(
-                    body, title,
-                    notify_type=notify_type, body_format=body_format,
-                    tag=tag, match_always=match_always, attach=attach,
-                    interpret_escapes=interpret_escapes,
-                ),
-                debug=self.debug
-            )
-
-        else:
-            try:
-                results = list(
-                    self._notifyall(
-                        Apprise._notifyhandler,
-                        body, title,
-                        notify_type=notify_type, body_format=body_format,
-                        tag=tag, attach=attach,
-                        interpret_escapes=interpret_escapes,
-                    )
-                )
-
-            except TypeError:
-                # No notifications sent, and there was an internal error.
-                return False
-
-            else:
-                if len(results) > 0:
-                    # All notifications sent, return False if any failed.
-                    return all(results)
-
-                else:
-                    # No notifications sent.
-                    return None
+        return py3compat.asyncio.tosync(
+            self.async_notify(
+                body, title,
+                notify_type=notify_type, body_format=body_format,
+                tag=tag, match_always=match_always, attach=attach,
+                interpret_escapes=interpret_escapes,
+            ),
+            debug=self.debug
+        )
 
     def async_notify(self, *args, **kwargs):
         """
@@ -413,8 +386,7 @@ class Apprise(object):
         awaited on, even if it is missing the async keyword in its signature.
         (This is omitted to preserve syntax compatibility with Python 2.)
 
-        The arguments are identical to those of Apprise.notify(). This method
-        is not available in Python 2.
+        The arguments are identical to those of Apprise.notify().
         """
 
         try:
@@ -496,23 +468,11 @@ class Apprise(object):
             raise TypeError(msg)
 
         try:
-            if six.PY2:
-                # Python 2.7 encoding support isn't the greatest, so we try
-                # to ensure that we're ALWAYS dealing with unicode characters
-                # prior to entrying the next part.  This is especially required
-                # for Markdown support
-                if title and isinstance(title, str):  # noqa: F821
-                    title = title.decode(self.asset.encoding)
+            if title and isinstance(title, bytes):  # noqa: F821
+                title = title.decode(self.asset.encoding)
 
-                if body and isinstance(body, str):  # noqa: F821
-                    body = body.decode(self.asset.encoding)
-
-            else:  # Python 3+
-                if title and isinstance(title, bytes):  # noqa: F821
-                    title = title.decode(self.asset.encoding)
-
-                if body and isinstance(body, bytes):  # noqa: F821
-                    body = body.decode(self.asset.encoding)
+            if body and isinstance(body, bytes):  # noqa: F821
+                body = body.decode(self.asset.encoding)
 
         except UnicodeDecodeError:
             msg = 'The content passed into Apprise was not of encoding ' \
@@ -581,7 +541,7 @@ class Apprise(object):
                             .decode('unicode-escape')
 
                     except UnicodeDecodeError:  # pragma: no cover
-                        # This occurs using a very old verion of Python 2.7
+                        # This occurs using a very old version of Python 2.7
                         # such as the one that ships with CentOS/RedHat 7.x
                         # (v2.7.5).
                         conversion_body_map[server.notify_format] = \
@@ -597,25 +557,6 @@ class Apprise(object):
                         msg = 'Failed to escape message body'
                         logger.error(msg)
                         raise TypeError(msg)
-
-                if six.PY2:
-                    # Python 2.7 strings must be encoded as utf-8 for
-                    # consistency across all platforms
-                    if conversion_body_map[server.notify_format] and \
-                            isinstance(
-                                conversion_body_map[server.notify_format],
-                                unicode):  # noqa: F821
-                        conversion_body_map[server.notify_format] = \
-                            conversion_body_map[server.notify_format]\
-                            .encode('utf-8')
-
-                    if conversion_title_map[server.notify_format] and \
-                            isinstance(
-                                conversion_title_map[server.notify_format],
-                                unicode):  # noqa: F821
-                        conversion_title_map[server.notify_format] = \
-                            conversion_title_map[server.notify_format]\
-                            .encode('utf-8')
 
             yield handler(
                 server,
@@ -779,15 +720,8 @@ class Apprise(object):
 
     def __bool__(self):
         """
-        Allows the Apprise object to be wrapped in an Python 3.x based 'if
-        statement'.  True is returned if at least one service has been loaded.
-        """
-        return len(self) > 0
-
-    def __nonzero__(self):
-        """
-        Allows the Apprise object to be wrapped in an Python 2.x based 'if
-        statement'.  True is returned if at least one service has been loaded.
+        Allows the Apprise object to be wrapped in an 'if statement'.
+        True is returned if at least one service has been loaded.
         """
         return len(self) > 0
 
@@ -807,7 +741,3 @@ class Apprise(object):
         """
         return sum([1 if not isinstance(s, (ConfigBase, AppriseConfig))
                     else len(s.servers()) for s in self.servers])
-
-
-if six.PY2:
-    del Apprise.async_notify

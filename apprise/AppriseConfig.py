@@ -37,7 +37,7 @@ from .utils import is_exclusive_match
 from .logger import logger
 
 
-class AppriseConfig(object):
+class AppriseConfig:
     """
     Our Apprise Configuration File Manager
 
@@ -432,15 +432,8 @@ class AppriseConfig(object):
 
     def __bool__(self):
         """
-        Allows the Apprise object to be wrapped in an Python 3.x based 'if
-        statement'.  True is returned if at least one service has been loaded.
-        """
-        return True if self.configs else False
-
-    def __nonzero__(self):
-        """
-        Allows the Apprise object to be wrapped in an Python 2.x based 'if
-        statement'.  True is returned if at least one service has been loaded.
+        Allows the Apprise object to be wrapped in an 'if statement'.
+        True is returned if at least one service has been loaded.
         """
         return True if self.configs else False
 

@@ -44,7 +44,7 @@ from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
 
-class RyverWebhookMode(object):
+class RyverWebhookMode:
     """
     Ryver supports to webhook modes
     """

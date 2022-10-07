@@ -27,13 +27,7 @@
 import re
 import os
 import platform
-try:
-    from setuptools import setup
-
-except ImportError:
-    from distutils.core import setup
-
-from setuptools import find_packages
+from setuptools import find_packages, setup
 
 cmdclass = {}
 try:

@@ -23,17 +23,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 from __future__ import print_function
-import sys
 from json import loads
-import pytest
 import requests
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
+from unittest import mock
 
 import apprise
 
@@ -129,9 +121,8 @@ def test_apprise_interpret_escapes(mock_post):
         .get('message', '') == 'ab\\ncd'
 
 
-@pytest.mark.skipif(sys.version_info.major <= 2, reason="Requires Python 3.x+")
 @mock.patch('requests.post')
-def test_apprise_escaping_py3(mock_post):
+def test_apprise_escaping(mock_post):
     """
     API: Apprise() Python v3.x escaping
 
@@ -235,132 +226,3 @@ def test_apprise_escaping_py3(mock_post):
     # Bytes are supported
     assert a.notify(
         title=b'byte title', body="valid", interpret_escapes=True) is True
-
-
-@pytest.mark.skipif(sys.version_info.major >= 3, reason="Requires Python 2.x+")
-@mock.patch('requests.post')
-def test_apprise_escaping_py2(mock_post):
-    """
-    API: Apprise() Python v2.x escaping
-
-    """
-    a = apprise.Apprise()
-
-    response = mock.Mock()
-    response.content = ''
-    response.status_code = requests.codes.ok
-    mock_post.return_value = response
-
-    # Create ourselves a test object to work with
-    a.add('json://localhost')
-
-    # Escape our content
-    assert a.notify(
-        title="\\r\\ntitle\\r\\n", body="\\r\\nbody\\r\\n",
-        interpret_escapes=True)
-
-    # Verify our content was escaped correctly
-    assert mock_post.call_count == 1
-    result = loads(mock_post.call_args_list[0][1]['data'])
-    assert result['title'] == 'title'
-    assert result['message'] == '\r\nbody'
-
-    # Reset our mock object
-    mock_post.reset_mock()
-
-    #
-    # Support Specially encoded content:
-    #
-
-    # Escape our content
-    assert a.notify(
-        # Google Translated to Arabic: "Let's make the world a better place."
-        title='دعونا نجعل العالم مكانا أفضل.\\r\\t\\t\\n\\r\\n',
-        # Google Translated to Hungarian: "One line of code at a time.'
-        body='Egy sor kódot egyszerre.\\r\\n\\r\\r\\n',
-        # Our Escape Flag
-        interpret_escapes=True)
-
-    # Verify our content was escaped correctly
-    assert mock_post.call_count == 1
-    result = loads(mock_post.call_args_list[0][1]['data'])
-
-    expected = 'دعونا نجعل العالم مكانا أفضل.'
-    assert result['title'] in (
-        expected,
-        # Older versions of Python (such as 2.7.5) provide this value as
-        # a type unicode. This specifically happens when building RPMs
-        # for RedHat/CentOS 7. The internal RPM unit tests fail without this:
-        expected.decode('utf-8'),
-    )
-
-    expected = 'Egy sor kódot egyszerre.'
-    assert result['message'] in (
-        expected,
-        # Older versions of Python (such as 2.7.5) provide this value as
-        # a type unicode. This specifically happens when building RPMs
-        # for RedHat/CentOS 7. The internal RPM unit tests fail without this:
-        expected.decode('utf-8'),
-    )
-
-    # Reset our status
-    mock_post.reset_mock()
-
-    # Use unicode characters
-    assert a.notify(
-        # Google Translated to Arabic: "Let's make the world a better place."
-        title='دعونا نجعل العالم مكانا أفضل.\\r\\t\\t\\n\\r\\n'.decode(
-            'utf-8'),
-        # Google Translated to Hungarian: "One line of code at a time.'
-        body='Egy sor kódot egyszerre.\\r\\n\\r\\r\\n'.decode(
-            'utf-8'),
-        # Our Escape Flag
-        interpret_escapes=True)
-
-    # Verify our content was escaped correctly
-    assert mock_post.call_count == 1
-    result = loads(mock_post.call_args_list[0][1]['data'])
-
-    expected = 'دعونا نجعل العالم مكانا أفضل.'
-    assert result['title'] in (
-        expected,
-        # Older versions of Python (such as 2.7.5) provide this value as
-        # a type unicode. This specifically happens when building RPMs
-        # for RedHat/CentOS 7. The internal RPM unit tests fail without this:
-        expected.decode('utf-8'),
-    )
-
-    expected = 'Egy sor kódot egyszerre.'
-    assert result['message'] in (
-        expected,
-        # Older versions of Python (such as 2.7.5) provide this value as
-        # a type unicode. This specifically happens when building RPMs
-        # for RedHat/CentOS 7. The internal RPM unit tests fail without this:
-        expected.decode('utf-8'),
-    )
-
-    # Error handling
-    #
-    # We can't escape the content below
-    assert a.notify(
-        title=None, body=4, interpret_escapes=True) is False
-    assert a.notify(
-        title=4, body=None, interpret_escapes=True) is False
-    assert a.notify(
-        title=4, body="valid body", interpret_escapes=True) is False
-    assert a.notify(
-        title=object(), body=False, interpret_escapes=True) is False
-    assert a.notify(
-        title=False, body=object(), interpret_escapes=True) is False
-
-    # The body is proessed first, so the errors thrown above get tested on
-    # the body only.  Now we run similar tests but only make the title
-    # bad and always mark the body good
-    assert a.notify(
-        title=None, body="valid", interpret_escapes=True) is True
-    assert a.notify(
-        title=4, body="valid", interpret_escapes=True) is False
-    assert a.notify(
-        title=object(), body="valid", interpret_escapes=True) is False
-    assert a.notify(
-        title=False, body="valid", interpret_escapes=True) is True

@@ -52,18 +52,11 @@ try:
 except ImportError:
     # gettext isn't available; no problem, just fall back to using
     # the library features without multi-language support.
-    try:
-        # Python v2.7
-        import __builtin__
-        __builtin__.__dict__['_'] = lambda x: x  # pragma: no branch
-
-    except ImportError:
-        # Python v3.4+
-        import builtins
-        builtins.__dict__['_'] = lambda x: x  # pragma: no branch
+    import builtins
+    builtins.__dict__['_'] = lambda x: x  # pragma: no branch
 
 
-class LazyTranslation(object):
+class LazyTranslation:
     """
     Doesn't translate anything until str() or unicode() references
     are made.
@@ -89,7 +82,7 @@ def gettext_lazy(text):
     return LazyTranslation(text=text)
 
 
-class AppriseLocale(object):
+class AppriseLocale:
     """
     A wrapper class to gettext so that we can manipulate multiple lanaguages
     on the fly if required.

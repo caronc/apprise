@@ -33,7 +33,7 @@ from .common import NotifyType
 from .utils import module_detection
 
 
-class AppriseAsset(object):
+class AppriseAsset:
     """
     Provides a supplimentary class that can be used to provide extra
     information and details that can be used by Apprise such as providing

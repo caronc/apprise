@@ -23,15 +23,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
-
 import pytest
+from unittest import mock
 from apprise.attachment.AttachBase import AttachBase
 
 # Disable logging for a cleaner testing output

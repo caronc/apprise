@@ -69,7 +69,7 @@ CONFIG_SCHEMA_MAP = {}
 ATTACHMENT_SCHEMA_MAP = {}
 
 
-class NotifyType(object):
+class NotifyType:
     """
     A simple mapping of notification types most commonly used with
     all types of logging and notification services.
@@ -88,7 +88,7 @@ NOTIFY_TYPES = (
 )
 
 
-class NotifyImageSize(object):
+class NotifyImageSize:
     """
     A list of pre-defined image sizes to make it easier to work with defined
     plugins.
@@ -107,7 +107,7 @@ NOTIFY_IMAGE_SIZES = (
 )
 
 
-class NotifyFormat(object):
+class NotifyFormat:
     """
     A list of pre-defined text message formats that can be passed via the
     apprise library.
@@ -124,7 +124,7 @@ NOTIFY_FORMATS = (
 )
 
 
-class OverflowMode(object):
+class OverflowMode:
     """
     A list of pre-defined modes of how to handle the text when it exceeds the
     defined maximum message size.
@@ -152,7 +152,7 @@ OVERFLOW_MODES = (
 )
 
 
-class ConfigFormat(object):
+class ConfigFormat:
     """
     A list of pre-defined config formats that can be passed via the
     apprise library.
@@ -175,7 +175,7 @@ CONFIG_FORMATS = (
 )
 
 
-class ContentIncludeMode(object):
+class ContentIncludeMode:
     """
     The different Content inclusion modes.  All content based plugins will
     have one of these associated with it.
@@ -200,7 +200,7 @@ CONTENT_INCLUDE_MODES = (
 )
 
 
-class ContentLocation(object):
+class ContentLocation:
     """
     This is primarily used for handling file attachments.  The idea is
     to track the source of the attachment itself.  We don't want

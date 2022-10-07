@@ -48,7 +48,7 @@ from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
 
-class NotificoFormat(object):
+class NotificoFormat:
     # Resets all formating
     Reset = '\x0F'
 
@@ -59,7 +59,7 @@ class NotificoFormat(object):
     BGSwap = '\x16'
 
 
-class NotificoColor(object):
+class NotificoColor:
     # Resets Color
     Reset = '\x03'
 

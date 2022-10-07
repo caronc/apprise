@@ -104,7 +104,7 @@ LAMETRIC_APP_ID_DETECTOR_RE = re.compile(
 LAMETRIC_IS_APP_TOKEN = re.compile(r'^[a-z0-9]{80,}==$', re.I)
 
 
-class LametricMode(object):
+class LametricMode:
     """
     Define Lametric Notification Modes
     """
@@ -121,7 +121,7 @@ LAMETRIC_MODES = (
 )
 
 
-class LametricPriority(object):
+class LametricPriority:
     """
     Priority of the message
     """
@@ -158,7 +158,7 @@ LAMETRIC_PRIORITIES = (
 )
 
 
-class LametricIconType(object):
+class LametricIconType:
     """
     Represents the nature of notification.
     """
@@ -184,7 +184,7 @@ LAMETRIC_ICON_TYPES = (
 )
 
 
-class LametricSoundCategory(object):
+class LametricSoundCategory:
     """
     Define Sound Categories
     """
@@ -192,7 +192,7 @@ class LametricSoundCategory(object):
     ALARMS = "alarms"
 
 
-class LametricSound(object):
+class LametricSound:
     """
     There are 2 categories of sounds, to make things simple we just lump them
     all togther in one class object.

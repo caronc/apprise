@@ -54,7 +54,7 @@ D7NETWORKS_HTTP_ERROR_MAP = {
 
 
 # Priorities
-class D7SMSPriority(object):
+class D7SMSPriority:
     """
     D7 Networks SMS Message Priority
     """
@@ -232,10 +232,10 @@ class NotifyD7Networks(NotifyBase):
 
         auth = '{user}:{password}'.format(
             user=self.user, password=self.password)
-        if six.PY3:
-            # Python 3's versio of b64encode() expects a byte array and not
-            # a string.  To accomodate this, we encode the content here
-            auth = auth.encode('utf-8')
+
+        # Python 3's versio of b64encode() expects a byte array and not
+        # a string.  To accommodate this, we encode the content here
+        auth = auth.encode('utf-8')
 
         # Prepare our headers
         headers = {

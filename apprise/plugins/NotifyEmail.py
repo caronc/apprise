@@ -47,7 +47,7 @@ from ..AppriseLocale import gettext_lazy as _
 charset.add_charset('utf-8', charset.QP, charset.QP, 'utf-8')
 
 
-class WebBaseLogin(object):
+class WebBaseLogin:
     """
     This class is just used in conjunction of the default emailers
     to best formulate a login to it using the data detected
@@ -60,7 +60,7 @@ class WebBaseLogin(object):
 
 
 # Secure Email Modes
-class SecureMailMode(object):
+class SecureMailMode:
     SSL = "ssl"
     STARTTLS = "starttls"
 
@@ -684,38 +684,21 @@ class NotifyEmail(NotifyBase):
             # Strip target out of reply_to list if in To
             reply_to = (self.reply_to - set([to_addr]))
 
-            try:
-                # Format our cc addresses to support the Name field
-                cc = [formataddr(
+            # Format our cc addresses to support the Name field
+            cc = [formataddr(
+                (self.names.get(addr, False), addr), charset='utf-8')
+                for addr in cc]
+
+            # Format our bcc addresses to support the Name field
+            bcc = [formataddr(
+                (self.names.get(addr, False), addr), charset='utf-8')
+                for addr in bcc]
+
+            if reply_to:
+                # Format our reply-to addresses to support the Name field
+                reply_to = [formataddr(
                     (self.names.get(addr, False), addr), charset='utf-8')
-                    for addr in cc]
-
-                # Format our bcc addresses to support the Name field
-                bcc = [formataddr(
-                    (self.names.get(addr, False), addr), charset='utf-8')
-                    for addr in bcc]
-
-                if reply_to:
-                    # Format our reply-to addresses to support the Name field
-                    reply_to = [formataddr(
-                        (self.names.get(addr, False), addr), charset='utf-8')
-                        for addr in reply_to]
-
-            except TypeError:
-                # Python v2.x Support (no charset keyword)
-                # Format our cc addresses to support the Name field
-                cc = [formataddr(  # pragma: no branch
-                    (self.names.get(addr, False), addr)) for addr in cc]
-
-                # Format our bcc addresses to support the Name field
-                bcc = [formataddr(  # pragma: no branch
-                    (self.names.get(addr, False), addr)) for addr in bcc]
-
-                if reply_to:
-                    # Format our reply-to addresses to support the Name field
-                    reply_to = [formataddr(  # pragma: no branch
-                        (self.names.get(addr, False), addr))
-                        for addr in reply_to]
+                    for addr in reply_to]
 
             self.logger.debug(
                 'Email From: {} <{}>'.format(from_name, self.from_addr))
@@ -781,25 +764,11 @@ class NotifyEmail(NotifyBase):
                 base[k] = Header(v, self._get_charset(v))
 
             base['Subject'] = Header(title, self._get_charset(title))
-            try:
-                base['From'] = formataddr(
-                    (from_name if from_name else False, self.from_addr),
-                    charset='utf-8')
-                base['To'] = formataddr((to_name, to_addr), charset='utf-8')
-
-            except TypeError:
-                # Python v2.x Support (no charset keyword)
-                base['From'] = formataddr(
-                    (from_name if from_name else False, self.from_addr))
-                base['To'] = formataddr((to_name, to_addr))
-
-            try:
-                base['Message-ID'] = make_msgid(domain=self.smtp_host)
-
-            except TypeError:
-                # Python v2.x Support (no domain keyword)
-                base['Message-ID'] = make_msgid()
-
+            base['From'] = formataddr(
+                (from_name if from_name else False, self.from_addr),
+                charset='utf-8')
+            base['To'] = formataddr((to_name, to_addr), charset='utf-8')
+            base['Message-ID'] = make_msgid(domain=self.smtp_host)
             base['Date'] = \
                 datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S +0000")
             base['X-Application'] = self.app_id

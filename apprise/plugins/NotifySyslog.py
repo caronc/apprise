@@ -101,7 +101,7 @@ SYSLOG_FACILITY_RMAP = {
 }
 
 
-class SyslogMode(object):
+class SyslogMode:
     # A local query
     LOCAL = "local"
 

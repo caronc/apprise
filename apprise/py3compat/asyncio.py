@@ -36,9 +36,7 @@ ASYNCIO_RUN_SUPPORT = \
     (sys.version_info.major == 3 and sys.version_info.minor >= 7)
 
 
-# async reference produces a SyntaxError (E999) in Python v2.7
-# For this reason we turn on the noqa flag
-async def notify(coroutines):  # noqa: E999
+async def notify(coroutines):
     """
     An async wrapper to the AsyncNotifyBase.async_notify() calls allowing us
     to call gather() and collect the responses
@@ -98,7 +96,7 @@ def tosync(cor, debug=False):
         return loop.run_until_complete(cor)
 
 
-async def toasyncwrapvalue(v):  # noqa: E999
+async def toasyncwrapvalue(v):
     """
     Create a coroutine that, when run, returns the provided value.
     """
@@ -106,7 +104,7 @@ async def toasyncwrapvalue(v):  # noqa: E999
     return v
 
 
-async def toasyncwrap(fn):  # noqa: E999
+async def toasyncwrap(fn):
     """
     Create a coroutine that, when run, executes the provided function.
     """
@@ -119,7 +117,7 @@ class AsyncNotifyBase(URLBase):
     asyncio wrapper for the NotifyBase object
     """
 
-    async def async_notify(self, *args, **kwargs):  # noqa: E999
+    async def async_notify(self, *args, **kwargs):
         """
         Async Notification Wrapper
         """

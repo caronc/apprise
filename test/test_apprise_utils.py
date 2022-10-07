@@ -29,13 +29,7 @@ import os
 import sys
 import six
 from inspect import cleandoc
-try:
-    # Python 2.7
-    from urllib import unquote
-
-except ImportError:
-    # Python 3.x
-    from urllib.parse import unquote
+from urllib.parse import unquote
 
 from apprise import utils
 from apprise import common
@@ -46,8 +40,6 @@ logging.disable(logging.CRITICAL)
 
 # Ensure we don't create .pyc files for these tests
 sys.dont_write_bytecode = True
-# Python v2.x support requires an environment variable
-os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 
 
 def test_parse_qsd():
@@ -1937,7 +1929,7 @@ def test_parse_list():
         '.xvid', '.wmv', '.mp4',
     ])
 
-    class StrangeObject(object):
+    class StrangeObject:
         def __str__(self):
             return '.avi'
 

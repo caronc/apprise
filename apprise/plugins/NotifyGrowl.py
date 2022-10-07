@@ -46,7 +46,7 @@ except ImportError:
 
 
 # Priorities
-class GrowlPriority(object):
+class GrowlPriority:
     LOW = -2
     MODERATE = -1
     NORMAL = 0
