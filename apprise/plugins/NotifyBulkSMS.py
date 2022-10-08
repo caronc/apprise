@@ -422,9 +422,9 @@ class NotifyBulkSMS(NotifyBase):
 
         # Get our entries; split_path() looks after unquoting content for us
         # by default
-        results['targets'] = [NotifyBulkSMS.unquote(results['host'])]
-        results['targets'].extend(
-            NotifyBulkSMS.split_path(results['fullpath']))
+        results['targets'] = [
+            NotifyBulkSMS.unquote(results['host']),
+            *NotifyBulkSMS.split_path(results['fullpath'])]
 
         # Support the 'from'  and 'source' variable so that we can support
         # targets this way too.
