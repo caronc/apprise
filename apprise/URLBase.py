@@ -24,21 +24,13 @@
 # THE SOFTWARE.
 
 import re
-import six
 from .logger import logger
 from time import sleep
 from datetime import datetime
 from xml.sax.saxutils import escape as sax_escape
 
-try:
-    # Python 2.7
-    from urllib import unquote as _unquote
-    from urllib import quote as _quote
-
-except ImportError:
-    # Python 3.x
-    from urllib.parse import unquote as _unquote
-    from urllib.parse import quote as _quote
+from urllib.parse import unquote as _unquote
+from urllib.parse import quote as _quote
 
 from .AppriseLocale import gettext_lazy as _
 from .AppriseAsset import AppriseAsset
@@ -52,7 +44,7 @@ from .utils import parse_phone_no
 PATHSPLIT_LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
 
 
-class PrivacyMode(object):
+class PrivacyMode:
     # Defines different privacy modes strings can be printed as
     # Astrisk sets 4 of them: e.g. ****
     # This is used for passwords
@@ -77,7 +69,7 @@ HTML_LOOKUP = {
 }
 
 
-class URLBase(object):
+class URLBase:
     """
     This is the base class for all URL Manipulation
     """
@@ -345,7 +337,7 @@ class URLBase(object):
         Returns:
             str: The escaped html
         """
-        if not isinstance(html, six.string_types) or not html:
+        if not isinstance(html, str) or not html:
             return ''
 
         # Escape HTML
@@ -369,7 +361,7 @@ class URLBase(object):
         encoding and errors parameters specify how to decode percent-encoded
         sequences.
 
-        Wrapper to Python's unquote while remaining compatible with both
+        Wrapper to Python's `unquote` while remaining compatible with both
         Python 2 & 3 since the reference to this function changed between
         versions.
 
@@ -388,20 +380,14 @@ class URLBase(object):
         if not content:
             return ''
 
-        try:
-            # Python v3.x
-            return _unquote(content, encoding=encoding, errors=errors)
-
-        except TypeError:
-            # Python v2.7
-            return _unquote(content)
+        return _unquote(content, encoding=encoding, errors=errors)
 
     @staticmethod
     def quote(content, safe='/', encoding=None, errors=None):
         """ Replaces single character non-ascii characters and URI specific
         ones by their %xx code.
 
-        Wrapper to Python's unquote while remaining compatible with both
+        Wrapper to Python's `quote` while remaining compatible with both
         Python 2 & 3 since the reference to this function changed between
         versions.
 
@@ -421,13 +407,7 @@ class URLBase(object):
         if not content:
             return ''
 
-        try:
-            # Python v3.x
-            return _quote(content, safe=safe, encoding=encoding, errors=errors)
-
-        except TypeError:
-            # Python v2.7
-            return _quote(content, safe=safe)
+        return _quote(content, safe=safe, encoding=encoding, errors=errors)
 
     @staticmethod
     def pprint(content, privacy=True, mode=PrivacyMode.Outer,
@@ -456,7 +436,7 @@ class URLBase(object):
             # Return 4 Asterisks
             return '****'
 
-        if not isinstance(content, six.string_types) or not content:
+        if not isinstance(content, str) or not content:
             # Nothing more to do
             return ''
 
@@ -471,7 +451,7 @@ class URLBase(object):
     def urlencode(query, doseq=False, safe='', encoding=None, errors=None):
         """Convert a mapping object or a sequence of two-element tuples
 
-        Wrapper to Python's unquote while remaining compatible with both
+        Wrapper to Python's `urlencode` while remaining compatible with both
         Python 2 & 3 since the reference to this function changed between
         versions.
 
@@ -573,11 +553,6 @@ class URLBase(object):
                 content = URLBase.unquote(content)
             except TypeError:
                 # Nothing further to do
-                return []
-
-            except AttributeError:
-                # This exception ONLY gets thrown under Python v2.7 if an
-                # object() is passed in place of the content
                 return []
 
         content = parse_phone_no(content)
@@ -714,13 +689,13 @@ class URLBase(object):
 
         for key in ('protocol', 'secure_protocol'):
             schema = getattr(self, key, None)
-            if isinstance(schema, six.string_types):
+            if isinstance(schema, str):
                 schemas.add(schema)
 
             elif isinstance(schema, (set, list, tuple)):
                 # Support iterables list types
                 for s in schema:
-                    if isinstance(s, six.string_types):
+                    if isinstance(s, str):
                         schemas.add(s)
 
         return schemas

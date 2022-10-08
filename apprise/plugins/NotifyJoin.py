@@ -63,7 +63,7 @@ JOIN_IMAGE_XY = NotifyImageSize.XY_72
 
 
 # Priorities
-class JoinPriority(object):
+class JoinPriority:
     LOW = -2
     MODERATE = -1
     NORMAL = 0

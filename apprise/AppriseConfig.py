@@ -23,8 +23,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import six
-
 from . import config
 from . import ConfigBase
 from . import CONFIG_FORMATS
@@ -37,7 +35,7 @@ from .utils import is_exclusive_match
 from .logger import logger
 
 
-class AppriseConfig(object):
+class AppriseConfig:
     """
     Our Apprise Configuration File Manager
 
@@ -169,7 +167,7 @@ class AppriseConfig(object):
             self.configs.append(configs)
             return True
 
-        elif isinstance(configs, six.string_types):
+        elif isinstance(configs, str):
             # Save our path
             configs = (configs, )
 
@@ -187,7 +185,7 @@ class AppriseConfig(object):
                 self.configs.append(_config)
                 continue
 
-            elif not isinstance(_config, six.string_types):
+            elif not isinstance(_config, str):
                 logger.warning(
                     "An invalid configuration (type={}) was specified.".format(
                         type(_config)))
@@ -241,7 +239,7 @@ class AppriseConfig(object):
             # prepare default asset
             asset = self.asset
 
-        if not isinstance(content, six.string_types):
+        if not isinstance(content, str):
             logger.warning(
                 "An invalid configuration (type={}) was specified.".format(
                     type(content)))
@@ -432,15 +430,8 @@ class AppriseConfig(object):
 
     def __bool__(self):
         """
-        Allows the Apprise object to be wrapped in an Python 3.x based 'if
-        statement'.  True is returned if at least one service has been loaded.
-        """
-        return True if self.configs else False
-
-    def __nonzero__(self):
-        """
-        Allows the Apprise object to be wrapped in an Python 2.x based 'if
-        statement'.  True is returned if at least one service has been loaded.
+        Allows the Apprise object to be wrapped in an 'if statement'.
+        True is returned if at least one service has been loaded.
         """
         return True if self.configs else False
 

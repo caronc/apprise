@@ -25,13 +25,7 @@
 
 import os
 import pytest
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
+from unittest import mock
 
 import requests
 from json import dumps
@@ -262,7 +256,7 @@ def test_plugin_pushsafer_general(mock_post):
         attach=attach) is True
 
     # Test error reading attachment from disk
-    with mock.patch('io.open', side_effect=OSError):
+    with mock.patch('builtins.open', side_effect=OSError):
         obj.notify(
             body='body', title='title', notify_type=NotifyType.INFO,
             attach=attach)

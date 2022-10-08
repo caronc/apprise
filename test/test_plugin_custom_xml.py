@@ -23,15 +23,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 import os
-import sys
 import re
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
+from unittest import mock
 
 import requests
 from apprise import plugins
@@ -198,13 +191,6 @@ def test_notify_xml_plugin_attachments(mock_post):
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=path) is False
 
-    # Get a appropriate "builtin" module name for pythons 2/3.
-    if sys.version_info.major >= 3:
-        builtin_open_function = 'builtins.open'
-
-    else:
-        builtin_open_function = '__builtin__.open'
-
     # Test Valid Attachment (load 3)
     path = (
         os.path.join(TEST_VAR_DIR, 'apprise-test.gif'),
@@ -216,7 +202,7 @@ def test_notify_xml_plugin_attachments(mock_post):
     # Return our good configuration
     mock_post.side_effect = None
     mock_post.return_value = okay_response
-    with mock.patch(builtin_open_function, side_effect=OSError()):
+    with mock.patch('builtins.open', side_effect=OSError()):
         # We can't send the message we can't open the attachment for reading
         assert obj.notify(
             body='body', title='title', notify_type=NotifyType.INFO,
@@ -291,7 +277,7 @@ def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
         assert new_results[k] == results[k]
 
     # Test our data set for our key/value pair
-    assert re.search('<Version>[1-9]+\.[0-9]+</Version>', details[1]['data'])
+    assert re.search(r'<Version>[1-9]+\.[0-9]+</Version>', details[1]['data'])
     assert re.search('<MessageType>info</MessageType>', details[1]['data'])
     assert re.search('<Subject>title</Subject>', details[1]['data'])
     # Custom entry Message acts as Over-ride and kicks in here

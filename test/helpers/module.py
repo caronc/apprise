@@ -27,16 +27,7 @@ import re
 import os
 import sys
 
-try:
-    # Python v3.4+
-    from importlib import reload
-except ImportError:
-    try:
-        # Python v3.0-v3.3
-        from imp import reload
-    except ImportError:
-        # Python v2.7
-        pass
+from importlib import reload
 
 
 def module_reload(filename):

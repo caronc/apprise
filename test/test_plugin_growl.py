@@ -24,15 +24,8 @@
 # THE SOFTWARE.
 
 import sys
-try:
-    # Python 3.x
-    from unittest import mock
+from unittest import mock
 
-except ImportError:
-    # Python 2.7
-    import mock
-
-import six
 import pytest
 import apprise
 from apprise.plugins.NotifyGrowl import GrowlPriority
@@ -278,11 +271,11 @@ def test_plugin_growl_general(mock_gntp):
 
             if isinstance(obj, apprise.plugins.NotifyBase):
                 # We loaded okay; now lets make sure we can reverse this url
-                assert isinstance(obj.url(), six.string_types) is True
+                assert isinstance(obj.url(), str) is True
 
                 # Test our privacy=True flag
                 assert isinstance(
-                    obj.url(privacy=True), six.string_types) is True
+                    obj.url(privacy=True), str) is True
 
                 # Instantiate the exact same object again using the URL from
                 # the one that was already created properly

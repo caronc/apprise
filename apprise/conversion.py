@@ -23,18 +23,12 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-
 import re
-import six
 from markdown import markdown
 from .common import NotifyFormat
 from .URLBase import URLBase
 
-if six.PY2:
-    from HTMLParser import HTMLParser
-
-else:
-    from html.parser import HTMLParser
+from html.parser import HTMLParser
 
 
 def convert_between(from_format, to_format, content):
@@ -80,10 +74,6 @@ def html_to_text(content):
     """
 
     parser = HTMLConverter()
-    if six.PY2:
-        # Python 2.7 requires an additional parsing to un-escape characters
-        content = parser.unescape(content)
-
     parser.feed(content)
     parser.close()
     return parser.converted
@@ -124,20 +114,6 @@ class HTMLConverter(HTMLParser, object):
     def close(self):
         string = ''.join(self._finalize(self._result))
         self.converted = string.strip()
-
-        if six.PY2:
-            # See https://stackoverflow.com/questions/10993612/\
-            #       how-to-remove-xa0-from-string-in-python
-            #
-            # This is required since the unescape() nbsp; with \xa0 when
-            # using Python 2.7
-            try:
-                self.converted = self.converted.replace(u'\xa0', u' ')
-
-            except UnicodeDecodeError:
-                # Python v2.7 isn't the greatest for handling unicode
-                self.converted = \
-                    self.converted.decode('utf-8').replace(u'\xa0', u' ')
 
     def _finalize(self, result):
         """

@@ -24,29 +24,14 @@
 # THE SOFTWARE.
 
 import os
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
+from unittest import mock
 
 import ctypes
 
 from apprise import AppriseLocale
 from apprise.utils import environ
+from importlib import reload
 
-try:
-    # Python v3.4+
-    from importlib import reload
-except ImportError:
-    try:
-        # Python v3.0-v3.3
-        from imp import reload
-    except ImportError:
-        # Python v2.7
-        pass
 
 # Disable logging for a cleaner testing output
 import logging
@@ -177,9 +162,11 @@ def test_detect_language_windows_users():
         # Detect french language
         assert AppriseLocale.AppriseLocale.detect_language() == 'fr'
 
-    # The following unsets all enviroment vaiables and sets LC_CTYPE
+    # The following unsets all environment variables and sets LC_CTYPE
     # This was causing Python 2.7 to internally parse UTF-8 as an invalid
-    # locale and throw an uncaught ValueError
+    # locale and throw an uncaught ValueError; Python v2 support has been
+    # dropped, but just to ensure this issue does not come back, we keep
+    # this test:
     with environ(*list(os.environ.keys()), LC_CTYPE="UTF-8"):
         assert AppriseLocale.AppriseLocale.detect_language() is None
 

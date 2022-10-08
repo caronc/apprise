@@ -33,7 +33,7 @@ from .common import (FCMMode, FCM_MODES)
 from ...logger import logger
 
 
-class NotificationPriority(object):
+class NotificationPriority:
     """
     Defines the Notification Priorities as described on:
     https://firebase.google.com/docs/reference/fcm/rest/v1/\
@@ -63,7 +63,7 @@ class NotificationPriority(object):
     HIGH = 'HIGH'
 
 
-class FCMPriority(object):
+class FCMPriority:
     """
     Defines our accepted priorites
     """
@@ -87,7 +87,7 @@ FCM_PRIORITIES = (
 )
 
 
-class FCMPriorityManager(object):
+class FCMPriorityManager:
     """
     A Simple object to make it easier to work with FCM set priorities
     """
@@ -242,14 +242,7 @@ class FCMPriorityManager(object):
 
     def __bool__(self):
         """
-        Allows this object to be wrapped in an Python 3.x based 'if
-        statement'.  True is returned if a priority was loaded
-        """
-        return True if self.priority else False
-
-    def __nonzero__(self):
-        """
-        Allows this object to be wrapped in an Python 2.x based 'if
-        statement'.  True is returned if a priority was loaded
+        Allows this object to be wrapped in an 'if statement'.
+        True is returned if a priority was loaded
         """
         return True if self.priority else False

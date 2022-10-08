@@ -80,7 +80,7 @@ SPARKPOST_HTTP_ERROR_MAP = {
 
 
 # Priorities
-class SparkPostRegion(object):
+class SparkPostRegion:
     US = 'us'
     EU = 'eu'
 
@@ -503,14 +503,9 @@ class NotifySparkPost(NotifyBase):
         # Send in batches if identified to do so
         batch_size = 1 if not self.batch else self.default_batch_size
 
-        try:
-            reply_to = formataddr((self.from_name if self.from_name else False,
-                                   self.from_addr), charset='utf-8')
-        except TypeError:
-            # Python v2.x Support (no charset keyword)
-            # Format our cc addresses to support the Name field
-            reply_to = formataddr((self.from_name if self.from_name else False,
-                                   self.from_addr))
+        reply_to = formataddr((self.from_name if self.from_name else False,
+                               self.from_addr), charset='utf-8')
+
         payload = {
             "options": {
                 # When set to True, an image is included with the email which

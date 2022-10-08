@@ -29,17 +29,9 @@
 # - Legacy API (v1) -> OAuth
 # - https://firebase.google.com/docs/cloud-messaging/migrate-v1
 
-import io
 import os
-import six
 import sys
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
+from unittest import mock
 
 import pytest
 import requests
@@ -60,12 +52,6 @@ except ImportError:
     # No problem; there is no cryptography support
     pass
 
-try:
-    from json.decoder import JSONDecodeError
-
-except ImportError:
-    # Python v2.7 Backwards Compatibility support
-    JSONDecodeError = ValueError
 
 # Disable logging for a cleaner testing output
 import logging
@@ -218,6 +204,8 @@ def test_plugin_fcm_urls():
 
 @pytest.mark.skipif(
     'cryptography' not in sys.modules, reason="Requires cryptography")
+@pytest.mark.skipif(
+    hasattr(sys, "pypy_version_info"), reason="Does not work reliably on PyPy")
 @mock.patch('requests.post')
 def test_plugin_fcm_general_legacy(mock_post):
     """
@@ -381,7 +369,7 @@ def test_plugin_fcm_general_oauth(mock_post):
     obj = Apprise.instantiate(
         'fcm://mock-project-id/device/?keyfile={}'.format(str(path)))
 
-    with mock.patch('io.open', side_effect=OSError):
+    with mock.patch('builtins.open', side_effect=OSError):
         # we'll fail as a result
         assert obj.notify("test") is False
 
@@ -617,7 +605,7 @@ def test_plugin_fcm_keyfile_parse(mock_post):
 
     # Now we test a case where we can't access the file we've been pointed to:
     oauth = GoogleOAuth()
-    with mock.patch('io.open', side_effect=OSError):
+    with mock.patch('builtins.open', side_effect=OSError):
         # We will fail to retrieve our Access Token
         assert oauth.load(path) is False
         assert oauth.access_token is None
@@ -722,7 +710,7 @@ def test_plugin_fcm_keyfile_missing_entries_parse(tmpdir):
 
     # Prepare a base keyfile reference to use
     path = os.path.join(PRIVATE_KEYFILE_DIR, 'service_account.json')
-    with io.open(path, mode="r", encoding='utf-8') as fp:
+    with open(path, mode="r", encoding='utf-8') as fp:
         content = json.loads(fp.read())
 
     path = tmpdir.join('fcm_keyfile.json')
@@ -804,7 +792,7 @@ def test_plugin_fcm_colors():
 
     # Asset colors
     instance = FCMColorManager('yes')
-    assert isinstance(instance.get(), six.string_types)
+    assert isinstance(instance.get(), str)
     # Output: #rrggbb
     assert len(instance.get()) == 7
     # Starts with has symbol
@@ -818,7 +806,7 @@ def test_plugin_fcm_colors():
 
     # Custom color
     instance = FCMColorManager('#A2B3A4')
-    assert isinstance(instance.get(), six.string_types)
+    assert isinstance(instance.get(), str)
     assert instance.get() == '#a2b3a4'
     assert bool(instance) is True
     # str() response does not include hashtag
@@ -826,7 +814,7 @@ def test_plugin_fcm_colors():
 
     # Custom color (no hashtag)
     instance = FCMColorManager('A2B3A4')
-    assert isinstance(instance.get(), six.string_types)
+    assert isinstance(instance.get(), str)
     # Hashtag is always part of output
     assert instance.get() == '#a2b3a4'
     assert bool(instance) is True
@@ -835,7 +823,7 @@ def test_plugin_fcm_colors():
 
     # Custom color (no hashtag) but only using 3 letter rgb values
     instance = FCMColorManager('AC4')
-    assert isinstance(instance.get(), six.string_types)
+    assert isinstance(instance.get(), str)
     # Hashtag is always part of output
     assert instance.get() == '#aacc44'
     assert bool(instance) is True

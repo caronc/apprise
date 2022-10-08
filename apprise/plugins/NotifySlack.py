@@ -94,7 +94,7 @@ SLACK_HTTP_ERROR_MAP = {
 CHANNEL_LIST_DELIM = re.compile(r'[ \t\r\n,#\\/]+')
 
 
-class SlackMode(object):
+class SlackMode:
     """
     Tracks the mode of which we're using Slack
     """

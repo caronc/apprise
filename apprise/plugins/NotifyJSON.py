@@ -23,7 +23,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import six
 import requests
 import base64
 from json import dumps
@@ -139,11 +138,11 @@ class NotifyJSON(NotifyBase):
         super(NotifyJSON, self).__init__(**kwargs)
 
         self.fullpath = kwargs.get('fullpath')
-        if not isinstance(self.fullpath, six.string_types):
+        if not isinstance(self.fullpath, str):
             self.fullpath = ''
 
         self.method = self.template_args['method']['default'] \
-            if not isinstance(method, six.string_types) else method.upper()
+            if not isinstance(method, str) else method.upper()
 
         if self.method not in METHODS:
             msg = 'The method specified ({}) is invalid.'.format(method)

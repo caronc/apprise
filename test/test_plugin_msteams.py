@@ -23,14 +23,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-try:
-    # Python 3.x
-    from unittest import mock
+from unittest import mock
 
-except ImportError:
-    # Python 2.7
-    import mock
-
+import sys
 import json
 import requests
 import pytest
@@ -389,6 +384,8 @@ def test_plugin_msteams_templating(mock_post, tmpdir):
         == 'http://localhost'
 
 
+@pytest.mark.skipif(
+    hasattr(sys, "pypy_version_info"), reason="Does not work reliably on PyPy")
 @mock.patch('requests.post')
 def test_msteams_yaml_config(mock_post, tmpdir):
     """

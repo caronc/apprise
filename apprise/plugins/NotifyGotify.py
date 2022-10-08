@@ -41,7 +41,7 @@ from ..AppriseLocale import gettext_lazy as _
 
 
 # Priorities
-class GotifyPriority(object):
+class GotifyPriority:
     LOW = 0
     MODERATE = 3
     NORMAL = 5

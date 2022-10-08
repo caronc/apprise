@@ -33,7 +33,6 @@
 # from). Activated phone numbers can be found on your dashboard here:
 #  - https://dashboard.sinch.com/numbers/your-numbers/numbers
 #
-import six
 import requests
 import json
 
@@ -46,7 +45,7 @@ from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
 
-class SinchRegion(object):
+class SinchRegion:
     """
     Defines the Sinch Server Regions
     """
@@ -192,7 +191,7 @@ class NotifySinch(NotifyBase):
 
         # Setup our region
         self.region = self.template_args['region']['default'] \
-            if not isinstance(region, six.string_types) else region.lower()
+            if not isinstance(region, str) else region.lower()
         if self.region and self.region not in SINCH_REGIONS:
             msg = 'The region specified ({}) is invalid.'.format(region)
             self.logger.warning(msg)

@@ -26,7 +26,6 @@
 # Official API reference: https://developer.gitter.im/docs/user-resource
 
 import re
-import six
 import requests
 from json import dumps
 
@@ -40,7 +39,7 @@ TARGET_LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
 
 
 # Priorities
-class ParsePlatformDevice(object):
+class ParsePlatformDevice:
     # All Devices
     ALL = 'all'
 
@@ -134,7 +133,7 @@ class NotifyParsePlatform(NotifyBase):
         super(NotifyParsePlatform, self).__init__(**kwargs)
 
         self.fullpath = kwargs.get('fullpath')
-        if not isinstance(self.fullpath, six.string_types):
+        if not isinstance(self.fullpath, str):
             self.fullpath = '/'
 
         # Application ID

@@ -23,14 +23,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import six
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
+from unittest import mock
 
 import requests
 from apprise import plugins
@@ -158,7 +151,7 @@ def test_plugin_nextcloud_edge_cases(mock_post):
     obj = plugins.NotifyNextcloud(
         host="localhost", user="admin", password="pass", targets="user")
     assert isinstance(obj, plugins.NotifyNextcloud) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
 
     # An empty body
     assert obj.send(body="") is True

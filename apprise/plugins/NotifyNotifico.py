@@ -48,8 +48,8 @@ from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
 
-class NotificoFormat(object):
-    # Resets all formating
+class NotificoFormat:
+    # Resets all formatting
     Reset = '\x0F'
 
     # Formatting
@@ -59,7 +59,7 @@ class NotificoFormat(object):
     BGSwap = '\x16'
 
 
-class NotificoColor(object):
+class NotificoColor:
     # Resets Color
     Reset = '\x03'
 
@@ -248,13 +248,13 @@ class NotifyNotifico(NotifyBase):
         if self.color:
             # Colors were specified, make sure we capture and correctly
             # allow them to exist inline in the message
-            # \g<1> is less ambigious than \1
-            body = re.sub(r'\\x03(\d{0,2})', '\x03\g<1>', body)
+            # \g<1> is less ambiguous than \1
+            body = re.sub(r'\\x03(\d{0,2})', r'\\x03\g<1>', body)
 
         else:
             # no colors specified, make sure we strip out any colors found
             # to make the string read-able
-            body = re.sub(r'\\x03(\d{1,2}(,[0-9]{1,2})?)?', '', body)
+            body = re.sub(r'\\x03(\d{1,2}(,[0-9]{1,2})?)?', r'', body)
 
         # Prepare our payload
         payload = {

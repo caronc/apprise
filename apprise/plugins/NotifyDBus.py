@@ -60,7 +60,7 @@ try:
         from dbus.mainloop.glib import DBusGMainLoop
         LOOP_GLIB = DBusGMainLoop()
 
-    except ImportError:
+    except ImportError:  # pragma: no cover
         # No problem
         pass
 
@@ -109,7 +109,7 @@ MAINLOOP_MAP = {
 
 
 # Urgencies
-class DBusUrgency(object):
+class DBusUrgency:
     LOW = 0
     NORMAL = 1
     HIGH = 2
@@ -161,10 +161,11 @@ class NotifyDBus(NotifyBase):
     service_url = 'http://www.freedesktop.org/Software/dbus/'
 
     # The default protocols
-    # Python 3 keys() does not return a list object, it's it's own dict_keys()
+    # Python 3 keys() does not return a list object, it is its own dict_keys()
     # object if we were to reference, we wouldn't be backwards compatible with
     # Python v2.  So converting the result set back into a list makes us
     # compatible
+    # TODO: Review after dropping support for Python 2.
     protocol = list(MAINLOOP_MAP.keys())
 
     # A URL that takes you to the setup/help of the specific protocol

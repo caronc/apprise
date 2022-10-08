@@ -24,14 +24,7 @@
 # THE SOFTWARE.
 
 import os
-import six
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
+from unittest import mock
 
 import pytest
 import requests
@@ -188,4 +181,4 @@ def test_plugin_guilded_general(mock_post):
         footer=True, thumbnail=False)
 
     # Test that we get a string response
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True

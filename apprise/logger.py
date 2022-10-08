@@ -66,7 +66,7 @@ logging.Logger.deprecate = deprecate
 logger = logging.getLogger(LOGGER_NAME)
 
 
-class LogCapture(object):
+class LogCapture:
     """
     A class used to allow one to instantiate loggers that write to
     memory for temporary purposes. e.g.:

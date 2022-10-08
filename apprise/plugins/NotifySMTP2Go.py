@@ -315,17 +315,9 @@ class NotifySMTP2Go(NotifyBase):
                     self.logger.debug('I/O Exception: %s' % str(e))
                     return False
 
-        try:
-            sender = formataddr(
-                (self.from_name if self.from_name else False,
-                 self.from_addr), charset='utf-8')
-
-        except TypeError:
-            # Python v2.x Support (no charset keyword)
-            # Format our cc addresses to support the Name field
-            sender = formataddr(
-                (self.from_name if self.from_name else False,
-                 self.from_addr))
+        sender = formataddr(
+            (self.from_name if self.from_name else False,
+             self.from_addr), charset='utf-8')
 
         # Prepare our payload
         payload = {
@@ -369,33 +361,17 @@ class NotifySMTP2Go(NotifyBase):
                 # Strip target out of bcc list if in To
                 bcc = (bcc - set([to_addr[1]]))
 
-                try:
-                    # Prepare our to
-                    to.append(formataddr(to_addr, charset='utf-8'))
-
-                except TypeError:
-                    # Python v2.x Support (no charset keyword)
-                    # Format our cc addresses to support the Name field
-
-                    # Prepare our to
-                    to.append(formataddr(to_addr))
+                # Prepare our `to`
+                to.append(formataddr(to_addr, charset='utf-8'))
 
             # Prepare our To
             payload['to'] = to
 
             if cc:
-                try:
-                    # Format our cc addresses to support the Name field
-                    payload['cc'] = [formataddr(
-                        (self.names.get(addr, False), addr), charset='utf-8')
-                        for addr in cc]
-
-                except TypeError:
-                    # Python v2.x Support (no charset keyword)
-                    # Format our cc addresses to support the Name field
-                    payload['cc'] = [formataddr(  # pragma: no branch
-                        (self.names.get(addr, False), addr))
-                        for addr in cc]
+                # Format our cc addresses to support the Name field
+                payload['cc'] = [formataddr(
+                    (self.names.get(addr, False), addr), charset='utf-8')
+                    for addr in cc]
 
             # Format our bcc addresses to support the Name field
             if bcc:

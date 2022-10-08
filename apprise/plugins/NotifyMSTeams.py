@@ -76,6 +76,7 @@
 import re
 import requests
 import json
+from json.decoder import JSONDecodeError
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
@@ -87,13 +88,6 @@ from ..utils import apply_template
 from ..utils import TemplateType
 from ..AppriseAttachment import AppriseAttachment
 from ..AppriseLocale import gettext_lazy as _
-
-try:
-    from json.decoder import JSONDecodeError
-
-except ImportError:
-    # Python v2.7 Backwards Compatibility support
-    JSONDecodeError = ValueError
 
 
 class NotifyMSTeams(NotifyBase):

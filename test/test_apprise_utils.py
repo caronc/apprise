@@ -27,15 +27,8 @@ from __future__ import print_function
 import re
 import os
 import sys
-import six
 from inspect import cleandoc
-try:
-    # Python 2.7
-    from urllib import unquote
-
-except ImportError:
-    # Python 3.x
-    from urllib.parse import unquote
+from urllib.parse import unquote
 
 from apprise import utils
 from apprise import common
@@ -46,8 +39,6 @@ logging.disable(logging.CRITICAL)
 
 # Ensure we don't create .pyc files for these tests
 sys.dont_write_bytecode = True
-# Python v2.x support requires an environment variable
-os.environ["PYTHONDONTWRITEBYTECODE"] = "1"
 
 
 def test_parse_qsd():
@@ -1937,7 +1928,7 @@ def test_parse_list():
         '.xvid', '.wmv', '.mp4',
     ])
 
-    class StrangeObject(object):
+    class StrangeObject:
         def __str__(self):
             return '.avi'
 
@@ -2541,39 +2532,39 @@ def test_apply_templating():
 
     result = utils.apply_template(
         template, **{'fname': 'Chris', 'whence': 'this morning'})
-    assert isinstance(result, six.string_types) is True
+    assert isinstance(result, str) is True
     assert result == "Hello Chris, How are you this morning?"
 
     # In this example 'whence' isn't provided, so it isn't swapped
     result = utils.apply_template(
         template, **{'fname': 'Chris'})
-    assert isinstance(result, six.string_types) is True
+    assert isinstance(result, str) is True
     assert result == "Hello Chris, How are you {{whence}}?"
 
     # white space won't cause any ill affects:
     template = "Hello {{ fname }}, How are you {{   whence}}?"
     result = utils.apply_template(
         template, **{'fname': 'Chris', 'whence': 'this morning'})
-    assert isinstance(result, six.string_types) is True
+    assert isinstance(result, str) is True
     assert result == "Hello Chris, How are you this morning?"
 
     # No arguments won't cause any problems
     template = "Hello {{fname}}, How are you {{whence}}?"
     result = utils.apply_template(template)
-    assert isinstance(result, six.string_types) is True
+    assert isinstance(result, str) is True
     assert result == template
 
     # Wrong elements are simply ignored
     result = utils.apply_template(
         template,
         **{'fname': 'l2g', 'whence': 'this evening', 'ignore': 'me'})
-    assert isinstance(result, six.string_types) is True
+    assert isinstance(result, str) is True
     assert result == "Hello l2g, How are you this evening?"
 
     # Empty template makes things easy
     result = utils.apply_template(
         "", **{'fname': 'l2g', 'whence': 'this evening'})
-    assert isinstance(result, six.string_types) is True
+    assert isinstance(result, str) is True
     assert result == ""
 
     # Regular expressions are safely escapped and act as normal

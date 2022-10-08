@@ -37,7 +37,6 @@
 #       notica://abc123
 #
 import re
-import six
 import requests
 
 from .NotifyBase import NotifyBase
@@ -47,7 +46,7 @@ from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
 
-class NoticaMode(object):
+class NoticaMode:
     """
     Tracks if we're accessing the notica upstream server or a locally hosted
     one.
@@ -176,7 +175,7 @@ class NotifyNotica(NotifyBase):
 
         # prepare our fullpath
         self.fullpath = kwargs.get('fullpath')
-        if not isinstance(self.fullpath, six.string_types):
+        if not isinstance(self.fullpath, str):
             self.fullpath = '/'
 
         self.headers = {}

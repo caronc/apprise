@@ -24,13 +24,8 @@
 # THE SOFTWARE.
 
 import os
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
+import sys
+from unittest import mock
 
 import pytest
 import requests
@@ -42,6 +37,10 @@ from helpers import AppriseURLTester
 # Disable logging for a cleaner testing output
 import logging
 logging.disable(logging.CRITICAL)
+
+if hasattr(sys, "pypy_version_info"):
+    raise pytest.skip(reason="Skipping test cases which stall on PyPy",
+                      allow_module_level=True)
 
 # Attachment Directory
 TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), 'var')

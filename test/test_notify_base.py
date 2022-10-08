@@ -22,7 +22,6 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
-import six
 import pytest
 from datetime import datetime
 from datetime import timedelta
@@ -156,7 +155,7 @@ def test_notify_base():
     assert nb.color(notify_type='invalid') is None
     assert isinstance(
         nb.color(notify_type=NotifyType.INFO, color_type=None),
-        six.string_types)
+        str)
     assert isinstance(
         nb.color(notify_type=NotifyType.INFO, color_type=int), int)
     assert isinstance(

@@ -23,18 +23,10 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import six
 import requests
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
-
 from apprise import plugins
 from helpers import AppriseURLTester
+from unittest import mock
 
 from json import dumps
 from datetime import datetime
@@ -279,7 +271,7 @@ def test_plugin_reddit_general(mock_post):
     # Variation Initializations
     obj = plugins.NotifyReddit(**kwargs)
     assert isinstance(obj, plugins.NotifyReddit) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
 
     # Dynamically pick up on a link
     assert obj.send(body="http://hostname") is True

@@ -31,13 +31,12 @@
 # https://firebase.google.com/docs/reference/fcm/rest/v1/\
 #       projects.messages#androidnotification
 import re
-import six
 from ...utils import parse_bool
 from ...common import NotifyType
 from ...AppriseAsset import AppriseAsset
 
 
-class FCMColorManager(object):
+class FCMColorManager:
     """
     A Simple object to accept either a boolean value
       - True: Use colors provided by Apprise
@@ -63,7 +62,7 @@ class FCMColorManager(object):
 
         # Prepare our color
         self.color = color
-        if isinstance(color, six.string_types):
+        if isinstance(color, str):
             self.color = self.__color_rgb.match(color)
             if self.color:
                 # Store our RGB value as #rrggbb
@@ -112,16 +111,8 @@ class FCMColorManager(object):
 
     def __bool__(self):
         """
-        Allows this object to be wrapped in an Python 3.x based 'if
-        statement'.  True is returned if a color was loaded
+        Allows this object to be wrapped in an 'if statement'.
+        True is returned if a color was loaded
         """
         return True if self.color is True or \
-            isinstance(self.color, six.string_types) else False
-
-    def __nonzero__(self):
-        """
-        Allows this object to be wrapped in an Python 2.x based 'if
-        statement'.  True is returned if a color was loaded
-        """
-        return True if self.color is True or \
-            isinstance(self.color, six.string_types) else False
+            isinstance(self.color, str) else False

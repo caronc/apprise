@@ -58,7 +58,7 @@ from ..utils import parse_list
 from ..utils import parse_bool
 
 
-class DapnetPriority(object):
+class DapnetPriority:
     NORMAL = 0
     EMERGENCY = 1
 

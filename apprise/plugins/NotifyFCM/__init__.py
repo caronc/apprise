@@ -45,7 +45,6 @@
 #
 # If you Generate a new private key, it will provide a .json file
 # You will need this in order to send an apprise messag
-import six
 import requests
 from json import dumps
 from ..NotifyBase import NotifyBase
@@ -74,7 +73,7 @@ except ImportError:
     # cryptography is the dependency of the .oauth library
 
     # Create a dummy object for init() call to work
-    class GoogleOAuth(object):
+    class GoogleOAuth:
         pass
 
 
@@ -228,7 +227,7 @@ class NotifyFCM(NotifyBase):
         else:
             # Setup our mode
             self.mode = NotifyFCM.template_tokens['mode']['default'] \
-                if not isinstance(mode, six.string_types) else mode.lower()
+                if not isinstance(mode, str) else mode.lower()
             if self.mode and self.mode not in FCM_MODES:
                 msg = 'The FCM mode specified ({}) is invalid.'.format(mode)
                 self.logger.warning(msg)

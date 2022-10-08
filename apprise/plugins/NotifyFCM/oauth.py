@@ -29,7 +29,6 @@
 #  2. Click Generate New Private Key, then confirm by clicking Generate Key.
 #  3. Securely store the JSON file containing the key.
 
-import io
 import requests
 import base64
 import json
@@ -41,26 +40,13 @@ from cryptography.hazmat.primitives import asymmetric
 from cryptography.exceptions import UnsupportedAlgorithm
 from datetime import datetime
 from datetime import timedelta
+from json.decoder import JSONDecodeError
+from urllib.parse import urlencode as _urlencode
+
 from ...logger import logger
 
-try:
-    # Python 2.7
-    from urllib import urlencode as _urlencode
 
-except ImportError:
-    # Python 3.x
-    from urllib.parse import urlencode as _urlencode
-
-try:
-    # Python 3.x
-    from json.decoder import JSONDecodeError
-
-except ImportError:
-    # Python v2.7 Backwards Compatibility support
-    JSONDecodeError = ValueError
-
-
-class GoogleOAuth(object):
+class GoogleOAuth:
     """
     A OAuth simplified implimentation to Google's Firebase Cloud Messaging
 
@@ -127,7 +113,7 @@ class GoogleOAuth(object):
         self.__access_token_expiry = datetime.utcnow()
 
         try:
-            with io.open(path, mode="r", encoding=self.encoding) as fp:
+            with open(path, mode="r", encoding=self.encoding) as fp:
                 self.content = json.loads(fp.read())
 
         except (OSError, IOError):

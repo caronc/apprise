@@ -23,7 +23,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import six
 import pytest
 from apprise.AppriseAsset import AppriseAsset
 from apprise.config.ConfigBase import ConfigBase
@@ -754,9 +753,9 @@ urls:
     assert asset.theme == AppriseAsset().theme
 
     # Empty string assignment
-    assert isinstance(asset.image_url_mask, six.string_types) is True
+    assert isinstance(asset.image_url_mask, str) is True
     assert asset.image_url_mask == ""
-    assert isinstance(asset.image_url_logo, six.string_types) is True
+    assert isinstance(asset.image_url_logo, str) is True
     assert asset.image_url_logo == ""
 
     # For on-lookers looking through this file; here is a perfectly formatted

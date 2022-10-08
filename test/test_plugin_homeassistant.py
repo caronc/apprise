@@ -23,14 +23,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import six
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
+from unittest import mock
 
 import requests
 from apprise import plugins
@@ -149,7 +142,7 @@ def test_plugin_homeassistant_general(mock_post):
     # Variation Initializations
     obj = Apprise.instantiate('hassio://localhost/accesstoken')
     assert isinstance(obj, plugins.NotifyHomeAssistant) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
 
     # Send Notification
     assert obj.send(body="test") is True

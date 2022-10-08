@@ -23,14 +23,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import six
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
+from unittest import mock
 
 import requests
 import pytest
@@ -165,7 +158,7 @@ def test_plugin_twilio_auth(mock_post):
         'twilio://{}:{}@{}/{}'
         .format(account_sid, auth_token, source, dest))
     assert isinstance(obj, plugins.NotifyTwilio) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
 
     # Send Notification
     assert obj.send(body=message_contents) is True
@@ -175,7 +168,7 @@ def test_plugin_twilio_auth(mock_post):
         'twilio://{}:{}@{}/{}?apikey={}'
         .format(account_sid, auth_token, source, dest, apikey))
     assert isinstance(obj, plugins.NotifyTwilio) is True
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
 
     # Send Notification
     assert obj.send(body=message_contents) is True

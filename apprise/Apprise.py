@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import os
-import six
 from itertools import chain
 from . import common
 from .conversion import convert_between
@@ -44,13 +43,13 @@ from .plugins.NotifyBase import NotifyBase
 from . import plugins
 from . import __version__
 
-# Python v3+ support code made importable so it can remain backwards
+# Python v3+ support code made importable, so it can remain backwards
 # compatible with Python v2
+# TODO: Review after dropping support for Python 2.
 from . import py3compat
-ASYNCIO_SUPPORT = not six.PY2
 
 
-class Apprise(object):
+class Apprise:
     """
     Our Notification Manager
 
@@ -124,7 +123,7 @@ class Apprise(object):
         # Prepare our Asset Object
         asset = asset if isinstance(asset, AppriseAsset) else AppriseAsset()
 
-        if isinstance(url, six.string_types):
+        if isinstance(url, str):
             # Acquire our url tokens
             results = plugins.url_to_dict(
                 url, secure_logging=asset.secure_logging)
@@ -247,7 +246,7 @@ class Apprise(object):
             # prepare default asset
             asset = self.asset
 
-        if isinstance(servers, six.string_types):
+        if isinstance(servers, str):
             # build our server list
             servers = parse_urls(servers)
             if len(servers) == 0:
@@ -275,7 +274,7 @@ class Apprise(object):
                 self.servers.append(_server)
                 continue
 
-            elif not isinstance(_server, (six.string_types, dict)):
+            elif not isinstance(_server, (str, dict)):
                 logger.error(
                     "An invalid notification (type={}) was specified.".format(
                         type(_server)))
@@ -306,7 +305,7 @@ class Apprise(object):
 
     def find(self, tag=common.MATCH_ALL_TAG, match_always=True):
         """
-        Returns an list of all servers matching against the tag specified.
+        Returns a list of all servers matching against the tag specified.
 
         """
 
@@ -347,14 +346,14 @@ class Apprise(object):
                body_format=None, tag=common.MATCH_ALL_TAG, match_always=True,
                attach=None, interpret_escapes=None):
         """
-        Send a notification to all of the plugins previously loaded.
+        Send a notification to all the plugins previously loaded.
 
         If the body_format specified is NotifyFormat.MARKDOWN, it will
         be converted to HTML if the Notification type expects this.
 
         if the tag is specified (either a string or a set/list/tuple
         of strings), then only the notifications flagged with that
-        tagged value are notified.  By default all added services
+        tagged value are notified.  By default, all added services
         are notified (tag=MATCH_ALL_TAG)
 
         This function returns True if all notifications were successfully
@@ -363,60 +362,33 @@ class Apprise(object):
         simply having empty configuration files that were read.
 
         Attach can contain a list of attachment URLs.  attach can also be
-        represented by a an AttachBase() (or list of) object(s). This
+        represented by an AttachBase() (or list of) object(s). This
         identifies the products you wish to notify
 
         Set interpret_escapes to True if you want to pre-escape a string
         such as turning a \n into an actual new line, etc.
         """
 
-        if ASYNCIO_SUPPORT:
-            return py3compat.asyncio.tosync(
-                self.async_notify(
-                    body, title,
-                    notify_type=notify_type, body_format=body_format,
-                    tag=tag, match_always=match_always, attach=attach,
-                    interpret_escapes=interpret_escapes,
-                ),
-                debug=self.debug
-            )
-
-        else:
-            try:
-                results = list(
-                    self._notifyall(
-                        Apprise._notifyhandler,
-                        body, title,
-                        notify_type=notify_type, body_format=body_format,
-                        tag=tag, attach=attach,
-                        interpret_escapes=interpret_escapes,
-                    )
-                )
-
-            except TypeError:
-                # No notifications sent, and there was an internal error.
-                return False
-
-            else:
-                if len(results) > 0:
-                    # All notifications sent, return False if any failed.
-                    return all(results)
-
-                else:
-                    # No notifications sent.
-                    return None
+        return py3compat.asyncio.tosync(
+            self.async_notify(
+                body, title,
+                notify_type=notify_type, body_format=body_format,
+                tag=tag, match_always=match_always, attach=attach,
+                interpret_escapes=interpret_escapes,
+            ),
+            debug=self.debug
+        )
 
     def async_notify(self, *args, **kwargs):
         """
-        Send a notification to all of the plugins previously loaded, for
+        Send a notification to all the plugins previously loaded, for
         asynchronous callers. This method is an async method that should be
         awaited on, even if it is missing the async keyword in its signature.
         (This is omitted to preserve syntax compatibility with Python 2.)
 
-        The arguments are identical to those of Apprise.notify(). This method
-        is not available in Python 2.
-        """
+        The arguments are identical to those of Apprise.notify().
 
+        """
         try:
             coroutines = list(
                 self._notifyall(
@@ -477,7 +449,7 @@ class Apprise(object):
                    tag=common.MATCH_ALL_TAG, match_always=True, attach=None,
                    interpret_escapes=None):
         """
-        Creates notifications for all of the plugins loaded.
+        Creates notifications for all the plugins loaded.
 
         Returns a generator that calls handler for each notification. The first
         and only argument supplied to handler is the server, and the keyword
@@ -496,23 +468,11 @@ class Apprise(object):
             raise TypeError(msg)
 
         try:
-            if six.PY2:
-                # Python 2.7 encoding support isn't the greatest, so we try
-                # to ensure that we're ALWAYS dealing with unicode characters
-                # prior to entrying the next part.  This is especially required
-                # for Markdown support
-                if title and isinstance(title, str):  # noqa: F821
-                    title = title.decode(self.asset.encoding)
+            if title and isinstance(title, bytes):
+                title = title.decode(self.asset.encoding)
 
-                if body and isinstance(body, str):  # noqa: F821
-                    body = body.decode(self.asset.encoding)
-
-            else:  # Python 3+
-                if title and isinstance(title, bytes):  # noqa: F821
-                    title = title.decode(self.asset.encoding)
-
-                if body and isinstance(body, bytes):  # noqa: F821
-                    body = body.decode(self.asset.encoding)
+            if body and isinstance(body, bytes):
+                body = body.decode(self.asset.encoding)
 
         except UnicodeDecodeError:
             msg = 'The content passed into Apprise was not of encoding ' \
@@ -580,42 +540,11 @@ class Apprise(object):
                             .encode('ascii', 'backslashreplace')\
                             .decode('unicode-escape')
 
-                    except UnicodeDecodeError:  # pragma: no cover
-                        # This occurs using a very old verion of Python 2.7
-                        # such as the one that ships with CentOS/RedHat 7.x
-                        # (v2.7.5).
-                        conversion_body_map[server.notify_format] = \
-                            conversion_body_map[server.notify_format] \
-                            .decode('string_escape')
-
-                        conversion_title_map[server.notify_format] = \
-                            conversion_title_map[server.notify_format] \
-                            .decode('string_escape')
-
                     except AttributeError:
                         # Must be of string type
                         msg = 'Failed to escape message body'
                         logger.error(msg)
                         raise TypeError(msg)
-
-                if six.PY2:
-                    # Python 2.7 strings must be encoded as utf-8 for
-                    # consistency across all platforms
-                    if conversion_body_map[server.notify_format] and \
-                            isinstance(
-                                conversion_body_map[server.notify_format],
-                                unicode):  # noqa: F821
-                        conversion_body_map[server.notify_format] = \
-                            conversion_body_map[server.notify_format]\
-                            .encode('utf-8')
-
-                    if conversion_title_map[server.notify_format] and \
-                            isinstance(
-                                conversion_title_map[server.notify_format],
-                                unicode):  # noqa: F821
-                        conversion_title_map[server.notify_format] = \
-                            conversion_title_map[server.notify_format]\
-                            .encode('utf-8')
 
             yield handler(
                 server,
@@ -669,12 +598,12 @@ class Apprise(object):
 
             # Standard protocol(s) should be None or a tuple
             protocols = getattr(plugin, 'protocol', None)
-            if isinstance(protocols, six.string_types):
+            if isinstance(protocols, str):
                 protocols = (protocols, )
 
             # Secure protocol(s) should be None or a tuple
             secure_protocols = getattr(plugin, 'secure_protocol', None)
-            if isinstance(secure_protocols, six.string_types):
+            if isinstance(secure_protocols, str):
                 secure_protocols = (secure_protocols, )
 
             # Add our protocol details to our content
@@ -779,15 +708,8 @@ class Apprise(object):
 
     def __bool__(self):
         """
-        Allows the Apprise object to be wrapped in an Python 3.x based 'if
-        statement'.  True is returned if at least one service has been loaded.
-        """
-        return len(self) > 0
-
-    def __nonzero__(self):
-        """
-        Allows the Apprise object to be wrapped in an Python 2.x based 'if
-        statement'.  True is returned if at least one service has been loaded.
+        Allows the Apprise object to be wrapped in an 'if statement'.
+        True is returned if at least one service has been loaded.
         """
         return len(self) > 0
 
@@ -807,7 +729,3 @@ class Apprise(object):
         """
         return sum([1 if not isinstance(s, (ConfigBase, AppriseConfig))
                     else len(s.servers()) for s in self.servers])
-
-
-if six.PY2:
-    del Apprise.async_notify

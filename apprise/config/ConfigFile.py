@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import re
-import io
 import os
 from .ConfigBase import ConfigBase
 from ..common import ConfigFormat
@@ -119,9 +118,7 @@ class ConfigFile(ConfigBase):
         self.throttle()
 
         try:
-            # Python 3 just supports open(), however to remain compatible with
-            # Python 2, we use the io module
-            with io.open(self.path, "rt", encoding=self.encoding) as f:
+            with open(self.path, "rt", encoding=self.encoding) as f:
                 # Store our content for parsing
                 response = f.read()
 

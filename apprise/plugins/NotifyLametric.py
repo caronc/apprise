@@ -85,7 +85,6 @@
 
 
 import re
-import six
 import requests
 from json import dumps
 from .NotifyBase import NotifyBase
@@ -104,7 +103,7 @@ LAMETRIC_APP_ID_DETECTOR_RE = re.compile(
 LAMETRIC_IS_APP_TOKEN = re.compile(r'^[a-z0-9]{80,}==$', re.I)
 
 
-class LametricMode(object):
+class LametricMode:
     """
     Define Lametric Notification Modes
     """
@@ -121,7 +120,7 @@ LAMETRIC_MODES = (
 )
 
 
-class LametricPriority(object):
+class LametricPriority:
     """
     Priority of the message
     """
@@ -158,7 +157,7 @@ LAMETRIC_PRIORITIES = (
 )
 
 
-class LametricIconType(object):
+class LametricIconType:
     """
     Represents the nature of notification.
     """
@@ -184,7 +183,7 @@ LAMETRIC_ICON_TYPES = (
 )
 
 
-class LametricSoundCategory(object):
+class LametricSoundCategory:
     """
     Define Sound Categories
     """
@@ -192,7 +191,7 @@ class LametricSoundCategory(object):
     ALARMS = "alarms"
 
 
-class LametricSound(object):
+class LametricSound:
     """
     There are 2 categories of sounds, to make things simple we just lump them
     all togther in one class object.
@@ -471,7 +470,7 @@ class NotifyLametric(NotifyBase):
         super(NotifyLametric, self).__init__(**kwargs)
 
         self.mode = mode.strip().lower() \
-            if isinstance(mode, six.string_types) \
+            if isinstance(mode, str) \
             else self.template_args['mode']['default']
 
         # Default Cloud Argument
@@ -543,7 +542,7 @@ class NotifyLametric(NotifyBase):
         # assign our icon (if it was defined); we also eliminate
         # any hashtag (#) entries that might be present
         self.icon = re.search(r'[#\s]*(?P<value>.+?)\s*$', icon) \
-            .group('value') if isinstance(icon, six.string_types) else None
+            .group('value') if isinstance(icon, str) else None
 
         if icon_type not in LAMETRIC_ICON_TYPES:
             self.icon_type = self.template_args['icon_type']['default']
@@ -557,7 +556,7 @@ class NotifyLametric(NotifyBase):
                     cycles > self.template_args['cycles']['min']) else cycles
 
         self.sound = None
-        if isinstance(sound, six.string_types):
+        if isinstance(sound, str):
             # If sound is set, get it's match
             self.sound = self.sound_lookup(sound.strip().lower())
             if self.sound is None:

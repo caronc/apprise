@@ -40,7 +40,7 @@ from ..utils import parse_bool
 from ..AppriseLocale import gettext_lazy as _
 
 
-class PagerDutySeverity(object):
+class PagerDutySeverity:
     """
     Defines the Pager Duty Severity Levels
     """
@@ -63,7 +63,7 @@ PAGERDUTY_SEVERITY_MAP = {
 
 
 # Priorities
-class PagerDutyRegion(object):
+class PagerDutyRegion:
     US = 'us'
     EU = 'eu'
 

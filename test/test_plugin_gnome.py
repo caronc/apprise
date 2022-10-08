@@ -23,18 +23,10 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import six
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
-
 import sys
 import types
-import pytest
+from unittest import mock
+
 import apprise
 from helpers import module_reload
 from apprise.plugins.NotifyGnome import GnomeUrgency
@@ -44,7 +36,6 @@ import logging
 logging.disable(logging.CRITICAL)
 
 
-@pytest.mark.skipif(sys.version_info.major <= 2, reason="Requires Python 3.x+")
 def test_plugin_gnome_general():
     """
     NotifyGnome() General Checks
@@ -110,7 +101,7 @@ def test_plugin_gnome_general():
     assert obj.enabled is True
 
     # Test url() call
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
 
     # test notifications
     assert obj.notify(title='title', body='body',

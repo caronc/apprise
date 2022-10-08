@@ -23,37 +23,19 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import pytest
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
-
 import sys
-import six
 import types
-import apprise
+import pytest
+from importlib import reload
+from unittest import mock
 
-try:
-    # Python v3.4+
-    from importlib import reload
-except ImportError:
-    try:
-        # Python v3.0-v3.3
-        from imp import reload
-    except ImportError:
-        # Python v2.7
-        pass
+import apprise
 
 # Disable logging for a cleaner testing output
 import logging
 logging.disable(logging.CRITICAL)
 
 
-@pytest.mark.skipif(sys.version_info.major <= 2, reason="Requires Python 3.x+")
 @pytest.mark.skipif((
     'win32api' in sys.modules or
     'win32con' in sys.modules or
@@ -124,7 +106,7 @@ def test_plugin_windows_mocked():
     obj.duration = 0
 
     # Test URL functionality
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
 
     # Check that it found our mocked environments
     assert obj.enabled is True
@@ -140,7 +122,7 @@ def test_plugin_windows_mocked():
     obj = apprise.Apprise.instantiate(
         'windows://_/?image=True', suppress_exceptions=False)
     obj.duration = 0
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True
@@ -148,14 +130,14 @@ def test_plugin_windows_mocked():
     obj = apprise.Apprise.instantiate(
         'windows://_/?image=False', suppress_exceptions=False)
     obj.duration = 0
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True
 
     obj = apprise.Apprise.instantiate(
         'windows://_/?duration=1', suppress_exceptions=False)
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     # loads okay
     assert obj.duration == 1
     assert obj.notify(
@@ -225,7 +207,7 @@ def test_plugin_windows_native(
     obj.duration = 0
 
     # Test URL functionality
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
 
     # Check that it found our mocked environments
     assert obj.enabled is True
@@ -241,7 +223,7 @@ def test_plugin_windows_native(
     obj = apprise.Apprise.instantiate(
         'windows://_/?image=True', suppress_exceptions=False)
     obj.duration = 0
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True
@@ -249,14 +231,14 @@ def test_plugin_windows_native(
     obj = apprise.Apprise.instantiate(
         'windows://_/?image=False', suppress_exceptions=False)
     obj.duration = 0
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True
 
     obj = apprise.Apprise.instantiate(
         'windows://_/?duration=1', suppress_exceptions=False)
-    assert isinstance(obj.url(), six.string_types) is True
+    assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True

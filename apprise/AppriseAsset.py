@@ -33,7 +33,7 @@ from .common import NotifyType
 from .utils import module_detection
 
 
-class AppriseAsset(object):
+class AppriseAsset:
     """
     Provides a supplimentary class that can be used to provide extra
     information and details that can be used by Apprise such as providing
@@ -107,8 +107,8 @@ class AppriseAsset(object):
     # - NotifyFormat.HTML
     # - None
     #
-    # If no format is specified (hence None), then no special pre-formating
-    # actions will take place during a notificaton. This has been and always
+    # If no format is specified (hence None), then no special pre-formatting
+    # actions will take place during a notification. This has been and always
     # will be the default.
     body_format = None
 

@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import os
-import six
 import re
 import copy
 
@@ -120,27 +119,7 @@ def __load_matrix(path=abspath(dirname(__file__)), name='apprise.plugins'):
         globals()[plugin_name] = plugin
 
         fn = getattr(plugin, 'schemas', None)
-        try:
-            schemas = set([]) if not callable(fn) else fn(plugin)
-
-        except TypeError:
-            # Python v2.x support where functions associated with classes
-            # were considered bound to them and could not be called prior
-            # to the classes initialization.  This code can be dropped
-            # once Python v2.x support is dropped. The below code introduces
-            # replication as it already exists and is tested in
-            # URLBase.schemas()
-            schemas = set([])
-            for key in ('protocol', 'secure_protocol'):
-                schema = getattr(plugin, key, None)
-                if isinstance(schema, six.string_types):
-                    schemas.add(schema)
-
-                elif isinstance(schema, (set, list, tuple)):
-                    # Support iterables list types
-                    for s in schema:
-                        if isinstance(s, six.string_types):
-                            schemas.add(s)
+        schemas = set([]) if not callable(fn) else fn(plugin)
 
         # map our schema to our plugin
         for schema in schemas:
@@ -232,7 +211,7 @@ def _sanitize_token(tokens, default_delimiter):
 
         if 'regex' in tokens[key]:
             # Verify that we are a tuple; convert strings to tuples
-            if isinstance(tokens[key]['regex'], six.string_types):
+            if isinstance(tokens[key]['regex'], str):
                 # Default tuple setup
                 tokens[key]['regex'] = \
                     (tokens[key]['regex'], None)
@@ -473,7 +452,7 @@ def requirements(plugin):
 
     # Get our required packages
     _req_packages = plugin.requirements.get('packages_required')
-    if isinstance(_req_packages, six.string_types):
+    if isinstance(_req_packages, str):
         # Convert to list
         _req_packages = [_req_packages]
 
@@ -485,7 +464,7 @@ def requirements(plugin):
 
     # Get our recommended packages
     _opt_packages = plugin.requirements.get('packages_recommended')
-    if isinstance(_opt_packages, six.string_types):
+    if isinstance(_opt_packages, str):
         # Convert to list
         _opt_packages = [_opt_packages]
 

@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 from __future__ import print_function
-import six
 import sys
 import pytest
 from apprise import Apprise
@@ -33,15 +32,14 @@ from apprise import NotifyFormat
 
 from apprise.common import NOTIFY_SCHEMA_MAP
 
-if not six.PY2:
-    import apprise.py3compat.asyncio as py3aio
+import apprise.py3compat.asyncio as py3aio
 
 # Disable logging for a cleaner testing output
 import logging
 logging.disable(logging.CRITICAL)
 
 
-@pytest.mark.skipif(sys.version_info.major <= 2 or sys.version_info >= (3, 7),
+@pytest.mark.skipif(sys.version_info >= (3, 7),
                     reason="Requires Python 3.0 to 3.6")
 def test_apprise_asyncio_runtime_error():
     """
@@ -112,7 +110,7 @@ def test_apprise_asyncio_runtime_error():
         asyncio.set_event_loop(loop)
 
 
-@pytest.mark.skipif(sys.version_info.major <= 2 or sys.version_info < (3, 7),
+@pytest.mark.skipif(sys.version_info < (3, 7),
                     reason="Requires Python 3.7+")
 def test_apprise_works_in_async_loop():
     """

@@ -33,7 +33,6 @@
 #  - swap http with mmost
 #  - drop /hooks/ reference
 
-import six
 import requests
 from json import dumps
 
@@ -156,7 +155,7 @@ class NotifyMattermost(NotifyBase):
 
         # our full path
         self.fullpath = '' if not isinstance(
-            fullpath, six.string_types) else fullpath.strip()
+            fullpath, str) else fullpath.strip()
 
         # Authorization Token (associated with project)
         self.token = validate_regex(token)

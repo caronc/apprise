@@ -23,7 +23,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import six
 import ctypes
 import locale
 import contextlib
@@ -52,18 +51,11 @@ try:
 except ImportError:
     # gettext isn't available; no problem, just fall back to using
     # the library features without multi-language support.
-    try:
-        # Python v2.7
-        import __builtin__
-        __builtin__.__dict__['_'] = lambda x: x  # pragma: no branch
-
-    except ImportError:
-        # Python v3.4+
-        import builtins
-        builtins.__dict__['_'] = lambda x: x  # pragma: no branch
+    import builtins
+    builtins.__dict__['_'] = lambda x: x  # pragma: no branch
 
 
-class LazyTranslation(object):
+class LazyTranslation:
     """
     Doesn't translate anything until str() or unicode() references
     are made.
@@ -89,7 +81,7 @@ def gettext_lazy(text):
     return LazyTranslation(text=text)
 
 
-class AppriseLocale(object):
+class AppriseLocale:
     """
     A wrapper class to gettext so that we can manipulate multiple lanaguages
     on the fly if required.
@@ -186,7 +178,7 @@ class AppriseLocale(object):
         """
         # We want to only use the 2 character version of this language
         # hence en_CA becomes en, en_US becomes en.
-        if not isinstance(lang, six.string_types):
+        if not isinstance(lang, str):
             if detect_fallback is False:
                 # no detection enabled; we're done
                 return None

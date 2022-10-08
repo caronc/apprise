@@ -24,13 +24,7 @@
 # THE SOFTWARE.
 from __future__ import print_function
 import re
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
+from unittest import mock
 
 import requests
 import json
@@ -47,17 +41,8 @@ from apprise.utils import environ
 from apprise.plugins import __load_matrix
 from apprise.plugins import __reset_matrix
 
+from importlib import reload
 
-try:
-    # Python v3.4+
-    from importlib import reload
-except ImportError:
-    try:
-        # Python v3.0-v3.3
-        from imp import reload
-    except ImportError:
-        # Python v2.7
-        pass
 
 # Disable logging for a cleaner testing output
 import logging
@@ -984,8 +969,7 @@ def test_apprise_cli_plugin_loading(mock_post, tmpdir):
     # We can find our new hook loaded in our NOTIFY_SCHEMA_MAP now...
     assert 'clihook' in NOTIFY_SCHEMA_MAP
 
-    # Store our key after parsing it as a list (this makes this test backwards
-    # compatible with Python 2.x
+    # Capture our key for reference
     key = [k for k in NOTIFY_CUSTOM_MODULE_MAP.keys()][0]
 
     assert len(NOTIFY_CUSTOM_MODULE_MAP[key]['notify']) == 1
@@ -1147,8 +1131,7 @@ def test_apprise_cli_plugin_loading(mock_post, tmpdir):
     assert 'clihook1' in NOTIFY_SCHEMA_MAP
     assert 'clihook2' in NOTIFY_SCHEMA_MAP
 
-    # Store our key after parsing it as a list (this makes this test backwards
-    # compatible with Python 2.x
+    # Capture our key for reference
     key = [k for k in NOTIFY_CUSTOM_MODULE_MAP.keys()][0]
 
     assert len(NOTIFY_CUSTOM_MODULE_MAP[key]['notify']) == 3

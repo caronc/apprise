@@ -74,7 +74,7 @@ OPSGENIE_CATEGORIES = (
 
 
 # Regions
-class OpsgenieRegion(object):
+class OpsgenieRegion:
     US = 'us'
     EU = 'eu'
 
@@ -93,7 +93,7 @@ OPSGENIE_REGIONS = (
 
 
 # Priorities
-class OpsgeniePriority(object):
+class OpsgeniePriority:
     LOW = 1
     MODERATE = 2
     NORMAL = 3

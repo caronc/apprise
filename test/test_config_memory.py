@@ -23,7 +23,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import six
 from apprise.config.ConfigMemory import ConfigMemory
 
 # Disable logging for a cleaner testing output
@@ -46,8 +45,8 @@ def test_config_memory():
     assert len(cm) == 1
 
     # Test general functions
-    assert isinstance(cm.url(), six.string_types) is True
-    assert isinstance(cm.read(), six.string_types) is True
+    assert isinstance(cm.url(), str) is True
+    assert isinstance(cm.read(), str) is True
 
     # Test situation where an auto-detect is required:
     cm = ConfigMemory(content="syslog://")
@@ -56,8 +55,8 @@ def test_config_memory():
     assert len(cm) == 1
 
     # Test general functions
-    assert isinstance(cm.url(), six.string_types) is True
-    assert isinstance(cm.read(), six.string_types) is True
+    assert isinstance(cm.url(), str) is True
+    assert isinstance(cm.read(), str) is True
 
     # Test situation where we can not detect the data
     assert len(ConfigMemory(content="garbage")) == 0

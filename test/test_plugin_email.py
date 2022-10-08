@@ -25,14 +25,7 @@
 
 import os
 import re
-import six
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
+from unittest import mock
 
 import smtplib
 from email.header import decode_header
@@ -330,11 +323,11 @@ def test_plugin_email(mock_smtp, mock_smtpssl):
 
             if isinstance(obj, plugins.NotifyBase):
                 # We loaded okay; now lets make sure we can reverse this url
-                assert isinstance(obj.url(), six.string_types) is True
+                assert isinstance(obj.url(), str) is True
 
                 # Test url() with privacy=True
                 assert isinstance(
-                    obj.url(privacy=True), six.string_types) is True
+                    obj.url(privacy=True), str) is True
 
                 # Some Simple Invalid Instance Testing
                 assert instance.parse_url(None) is None
@@ -564,7 +557,7 @@ def test_plugin_email_smtplib_internationalization(mock_smtp):
         suppress_exceptions=False)
     assert isinstance(obj, plugins.NotifyEmail)
 
-    class SMTPMock(object):
+    class SMTPMock:
         def sendmail(self, *args, **kwargs):
             """
             over-ride sendmail calls so we can check our our
@@ -584,19 +577,11 @@ def test_plugin_email_smtplib_internationalization(mock_smtp):
             # Verify our output was correctly stored
             assert match_from.group('email') == 'user@gmail.com'
 
-            if six.PY2:  # Python 2.x (backwards compatible)
-                assert decode_header(match_from.group('name'))[0][0]\
-                    .decode('utf-8') == u'Например так'
+            assert decode_header(match_from.group('name'))[0][0]\
+                .decode('utf-8') == 'Например так'
 
-                assert decode_header(match_subject.group('subject'))[0][0]\
-                    .decode('utf-8') == u'دعونا نجعل العالم مكانا أفضل.'
-
-            else:  # Python 3+
-                assert decode_header(match_from.group('name'))[0][0]\
-                    .decode('utf-8') == 'Например так'
-
-                assert decode_header(match_subject.group('subject'))[0][0]\
-                    .decode('utf-8') == 'دعونا نجعل العالم مكانا أفضل.'
+            assert decode_header(match_subject.group('subject'))[0][0]\
+                .decode('utf-8') == 'دعونا نجعل العالم مكانا أفضل.'
 
         # Dummy Function
         def quit(self, *args, **kwargs):

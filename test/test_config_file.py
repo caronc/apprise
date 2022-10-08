@@ -23,14 +23,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import six
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
+from unittest import mock
 
 from apprise.config.ConfigFile import ConfigFile
 from apprise.plugins.NotifyBase import NotifyBase
@@ -64,7 +57,7 @@ def test_config_file(tmpdir):
     # one entry added
     assert len(cf) == 1
 
-    assert isinstance(cf.url(), six.string_types) is True
+    assert isinstance(cf.url(), str) is True
 
     # Verify that we're using the same asset
     assert cf[0].asset is asset
@@ -102,8 +95,8 @@ def test_config_file(tmpdir):
         'file://{}?cache=30'.format(str(t)))
     assert isinstance(results, dict)
     cf = ConfigFile(**results)
-    assert isinstance(cf.url(), six.string_types) is True
-    assert isinstance(cf.read(), six.string_types) is True
+    assert isinstance(cf.url(), str) is True
+    assert isinstance(cf.read(), str) is True
 
 
 def test_config_file_exceptions(tmpdir):
@@ -120,7 +113,7 @@ def test_config_file_exceptions(tmpdir):
     cf = ConfigFile(path=str(t), format='text')
 
     # Internal Exception would have been thrown and this would fail
-    with mock.patch('io.open', side_effect=OSError):
+    with mock.patch('builtins.open', side_effect=OSError):
         assert cf.read() is None
 
     # handle case where the file is to large for what was expected:

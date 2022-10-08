@@ -60,7 +60,7 @@ except (ImportError, ValueError, AttributeError):
 
 
 # Urgencies
-class GnomeUrgency(object):
+class GnomeUrgency:
     LOW = 0
     NORMAL = 1
     HIGH = 2

@@ -24,17 +24,8 @@
 # THE SOFTWARE.
 
 import sys
-import six
-import io
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
-
 import pytest
+from unittest import mock
 from apprise import NotifyFormat
 from apprise import ConfigFormat
 from apprise import ContentIncludeMode
@@ -109,7 +100,7 @@ def test_apprise_config(tmpdir):
     assert len(ac.servers()) == 4
 
     # Get our URL back
-    assert isinstance(ac[0].url(), six.string_types)
+    assert isinstance(ac[0].url(), str)
 
     # Test cases where our URL is invalid
     t = tmpdir.mkdir("strange-lines").join("apprise")
@@ -156,13 +147,9 @@ def test_apprise_config(tmpdir):
         # Iñtërnâtiônàlization Testing
         windows://"""
 
-    if six.PY2:
-        # decode string into unicode
-        istr = istr.decode('utf-8')
-
     # Write our content to our file
     t = tmpdir.mkdir("internationalization").join("apprise")
-    with io.open(str(t), 'wb') as f:
+    with open(str(t), 'wb') as f:
         f.write(istr.encode('latin-1'))
 
     # Create ourselves a config object
@@ -191,7 +178,7 @@ def test_apprise_config(tmpdir):
     assert len(ac.servers()) == 1
 
     # Get our URL back
-    assert isinstance(ac[0].url(), six.string_types)
+    assert isinstance(ac[0].url(), str)
 
     # pop an entry from our list
     assert isinstance(ac.pop(0), ConfigBase) is True
@@ -329,7 +316,7 @@ def test_apprise_add_config():
     assert len(ac.servers()) == 3
 
     # Get our URL back
-    assert isinstance(ac[0].url(), six.string_types)
+    assert isinstance(ac[0].url(), str)
 
     # Test invalid content
     assert ac.add_config(content=object()) is False
@@ -1012,13 +999,13 @@ def test_configmatrix_dynamic_importing(tmpdir):
     # Test no app_id
     base.join('ConfigBadFile1.py').write(
         """
-class ConfigBadFile1(object):
+class ConfigBadFile1:
     pass""")
 
     # No class of the same name
     base.join('ConfigBadFile2.py').write(
         """
-class BadClassName(object):
+class BadClassName:
     pass""")
 
     # Exception thrown

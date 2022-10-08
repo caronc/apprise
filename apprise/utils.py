@@ -24,7 +24,6 @@
 # THE SOFTWARE.
 
 import re
-import six
 import sys
 import json
 import contextlib
@@ -36,63 +35,40 @@ from functools import reduce
 from . import common
 from .logger import logger
 
-try:
-    # Python 2.7
-    from urllib import unquote
-    from urllib import quote
-    from urlparse import urlparse
-    from urllib import urlencode as _urlencode
+from urllib.parse import unquote
+from urllib.parse import quote
+from urllib.parse import urlparse
+from urllib.parse import urlencode as _urlencode
 
-    import imp
+import importlib.util
 
-    def import_module(path, name):
-        """
-        Load our module based on path
-        """
-        try:
-            return imp.load_source(name, path)
 
-        except Exception as e:
-            logger.debug(
-                'Custom module exception raised from %s (name=%s) %s',
-                path, name, str(e))
+def import_module(path, name):
+    """
+    Load our module based on path
+    """
+    # if path.endswith('test_module_detection0/a/hook.py'):
+    #     import pdb
+    #     pdb.set_trace()
 
-        return None
+    spec = importlib.util.spec_from_file_location(name, path)
+    try:
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[name] = module
 
-except ImportError:
-    # Python 3.5+
-    from urllib.parse import unquote
-    from urllib.parse import quote
-    from urllib.parse import urlparse
-    from urllib.parse import urlencode as _urlencode
+        spec.loader.exec_module(module)
 
-    import importlib.util
+    except Exception as e:
+        # module isn't loadable
+        del sys.modules[name]
+        module = None
 
-    def import_module(path, name):
-        """
-        Load our module based on path
-        """
-        # if path.endswith('test_module_detection0/a/hook.py'):
-        #     import pdb
-        #     pdb.set_trace()
+        logger.debug(
+            'Custom module exception raised from %s (name=%s) %s',
+            path, name, str(e))
 
-        spec = importlib.util.spec_from_file_location(name, path)
-        try:
-            module = importlib.util.module_from_spec(spec)
-            sys.modules[name] = module
+    return module
 
-            spec.loader.exec_module(module)
-
-        except Exception as e:
-            # module isn't loadable
-            del sys.modules[name]
-            module = None
-
-            logger.debug(
-                'Custom module exception raised from %s (name=%s) %s',
-                path, name, str(e))
-
-        return module
 
 # Hash of all paths previously scanned so we don't waste effort/overhead doing
 # it again
@@ -226,7 +202,7 @@ UUID4_RE = re.compile(
 REGEX_VALIDATE_LOOKUP = {}
 
 
-class TemplateType(object):
+class TemplateType:
     """
     Defines the different template types we can perform parsing on
     """
@@ -690,7 +666,7 @@ def parse_url(url, default_schema='http', verify_host=True, strict_port=False,
 
     """
 
-    if not isinstance(url, six.string_types):
+    if not isinstance(url, str):
         # Simple error checking
         return None
 
@@ -862,10 +838,10 @@ def parse_url(url, default_schema='http', verify_host=True, strict_port=False,
 
     # Re-assemble cleaned up version of the url
     result['url'] = '%s://' % result['schema']
-    if isinstance(result.get('user'), six.string_types):
+    if isinstance(result.get('user'), str):
         result['url'] += result['user']
 
-        if isinstance(result.get('password'), six.string_types):
+        if isinstance(result.get('password'), str):
             result['url'] += ':%s@' % result['password']
 
         else:
@@ -900,7 +876,7 @@ def parse_bool(arg, default=False):
     If the content could not be parsed, then the default is returned.
     """
 
-    if isinstance(arg, six.string_types):
+    if isinstance(arg, str):
         # no = no - False
         # of = short for off - False
         # 0  = int for False
@@ -930,20 +906,15 @@ def parse_bool(arg, default=False):
     return bool(arg)
 
 
-def parse_phone_no(*args, **kwargs):
+def parse_phone_no(*args, store_unparseable=True, **kwargs):
     """
     Takes a string containing phone numbers separated by comma's and/or spaces
     and returns a list.
     """
 
-    # for Python 2.7 support, store_unparsable is not in the url above
-    # as just parse_emails(*args, store_unparseable=True) since it is
-    # an invalid syntax.  This is the workaround to be backards compatible:
-    store_unparseable = kwargs.get('store_unparseable', True)
-
     result = []
     for arg in args:
-        if isinstance(arg, six.string_types) and arg:
+        if isinstance(arg, str) and arg:
             _result = PHONE_NO_DETECTION_RE.findall(arg)
             if _result:
                 result += _result
@@ -967,20 +938,15 @@ def parse_phone_no(*args, **kwargs):
     return result
 
 
-def parse_call_sign(*args, **kwargs):
+def parse_call_sign(*args, store_unparseable=True, **kwargs):
     """
     Takes a string containing ham radio call signs separated by
     comma and/or spacesand returns a list.
     """
 
-    # for Python 2.7 support, store_unparsable is not in the url above
-    # as just parse_emails(*args, store_unparseable=True) since it is
-    # an invalid syntax.  This is the workaround to be backards compatible:
-    store_unparseable = kwargs.get('store_unparseable', True)
-
     result = []
     for arg in args:
-        if isinstance(arg, six.string_types) and arg:
+        if isinstance(arg, str) and arg:
             _result = CALL_SIGN_DETECTION_RE.findall(arg)
             if _result:
                 result += _result
@@ -1004,20 +970,15 @@ def parse_call_sign(*args, **kwargs):
     return result
 
 
-def parse_emails(*args, **kwargs):
+def parse_emails(*args, store_unparseable=True, **kwargs):
     """
     Takes a string containing emails separated by comma's and/or spaces and
     returns a list.
     """
 
-    # for Python 2.7 support, store_unparsable is not in the url above
-    # as just parse_emails(*args, store_unparseable=True) since it is
-    # an invalid syntax.  This is the workaround to be backards compatible:
-    store_unparseable = kwargs.get('store_unparseable', True)
-
     result = []
     for arg in args:
-        if isinstance(arg, six.string_types) and arg:
+        if isinstance(arg, str) and arg:
             _result = EMAIL_DETECTION_RE.findall(arg)
             if _result:
                 result += _result
@@ -1040,20 +1001,15 @@ def parse_emails(*args, **kwargs):
     return result
 
 
-def parse_urls(*args, **kwargs):
+def parse_urls(*args, store_unparseable=True, **kwargs):
     """
     Takes a string containing URLs separated by comma's and/or spaces and
     returns a list.
     """
 
-    # for Python 2.7 support, store_unparsable is not in the url above
-    # as just parse_urls(*args, store_unparseable=True) since it is
-    # an invalid syntax.  This is the workaround to be backards compatible:
-    store_unparseable = kwargs.get('store_unparseable', True)
-
     result = []
     for arg in args:
-        if isinstance(arg, six.string_types) and arg:
+        if isinstance(arg, str) and arg:
             _result = URL_DETECTION_RE.findall(arg)
             if _result:
                 result += _result
@@ -1140,15 +1096,9 @@ def urlencode(query, doseq=False, safe='', encoding=None, errors=None):
     """
     # Tidy query by eliminating any records set to None
     _query = {k: v for (k, v) in query.items() if v is not None}
-    try:
-        # Python v3.x
-        return _urlencode(
-            _query, doseq=doseq, safe=safe, encoding=encoding,
-            errors=errors)
-
-    except TypeError:
-        # Python v2.7
-        return _urlencode(_query)
+    return _urlencode(
+        _query, doseq=doseq, safe=safe, encoding=encoding,
+        errors=errors)
 
 
 def parse_list(*args):
@@ -1174,7 +1124,7 @@ def parse_list(*args):
 
     result = []
     for arg in args:
-        if isinstance(arg, six.string_types):
+        if isinstance(arg, str):
             result += re.split(STRING_DELIMITERS, arg)
 
         elif isinstance(arg, (set, list, tuple)):
@@ -1183,9 +1133,10 @@ def parse_list(*args):
     #
     # filter() eliminates any empty entries
     #
-    # Since Python v3 returns a filter (iterator) where-as Python v2 returned
+    # Since Python v3 returns a filter (iterator) whereas Python v2 returned
     # a list, we need to change it into a list object to remain compatible with
     # both distribution types.
+    # TODO: Review after dropping support for Python 2.
     return sorted([x for x in filter(bool, list(set(result)))])
 
 
@@ -1211,7 +1162,7 @@ def is_exclusive_match(logic, data, match_all=common.MATCH_ALL_TAG,
     to all specified logic searches.
     """
 
-    if isinstance(logic, six.string_types):
+    if isinstance(logic, str):
         # Update our logic to support our delimiters
         logic = set(parse_list(logic))
 
@@ -1234,7 +1185,7 @@ def is_exclusive_match(logic, data, match_all=common.MATCH_ALL_TAG,
 
     # Every entry here will be or'ed with the next
     for entry in logic:
-        if not isinstance(entry, (six.string_types, list, tuple, set)):
+        if not isinstance(entry, (str, list, tuple, set)):
             # Garbage entry in our logic found
             return False
 
@@ -1300,7 +1251,7 @@ def validate_regex(value, regex=r'[^\s]+', flags=re.I, strip=True, fmt=None):
             'x': re.X,
         }
 
-        if isinstance(flags, six.string_types):
+        if isinstance(flags, str):
             # Convert a string of regular expression flags into their
             # respected integer (expected) Python values and perform
             # a bit-wise or on each match found:
@@ -1355,7 +1306,7 @@ def cwe312_word(word, force=False, advanced=True, threshold=5):
     reached, then content is considered secret
     """
 
-    class Variance(object):
+    class Variance:
         """
         A Simple List of Possible Character Variances
         """
@@ -1368,7 +1319,7 @@ def cwe312_word(word, force=False, advanced=True, threshold=5):
         # A Numerical Character (1234... etc)
         NUMERIC = 'n'
 
-    if not (isinstance(word, six.string_types) and word.strip()):
+    if not (isinstance(word, str) and word.strip()):
         # not a password if it's not something we even support
         return word
 
@@ -1594,7 +1545,7 @@ def module_detection(paths, cache=True):
     module_re = re.compile(
         r'^(?P<name>[_a-z0-9][a-z0-9._-]+)?(\.py)?$', re.I)
 
-    if isinstance(paths, six.string_types):
+    if isinstance(paths, str):
         paths = [paths, ]
 
     if not paths or not isinstance(paths, (tuple, list)):
