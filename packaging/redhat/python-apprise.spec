@@ -93,6 +93,12 @@ Requires: python%{python3_pkgversion}-cryptography
 Requires: python%{python3_pkgversion}-yaml
 
 %if %{with tests}
+%if 0%{?rhel} >= 9
+# Do not import python3-mock
+%else
+# python-mock switched to unittest.mock
+BuildRequires: python%{python3_pkgversion}-mock
+%endif
 BuildRequires: python%{python3_pkgversion}-pytest
 BuildRequires: python%{python3_pkgversion}-pytest-runner
 %endif
@@ -104,6 +110,14 @@ BuildRequires: python%{python3_pkgversion}-pytest-runner
 %if 0%{?rhel} && 0%{?rhel} <= 8
 # Rocky/RHEL 8 click v6.7 unit testing support
 %patch0 -p1
+%endif
+
+%if 0%{?rhel} >= 9
+# Do nothing
+%else
+# CentOS 8.x requires python-mock (cororlates with import ab)ve
+find test -type f -name '*.py' -exec \
+   sed -i -e 's|^from unittest import mock|import mock|g' {} \;
 %endif
 
 %build
