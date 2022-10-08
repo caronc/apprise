@@ -35,17 +35,17 @@ Apprise is a Python package for simplifying access to all of the different
 notification services that are out there. Apprise opens the door and makes
 it easy to access:
 
-Apprise API, AWS SES, AWS SNS, Bark, Boxcar, ClickSend, DAPNET, DingTalk,
-Discord, E-Mail, Emby, Faast, FCM, Flock, Gitter, Google Chat, Gotify, Growl,
-Guilded, Home Assistant, IFTTT, Join, Kavenegar, KODI, Kumulos, LaMetric,
-Line, MacOSX, Mailgun, Mattermost, Matrix, Microsoft Windows, Microsoft Teams,
-MessageBird, MQTT, MSG91, MyAndroid, Nexmo, Nextcloud, NextcloudTalk, Notica,
-Notifico, ntfy, Office365, OneSignal, Opsgenie, PagerDuty, ParsePlatform,
-PopcornNotify, Prowl, Pushalot, PushBullet, Pushjet, Pushover, PushSafer,
-Reddit, Rocket.Chat, SendGrid, ServerChan, Signal, SimplePush, Sinch, Slack,
-SMSEagle, SMTP2Go, Spontit, SparkPost, Super Toasty, Streamlabs, Stride,
-Syslog, Techulus Push, Telegram, Twilio, Twitter, Twist, XBMC, Vonage, Webex
-Teams}
+Apprise API, AWS SES, AWS SNS, Bark, BulkSMS, Boxcar, ClickSend, DAPNET,
+DingTalk, Discord, E-Mail, Emby, Faast, FCM, Flock, Gitter, Google Chat,
+Gotify, Growl, Guilded, Home Assistant, IFTTT, Join, Kavenegar, KODI, Kumulos,
+LaMetric, Line, MacOSX, Mailgun, Mattermost, Matrix, Microsoft Windows,
+Microsoft Teams, MessageBird, MQTT, MSG91, MyAndroid, Nexmo, Nextcloud,
+NextcloudTalk, Notica, Notifico, ntfy, Office365, OneSignal, Opsgenie,
+PagerDuty, ParsePlatform, PopcornNotify, Prowl, Pushalot, PushBullet, Pushjet,
+Pushover, PushSafer, Reddit, Rocket.Chat, SendGrid, ServerChan, Signal,
+SimplePush, Sinch, Slack, SMSEagle, SMTP2Go, Spontit, SparkPost, Super Toasty,
+Streamlabs, Stride, Syslog, Techulus Push, Telegram, Twilio, Twitter, Twist,
+XBMC, Vonage, Webex Teams}
 
 Name:           python-%{pypi_name}
 Version:        1.0.0
