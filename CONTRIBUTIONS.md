@@ -24,6 +24,8 @@ The contributors have been listed in chronological order:
 
 * Andreas Motl <andreas@getkotori.org>
   * Mar 2020 - Fix XMPP Support
+  * Oct 2022 - Drop support for Python 2
+  * Oct 2022 - Add support for Python 3.11
 
 * Joey Espinosa <@particledecay>
   * Apr 3rd 2022 - Added Ntfy Support
