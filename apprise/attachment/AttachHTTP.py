@@ -61,7 +61,7 @@ class AttachHTTP(AttachBase):
         additionally include as part of the server headers to post with
 
         """
-        super(AttachHTTP, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.schema = 'https' if self.secure else 'http'
 
@@ -254,7 +254,7 @@ class AttachHTTP(AttachBase):
             self._temp_file.close()
             self._temp_file = None
 
-        super(AttachHTTP, self).invalidate()
+        super().invalidate()
 
     def url(self, privacy=False, *args, **kwargs):
         """

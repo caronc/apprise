@@ -467,7 +467,7 @@ class NotifyLametric(NotifyBase):
         """
         Initialize LaMetric Object
         """
-        super(NotifyLametric, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.mode = mode.strip().lower() \
             if isinstance(mode, str) \

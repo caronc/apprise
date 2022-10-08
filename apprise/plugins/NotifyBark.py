@@ -204,7 +204,7 @@ class NotifyBark(NotifyBase):
         """
         Initialize Notify Bark Object
         """
-        super(NotifyBark, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Prepare our URL
         self.notify_url = '%s://%s%s/push' % (

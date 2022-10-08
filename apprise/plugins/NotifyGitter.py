@@ -137,7 +137,7 @@ class NotifyGitter(NotifyBase):
         """
         Initialize Gitter Object
         """
-        super(NotifyGitter, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Secret Key (associated with project)
         self.token = validate_regex(

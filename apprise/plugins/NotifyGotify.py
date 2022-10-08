@@ -155,7 +155,7 @@ class NotifyGotify(NotifyBase):
         Initialize Gotify Object
 
         """
-        super(NotifyGotify, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Token (associated with project)
         self.token = validate_regex(token)

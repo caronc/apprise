@@ -50,7 +50,7 @@ class AttachFile(AttachBase):
         Initialize Local File Attachment Object
 
         """
-        super(AttachFile, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Store path but mark it dirty since we have not performed any
         # verification at this point.

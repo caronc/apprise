@@ -173,7 +173,7 @@ class NotifyOffice365(NotifyBase):
         """
         Initialize Office 365 Object
         """
-        super(NotifyOffice365, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Tenant identifier
         self.tenant = validate_regex(

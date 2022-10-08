@@ -149,7 +149,7 @@ class NotifyKavenegar(NotifyBase):
         """
         Initialize Kavenegar Object
         """
-        super(NotifyKavenegar, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # API Key (associated with project)
         self.apikey = validate_regex(

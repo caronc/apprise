@@ -223,7 +223,7 @@ class NotifyMQTT(NotifyBase):
         Initialize MQTT Object
         """
 
-        super(NotifyMQTT, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Initialize topics
         self.topics = parse_list(targets)

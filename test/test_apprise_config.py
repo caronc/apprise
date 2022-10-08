@@ -233,7 +233,7 @@ def test_apprise_multi_config_entries(tmpdir):
     # Define our good:// url
     class GoodNotification(NotifyBase):
         def __init__(self, **kwargs):
-            super(GoodNotification, self).__init__(
+            super().__init__(
                 notify_format=NotifyFormat.HTML, **kwargs)
 
         def notify(self, **kwargs):
@@ -454,7 +454,7 @@ def test_apprise_config_instantiate():
         allow_cross_includes = ContentIncludeMode.ALWAYS
 
         def __init__(self, **kwargs):
-            super(BadConfig, self).__init__(**kwargs)
+            super().__init__(**kwargs)
 
             # We fail whenever we're initialized
             raise TypeError()
@@ -487,7 +487,7 @@ def test_invalid_apprise_config(tmpdir):
         allow_cross_includes = ContentIncludeMode.ALWAYS
 
         def __init__(self, **kwargs):
-            super(BadConfig, self).__init__(**kwargs)
+            super().__init__(**kwargs)
 
             # We intentionally fail whenever we're initialized
             raise TypeError()
@@ -551,7 +551,7 @@ def test_apprise_config_with_apprise_obj(tmpdir):
     # Define our good:// url
     class GoodNotification(NotifyBase):
         def __init__(self, **kwargs):
-            super(GoodNotification, self).__init__(
+            super().__init__(
                 notify_format=NotifyFormat.HTML, **kwargs)
 
         def notify(self, **kwargs):

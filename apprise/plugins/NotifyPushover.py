@@ -251,7 +251,7 @@ class NotifyPushover(NotifyBase):
         """
         Initialize Pushover Object
         """
-        super(NotifyPushover, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Access Token (associated with project)
         self.token = validate_regex(token)

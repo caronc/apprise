@@ -48,7 +48,7 @@ def test_apprise_asyncio_runtime_error():
     """
     class GoodNotification(NotifyBase):
         def __init__(self, **kwargs):
-            super(GoodNotification, self).__init__(
+            super().__init__(
                 notify_format=NotifyFormat.HTML, **kwargs)
 
         def url(self, **kwargs):
@@ -119,7 +119,7 @@ def test_apprise_works_in_async_loop():
     """
     class GoodNotification(NotifyBase):
         def __init__(self, **kwargs):
-            super(GoodNotification, self).__init__(
+            super().__init__(
                 notify_format=NotifyFormat.HTML, **kwargs)
 
         def url(self, **kwargs):

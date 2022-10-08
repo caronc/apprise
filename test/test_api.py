@@ -180,7 +180,7 @@ def apprise_test(do_notify):
 
     class BadNotification(NotifyBase):
         def __init__(self, **kwargs):
-            super(BadNotification, self).__init__(**kwargs)
+            super().__init__(**kwargs)
 
             # We fail whenever we're initialized
             raise TypeError()
@@ -196,7 +196,7 @@ def apprise_test(do_notify):
 
     class GoodNotification(NotifyBase):
         def __init__(self, **kwargs):
-            super(GoodNotification, self).__init__(
+            super().__init__(
                 notify_format=NotifyFormat.HTML, **kwargs)
 
         def url(self, **kwargs):
@@ -736,7 +736,7 @@ def test_apprise_notify_formats(tmpdir):
         notify_format = NotifyFormat.TEXT
 
         def __init__(self, **kwargs):
-            super(TextNotification, self).__init__()
+            super().__init__()
 
         def notify(self, **kwargs):
             # Pretend everything is okay
@@ -752,7 +752,7 @@ def test_apprise_notify_formats(tmpdir):
         notify_format = NotifyFormat.HTML
 
         def __init__(self, **kwargs):
-            super(HtmlNotification, self).__init__()
+            super().__init__()
 
         def notify(self, **kwargs):
             # Pretend everything is okay
@@ -768,7 +768,7 @@ def test_apprise_notify_formats(tmpdir):
         notify_format = NotifyFormat.MARKDOWN
 
         def __init__(self, **kwargs):
-            super(MarkDownNotification, self).__init__()
+            super().__init__()
 
         def notify(self, **kwargs):
             # Pretend everything is okay
@@ -990,7 +990,7 @@ def test_apprise_disabled_plugins():
         service_name = 'na02'
 
         def __init__(self, *args, **kwargs):
-            super(TestDisabled02Notification, self).__init__(**kwargs)
+            super().__init__(**kwargs)
 
             # enable state changes **AFTER** we initialize
             self.enabled = False

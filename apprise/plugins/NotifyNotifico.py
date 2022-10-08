@@ -160,7 +160,7 @@ class NotifyNotifico(NotifyBase):
         """
         Initialize Notifico Object
         """
-        super(NotifyNotifico, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Assign our message hook
         self.project_id = validate_regex(

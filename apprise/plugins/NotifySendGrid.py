@@ -159,7 +159,7 @@ class NotifySendGrid(NotifyBase):
         """
         Initialize Notify SendGrid Object
         """
-        super(NotifySendGrid, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # API Key (associated with project)
         self.apikey = validate_regex(

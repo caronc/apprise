@@ -179,7 +179,7 @@ class NotifyDapnet(NotifyBase):
         """
         Initialize Dapnet Object
         """
-        super(NotifyDapnet, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Parse our targets
         self.targets = list()

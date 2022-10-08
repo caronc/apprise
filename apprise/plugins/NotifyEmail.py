@@ -419,7 +419,7 @@ class NotifyEmail(NotifyBase):
         The smtp_host and secure_mode can be automatically detected depending
         on how the URL was built
         """
-        super(NotifyEmail, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Handle SMTP vs SMTPS (Secure vs UnSecure)
         if not self.port:

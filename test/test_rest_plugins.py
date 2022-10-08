@@ -77,7 +77,7 @@ def test_notify_overflow_truncate():
         title_maxlen = 10
 
         def __init__(self, *args, **kwargs):
-            super(TestNotification, self).__init__(**kwargs)
+            super().__init__(**kwargs)
 
         def notify(self, *args, **kwargs):
             # Pretend everything is okay
@@ -114,7 +114,7 @@ def test_notify_overflow_truncate():
         body_max_line_count = 5
 
         def __init__(self, *args, **kwargs):
-            super(TestNotification, self).__init__(**kwargs)
+            super().__init__(**kwargs)
 
         def notify(self, *args, **kwargs):
             # Pretend everything is okay
@@ -145,7 +145,7 @@ def test_notify_overflow_truncate():
         body_maxlen = 10
 
         def __init__(self, *args, **kwargs):
-            super(TestNotification, self).__init__(**kwargs)
+            super().__init__(**kwargs)
 
         def notify(self, *args, **kwargs):
             # Pretend everything is okay
@@ -175,7 +175,7 @@ def test_notify_overflow_truncate():
         body_maxlen = 100
 
         def __init__(self, *args, **kwargs):
-            super(TestNotification, self).__init__(**kwargs)
+            super().__init__(**kwargs)
 
         def notify(self, *args, **kwargs):
             # Pretend everything is okay
@@ -250,7 +250,7 @@ def test_notify_overflow_split():
         title_maxlen = 10
 
         def __init__(self, *args, **kwargs):
-            super(TestNotification, self).__init__(**kwargs)
+            super().__init__(**kwargs)
 
         def notify(self, *args, **kwargs):
             # Pretend everything is okay
@@ -280,7 +280,7 @@ def test_notify_overflow_split():
         body_max_line_count = 5
 
         def __init__(self, *args, **kwargs):
-            super(TestNotification, self).__init__(**kwargs)
+            super().__init__(**kwargs)
 
         def notify(self, *args, **kwargs):
             # Pretend everything is okay
@@ -311,7 +311,7 @@ def test_notify_overflow_split():
         body_maxlen = int(body_len / 4)
 
         def __init__(self, *args, **kwargs):
-            super(TestNotification, self).__init__(**kwargs)
+            super().__init__(**kwargs)
 
         def notify(self, *args, **kwargs):
             # Pretend everything is okay
@@ -348,7 +348,7 @@ def test_notify_overflow_split():
         body_maxlen = int(title_len / 4)
 
         def __init__(self, *args, **kwargs):
-            super(TestNotification, self).__init__(**kwargs)
+            super().__init__(**kwargs)
 
         def notify(self, *args, **kwargs):
             # Pretend everything is okay
@@ -411,7 +411,7 @@ def test_notify_overflow_general():
         notify_format = NotifyFormat.MARKDOWN
 
         def __init__(self, *args, **kwargs):
-            super(TestMarkdownNotification, self).__init__(**kwargs)
+            super().__init__(**kwargs)
 
         def notify(self, *args, **kwargs):
             # Pretend everything is okay

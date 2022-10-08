@@ -130,7 +130,7 @@ class NotifyParsePlatform(NotifyBase):
         """
         Initialize Parse Platform Object
         """
-        super(NotifyParsePlatform, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.fullpath = kwargs.get('fullpath')
         if not isinstance(self.fullpath, str):

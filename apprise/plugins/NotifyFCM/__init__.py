@@ -218,7 +218,7 @@ class NotifyFCM(NotifyBase):
         Initialize Firebase Cloud Messaging
 
         """
-        super(NotifyFCM, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         if mode is None:
             # Detect our mode

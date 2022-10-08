@@ -46,7 +46,7 @@ class ConfigMemory(ConfigBase):
         Memory objects just store the raw configuration in memory.  There is
         no external reference point. It's always considered cached.
         """
-        super(ConfigMemory, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Store our raw config into memory
         self.content = content

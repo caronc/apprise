@@ -75,7 +75,7 @@ class ConfigHTTP(ConfigBase):
         additionally include as part of the server headers to post with
 
         """
-        super(ConfigHTTP, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.schema = 'https' if self.secure else 'http'
 

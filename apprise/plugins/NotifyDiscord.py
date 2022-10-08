@@ -164,7 +164,7 @@ class NotifyDiscord(NotifyBase):
         Initialize Discord Object
 
         """
-        super(NotifyDiscord, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Webhook ID (associated with project)
         self.webhook_id = validate_regex(webhook_id)

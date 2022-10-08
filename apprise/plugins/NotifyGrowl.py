@@ -187,7 +187,7 @@ class NotifyGrowl(NotifyBase):
         """
         Initialize Growl Object
         """
-        super(NotifyGrowl, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         if not self.port:
             self.port = self.default_port

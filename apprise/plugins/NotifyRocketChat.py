@@ -188,7 +188,7 @@ class NotifyRocketChat(NotifyBase):
         """
         Initialize Notify Rocket.Chat Object
         """
-        super(NotifyRocketChat, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Set our schema
         self.schema = 'https' if self.secure else 'http'

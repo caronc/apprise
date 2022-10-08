@@ -99,7 +99,7 @@ class HTMLConverter(HTMLParser, object):
     BLOCK_END = {}
 
     def __init__(self, **kwargs):
-        super(HTMLConverter, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Shoudl we store the text content or not?
         self._do_store = True

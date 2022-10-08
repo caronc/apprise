@@ -400,7 +400,7 @@ class NotifyPushSafer(NotifyBase):
         """
         Initialize PushSafer Object
         """
-        super(NotifyPushSafer, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         #
         # Priority

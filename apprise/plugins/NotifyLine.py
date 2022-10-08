@@ -114,7 +114,7 @@ class NotifyLine(NotifyBase):
         """
         Initialize Line Object
         """
-        super(NotifyLine, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Long-Lived Access token (generated from User Profile)
         self.token = validate_regex(token)

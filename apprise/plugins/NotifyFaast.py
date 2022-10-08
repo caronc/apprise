@@ -84,7 +84,7 @@ class NotifyFaast(NotifyBase):
         """
         Initialize Faast Object
         """
-        super(NotifyFaast, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Store the Authentication Token
         self.authtoken = validate_regex(authtoken)

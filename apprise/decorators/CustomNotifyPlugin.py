@@ -134,7 +134,7 @@ class CustomNotifyPlugin(NotifyBase):
 
                 """
                 #  init parent
-                super(CustomNotifyPluginWrapper, self).__init__(**kwargs)
+                super().__init__(**kwargs)
 
                 self._default_args = {}
 

@@ -135,7 +135,7 @@ class NotifyJSON(NotifyBase):
         additionally include as part of the server headers to post with
 
         """
-        super(NotifyJSON, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.fullpath = kwargs.get('fullpath')
         if not isinstance(self.fullpath, str):

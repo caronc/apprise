@@ -124,7 +124,7 @@ class NotifyMacOSX(NotifyBase):
         Initialize MacOSX Object
         """
 
-        super(NotifyMacOSX, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Track whether or not we want to send an image with our notification
         # or not.

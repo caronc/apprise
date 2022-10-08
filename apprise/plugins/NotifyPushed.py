@@ -120,7 +120,7 @@ class NotifyPushed(NotifyBase):
         Initialize Pushed Object
 
         """
-        super(NotifyPushed, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Application Key (associated with project)
         self.app_key = validate_regex(app_key)

@@ -278,7 +278,7 @@ class NotifySlack(NotifyBase):
         """
         Initialize Slack Object
         """
-        super(NotifySlack, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Setup our mode
         self.mode = SlackMode.BOT if access_token else SlackMode.WEBHOOK

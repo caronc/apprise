@@ -132,7 +132,7 @@ class NotifyClickSend(NotifyBase):
         """
         Initialize ClickSend Object
         """
-        super(NotifyClickSend, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Prepare Batch Mode Flag
         self.batch = batch

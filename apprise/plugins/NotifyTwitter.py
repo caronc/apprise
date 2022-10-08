@@ -194,7 +194,7 @@ class NotifyTwitter(NotifyBase):
         Initialize Twitter Object
 
         """
-        super(NotifyTwitter, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.ckey = validate_regex(ckey)
         if not self.ckey:

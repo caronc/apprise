@@ -140,7 +140,7 @@ class NotifyXML(NotifyBase):
         additionally include as part of the server headers to post with
 
         """
-        super(NotifyXML, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.payload = """<?xml version='1.0' encoding='utf-8'?>
 <soapenv:Envelope

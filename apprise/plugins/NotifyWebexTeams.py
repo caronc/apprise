@@ -125,7 +125,7 @@ class NotifyWebexTeams(NotifyBase):
         """
         Initialize Webex Teams Object
         """
-        super(NotifyWebexTeams, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # The token associated with the account
         self.token = validate_regex(

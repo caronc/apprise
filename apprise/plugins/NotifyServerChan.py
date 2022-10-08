@@ -79,7 +79,7 @@ class NotifyServerChan(NotifyBase):
         """
         Initialize ServerChan Object
         """
-        super(NotifyServerChan, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Token (associated with project)
         self.token = validate_regex(

@@ -133,7 +133,7 @@ class NotifyAppriseAPI(NotifyBase):
         additionally include as part of the server headers to post with
 
         """
-        super(NotifyAppriseAPI, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.fullpath = kwargs.get('fullpath')
         if not isinstance(self.fullpath, str):

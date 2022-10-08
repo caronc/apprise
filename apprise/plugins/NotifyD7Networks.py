@@ -177,7 +177,7 @@ class NotifyD7Networks(NotifyBase):
         """
         Initialize D7 Networks Object
         """
-        super(NotifyD7Networks, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # The Priority of the message
         if priority not in D7NETWORK_SMS_PRIORITIES:

@@ -180,7 +180,7 @@ class NotifyBase(BASE_OBJECT):
 
         """
 
-        super(NotifyBase, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         if 'format' in kwargs:
             # Store the specified format if specified
@@ -423,7 +423,7 @@ class NotifyBase(BASE_OBJECT):
             'overflow': self.overflow_mode,
         }
 
-        params.update(super(NotifyBase, self).url_parameters(*args, **kwargs))
+        params.update(super().url_parameters(*args, **kwargs))
 
         # return default parameters
         return params

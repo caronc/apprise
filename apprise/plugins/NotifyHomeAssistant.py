@@ -115,7 +115,7 @@ class NotifyHomeAssistant(NotifyBase):
         """
         Initialize Home Assistant Object
         """
-        super(NotifyHomeAssistant, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.fullpath = kwargs.get('fullpath', '')
 

@@ -113,7 +113,7 @@ class NotifyWindows(NotifyBase):
         Initialize Windows Object
         """
 
-        super(NotifyWindows, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Number of seconds to display notification for
         self.duration = self.default_popup_duration_sec \

@@ -315,7 +315,7 @@ class NotifyTelegram(NotifyBase):
         """
         Initialize Telegram Object
         """
-        super(NotifyTelegram, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.bot_token = validate_regex(
             bot_token, *self.template_tokens['bot_token']['regex'],

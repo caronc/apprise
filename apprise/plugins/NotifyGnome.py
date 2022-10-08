@@ -164,7 +164,7 @@ class NotifyGnome(NotifyBase):
         Initialize Gnome Object
         """
 
-        super(NotifyGnome, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # The urgency of the message
         self.urgency = int(
