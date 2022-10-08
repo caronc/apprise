@@ -6,9 +6,9 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: apprise 1.0.0\n"
+"Project-Id-Version: apprise 1.1.0\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2022-08-06 13:14-0400\n"
+"POT-Creation-Date: 2022-10-08 14:03-0400\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -242,6 +242,9 @@ msgstr ""
 msgid "Flair Text"
 msgstr ""
 
+msgid "Flash"
+msgstr ""
+
 msgid "Footer Logo"
 msgstr ""
 
@@ -430,6 +433,9 @@ msgstr ""
 msgid "Remove Tokens"
 msgstr ""
 
+msgid "Reply To"
+msgstr ""
+
 msgid "Reply To Email"
 msgstr ""
 
@@ -443,6 +449,9 @@ msgid "Rooms"
 msgstr ""
 
 msgid "Route"
+msgstr ""
+
+msgid "Route Group"
 msgstr ""
 
 msgid "Routing Key"
@@ -529,6 +538,9 @@ msgstr ""
 msgid "Target Chat ID"
 msgstr ""
 
+msgid "Target Contact"
+msgstr ""
+
 msgid "Target Device"
 msgstr ""
 
@@ -545,6 +557,9 @@ msgid "Target Encoded ID"
 msgstr ""
 
 msgid "Target Escalation"
+msgstr ""
+
+msgid "Target Group"
 msgstr ""
 
 msgid "Target Group ID"
@@ -613,6 +628,9 @@ msgstr ""
 msgid "Tenant Domain"
 msgstr ""
 
+msgid "Test Only"
+msgstr ""
+
 msgid "Text To Speech"
 msgstr ""
 
@@ -650,6 +668,9 @@ msgid "URL"
 msgstr ""
 
 msgid "URL Title"
+msgstr ""
+
+msgid "Unicode Characters"
 msgstr ""
 
 msgid "Urgency"

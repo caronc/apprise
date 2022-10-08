@@ -48,8 +48,8 @@ Streamlabs, Stride, Syslog, Techulus Push, Telegram, Twilio, Twitter, Twist,
 XBMC, Vonage, Webex Teams}
 
 Name:           python-%{pypi_name}
-Version:        1.0.0
-Release:        3%{?dist}
+Version:        1.1.0
+Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        MIT
 URL:            https://github.com/caronc/%{pypi_name}
@@ -147,6 +147,9 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 %{python3_sitelib}/%{pypi_name}/cli.*
 
 %changelog
+* Sat Oct  8 2022 Chris Caron <lead2gold@gmail.com> - 1.1.0-1
+- Updated to v1.1.0
+
 * Fri Oct  7 2022 Chris Caron <lead2gold@gmail.com> - 1.0.0-3
 - Python 2 Support dropped
 
