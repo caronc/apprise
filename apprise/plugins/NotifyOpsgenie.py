@@ -382,7 +382,7 @@ class NotifyOpsgenie(NotifyBase):
         has_error = False
 
         # Use body if title not set
-        title_body = body if not title else body
+        title_body = body if not title else title
 
         # Create a copy ouf our details object
         details = self.details.copy()
