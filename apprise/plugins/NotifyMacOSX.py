@@ -39,13 +39,15 @@ from ..AppriseLocale import gettext_lazy as _
 # Default our global support flag
 NOTIFY_MACOSX_SUPPORT_ENABLED = False
 
+
+# TODO: The module will be easier to test without module-level code.
 if platform.system() == 'Darwin':
     # Check this is Mac OS X 10.8, or higher
     major, minor = platform.mac_ver()[0].split('.')[:2]
 
-    # Toggle our enabled flag if verion is correct and executable
+    # Toggle our enabled flag, if version is correct and executable
     # found. This is done in such a way to provide verbosity to the
-    # end user so they know why it may or may not work for them.
+    # end user, so they know why it may or may not work for them.
     NOTIFY_MACOSX_SUPPORT_ENABLED = \
         (int(major) > 10 or (int(major) == 10 and int(minor) >= 8))
 
@@ -126,17 +128,15 @@ class NotifyMacOSX(NotifyBase):
 
         super().__init__(**kwargs)
 
-        # Track whether or not we want to send an image with our notification
-        # or not.
+        # Track whether we want to add an image to the notification.
         self.include_image = include_image
 
-        # Acquire the notify path
+        # Acquire the path to the `terminal-notifier` program.
         self.notify_path = next(  # pragma: no branch
             (p for p in self.notify_paths if os.access(p, os.X_OK)), None)
 
         # Set sound object (no q/a for now)
         self.sound = sound
-        return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """

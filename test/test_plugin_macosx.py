@@ -22,49 +22,67 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
-
+import logging
 import os
-from unittest import mock
+import sys
+from unittest.mock import Mock
 
-from helpers import reload_plugin
+import pytest
 
 import apprise
+from apprise.plugins.NotifyMacOSX import NotifyMacOSX
+from helpers import reload_plugin
 
-# Disable logging for a cleaner testing output
-import logging
+
+# Disable logging for a cleaner testing output.
 logging.disable(logging.CRITICAL)
 
 
-@mock.patch('subprocess.Popen')
-@mock.patch('platform.system')
-@mock.patch('platform.mac_ver')
-def test_plugin_macosx_general(mock_macver, mock_system, mock_popen, tmpdir):
+@pytest.fixture
+def pretend_macos(mocker):
     """
-    NotifyMacOSX() General Checks
-
+    Fixture to simulate a macOS environment.
     """
+    mocker.patch("platform.system", return_value="Darwin")
+    mocker.patch("platform.mac_ver", return_value=('10.8', ('', '', ''), ''))
 
-    # Create a temporary binary file we can reference
-    script = tmpdir.join("terminal-notifier")
-    script.write('')
-    # Give execute bit
-    os.chmod(str(script), 0o755)
-    mock_cmd_response = mock.Mock()
+    # Reload plugin module, in order to re-run module-level code.
+    current_module = sys.modules[__name__]
+    reload_plugin("NotifyMacOSX", replace_in=current_module)
 
-    # Set a successful response
-    mock_cmd_response.returncode = 0
 
-    # Simulate a Mac Environment
-    mock_system.return_value = 'Darwin'
-    mock_macver.return_value = ('10.8', ('', '', ''), '')
-    mock_popen.return_value = mock_cmd_response
+@pytest.fixture
+def terminal_notifier(mocker, tmp_path):
+    """
+    Fixture for providing a surrogate for the `terminal-notifier` program.
+    """
+    notifier_program = tmp_path.joinpath("terminal-notifier")
+    notifier_program.write_text('#!/bin/sh\n\necho hello')
 
-    # Ensure our environment is loaded with this configuration
-    reload_plugin('NotifyMacOSX')
-    from apprise.plugins.NotifyMacOSX import NotifyMacOSX
+    # Set execute bit.
+    os.chmod(notifier_program, 0o755)
 
-    # Point our object to our new temporary existing file
-    NotifyMacOSX.notify_paths = (str(script), )
+    # Make the notifier use the temporary file instead of `terminal-notifier`.
+    mocker.patch("apprise.plugins.NotifyMacOSX.NotifyMacOSX.notify_paths",
+                 (str(notifier_program),))
+
+    yield notifier_program
+
+
+@pytest.fixture
+def macos_notify_environment(pretend_macos, terminal_notifier):
+    """
+    Fixture to bundle general test case setup.
+
+    Use this fixture if you don't need access to the individual members.
+    """
+    pass
+
+
+def test_plugin_macosx_general_success(macos_notify_environment):
+    """
+    NotifyMacOSX() general checks
+    """
 
     obj = apprise.Apprise.instantiate(
         'macosx://_/?image=True', suppress_exceptions=False)
@@ -103,68 +121,81 @@ def test_plugin_macosx_general(mock_macver, mock_system, mock_popen, tmpdir):
     assert obj.notify(title='title', body='body',
                       notify_type=apprise.NotifyType.INFO) is True
 
-    # If our binary is inacccessible (or not executable), we can
-    # no longer send our notifications
-    os.chmod(str(script), 0o644)
+
+def test_plugin_macosx_terminal_notifier_not_executable(
+        pretend_macos, terminal_notifier):
+    """
+    When the `terminal-notifier` program is inaccessible or not executable,
+    we are unable to send notifications.
+    """
+
+    obj = apprise.Apprise.instantiate('macosx://', suppress_exceptions=False)
+
+    # Unset the executable bit.
+    os.chmod(terminal_notifier, 0o644)
+
     assert obj.notify(title='title', body='body',
                       notify_type=apprise.NotifyType.INFO) is False
 
-    # Restore permission
-    os.chmod(str(script), 0o755)
 
-    # But now let's disrupt the path location
+def test_plugin_macosx_terminal_notifier_invalid(macos_notify_environment):
+    """
+    When the `terminal-notifier` program is wrongly addressed,
+    notifications should fail.
+    """
+
+    obj = apprise.Apprise.instantiate('macosx://', suppress_exceptions=False)
+
+    # Let's disrupt the path location.
     obj.notify_path = 'invalid_missing-file'
     assert not os.path.isfile(obj.notify_path)
+
     assert obj.notify(title='title', body='body',
                       notify_type=apprise.NotifyType.INFO) is False
 
-    # Test cases where the script just flat out fails
-    mock_cmd_response.returncode = 1
-    obj = apprise.Apprise.instantiate(
-        'macosx://', suppress_exceptions=False)
+
+def test_plugin_macosx_terminal_notifier_croaks(
+        mocker, macos_notify_environment):
+    """
+    When the `terminal-notifier` program croaks on execution,
+    notifications should fail.
+    """
+
+    # Emulate a failing program.
+    mocker.patch("subprocess.Popen", return_value=Mock(returncode=1))
+
+    obj = apprise.Apprise.instantiate('macosx://', suppress_exceptions=False)
     assert isinstance(obj, NotifyMacOSX) is True
     assert obj.notify(title='title', body='body',
                       notify_type=apprise.NotifyType.INFO) is False
 
-    # Restore script return value
-    mock_cmd_response.returncode = 0
 
-    # Test case where we simply aren't on a mac
-    mock_system.return_value = 'Linux'
-    reload_plugin('NotifyMacOSX')
+def test_plugin_macosx_pretend_linux(mocker, pretend_macos):
+    """
+    The notification object is disabled when pretending to run on Linux.
+    """
 
-    # Point our object to our new temporary existing file
-    NotifyMacOSX.notify_paths = (str(script), )
+    # When patching something which has a side effect on the module-level code
+    # of a plugin, make sure to reload it.
+    mocker.patch("platform.system", return_value="Linux")
+    reload_plugin("NotifyMacOSX")
 
-    # Our object is disabled
-    obj = apprise.Apprise.instantiate(
-        'macosx://_/?sound=default', suppress_exceptions=False)
+    # Our object is disabled.
+    obj = apprise.Apprise.instantiate('macosx://', suppress_exceptions=False)
     assert obj is None
 
-    # Restore mac environment
-    mock_system.return_value = 'Darwin'
 
-    # Now we must be Mac OS v10.8 or higher...
-    mock_macver.return_value = ('10.7', ('', '', ''), '')
-    reload_plugin('NotifyMacOSX')
+@pytest.mark.parametrize("macos_version", ["9.12", "10.7"])
+def test_plugin_macosx_pretend_old_macos(mocker, macos_version):
+    """
+    The notification object is disabled when pretending to run on older macOS.
+    """
 
-    # Point our object to our new temporary existing file
-    NotifyMacOSX.notify_paths = (str(script), )
+    # When patching something which has a side effect on the module-level code
+    # of a plugin, make sure to reload it.
+    mocker.patch("platform.mac_ver",
+                 return_value=(macos_version, ('', '', ''), ''))
+    reload_plugin("NotifyMacOSX")
 
-    obj = apprise.Apprise.instantiate(
-        'macosx://_/?sound=default', suppress_exceptions=False)
-    assert obj is None
-
-    # A newer environment to test edge case where this is tested
-    mock_macver.return_value = ('9.12', ('', '', ''), '')
-    reload_plugin('NotifyMacOSX')
-
-    # Point our object to our new temporary existing file
-    NotifyMacOSX.notify_paths = (str(script), )
-
-    # This is just to test that the the minor (in this case .12)
-    # is only weighed with respect to the major number as wel
-    # with respect to the versioning
-    obj = apprise.Apprise.instantiate(
-        'macosx://_/?sound=default', suppress_exceptions=False)
+    obj = apprise.Apprise.instantiate('macosx://', suppress_exceptions=False)
     assert obj is None
