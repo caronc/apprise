@@ -26,7 +26,8 @@ import os
 from unittest import mock
 
 import requests
-from apprise import plugins
+
+from apprise.plugins.NotifyForm import NotifyForm
 from helpers import AppriseURLTester
 from apprise import Apprise
 from apprise import NotifyType
@@ -51,89 +52,89 @@ apprise_url_tests = (
         'instance': None,
     }),
     ('form://localhost', {
-        'instance': plugins.NotifyForm,
+        'instance': NotifyForm,
     }),
     ('form://user@localhost?method=invalid', {
         'instance': TypeError,
     }),
     ('form://user:pass@localhost', {
-        'instance': plugins.NotifyForm,
+        'instance': NotifyForm,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'form://user:****@localhost',
     }),
     ('form://user@localhost', {
-        'instance': plugins.NotifyForm,
+        'instance': NotifyForm,
     }),
 
     # Test method variations
     ('form://user@localhost?method=put', {
-        'instance': plugins.NotifyForm,
+        'instance': NotifyForm,
     }),
     ('form://user@localhost?method=get', {
-        'instance': plugins.NotifyForm,
+        'instance': NotifyForm,
     }),
     ('form://user@localhost?method=post', {
-        'instance': plugins.NotifyForm,
+        'instance': NotifyForm,
     }),
     ('form://user@localhost?method=head', {
-        'instance': plugins.NotifyForm,
+        'instance': NotifyForm,
     }),
     ('form://user@localhost?method=delete', {
-        'instance': plugins.NotifyForm,
+        'instance': NotifyForm,
     }),
 
     # Custom payload options
     ('form://localhost:8080?:key=value&:key2=value2', {
-        'instance': plugins.NotifyForm,
+        'instance': NotifyForm,
     }),
 
     # Continue testing other cases
     ('form://localhost:8080', {
-        'instance': plugins.NotifyForm,
+        'instance': NotifyForm,
     }),
     ('form://user:pass@localhost:8080', {
-        'instance': plugins.NotifyForm,
+        'instance': NotifyForm,
     }),
     ('forms://localhost', {
-        'instance': plugins.NotifyForm,
+        'instance': NotifyForm,
     }),
     ('forms://user:pass@localhost', {
-        'instance': plugins.NotifyForm,
+        'instance': NotifyForm,
     }),
     ('forms://localhost:8080/path/', {
-        'instance': plugins.NotifyForm,
+        'instance': NotifyForm,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'forms://localhost:8080/path/',
     }),
     ('forms://user:password@localhost:8080', {
-        'instance': plugins.NotifyForm,
+        'instance': NotifyForm,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'forms://user:****@localhost:8080',
     }),
     # Test our GET params
     ('form://localhost:8080/path?-ParamA=Value', {
-        'instance': plugins.NotifyForm,
+        'instance': NotifyForm,
     }),
     # Test our Headers
     ('form://localhost:8080/path?+HeaderKey=HeaderValue', {
-        'instance': plugins.NotifyForm,
+        'instance': NotifyForm,
     }),
     ('form://user:pass@localhost:8081', {
-        'instance': plugins.NotifyForm,
+        'instance': NotifyForm,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('form://user:pass@localhost:8082', {
-        'instance': plugins.NotifyForm,
+        'instance': NotifyForm,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('form://user:pass@localhost:8083', {
-        'instance': plugins.NotifyForm,
+        'instance': NotifyForm,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -167,7 +168,7 @@ def test_plugin_custom_form_attachments(mock_post, no_throttling):
 
     obj = Apprise.instantiate(
         'form://user@localhost.localdomain/?method=post')
-    assert isinstance(obj, plugins.NotifyForm)
+    assert isinstance(obj, NotifyForm)
 
     # Test Valid Attachment
     path = os.path.join(TEST_VAR_DIR, 'apprise-test.gif')
@@ -238,7 +239,7 @@ def test_plugin_custom_form_edge_cases(mock_get, mock_post, no_throttling):
     mock_post.return_value = response
     mock_get.return_value = response
 
-    results = plugins.NotifyForm.parse_url(
+    results = NotifyForm.parse_url(
         'form://localhost:8080/command?:abcd=test&method=POST')
 
     assert isinstance(results, dict)
@@ -254,8 +255,8 @@ def test_plugin_custom_form_edge_cases(mock_get, mock_post, no_throttling):
     assert isinstance(results['qsd:'], dict) is True
     assert results['qsd:']['abcd'] == 'test'
 
-    instance = plugins.NotifyForm(**results)
-    assert isinstance(instance, plugins.NotifyForm)
+    instance = NotifyForm(**results)
+    assert isinstance(instance, NotifyForm)
 
     response = instance.send(title='title', body='body')
     assert response is True
@@ -275,7 +276,7 @@ def test_plugin_custom_form_edge_cases(mock_get, mock_post, no_throttling):
         'form://localhost:8080/command?')
 
     # Generate a new URL based on our last and verify key values are the same
-    new_results = plugins.NotifyForm.parse_url(instance.url(safe=False))
+    new_results = NotifyForm.parse_url(instance.url(safe=False))
     for k in ('user', 'password', 'port', 'host', 'fullpath', 'path', 'query',
               'schema', 'url', 'payload', 'method'):
         assert new_results[k] == results[k]
@@ -284,7 +285,7 @@ def test_plugin_custom_form_edge_cases(mock_get, mock_post, no_throttling):
     mock_post.reset_mock()
     mock_get.reset_mock()
 
-    results = plugins.NotifyForm.parse_url(
+    results = NotifyForm.parse_url(
         'form://localhost:8080/command?:message=test&method=POST')
 
     assert isinstance(results, dict)
@@ -300,8 +301,8 @@ def test_plugin_custom_form_edge_cases(mock_get, mock_post, no_throttling):
     assert isinstance(results['qsd:'], dict) is True
     assert results['qsd:']['message'] == 'test'
 
-    instance = plugins.NotifyForm(**results)
-    assert isinstance(instance, plugins.NotifyForm)
+    instance = NotifyForm(**results)
+    assert isinstance(instance, NotifyForm)
 
     response = instance.send(title='title', body='body')
     assert response is True
@@ -320,7 +321,7 @@ def test_plugin_custom_form_edge_cases(mock_get, mock_post, no_throttling):
         'form://localhost:8080/command?')
 
     # Generate a new URL based on our last and verify key values are the same
-    new_results = plugins.NotifyForm.parse_url(instance.url(safe=False))
+    new_results = NotifyForm.parse_url(instance.url(safe=False))
     for k in ('user', 'password', 'port', 'host', 'fullpath', 'path', 'query',
               'schema', 'url', 'payload', 'method'):
         assert new_results[k] == results[k]
@@ -329,7 +330,7 @@ def test_plugin_custom_form_edge_cases(mock_get, mock_post, no_throttling):
     mock_post.reset_mock()
     mock_get.reset_mock()
 
-    results = plugins.NotifyForm.parse_url(
+    results = NotifyForm.parse_url(
         'form://localhost:8080/command?:message=test&method=GET')
 
     assert isinstance(results, dict)
@@ -345,8 +346,8 @@ def test_plugin_custom_form_edge_cases(mock_get, mock_post, no_throttling):
     assert isinstance(results['qsd:'], dict) is True
     assert results['qsd:']['message'] == 'test'
 
-    instance = plugins.NotifyForm(**results)
-    assert isinstance(instance, plugins.NotifyForm)
+    instance = NotifyForm(**results)
+    assert isinstance(instance, NotifyForm)
 
     response = instance.send(title='title', body='body')
     assert response is True
@@ -366,7 +367,7 @@ def test_plugin_custom_form_edge_cases(mock_get, mock_post, no_throttling):
         'form://localhost:8080/command?')
 
     # Generate a new URL based on our last and verify key values are the same
-    new_results = plugins.NotifyForm.parse_url(instance.url(safe=False))
+    new_results = NotifyForm.parse_url(instance.url(safe=False))
     for k in ('user', 'password', 'port', 'host', 'fullpath', 'path', 'query',
               'schema', 'url', 'payload', 'method'):
         assert new_results[k] == results[k]

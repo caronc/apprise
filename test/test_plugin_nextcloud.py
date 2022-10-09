@@ -26,7 +26,7 @@
 from unittest import mock
 
 import requests
-from apprise import plugins
+from apprise.plugins.NotifyNextcloud import NotifyNextcloud
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -64,55 +64,55 @@ apprise_url_tests = (
         'instance': TypeError,
     }),
     ('ncloud://localhost/admin', {
-        'instance': plugins.NotifyNextcloud,
+        'instance': NotifyNextcloud,
     }),
     ('ncloud://user@localhost/admin', {
-        'instance': plugins.NotifyNextcloud,
+        'instance': NotifyNextcloud,
     }),
     ('ncloud://user@localhost?to=user1,user2', {
-        'instance': plugins.NotifyNextcloud,
+        'instance': NotifyNextcloud,
     }),
     ('ncloud://user@localhost?to=user1,user2&version=20', {
-        'instance': plugins.NotifyNextcloud,
+        'instance': NotifyNextcloud,
     }),
     ('ncloud://user@localhost?to=user1,user2&version=21', {
-        'instance': plugins.NotifyNextcloud,
+        'instance': NotifyNextcloud,
     }),
     ('ncloud://user:pass@localhost/user1/user2', {
-        'instance': plugins.NotifyNextcloud,
+        'instance': NotifyNextcloud,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'ncloud://user:****@localhost/user1/user2',
     }),
     ('ncloud://user:pass@localhost:8080/admin', {
-        'instance': plugins.NotifyNextcloud,
+        'instance': NotifyNextcloud,
     }),
     ('nclouds://user:pass@localhost/admin', {
-        'instance': plugins.NotifyNextcloud,
+        'instance': NotifyNextcloud,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'nclouds://user:****@localhost/admin',
     }),
     ('nclouds://user:pass@localhost:8080/admin/', {
-        'instance': plugins.NotifyNextcloud,
+        'instance': NotifyNextcloud,
     }),
     ('ncloud://localhost:8080/admin?+HeaderKey=HeaderValue', {
-        'instance': plugins.NotifyNextcloud,
+        'instance': NotifyNextcloud,
     }),
     ('ncloud://user:pass@localhost:8081/admin', {
-        'instance': plugins.NotifyNextcloud,
+        'instance': NotifyNextcloud,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('ncloud://user:pass@localhost:8082/admin', {
-        'instance': plugins.NotifyNextcloud,
+        'instance': NotifyNextcloud,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('ncloud://user:pass@localhost:8083/user1/user2/user3', {
-        'instance': plugins.NotifyNextcloud,
+        'instance': NotifyNextcloud,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -146,9 +146,9 @@ def test_plugin_nextcloud_edge_cases(mock_post, no_throttling):
     mock_post.return_value = robj
 
     # Variation Initializations
-    obj = plugins.NotifyNextcloud(
+    obj = NotifyNextcloud(
         host="localhost", user="admin", password="pass", targets="user")
-    assert isinstance(obj, plugins.NotifyNextcloud) is True
+    assert isinstance(obj, NotifyNextcloud) is True
     assert isinstance(obj.url(), str) is True
 
     # An empty body

@@ -23,7 +23,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 import requests
-from apprise import plugins
+
+from apprise.plugins.NotifyNotifico import NotifyNotifico
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -48,62 +49,62 @@ apprise_url_tests = (
     }),
     ('notifico://1234/ckhrjW8w672m6HG', {
         # A project id and message hook provided
-        'instance': plugins.NotifyNotifico,
+        'instance': NotifyNotifico,
     }),
     ('notifico://1234/ckhrjW8w672m6HG?prefix=no', {
         # Disable our prefix
-        'instance': plugins.NotifyNotifico,
+        'instance': NotifyNotifico,
     }),
     ('notifico://1234/ckhrjW8w672m6HG?color=yes', {
-        'instance': plugins.NotifyNotifico,
+        'instance': NotifyNotifico,
         'notify_type': 'info',
     }),
     ('notifico://1234/ckhrjW8w672m6HG?color=yes', {
-        'instance': plugins.NotifyNotifico,
+        'instance': NotifyNotifico,
         'notify_type': 'success',
     }),
     ('notifico://1234/ckhrjW8w672m6HG?color=yes', {
-        'instance': plugins.NotifyNotifico,
+        'instance': NotifyNotifico,
         'notify_type': 'warning',
     }),
     ('notifico://1234/ckhrjW8w672m6HG?color=yes', {
-        'instance': plugins.NotifyNotifico,
+        'instance': NotifyNotifico,
         'notify_type': 'failure',
     }),
     ('notifico://1234/ckhrjW8w672m6HG?color=yes', {
-        'instance': plugins.NotifyNotifico,
+        'instance': NotifyNotifico,
         'notify_type': 'invalid',
     }),
     ('notifico://1234/ckhrjW8w672m6HG?color=no', {
         # Test our color flag by having it set to off
-        'instance': plugins.NotifyNotifico,
+        'instance': NotifyNotifico,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'notifico://1...4/c...G',
     }),
     # Support Native URLs
     ('https://n.tkte.ch/h/2144/uJmKaBW9WFk42miB146ci3Kj', {
-        'instance': plugins.NotifyNotifico,
+        'instance': NotifyNotifico,
     }),
     ('notifico://1234/ckhrjW8w672m6HG', {
-        'instance': plugins.NotifyNotifico,
+        'instance': NotifyNotifico,
         # don't include an image by default
         'include_image': False,
     }),
     ('notifico://1234/ckhrjW8w672m6HG', {
-        'instance': plugins.NotifyNotifico,
+        'instance': NotifyNotifico,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('notifico://1234/ckhrjW8w672m6HG', {
-        'instance': plugins.NotifyNotifico,
+        'instance': NotifyNotifico,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('notifico://1234/ckhrjW8w672m6HG', {
-        'instance': plugins.NotifyNotifico,
+        'instance': NotifyNotifico,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,

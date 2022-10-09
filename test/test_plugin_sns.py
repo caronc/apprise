@@ -27,8 +27,8 @@ from unittest import mock
 
 import pytest
 import requests
-from apprise import plugins
 from apprise import Apprise
+from apprise.plugins.NotifySNS import NotifySNS
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -58,16 +58,16 @@ apprise_url_tests = (
     }),
     ('sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcevi7FQ/us-west-2/12223334444', {
         # we have a valid URL and one number to text
-        'instance': plugins.NotifySNS,
+        'instance': NotifySNS,
     }),
     ('sns://?access=T1JJ3T3L2&secret=A1BRTD4JD/TIiajkdnlazkcevi7FQ'
         '&region=us-west-2&to=12223334444', {
             # Initialize using get parameters instead
-            'instance': plugins.NotifySNS,
+            'instance': NotifySNS,
         }),
     ('sns://T1JJ3TD4JD/TIiajkdnlazk7FQ/us-west-2/12223334444/12223334445', {
         # Multi SNS Suppport
-        'instance': plugins.NotifySNS,
+        'instance': NotifySNS,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'sns://T...D/****/us-west-2',
@@ -75,16 +75,16 @@ apprise_url_tests = (
     ('sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/us-east-1'
         '?to=12223334444', {
             # Missing a topic and/or phone No
-            'instance': plugins.NotifySNS,
+            'instance': NotifySNS,
         }),
     ('sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcevi7FQ/us-west-2/12223334444', {
-        'instance': plugins.NotifySNS,
+        'instance': NotifySNS,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcevi7FQ/us-west-2/15556667777', {
-        'instance': plugins.NotifySNS,
+        'instance': NotifySNS,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -114,7 +114,7 @@ def test_plugin_sns_edge_cases(mock_post):
     # Initializes the plugin with a valid access, but invalid access key
     with pytest.raises(TypeError):
         # No access_key_id specified
-        plugins.NotifySNS(
+        NotifySNS(
             access_key_id=None,
             secret_access_key=TEST_ACCESS_KEY_SECRET,
             region_name=TEST_REGION,
@@ -123,7 +123,7 @@ def test_plugin_sns_edge_cases(mock_post):
 
     with pytest.raises(TypeError):
         # No secret_access_key specified
-        plugins.NotifySNS(
+        NotifySNS(
             access_key_id=TEST_ACCESS_KEY_ID,
             secret_access_key=None,
             region_name=TEST_REGION,
@@ -132,7 +132,7 @@ def test_plugin_sns_edge_cases(mock_post):
 
     with pytest.raises(TypeError):
         # No region_name specified
-        plugins.NotifySNS(
+        NotifySNS(
             access_key_id=TEST_ACCESS_KEY_ID,
             secret_access_key=TEST_ACCESS_KEY_SECRET,
             region_name=None,
@@ -140,7 +140,7 @@ def test_plugin_sns_edge_cases(mock_post):
         )
 
     # No recipients
-    obj = plugins.NotifySNS(
+    obj = NotifySNS(
         access_key_id=TEST_ACCESS_KEY_ID,
         secret_access_key=TEST_ACCESS_KEY_SECRET,
         region_name=TEST_REGION,
@@ -152,7 +152,7 @@ def test_plugin_sns_edge_cases(mock_post):
 
     # The phone number is invalid, and without it, there is nothing
     # to notify
-    obj = plugins.NotifySNS(
+    obj = NotifySNS(
         access_key_id=TEST_ACCESS_KEY_ID,
         secret_access_key=TEST_ACCESS_KEY_SECRET,
         region_name=TEST_REGION,
@@ -164,7 +164,7 @@ def test_plugin_sns_edge_cases(mock_post):
 
     # The phone number is invalid, and without it, there is nothing
     # to notify; we
-    obj = plugins.NotifySNS(
+    obj = NotifySNS(
         access_key_id=TEST_ACCESS_KEY_ID,
         secret_access_key=TEST_ACCESS_KEY_SECRET,
         region_name=TEST_REGION,
@@ -182,7 +182,7 @@ def test_plugin_sns_url_parsing():
     """
 
     # No recipients
-    results = plugins.NotifySNS.parse_url('sns://%s/%s/%s/' % (
+    results = NotifySNS.parse_url('sns://%s/%s/%s/' % (
         TEST_ACCESS_KEY_ID,
         TEST_ACCESS_KEY_SECRET,
         TEST_REGION)
@@ -198,7 +198,7 @@ def test_plugin_sns_url_parsing():
     assert TEST_ACCESS_KEY_SECRET == results['secret_access_key']
 
     # Detect recipients
-    results = plugins.NotifySNS.parse_url('sns://%s/%s/%s/%s/%s/' % (
+    results = NotifySNS.parse_url('sns://%s/%s/%s/%s/%s/' % (
         TEST_ACCESS_KEY_ID,
         TEST_ACCESS_KEY_SECRET,
         # Uppercase Region won't break anything
@@ -252,28 +252,28 @@ def test_plugin_sns_aws_response_handling():
 
     """
     # Not a string
-    response = plugins.NotifySNS.aws_response_to_dict(None)
+    response = NotifySNS.aws_response_to_dict(None)
     assert response['type'] is None
     assert response['request_id'] is None
 
     # Invalid XML
-    response = plugins.NotifySNS.aws_response_to_dict(
+    response = NotifySNS.aws_response_to_dict(
         '<Bad Response xmlns="http://sns.amazonaws.com/doc/2010-03-31/">')
     assert response['type'] is None
     assert response['request_id'] is None
 
     # Single Element in XML
-    response = plugins.NotifySNS.aws_response_to_dict(
+    response = NotifySNS.aws_response_to_dict(
         '<SingleElement></SingleElement>')
     assert response['type'] == 'SingleElement'
     assert response['request_id'] is None
 
     # Empty String
-    response = plugins.NotifySNS.aws_response_to_dict('')
+    response = NotifySNS.aws_response_to_dict('')
     assert response['type'] is None
     assert response['request_id'] is None
 
-    response = plugins.NotifySNS.aws_response_to_dict(
+    response = NotifySNS.aws_response_to_dict(
         """
         <PublishResponse xmlns="http://sns.amazonaws.com/doc/2010-03-31/">
             <PublishResult>
@@ -288,7 +288,7 @@ def test_plugin_sns_aws_response_handling():
     assert response['request_id'] == 'dc258024-d0e6-56bb-af1b-d4fe5f4181a4'
     assert response['message_id'] == '5e16935a-d1fb-5a31-a716-c7805e5c1d2e'
 
-    response = plugins.NotifySNS.aws_response_to_dict(
+    response = NotifySNS.aws_response_to_dict(
         """
          <CreateTopicResponse xmlns="http://sns.amazonaws.com/doc/2010-03-31/">
            <CreateTopicResult>
@@ -303,7 +303,7 @@ def test_plugin_sns_aws_response_handling():
     assert response['request_id'] == '604bef0f-369c-50c5-a7a4-bbd474c83d6a'
     assert response['topic_arn'] == 'arn:aws:sns:us-east-1:000000000000:abcd'
 
-    response = plugins.NotifySNS.aws_response_to_dict(
+    response = NotifySNS.aws_response_to_dict(
         """
         <ErrorResponse xmlns="http://sns.amazonaws.com/doc/2010-03-31/">
             <Error>
@@ -330,7 +330,7 @@ def test_plugin_sns_aws_topic_handling(mock_post):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifySNS.request_rate_per_sec = 0
+    NotifySNS.request_rate_per_sec = 0
 
     arn_response = \
         """

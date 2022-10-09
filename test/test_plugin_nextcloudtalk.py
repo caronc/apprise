@@ -26,7 +26,7 @@
 from unittest import mock
 
 import requests
-from apprise import plugins
+from apprise.plugins.NotifyNextcloudTalk import NotifyNextcloudTalk
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -64,45 +64,45 @@ apprise_url_tests = (
         'instance': TypeError,
     }),
     ('nctalk://user:pass@localhost/roomid1/roomid2', {
-        'instance': plugins.NotifyNextcloudTalk,
+        'instance': NotifyNextcloudTalk,
         'requests_response_code': requests.codes.created,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'nctalk://user:****@localhost/roomid1/roomid2',
     }),
     ('nctalk://user:pass@localhost:8080/roomid', {
-        'instance': plugins.NotifyNextcloudTalk,
+        'instance': NotifyNextcloudTalk,
         'requests_response_code': requests.codes.created,
     }),
     ('nctalks://user:pass@localhost/roomid', {
-        'instance': plugins.NotifyNextcloudTalk,
+        'instance': NotifyNextcloudTalk,
         'requests_response_code': requests.codes.created,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'nctalks://user:****@localhost/roomid',
     }),
     ('nctalks://user:pass@localhost:8080/roomid/', {
-        'instance': plugins.NotifyNextcloudTalk,
+        'instance': NotifyNextcloudTalk,
         'requests_response_code': requests.codes.created,
     }),
     ('nctalk://user:pass@localhost:8080/roomid?+HeaderKey=HeaderValue', {
-        'instance': plugins.NotifyNextcloudTalk,
+        'instance': NotifyNextcloudTalk,
         'requests_response_code': requests.codes.created,
     }),
     ('nctalk://user:pass@localhost:8081/roomid', {
-        'instance': plugins.NotifyNextcloudTalk,
+        'instance': NotifyNextcloudTalk,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('nctalk://user:pass@localhost:8082/roomid', {
-        'instance': plugins.NotifyNextcloudTalk,
+        'instance': NotifyNextcloudTalk,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('nctalk://user:pass@localhost:8083/roomid1/roomid2/roomid3', {
-        'instance': plugins.NotifyNextcloudTalk,
+        'instance': NotifyNextcloudTalk,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -136,9 +136,9 @@ def test_plugin_nextcloudtalk_edge_cases(mock_post, no_throttling):
     mock_post.return_value = robj
 
     # Variation Initializations
-    obj = plugins.NotifyNextcloudTalk(
+    obj = NotifyNextcloudTalk(
         host="localhost", user="admin", password="pass", targets="roomid")
-    assert isinstance(obj, plugins.NotifyNextcloudTalk) is True
+    assert isinstance(obj, NotifyNextcloudTalk) is True
     assert isinstance(obj.url(), str) is True
 
     # An empty body

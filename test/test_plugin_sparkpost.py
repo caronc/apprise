@@ -29,10 +29,10 @@ from unittest import mock
 
 import requests
 from json import dumps
-from apprise import plugins
 from apprise import Apprise
 from apprise import AppriseAttachment
 from apprise import NotifyType
+from apprise.plugins.NotifySparkPost import NotifySparkPost
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -64,7 +64,7 @@ apprise_url_tests = (
     }),
     # No To email address, but everything else is valid
     ('sparkpost://user@localhost.localdomain/{}'.format('c' * 32), {
-        'instance': plugins.NotifySparkPost,
+        'instance': NotifySparkPost,
         'requests_response_text': {
             "results": {
                 "total_rejected_recipients": 0,
@@ -75,7 +75,7 @@ apprise_url_tests = (
     }),
     ('sparkpost://user@localhost.localdomain/{}?format=markdown'
         .format('d' * 32), {
-            'instance': plugins.NotifySparkPost,
+            'instance': NotifySparkPost,
             'requests_response_text': {
                 "results": {
                     "total_rejected_recipients": 0,
@@ -86,7 +86,7 @@ apprise_url_tests = (
         }),
     ('sparkpost://user@localhost.localdomain/{}?format=html'
         .format('d' * 32), {
-            'instance': plugins.NotifySparkPost,
+            'instance': NotifySparkPost,
             'requests_response_text': {
                 "results": {
                     "total_rejected_recipients": 0,
@@ -97,7 +97,7 @@ apprise_url_tests = (
         }),
     ('sparkpost://user@localhost.localdomain/{}?format=text'
         .format('d' * 32), {
-            'instance': plugins.NotifySparkPost,
+            'instance': NotifySparkPost,
             'requests_response_text': {
                 "results": {
                     "total_rejected_recipients": 0,
@@ -108,7 +108,7 @@ apprise_url_tests = (
         }),
     # valid url with region specified (case insensitve)
     ('sparkpost://user@localhost.localdomain/{}?region=uS'.format('d' * 32), {
-        'instance': plugins.NotifySparkPost,
+        'instance': NotifySparkPost,
         'requests_response_text': {
             "results": {
                 "total_rejected_recipients": 0,
@@ -119,7 +119,7 @@ apprise_url_tests = (
     }),
     # valid url with region specified (case insensitve)
     ('sparkpost://user@localhost.localdomain/{}?region=EU'.format('e' * 32), {
-        'instance': plugins.NotifySparkPost,
+        'instance': NotifySparkPost,
         'requests_response_text': {
             "results": {
                 "total_rejected_recipients": 0,
@@ -131,7 +131,7 @@ apprise_url_tests = (
     # headers
     ('sparkpost://user@localhost.localdomain/{}'
         '?+X-Customer-Campaign-ID=Apprise'.format('f' * 32), {
-            'instance': plugins.NotifySparkPost,
+            'instance': NotifySparkPost,
             'requests_response_text': {
                 "results": {
                     "total_rejected_recipients": 0,
@@ -143,7 +143,7 @@ apprise_url_tests = (
     # template tokens
     ('sparkpost://user@localhost.localdomain/{}'
         '?:name=Chris&:status=admin'.format('g' * 32), {
-            'instance': plugins.NotifySparkPost,
+            'instance': NotifySparkPost,
             'requests_response_text': {
                 "results": {
                     "total_rejected_recipients": 0,
@@ -155,7 +155,7 @@ apprise_url_tests = (
     # bcc and cc
     ('sparkpost://user@localhost.localdomain/{}'
         '?bcc=user@example.com&cc=user2@example.com'.format('h' * 32), {
-            'instance': plugins.NotifySparkPost,
+            'instance': NotifySparkPost,
             'requests_response_text': {
                 "results": {
                     "total_rejected_recipients": 0,
@@ -172,7 +172,7 @@ apprise_url_tests = (
     # One 'To' Email address
     ('sparkpost://user@localhost.localdomain/{}/test@example.com'.format(
         'a' * 32), {
-            'instance': plugins.NotifySparkPost,
+            'instance': NotifySparkPost,
             'requests_response_text': {
                 "results": {
                     "total_rejected_recipients": 0,
@@ -184,7 +184,7 @@ apprise_url_tests = (
     # Invalid 'To' Email address
     ('sparkpost://user@localhost.localdomain/{}/invalid'.format(
         'i' * 32), {
-            'instance': plugins.NotifySparkPost,
+            'instance': NotifySparkPost,
             # Expected notify() response
             'notify_response': False,
     }),
@@ -194,7 +194,7 @@ apprise_url_tests = (
         '/'.join(('user1@example.com', 'invalid', 'User2:user2@example.com')),
         ','.join(('user3@example.com', 'i@v', 'User1:user1@example.com')),
         ','.join(('user4@example.com', 'g@r@b', 'Da:user5@example.com'))), {
-            'instance': plugins.NotifySparkPost,
+            'instance': NotifySparkPost,
             'requests_response_text': {
                 "results": {
                     "total_rejected_recipients": 0,
@@ -205,7 +205,7 @@ apprise_url_tests = (
     }),
     ('sparkpost://user@localhost.localdomain/'
         '{}?to=test@example.com'.format('k' * 32), {
-            'instance': plugins.NotifySparkPost,
+            'instance': NotifySparkPost,
             'requests_response_text': {
                 "results": {
                     "total_rejected_recipients": 0,
@@ -217,7 +217,7 @@ apprise_url_tests = (
     # One To Email address, a from name specified too
     ('sparkpost://user@localhost.localdomain/{}/'
         'test@example.com?name="Frodo"'.format('l' * 32), {
-            'instance': plugins.NotifySparkPost,
+            'instance': NotifySparkPost,
             'requests_response_text': {
                 "results": {
                     "total_rejected_recipients": 0,
@@ -228,23 +228,23 @@ apprise_url_tests = (
         }),
     # Test invalid JSON response
     ('sparkpost://user@localhost.localdomain/{}'.format('m' * 32), {
-        'instance': plugins.NotifySparkPost,
+        'instance': NotifySparkPost,
         'requests_response_text': "{",
     }),
     ('sparkpost://user@localhost.localdomain/{}'.format('n' * 32), {
-        'instance': plugins.NotifySparkPost,
+        'instance': NotifySparkPost,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('sparkpost://user@localhost.localdomain/{}'.format('o' * 32), {
-        'instance': plugins.NotifySparkPost,
+        'instance': NotifySparkPost,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('sparkpost://user@localhost.localdomain/{}'.format('p' * 32), {
-        'instance': plugins.NotifySparkPost,
+        'instance': NotifySparkPost,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -269,8 +269,8 @@ def test_plugin_sparkpost_throttling(mock_post, no_throttling):
 
     """
 
-    plugins.NotifySparkPost.sparkpost_retry_wait_sec = 0.1
-    plugins.NotifySparkPost.sparkpost_retry_attempts = 3
+    NotifySparkPost.sparkpost_retry_wait_sec = 0.1
+    NotifySparkPost.sparkpost_retry_attempts = 3
 
     # API Key
     apikey = 'abc123'
@@ -280,12 +280,12 @@ def test_plugin_sparkpost_throttling(mock_post, no_throttling):
 
     # Exception should be thrown about the fact no user was specified
     with pytest.raises(TypeError):
-        plugins.NotifySparkPost(
+        NotifySparkPost(
             apikey=apikey, targets=targets, host=host)
 
     # Exception should be thrown about the fact no private key was specified
     with pytest.raises(TypeError):
-        plugins.NotifySparkPost(
+        NotifySparkPost(
             apikey=None, targets=targets, user=user, host=host)
 
     okay_response = requests.Request()
@@ -317,7 +317,7 @@ def test_plugin_sparkpost_throttling(mock_post, no_throttling):
 
     obj = Apprise.instantiate(
         'sparkpost://user@localhost.localdomain/{}'.format(apikey))
-    assert isinstance(obj, plugins.NotifySparkPost)
+    assert isinstance(obj, NotifySparkPost)
 
     # We'll successfully perform the notification as we're within
     # our retry limit
@@ -337,8 +337,8 @@ def test_plugin_sparkpost_attachments(mock_post, no_throttling):
     NotifySparkPost() Attachments
 
     """
-    plugins.NotifySparkPost.sparkpost_retry_wait_sec = 0.1
-    plugins.NotifySparkPost.sparkpost_retry_attempts = 3
+    NotifySparkPost.sparkpost_retry_wait_sec = 0.1
+    NotifySparkPost.sparkpost_retry_attempts = 3
 
     okay_response = requests.Request()
     okay_response.status_code = requests.codes.ok
@@ -358,7 +358,7 @@ def test_plugin_sparkpost_attachments(mock_post, no_throttling):
 
     obj = Apprise.instantiate(
         'sparkpost://user@localhost.localdomain/{}'.format(apikey))
-    assert isinstance(obj, plugins.NotifySparkPost)
+    assert isinstance(obj, NotifySparkPost)
 
     # Test Valid Attachment
     path = os.path.join(TEST_VAR_DIR, 'apprise-test.gif')
@@ -382,7 +382,7 @@ def test_plugin_sparkpost_attachments(mock_post, no_throttling):
     obj = Apprise.instantiate(
         'sparkpost://no-reply@example.com/{}/'
         'user1@example.com/user2@example.com?batch=yes'.format(apikey))
-    assert isinstance(obj, plugins.NotifySparkPost)
+    assert isinstance(obj, NotifySparkPost)
 
     # Force our batch to break into separate messages
     obj.default_batch_size = 1

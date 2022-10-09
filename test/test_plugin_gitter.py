@@ -27,8 +27,9 @@ import pytest
 from unittest import mock
 
 import requests
+
+from apprise.plugins.NotifyGitter import NotifyGitter
 from helpers import AppriseURLTester
-from apprise import plugins
 
 from json import dumps
 from datetime import datetime
@@ -58,12 +59,12 @@ apprise_url_tests = (
     }),
     # Token + channel
     ('gitter://%s/apprise' % ('b' * 40), {
-        'instance': plugins.NotifyGitter,
+        'instance': NotifyGitter,
         'response': False,
     }),
     # include image in post
     ('gitter://%s/apprise?image=Yes' % ('c' * 40), {
-        'instance': plugins.NotifyGitter,
+        'instance': NotifyGitter,
         'response': False,
 
         # Our expected url(privacy=True) startswith() response:
@@ -71,30 +72,30 @@ apprise_url_tests = (
     }),
     # Don't include image in post (this is the default anyway)
     ('gitter://%s/apprise?image=Yes' % ('d' * 40), {
-        'instance': plugins.NotifyGitter,
+        'instance': NotifyGitter,
         'response': False,
         # don't include an image by default
         'include_image': False,
     }),
     # Don't include image in post (this is the default anyway)
     ('gitter://%s/apprise?image=No' % ('e' * 40), {
-        'instance': plugins.NotifyGitter,
+        'instance': NotifyGitter,
         'response': False,
     }),
     ('gitter://%s/apprise' % ('f' * 40), {
-        'instance': plugins.NotifyGitter,
+        'instance': NotifyGitter,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('gitter://%s/apprise' % ('g' * 40), {
-        'instance': plugins.NotifyGitter,
+        'instance': NotifyGitter,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('gitter://%s/apprise' % ('h' * 40), {
-        'instance': plugins.NotifyGitter,
+        'instance': NotifyGitter,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -163,8 +164,8 @@ def test_plugin_gitter_general(mock_post, mock_get, no_throttling):
     mock_post.return_value = request
 
     # Variation Initializations
-    obj = plugins.NotifyGitter(token=token, targets='apprise')
-    assert isinstance(obj, plugins.NotifyGitter) is True
+    obj = NotifyGitter(token=token, targets='apprise')
+    assert isinstance(obj, NotifyGitter) is True
     assert isinstance(obj.url(), str) is True
 
     # apprise room was found
@@ -233,7 +234,7 @@ def test_plugin_gitter_general(mock_post, mock_get, no_throttling):
     request.content = '{}'
 
     # Support the 'to' as a target
-    results = plugins.NotifyGitter.parse_url(
+    results = NotifyGitter.parse_url(
         'gitter://{}?to={}'.format(token, 'apprise'))
     assert isinstance(results, dict) is True
     assert 'apprise' in results['targets']
@@ -246,8 +247,8 @@ def test_plugin_gitter_general(mock_post, mock_get, no_throttling):
     assert obj.send(body="test") is True
 
     # Variation Initializations
-    obj = plugins.NotifyGitter(token=token, targets='apprise')
-    assert isinstance(obj, plugins.NotifyGitter) is True
+    obj = NotifyGitter(token=token, targets='apprise')
+    assert isinstance(obj, NotifyGitter) is True
     assert isinstance(obj.url(), str) is True
     # apprise room was not found
     assert obj.send(body="test") is False
@@ -277,7 +278,7 @@ def test_plugin_gitter_edge_cases():
 
     # Initializes the plugin with an invalid token
     with pytest.raises(TypeError):
-        plugins.NotifyGitter(token=None, targets=targets)
+        NotifyGitter(token=None, targets=targets)
     # Whitespace also acts as an invalid token value
     with pytest.raises(TypeError):
-        plugins.NotifyGitter(token="   ", targets=targets)
+        NotifyGitter(token="   ", targets=targets)

@@ -115,9 +115,6 @@ def __load_matrix(path=abspath(dirname(__file__)), name='apprise.plugins'):
         # Add our module name to our __all__
         __all__.append(plugin_name)
 
-        # Load our module into memory so it's accessible to all
-        globals()[plugin_name] = plugin
-
         fn = getattr(plugin, 'schemas', None)
         schemas = set([]) if not callable(fn) else fn(plugin)
 
@@ -147,8 +144,6 @@ def __reset_matrix():
 
     # Iterate over our module map so we can clear out our __all__ and globals
     for plugin_name in common.NOTIFY_MODULE_MAP.keys():
-        # Clear out globals
-        del globals()[plugin_name]
 
         # Remove element from plugins
         __all__.remove(plugin_name)

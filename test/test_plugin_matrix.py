@@ -27,9 +27,10 @@ from unittest import mock
 
 import requests
 import pytest
-from apprise import plugins
 from apprise import AppriseAsset
 from json import dumps
+
+from apprise.plugins.NotifyMatrix import NotifyMatrix
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -49,7 +50,7 @@ apprise_url_tests = (
     }),
     ('matrix://localhost?mode=off', {
         # treats it as a anonymous user to register
-        'instance': plugins.NotifyMatrix,
+        'instance': NotifyMatrix,
         # response is false because we have nothing to notify
         'response': False,
     }),
@@ -59,18 +60,18 @@ apprise_url_tests = (
         'instance': TypeError
     }),
     ('matrix://user:pass@localhost/#room1/#room2/#room3', {
-        'instance': plugins.NotifyMatrix,
+        'instance': NotifyMatrix,
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('matrix://user:pass@localhost/#room1/#room2/!room1', {
-        'instance': plugins.NotifyMatrix,
+        'instance': NotifyMatrix,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('matrix://user:pass@localhost:1234/#room', {
-        'instance': plugins.NotifyMatrix,
+        'instance': NotifyMatrix,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -82,42 +83,42 @@ apprise_url_tests = (
     # Matrix supports webhooks too; the following tests this now:
     ('matrix://user:token@localhost?mode=matrix&format=text', {
         # user and token correctly specified with webhook
-        'instance': plugins.NotifyMatrix,
+        'instance': NotifyMatrix,
         'response': False,
     }),
     ('matrix://user:token@localhost?mode=matrix&format=html', {
         # user and token correctly specified with webhook
-        'instance': plugins.NotifyMatrix,
+        'instance': NotifyMatrix,
     }),
     ('matrix://user:token@localhost?mode=slack&format=text', {
         # user and token correctly specified with webhook
-        'instance': plugins.NotifyMatrix,
+        'instance': NotifyMatrix,
     }),
     ('matrixs://user:token@localhost?mode=SLACK&format=markdown', {
         # user and token specified; slack webhook still detected
         # despite uppercase characters
-        'instance': plugins.NotifyMatrix,
+        'instance': NotifyMatrix,
     }),
     ('matrix://user@localhost?mode=SLACK&format=markdown&token=mytoken', {
         # user and token specified; slack webhook still detected
         # despite uppercase characters; token also set on URL as arg
-        'instance': plugins.NotifyMatrix,
+        'instance': NotifyMatrix,
     }),
     ('matrix://_?mode=t2bot&token={}'.format('b' * 64), {
         # Testing t2bot initialization and setting the password using the
         # token directive
-        'instance': plugins.NotifyMatrix,
+        'instance': NotifyMatrix,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'matrix://b...b/',
     }),
     # Image Reference
     ('matrixs://user:token@localhost?mode=slack&format=markdown&image=True', {
         # user and token specified; image set to True
-        'instance': plugins.NotifyMatrix,
+        'instance': NotifyMatrix,
     }),
     ('matrixs://user:token@localhost?mode=slack&format=markdown&image=False', {
         # user and token specified; image set to True
-        'instance': plugins.NotifyMatrix,
+        'instance': NotifyMatrix,
     }),
     # A Bunch of bad ports
     ('matrixs://user:pass@hostname:port/#room_alias', {
@@ -136,15 +137,15 @@ apprise_url_tests = (
     ('matrixs://user@{}?mode=t2bot&format=markdown&image=True'
      .format('a' * 64), {
          # user and token specified; image set to True
-         'instance': plugins.NotifyMatrix}),
+         'instance': NotifyMatrix}),
     ('matrix://user@{}?mode=t2bot&format=html&image=False'
      .format('z' * 64), {
          # user and token specified; image set to True
-         'instance': plugins.NotifyMatrix}),
+         'instance': NotifyMatrix}),
     # This will default to t2bot because no targets were specified and no
     # password
     ('matrixs://{}'.format('c' * 64), {
-        'instance': plugins.NotifyMatrix,
+        'instance': NotifyMatrix,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -152,31 +153,31 @@ apprise_url_tests = (
     # Test Native URL
     ('https://webhooks.t2bot.io/api/v1/matrix/hook/{}/'.format('d' * 64), {
         # user and token specified; image set to True
-        'instance': plugins.NotifyMatrix,
+        'instance': NotifyMatrix,
     }),
     ('matrix://user:token@localhost?mode=On', {
         # invalid webhook specified (unexpected boolean)
         'instance': TypeError,
     }),
     ('matrix://token@localhost/?mode=Matrix', {
-        'instance': plugins.NotifyMatrix,
+        'instance': NotifyMatrix,
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('matrix://user:token@localhost/mode=matrix', {
-        'instance': plugins.NotifyMatrix,
+        'instance': NotifyMatrix,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('matrix://token@localhost:8080/?mode=slack', {
-        'instance': plugins.NotifyMatrix,
+        'instance': NotifyMatrix,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
     }),
     ('matrix://{}/?mode=t2bot'.format('b' * 64), {
-        'instance': plugins.NotifyMatrix,
+        'instance': NotifyMatrix,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -218,70 +219,70 @@ def test_plugin_matrix_general(mock_post, mock_get, no_throttling):
     mock_post.return_value = request
 
     # Variation Initializations
-    obj = plugins.NotifyMatrix(host='host', targets='#abcd')
-    assert isinstance(obj, plugins.NotifyMatrix) is True
+    obj = NotifyMatrix(host='host', targets='#abcd')
+    assert isinstance(obj, NotifyMatrix) is True
     assert isinstance(obj.url(), str) is True
     # Registration successful
     assert obj.send(body="test") is True
 
-    obj = plugins.NotifyMatrix(host='host', user='user', targets='#abcd')
-    assert isinstance(obj, plugins.NotifyMatrix) is True
+    obj = NotifyMatrix(host='host', user='user', targets='#abcd')
+    assert isinstance(obj, NotifyMatrix) is True
     assert isinstance(obj.url(), str) is True
     # Registration successful
     assert obj.send(body="test") is True
 
-    obj = plugins.NotifyMatrix(host='host', password='passwd', targets='#abcd')
-    assert isinstance(obj, plugins.NotifyMatrix) is True
+    obj = NotifyMatrix(host='host', password='passwd', targets='#abcd')
+    assert isinstance(obj, NotifyMatrix) is True
     assert isinstance(obj.url(), str) is True
     # A username gets automatically generated in these cases
     assert obj.send(body="test") is True
 
-    obj = plugins.NotifyMatrix(
+    obj = NotifyMatrix(
         host='host', user='user', password='passwd', targets='#abcd')
     assert isinstance(obj.url(), str) is True
-    assert isinstance(obj, plugins.NotifyMatrix) is True
+    assert isinstance(obj, NotifyMatrix) is True
     # Registration Successful
     assert obj.send(body="test") is True
 
     # Test sending other format types
-    kwargs = plugins.NotifyMatrix.parse_url(
+    kwargs = NotifyMatrix.parse_url(
         'matrix://user:passwd@hostname/#abcd?format=html')
-    obj = plugins.NotifyMatrix(**kwargs)
+    obj = NotifyMatrix(**kwargs)
     assert isinstance(obj.url(), str) is True
-    assert isinstance(obj, plugins.NotifyMatrix) is True
+    assert isinstance(obj, NotifyMatrix) is True
     obj.send(body="test") is True
     obj.send(title="title", body="test") is True
 
-    kwargs = plugins.NotifyMatrix.parse_url(
+    kwargs = NotifyMatrix.parse_url(
         'matrix://user:passwd@hostname/#abcd/#abcd:localhost?format=markdown')
-    obj = plugins.NotifyMatrix(**kwargs)
+    obj = NotifyMatrix(**kwargs)
     assert isinstance(obj.url(), str) is True
-    assert isinstance(obj, plugins.NotifyMatrix) is True
+    assert isinstance(obj, NotifyMatrix) is True
     obj.send(body="test") is True
     obj.send(title="title", body="test") is True
 
-    kwargs = plugins.NotifyMatrix.parse_url(
+    kwargs = NotifyMatrix.parse_url(
         'matrix://user:passwd@hostname/#abcd/!abcd:localhost?format=text')
-    obj = plugins.NotifyMatrix(**kwargs)
+    obj = NotifyMatrix(**kwargs)
     assert isinstance(obj.url(), str) is True
-    assert isinstance(obj, plugins.NotifyMatrix) is True
+    assert isinstance(obj, NotifyMatrix) is True
     obj.send(body="test") is True
     obj.send(title="title", body="test") is True
 
     # Test notice type notifications
-    kwargs = plugins.NotifyMatrix.parse_url(
+    kwargs = NotifyMatrix.parse_url(
         'matrix://user:passwd@hostname/#abcd?msgtype=notice')
-    obj = plugins.NotifyMatrix(**kwargs)
+    obj = NotifyMatrix(**kwargs)
     assert isinstance(obj.url(), str) is True
-    assert isinstance(obj, plugins.NotifyMatrix) is True
+    assert isinstance(obj, NotifyMatrix) is True
     obj.send(body="test") is True
     obj.send(title="title", body="test") is True
 
     with pytest.raises(TypeError):
         # invalid message type specified
-        kwargs = plugins.NotifyMatrix.parse_url(
+        kwargs = NotifyMatrix.parse_url(
             'matrix://user:passwd@hostname/#abcd?msgtype=invalid')
-        obj = plugins.NotifyMatrix(**kwargs)
+        obj = NotifyMatrix(**kwargs)
 
     # Force a failed login
     ro = response_obj.copy()
@@ -292,20 +293,20 @@ def test_plugin_matrix_general(mock_post, mock_get, no_throttling):
     # Fails because we couldn't register because of 404 errors
     assert obj.send(body="test") is False
 
-    obj = plugins.NotifyMatrix(host='host', user='test', targets='#abcd')
-    assert isinstance(obj, plugins.NotifyMatrix) is True
+    obj = NotifyMatrix(host='host', user='test', targets='#abcd')
+    assert isinstance(obj, NotifyMatrix) is True
     # Fails because we still couldn't register
     assert obj.send(user='test', password='passwd', body="test") is False
 
-    obj = plugins.NotifyMatrix(
+    obj = NotifyMatrix(
         host='host', user='test', password='passwd', targets='#abcd')
-    assert isinstance(obj, plugins.NotifyMatrix) is True
+    assert isinstance(obj, NotifyMatrix) is True
     # Fails because we still couldn't register
     assert obj.send(body="test") is False
 
-    obj = plugins.NotifyMatrix(host='host', password='passwd', targets='#abcd')
+    obj = NotifyMatrix(host='host', password='passwd', targets='#abcd')
     # Fails because we still couldn't register
-    assert isinstance(obj, plugins.NotifyMatrix) is True
+    assert isinstance(obj, NotifyMatrix) is True
     assert obj.send(body="test") is False
 
     # Force a empty joined list response
@@ -331,8 +332,8 @@ def test_plugin_matrix_general(mock_post, mock_get, no_throttling):
     request.content = dumps(response_obj)
     request.status_code = requests.codes.ok
 
-    obj = plugins.NotifyMatrix(host='host', targets=None)
-    assert isinstance(obj, plugins.NotifyMatrix) is True
+    obj = NotifyMatrix(host='host', targets=None)
+    assert isinstance(obj, NotifyMatrix) is True
 
     # Force a empty joined list response
     ro = response_obj.copy()
@@ -388,17 +389,17 @@ def test_plugin_matrix_fetch(mock_post, mock_get, no_throttling):
     mock_get.side_effect = fetch_failed
     mock_post.side_effect = fetch_failed
 
-    obj = plugins.NotifyMatrix(
+    obj = NotifyMatrix(
         host='host', user='user', password='passwd', include_image=True)
-    assert isinstance(obj, plugins.NotifyMatrix) is True
+    assert isinstance(obj, NotifyMatrix) is True
     # We would hve failed to send our image notification
     assert obj.send(user='test', password='passwd', body="test") is False
 
     # Do the same query with no images to fetch
     asset = AppriseAsset(image_path_mask=False, image_url_mask=False)
-    obj = plugins.NotifyMatrix(
+    obj = NotifyMatrix(
         host='host', user='user', password='passwd', asset=asset)
-    assert isinstance(obj, plugins.NotifyMatrix) is True
+    assert isinstance(obj, NotifyMatrix) is True
     # We would hve failed to send our notification
     assert obj.send(user='test', password='passwd', body="test") is False
 
@@ -422,8 +423,8 @@ def test_plugin_matrix_fetch(mock_post, mock_get, no_throttling):
     mock_post.return_value = request
     mock_get.return_value = request
 
-    obj = plugins.NotifyMatrix(host='host', include_image=True)
-    assert isinstance(obj, plugins.NotifyMatrix) is True
+    obj = NotifyMatrix(host='host', include_image=True)
+    assert isinstance(obj, NotifyMatrix) is True
     assert obj.access_token is None
     assert obj._register() is True
     assert obj.access_token is not None
@@ -473,8 +474,8 @@ def test_plugin_matrix_auth(mock_post, mock_get, no_throttling):
     mock_post.return_value = request
     mock_get.return_value = request
 
-    obj = plugins.NotifyMatrix(host='localhost')
-    assert isinstance(obj, plugins.NotifyMatrix) is True
+    obj = NotifyMatrix(host='localhost')
+    assert isinstance(obj, NotifyMatrix) is True
     assert obj.access_token is None
     # logging out without an access_token is silently a success
     assert obj._logout() is True
@@ -510,8 +511,8 @@ def test_plugin_matrix_auth(mock_post, mock_get, no_throttling):
     assert obj.access_token is None
 
     # So will login
-    obj = plugins.NotifyMatrix(host='host', user='user', password='password')
-    assert isinstance(obj, plugins.NotifyMatrix) is True
+    obj = NotifyMatrix(host='host', user='user', password='password')
+    assert isinstance(obj, NotifyMatrix) is True
     assert obj._login() is False
     assert obj.access_token is None
 
@@ -573,8 +574,8 @@ def test_plugin_matrix_rooms(mock_post, mock_get, no_throttling):
     mock_post.return_value = request
     mock_get.return_value = request
 
-    obj = plugins.NotifyMatrix(host='host')
-    assert isinstance(obj, plugins.NotifyMatrix) is True
+    obj = NotifyMatrix(host='host')
+    assert isinstance(obj, NotifyMatrix) is True
     assert obj.access_token is None
 
     # Can't get room listing if we're not connnected
@@ -632,8 +633,8 @@ def test_plugin_matrix_rooms(mock_post, mock_get, no_throttling):
 
     # Room creation
     request.status_code = requests.codes.ok
-    obj = plugins.NotifyMatrix(host='host')
-    assert isinstance(obj, plugins.NotifyMatrix) is True
+    obj = NotifyMatrix(host='host')
+    assert isinstance(obj, NotifyMatrix) is True
     assert obj.access_token is None
 
     # Can't get room listing if we're not connnected
@@ -677,8 +678,8 @@ def test_plugin_matrix_rooms(mock_post, mock_get, no_throttling):
     # Room detection
     request.status_code = requests.codes.ok
     request.content = dumps(response_obj)
-    obj = plugins.NotifyMatrix(host='localhost')
-    assert isinstance(obj, plugins.NotifyMatrix) is True
+    obj = NotifyMatrix(host='localhost')
+    assert isinstance(obj, NotifyMatrix) is True
     assert obj.access_token is None
 
     # No rooms if we're not connected
@@ -703,8 +704,8 @@ def test_plugin_matrix_rooms(mock_post, mock_get, no_throttling):
 
     # Room id lookup
     request.status_code = requests.codes.ok
-    obj = plugins.NotifyMatrix(host='localhost')
-    assert isinstance(obj, plugins.NotifyMatrix) is True
+    obj = NotifyMatrix(host='localhost')
+    assert isinstance(obj, NotifyMatrix) is True
     assert obj.access_token is None
 
     # Can't get room listing if we're not connnected
@@ -737,13 +738,13 @@ def test_plugin_matrix_url_parsing():
     NotifyMatrix() URL Testing
 
     """
-    result = plugins.NotifyMatrix.parse_url(
+    result = NotifyMatrix.parse_url(
         'matrix://user:token@localhost?to=#room')
     assert isinstance(result, dict) is True
     assert len(result['targets']) == 1
     assert '#room' in result['targets']
 
-    result = plugins.NotifyMatrix.parse_url(
+    result = NotifyMatrix.parse_url(
         'matrix://user:token@localhost?to=#room1,#room2,#room3')
     assert isinstance(result, dict) is True
     assert len(result['targets']) == 3
@@ -786,16 +787,16 @@ def test_plugin_matrix_image_errors(mock_post, mock_get):
     mock_get.side_effect = mock_function_handing
     mock_post.side_effect = mock_function_handing
 
-    obj = plugins.NotifyMatrix(host='host', include_image=True)
-    assert isinstance(obj, plugins.NotifyMatrix) is True
+    obj = NotifyMatrix(host='host', include_image=True)
+    assert isinstance(obj, NotifyMatrix) is True
     assert obj.access_token is None
 
     # Notification was successful, however we could not post image and since
     # we had post errors (of any kind) we still report a failure.
     assert obj.notify('test', 'test') is False
 
-    obj = plugins.NotifyMatrix(host='host', include_image=False)
-    assert isinstance(obj, plugins.NotifyMatrix) is True
+    obj = NotifyMatrix(host='host', include_image=False)
+    assert isinstance(obj, NotifyMatrix) is True
     assert obj.access_token is None
 
     # We didn't post an image (which was set to fail) and therefore our
@@ -823,14 +824,14 @@ def test_plugin_matrix_image_errors(mock_post, mock_get):
     # Prepare Mock
     mock_get.side_effect = mock_function_handing
     mock_post.side_effect = mock_function_handing
-    obj = plugins.NotifyMatrix(host='host', include_image=True)
-    assert isinstance(obj, plugins.NotifyMatrix) is True
+    obj = NotifyMatrix(host='host', include_image=True)
+    assert isinstance(obj, NotifyMatrix) is True
     assert obj.access_token is None
 
     assert obj.notify('test', 'test') is True
 
-    obj = plugins.NotifyMatrix(host='host', include_image=False)
-    assert isinstance(obj, plugins.NotifyMatrix) is True
+    obj = NotifyMatrix(host='host', include_image=False)
+    assert isinstance(obj, NotifyMatrix) is True
     assert obj.access_token is None
 
     assert obj.notify('test', 'test') is True

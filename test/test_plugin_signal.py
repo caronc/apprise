@@ -29,8 +29,8 @@ from unittest import mock
 
 import pytest
 import requests
-from apprise import plugins
 from apprise import Apprise
+from apprise.plugins.NotifySignalAPI import NotifySignalAPI
 from helpers import AppriseURLTester
 from apprise import AppriseAttachment
 from apprise import NotifyType
@@ -67,7 +67,7 @@ apprise_url_tests = (
     }),
     ('signal://localhost/{}/123/'.format('1' * 11), {
         # invalid 'to' phone number
-        'instance': plugins.NotifySignalAPI,
+        'instance': NotifySignalAPI,
         # Notify will fail because it couldn't send to anyone
         'response': False,
         # Our expected url(privacy=True) startswith() response:
@@ -75,67 +75,67 @@ apprise_url_tests = (
     }),
     ('signal://localhost:8080/{}/'.format('1' * 11), {
         # one phone number will notify ourselves
-        'instance': plugins.NotifySignalAPI,
+        'instance': NotifySignalAPI,
     }),
 
     ('signal://localhost:8082/+{}/@group.abcd/'.format('2' * 11), {
         # a valid group
-        'instance': plugins.NotifySignalAPI,
+        'instance': NotifySignalAPI,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'signal://localhost:8082/+{}/@abcd'.format('2' * 11),
     }),
     ('signal://localhost:8080/+{}/group.abcd/'.format('1' * 11), {
         # another valid group (without @ symbol)
-        'instance': plugins.NotifySignalAPI,
+        'instance': NotifySignalAPI,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'signal://localhost:8080/+{}/@abcd'.format('1' * 11),
     }),
     ('signal://localhost:8080/?from={}&to={},{}'.format(
         '1' * 11, '2' * 11, '3' * 11), {
         # use get args to acomplish the same thing
-        'instance': plugins.NotifySignalAPI,
+        'instance': NotifySignalAPI,
     }),
     ('signal://localhost:8080/?from={}&to={},{},{}'.format(
         '1' * 11, '2' * 11, '3' * 11, '5' * 3), {
         # 2 good targets and one invalid one
-        'instance': plugins.NotifySignalAPI,
+        'instance': NotifySignalAPI,
     }),
     ('signal://localhost:8080/{}/{}/?from={}'.format(
         '1' * 11, '2' * 11, '3' * 11), {
         # If we have from= specified, then all elements take on the to= value
-        'instance': plugins.NotifySignalAPI,
+        'instance': NotifySignalAPI,
     }),
     ('signals://user@localhost/{}/{}'.format('1' * 11, '3' * 11), {
         # use get args to acomplish the same thing (use source instead of from)
-        'instance': plugins.NotifySignalAPI,
+        'instance': NotifySignalAPI,
     }),
     ('signals://user:password@localhost/{}/{}'.format('1' * 11, '3' * 11), {
         # use get args to acomplish the same thing (use source instead of from)
-        'instance': plugins.NotifySignalAPI,
+        'instance': NotifySignalAPI,
     }),
     ('signals://user:password@localhost/{}/{}'.format('1' * 11, '3' * 11), {
-        'instance': plugins.NotifySignalAPI,
+        'instance': NotifySignalAPI,
         # Test that a 201 response code is still accepted
         'requests_response_code': 201,
     }),
     ('signals://localhost/{}/{}/{}?batch=True'.format(
         '1' * 11, '3' * 11, '4' * 11), {
             # test batch mode
-            'instance': plugins.NotifySignalAPI,
+            'instance': NotifySignalAPI,
     }),
     ('signals://localhost/{}/{}/{}?status=True'.format(
         '1' * 11, '3' * 11, '4' * 11), {
             # test status switch
-            'instance': plugins.NotifySignalAPI,
+            'instance': NotifySignalAPI,
     }),
     ('signal://localhost/{}/{}'.format('1' * 11, '4' * 11), {
-        'instance': plugins.NotifySignalAPI,
+        'instance': NotifySignalAPI,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('signal://localhost/{}/{}'.format('1' * 11, '4' * 11), {
-        'instance': plugins.NotifySignalAPI,
+        'instance': NotifySignalAPI,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -175,7 +175,7 @@ def test_plugin_signal_edge_cases(mock_post, no_throttling):
 
     # No apikey specified
     with pytest.raises(TypeError):
-        plugins.NotifySignalAPI(source=None)
+        NotifySignalAPI(source=None)
 
     aobj = Apprise()
     assert aobj.add("signals://localhost:231/{}/{}".format(source, target))
@@ -321,7 +321,7 @@ def test_notify_signal_plugin_attachments(mock_post, no_throttling):
     obj = Apprise.instantiate(
         'signal://10.0.0.112:8080/+12512222222/+12513333333/'
         '12514444444?batch=no')
-    assert isinstance(obj, plugins.NotifySignalAPI)
+    assert isinstance(obj, NotifySignalAPI)
 
     # Test Valid Attachment
     path = os.path.join(TEST_VAR_DIR, 'apprise-test.gif')
@@ -364,7 +364,7 @@ def test_notify_signal_plugin_attachments(mock_post, no_throttling):
     obj = Apprise.instantiate(
         'signal://10.0.0.112:8080/+12512222222/+12513333333/'
         '12514444444?batch=yes')
-    assert isinstance(obj, plugins.NotifySignalAPI)
+    assert isinstance(obj, NotifySignalAPI)
 
     # Now send an attachment normally without issues
     mock_post.reset_mock()

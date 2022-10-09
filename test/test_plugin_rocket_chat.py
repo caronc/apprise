@@ -24,8 +24,8 @@
 # THE SOFTWARE.
 import pytest
 import requests
-from apprise import plugins
 from apprise import NotifyType
+from apprise.plugins.NotifyRocketChat import NotifyRocketChat
 from helpers import AppriseURLTester
 from unittest import mock
 
@@ -66,7 +66,7 @@ apprise_url_tests = (
     }),
     # A room and port identifier
     ('rocket://user:pass@localhost:8080/room/', {
-        'instance': plugins.NotifyRocketChat,
+        'instance': NotifyRocketChat,
         # The response text is expected to be the following on a success
         'requests_response_text': {
             'status': 'success',
@@ -78,7 +78,7 @@ apprise_url_tests = (
     }),
     # A channel (using the to=)
     ('rockets://user:pass@localhost?to=#channel', {
-        'instance': plugins.NotifyRocketChat,
+        'instance': NotifyRocketChat,
         # The response text is expected to be the following on a success
         'requests_response_text': {
             'status': 'success',
@@ -90,7 +90,7 @@ apprise_url_tests = (
     }),
     # A channel
     ('rockets://user:pass@localhost/#channel', {
-        'instance': plugins.NotifyRocketChat,
+        'instance': NotifyRocketChat,
         # The response text is expected to be the following on a success
         'requests_response_text': {
             'status': 'success',
@@ -102,7 +102,7 @@ apprise_url_tests = (
     }),
     # Several channels
     ('rocket://user:pass@localhost/#channel1/#channel2/?avatar=Yes', {
-        'instance': plugins.NotifyRocketChat,
+        'instance': NotifyRocketChat,
         # The response text is expected to be the following on a success
         'requests_response_text': {
             'status': 'success',
@@ -114,7 +114,7 @@ apprise_url_tests = (
     }),
     # Several Rooms
     ('rocket://user:pass@localhost/room1/room2', {
-        'instance': plugins.NotifyRocketChat,
+        'instance': NotifyRocketChat,
         # The response text is expected to be the following on a success
         'requests_response_text': {
             'status': 'success',
@@ -126,7 +126,7 @@ apprise_url_tests = (
     }),
     # A room and channel
     ('rocket://user:pass@localhost/room/#channel?mode=basic&avatar=Yes', {
-        'instance': plugins.NotifyRocketChat,
+        'instance': NotifyRocketChat,
         # The response text is expected to be the following on a success
         'requests_response_text': {
             'status': 'success',
@@ -142,7 +142,7 @@ apprise_url_tests = (
     # to ensure we get the right mode, we enforce basic mode
     # so that web/token gets interpreted as a password
     ('rockets://user:pass%2Fwithslash@localhost/#channel/?mode=basic', {
-        'instance': plugins.NotifyRocketChat,
+        'instance': NotifyRocketChat,
         # The response text is expected to be the following on a success
         'requests_response_text': {
             'status': 'success',
@@ -161,54 +161,54 @@ apprise_url_tests = (
             'status': 'failure',
         },
         # Exception is thrown in this case
-        'instance': plugins.NotifyRocketChat,
+        'instance': NotifyRocketChat,
         # Notifications will fail in this event
         'response': False,
     }),
     # A web token
     ('rockets://web/token@localhost/@user/#channel/roomid', {
-        'instance': plugins.NotifyRocketChat,
+        'instance': NotifyRocketChat,
     }),
     ('rockets://user:web/token@localhost/@user/?mode=webhook', {
-        'instance': plugins.NotifyRocketChat,
+        'instance': NotifyRocketChat,
     }),
     ('rockets://user:web/token@localhost?to=@user2,#channel2', {
-        'instance': plugins.NotifyRocketChat,
+        'instance': NotifyRocketChat,
     }),
     ('rockets://web/token@localhost/?avatar=No', {
         # a simple webhook token with default values
-        'instance': plugins.NotifyRocketChat,
+        'instance': NotifyRocketChat,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'rockets://w...n@localhost',
     }),
     ('rockets://localhost/@user/?mode=webhook&webhook=web/token', {
-        'instance': plugins.NotifyRocketChat,
+        'instance': NotifyRocketChat,
     }),
     ('rockets://user:web/token@localhost/@user/?mode=invalid', {
         # invalid mode
         'instance': TypeError,
     }),
     ('rocket://user:pass@localhost:8081/room1/room2', {
-        'instance': plugins.NotifyRocketChat,
+        'instance': NotifyRocketChat,
         # force a failure using basic mode
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('rockets://user:web/token@localhost?to=@user3,#channel3', {
-        'instance': plugins.NotifyRocketChat,
+        'instance': NotifyRocketChat,
         # force a failure using webhook mode
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('rocket://user:pass@localhost:8082/#channel', {
-        'instance': plugins.NotifyRocketChat,
+        'instance': NotifyRocketChat,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('rocket://user:pass@localhost:8083/#chan1/#chan2/room', {
-        'instance': plugins.NotifyRocketChat,
+        'instance': NotifyRocketChat,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -249,16 +249,16 @@ def test_plugin_rocketchat_edge_cases(mock_post, mock_get, no_throttling):
     mock_post.return_value.content = ''
     mock_get.return_value.content = ''
 
-    obj = plugins.NotifyRocketChat(
+    obj = NotifyRocketChat(
         user=user, password=password, targets=recipients)
-    assert isinstance(obj, plugins.NotifyRocketChat) is True
+    assert isinstance(obj, NotifyRocketChat) is True
     assert len(obj.channels) == 2
     assert len(obj.users) == 2
     assert len(obj.rooms) == 1
 
     # No Webhook specified
     with pytest.raises(TypeError):
-        obj = plugins.NotifyRocketChat(webhook=None, mode='webhook')
+        obj = NotifyRocketChat(webhook=None, mode='webhook')
 
     #
     # Logout

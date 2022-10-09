@@ -26,7 +26,8 @@ from unittest import mock
 
 import pytest
 import requests
-from apprise import plugins
+
+from apprise.plugins.NotifyFlock import NotifyFlock
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -44,74 +45,74 @@ apprise_url_tests = (
     }),
     # Provide a token
     ('flock://%s' % ('t' * 24), {
-        'instance': plugins.NotifyFlock,
+        'instance': NotifyFlock,
     }),
     # Image handling
     ('flock://%s?image=True' % ('t' * 24), {
-        'instance': plugins.NotifyFlock,
+        'instance': NotifyFlock,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'flock://t...t',
     }),
     ('flock://%s?image=False' % ('t' * 24), {
-        'instance': plugins.NotifyFlock,
+        'instance': NotifyFlock,
     }),
     ('flock://%s?image=True' % ('t' * 24), {
-        'instance': plugins.NotifyFlock,
+        'instance': NotifyFlock,
         # Run test when image is set to True, but one couldn't actually be
         # loaded from the Asset Object.
         'include_image': False,
     }),
     # Test to=
     ('flock://%s?to=u:%s&format=markdown' % ('i' * 24, 'u' * 12), {
-        'instance': plugins.NotifyFlock,
+        'instance': NotifyFlock,
     }),
     # Provide markdown format
     ('flock://%s?format=markdown' % ('i' * 24), {
-        'instance': plugins.NotifyFlock,
+        'instance': NotifyFlock,
     }),
     # Provide text format
     ('flock://%s?format=text' % ('i' * 24), {
-        'instance': plugins.NotifyFlock,
+        'instance': NotifyFlock,
     }),
     # Native URL Support, take the slack URL and still build from it
     ('https://api.flock.com/hooks/sendMessage/{}/'.format('i' * 24), {
-        'instance': plugins.NotifyFlock,
+        'instance': NotifyFlock,
     }),
     # Native URL Support with arguments
     ('https://api.flock.com/hooks/sendMessage/{}/?format=markdown'.format(
         'i' * 24), {
-        'instance': plugins.NotifyFlock,
+        'instance': NotifyFlock,
     }),
     # Bot API presumed if one or more targets are specified
     # Provide markdown format
     ('flock://%s/u:%s?format=markdown' % ('i' * 24, 'u' * 12), {
-        'instance': plugins.NotifyFlock,
+        'instance': NotifyFlock,
     }),
     # Bot API presumed if one or more targets are specified
     # Provide text format
     ('flock://%s/u:%s?format=html' % ('i' * 24, 'u' * 12), {
-        'instance': plugins.NotifyFlock,
+        'instance': NotifyFlock,
     }),
     # Bot API presumed if one or more targets are specified
     # u: is optional
     ('flock://%s/%s?format=text' % ('i' * 24, 'u' * 12), {
-        'instance': plugins.NotifyFlock,
+        'instance': NotifyFlock,
     }),
     # Bot API presumed if one or more targets are specified
     # Multi-entries
     ('flock://%s/g:%s/u:%s?format=text' % ('i' * 24, 'g' * 12, 'u' * 12), {
-        'instance': plugins.NotifyFlock,
+        'instance': NotifyFlock,
     }),
     # Bot API presumed if one or more targets are specified
     # Multi-entries using @ for user and # for channel
     ('flock://%s/#%s/@%s?format=text' % ('i' * 24, 'g' * 12, 'u' * 12), {
-        'instance': plugins.NotifyFlock,
+        'instance': NotifyFlock,
     }),
     # Bot API presumed if one or more targets are specified
     # has bad entry
     ('flock://%s/g:%s/u:%s?format=text' % ('i' * 24, 'g' * 12, 'u' * 10), {
-        'instance': plugins.NotifyFlock,
+        'instance': NotifyFlock,
     }),
     # Invalid user/group defined
     ('flock://%s/g:/u:?format=text' % ('i' * 24), {
@@ -121,29 +122,29 @@ apprise_url_tests = (
     # As a result, the following will load and pass the data upstream
     ('flock://%s/g:%s/u:%s?format=text' % ('i' * 24, 'g' * 14, 'u' * 10), {
         # We will still instantiate the object
-        'instance': plugins.NotifyFlock,
+        'instance': NotifyFlock,
     }),
     # Error Testing
     ('flock://%s/g:%s/u:%s?format=text' % ('i' * 24, 'g' * 12, 'u' * 10), {
-        'instance': plugins.NotifyFlock,
+        'instance': NotifyFlock,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('flock://%s/' % ('t' * 24), {
-        'instance': plugins.NotifyFlock,
+        'instance': NotifyFlock,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('flock://%s/' % ('t' * 24), {
-        'instance': plugins.NotifyFlock,
+        'instance': NotifyFlock,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('flock://%s/' % ('t' * 24), {
-        'instance': plugins.NotifyFlock,
+        'instance': NotifyFlock,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -171,7 +172,7 @@ def test_plugin_flock_edge_cases(mock_post, mock_get, no_throttling):
 
     # Initializes the plugin with an invalid token
     with pytest.raises(TypeError):
-        plugins.NotifyFlock(token=None)
+        NotifyFlock(token=None)
     # Whitespace also acts as an invalid token value
     with pytest.raises(TypeError):
-        plugins.NotifyFlock(token="   ")
+        NotifyFlock(token="   ")

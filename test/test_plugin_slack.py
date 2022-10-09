@@ -28,9 +28,9 @@ from unittest import mock
 
 import pytest
 import requests
-from apprise import plugins
 from apprise import NotifyType
 from apprise import AppriseAttachment
+from apprise.plugins.NotifySlack import NotifySlack
 from helpers import AppriseURLTester
 
 from json import dumps
@@ -61,7 +61,7 @@ apprise_url_tests = (
     ('slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#hmm/#-invalid-', {
         # No username specified; this is still okay as we sub in
         # default; The one invalid channel is skipped when sending a message
-        'instance': plugins.NotifySlack,
+        'instance': NotifySlack,
         # There is an invalid channel that we will fail to deliver to
         # as a result the response type will be false
         'response': False,
@@ -73,7 +73,7 @@ apprise_url_tests = (
     ('slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#channel', {
         # No username specified; this is still okay as we sub in
         # default; The one invalid channel is skipped when sending a message
-        'instance': plugins.NotifySlack,
+        'instance': NotifySlack,
         # don't include an image by default
         'include_image': False,
         'requests_response_text': 'ok'
@@ -81,48 +81,48 @@ apprise_url_tests = (
     ('slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/+id/@id/', {
         # + encoded id,
         # @ userid
-        'instance': plugins.NotifySlack,
+        'instance': NotifySlack,
         'requests_response_text': 'ok',
     }),
     ('slack://username@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/'
         '?to=#nuxref', {
-            'instance': plugins.NotifySlack,
+            'instance': NotifySlack,
 
             # Our expected url(privacy=True) startswith() response:
             'privacy_url': 'slack://username@T...2/A...D/T...Q/',
             'requests_response_text': 'ok',
         }),
     ('slack://username@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#nuxref', {
-        'instance': plugins.NotifySlack,
+        'instance': NotifySlack,
         'requests_response_text': 'ok',
     }),
     # You can't send to email using webhook
     ('slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnl/user@gmail.com', {
-        'instance': plugins.NotifySlack,
+        'instance': NotifySlack,
         'requests_response_text': 'ok',
         # we'll have a notify response failure in this case
         'notify_response': False,
     }),
     # Specify Token on argument string (with username)
     ('slack://bot@_/#nuxref?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnadfdajkjkfl/', {
-        'instance': plugins.NotifySlack,
+        'instance': NotifySlack,
         'requests_response_text': 'ok',
     }),
     # Specify Token and channels on argument string (no username)
     ('slack://?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/&to=#chan', {
-        'instance': plugins.NotifySlack,
+        'instance': NotifySlack,
         'requests_response_text': 'ok',
     }),
     # Test webhook that doesn't have a proper response
     ('slack://username@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#nuxref', {
-        'instance': plugins.NotifySlack,
+        'instance': NotifySlack,
         'requests_response_text': 'fail',
         # we'll have a notify response failure in this case
         'notify_response': False,
     }),
     # Test using a bot-token (also test footer set to no flag)
     ('slack://username@xoxb-1234-1234-abc124/#nuxref?footer=no', {
-        'instance': plugins.NotifySlack,
+        'instance': NotifySlack,
         'requests_response_text': {
             'ok': True,
             'message': '',
@@ -136,32 +136,32 @@ apprise_url_tests = (
     ('slack://?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/'
      '&to=#chan&blocks=yes&footer=yes',
         {
-            'instance': plugins.NotifySlack,
+            'instance': NotifySlack,
             'requests_response_text': 'ok'}),
     ('slack://?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/'
      '&to=#chan&blocks=yes&footer=no',
         {
-            'instance': plugins.NotifySlack,
+            'instance': NotifySlack,
             'requests_response_text': 'ok'}),
     ('slack://?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/'
      '&to=#chan&blocks=yes&footer=yes&image=no',
         {
-            'instance': plugins.NotifySlack,
+            'instance': NotifySlack,
             'requests_response_text': 'ok'}),
     ('slack://?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/'
      '&to=#chan&blocks=yes&format=text',
         {
-            'instance': plugins.NotifySlack,
+            'instance': NotifySlack,
             'requests_response_text': 'ok'}),
     ('slack://?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/'
      '&to=#chan&blocks=no&format=text',
         {
-            'instance': plugins.NotifySlack,
+            'instance': NotifySlack,
             'requests_response_text': 'ok'}),
 
     # Test using a bot-token as argument
     ('slack://?token=xoxb-1234-1234-abc124&to=#nuxref&footer=no&user=test', {
-        'instance': plugins.NotifySlack,
+        'instance': NotifySlack,
         'requests_response_text': {
             'ok': True,
             'message': '',
@@ -175,7 +175,7 @@ apprise_url_tests = (
     }),
     # We contain 1 or more invalid channels, so we'll fail on our notify call
     ('slack://?token=xoxb-1234-1234-abc124&to=#nuxref,#$,#-&footer=no', {
-        'instance': plugins.NotifySlack,
+        'instance': NotifySlack,
         'requests_response_text': {
             'ok': True,
             'message': '',
@@ -188,7 +188,7 @@ apprise_url_tests = (
         'notify_response': False,
     }),
     ('slack://username@xoxb-1234-1234-abc124/#nuxref', {
-        'instance': plugins.NotifySlack,
+        'instance': NotifySlack,
         'requests_response_text': {
             'ok': True,
             'message': '',
@@ -200,19 +200,19 @@ apprise_url_tests = (
 
     ('slack://username@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ', {
         # Missing a channel, falls back to webhook channel bindings
-        'instance': plugins.NotifySlack,
+        'instance': NotifySlack,
         'requests_response_text': 'ok',
     }),
     # Native URL Support, take the slack URL and still build from it
     ('https://hooks.slack.com/services/{}/{}/{}'.format(
         'A' * 9, 'B' * 9, 'c' * 24), {
-        'instance': plugins.NotifySlack,
+        'instance': NotifySlack,
         'requests_response_text': 'ok',
     }),
     # Native URL Support with arguments
     ('https://hooks.slack.com/services/{}/{}/{}?format=text'.format(
         'A' * 9, 'B' * 9, 'c' * 24), {
-        'instance': plugins.NotifySlack,
+        'instance': NotifySlack,
         'requests_response_text': 'ok',
     }),
     ('slack://username@-INVALID-/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#cool', {
@@ -228,21 +228,21 @@ apprise_url_tests = (
         'instance': TypeError,
     }),
     ('slack://l2g@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#usenet', {
-        'instance': plugins.NotifySlack,
+        'instance': NotifySlack,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
         'requests_response_text': 'ok',
     }),
     ('slack://respect@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#a', {
-        'instance': plugins.NotifySlack,
+        'instance': NotifySlack,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
         'requests_response_text': 'ok',
     }),
     ('slack://notify@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#b', {
-        'instance': plugins.NotifySlack,
+        'instance': NotifySlack,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -268,7 +268,7 @@ def test_plugin_slack_oauth_access_token(mock_post):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifySlack.request_rate_per_sec = 0
+    NotifySlack.request_rate_per_sec = 0
 
     # Generate an invalid bot token
     token = 'xo-invalid'
@@ -287,7 +287,7 @@ def test_plugin_slack_oauth_access_token(mock_post):
 
     # We'll fail to validate the access_token
     with pytest.raises(TypeError):
-        plugins.NotifySlack(access_token=token)
+        NotifySlack(access_token=token)
 
     # Generate a (valid) bot token
     token = 'xoxb-1234-1234-abc124'
@@ -296,8 +296,8 @@ def test_plugin_slack_oauth_access_token(mock_post):
     mock_post.return_value = request
 
     # Variation Initializations
-    obj = plugins.NotifySlack(access_token=token, targets='#apprise')
-    assert isinstance(obj, plugins.NotifySlack) is True
+    obj = NotifySlack(access_token=token, targets='#apprise')
+    assert isinstance(obj, NotifySlack) is True
     assert isinstance(obj.url(), str) is True
 
     # apprise room was found
@@ -391,7 +391,7 @@ def test_plugin_slack_webhook_mode(mock_post):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifySlack.request_rate_per_sec = 0
+    NotifySlack.request_rate_per_sec = 0
 
     # Prepare Mock
     mock_post.return_value = requests.Request()
@@ -407,7 +407,7 @@ def test_plugin_slack_webhook_mode(mock_post):
     # Support strings
     channels = 'chan1,#chan2,+BAK4K23G5,@user,,,'
 
-    obj = plugins.NotifySlack(
+    obj = NotifySlack(
         token_a=token_a, token_b=token_b, token_c=token_c, targets=channels)
     assert len(obj.channels) == 4
 
@@ -417,12 +417,12 @@ def test_plugin_slack_webhook_mode(mock_post):
 
     # Missing first Token
     with pytest.raises(TypeError):
-        plugins.NotifySlack(
+        NotifySlack(
             token_a=None, token_b=token_b, token_c=token_c,
             targets=channels)
 
     # Test include_image
-    obj = plugins.NotifySlack(
+    obj = NotifySlack(
         token_a=token_a, token_b=token_b, token_c=token_c, targets=channels,
         include_image=True)
 
@@ -439,7 +439,7 @@ def test_plugin_slack_send_by_email(mock_get, mock_post):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifySlack.request_rate_per_sec = 0
+    NotifySlack.request_rate_per_sec = 0
 
     # Generate a (valid) bot token
     token = 'xoxb-1234-1234-abc124'
@@ -459,8 +459,8 @@ def test_plugin_slack_send_by_email(mock_get, mock_post):
     mock_get.return_value = request
 
     # Variation Initializations
-    obj = plugins.NotifySlack(access_token=token, targets='user@gmail.com')
-    assert isinstance(obj, plugins.NotifySlack) is True
+    obj = NotifySlack(access_token=token, targets='user@gmail.com')
+    assert isinstance(obj, NotifySlack) is True
     assert isinstance(obj.url(), str) is True
 
     # No calls made yet
@@ -515,8 +515,8 @@ def test_plugin_slack_send_by_email(mock_get, mock_post):
     mock_get.return_value = request
 
     # Variation Initializations
-    obj = plugins.NotifySlack(access_token=token, targets='user@gmail.com')
-    assert isinstance(obj, plugins.NotifySlack) is True
+    obj = NotifySlack(access_token=token, targets='user@gmail.com')
+    assert isinstance(obj, NotifySlack) is True
     assert isinstance(obj.url(), str) is True
 
     # No calls made yet
@@ -549,8 +549,8 @@ def test_plugin_slack_send_by_email(mock_get, mock_post):
     mock_get.return_value = request
 
     # Variation Initializations
-    obj = plugins.NotifySlack(access_token=token, targets='user@gmail.com')
-    assert isinstance(obj, plugins.NotifySlack) is True
+    obj = NotifySlack(access_token=token, targets='user@gmail.com')
+    assert isinstance(obj, NotifySlack) is True
     assert isinstance(obj.url(), str) is True
 
     # No calls made yet
@@ -583,8 +583,8 @@ def test_plugin_slack_send_by_email(mock_get, mock_post):
     mock_get.return_value = request
 
     # Variation Initializations
-    obj = plugins.NotifySlack(access_token=token, targets='user@gmail.com')
-    assert isinstance(obj, plugins.NotifySlack) is True
+    obj = NotifySlack(access_token=token, targets='user@gmail.com')
+    assert isinstance(obj, NotifySlack) is True
     assert isinstance(obj.url(), str) is True
 
     # No calls made yet
@@ -627,8 +627,8 @@ def test_plugin_slack_send_by_email(mock_get, mock_post):
         0, 'requests.ConnectionError() not handled')
 
     # Variation Initializations
-    obj = plugins.NotifySlack(access_token=token, targets='user@gmail.com')
-    assert isinstance(obj, plugins.NotifySlack) is True
+    obj = NotifySlack(access_token=token, targets='user@gmail.com')
+    assert isinstance(obj, NotifySlack) is True
     assert isinstance(obj.url(), str) is True
 
     # No calls made yet

@@ -27,8 +27,8 @@ from json import loads, dumps
 from unittest import mock
 
 import requests
-from apprise import plugins
 from apprise import Apprise
+from apprise.plugins.NotifySMSEagle import NotifySMSEagle
 from helpers import AppriseURLTester
 from apprise import AppriseAttachment
 from apprise import NotifyType
@@ -73,7 +73,7 @@ apprise_url_tests = (
     }),
     ('smseagle://token@localhost/123/', {
         # invalid 'to' phone number
-        'instance': plugins.NotifySMSEagle,
+        'instance': NotifySMSEagle,
         # Notify will fail because it couldn't send to anyone
         'response': False,
         # Our expected url(privacy=True) startswith() response:
@@ -83,7 +83,7 @@ apprise_url_tests = (
     }),
     ('smseagle://token@localhost/%20/%20/', {
         # invalid 'to' phone number
-        'instance': plugins.NotifySMSEagle,
+        'instance': NotifySMSEagle,
         # Notify will fail because it couldn't send to anyone
         'response': False,
         # Our expected url(privacy=True) startswith() response:
@@ -93,25 +93,25 @@ apprise_url_tests = (
     }),
     ('smseagle://token@localhost:8080/{}/'.format('1' * 11), {
         # one phone number will notify ourselves
-        'instance': plugins.NotifySMSEagle,
+        'instance': NotifySMSEagle,
         # Our response expected server response
         'requests_response_text': SMSEAGLE_GOOD_RESPONSE,
     }),
     ('smseagle://localhost:8080/{}/?token=abc1234'.format('1' * 11), {
         # pass our token in as an argument
-        'instance': plugins.NotifySMSEagle,
+        'instance': NotifySMSEagle,
         # Our response expected server response
         'requests_response_text': SMSEAGLE_GOOD_RESPONSE,
     }),
     # Set priority
     ('smseagle://token@localhost/@user/?priority=high', {
-        'instance': plugins.NotifySMSEagle,
+        'instance': NotifySMSEagle,
         # Our response expected server response
         'requests_response_text': SMSEAGLE_GOOD_RESPONSE,
     }),
     # Support integer value too
     ('smseagle://token@localhost/@user/?priority=1', {
-        'instance': plugins.NotifySMSEagle,
+        'instance': NotifySMSEagle,
         'requests_response_text': SMSEAGLE_GOOD_RESPONSE,
     }),
     # Invalid priority
@@ -126,7 +126,7 @@ apprise_url_tests = (
     }),
     ('smseagle://token@localhost:8082/#abcd/', {
         # a valid group
-        'instance': plugins.NotifySMSEagle,
+        'instance': NotifySMSEagle,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'smseagle://****@localhost:8082/#abcd',
         # Our response expected server response
@@ -134,7 +134,7 @@ apprise_url_tests = (
     }),
     ('smseagle://token@localhost:8082/@abcd/', {
         # a valid contact
-        'instance': plugins.NotifySMSEagle,
+        'instance': NotifySMSEagle,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'smseagle://****@localhost:8082/@abcd',
         # Our response expected server response
@@ -142,7 +142,7 @@ apprise_url_tests = (
     }),
     ('smseagles://token@localhost:8081/contact/', {
         # another valid group (without @ symbol)
-        'instance': plugins.NotifySMSEagle,
+        'instance': NotifySMSEagle,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'smseagles://****@localhost:8081/@contact',
         # Our response expected server response
@@ -150,7 +150,7 @@ apprise_url_tests = (
     }),
     ('smseagle://token@localhost:8082/@/#/,/', {
         # Test case where we provide bad data
-        'instance': plugins.NotifySMSEagle,
+        'instance': NotifySMSEagle,
         # Our failed response
         'requests_response_text': SMSEAGLE_GOOD_RESPONSE,
         # as a result, we expect a failed notification
@@ -158,7 +158,7 @@ apprise_url_tests = (
     }),
     ('smseagle://token@localhost:8083/@user/', {
         # Test case where we get a bad response
-        'instance': plugins.NotifySMSEagle,
+        'instance': NotifySMSEagle,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'smseagle://****@localhost:8083/@user',
         # Our failed response
@@ -168,7 +168,7 @@ apprise_url_tests = (
     }),
     ('smseagle://token@localhost:8084/@user/', {
         # Test case where we get a bad response
-        'instance': plugins.NotifySMSEagle,
+        'instance': NotifySMSEagle,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'smseagle://****@localhost:8084/@user',
         # Our failed response
@@ -178,7 +178,7 @@ apprise_url_tests = (
     }),
     ('smseagle://token@localhost:8085/@user/', {
         # Test case where we get a bad response
-        'instance': plugins.NotifySMSEagle,
+        'instance': NotifySMSEagle,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'smseagle://****@localhost:8085/@user',
         # Our failed response (bad json)
@@ -189,60 +189,60 @@ apprise_url_tests = (
     ('smseagle://token@localhost:8086/?to={},{}'.format(
         '2' * 11, '3' * 11), {
         # use get args to acomplish the same thing
-        'instance': plugins.NotifySMSEagle,
+        'instance': NotifySMSEagle,
         # Our response expected server response
         'requests_response_text': SMSEAGLE_GOOD_RESPONSE,
     }),
     ('smseagle://token@localhost:8087/?to={},{},{}'.format(
         '2' * 11, '3' * 11, '5' * 3), {
         # 2 good targets and one invalid one
-        'instance': plugins.NotifySMSEagle,
+        'instance': NotifySMSEagle,
         # Our response expected server response
         'requests_response_text': SMSEAGLE_GOOD_RESPONSE,
     }),
     ('smseagle://token@localhost:8088/{}/{}/'.format(
         '2' * 11, '3' * 11), {
         # If we have from= specified, then all elements take on the to= value
-        'instance': plugins.NotifySMSEagle,
+        'instance': NotifySMSEagle,
         # Our response expected server response
         'requests_response_text': SMSEAGLE_GOOD_RESPONSE,
     }),
     ('smseagles://token@localhost/{}'.format('3' * 11), {
         # use get args to acomplish the same thing (use source instead of from)
-        'instance': plugins.NotifySMSEagle,
+        'instance': NotifySMSEagle,
         # Our response expected server response
         'requests_response_text': SMSEAGLE_GOOD_RESPONSE,
     }),
     ('smseagles://token@localhost/{}/{}?batch=True'.format(
         '3' * 11, '4' * 11), {
             # test batch mode
-            'instance': plugins.NotifySMSEagle,
+            'instance': NotifySMSEagle,
             # Our response expected server response
             'requests_response_text': SMSEAGLE_GOOD_RESPONSE,
     }),
     ('smseagles://token@localhost/{}/?flash=yes'.format(
         '3' * 11), {
             # test flash mode
-            'instance': plugins.NotifySMSEagle,
+            'instance': NotifySMSEagle,
             # Our response expected server response
             'requests_response_text': SMSEAGLE_GOOD_RESPONSE,
     }),
     ('smseagles://token@localhost/{}/?test=yes'.format(
         '3' * 11), {
             # test mode
-            'instance': plugins.NotifySMSEagle,
+            'instance': NotifySMSEagle,
             # Our response expected server response
             'requests_response_text': SMSEAGLE_GOOD_RESPONSE,
     }),
     ('smseagles://token@localhost/{}/{}?status=True'.format(
         '3' * 11, '4' * 11), {
             # test status switch
-            'instance': plugins.NotifySMSEagle,
+            'instance': NotifySMSEagle,
             # Our response expected server response
             'requests_response_text': SMSEAGLE_GOOD_RESPONSE,
     }),
     ('smseagle://token@localhost/{}'.format('4' * 11), {
-        'instance': plugins.NotifySMSEagle,
+        'instance': NotifySMSEagle,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
@@ -250,7 +250,7 @@ apprise_url_tests = (
         'requests_response_text': SMSEAGLE_GOOD_RESPONSE,
     }),
     ('smseagle://token@localhost/{}'.format('4' * 11), {
-        'instance': plugins.NotifySMSEagle,
+        'instance': NotifySMSEagle,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -554,7 +554,7 @@ def test_notify_smseagle_plugin_result_list(mock_post, no_throttling):
     mock_post.return_value = okay_response
 
     obj = Apprise.instantiate('smseagle://token@127.0.0.1/12222222/')
-    assert isinstance(obj, plugins.NotifySMSEagle)
+    assert isinstance(obj, NotifySMSEagle)
 
     # We should successfully handle the list
     assert obj.notify("test") is True
@@ -593,7 +593,7 @@ def test_notify_smseagle_plugin_attachments(mock_post, no_throttling):
     obj = Apprise.instantiate(
         'smseagle://token@10.0.0.112:8080/+12512222222/+12513333333/'
         '12514444444?batch=no')
-    assert isinstance(obj, plugins.NotifySMSEagle)
+    assert isinstance(obj, NotifySMSEagle)
 
     # Test Valid Attachment
     path = os.path.join(TEST_VAR_DIR, 'apprise-test.gif')
@@ -628,7 +628,7 @@ def test_notify_smseagle_plugin_attachments(mock_post, no_throttling):
     obj = Apprise.instantiate(
         'smseagle://token@10.0.0.112:8080/+12512222222/+12513333333/'
         '12514444444?batch=yes')
-    assert isinstance(obj, plugins.NotifySMSEagle)
+    assert isinstance(obj, NotifySMSEagle)
 
     # Now send an attachment normally without issues
     mock_post.reset_mock()
@@ -677,7 +677,7 @@ def test_notify_smseagle_plugin_attachments(mock_post, no_throttling):
     # test the handling of our batch modes
     obj = Apprise.instantiate(
         'smseagle://token@10.0.0.112:8080/513333333/')
-    assert isinstance(obj, plugins.NotifySMSEagle)
+    assert isinstance(obj, NotifySMSEagle)
 
     # Unsupported (non image types are not sent)
     attach = os.path.join(TEST_VAR_DIR, 'apprise-test.mp4')

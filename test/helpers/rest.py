@@ -32,7 +32,7 @@ from random import choice
 from string import ascii_uppercase as str_alpha
 from string import digits as str_num
 
-from apprise import plugins
+from apprise import NotifyBase
 from apprise import NotifyType
 from apprise import Apprise
 from apprise import AppriseAsset
@@ -116,7 +116,7 @@ class AppriseURLTester:
         Run a specific test
         """
         # Disable Throttling to speed testing
-        plugins.NotifyBase.request_rate_per_sec = 0
+        NotifyBase.request_rate_per_sec = 0
 
         # Our expected instance
         instance = meta.get('instance', None)
@@ -229,7 +229,7 @@ class AppriseURLTester:
                 url, type(instance), str(obj)))
             assert False
 
-        if isinstance(obj, plugins.NotifyBase):
+        if isinstance(obj, NotifyBase):
             # Ensure we are not performing any type of thorttling
             obj.request_rate_per_sec = 0
 
@@ -264,7 +264,7 @@ class AppriseURLTester:
 
             # Our object should be the same instance as what we had
             # originally expected above.
-            if not isinstance(obj_cmp, plugins.NotifyBase):
+            if not isinstance(obj_cmp, NotifyBase):
                 # Assert messages are hard to trace back with the
                 # way these tests work. Just printing before
                 # throwing our assertion failure makes things

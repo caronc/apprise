@@ -22,8 +22,9 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
-from apprise import plugins
 import requests
+
+from apprise.plugins.NotifyFaast import NotifyFaast
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -40,30 +41,30 @@ apprise_url_tests = (
     }),
     # Auth Token specified
     ('faast://%s' % ('a' * 32), {
-        'instance': plugins.NotifyFaast,
+        'instance': NotifyFaast,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'faast://a...a',
     }),
     ('faast://%s' % ('a' * 32), {
-        'instance': plugins.NotifyFaast,
+        'instance': NotifyFaast,
         # don't include an image by default
         'include_image': False,
     }),
     ('faast://%s' % ('a' * 32), {
-        'instance': plugins.NotifyFaast,
+        'instance': NotifyFaast,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('faast://%s' % ('a' * 32), {
-        'instance': plugins.NotifyFaast,
+        'instance': NotifyFaast,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('faast://%s' % ('a' * 32), {
-        'instance': plugins.NotifyFaast,
+        'instance': NotifyFaast,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,

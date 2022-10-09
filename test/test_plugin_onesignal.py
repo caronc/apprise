@@ -22,7 +22,7 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
-from apprise import plugins
+from apprise.plugins.NotifyOneSignal import NotifyOneSignal
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -53,61 +53,61 @@ apprise_url_tests = (
     }),
     ('onesignal://appid@apikey/', {
         # No targets specified; we will initialize but not notify anything
-        'instance': plugins.NotifyOneSignal,
+        'instance': NotifyOneSignal,
         'notify_response': False,
     }),
     ('onesignal://appid@apikey/playerid', {
         # Valid playerid
-        'instance': plugins.NotifyOneSignal,
+        'instance': NotifyOneSignal,
         'privacy_url': 'onesignal://a...d@a...y/playerid',
     }),
     ('onesignal://appid@apikey/player', {
         # Valid player id
-        'instance': plugins.NotifyOneSignal,
+        'instance': NotifyOneSignal,
         # don't include an image by default
         'include_image': False,
     }),
     ('onesignal://appid@apikey/@user?image=no', {
         # Valid userid, no image
-        'instance': plugins.NotifyOneSignal,
+        'instance': NotifyOneSignal,
     }),
     ('onesignal://appid@apikey/user@email.com/#seg/player/@user/%20/a', {
         # Valid email, valid playerid, valid user, invalid entry (%20),
         # and too short of an entry (a)
-        'instance': plugins.NotifyOneSignal,
+        'instance': NotifyOneSignal,
     }),
     ('onesignal://appid@apikey?to=#segment,playerid', {
         # Test to=
-        'instance': plugins.NotifyOneSignal,
+        'instance': NotifyOneSignal,
     }),
     ('onesignal://appid@apikey/#segment/@user/?batch=yes', {
         # Test batch=
-        'instance': plugins.NotifyOneSignal,
+        'instance': NotifyOneSignal,
     }),
     ('onesignal://appid@apikey/#segment/@user/?batch=no', {
         # Test batch=
-        'instance': plugins.NotifyOneSignal,
+        'instance': NotifyOneSignal,
     }),
     ('onesignal://templateid:appid@apikey/playerid', {
         # Test Template ID
-        'instance': plugins.NotifyOneSignal,
+        'instance': NotifyOneSignal,
     }),
     ('onesignal://appid@apikey/playerid/?lang=es&subtitle=Sub', {
         # Test Language and Subtitle Over-ride
-        'instance': plugins.NotifyOneSignal,
+        'instance': NotifyOneSignal,
     }),
     ('onesignal://?apikey=abc&template=tp&app=123&to=playerid', {
         # Test Kwargs
-        'instance': plugins.NotifyOneSignal,
+        'instance': NotifyOneSignal,
     }),
     ('onesignal://appid@apikey/#segment/playerid/', {
-        'instance': plugins.NotifyOneSignal,
+        'instance': NotifyOneSignal,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('onesignal://appid@apikey/#segment/playerid/', {
-        'instance': plugins.NotifyOneSignal,
+        'instance': NotifyOneSignal,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,

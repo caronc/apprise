@@ -30,8 +30,7 @@ from unittest import mock
 import smtplib
 from email.header import decode_header
 
-from apprise import plugins
-from apprise import NotifyType
+from apprise import NotifyType, NotifyBase
 from apprise import Apprise
 from apprise import AttachBase
 from apprise import AppriseAttachment
@@ -39,6 +38,9 @@ from apprise.plugins import NotifyEmailBase
 
 # Disable logging for a cleaner testing output
 import logging
+
+from apprise.plugins.NotifyEmail import NotifyEmail
+
 logging.disable(logging.CRITICAL)
 
 # Attachment Directory
@@ -65,116 +67,116 @@ TEST_URLS = (
 
     # Pre-Configured Email Services
     ('mailto://user:pass@gmail.com', {
-        'instance': plugins.NotifyEmail,
+        'instance': NotifyEmail,
     }),
     ('mailto://user:pass@hotmail.com', {
-        'instance': plugins.NotifyEmail,
+        'instance': NotifyEmail,
     }),
     ('mailto://user:pass@live.com', {
-        'instance': plugins.NotifyEmail,
+        'instance': NotifyEmail,
     }),
     ('mailto://user:pass@prontomail.com', {
-        'instance': plugins.NotifyEmail,
+        'instance': NotifyEmail,
     }),
     ('mailto://user:pass@yahoo.com', {
-        'instance': plugins.NotifyEmail,
+        'instance': NotifyEmail,
     }),
     ('mailto://user:pass@yahoo.ca', {
-        'instance': plugins.NotifyEmail,
+        'instance': NotifyEmail,
     }),
     ('mailto://user:pass@fastmail.com', {
-        'instance': plugins.NotifyEmail,
+        'instance': NotifyEmail,
     }),
     ('mailto://user:pass@sendgrid.com', {
-        'instance': plugins.NotifyEmail,
+        'instance': NotifyEmail,
     }),
 
     # Yandex
     ('mailto://user:pass@yandex.com', {
-        'instance': plugins.NotifyEmail,
+        'instance': NotifyEmail,
     }),
     ('mailto://user:pass@yandex.ru', {
-        'instance': plugins.NotifyEmail,
+        'instance': NotifyEmail,
     }),
     ('mailto://user:pass@yandex.fr', {
-        'instance': plugins.NotifyEmail,
+        'instance': NotifyEmail,
     }),
 
     # Custom Emails
     ('mailtos://user:pass@nuxref.com:567', {
-        'instance': plugins.NotifyEmail,
+        'instance': NotifyEmail,
     }),
     ('mailto://user:pass@nuxref.com:567?format=html', {
-        'instance': plugins.NotifyEmail,
+        'instance': NotifyEmail,
     }),
     ('mailtos://user:pass@nuxref.com:567?to=l2g@nuxref.com', {
-        'instance': plugins.NotifyEmail,
+        'instance': NotifyEmail,
     }),
     ('mailtos://user:pass@nuxref.com:567/l2g@nuxref.com', {
-        'instance': plugins.NotifyEmail,
+        'instance': NotifyEmail,
     }),
     (
         'mailto://user:pass@example.com:2525?user=l2g@example.com'
         '&pass=l2g@apprise!is!Awesome', {
-            'instance': plugins.NotifyEmail,
+            'instance': NotifyEmail,
         },
     ),
     (
         'mailto://user:pass@example.com:2525?user=l2g@example.com'
         '&pass=l2g@apprise!is!Awesome&format=text', {
-            'instance': plugins.NotifyEmail,
+            'instance': NotifyEmail,
         },
     ),
     (
         # Test Carbon Copy
         'mailtos://user:pass@example.com?smtp=smtp.example.com'
         '&name=l2g&cc=noreply@example.com,test@example.com', {
-            'instance': plugins.NotifyEmail,
+            'instance': NotifyEmail,
         },
     ),
     (
         # Test Blind Carbon Copy
         'mailtos://user:pass@example.com?smtp=smtp.example.com'
         '&name=l2g&bcc=noreply@example.com,test@example.com', {
-            'instance': plugins.NotifyEmail,
+            'instance': NotifyEmail,
         },
     ),
     (
         # Test Carbon Copy with bad email
         'mailtos://user:pass@example.com?smtp=smtp.example.com'
         '&name=l2g&cc=noreply@example.com,@', {
-            'instance': plugins.NotifyEmail,
+            'instance': NotifyEmail,
         },
     ),
     (
         # Test Blind Carbon Copy with bad email
         'mailtos://user:pass@example.com?smtp=smtp.example.com'
         '&name=l2g&bcc=noreply@example.com,@', {
-            'instance': plugins.NotifyEmail,
+            'instance': NotifyEmail,
         },
     ),
     (
         # Test Reply To
         'mailtos://user:pass@example.com?smtp=smtp.example.com'
         '&name=l2g&reply=test@example.com,test2@example.com', {
-            'instance': plugins.NotifyEmail,
+            'instance': NotifyEmail,
         },
     ),
     (
         # Test Reply To with bad email
         'mailtos://user:pass@example.com?smtp=smtp.example.com'
         '&name=l2g&reply=test@example.com,@', {
-            'instance': plugins.NotifyEmail,
+            'instance': NotifyEmail,
         },
     ),
     # headers
     ('mailto://user:pass@localhost.localdomain'
         '?+X-Customer-Campaign-ID=Apprise', {
-            'instance': plugins.NotifyEmail,
+            'instance': NotifyEmail,
         }),
     # No Password
     ('mailtos://user:@nuxref.com', {
-        'instance': plugins.NotifyEmail,
+        'instance': NotifyEmail,
     }),
     # Invalid From Address
     ('mailtos://user:pass@nuxref.com?from=@', {
@@ -187,7 +189,7 @@ TEST_URLS = (
     # Invalid To Address is accepted, but we won't be able to properly email
     # using the notify() call
     ('mailtos://user:pass@nuxref.com?to=@', {
-        'instance': plugins.NotifyEmail,
+        'instance': NotifyEmail,
         'response': False,
     }),
     # Valid URL, but can't structure a proper email
@@ -204,44 +206,44 @@ TEST_URLS = (
     }),
     # STARTTLS flag checking
     ('mailtos://user:pass@gmail.com?mode=starttls', {
-        'instance': plugins.NotifyEmail,
+        'instance': NotifyEmail,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'mailtos://user:****@gmail.com',
     }),
     # SSL flag checking
     ('mailtos://user:pass@gmail.com?mode=ssl', {
-        'instance': plugins.NotifyEmail,
+        'instance': NotifyEmail,
     }),
     # Can make a To address using what we have (l2g@nuxref.com)
     ('mailtos://nuxref.com?user=l2g&pass=.', {
-        'instance': plugins.NotifyEmail,
+        'instance': NotifyEmail,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'mailtos://l2g:****@nuxref.com',
     }),
     ('mailto://user:pass@localhost:2525', {
-        'instance': plugins.NotifyEmail,
+        'instance': NotifyEmail,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_smtplib_exceptions': True,
     }),
     # Test no auth at all
     ('mailto://localhost?from=test@example.com&to=test@example.com', {
-        'instance': plugins.NotifyEmail,
+        'instance': NotifyEmail,
         'privacy_url': 'mailto://localhost',
     }),
     # Test multi-emails where some are bad
     ('mailto://user:pass@localhost/test@example.com/test2@/$@!/', {
-        'instance': plugins.NotifyEmail,
+        'instance': NotifyEmail,
         'privacy_url': 'mailto://user:****@localhost/'
     }),
     ('mailto://user:pass@localhost/?bcc=test2@,$@!/', {
-        'instance': plugins.NotifyEmail,
+        'instance': NotifyEmail,
     }),
     ('mailto://user:pass@localhost/?cc=test2@,$@!/', {
-        'instance': plugins.NotifyEmail,
+        'instance': NotifyEmail,
     }),
     ('mailto://user:pass@localhost/?reply=test2@,$@!/', {
-        'instance': plugins.NotifyEmail,
+        'instance': NotifyEmail,
     }),
 )
 
@@ -319,7 +321,7 @@ def test_plugin_email(mock_smtp, mock_smtpssl, no_throttling):
 
             assert isinstance(obj, instance)
 
-            if isinstance(obj, plugins.NotifyBase):
+            if isinstance(obj, NotifyBase):
                 # We loaded okay; now lets make sure we can reverse this url
                 assert isinstance(obj.url(), str) is True
 
@@ -342,7 +344,7 @@ def test_plugin_email(mock_smtp, mock_smtpssl, no_throttling):
 
                 # Our object should be the same instance as what we had
                 # originally expected above.
-                if not isinstance(obj_cmp, plugins.NotifyBase):
+                if not isinstance(obj_cmp, NotifyBase):
                     # Assert messages are hard to trace back with the way
                     # these tests work. Just printing before throwing our
                     # assertion failure makes things easier to debug later on
@@ -430,7 +432,7 @@ def test_plugin_email_webbase_lookup(mock_smtp, mock_smtpssl):
     obj = Apprise.instantiate(
         'mailto://user:pass@l2g.com', suppress_exceptions=True)
 
-    assert isinstance(obj, plugins.NotifyEmail)
+    assert isinstance(obj, NotifyEmail)
     assert len(obj.targets) == 1
     assert (False, 'user@l2g.com') in obj.targets
     assert obj.from_addr == 'user@l2g.com'
@@ -456,7 +458,7 @@ def test_plugin_email_smtplib_init_fail(mock_smtplib, no_throttling):
 
     obj = Apprise.instantiate(
         'mailto://user:pass@gmail.com', suppress_exceptions=False)
-    assert isinstance(obj, plugins.NotifyEmail)
+    assert isinstance(obj, NotifyEmail)
 
     # Support Exception handling of smtplib.SMTP
     mock_smtplib.side_effect = RuntimeError('Test')
@@ -480,7 +482,7 @@ def test_plugin_email_smtplib_send_okay(mock_smtplib, no_throttling):
     # Defaults to HTML
     obj = Apprise.instantiate(
         'mailto://user:pass@gmail.com', suppress_exceptions=False)
-    assert isinstance(obj, plugins.NotifyEmail)
+    assert isinstance(obj, NotifyEmail)
 
     # Support an email simulation where we can correctly quit
     mock_smtplib.starttls.return_value = True
@@ -494,7 +496,7 @@ def test_plugin_email_smtplib_send_okay(mock_smtplib, no_throttling):
     # Set Text
     obj = Apprise.instantiate(
         'mailto://user:pass@gmail.com?format=text', suppress_exceptions=False)
-    assert isinstance(obj, plugins.NotifyEmail)
+    assert isinstance(obj, NotifyEmail)
 
     assert obj.notify(
         body='body', title='test', notify_type=NotifyType.INFO) is True
@@ -547,7 +549,7 @@ def test_plugin_email_smtplib_internationalization(mock_smtp, no_throttling):
     obj = Apprise.instantiate(
         'mailto://user:pass@gmail.com?name=Например%20так',
         suppress_exceptions=False)
-    assert isinstance(obj, plugins.NotifyEmail)
+    assert isinstance(obj, NotifyEmail)
 
     class SMTPMock:
         def sendmail(self, *args, **kwargs):
@@ -611,7 +613,7 @@ def test_plugin_email_url_escaping():
     # So the above translates to ' %20' (a space in front of %20).  We want
     # to verify the handling of the password escaping and when it happens.
     # a very bad response would be '  ' (double space)
-    obj = plugins.NotifyEmail.parse_url(
+    obj = NotifyEmail.parse_url(
         'mailto://user:{}@gmail.com?format=text'.format(passwd))
 
     assert isinstance(obj, dict) is True
@@ -624,7 +626,7 @@ def test_plugin_email_url_escaping():
     obj = Apprise.instantiate(
         'mailto://user:{}@gmail.com?format=text'.format(passwd),
         suppress_exceptions=False)
-    assert isinstance(obj, plugins.NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail) is True
 
     # The password is escaped only 'once'
     assert obj.password == ' %20'
@@ -642,7 +644,7 @@ def test_plugin_email_url_variations():
             user='apprise%40example21.ca',
             passwd='abcd123'),
         suppress_exceptions=False)
-    assert isinstance(obj, plugins.NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail) is True
 
     assert obj.password == 'abcd123'
     assert obj.user == 'apprise@example21.ca'
@@ -654,7 +656,7 @@ def test_plugin_email_url_variations():
             user='apprise%40example21.ca',
             passwd='abcd123'),
         suppress_exceptions=False)
-    assert isinstance(obj, plugins.NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail) is True
 
     assert obj.password == 'abcd123'
     assert obj.user == 'apprise@example21.ca'
@@ -666,7 +668,7 @@ def test_plugin_email_url_variations():
             user='apprise%40example21.ca',
             passwd='abcd123'),
         suppress_exceptions=False)
-    assert isinstance(obj, plugins.NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail) is True
 
     assert obj.password == 'abcd123'
     assert obj.user == 'apprise@example21.ca'
@@ -683,7 +685,7 @@ def test_plugin_email_url_variations():
             user='apprise%40example21.ca',
             passwd='abcd123'),
         suppress_exceptions=False)
-    assert isinstance(obj, plugins.NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail) is True
 
     assert obj.password == 'abcd123'
     assert obj.user == 'apprise@example21.ca'
@@ -704,7 +706,7 @@ def test_plugin_email_url_variations():
             that='to@example.jp',
             smtp_host='smtp.example.edu'),
         suppress_exceptions=False)
-    assert isinstance(obj, plugins.NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail) is True
 
     assert obj.password == 'abcd123'
     assert obj.user == 'apprise@example21.ca'
@@ -728,7 +730,7 @@ def test_plugin_email_dict_variations():
         'user': 'apprise@example.com',
         'password': 'abd123',
         'host': 'example.com'}, suppress_exceptions=False)
-    assert isinstance(obj, plugins.NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail) is True
 
 
 @mock.patch('smtplib.SMTP_SSL')
@@ -746,7 +748,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl, no_throttling):
     # Test variations of username required to be an email address
     # user@example.com; we also test an over-ride port on a template driven
     # mailto:// entry
-    results = plugins.NotifyEmail.parse_url(
+    results = NotifyEmail.parse_url(
         'mailtos://user:pass123@hotmail.com:444'
         '?to=user2@yahoo.com&name=test%20name')
     assert isinstance(results, dict)
@@ -758,7 +760,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl, no_throttling):
     assert 'user2@yahoo.com' in results['targets']
 
     obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, plugins.NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail) is True
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
@@ -794,7 +796,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl, no_throttling):
     # The below switches the `name` with the `to` to verify the results
     # are the same; it also verfies that the mode gets changed to SSL
     # instead of STARTTLS
-    results = plugins.NotifyEmail.parse_url(
+    results = NotifyEmail.parse_url(
         'mailtos://user:pass123@hotmail.com?smtp=override.com'
         '&name=test%20name&to=user2@yahoo.com&mode=ssl')
     assert isinstance(results, dict)
@@ -805,7 +807,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl, no_throttling):
     assert 'user2@yahoo.com' in results['targets']
     assert 'ssl' == results['secure_mode']
     obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, plugins.NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail) is True
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
@@ -842,44 +844,44 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl, no_throttling):
     #
     # Test outlook/hotmail lookups
     #
-    results = plugins.NotifyEmail.parse_url(
+    results = NotifyEmail.parse_url(
         'mailtos://user:pass123@outlook.com')
     obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, plugins.NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail) is True
     assert obj.smtp_host == 'smtp-mail.outlook.com'
     # No entries in the reply_to
     assert not obj.reply_to
 
-    results = plugins.NotifyEmail.parse_url(
+    results = NotifyEmail.parse_url(
         'mailtos://user:pass123@outlook.com.au')
     obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, plugins.NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail) is True
     assert obj.smtp_host == 'smtp-mail.outlook.com'
     # No entries in the reply_to
     assert not obj.reply_to
 
-    results = plugins.NotifyEmail.parse_url(
+    results = NotifyEmail.parse_url(
         'mailtos://user:pass123@live.com')
     obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, plugins.NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail) is True
     # No entries in the reply_to
     assert not obj.reply_to
 
-    results = plugins.NotifyEmail.parse_url(
+    results = NotifyEmail.parse_url(
         'mailtos://user:pass123@hotmail.com')
     obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, plugins.NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail) is True
     # No entries in the reply_to
     assert not obj.reply_to
 
     #
     # Test Port Over-Riding
     #
-    results = plugins.NotifyEmail.parse_url(
+    results = NotifyEmail.parse_url(
         "mailtos://abc:password@xyz.cn:465?"
         "smtp=smtp.exmail.qq.com&mode=ssl")
     obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, plugins.NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail) is True
 
     # Verify our over-rides are in place
     assert obj.smtp_host == 'smtp.exmail.qq.com'
@@ -889,11 +891,11 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl, no_throttling):
     # No entries in the reply_to
     assert not obj.reply_to
 
-    results = plugins.NotifyEmail.parse_url(
+    results = NotifyEmail.parse_url(
         "mailtos://abc:password@xyz.cn?"
         "smtp=smtp.exmail.qq.com&mode=ssl&port=465")
     obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, plugins.NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail) is True
 
     # Verify our over-rides are in place
     assert obj.smtp_host == 'smtp.exmail.qq.com'
@@ -906,10 +908,10 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl, no_throttling):
     #
     # Test Reply-To Email
     #
-    results = plugins.NotifyEmail.parse_url(
+    results = NotifyEmail.parse_url(
         "mailtos://user:pass@example.com?reply=noreply@example.com")
     obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, plugins.NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail) is True
     # Verify our over-rides are in place
     assert obj.smtp_host == 'example.com'
     assert obj.from_addr == 'user@example.com'

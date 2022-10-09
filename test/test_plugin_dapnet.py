@@ -28,8 +28,7 @@ import requests
 from unittest import mock
 
 import apprise
-from apprise.plugins.NotifyDapnet import DapnetPriority
-from apprise import plugins
+from apprise.plugins.NotifyDapnet import DapnetPriority, NotifyDapnet
 from helpers import AppriseURLTester
 
 logging.disable(logging.CRITICAL)
@@ -54,18 +53,18 @@ apprise_url_tests = (
     }),
     ('dapnet://user:pass@{}'.format('DF1ABC'), {
         # valid call sign
-        'instance': plugins.NotifyDapnet,
+        'instance': NotifyDapnet,
         'requests_response_code': requests.codes.created,
     }),
     ('dapnet://user:pass@{}/{}'.format('DF1ABC', 'DF1DEF'), {
         # valid call signs
-        'instance': plugins.NotifyDapnet,
+        'instance': NotifyDapnet,
         'requests_response_code': requests.codes.created,
     }),
     ('dapnet://user:pass@DF1ABC-1/DF1ABC/DF1ABC-15', {
         # valid call signs; but a few are duplicates;
         # at the end there will only be 1 entry
-        'instance': plugins.NotifyDapnet,
+        'instance': NotifyDapnet,
         'requests_response_code': requests.codes.created,
         # Our expected url(privacy=True) startswith() response:
         # Note that only 1 entry is saved (as other 2 are duplicates)
@@ -73,50 +72,50 @@ apprise_url_tests = (
     }),
     ('dapnet://user:pass@?to={},{}'.format('DF1ABC', 'DF1DEF'), {
         # support the to= argument
-        'instance': plugins.NotifyDapnet,
+        'instance': NotifyDapnet,
         'requests_response_code': requests.codes.created,
     }),
     ('dapnet://user:pass@{}?priority=normal'.format('DF1ABC'), {
         # valid call sign with priority
-        'instance': plugins.NotifyDapnet,
+        'instance': NotifyDapnet,
         'requests_response_code': requests.codes.created,
     }),
     ('dapnet://user:pass@{}?priority=em&batch=false'.format(
         '/'.join(['DF1ABC', '0A1DEF'])), {
             # valid call sign with priority (emergency) + no batch
             # transmissions
-            'instance': plugins.NotifyDapnet,
+            'instance': NotifyDapnet,
             'requests_response_code': requests.codes.created,
     }),
     ('dapnet://user:pass@{}?priority=invalid'.format('DF1ABC'), {
         # invalid priority
-        'instance': plugins.NotifyDapnet,
+        'instance': NotifyDapnet,
         'requests_response_code': requests.codes.created,
     }),
     ('dapnet://user:pass@{}?txgroups=dl-all,all'.format('DF1ABC'), {
         # valid call sign with two transmitter groups
-        'instance': plugins.NotifyDapnet,
+        'instance': NotifyDapnet,
         'requests_response_code': requests.codes.created,
     }),
     ('dapnet://user:pass@{}?txgroups=invalid'.format('DF1ABC'), {
         # valid call sign with invalid transmitter group
-        'instance': plugins.NotifyDapnet,
+        'instance': NotifyDapnet,
         'requests_response_code': requests.codes.created,
     }),
     ('dapnet://user:pass@{}/{}'.format('abcdefghi', 'a'), {
         # invalid call signs
-        'instance': plugins.NotifyDapnet,
+        'instance': NotifyDapnet,
         'notify_response': False,
     }),
     # Edge cases
     ('dapnet://user:pass@{}'.format('DF1ABC'), {
-        'instance': plugins.NotifyDapnet,
+        'instance': NotifyDapnet,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('dapnet://user:pass@{}'.format('DF1ABC'), {
-        'instance': plugins.NotifyDapnet,
+        'instance': NotifyDapnet,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -163,7 +162,7 @@ def test_plugin_dapnet_config_files(mock_post):
     """
 
     # Disable Throttling to speed testing
-    plugins.NotifyDapnet.request_rate_per_sec = 0
+    NotifyDapnet.request_rate_per_sec = 0
 
     # Prepare Mock
     mock_post.return_value = requests.Request()

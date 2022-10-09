@@ -23,7 +23,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 import requests
-from apprise import plugins
+
+from apprise.plugins.NotifyTechulusPush import NotifyTechulusPush
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -45,7 +46,7 @@ apprise_url_tests = (
     }),
     # APIkey
     ('push://%s' % UUID4, {
-        'instance': plugins.NotifyTechulusPush,
+        'instance': NotifyTechulusPush,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'push://8...2/',
@@ -55,19 +56,19 @@ apprise_url_tests = (
         'instance': TypeError,
     }),
     ('push://%s' % UUID4, {
-        'instance': plugins.NotifyTechulusPush,
+        'instance': NotifyTechulusPush,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('push://%s' % UUID4, {
-        'instance': plugins.NotifyTechulusPush,
+        'instance': NotifyTechulusPush,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('push://%s' % UUID4, {
-        'instance': plugins.NotifyTechulusPush,
+        'instance': NotifyTechulusPush,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,

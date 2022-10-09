@@ -28,8 +28,8 @@ from unittest import mock
 import requests
 import pytest
 from json import dumps
-from apprise import plugins
 from apprise import Apprise
+from apprise.plugins.NotifyTwilio import NotifyTwilio
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -57,7 +57,7 @@ apprise_url_tests = (
     ('twilio://AC{}:{}@{}'.format('a' * 32, 'b' * 32, '3' * 5), {
         # using short-code (5 characters) without a target
         # We can still instantiate ourselves with a valid short code
-        'instance': plugins.NotifyTwilio,
+        'instance': NotifyTwilio,
         # Since there are no targets specified we expect a False return on
         # send()
         'notify_response': False,
@@ -69,47 +69,47 @@ apprise_url_tests = (
     ('twilio://AC{}:{}@{}/123/{}/abcd/'.format(
         'a' * 32, 'b' * 32, '3' * 11, '9' * 15), {
         # valid everything but target numbers
-        'instance': plugins.NotifyTwilio,
+        'instance': NotifyTwilio,
     }),
     ('twilio://AC{}:{}@12345/{}'.format('a' * 32, 'b' * 32, '4' * 11), {
         # using short-code (5 characters)
-        'instance': plugins.NotifyTwilio,
+        'instance': NotifyTwilio,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'twilio://...aaaa:b...b@12345',
     }),
     ('twilio://AC{}:{}@123456/{}'.format('a' * 32, 'b' * 32, '4' * 11), {
         # using short-code (6 characters)
-        'instance': plugins.NotifyTwilio,
+        'instance': NotifyTwilio,
     }),
     ('twilio://AC{}:{}@{}'.format('a' * 32, 'b' * 32, '5' * 11), {
         # using phone no with no target - we text ourselves in
         # this case
-        'instance': plugins.NotifyTwilio,
+        'instance': NotifyTwilio,
     }),
     ('twilio://_?sid=AC{}&token={}&from={}'.format(
         'a' * 32, 'b' * 32, '5' * 11), {
         # use get args to acomplish the same thing
-        'instance': plugins.NotifyTwilio,
+        'instance': NotifyTwilio,
     }),
     ('twilio://_?sid=AC{}&token={}&source={}'.format(
         'a' * 32, 'b' * 32, '5' * 11), {
         # use get args to acomplish the same thing (use source instead of from)
-        'instance': plugins.NotifyTwilio,
+        'instance': NotifyTwilio,
     }),
     ('twilio://_?sid=AC{}&token={}&from={}&to={}'.format(
         'a' * 32, 'b' * 32, '5' * 11, '7' * 13), {
         # use to=
-        'instance': plugins.NotifyTwilio,
+        'instance': NotifyTwilio,
     }),
     ('twilio://AC{}:{}@{}'.format('a' * 32, 'b' * 32, '6' * 11), {
-        'instance': plugins.NotifyTwilio,
+        'instance': NotifyTwilio,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('twilio://AC{}:{}@{}'.format('a' * 32, 'b' * 32, '6' * 11), {
-        'instance': plugins.NotifyTwilio,
+        'instance': NotifyTwilio,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -155,7 +155,7 @@ def test_plugin_twilio_auth(mock_post, no_throttling):
     obj = Apprise.instantiate(
         'twilio://{}:{}@{}/{}'
         .format(account_sid, auth_token, source, dest))
-    assert isinstance(obj, plugins.NotifyTwilio) is True
+    assert isinstance(obj, NotifyTwilio) is True
     assert isinstance(obj.url(), str) is True
 
     # Send Notification
@@ -165,7 +165,7 @@ def test_plugin_twilio_auth(mock_post, no_throttling):
     obj = Apprise.instantiate(
         'twilio://{}:{}@{}/{}?apikey={}'
         .format(account_sid, auth_token, source, dest, apikey))
-    assert isinstance(obj, plugins.NotifyTwilio) is True
+    assert isinstance(obj, NotifyTwilio) is True
     assert isinstance(obj.url(), str) is True
 
     # Send Notification
@@ -217,12 +217,12 @@ def test_plugin_twilio_edge_cases(mock_post, no_throttling):
 
     # No account_sid specified
     with pytest.raises(TypeError):
-        plugins.NotifyTwilio(
+        NotifyTwilio(
             account_sid=None, auth_token=auth_token, source=source)
 
     # No auth_token specified
     with pytest.raises(TypeError):
-        plugins.NotifyTwilio(
+        NotifyTwilio(
             account_sid=account_sid, auth_token=None, source=source)
 
     # a error response
@@ -234,7 +234,7 @@ def test_plugin_twilio_edge_cases(mock_post, no_throttling):
     mock_post.return_value = response
 
     # Initialize our object
-    obj = plugins.NotifyTwilio(
+    obj = NotifyTwilio(
         account_sid=account_sid, auth_token=auth_token, source=source)
 
     # We will fail with the above error code

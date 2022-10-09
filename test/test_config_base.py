@@ -27,11 +27,13 @@ import pytest
 from apprise.AppriseAsset import AppriseAsset
 from apprise.config.ConfigBase import ConfigBase
 from apprise import ConfigFormat
-from apprise import plugins
 import yaml
 
 # Disable logging for a cleaner testing output
 import logging
+
+from apprise.plugins.NotifyEmail import NotifyEmail
+
 logging.disable(logging.CRITICAL)
 
 
@@ -949,8 +951,8 @@ def test_yaml_vs_text_tagging():
 
     # Now we compare our results and verify they are the same
     assert len(yaml_result) == len(text_result)
-    assert isinstance(yaml_result[0], plugins.NotifyEmail)
-    assert isinstance(text_result[0], plugins.NotifyEmail)
+    assert isinstance(yaml_result[0], NotifyEmail)
+    assert isinstance(text_result[0], NotifyEmail)
     assert 'mytag' in text_result[0]
     assert 'mytag' in yaml_result[0]
 

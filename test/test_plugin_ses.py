@@ -31,7 +31,7 @@ import pytest
 import requests
 from apprise import Apprise
 from apprise import AppriseAttachment
-from apprise import plugins
+from apprise.plugins.NotifySES import NotifySES
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -100,7 +100,7 @@ apprise_url_tests = (
     ('ses://user@example.com/T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcevi7FQ/'
         'us-west-2', {
             # we have a valid URL and we'll use our own email as a target
-            'instance': plugins.NotifySES,
+            'instance': NotifySES,
 
             # Our response expected server response
             'requests_response_text': AWS_SES_GOOD_RESPONSE,
@@ -108,7 +108,7 @@ apprise_url_tests = (
     ('ses://user@example.com/T1JJ3TD4JD/TIiajkdnlazk7FQ/us-west-2/'
         'user2@example.ca/user3@example.eu', {
             # Multi Email Suppport
-            'instance': plugins.NotifySES,
+            'instance': NotifySES,
 
             # Our response expected server response
             'requests_response_text': AWS_SES_GOOD_RESPONSE,
@@ -119,7 +119,7 @@ apprise_url_tests = (
     ('ses://user@example.com/T1JJ3T3L2/A1BRTD4JD/TIiajkdnlaevi7FQ/us-east-1'
         '?to=user2@example.ca', {
             # leveraging to: keyword
-            'instance': plugins.NotifySES,
+            'instance': NotifySES,
 
             # Our response expected server response
             'requests_response_text': AWS_SES_GOOD_RESPONSE,
@@ -132,7 +132,7 @@ apprise_url_tests = (
         '&to=user2@example.ca', {
             # leveraging a ton of our keywords
             # We also test invlid emails specified on the bcc and cc list
-            'instance': plugins.NotifySES,
+            'instance': NotifySES,
 
             # Our response expected server response
             'requests_response_text': AWS_SES_GOOD_RESPONSE,
@@ -140,7 +140,7 @@ apprise_url_tests = (
     ('ses://user@example.com/T1JJ3T3L2/A1BRTD4JD/TIiacevi7FQ/us-west-2/'
         '?name=From%20Name&to=user2@example.ca,invalid-email', {
             # leveraging a ton of our keywords
-            'instance': plugins.NotifySES,
+            'instance': NotifySES,
 
             # Our response expected server response
             'requests_response_text': AWS_SES_GOOD_RESPONSE,
@@ -148,7 +148,7 @@ apprise_url_tests = (
     ('ses://user@example.com/T1JJ3T3L2/A1BRTD4JD/TIiacevi7FQ/us-west-2/'
         '?format=text', {
             # Send email as a text (instead of HTML)
-            'instance': plugins.NotifySES,
+            'instance': NotifySES,
 
             # Our response expected server response
             'requests_response_text': AWS_SES_GOOD_RESPONSE,
@@ -157,7 +157,7 @@ apprise_url_tests = (
         '?to=invalid-email', {
             # An invalid email will get dropped during the initialization
             # we'll have no targets to notify afterwards
-            'instance': plugins.NotifySES,
+            'instance': NotifySES,
 
             # Our response expected server response
             'requests_response_text': AWS_SES_GOOD_RESPONSE,
@@ -167,7 +167,7 @@ apprise_url_tests = (
         }),
     ('ses://user@example.com/T1JJ3T3L2/A1BRTD4JD/TIiacevi7FQ/us-west-2/'
         'user2@example.com', {
-            'instance': plugins.NotifySES,
+            'instance': NotifySES,
             # Our response expected server response
             'requests_response_text': AWS_SES_GOOD_RESPONSE,
             # throw a bizzare code forcing us to fail to look it up
@@ -176,7 +176,7 @@ apprise_url_tests = (
         }),
     ('ses://user@example.com/T1JJ3T3L2/A1BRTD4JD/TIiajkdnlavi7FQ/us-west-2/'
         'user2@example.com', {
-            'instance': plugins.NotifySES,
+            'instance': NotifySES,
             # Our response expected server response
             'requests_response_text': AWS_SES_GOOD_RESPONSE,
             # Throws a series of connection and transfer exceptions when this
@@ -208,7 +208,7 @@ def test_plugin_ses_edge_cases(mock_post):
     # Initializes the plugin with a valid access, but invalid access key
     with pytest.raises(TypeError):
         # No access_key_id specified
-        plugins.NotifySES(
+        NotifySES(
             from_addr="user@example.eu",
             access_key_id=None,
             secret_access_key=TEST_ACCESS_KEY_SECRET,
@@ -218,7 +218,7 @@ def test_plugin_ses_edge_cases(mock_post):
 
     with pytest.raises(TypeError):
         # No secret_access_key specified
-        plugins.NotifySES(
+        NotifySES(
             from_addr="user@example.eu",
             access_key_id=TEST_ACCESS_KEY_ID,
             secret_access_key=None,
@@ -228,7 +228,7 @@ def test_plugin_ses_edge_cases(mock_post):
 
     with pytest.raises(TypeError):
         # No region_name specified
-        plugins.NotifySES(
+        NotifySES(
             from_addr="user@example.eu",
             access_key_id=TEST_ACCESS_KEY_ID,
             secret_access_key=TEST_ACCESS_KEY_SECRET,
@@ -237,7 +237,7 @@ def test_plugin_ses_edge_cases(mock_post):
         )
 
     # No recipients
-    obj = plugins.NotifySES(
+    obj = NotifySES(
         from_addr="user@example.eu",
         access_key_id=TEST_ACCESS_KEY_ID,
         secret_access_key=TEST_ACCESS_KEY_SECRET,
@@ -250,7 +250,7 @@ def test_plugin_ses_edge_cases(mock_post):
 
     # The phone number is invalid, and without it, there is nothing
     # to notify; we
-    obj = plugins.NotifySES(
+    obj = NotifySES(
         from_addr="user@example.eu",
         access_key_id=TEST_ACCESS_KEY_ID,
         secret_access_key=TEST_ACCESS_KEY_SECRET,
@@ -269,7 +269,7 @@ def test_plugin_ses_url_parsing():
     """
 
     # No recipients
-    results = plugins.NotifySES.parse_url('ses://%s/%s/%s/%s/' % (
+    results = NotifySES.parse_url('ses://%s/%s/%s/%s/' % (
         'user@example.com',
         TEST_ACCESS_KEY_ID,
         TEST_ACCESS_KEY_SECRET,
@@ -286,7 +286,7 @@ def test_plugin_ses_url_parsing():
     assert TEST_ACCESS_KEY_SECRET == results['secret_access_key']
 
     # Detect recipients
-    results = plugins.NotifySES.parse_url('ses://%s/%s/%s/%s/%s/%s/' % (
+    results = NotifySES.parse_url('ses://%s/%s/%s/%s/%s/%s/' % (
         'user@example.com',
         TEST_ACCESS_KEY_ID,
         TEST_ACCESS_KEY_SECRET,
@@ -314,28 +314,28 @@ def test_plugin_ses_aws_response_handling():
 
     """
     # Not a string
-    response = plugins.NotifySES.aws_response_to_dict(None)
+    response = NotifySES.aws_response_to_dict(None)
     assert response['type'] is None
     assert response['request_id'] is None
 
     # Invalid XML
-    response = plugins.NotifySES.aws_response_to_dict(
+    response = NotifySES.aws_response_to_dict(
         '<Bad Response xmlns="http://ses.amazonaws.com/doc/2010-03-31/">')
     assert response['type'] is None
     assert response['request_id'] is None
 
     # Single Element in XML
-    response = plugins.NotifySES.aws_response_to_dict(
+    response = NotifySES.aws_response_to_dict(
         '<SingleElement></SingleElement>')
     assert response['type'] == 'SingleElement'
     assert response['request_id'] is None
 
     # Empty String
-    response = plugins.NotifySES.aws_response_to_dict('')
+    response = NotifySES.aws_response_to_dict('')
     assert response['type'] is None
     assert response['request_id'] is None
 
-    response = plugins.NotifySES.aws_response_to_dict(
+    response = NotifySES.aws_response_to_dict(
         """
         <SendRawEmailResponse
              xmlns="http://ses.amazonaws.com/doc/2010-12-01/">
@@ -353,7 +353,7 @@ def test_plugin_ses_aws_response_handling():
     assert response['message_id'] == \
         '010f017d87656ee2-a2ea291f-79ea-44f3-9d25-00d041de307'
 
-    response = plugins.NotifySES.aws_response_to_dict(
+    response = NotifySES.aws_response_to_dict(
         """
         <ErrorResponse xmlns="http://ses.amazonaws.com/doc/2010-03-31/">
             <Error>
@@ -378,7 +378,7 @@ def test_plugin_ses_attachments(mock_post):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifySES.request_rate_per_sec = 0
+    NotifySES.request_rate_per_sec = 0
 
     # Prepare Mock return object
     response = mock.Mock()

@@ -26,7 +26,8 @@ from unittest import mock
 
 import pytest
 import requests
-from apprise import plugins
+
+from apprise.plugins.NotifyMSG91 import NotifyMSG91
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -45,21 +46,21 @@ apprise_url_tests = (
     }),
     ('msg91://{}'.format('a' * 23), {
         # valid AuthKey
-        'instance': plugins.NotifyMSG91,
+        'instance': NotifyMSG91,
         # Since there are no targets specified we expect a False return on
         # send()
         'notify_response': False,
     }),
     ('msg91://{}/123'.format('a' * 23), {
         # invalid phone number
-        'instance': plugins.NotifyMSG91,
+        'instance': NotifyMSG91,
         # Since there are no targets specified we expect a False return on
         # send()
         'notify_response': False,
     }),
     ('msg91://{}/abcd'.format('a' * 23), {
         # No number to notify
-        'instance': plugins.NotifyMSG91,
+        'instance': NotifyMSG91,
         # Since there are no targets specified we expect a False return on
         # send()
         'notify_response': False,
@@ -82,32 +83,32 @@ apprise_url_tests = (
     }),
     ('msg91://{}/15551232000'.format('a' * 23), {
         # a valid message
-        'instance': plugins.NotifyMSG91,
+        'instance': NotifyMSG91,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'msg91://a...a/15551232000',
     }),
     ('msg91://{}/?to=15551232000'.format('a' * 23), {
         # a valid message
-        'instance': plugins.NotifyMSG91,
+        'instance': NotifyMSG91,
     }),
     ('msg91://{}/15551232000?country=91&route=1'.format('a' * 23), {
         # using phone no with no target - we text ourselves in
         # this case
-        'instance': plugins.NotifyMSG91,
+        'instance': NotifyMSG91,
     }),
     ('msg91://{}/15551232000'.format('a' * 23), {
         # use get args to acomplish the same thing
-        'instance': plugins.NotifyMSG91,
+        'instance': NotifyMSG91,
     }),
     ('msg91://{}/15551232000'.format('a' * 23), {
-        'instance': plugins.NotifyMSG91,
+        'instance': NotifyMSG91,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('msg91://{}/15551232000'.format('a' * 23), {
-        'instance': plugins.NotifyMSG91,
+        'instance': NotifyMSG91,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -145,6 +146,6 @@ def test_plugin_msg91_edge_cases(mock_post, no_throttling):
 
     # No authkey specified
     with pytest.raises(TypeError):
-        plugins.NotifyMSG91(authkey=None, targets=target)
+        NotifyMSG91(authkey=None, targets=target)
     with pytest.raises(TypeError):
-        plugins.NotifyMSG91(authkey="    ", targets=target)
+        NotifyMSG91(authkey="    ", targets=target)

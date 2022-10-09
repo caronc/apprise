@@ -23,7 +23,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 import requests
-from apprise import plugins
+from apprise.plugins.NotifyWebexTeams import NotifyWebexTeams
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -44,7 +44,7 @@ apprise_url_tests = (
     }),
     ('wxteams://{}'.format('a' * 80), {
         # token provided - we're good
-        'instance': plugins.NotifyWebexTeams,
+        'instance': NotifyWebexTeams,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'wxteams://a...a/',
@@ -52,28 +52,28 @@ apprise_url_tests = (
     # Support Native URLs
     ('https://api.ciscospark.com/v1/webhooks/incoming/{}'.format('a' * 80), {
         # token provided - we're good
-        'instance': plugins.NotifyWebexTeams,
+        'instance': NotifyWebexTeams,
     }),
     # Support Native URLs with arguments
     ('https://api.ciscospark.com/v1/webhooks/incoming/{}?format=text'.format(
         'a' * 80), {
         # token provided - we're good
-        'instance': plugins.NotifyWebexTeams,
+        'instance': NotifyWebexTeams,
     }),
     ('wxteams://{}'.format('a' * 80), {
-        'instance': plugins.NotifyWebexTeams,
+        'instance': NotifyWebexTeams,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('wxteams://{}'.format('a' * 80), {
-        'instance': plugins.NotifyWebexTeams,
+        'instance': NotifyWebexTeams,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('wxteams://{}'.format('a' * 80), {
-        'instance': plugins.NotifyWebexTeams,
+        'instance': NotifyWebexTeams,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,

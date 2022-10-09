@@ -22,8 +22,9 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
-from apprise import plugins
 import requests
+
+from apprise.plugins.NotifyEnigma2 import NotifyEnigma2
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -42,18 +43,18 @@ apprise_url_tests = (
         'instance': None,
     }),
     ('enigma2://localhost', {
-        'instance': plugins.NotifyEnigma2,
+        'instance': NotifyEnigma2,
         # This will fail because we're also expecting a server acknowledgement
         'notify_response': False,
     }),
     ('enigma2://localhost', {
-        'instance': plugins.NotifyEnigma2,
+        'instance': NotifyEnigma2,
         # invalid JSON response
         'requests_response_text': '{',
         'notify_response': False,
     }),
     ('enigma2://localhost', {
-        'instance': plugins.NotifyEnigma2,
+        'instance': NotifyEnigma2,
         # False is returned
         'requests_response_text': {
             'result': False
@@ -61,41 +62,41 @@ apprise_url_tests = (
         'notify_response': False,
     }),
     ('enigma2://localhost', {
-        'instance': plugins.NotifyEnigma2,
+        'instance': NotifyEnigma2,
         # With the right content, this will succeed
         'requests_response_text': {
             'result': True
         }
     }),
     ('enigma2://user@localhost', {
-        'instance': plugins.NotifyEnigma2,
+        'instance': NotifyEnigma2,
         'requests_response_text': {
             'result': True
         }
     }),
     # Set timeout
     ('enigma2://user@localhost?timeout=-1', {
-        'instance': plugins.NotifyEnigma2,
+        'instance': NotifyEnigma2,
         'requests_response_text': {
             'result': True
         }
     }),
     # Set timeout
     ('enigma2://user@localhost?timeout=-1000', {
-        'instance': plugins.NotifyEnigma2,
+        'instance': NotifyEnigma2,
         'requests_response_text': {
             'result': True
         }
     }),
     # Set invalid timeout (defaults to a set value)
     ('enigma2://user@localhost?timeout=invalid', {
-        'instance': plugins.NotifyEnigma2,
+        'instance': NotifyEnigma2,
         'requests_response_text': {
             'result': True
         }
     }),
     ('enigma2://user:pass@localhost', {
-        'instance': plugins.NotifyEnigma2,
+        'instance': NotifyEnigma2,
         'requests_response_text': {
             'result': True
         },
@@ -104,25 +105,25 @@ apprise_url_tests = (
         'privacy_url': 'enigma2://user:****@localhost',
     }),
     ('enigma2://localhost:8080', {
-        'instance': plugins.NotifyEnigma2,
+        'instance': NotifyEnigma2,
         'requests_response_text': {
             'result': True
         },
     }),
     ('enigma2://user:pass@localhost:8080', {
-        'instance': plugins.NotifyEnigma2,
+        'instance': NotifyEnigma2,
         'requests_response_text': {
             'result': True
         },
     }),
     ('enigma2s://localhost', {
-        'instance': plugins.NotifyEnigma2,
+        'instance': NotifyEnigma2,
         'requests_response_text': {
             'result': True
         },
     }),
     ('enigma2s://user:pass@localhost', {
-        'instance': plugins.NotifyEnigma2,
+        'instance': NotifyEnigma2,
         'requests_response_text': {
             'result': True
         },
@@ -131,7 +132,7 @@ apprise_url_tests = (
         'privacy_url': 'enigma2s://user:****@localhost',
     }),
     ('enigma2s://localhost:8080/path/', {
-        'instance': plugins.NotifyEnigma2,
+        'instance': NotifyEnigma2,
         'requests_response_text': {
             'result': True
         },
@@ -139,19 +140,19 @@ apprise_url_tests = (
         'privacy_url': 'enigma2s://localhost:8080/path/',
     }),
     ('enigma2s://user:pass@localhost:8080', {
-        'instance': plugins.NotifyEnigma2,
+        'instance': NotifyEnigma2,
         'requests_response_text': {
             'result': True
         },
     }),
     ('enigma2://localhost:8080/path?+HeaderKey=HeaderValue', {
-        'instance': plugins.NotifyEnigma2,
+        'instance': NotifyEnigma2,
         'requests_response_text': {
             'result': True
         },
     }),
     ('enigma2://user:pass@localhost:8081', {
-        'instance': plugins.NotifyEnigma2,
+        'instance': NotifyEnigma2,
         'requests_response_text': {
             'result': True
         },
@@ -160,7 +161,7 @@ apprise_url_tests = (
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('enigma2://user:pass@localhost:8082', {
-        'instance': plugins.NotifyEnigma2,
+        'instance': NotifyEnigma2,
         'requests_response_text': {
             'result': True
         },
@@ -169,7 +170,7 @@ apprise_url_tests = (
         'requests_response_code': 999,
     }),
     ('enigma2://user:pass@localhost:8083', {
-        'instance': plugins.NotifyEnigma2,
+        'instance': NotifyEnigma2,
         'requests_response_text': {
             'result': True
         },

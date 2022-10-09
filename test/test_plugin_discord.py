@@ -28,10 +28,11 @@ from unittest import mock
 
 import pytest
 import requests
+
+from apprise.plugins.NotifyDiscord import NotifyDiscord
 from helpers import AppriseURLTester
 from apprise import Apprise
 from apprise import AppriseAttachment
-from apprise import plugins
 from apprise import NotifyType
 from apprise import NotifyFormat
 
@@ -57,99 +58,99 @@ apprise_url_tests = (
     }),
     # Provide both an webhook id and a webhook token
     ('discord://%s/%s' % ('i' * 24, 't' * 64), {
-        'instance': plugins.NotifyDiscord,
+        'instance': NotifyDiscord,
         'requests_response_code': requests.codes.no_content,
     }),
     # Provide a temporary username
     ('discord://l2g@%s/%s' % ('i' * 24, 't' * 64), {
-        'instance': plugins.NotifyDiscord,
+        'instance': NotifyDiscord,
         'requests_response_code': requests.codes.no_content,
     }),
     # test image= field
     ('discord://%s/%s?format=markdown&footer=Yes&image=Yes' % (
         'i' * 24, 't' * 64), {
-            'instance': plugins.NotifyDiscord,
+            'instance': NotifyDiscord,
             'requests_response_code': requests.codes.no_content,
             # don't include an image by default
             'include_image': False,
     }),
     ('discord://%s/%s?format=markdown&footer=Yes&image=No&fields=no' % (
         'i' * 24, 't' * 64), {
-            'instance': plugins.NotifyDiscord,
+            'instance': NotifyDiscord,
             'requests_response_code': requests.codes.no_content,
     }),
     ('discord://%s/%s?format=markdown&footer=Yes&image=Yes' % (
         'i' * 24, 't' * 64), {
-            'instance': plugins.NotifyDiscord,
+            'instance': NotifyDiscord,
             'requests_response_code': requests.codes.no_content,
     }),
     ('https://discord.com/api/webhooks/{}/{}'.format(
         '0' * 10, 'B' * 40), {
             # Native URL Support, support the provided discord URL from their
             # webpage.
-            'instance': plugins.NotifyDiscord,
+            'instance': NotifyDiscord,
             'requests_response_code': requests.codes.no_content,
     }),
     ('https://discordapp.com/api/webhooks/{}/{}'.format(
         '0' * 10, 'B' * 40), {
             # Legacy Native URL Support, support the older URL (to be
             # decomissioned on Nov 7th 2020)
-            'instance': plugins.NotifyDiscord,
+            'instance': NotifyDiscord,
             'requests_response_code': requests.codes.no_content,
     }),
     ('https://discordapp.com/api/webhooks/{}/{}?footer=yes'.format(
         '0' * 10, 'B' * 40), {
             # Native URL Support with arguments
-            'instance': plugins.NotifyDiscord,
+            'instance': NotifyDiscord,
             'requests_response_code': requests.codes.no_content,
     }),
     ('discord://%s/%s?format=markdown&avatar=No&footer=No' % (
         'i' * 24, 't' * 64), {
-            'instance': plugins.NotifyDiscord,
+            'instance': NotifyDiscord,
             'requests_response_code': requests.codes.no_content,
     }),
     # different format support
     ('discord://%s/%s?format=markdown' % ('i' * 24, 't' * 64), {
-        'instance': plugins.NotifyDiscord,
+        'instance': NotifyDiscord,
         'requests_response_code': requests.codes.no_content,
     }),
     # Thread ID
     ('discord://%s/%s?format=markdown&thread=abc123' % (
         'i' * 24, 't' * 64), {
-            'instance': plugins.NotifyDiscord,
+            'instance': NotifyDiscord,
             'requests_response_code': requests.codes.no_content,
     }),
     ('discord://%s/%s?format=text' % ('i' * 24, 't' * 64), {
-        'instance': plugins.NotifyDiscord,
+        'instance': NotifyDiscord,
         'requests_response_code': requests.codes.no_content,
     }),
     # Test with avatar URL
     ('discord://%s/%s?avatar_url=http://localhost/test.jpg' % (
         'i' * 24, 't' * 64), {
-            'instance': plugins.NotifyDiscord,
+            'instance': NotifyDiscord,
             'requests_response_code': requests.codes.no_content,
     }),
     # Test without image set
     ('discord://%s/%s' % ('i' * 24, 't' * 64), {
-        'instance': plugins.NotifyDiscord,
+        'instance': NotifyDiscord,
         'requests_response_code': requests.codes.no_content,
         # don't include an image by default
         'include_image': False,
     }),
     ('discord://%s/%s/' % ('a' * 24, 'b' * 64), {
-        'instance': plugins.NotifyDiscord,
+        'instance': NotifyDiscord,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('discord://%s/%s/' % ('a' * 24, 'b' * 64), {
-        'instance': plugins.NotifyDiscord,
+        'instance': NotifyDiscord,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('discord://%s/%s/' % ('a' * 24, 'b' * 64), {
-        'instance': plugins.NotifyDiscord,
+        'instance': NotifyDiscord,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -184,19 +185,19 @@ def test_plugin_discord_general(mock_post, no_throttling):
 
     # Invalid webhook id
     with pytest.raises(TypeError):
-        plugins.NotifyDiscord(webhook_id=None, webhook_token=webhook_token)
+        NotifyDiscord(webhook_id=None, webhook_token=webhook_token)
     # Invalid webhook id (whitespace)
     with pytest.raises(TypeError):
-        plugins.NotifyDiscord(webhook_id="  ", webhook_token=webhook_token)
+        NotifyDiscord(webhook_id="  ", webhook_token=webhook_token)
 
     # Invalid webhook token
     with pytest.raises(TypeError):
-        plugins.NotifyDiscord(webhook_id=webhook_id, webhook_token=None)
+        NotifyDiscord(webhook_id=webhook_id, webhook_token=None)
     # Invalid webhook token (whitespace)
     with pytest.raises(TypeError):
-        plugins.NotifyDiscord(webhook_id=webhook_id, webhook_token="   ")
+        NotifyDiscord(webhook_id=webhook_id, webhook_token="   ")
 
-    obj = plugins.NotifyDiscord(
+    obj = NotifyDiscord(
         webhook_id=webhook_id,
         webhook_token=webhook_token,
         footer=True, thumbnail=False)
@@ -286,7 +287,7 @@ def test_plugin_discord_general(mock_post, no_throttling):
             webhook_token=webhook_token)) is True
 
     # This call includes an image with it's payload:
-    plugins.NotifyDiscord.discord_max_fields = 1
+    NotifyDiscord.discord_max_fields = 1
 
     assert a.notify(body=test_markdown, title='title',
                     notify_type=NotifyType.INFO,
@@ -304,7 +305,7 @@ def test_plugin_discord_general(mock_post, no_throttling):
     # Test our markdown
     obj = Apprise.instantiate(
         'discord://{}/{}/?format=markdown'.format(webhook_id, webhook_token))
-    assert isinstance(obj, plugins.NotifyDiscord)
+    assert isinstance(obj, NotifyDiscord)
     assert obj.notify(
         body=test_markdown, title='title',
         notify_type=NotifyType.INFO) is False

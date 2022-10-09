@@ -31,7 +31,7 @@ import requests
 from json import dumps
 from apprise import AppriseAttachment
 from apprise import NotifyType
-from apprise import plugins
+from apprise.plugins.NotifyPushSafer import NotifyPushSafer
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -53,18 +53,18 @@ apprise_url_tests = (
         'instance': TypeError,
     }),
     ('psafer://{}'.format('a' * 20), {
-        'instance': plugins.NotifyPushSafer,
+        'instance': NotifyPushSafer,
         # This will fail because we're also expecting a server acknowledgement
         'notify_response': False,
     }),
     ('psafer://{}'.format('b' * 20), {
-        'instance': plugins.NotifyPushSafer,
+        'instance': NotifyPushSafer,
         # invalid JSON response
         'requests_response_text': '{',
         'notify_response': False,
     }),
     ('psafer://{}'.format('c' * 20), {
-        'instance': plugins.NotifyPushSafer,
+        'instance': NotifyPushSafer,
         # A failure has status set to zero
         # We also expect an 'error' flag to be set
         'requests_response_text': {
@@ -74,7 +74,7 @@ apprise_url_tests = (
         'notify_response': False,
     }),
     ('psafers://{}'.format('d' * 20), {
-        'instance': plugins.NotifyPushSafer,
+        'instance': NotifyPushSafer,
         # A failure has status set to zero
         # Test without an 'error' flag
         'requests_response_text': {
@@ -84,7 +84,7 @@ apprise_url_tests = (
     }),
     # This will notify all users ('a')
     ('psafer://{}'.format('e' * 20), {
-        'instance': plugins.NotifyPushSafer,
+        'instance': NotifyPushSafer,
         # A status of 1 is a success
         'requests_response_text': {
             'status': 1,
@@ -92,7 +92,7 @@ apprise_url_tests = (
     }),
     # This will notify a selected set of devices
     ('psafer://{}/12/24/53'.format('e' * 20), {
-        'instance': plugins.NotifyPushSafer,
+        'instance': NotifyPushSafer,
         # A status of 1 is a success
         'requests_response_text': {
             'status': 1,
@@ -100,7 +100,7 @@ apprise_url_tests = (
     }),
     # Same as above, but exercises the to= argument
     ('psafer://{}?to=12,24,53'.format('e' * 20), {
-        'instance': plugins.NotifyPushSafer,
+        'instance': NotifyPushSafer,
         # A status of 1 is a success
         'requests_response_text': {
             'status': 1,
@@ -108,14 +108,14 @@ apprise_url_tests = (
     }),
     # Set priority
     ('psafer://{}?priority=emergency'.format('f' * 20), {
-        'instance': plugins.NotifyPushSafer,
+        'instance': NotifyPushSafer,
         'requests_response_text': {
             'status': 1,
         }
     }),
     # Support integer value too
     ('psafer://{}?priority=-1'.format('f' * 20), {
-        'instance': plugins.NotifyPushSafer,
+        'instance': NotifyPushSafer,
         'requests_response_text': {
             'status': 1,
         }
@@ -132,14 +132,14 @@ apprise_url_tests = (
     }),
     # Set sound
     ('psafer://{}?sound=ok'.format('g' * 20), {
-        'instance': plugins.NotifyPushSafer,
+        'instance': NotifyPushSafer,
         'requests_response_text': {
             'status': 1,
         }
     }),
     # Support integer value too
     ('psafers://{}?sound=14'.format('g' * 20), {
-        'instance': plugins.NotifyPushSafer,
+        'instance': NotifyPushSafer,
         'requests_response_text': {
             'status': 1,
         },
@@ -156,7 +156,7 @@ apprise_url_tests = (
     }),
     # Set vibration (integer only)
     ('psafers://{}?vibration=1'.format('h' * 20), {
-        'instance': plugins.NotifyPushSafer,
+        'instance': NotifyPushSafer,
         'requests_response_text': {
             'status': 1,
         },
@@ -173,7 +173,7 @@ apprise_url_tests = (
         'instance': TypeError,
     }),
     ('psafers://{}'.format('d' * 20), {
-        'instance': plugins.NotifyPushSafer,
+        'instance': NotifyPushSafer,
         # A failure has status set to zero
         # Test without an 'error' flag
         'requests_response_text': {
@@ -185,7 +185,7 @@ apprise_url_tests = (
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('psafer://{}'.format('d' * 20), {
-        'instance': plugins.NotifyPushSafer,
+        'instance': NotifyPushSafer,
         # A failure has status set to zero
         # Test without an 'error' flag
         'requests_response_text': {
@@ -197,7 +197,7 @@ apprise_url_tests = (
         'requests_response_code': 999,
     }),
     ('psafers://{}'.format('d' * 20), {
-        'instance': plugins.NotifyPushSafer,
+        'instance': NotifyPushSafer,
         # A failure has status set to zero
         # Test without an 'error' flag
         'requests_response_text': {
@@ -227,7 +227,7 @@ def test_plugin_pushsafer_general(mock_post):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyPushSafer.request_rate_per_sec = 0
+    NotifyPushSafer.request_rate_per_sec = 0
 
     # Private Key
     privatekey = 'abc123'
@@ -242,7 +242,7 @@ def test_plugin_pushsafer_general(mock_post):
 
     # Exception should be thrown about the fact no private key was specified
     with pytest.raises(TypeError):
-        plugins.NotifyPushSafer(privatekey=None)
+        NotifyPushSafer(privatekey=None)
 
     # Multiple Attachment Support
     path = os.path.join(TEST_VAR_DIR, 'apprise-test.gif')
@@ -250,7 +250,7 @@ def test_plugin_pushsafer_general(mock_post):
     for _ in range(0, 4):
         attach.add(path)
 
-    obj = plugins.NotifyPushSafer(privatekey=privatekey)
+    obj = NotifyPushSafer(privatekey=privatekey)
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=attach) is True

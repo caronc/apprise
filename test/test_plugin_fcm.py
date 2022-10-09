@@ -37,7 +37,7 @@ import pytest
 import requests
 import json
 from apprise import Apprise
-from apprise import plugins
+from apprise.plugins.NotifyFCM import NotifyFCM
 from helpers import AppriseURLTester
 
 try:
@@ -76,18 +76,18 @@ apprise_url_tests = (
     }),
     ('fcm://apikey/', {
         # no project id specified so we operate in legacy mode
-        'instance': plugins.NotifyFCM,
+        'instance': NotifyFCM,
         # but there are no targets specified so we return False
         'notify_response': False,
     }),
     ('fcm://apikey/device', {
         # Valid device
-        'instance': plugins.NotifyFCM,
+        'instance': NotifyFCM,
         'privacy_url': 'fcm://a...y/device',
     }),
     ('fcm://apikey/#topic', {
         # Valid topic
-        'instance': plugins.NotifyFCM,
+        'instance': NotifyFCM,
         'privacy_url': 'fcm://a...y/%23topic',
     }),
     ('fcm://apikey/device?mode=invalid', {
@@ -96,39 +96,39 @@ apprise_url_tests = (
     }),
     ('fcm://apikey/#topic1/device/%20/', {
         # Valid topic, valid device, and invalid entry
-        'instance': plugins.NotifyFCM,
+        'instance': NotifyFCM,
     }),
     ('fcm://apikey?to=#topic1,device', {
         # Test to=
-        'instance': plugins.NotifyFCM,
+        'instance': NotifyFCM,
     }),
     ('fcm://?apikey=abc123&to=device', {
         # Test apikey= to=
-        'instance': plugins.NotifyFCM,
+        'instance': NotifyFCM,
     }),
     ('fcm://?apikey=abc123&to=device&image=yes', {
         # Test image boolean
-        'instance': plugins.NotifyFCM,
+        'instance': NotifyFCM,
     }),
     ('fcm://?apikey=abc123&to=device&color=no', {
         # Disable colors
-        'instance': plugins.NotifyFCM,
+        'instance': NotifyFCM,
     }),
     ('fcm://?apikey=abc123&to=device&color=aabbcc', {
         # custom colors
-        'instance': plugins.NotifyFCM,
+        'instance': NotifyFCM,
     }),
     ('fcm://?apikey=abc123&to=device'
         '&image_url=http://example.com/interesting.jpg', {
             # Test image_url
-            'instance': plugins.NotifyFCM}),
+            'instance': NotifyFCM}),
     ('fcm://?apikey=abc123&to=device'
         '&image_url=http://example.com/interesting.jpg&image=no', {
             # Test image_url but set to no
-            'instance': plugins.NotifyFCM}),
+            'instance': NotifyFCM}),
     ('fcm://?apikey=abc123&to=device&+key=value&+key2=value2', {
         # Test apikey= to= and data arguments
-        'instance': plugins.NotifyFCM,
+        'instance': NotifyFCM,
     }),
     ('fcm://%20?to=device&keyfile=/invalid/path', {
         # invalid Project ID
@@ -136,13 +136,13 @@ apprise_url_tests = (
     }),
     ('fcm://project_id?to=device&keyfile=/invalid/path', {
         # Test to= and auto detection of oauth mode
-        'instance': plugins.NotifyFCM,
+        'instance': NotifyFCM,
         # we'll fail to send our notification as a result
         'response': False,
     }),
     ('fcm://?to=device&project=project_id&keyfile=/invalid/path', {
         # Test project= & to= and auto detection of oauth mode
-        'instance': plugins.NotifyFCM,
+        'instance': NotifyFCM,
         # we'll fail to send our notification as a result
         'response': False,
     }),
@@ -153,18 +153,18 @@ apprise_url_tests = (
     ('fcm://project_id?to=device&mode=oauth2&keyfile=/invalid/path', {
         # Same test as above except we explicitly set our oauth2 mode
         # Test to= and auto detection of oauth mode
-        'instance': plugins.NotifyFCM,
+        'instance': NotifyFCM,
         # we'll fail to send our notification as a result
         'response': False,
     }),
     ('fcm://apikey/#topic1/device/?mode=legacy', {
-        'instance': plugins.NotifyFCM,
+        'instance': NotifyFCM,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('fcm://apikey/#topic1/device/?mode=legacy', {
-        'instance': plugins.NotifyFCM,
+        'instance': NotifyFCM,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -173,7 +173,7 @@ apprise_url_tests = (
         os.path.join(
             os.path.dirname(__file__), 'var', 'fcm',
             'service_account.json')), {
-                'instance': plugins.NotifyFCM,
+                'instance': NotifyFCM,
                 # throw a bizzare code forcing us to fail to look it up
                 'response': False,
                 'requests_response_code': 999,
@@ -182,7 +182,7 @@ apprise_url_tests = (
         os.path.join(
             os.path.dirname(__file__), 'var', 'fcm',
             'service_account.json')), {
-                'instance': plugins.NotifyFCM,
+                'instance': NotifyFCM,
                 # Throws a series of connection and transfer exceptions when
                 # this flag is set and tests that we gracfully handle them
                 'test_requests_exceptions': True,
@@ -862,5 +862,5 @@ def test_plugin_fcm_edge_cases(mock_post, no_throttling):
     # this tests an edge case where verify if the data_kwargs is a dictionary
     # or not.  Below, we don't even define it, so it will be None (causing
     # the check to go).  We'll still correctly instantiate a plugin:
-    obj = plugins.NotifyFCM("project", "api:123", targets='device')
+    obj = NotifyFCM("project", "api:123", targets='device')
     assert obj is not None

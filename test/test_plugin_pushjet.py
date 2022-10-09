@@ -24,7 +24,8 @@
 # THE SOFTWARE.
 import pytest
 import requests
-from apprise import plugins
+
+from apprise.plugins.NotifyPushjet import NotifyPushjet
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -48,37 +49,37 @@ apprise_url_tests = (
     }),
     # The proper way to log in
     ('pjet://user:pass@localhost/%s' % ('a' * 32), {
-        'instance': plugins.NotifyPushjet,
+        'instance': NotifyPushjet,
     }),
     # The proper way to log in
     ('pjets://localhost/%s' % ('a' * 32), {
-        'instance': plugins.NotifyPushjet,
+        'instance': NotifyPushjet,
     }),
     # Specify your own server with login (secret= MUST be provided)
     ('pjet://user:pass@localhost?secret=%s' % ('a' * 32), {
-        'instance': plugins.NotifyPushjet,
+        'instance': NotifyPushjet,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'pjet://user:****@localhost',
     }),
     # Specify your own server with port
     ('pjets://localhost:8080/%s' % ('a' * 32), {
-        'instance': plugins.NotifyPushjet,
+        'instance': NotifyPushjet,
     }),
     ('pjets://localhost:8080/%s' % ('a' * 32), {
-        'instance': plugins.NotifyPushjet,
+        'instance': NotifyPushjet,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('pjets://localhost:4343/%s' % ('a' * 32), {
-        'instance': plugins.NotifyPushjet,
+        'instance': NotifyPushjet,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('pjet://localhost:8081/%s' % ('a' * 32), {
-        'instance': plugins.NotifyPushjet,
+        'instance': NotifyPushjet,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -104,7 +105,7 @@ def test_plugin_pushjet_edge_cases(no_throttling):
 
     # No application Key specified
     with pytest.raises(TypeError):
-        plugins.NotifyPushjet(secret_key=None)
+        NotifyPushjet(secret_key=None)
 
     with pytest.raises(TypeError):
-        plugins.NotifyPushjet(secret_key="  ")
+        NotifyPushjet(secret_key="  ")

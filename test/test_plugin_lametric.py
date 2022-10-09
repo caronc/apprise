@@ -24,7 +24,7 @@
 # THE SOFTWARE.
 import pytest
 import requests
-from apprise import plugins
+from apprise.plugins.NotifyLametric import NotifyLametric
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -52,7 +52,7 @@ apprise_url_tests = (
     ('lametric://root:{}@192.168.0.5:8080/'.format(UUID4), {
         # Everything is okay; this would be picked up in Device Mode
         # We're using a default port and enforcing a special user
-        'instance': plugins.NotifyLametric,
+        'instance': NotifyLametric,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'lametric://root:8...2@192.168.0.5/',
@@ -60,21 +60,21 @@ apprise_url_tests = (
     ('lametric://{}@192.168.0.4:8000/'.format(UUID4), {
         # Everything is okay; this would be picked up in Device Mode
         # Port is enforced
-        'instance': plugins.NotifyLametric,
+        'instance': NotifyLametric,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'lametric://8...2@192.168.0.4:8000/',
     }),
     ('lametric://{}@192.168.0.5/'.format(UUID4), {
         # Everything is okay; this would be picked up in Device Mode
-        'instance': plugins.NotifyLametric,
+        'instance': NotifyLametric,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'lametric://8...2@192.168.0.5/',
     }),
     ('lametrics://{}@192.168.0.6/?mode=device'.format(UUID4), {
         # Everything is okay; Device mode forced
-        'instance': plugins.NotifyLametric,
+        'instance': NotifyLametric,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'lametrics://8...2@192.168.0.6/',
@@ -83,7 +83,7 @@ apprise_url_tests = (
     ('https://developer.lametric.com/api/v1/dev/widget/update/'
         'com.lametric.ABCD123/1?token={}=='.format('D' * 88), {
             # Everything is okay; Device mode forced
-            'instance': plugins.NotifyLametric,
+            'instance': NotifyLametric,
 
             # Our expected url(privacy=True) startswith() response:
             'privacy_url': 'lametric://D...=@A...3/1/',
@@ -91,7 +91,7 @@ apprise_url_tests = (
 
     ('lametric://192.168.2.8/?mode=device&apikey=abc123', {
         # Everything is okay; Device mode forced
-        'instance': plugins.NotifyLametric,
+        'instance': NotifyLametric,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'lametric://a...3@192.168.2.8/',
@@ -101,7 +101,7 @@ apprise_url_tests = (
             # Everything is okay; Cloud mode forced
             # We gracefully strip off the com.lametric. part as well
             # We also set an application version of 2
-            'instance': plugins.NotifyLametric,
+            'instance': NotifyLametric,
 
             # Our expected url(privacy=True) startswith() response:
             'privacy_url': 'lametric://A...=@9...0/',
@@ -115,7 +115,7 @@ apprise_url_tests = (
     ('lametric://?app=com.lametric.941c51dff3135bd87aa72db9d855dd50&token={}=='
         '&mode=cloud'.format('B' * 88), {
             # Everything is okay; Cloud mode forced
-            'instance': plugins.NotifyLametric,
+            'instance': NotifyLametric,
 
             # Our expected url(privacy=True) startswith() response:
             'privacy_url': 'lametric://B...=@9...0/',
@@ -124,7 +124,7 @@ apprise_url_tests = (
      '&priority=critical&cycles=10'.format('C' * 88), {
          # Cloud mode forced, sound, icon_type, and priority not supported
          # with cloud mode so warnings are created
-         'instance': plugins.NotifyLametric,
+         'instance': NotifyLametric,
 
          # Our expected url(privacy=True) startswith() response:
          'privacy_url': 'lametric://C...=@a...d/',
@@ -135,70 +135,70 @@ apprise_url_tests = (
     }),
     ('lametrics://{}@192.168.0.6/?sound=alarm1'.format(UUID4), {
         # Device mode with sound set to alarm1
-        'instance': plugins.NotifyLametric,
+        'instance': NotifyLametric,
     }),
     ('lametrics://{}@192.168.0.7/?sound=bike'.format(UUID4), {
         # Device mode with sound set to bicycle using alias
-        'instance': plugins.NotifyLametric,
+        'instance': NotifyLametric,
         # Bike is an alias,
         'url_matches': r'sound=bicycle',
     }),
     ('lametrics://{}@192.168.0.8/?sound=invalid!'.format(UUID4), {
         # Invalid sounds just produce warnings... object still loads
-        'instance': plugins.NotifyLametric,
+        'instance': NotifyLametric,
     }),
     ('lametrics://{}@192.168.0.9/?icon_type=alert'.format(UUID4), {
         # Icon Type Changed
-        'instance': plugins.NotifyLametric,
+        'instance': NotifyLametric,
         # icon=alert exists somewhere on our generated URL
         'url_matches': r'icon_type=alert',
     }),
     ('lametrics://{}@192.168.0.10/?icon_type=invalid'.format(UUID4), {
         # Invalid icon types just produce warnings... object still loads
-        'instance': plugins.NotifyLametric,
+        'instance': NotifyLametric,
     }),
     ('lametric://{}@192.168.1.1/?priority=warning'.format(UUID4), {
         # Priority changed
-        'instance': plugins.NotifyLametric,
+        'instance': NotifyLametric,
     }),
     ('lametrics://{}@192.168.1.2/?priority=invalid'.format(UUID4), {
         # Invalid priority just produce warnings... object still loads
-        'instance': plugins.NotifyLametric,
+        'instance': NotifyLametric,
     }),
     ('lametric://{}@192.168.1.2/?icon=230'.format(UUID4), {
         # Our custom icon by it's ID
-        'instance': plugins.NotifyLametric,
+        'instance': NotifyLametric,
     }),
     ('lametrics://{}@192.168.1.2/?icon=#230'.format(UUID4), {
         # Our custom icon by it's ID; the hashtag at the front is ignored
-        'instance': plugins.NotifyLametric,
+        'instance': NotifyLametric,
     }),
     ('lametric://{}@192.168.1.2/?icon=Heart'.format(UUID4), {
         # Our custom icon; the hashtag at the front is ignored
-        'instance': plugins.NotifyLametric,
+        'instance': NotifyLametric,
     }),
     ('lametric://{}@192.168.1.2/?icon=#'.format(UUID4), {
         # a hashtag and nothing else
-        'instance': plugins.NotifyLametric,
+        'instance': NotifyLametric,
     }),
     ('lametric://{}@192.168.1.2/?icon=#%20%20%20'.format(UUID4), {
         # a hashtag and some spaces
-        'instance': plugins.NotifyLametric,
+        'instance': NotifyLametric,
     }),
     ('lametric://{}@192.168.1.3/?cycles=2'.format(UUID4), {
         # Cycles changed
-        'instance': plugins.NotifyLametric,
+        'instance': NotifyLametric,
     }),
     ('lametric://{}@192.168.1.4/?cycles=-1'.format(UUID4), {
         # Cycles changed (out of range)
-        'instance': plugins.NotifyLametric,
+        'instance': NotifyLametric,
     }),
     ('lametrics://{}@192.168.1.5/?cycles=invalid'.format(UUID4), {
         # Invalid priority just produce warnings... object still loads
-        'instance': plugins.NotifyLametric,
+        'instance': NotifyLametric,
     }),
     ('lametric://{}@example.com/'.format(UUID4), {
-        'instance': plugins.NotifyLametric,
+        'instance': NotifyLametric,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
@@ -207,7 +207,7 @@ apprise_url_tests = (
         'privacy_url': 'lametric://8...2@example.com/',
     }),
     ('lametrics://{}@example.ca/'.format(UUID4), {
-        'instance': plugins.NotifyLametric,
+        'instance': NotifyLametric,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
@@ -216,7 +216,7 @@ apprise_url_tests = (
         'privacy_url': 'lametrics://8...2@example.ca/',
     }),
     ('lametrics://{}@example.net/'.format(UUID4), {
-        'instance': plugins.NotifyLametric,
+        'instance': NotifyLametric,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -241,8 +241,8 @@ def test_plugin_lametric_edge_cases():
     """
     # Initializes the plugin with an invalid API Key
     with pytest.raises(TypeError):
-        plugins.NotifyLametric(apikey=None, mode="device")
+        NotifyLametric(apikey=None, mode="device")
 
     # Initializes the plugin with an invalid Client Secret
     with pytest.raises(TypeError):
-        plugins.NotifyLametric(client_id='valid', secret=None, mode="cloud")
+        NotifyLametric(client_id='valid', secret=None, mode="cloud")

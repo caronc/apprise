@@ -22,7 +22,7 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
-from apprise import plugins
+from apprise.plugins.NotifyPagerDuty import NotifyPagerDuty
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -61,47 +61,47 @@ apprise_url_tests = (
     }),
     ('pagerduty://myroutekey@myapikey', {
         # minimum requirements met
-        'instance': plugins.NotifyPagerDuty,
+        'instance': NotifyPagerDuty,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'pagerduty://****@****/A...e/N...n?',
     }),
     ('pagerduty://myroutekey@myapikey?image=no', {
         # minimum requirements met and disable images
-        'instance': plugins.NotifyPagerDuty,
+        'instance': NotifyPagerDuty,
     }),
     ('pagerduty://myroutekey@myapikey?region=eu', {
         # european region
-        'instance': plugins.NotifyPagerDuty,
+        'instance': NotifyPagerDuty,
     }),
     # Custom values
     ('pagerduty://myroutekey@myapikey?+key=value&+key2=value2', {
         # minimum requirements and support custom key/value pairs
-        'instance': plugins.NotifyPagerDuty,
+        'instance': NotifyPagerDuty,
     }),
     ('pagerduty://myroutekey@myapikey/mysource/mycomponent', {
         # a valid url
-        'instance': plugins.NotifyPagerDuty,
+        'instance': NotifyPagerDuty,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'pagerduty://****@****/m...e/m...t?',
     }),
     ('pagerduty://routekey@apikey/ms/mc?group=mygroup&class=myclass', {
         # class/group testing
-        'instance': plugins.NotifyPagerDuty,
+        'instance': NotifyPagerDuty,
     }),
     ('pagerduty://?integrationkey=r&apikey=a&source=s&component=c'
         '&group=g&class=c&image=no&click=http://localhost', {
             # all parameters
-            'instance': plugins.NotifyPagerDuty}),
+            'instance': NotifyPagerDuty}),
     ('pagerduty://somerkey@someapikey/bizzare/code', {
-        'instance': plugins.NotifyPagerDuty,
+        'instance': NotifyPagerDuty,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('pagerduty://myroutekey@myapikey/mysource/mycomponent', {
-        'instance': plugins.NotifyPagerDuty,
+        'instance': NotifyPagerDuty,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,

@@ -24,7 +24,8 @@
 # THE SOFTWARE.
 import pytest
 import requests
-from apprise import plugins
+
+from apprise.plugins.NotifyKumulos import NotifyKumulos
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -53,13 +54,13 @@ apprise_url_tests = (
     }),
     ('kumulos://{}/{}/'.format(UUID4, 'w' * 36), {
         # Everything is okay
-        'instance': plugins.NotifyKumulos,
+        'instance': NotifyKumulos,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'kumulos://8...2/w...w/',
     }),
     ('kumulos://{}/{}/'.format(UUID4, 'x' * 36), {
-        'instance': plugins.NotifyKumulos,
+        'instance': NotifyKumulos,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
@@ -68,7 +69,7 @@ apprise_url_tests = (
         'privacy_url': 'kumulos://8...2/x...x/',
     }),
     ('kumulos://{}/{}/'.format(UUID4, 'y' * 36), {
-        'instance': plugins.NotifyKumulos,
+        'instance': NotifyKumulos,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
@@ -77,7 +78,7 @@ apprise_url_tests = (
         'privacy_url': 'kumulos://8...2/y...y/',
     }),
     ('kumulos://{}/{}/'.format(UUID4, 'z' * 36), {
-        'instance': plugins.NotifyKumulos,
+        'instance': NotifyKumulos,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -103,12 +104,12 @@ def test_plugin_kumulos_edge_cases(no_throttling):
 
     # Invalid API Key
     with pytest.raises(TypeError):
-        plugins.NotifyKumulos(None, None)
+        NotifyKumulos(None, None)
     with pytest.raises(TypeError):
-        plugins.NotifyKumulos("     ", None)
+        NotifyKumulos("     ", None)
 
     # Invalid Server Key
     with pytest.raises(TypeError):
-        plugins.NotifyKumulos("abcd", None)
+        NotifyKumulos("abcd", None)
     with pytest.raises(TypeError):
-        plugins.NotifyKumulos("abcd", "       ")
+        NotifyKumulos("abcd", "       ")

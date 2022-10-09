@@ -27,6 +27,8 @@ from unittest import mock
 from json import dumps
 from apprise import Apprise
 import requests
+
+from apprise.plugins.NotifyEmby import NotifyEmby
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -53,13 +55,13 @@ apprise_url_tests = (
     }),
     # Valid Authentication
     ('emby://l2g@localhost', {
-        'instance': plugins.NotifyEmby,
+        'instance': NotifyEmby,
         # our response will be False because our authentication can't be
         # tested very well using this matrix.
         'response': False,
     }),
     ('embys://l2g:password@localhost', {
-        'instance': plugins.NotifyEmby,
+        'instance': NotifyEmby,
         # our response will be False because our authentication can't be
         # tested very well using this matrix.
         'response': False,
@@ -80,9 +82,9 @@ def test_plugin_template_urls():
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-@mock.patch('apprise.plugins.NotifyEmby.sessions')
-@mock.patch('apprise.plugins.NotifyEmby.login')
-@mock.patch('apprise.plugins.NotifyEmby.logout')
+@mock.patch('apprise.plugins.NotifyEmby.NotifyEmby.sessions')
+@mock.patch('apprise.plugins.NotifyEmby.NotifyEmby.login')
+@mock.patch('apprise.plugins.NotifyEmby.NotifyEmby.logout')
 @mock.patch('requests.get')
 @mock.patch('requests.post')
 def test_plugin_emby_general(mock_post, mock_get, mock_logout,
@@ -104,14 +106,14 @@ def test_plugin_emby_general(mock_post, mock_get, mock_logout,
     mock_sessions.return_value = {'abcd': {}}
 
     obj = Apprise.instantiate('emby://l2g:l2gpass@localhost?modal=False')
-    assert isinstance(obj, plugins.NotifyEmby)
+    assert isinstance(obj, NotifyEmby)
     assert obj.notify('title', 'body', 'info') is True
     obj.access_token = 'abc'
     obj.user_id = '123'
 
     # Test Modal support
     obj = Apprise.instantiate('emby://l2g:l2gpass@localhost?modal=True')
-    assert isinstance(obj, plugins.NotifyEmby)
+    assert isinstance(obj, NotifyEmby)
     assert obj.notify('title', 'body', 'info') is True
     obj.access_token = 'abc'
     obj.user_id = '123'
@@ -171,7 +173,7 @@ def test_plugin_emby_login(mock_post, mock_get, no_throttling):
     mock_post.return_value = requests.Request()
 
     obj = Apprise.instantiate('emby://l2g:l2gpass@localhost')
-    assert isinstance(obj, plugins.NotifyEmby)
+    assert isinstance(obj, NotifyEmby)
 
     # Test our exception handling
     for _exception in AppriseURLTester.req_exceptions:
@@ -203,7 +205,7 @@ def test_plugin_emby_login(mock_post, mock_get, no_throttling):
 
     obj = Apprise.instantiate('emby://l2g:l2gpass@localhost:1234')
     # Set a different port (outside of default)
-    assert isinstance(obj, plugins.NotifyEmby)
+    assert isinstance(obj, NotifyEmby)
     assert obj.port == 1234
 
     # The login will fail because '' is not a parseable JSON response
@@ -215,7 +217,7 @@ def test_plugin_emby_login(mock_post, mock_get, no_throttling):
 
     # Default port assignments
     obj = Apprise.instantiate('emby://l2g:l2gpass@localhost')
-    assert isinstance(obj, plugins.NotifyEmby)
+    assert isinstance(obj, NotifyEmby)
     assert obj.port == 8096
 
     # The login will (still) fail because '' is not a parseable JSON response
@@ -228,7 +230,7 @@ def test_plugin_emby_login(mock_post, mock_get, no_throttling):
     mock_get.return_value.content = mock_post.return_value.content
 
     obj = Apprise.instantiate('emby://l2g:l2gpass@localhost')
-    assert isinstance(obj, plugins.NotifyEmby)
+    assert isinstance(obj, NotifyEmby)
 
     # The login will fail because the 'User' or 'Id' field wasn't parsed
     assert obj.login() is False
@@ -246,7 +248,7 @@ def test_plugin_emby_login(mock_post, mock_get, no_throttling):
     mock_get.return_value.content = mock_post.return_value.content
 
     obj = Apprise.instantiate('emby://l2g:l2gpass@localhost')
-    assert isinstance(obj, plugins.NotifyEmby)
+    assert isinstance(obj, NotifyEmby)
 
     # Login
     assert obj.login() is True
@@ -270,8 +272,8 @@ def test_plugin_emby_login(mock_post, mock_get, no_throttling):
     assert obj.access_token == '0000-0000-0000-0000'
 
 
-@mock.patch('apprise.plugins.NotifyEmby.login')
-@mock.patch('apprise.plugins.NotifyEmby.logout')
+@mock.patch('apprise.plugins.NotifyEmby.NotifyEmby.login')
+@mock.patch('apprise.plugins.NotifyEmby.NotifyEmby.logout')
 @mock.patch('requests.get')
 @mock.patch('requests.post')
 def test_plugin_emby_sessions(mock_post, mock_get, mock_logout, mock_login,
@@ -290,7 +292,7 @@ def test_plugin_emby_sessions(mock_post, mock_get, mock_logout, mock_login,
     mock_logout.return_value = True
 
     obj = Apprise.instantiate('emby://l2g:l2gpass@localhost')
-    assert isinstance(obj, plugins.NotifyEmby)
+    assert isinstance(obj, NotifyEmby)
     obj.access_token = 'abc'
     obj.user_id = '123'
 
@@ -367,7 +369,7 @@ def test_plugin_emby_sessions(mock_post, mock_get, mock_logout, mock_login,
     assert len(sessions) == 0
 
 
-@mock.patch('apprise.plugins.NotifyEmby.login')
+@mock.patch('apprise.plugins.NotifyEmby.NotifyEmby.login')
 @mock.patch('requests.get')
 @mock.patch('requests.post')
 def test_plugin_emby_logout(mock_post, mock_get, mock_login, no_throttling):
@@ -384,7 +386,7 @@ def test_plugin_emby_logout(mock_post, mock_get, mock_login, no_throttling):
     mock_login.return_value = True
 
     obj = Apprise.instantiate('emby://l2g:l2gpass@localhost')
-    assert isinstance(obj, plugins.NotifyEmby)
+    assert isinstance(obj, NotifyEmby)
     obj.access_token = 'abc'
     obj.user_id = '123'
 

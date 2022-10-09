@@ -31,8 +31,8 @@ import requests
 import pytest
 from apprise import Apprise
 from apprise import AppriseConfig
-from apprise import plugins
 from apprise import NotifyType
+from apprise.plugins.NotifyMSTeams import NotifyMSTeams
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -71,13 +71,13 @@ apprise_url_tests = (
     }),
     ('msteams://{}@{}/{}/{}?t1'.format(UUID4, UUID4, 'b' * 32, UUID4), {
         # All tokens provided - we're good
-        'instance': plugins.NotifyMSTeams,
+        'instance': NotifyMSTeams,
     }),
     # Support native URLs
     ('https://outlook.office.com/webhook/{}@{}/IncomingWebhook/{}/{}'
      .format(UUID4, UUID4, 'k' * 32, UUID4), {
          # All tokens provided - we're good
-         'instance': plugins.NotifyMSTeams,
+         'instance': NotifyMSTeams,
 
          # Our expected url(privacy=True) startswith() response (v1 format)
          'privacy_url': 'msteams://8...2/k...k/8...2/'}),
@@ -86,7 +86,7 @@ apprise_url_tests = (
     ('https://myteam.webhook.office.com/webhookb2/{}@{}/IncomingWebhook/{}/{}'
      .format(UUID4, UUID4, 'm' * 32, UUID4), {
          # All tokens provided - we're good
-         'instance': plugins.NotifyMSTeams,
+         'instance': NotifyMSTeams,
 
          # Our expected url(privacy=True) startswith() response (v2 format):
          'privacy_url': 'msteams://myteam/8...2/m...m/8...2/'}),
@@ -94,14 +94,14 @@ apprise_url_tests = (
     # Legacy URL Formatting
     ('msteams://{}@{}/{}/{}?t2'.format(UUID4, UUID4, 'c' * 32, UUID4), {
         # All tokens provided - we're good
-        'instance': plugins.NotifyMSTeams,
+        'instance': NotifyMSTeams,
         # don't include an image by default
         'include_image': False,
     }),
     # Legacy URL Formatting
     ('msteams://{}@{}/{}/{}?image=No'.format(UUID4, UUID4, 'd' * 32, UUID4), {
         # All tokens provided - we're good  no image
-        'instance': plugins.NotifyMSTeams,
+        'instance': NotifyMSTeams,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'msteams://8...2/d...d/8...2/',
@@ -110,7 +110,7 @@ apprise_url_tests = (
     ('msteams://apprise/{}@{}/{}/{}'.format(
         UUID4, UUID4, 'e' * 32, UUID4), {
             # All tokens provided - we're good  no image
-            'instance': plugins.NotifyMSTeams,
+            'instance': NotifyMSTeams,
 
             # Our expected url(privacy=True) startswith() response:
             'privacy_url': 'msteams://apprise/8...2/e...e/8...2/',
@@ -119,7 +119,7 @@ apprise_url_tests = (
     ('msteams://{}@{}/{}/{}?team=teamname'.format(
         UUID4, UUID4, 'f' * 32, UUID4), {
             # All tokens provided - we're good  no image
-            'instance': plugins.NotifyMSTeams,
+            'instance': NotifyMSTeams,
 
             # Our expected url(privacy=True) startswith() response:
             'privacy_url': 'msteams://teamname/8...2/f...f/8...2/',
@@ -128,7 +128,7 @@ apprise_url_tests = (
     ('msteams://apprise/{}@{}/{}/{}?version=1'.format(
         UUID4, UUID4, 'e' * 32, UUID4), {
             # All tokens provided - we're good
-            'instance': plugins.NotifyMSTeams,
+            'instance': NotifyMSTeams,
 
             # Our expected url(privacy=True) startswith() response:
             'privacy_url': 'msteams://8...2/e...e/8...2/',
@@ -145,19 +145,19 @@ apprise_url_tests = (
             'instance': TypeError,
     }),
     ('msteams://{}@{}/{}/{}?tx'.format(UUID4, UUID4, 'x' * 32, UUID4), {
-        'instance': plugins.NotifyMSTeams,
+        'instance': NotifyMSTeams,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('msteams://{}@{}/{}/{}?ty'.format(UUID4, UUID4, 'y' * 32, UUID4), {
-        'instance': plugins.NotifyMSTeams,
+        'instance': NotifyMSTeams,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('msteams://{}@{}/{}/{}?tz'.format(UUID4, UUID4, 'z' * 32, UUID4), {
-        'instance': plugins.NotifyMSTeams,
+        'instance': NotifyMSTeams,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -214,7 +214,7 @@ def test_plugin_msteams_templating(mock_post, tmpdir, no_throttling):
         kwargs=':key1=token&:key2=token',
     ))
 
-    assert isinstance(obj, plugins.NotifyMSTeams)
+    assert isinstance(obj, NotifyMSTeams)
     assert obj.notify(
         body="body", title='title',
         notify_type=NotifyType.INFO) is True
@@ -244,7 +244,7 @@ def test_plugin_msteams_templating(mock_post, tmpdir, no_throttling):
         kwargs=':key1=token&:key2=token',
     ))
 
-    assert isinstance(obj, plugins.NotifyMSTeams)
+    assert isinstance(obj, NotifyMSTeams)
     # We will fail to preform our notifcation because the JSON is bad
     assert obj.notify(
         body="body", title='title',
@@ -274,7 +274,7 @@ def test_plugin_msteams_templating(mock_post, tmpdir, no_throttling):
         kwargs=':key1=token&:key2=token',
     ))
 
-    assert isinstance(obj, plugins.NotifyMSTeams)
+    assert isinstance(obj, NotifyMSTeams)
 
     # We can not load the file because we're missing the @type entry
     assert obj.notify(
@@ -305,7 +305,7 @@ def test_plugin_msteams_templating(mock_post, tmpdir, no_throttling):
         kwargs=':key1=token&:key2=token',
     ))
 
-    assert isinstance(obj, plugins.NotifyMSTeams)
+    assert isinstance(obj, NotifyMSTeams)
     # We can not load the file because we're missing the @context entry
     assert obj.notify(
         body="body", title='title',
@@ -360,7 +360,7 @@ def test_plugin_msteams_templating(mock_post, tmpdir, no_throttling):
         kwargs=':key1=token&:key2=token&:target=http://localhost',
     ))
 
-    assert isinstance(obj, plugins.NotifyMSTeams)
+    assert isinstance(obj, NotifyMSTeams)
     assert obj.notify(
         body="body", title='title',
         notify_type=NotifyType.INFO) is True
@@ -434,7 +434,7 @@ def test_msteams_yaml_config(mock_post, tmpdir, no_throttling):
     assert len(cfg[0]) == 1
 
     obj = cfg[0][0]
-    assert isinstance(obj, plugins.NotifyMSTeams)
+    assert isinstance(obj, NotifyMSTeams)
     assert obj.notify(
         body="body", title='title',
         notify_type=NotifyType.INFO) is False
@@ -458,7 +458,7 @@ def test_msteams_yaml_config(mock_post, tmpdir, no_throttling):
     assert len(cfg[0]) == 1
 
     obj = cfg[0][0]
-    assert isinstance(obj, plugins.NotifyMSTeams)
+    assert isinstance(obj, NotifyMSTeams)
     assert obj.notify(
         body="body", title='title',
         notify_type=NotifyType.INFO) is True
@@ -496,7 +496,7 @@ def test_msteams_yaml_config(mock_post, tmpdir, no_throttling):
     assert len(cfg[0]) == 1
 
     obj = cfg[0][0]
-    assert isinstance(obj, plugins.NotifyMSTeams)
+    assert isinstance(obj, NotifyMSTeams)
     assert obj.notify(
         body="body", title='title',
         notify_type=NotifyType.INFO) is True
@@ -535,7 +535,7 @@ def test_msteams_yaml_config(mock_post, tmpdir, no_throttling):
     assert len(cfg[0]) == 1
 
     obj = cfg[0][0]
-    assert isinstance(obj, plugins.NotifyMSTeams)
+    assert isinstance(obj, NotifyMSTeams)
     assert obj.notify(
         body="body", title='title',
         notify_type=NotifyType.INFO) is True
@@ -574,7 +574,7 @@ def test_msteams_yaml_config(mock_post, tmpdir, no_throttling):
     assert len(cfg[0]) == 1
 
     obj = cfg[0][0]
-    assert isinstance(obj, plugins.NotifyMSTeams)
+    assert isinstance(obj, NotifyMSTeams)
     assert obj.notify(
         body="body", title='title',
         notify_type=NotifyType.INFO) is True
@@ -611,7 +611,7 @@ def test_msteams_yaml_config(mock_post, tmpdir, no_throttling):
     assert len(cfg[0]) == 1
 
     obj = cfg[0][0]
-    assert isinstance(obj, plugins.NotifyMSTeams)
+    assert isinstance(obj, NotifyMSTeams)
     assert obj.notify(
         body="body", title='title',
         notify_type=NotifyType.INFO) is True
@@ -657,27 +657,27 @@ def test_plugin_msteams_edge_cases():
     """
     # Initializes the plugin with an invalid token
     with pytest.raises(TypeError):
-        plugins.NotifyMSTeams(token_a=None, token_b='abcd', token_c='abcd')
+        NotifyMSTeams(token_a=None, token_b='abcd', token_c='abcd')
     # Whitespace also acts as an invalid token value
     with pytest.raises(TypeError):
-        plugins.NotifyMSTeams(token_a='  ', token_b='abcd', token_c='abcd')
+        NotifyMSTeams(token_a='  ', token_b='abcd', token_c='abcd')
 
     with pytest.raises(TypeError):
-        plugins.NotifyMSTeams(token_a='abcd', token_b=None, token_c='abcd')
+        NotifyMSTeams(token_a='abcd', token_b=None, token_c='abcd')
     # Whitespace also acts as an invalid token value
     with pytest.raises(TypeError):
-        plugins.NotifyMSTeams(token_a='abcd', token_b='  ', token_c='abcd')
+        NotifyMSTeams(token_a='abcd', token_b='  ', token_c='abcd')
 
     with pytest.raises(TypeError):
-        plugins.NotifyMSTeams(token_a='abcd', token_b='abcd', token_c=None)
+        NotifyMSTeams(token_a='abcd', token_b='abcd', token_c=None)
     # Whitespace also acts as an invalid token value
     with pytest.raises(TypeError):
-        plugins.NotifyMSTeams(token_a='abcd', token_b='abcd', token_c='  ')
+        NotifyMSTeams(token_a='abcd', token_b='abcd', token_c='  ')
 
     uuid4 = '8b799edf-6f98-4d3a-9be7-2862fb4e5752'
     token_a = '{}@{}'.format(uuid4, uuid4)
     token_b = 'A' * 32
     # test case where no tokens are specified
-    obj = plugins.NotifyMSTeams(
+    obj = NotifyMSTeams(
         token_a=token_a, token_b=token_b, token_c=uuid4)
-    assert isinstance(obj, plugins.NotifyMSTeams)
+    assert isinstance(obj, NotifyMSTeams)
