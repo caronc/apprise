@@ -263,14 +263,12 @@ def test_plugin_sparkpost_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_sparkpost_throttling(mock_post):
+def test_plugin_sparkpost_throttling(mock_post, no_throttling):
     """
     NotifySparkPost() Throttling
 
     """
 
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
     plugins.NotifySparkPost.sparkpost_retry_wait_sec = 0.1
     plugins.NotifySparkPost.sparkpost_retry_attempts = 3
 
@@ -334,13 +332,11 @@ def test_plugin_sparkpost_throttling(mock_post):
 
 
 @mock.patch('requests.post')
-def test_plugin_sparkpost_attachments(mock_post):
+def test_plugin_sparkpost_attachments(mock_post, no_throttling):
     """
     NotifySparkPost() Attachments
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
     plugins.NotifySparkPost.sparkpost_retry_wait_sec = 0.1
     plugins.NotifySparkPost.sparkpost_retry_attempts = 3
 

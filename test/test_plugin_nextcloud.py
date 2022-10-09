@@ -131,13 +131,11 @@ def test_plugin_nextcloud_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_nextcloud_edge_cases(mock_post):
+def test_plugin_nextcloud_edge_cases(mock_post, no_throttling):
     """
     NotifyNextcloud() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # A response
     robj = mock.Mock()

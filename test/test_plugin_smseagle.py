@@ -269,13 +269,11 @@ def test_plugin_smseagle_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_smseagle_edge_cases(mock_post):
+def test_plugin_smseagle_edge_cases(mock_post, no_throttling):
     """
     NotifySMSEagle() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare our response
     response = requests.Request()
@@ -321,13 +319,11 @@ def test_plugin_smseagle_edge_cases(mock_post):
 
 
 @mock.patch('requests.post')
-def test_plugin_smseagle_result_set(mock_post):
+def test_plugin_smseagle_result_set(mock_post, no_throttling):
     """
     NotifySMSEagle() Result Sets
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare our response
     response = requests.Request()
@@ -539,13 +535,11 @@ def test_plugin_smseagle_result_set(mock_post):
 
 
 @mock.patch('requests.post')
-def test_notify_smseagle_plugin_result_list(mock_post):
+def test_notify_smseagle_plugin_result_list(mock_post, no_throttling):
     """
     NotifySMSEagle() Result List Response
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     okay_response = requests.Request()
     okay_response.status_code = requests.codes.ok
@@ -583,13 +577,11 @@ def test_notify_smseagle_plugin_result_list(mock_post):
 
 
 @mock.patch('requests.post')
-def test_notify_smseagle_plugin_attachments(mock_post):
+def test_notify_smseagle_plugin_attachments(mock_post, no_throttling):
     """
     NotifySMSEagle() Attachments
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     okay_response = requests.Request()
     okay_response.status_code = requests.codes.ok

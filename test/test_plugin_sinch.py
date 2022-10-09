@@ -133,13 +133,11 @@ def test_plugin_sinch_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_sinch_edge_cases(mock_post):
+def test_plugin_sinch_edge_cases(mock_post, no_throttling):
     """
     NotifySinch() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare our response
     response = requests.Request()

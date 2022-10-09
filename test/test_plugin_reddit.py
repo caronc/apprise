@@ -225,14 +225,12 @@ def test_plugin_reddit_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_reddit_general(mock_post):
+def test_plugin_reddit_general(mock_post, no_throttling):
     """
     NotifyReddit() General Tests
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
-    plugins.NotifyReddit.clock_skew = timedelta(seconds=0)
+    NotifyReddit.clock_skew = timedelta(seconds=0)
 
     # Generate a valid credentials:
     kwargs = {

@@ -183,13 +183,11 @@ def test_plugin_office365_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_office365_general(mock_post):
+def test_plugin_office365_general(mock_post, no_throttling):
     """
     NotifyOffice365() General Testing
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Initialize some generic (but valid) tokens
     email = 'user@example.net'
@@ -301,13 +299,11 @@ def test_plugin_office365_general(mock_post):
 
 
 @mock.patch('requests.post')
-def test_plugin_office365_authentication(mock_post):
+def test_plugin_office365_authentication(mock_post, no_throttling):
     """
     NotifyOffice365() Authentication Testing
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Initialize some generic (but valid) tokens
     tenant = 'ff-gg-hh-ii-jj'

@@ -168,13 +168,11 @@ def test_plugin_discord_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_discord_general(mock_post):
+def test_plugin_discord_general(mock_post, no_throttling):
     """
     NotifyDiscord() General Checks
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Initialize some generic (but valid) tokens
     webhook_id = 'A' * 24
@@ -364,13 +362,11 @@ def test_plugin_discord_general(mock_post):
 
 
 @mock.patch('requests.post')
-def test_plugin_discord_attachments(mock_post):
+def test_plugin_discord_attachments(mock_post, no_throttling):
     """
     NotifyDiscord() Attachment Checks
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Initialize some generic (but valid) tokens
     webhook_id = 'C' * 24

@@ -26,7 +26,6 @@ from unittest import mock
 
 from json import dumps
 from apprise import Apprise
-from apprise import plugins
 import requests
 from helpers import AppriseURLTester
 
@@ -87,13 +86,11 @@ def test_plugin_template_urls():
 @mock.patch('requests.get')
 @mock.patch('requests.post')
 def test_plugin_emby_general(mock_post, mock_get, mock_logout,
-                             mock_login, mock_sessions):
+                             mock_login, mock_sessions, no_throttling):
     """
     NotifyEmby General Tests
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     req = requests.Request()
     req.status_code = requests.codes.ok
@@ -163,13 +160,11 @@ def test_plugin_emby_general(mock_post, mock_get, mock_logout,
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_emby_login(mock_post, mock_get):
+def test_plugin_emby_login(mock_post, mock_get, no_throttling):
     """
     NotifyEmby() login()
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare Mock
     mock_get.return_value = requests.Request()
@@ -279,13 +274,12 @@ def test_plugin_emby_login(mock_post, mock_get):
 @mock.patch('apprise.plugins.NotifyEmby.logout')
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_emby_sessions(mock_post, mock_get, mock_logout, mock_login):
+def test_plugin_emby_sessions(mock_post, mock_get, mock_logout, mock_login,
+                              no_throttling):
     """
     NotifyEmby() sessions()
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare Mock
     mock_get.return_value = requests.Request()
@@ -376,13 +370,11 @@ def test_plugin_emby_sessions(mock_post, mock_get, mock_logout, mock_login):
 @mock.patch('apprise.plugins.NotifyEmby.login')
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_emby_logout(mock_post, mock_get, mock_login):
+def test_plugin_emby_logout(mock_post, mock_get, mock_login, no_throttling):
     """
     NotifyEmby() logout()
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare Mock
     mock_get.return_value = requests.Request()

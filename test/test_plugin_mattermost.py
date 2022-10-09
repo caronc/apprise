@@ -122,13 +122,11 @@ def test_plugin_mattermost_urls():
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-def test_plugin_mattermost_edge_cases():
+def test_plugin_mattermost_edge_cases(no_throttling):
     """
     NotifyMattermost() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Invalid Authorization Token
     with pytest.raises(TypeError):

@@ -164,13 +164,11 @@ def test_plugin_twist_init():
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_twist_auth(mock_post, mock_get):
+def test_plugin_twist_auth(mock_post, mock_get, no_throttling):
     """
     NotifyTwist() login/logout()
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare Mock
     mock_get.return_value = requests.Request()
@@ -268,13 +266,11 @@ def test_plugin_twist_auth(mock_post, mock_get):
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_twist_cache(mock_post, mock_get):
+def test_plugin_twist_cache(mock_post, mock_get, no_throttling):
     """
     NotifyTwist() Cache Handling
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     def _response(url, *args, **kwargs):
 
@@ -355,7 +351,7 @@ def test_plugin_twist_cache(mock_post, mock_get):
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_twist_fetch(mock_post, mock_get):
+def test_plugin_twist_fetch(mock_post, mock_get, no_throttling):
     """
     NotifyTwist() fetch()
 
@@ -364,8 +360,6 @@ def test_plugin_twist_fetch(mock_post, mock_get):
     happens to expire.  This tests these edge cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Track our iteration; by tracing within an object, we can re-reference
     # it within a function scope.

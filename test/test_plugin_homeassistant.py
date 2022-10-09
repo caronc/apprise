@@ -124,13 +124,11 @@ def test_plugin_homeassistant_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_homeassistant_general(mock_post):
+def test_plugin_homeassistant_general(mock_post, no_throttling):
     """
     NotifyHomeAssistant() General Checks
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     response = mock.Mock()
     response.content = ''

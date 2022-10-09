@@ -165,13 +165,11 @@ def test_plugin_custom_xml_urls():
 
 
 @mock.patch('requests.post')
-def test_notify_xml_plugin_attachments(mock_post):
+def test_notify_xml_plugin_attachments(mock_post, no_throttling):
     """
     NotifyXML() Attachments
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     okay_response = requests.Request()
     okay_response.status_code = requests.codes.ok
@@ -227,13 +225,11 @@ def test_notify_xml_plugin_attachments(mock_post):
 
 @mock.patch('requests.post')
 @mock.patch('requests.get')
-def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
+def test_plugin_custom_xml_edge_cases(mock_get, mock_post, no_throttling):
     """
     NotifyXML() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare our response
     response = requests.Request()

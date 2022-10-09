@@ -154,13 +154,11 @@ def test_plugin_signal_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_signal_edge_cases(mock_post):
+def test_plugin_signal_edge_cases(mock_post, no_throttling):
     """
     NotifySignalAPI() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare our response
     response = requests.Request()
@@ -209,13 +207,11 @@ def test_plugin_signal_edge_cases(mock_post):
 
 
 @mock.patch('requests.post')
-def test_plugin_signal_test_based_on_feedback(mock_post):
+def test_plugin_signal_test_based_on_feedback(mock_post, no_throttling):
     """
     NotifySignalAPI() User Feedback Test
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare our response
     response = requests.Request()
@@ -309,13 +305,11 @@ def test_plugin_signal_test_based_on_feedback(mock_post):
 
 
 @mock.patch('requests.post')
-def test_notify_signal_plugin_attachments(mock_post):
+def test_notify_signal_plugin_attachments(mock_post, no_throttling):
     """
     NotifySignalAPI() Attachments
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     okay_response = requests.Request()
     okay_response.status_code = requests.codes.ok

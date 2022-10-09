@@ -192,13 +192,11 @@ def test_plugin_pushbullet_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_pushbullet_attachments(mock_post):
+def test_plugin_pushbullet_attachments(mock_post, no_throttling):
     """
     NotifyPushBullet() Attachment Checks
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyPushBullet.request_rate_per_sec = 0
 
     # Initialize some generic (but valid) tokens
     access_token = 't' * 32
@@ -335,13 +333,11 @@ def test_plugin_pushbullet_attachments(mock_post):
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_pushbullet_edge_cases(mock_post, mock_get):
+def test_plugin_pushbullet_edge_cases(mock_post, mock_get, no_throttling):
     """
     NotifyPushBullet() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Initialize some generic (but valid) tokens
     accesstoken = 'a' * 32

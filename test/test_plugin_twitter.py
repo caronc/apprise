@@ -212,7 +212,7 @@ def test_plugin_twitter_urls():
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_twitter_general(mock_post, mock_get):
+def test_plugin_twitter_general(mock_post, mock_get, no_throttling):
     """
     NotifyTwitter() General Tests
 
@@ -227,9 +227,6 @@ def test_plugin_twitter_general(mock_post, mock_get):
         'screen_name': screen_name,
         'id': 9876,
     }]
-
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Epoch time:
     epoch = datetime.utcfromtimestamp(0)
@@ -423,7 +420,7 @@ def test_plugin_twitter_edge_cases():
 
 @mock.patch('requests.post')
 @mock.patch('requests.get')
-def test_plugin_twitter_dm_attachments(mock_get, mock_post):
+def test_plugin_twitter_dm_attachments(mock_get, mock_post, no_throttling):
     """
     NotifyTwitter() DM Attachment Checks
 
@@ -438,9 +435,6 @@ def test_plugin_twitter_dm_attachments(mock_get, mock_post):
         'screen_name': screen_name,
         'id': 9876,
     }
-
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare a good DM response
     good_dm_response = mock.Mock()
@@ -642,7 +636,7 @@ def test_plugin_twitter_dm_attachments(mock_get, mock_post):
 
 @mock.patch('requests.post')
 @mock.patch('requests.get')
-def test_plugin_twitter_tweet_attachments(mock_get, mock_post):
+def test_plugin_twitter_tweet_attachments(mock_get, mock_post, no_throttling):
     """
     NotifyTwitter() Tweet Attachment Checks
 
@@ -657,9 +651,6 @@ def test_plugin_twitter_tweet_attachments(mock_get, mock_post):
         'screen_name': screen_name,
         'id': 9876,
     }
-
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare a good DM response
     good_tweet_response = mock.Mock()

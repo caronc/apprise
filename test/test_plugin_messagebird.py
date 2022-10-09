@@ -103,13 +103,11 @@ def test_plugin_messagebird_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_messagebird_edge_cases(mock_post):
+def test_plugin_messagebird_edge_cases(mock_post, no_throttling):
     """
     NotifyMessageBird() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare our response
     response = requests.Request()

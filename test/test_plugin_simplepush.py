@@ -130,13 +130,11 @@ def test_plugin_fcm_cryptography_import_error():
 
 @pytest.mark.skipif(
     'cryptography' not in sys.modules, reason="Requires cryptography")
-def test_plugin_simplepush_edge_cases():
+def test_plugin_simplepush_edge_cases(no_throttling):
     """
     NotifySimplePush() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # No token
     with pytest.raises(TypeError):
@@ -156,12 +154,10 @@ def test_plugin_simplepush_edge_cases():
 @pytest.mark.skipif(
     'cryptography' not in sys.modules, reason="Requires cryptography")
 @mock.patch('requests.post')
-def test_plugin_simplepush_general(mock_post):
+def test_plugin_simplepush_general(mock_post, no_throttling):
     """
     NotifySimplePush() General Tests
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare a good response
     response = mock.Mock()

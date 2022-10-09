@@ -132,13 +132,11 @@ def test_plugin_bulksms_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_bulksms_edge_cases(mock_post):
+def test_plugin_bulksms_edge_cases(mock_post, no_throttling):
     """
     NotifyBulkSMS() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Initialize some generic (but valid) tokens
     user = 'abcd'

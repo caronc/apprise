@@ -114,13 +114,11 @@ def test_plugin_gitter_urls():
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_gitter_general(mock_post, mock_get):
+def test_plugin_gitter_general(mock_post, mock_get, no_throttling):
     """
     NotifyGitter() General Tests
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Generate a valid token (40 characters)
     token = 'a' * 40

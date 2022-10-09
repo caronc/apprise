@@ -120,13 +120,11 @@ def test_plugin_zulip_urls():
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-def test_plugin_zulip_edge_cases():
+def test_plugin_zulip_edge_cases(no_throttling):
     """
     NotifyZulip() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # must be 32 characters long
     token = 'a' * 32

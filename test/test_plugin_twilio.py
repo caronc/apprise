@@ -128,15 +128,13 @@ def test_plugin_twilio_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_twilio_auth(mock_post):
+def test_plugin_twilio_auth(mock_post, no_throttling):
     """
     NotifyTwilio() Auth
       - account-wide auth token
       - API key and its own auth token
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     response = mock.Mock()
     response.content = ''
@@ -199,13 +197,11 @@ def test_plugin_twilio_auth(mock_post):
 
 
 @mock.patch('requests.post')
-def test_plugin_twilio_edge_cases(mock_post):
+def test_plugin_twilio_edge_cases(mock_post, no_throttling):
     """
     NotifyTwilio() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare our response
     response = requests.Request()

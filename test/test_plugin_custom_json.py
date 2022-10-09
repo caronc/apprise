@@ -150,13 +150,11 @@ def test_plugin_custom_json_urls():
 
 @mock.patch('requests.post')
 @mock.patch('requests.get')
-def test_plugin_custom_json_edge_cases(mock_get, mock_post):
+def test_plugin_custom_json_edge_cases(mock_get, mock_post, no_throttling):
     """
     NotifyJSON() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare our response
     response = requests.Request()

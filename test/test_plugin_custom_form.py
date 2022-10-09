@@ -152,13 +152,11 @@ def test_plugin_custom_form_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_custom_form_attachments(mock_post):
+def test_plugin_custom_form_attachments(mock_post, no_throttling):
     """
     NotifyForm() Attachments
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     okay_response = requests.Request()
     okay_response.status_code = requests.codes.ok
@@ -226,13 +224,11 @@ def test_plugin_custom_form_attachments(mock_post):
 
 @mock.patch('requests.post')
 @mock.patch('requests.get')
-def test_plugin_custom_form_edge_cases(mock_get, mock_post):
+def test_plugin_custom_form_edge_cases(mock_get, mock_post, no_throttling):
     """
     NotifyForm() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare our response
     response = requests.Request()

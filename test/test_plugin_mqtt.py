@@ -54,13 +54,11 @@ def test_plugin_mqtt_paho_import_error(mock_post):
 @pytest.mark.skipif(
     'paho' not in sys.modules, reason="Requires paho-mqtt")
 @mock.patch('paho.mqtt.client.Client')
-def test_plugin_mqtt_general(mock_client):
+def test_plugin_mqtt_general(mock_client, no_throttling):
     """
     NotifyMQTT() General Checks
 
     """
-    # Speed up request rate for testing
-    apprise.plugins.NotifyBase.request_rate_per_sec = 0
 
     # our call to publish() response object
     publish_result = mock.Mock()

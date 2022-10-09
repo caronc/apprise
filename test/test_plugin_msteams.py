@@ -176,13 +176,11 @@ def test_plugin_msteams_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_msteams_templating(mock_post, tmpdir):
+def test_plugin_msteams_templating(mock_post, tmpdir, no_throttling):
     """
     NotifyMSTeams() Templating
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare Mock
     mock_post.return_value = requests.Request()
@@ -387,14 +385,11 @@ def test_plugin_msteams_templating(mock_post, tmpdir):
 @pytest.mark.skipif(
     hasattr(sys, "pypy_version_info"), reason="Does not work reliably on PyPy")
 @mock.patch('requests.post')
-def test_msteams_yaml_config(mock_post, tmpdir):
+def test_msteams_yaml_config(mock_post, tmpdir, no_throttling):
     """
     NotifyMSTeams() YAML Configuration Entries
 
     """
-
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare Mock
     mock_post.return_value = requests.Request()

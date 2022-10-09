@@ -228,13 +228,11 @@ def test_plugin_rocket_chat_urls():
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_rocketchat_edge_cases(mock_post, mock_get):
+def test_plugin_rocketchat_edge_cases(mock_post, mock_get, no_throttling):
     """
     NotifyRocketChat() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Chat ID
     recipients = 'AbcD1245, @l2g, @lead2gold, #channel, #channel2'

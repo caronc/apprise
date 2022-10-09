@@ -96,13 +96,11 @@ def test_plugin_pushjet_urls():
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-def test_plugin_pushjet_edge_cases():
+def test_plugin_pushjet_edge_cases(no_throttling):
     """
     NotifyPushjet() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # No application Key specified
     with pytest.raises(TypeError):

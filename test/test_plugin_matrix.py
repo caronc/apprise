@@ -196,13 +196,11 @@ def test_plugin_matrix_urls():
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_matrix_general(mock_post, mock_get):
+def test_plugin_matrix_general(mock_post, mock_get, no_throttling):
     """
     NotifyMatrix() General Tests
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     response_obj = {
         'room_id': '!abc123:localhost',
@@ -353,13 +351,11 @@ def test_plugin_matrix_general(mock_post, mock_get):
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_matrix_fetch(mock_post, mock_get):
+def test_plugin_matrix_fetch(mock_post, mock_get, no_throttling):
     """
     NotifyMatrix() Server Fetch/API Tests
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     response_obj = {
         'room_id': '!abc123:localhost',
@@ -405,9 +401,6 @@ def test_plugin_matrix_fetch(mock_post, mock_get):
     assert isinstance(obj, plugins.NotifyMatrix) is True
     # We would hve failed to send our notification
     assert obj.send(user='test', password='passwd', body="test") is False
-
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     response_obj = {
         # Registration
@@ -460,13 +453,11 @@ def test_plugin_matrix_fetch(mock_post, mock_get):
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_matrix_auth(mock_post, mock_get):
+def test_plugin_matrix_auth(mock_post, mock_get, no_throttling):
     """
     NotifyMatrix() Server Authentication
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     response_obj = {
         # Registration
@@ -556,13 +547,11 @@ def test_plugin_matrix_auth(mock_post, mock_get):
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_matrix_rooms(mock_post, mock_get):
+def test_plugin_matrix_rooms(mock_post, mock_get, no_throttling):
     """
     NotifyMatrix() Room Testing
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     response_obj = {
         # Registration

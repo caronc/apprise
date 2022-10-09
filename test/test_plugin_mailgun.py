@@ -176,13 +176,11 @@ def test_plugin_mailgun_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_mailgun_attachments(mock_post):
+def test_plugin_mailgun_attachments(mock_post, no_throttling):
     """
     NotifyMailgun() Attachments
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     okay_response = requests.Request()
     okay_response.status_code = requests.codes.ok

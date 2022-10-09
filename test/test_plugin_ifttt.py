@@ -111,13 +111,11 @@ def test_plugin_ifttt_urls():
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_ifttt_edge_cases(mock_post, mock_get):
+def test_plugin_ifttt_edge_cases(mock_post, mock_get, no_throttling):
     """
     NotifyIFTTT() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Initialize some generic (but valid) tokens
     webhook_id = 'webhook_id'
@@ -134,9 +132,6 @@ def test_plugin_ifttt_edge_cases(mock_post, mock_get):
     # No webhook_id specified
     with pytest.raises(TypeError):
         plugins.NotifyIFTTT(webhook_id=None, events=None)
-
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Initializes the plugin with an invalid webhook id
     with pytest.raises(TypeError):

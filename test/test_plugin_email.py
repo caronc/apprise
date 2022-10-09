@@ -248,13 +248,11 @@ TEST_URLS = (
 
 @mock.patch('smtplib.SMTP')
 @mock.patch('smtplib.SMTP_SSL')
-def test_plugin_email(mock_smtp, mock_smtpssl):
+def test_plugin_email(mock_smtp, mock_smtpssl, no_throttling):
     """
     NotifyEmail() General Checks
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # iterate over our dictionary and test it out
     for (url, meta) in TEST_URLS:
@@ -450,13 +448,11 @@ def test_plugin_email_webbase_lookup(mock_smtp, mock_smtpssl):
 
 
 @mock.patch('smtplib.SMTP')
-def test_plugin_email_smtplib_init_fail(mock_smtplib):
+def test_plugin_email_smtplib_init_fail(mock_smtplib, no_throttling):
     """
     NotifyEmail() Test exception handling when calling smtplib.SMTP()
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     obj = Apprise.instantiate(
         'mailto://user:pass@gmail.com', suppress_exceptions=False)
@@ -475,13 +471,11 @@ def test_plugin_email_smtplib_init_fail(mock_smtplib):
 
 
 @mock.patch('smtplib.SMTP')
-def test_plugin_email_smtplib_send_okay(mock_smtplib):
+def test_plugin_email_smtplib_send_okay(mock_smtplib, no_throttling):
     """
     NotifyEmail() Test a successfully sent email
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Defaults to HTML
     obj = Apprise.instantiate(
@@ -543,13 +537,11 @@ def test_plugin_email_smtplib_send_okay(mock_smtplib):
 
 
 @mock.patch('smtplib.SMTP')
-def test_plugin_email_smtplib_internationalization(mock_smtp):
+def test_plugin_email_smtplib_internationalization(mock_smtp, no_throttling):
     """
     NotifyEmail() Internationalization Handling
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Defaults to HTML
     obj = Apprise.instantiate(
@@ -741,14 +733,11 @@ def test_plugin_email_dict_variations():
 
 @mock.patch('smtplib.SMTP_SSL')
 @mock.patch('smtplib.SMTP')
-def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
+def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl, no_throttling):
     """
     NotifyEmail() Test email url parsing
 
     """
-
-    # Disable Throttling to speed testing
-    plugins.NotifyEmail.request_rate_per_sec = 0
 
     response = mock.Mock()
     mock_smtp_ssl.return_value = response

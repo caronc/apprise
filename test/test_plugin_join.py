@@ -129,13 +129,11 @@ def test_plugin_join_urls():
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_join_edge_cases(mock_post, mock_get):
+def test_plugin_join_edge_cases(mock_post, mock_get, no_throttling):
     """
     NotifyJoin() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Generate some generic message types
     device = 'A' * 32
@@ -172,7 +170,7 @@ def test_plugin_join_edge_cases(mock_post, mock_get):
 
 
 @mock.patch('requests.post')
-def test_plugin_join_config_files(mock_post):
+def test_plugin_join_config_files(mock_post, no_throttling):
     """
     NotifyJoin() Config File Cases
     """
@@ -198,9 +196,6 @@ def test_plugin_join_config_files(mock_post):
           - priority: emergency
             tag: join_str emerg
     """ % ('a' * 32, 'b' * 32, 'c' * 32, 'd' * 32)
-
-    # Disable Throttling to speed testing
-    plugins.NotifyJoin.request_rate_per_sec = 0
 
     # Prepare Mock
     mock_post.return_value = requests.Request()

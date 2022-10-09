@@ -234,13 +234,11 @@ def test_plugin_ntfy_chat_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_ntfy_attachments(mock_post):
+def test_plugin_ntfy_attachments(mock_post, no_throttling):
     """
     NotifyNtfy() Attachment Checks
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyNtfy.request_rate_per_sec = 0
 
     # Prepare Mock return object
     response = mock.Mock()
@@ -351,13 +349,11 @@ def test_plugin_ntfy_attachments(mock_post):
 
 
 @mock.patch('requests.post')
-def test_plugin_custom_ntfy_edge_cases(mock_post):
+def test_plugin_custom_ntfy_edge_cases(mock_post, no_throttling):
     """
     NotifyNtfy() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare our response
     response = requests.Request()
@@ -430,7 +426,7 @@ def test_plugin_custom_ntfy_edge_cases(mock_post):
 
 @mock.patch('requests.post')
 @mock.patch('requests.get')
-def test_plugin_ntfy_config_files(mock_post, mock_get):
+def test_plugin_ntfy_config_files(mock_post, mock_get, no_throttling):
     """
     NotifyNtfy() Config File Cases
     """
@@ -458,9 +454,6 @@ def test_plugin_ntfy_config_files(mock_post, mock_get):
           - priority: max
             tag: ntfy_str max
     """
-
-    # Disable Throttling to speed testing
-    plugins.NotifyNtfy.request_rate_per_sec = 0
 
     # Prepare Mock
     mock_post.return_value = requests.Request()

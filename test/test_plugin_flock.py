@@ -163,13 +163,11 @@ def test_plugin_flock_urls():
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_flock_edge_cases(mock_post, mock_get):
+def test_plugin_flock_edge_cases(mock_post, mock_get, no_throttling):
     """
     NotifyFlock() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Initializes the plugin with an invalid token
     with pytest.raises(TypeError):

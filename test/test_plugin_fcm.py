@@ -207,13 +207,11 @@ def test_plugin_fcm_urls():
 @pytest.mark.skipif(
     hasattr(sys, "pypy_version_info"), reason="Does not work reliably on PyPy")
 @mock.patch('requests.post')
-def test_plugin_fcm_general_legacy(mock_post):
+def test_plugin_fcm_general_legacy(mock_post, no_throttling):
     """
     NotifyFCM() General Legacy/APIKey Checks
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare a good response
     response = mock.Mock()
@@ -334,7 +332,7 @@ def test_plugin_fcm_general_legacy(mock_post):
 @pytest.mark.skipif(
     'cryptography' not in sys.modules, reason="Requires cryptography")
 @mock.patch('requests.post')
-def test_plugin_fcm_general_oauth(mock_post):
+def test_plugin_fcm_general_oauth(mock_post, no_throttling):
     """
     NotifyFCM() General OAuth Checks
 
@@ -342,9 +340,6 @@ def test_plugin_fcm_general_oauth(mock_post):
 
     # Valid Keyfile
     path = os.path.join(PRIVATE_KEYFILE_DIR, 'service_account.json')
-
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare a good response
     response = mock.Mock()
@@ -853,13 +848,11 @@ def test_plugin_fcm_cryptography_import_error():
 @pytest.mark.skipif(
     'cryptography' not in sys.modules, reason="Requires cryptography")
 @mock.patch('requests.post')
-def test_plugin_fcm_edge_cases(mock_post):
+def test_plugin_fcm_edge_cases(mock_post, no_throttling):
     """
     NotifyFCM() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare a good response
     response = mock.Mock()

@@ -323,7 +323,7 @@ def test_plugin_growl_general(mock_gntp):
 @pytest.mark.skipif(
     'gntp' not in sys.modules, reason="Requires gntp")
 @mock.patch('gntp.notifier.GrowlNotifier')
-def test_plugin_growl_config_files(mock_gntp):
+def test_plugin_growl_config_files(mock_gntp, no_throttling):
     """
     NotifyGrowl() Config File Cases
     """
@@ -349,9 +349,6 @@ def test_plugin_growl_config_files(mock_gntp):
           - priority: emergency
             tag: growl_str emerg
     """
-
-    # Disable Throttling to speed testing
-    apprise.plugins.NotifyGrowl.request_rate_per_sec = 0
 
     mock_notifier = mock.Mock()
     mock_gntp.return_value = mock_notifier
