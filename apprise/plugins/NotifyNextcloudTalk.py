@@ -106,7 +106,7 @@ class NotifyNextcloudTalk(NotifyBase):
         """
         Initialize Nextcloud Talk Object
         """
-        super(NotifyNextcloudTalk, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         if self.user is None or self.password is None:
             msg = 'User and password have to be specified.'

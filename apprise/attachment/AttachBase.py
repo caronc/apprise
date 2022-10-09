@@ -120,7 +120,7 @@ class AttachBase(URLBase):
         should be considered expired.
         """
 
-        super(AttachBase, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         if not mimetypes.inited:
             # Ensure mimetypes has been initialized

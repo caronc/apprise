@@ -160,7 +160,7 @@ class NotifyNotica(NotifyBase):
         """
         Initialize Notica Object
         """
-        super(NotifyNotica, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Token (associated with project)
         self.token = validate_regex(token)

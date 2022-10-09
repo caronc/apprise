@@ -67,7 +67,7 @@ class LazyTranslation:
         """
         self.text = text
 
-        super(LazyTranslation, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def __str__(self):
         return gettext.gettext(self.text)

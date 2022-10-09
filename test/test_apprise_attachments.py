@@ -269,7 +269,7 @@ def test_apprise_attachment_instantiate():
 
     class BadAttachType(AttachBase):
         def __init__(self, **kwargs):
-            super(BadAttachType, self).__init__(**kwargs)
+            super().__init__(**kwargs)
 
             # We fail whenever we're initialized
             raise TypeError()

@@ -113,7 +113,7 @@ class ConfigBase(URLBase):
         these 'include' entries to be honored, this value must be set to True.
         """
 
-        super(ConfigBase, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Tracks the time the content was last retrieved on.  This place a role
         # for cases where we are not caching our response and are required to

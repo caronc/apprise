@@ -131,7 +131,7 @@ class NotifyXBMC(NotifyBase):
         """
         Initialize XBMC/KODI Object
         """
-        super(NotifyXBMC, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Number of seconds to display notification for
         self.duration = self.template_args['duration']['default'] \

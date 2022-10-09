@@ -233,7 +233,7 @@ class NotifyDBus(NotifyBase):
         Initialize DBus Object
         """
 
-        super(NotifyDBus, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Track our notifications
         self.registry = {}

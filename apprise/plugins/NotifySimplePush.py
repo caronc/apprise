@@ -125,7 +125,7 @@ class NotifySimplePush(NotifyBase):
         """
         Initialize SimplePush Object
         """
-        super(NotifySimplePush, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # API Key (associated with project)
         self.apikey = validate_regex(apikey)

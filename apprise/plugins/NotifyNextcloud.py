@@ -125,7 +125,7 @@ class NotifyNextcloud(NotifyBase):
         """
         Initialize Nextcloud Object
         """
-        super(NotifyNextcloud, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         self.targets = parse_list(targets)
         if len(self.targets) == 0:

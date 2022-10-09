@@ -115,7 +115,7 @@ class NotifyPushBullet(NotifyBase):
         """
         Initialize PushBullet Object
         """
-        super(NotifyPushBullet, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Access Token (associated with project)
         self.accesstoken = validate_regex(accesstoken)

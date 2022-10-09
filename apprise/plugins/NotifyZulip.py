@@ -172,7 +172,7 @@ class NotifyZulip(NotifyBase):
         """
         Initialize Zulip Object
         """
-        super(NotifyZulip, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # our default hostname
         self.hostname = self.default_hostname

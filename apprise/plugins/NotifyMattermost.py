@@ -145,7 +145,7 @@ class NotifyMattermost(NotifyBase):
         """
         Initialize Mattermost Object
         """
-        super(NotifyMattermost, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         if self.secure:
             self.schema = 'https'

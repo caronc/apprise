@@ -129,7 +129,7 @@ class NotifyRyver(NotifyBase):
         """
         Initialize Ryver Object
         """
-        super(NotifyRyver, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # API Token (associated with project)
         self.token = validate_regex(

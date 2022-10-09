@@ -240,7 +240,7 @@ class NotifyReddit(NotifyBase):
         """
         Initialize Notify Reddit Object
         """
-        super(NotifyReddit, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Initialize subreddit list
         self.subreddits = set()

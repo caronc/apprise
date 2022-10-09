@@ -199,7 +199,7 @@ class NotifySyslog(NotifyBase):
         """
         Initialize Syslog Object
         """
-        super(NotifySyslog, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         if facility:
             try:

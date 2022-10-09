@@ -156,7 +156,7 @@ class NotifyMSG91(NotifyBase):
         """
         Initialize MSG91 Object
         """
-        super(NotifyMSG91, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Authentication Key (associated with project)
         self.authkey = validate_regex(

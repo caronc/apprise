@@ -157,7 +157,7 @@ class NotifySignalAPI(NotifyBase):
         """
         Initialize SignalAPI Object
         """
-        super(NotifySignalAPI, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Prepare Batch Mode Flag
         self.batch = batch

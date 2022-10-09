@@ -150,7 +150,7 @@ class NotifyBoxcar(NotifyBase):
         """
         Initialize Boxcar Object
         """
-        super(NotifyBoxcar, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Initialize tag list
         self.tags = list()

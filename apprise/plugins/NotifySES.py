@@ -217,7 +217,7 @@ class NotifySES(NotifyBase):
         """
         Initialize Notify AWS SES Object
         """
-        super(NotifySES, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Store our AWS API Access Key
         self.aws_access_key_id = validate_regex(access_key_id)

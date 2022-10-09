@@ -102,7 +102,7 @@ class NotifyPushjet(NotifyBase):
         """
         Initialize Pushjet Object
         """
-        super(NotifyPushjet, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Secret Key (associated with project)
         self.secret_key = validate_regex(secret_key)

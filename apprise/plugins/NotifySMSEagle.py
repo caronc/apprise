@@ -191,7 +191,7 @@ class NotifySMSEagle(NotifyBase):
         """
         Initialize SMSEagle Object
         """
-        super(NotifySMSEagle, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Prepare Flash Mode Flag
         self.flash = flash

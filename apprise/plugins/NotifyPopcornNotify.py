@@ -105,7 +105,7 @@ class NotifyPopcornNotify(NotifyBase):
         """
         Initialize PopcornNotify Object
         """
-        super(NotifyPopcornNotify, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Access Token (associated with project)
         self.apikey = validate_regex(

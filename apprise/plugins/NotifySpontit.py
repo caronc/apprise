@@ -148,7 +148,7 @@ class NotifySpontit(NotifyBase):
         """
         Initialize Spontit Object
         """
-        super(NotifySpontit, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # User ID (associated with project)
         user = validate_regex(

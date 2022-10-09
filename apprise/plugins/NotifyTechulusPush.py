@@ -104,7 +104,7 @@ class NotifyTechulusPush(NotifyBase):
         """
         Initialize Techulus Push Object
         """
-        super(NotifyTechulusPush, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # The apikey associated with the account
         self.apikey = validate_regex(

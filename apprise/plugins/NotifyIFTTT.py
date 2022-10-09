@@ -147,7 +147,7 @@ class NotifyIFTTT(NotifyBase):
         reference to Value1, Value2, and/or Value3
 
         """
-        super(NotifyIFTTT, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Webhook ID (associated with project)
         self.webhook_id = validate_regex(webhook_id)

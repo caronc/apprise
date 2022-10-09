@@ -163,7 +163,7 @@ class NotifyTwilio(NotifyBase):
         """
         Initialize Twilio Object
         """
-        super(NotifyTwilio, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # The Account SID associated with the account
         self.account_sid = validate_regex(

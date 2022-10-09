@@ -203,7 +203,7 @@ class NotifyMailgun(NotifyBase):
         """
         Initialize Mailgun Object
         """
-        super(NotifyMailgun, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # API Key (associated with project)
         self.apikey = validate_regex(apikey)

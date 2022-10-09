@@ -57,7 +57,7 @@ def test_apprise_cli_nux_env(tmpdir):
 
     class GoodNotification(NotifyBase):
         def __init__(self, *args, **kwargs):
-            super(GoodNotification, self).__init__(*args, **kwargs)
+            super().__init__(*args, **kwargs)
 
         def notify(self, **kwargs):
             # Pretend everything is okay
@@ -69,7 +69,7 @@ def test_apprise_cli_nux_env(tmpdir):
 
     class BadNotification(NotifyBase):
         def __init__(self, *args, **kwargs):
-            super(BadNotification, self).__init__(*args, **kwargs)
+            super().__init__(*args, **kwargs)
 
         def notify(self, **kwargs):
             # Force a notification failure
@@ -770,7 +770,7 @@ def test_apprise_cli_details(tmpdir):
         service_name = 'na02'
 
         def __init__(self, *args, **kwargs):
-            super(TestDisabled02Notification, self).__init__(**kwargs)
+            super().__init__(**kwargs)
 
             # enable state changes **AFTER** we initialize
             self.enabled = False

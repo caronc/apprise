@@ -53,7 +53,7 @@ class ConfigFile(ConfigBase):
         additionally include as part of the server headers to post with
 
         """
-        super(ConfigFile, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Store our file path as it was set
         self.path = os.path.abspath(os.path.expanduser(path))

@@ -192,7 +192,7 @@ class NotifyPagerDuty(NotifyBase):
         """
         Initialize Pager Duty Object
         """
-        super(NotifyPagerDuty, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Long-Lived Access token (generated from User Profile)
         self.apikey = validate_regex(apikey)

@@ -169,7 +169,7 @@ class NotifySinch(NotifyBase):
         """
         Initialize Sinch Object
         """
-        super(NotifySinch, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # The Account SID associated with the account
         self.service_plan_id = validate_regex(

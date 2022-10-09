@@ -131,7 +131,7 @@ class NotifyTwist(NotifyBase):
         """
         Initialize Notify Twist Object
         """
-        super(NotifyTwist, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Initialize channels list
         self.channels = set()

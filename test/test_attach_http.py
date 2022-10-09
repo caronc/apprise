@@ -117,7 +117,7 @@ def test_attach_http(mock_get):
     # Define our good:// url
     class GoodNotification(NotifyBase):
         def __init__(self, *args, **kwargs):
-            super(GoodNotification, self).__init__(*args, **kwargs)
+            super().__init__(*args, **kwargs)
 
         def notify(self, *args, **kwargs):
             # Pretend everything is okay

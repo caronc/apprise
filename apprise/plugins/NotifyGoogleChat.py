@@ -138,7 +138,7 @@ class NotifyGoogleChat(NotifyBase):
         Initialize Google Chat Object
 
         """
-        super(NotifyGoogleChat, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Workspace (associated with project)
         self.workspace = validate_regex(workspace)

@@ -145,7 +145,7 @@ class NotifyFlock(NotifyBase):
         """
         Initialize Flock Object
         """
-        super(NotifyFlock, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Build ourselves a target list
         self.targets = list()

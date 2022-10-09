@@ -124,7 +124,7 @@ class NotifyDingTalk(NotifyBase):
         """
         Initialize DingTalk Object
         """
-        super(NotifyDingTalk, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Secret Key (associated with project)
         self.token = validate_regex(

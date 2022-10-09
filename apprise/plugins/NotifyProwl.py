@@ -143,7 +143,7 @@ class NotifyProwl(NotifyBase):
         """
         Initialize Prowl Object
         """
-        super(NotifyProwl, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # The Priority of the message
         self.priority = NotifyProwl.template_args['priority']['default'] \

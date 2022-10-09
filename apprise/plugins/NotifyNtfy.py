@@ -242,7 +242,7 @@ class NotifyNtfy(NotifyBase):
         """
         Initialize ntfy Object
         """
-        super(NotifyNtfy, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Prepare our mode
         self.mode = mode.strip().lower() \

@@ -194,7 +194,7 @@ class NotifyJoin(NotifyBase):
         """
         Initialize Join Object
         """
-        super(NotifyJoin, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Track whether or not we want to send an image with our notification
         # or not.

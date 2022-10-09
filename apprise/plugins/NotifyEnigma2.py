@@ -155,7 +155,7 @@ class NotifyEnigma2(NotifyBase):
         headers can be a dictionary of key/value pairs that you want to
         additionally include as part of the server headers to post with
         """
-        super(NotifyEnigma2, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         try:
             self.timeout = int(timeout)

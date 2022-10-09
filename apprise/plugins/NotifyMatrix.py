@@ -239,7 +239,7 @@ class NotifyMatrix(NotifyBase):
         """
         Initialize Matrix Object
         """
-        super(NotifyMatrix, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # Prepare a list of rooms to connect and notify
         self.rooms = parse_list(targets)

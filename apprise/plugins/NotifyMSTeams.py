@@ -214,7 +214,7 @@ class NotifyMSTeams(NotifyBase):
         template arguments that can not be over-ridden are:
            `body`, `title`, and `type`.
         """
-        super(NotifyMSTeams, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         try:
             self.version = int(version)
