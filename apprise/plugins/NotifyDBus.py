@@ -280,11 +280,8 @@ class NotifyDBus(NotifyBase):
             self.x_axis = None
             self.y_axis = None
 
-        # Track whether or not we want to send an image with our notification
-        # or not.
+        # Track whether we want to add an image to the notification.
         self.include_image = include_image
-
-        return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
@@ -350,8 +347,8 @@ class NotifyDBus(NotifyBase):
 
             except Exception as e:
                 self.logger.warning(
-                    "Could not load Gnome notification icon ({}): {}"
-                    .format(icon_path, e))
+                    f"Could not load notification icon (%s). "
+                    f"Reason: {e}", icon_path)
 
         try:
             # Always call throttle() before any remote execution is made
@@ -378,8 +375,9 @@ class NotifyDBus(NotifyBase):
 
             self.logger.info('Sent DBus notification.')
 
-        except Exception:
-            self.logger.warning('Failed to send DBus notification.')
+        except Exception as e:
+            self.logger.warning(f'Failed to send DBus notification. '
+                                f'Reason: {e}')
             self.logger.exception('DBus Exception')
             return False
 
