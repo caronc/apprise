@@ -1,6 +1,6 @@
 version: "3.3"
 services:
-  test.py35:
+  test.py36:
     build:
       context: .
       dockerfile: Dockerfile.py36
