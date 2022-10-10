@@ -26,6 +26,7 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
+import sys
 from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
 from ..common import NotifyType
@@ -76,6 +77,13 @@ try:
     # We're good as long as at least one
     NOTIFY_DBUS_SUPPORT_ENABLED = (
         LOOP_GLIB is not None or LOOP_QT is not None)
+
+    # ImportError: When using gi.repository you must not import static modules
+    # like "gobject". Please change all occurrences of "import gobject" to
+    # "from gi.repository import GObject".
+    # See: https://bugzilla.gnome.org/show_bug.cgi?id=709183
+    if "gobject" in sys.modules:  # pragma: no cover
+        del sys.modules["gobject"]
 
     try:
         # The following is required for Image/Icon loading only
