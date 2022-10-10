@@ -153,7 +153,7 @@ def test_plugin_custom_form_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_custom_form_attachments(mock_post, no_throttling):
+def test_plugin_custom_form_attachments(mock_post):
     """
     NotifyForm() Attachments
 
@@ -225,7 +225,7 @@ def test_plugin_custom_form_attachments(mock_post, no_throttling):
 
 @mock.patch('requests.post')
 @mock.patch('requests.get')
-def test_plugin_custom_form_edge_cases(mock_get, mock_post, no_throttling):
+def test_plugin_custom_form_edge_cases(mock_get, mock_post):
     """
     NotifyForm() Edge Cases
 

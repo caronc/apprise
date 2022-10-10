@@ -97,7 +97,7 @@ def test_plugin_pushjet_urls():
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-def test_plugin_pushjet_edge_cases(no_throttling):
+def test_plugin_pushjet_edge_cases():
     """
     NotifyPushjet() Edge Cases
 

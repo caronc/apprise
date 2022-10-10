@@ -27,22 +27,17 @@ import os
 
 import pytest
 
-from apprise import NotifyBase
-from apprise.plugins.NotifyPushBullet import NotifyPushBullet
+from apprise.common import NOTIFY_MODULE_MAP
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'helpers'))
 
 
-@pytest.fixture
-def no_throttling():
+@pytest.fixture(scope="session", autouse=True)
+def no_throttling_everywhere(session_mocker):
     """
-    A pytest fixture which disables Apprise throttling.
+    A pytest session fixture which disables throttling on all notifiers.
+    It is automatically enabled.
     """
-    backup = {}
-    backup["NotifyBase"] = NotifyBase.request_rate_per_sec
-    backup["NotifyPushBullet"] = NotifyPushBullet.request_rate_per_sec
-    NotifyBase.request_rate_per_sec = 0
-    NotifyPushBullet.request_rate_per_sec = 0
-    yield
-    NotifyBase.request_rate_per_sec = backup["NotifyBase"]
-    NotifyPushBullet.request_rate_per_sec = backup["NotifyPushBullet"]
+    for notifier in NOTIFY_MODULE_MAP.values():
+        plugin = notifier["plugin"]
+        session_mocker.patch.object(plugin, "request_rate_per_sec", 0)

@@ -226,7 +226,7 @@ def test_plugin_reddit_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_reddit_general(mock_post, no_throttling):
+def test_plugin_reddit_general(mock_post):
     """
     NotifyReddit() General Tests
 

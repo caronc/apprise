@@ -250,7 +250,7 @@ TEST_URLS = (
 
 @mock.patch('smtplib.SMTP')
 @mock.patch('smtplib.SMTP_SSL')
-def test_plugin_email(mock_smtp, mock_smtpssl, no_throttling):
+def test_plugin_email(mock_smtp, mock_smtpssl):
     """
     NotifyEmail() General Checks
 
@@ -450,7 +450,7 @@ def test_plugin_email_webbase_lookup(mock_smtp, mock_smtpssl):
 
 
 @mock.patch('smtplib.SMTP')
-def test_plugin_email_smtplib_init_fail(mock_smtplib, no_throttling):
+def test_plugin_email_smtplib_init_fail(mock_smtplib):
     """
     NotifyEmail() Test exception handling when calling smtplib.SMTP()
 
@@ -473,7 +473,7 @@ def test_plugin_email_smtplib_init_fail(mock_smtplib, no_throttling):
 
 
 @mock.patch('smtplib.SMTP')
-def test_plugin_email_smtplib_send_okay(mock_smtplib, no_throttling):
+def test_plugin_email_smtplib_send_okay(mock_smtplib):
     """
     NotifyEmail() Test a successfully sent email
 
@@ -539,7 +539,7 @@ def test_plugin_email_smtplib_send_okay(mock_smtplib, no_throttling):
 
 
 @mock.patch('smtplib.SMTP')
-def test_plugin_email_smtplib_internationalization(mock_smtp, no_throttling):
+def test_plugin_email_smtplib_internationalization(mock_smtp):
     """
     NotifyEmail() Internationalization Handling
 
@@ -735,7 +735,7 @@ def test_plugin_email_dict_variations():
 
 @mock.patch('smtplib.SMTP_SSL')
 @mock.patch('smtplib.SMTP')
-def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl, no_throttling):
+def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     """
     NotifyEmail() Test email url parsing
 

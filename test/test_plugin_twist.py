@@ -164,7 +164,7 @@ def test_plugin_twist_init():
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_twist_auth(mock_post, mock_get, no_throttling):
+def test_plugin_twist_auth(mock_post, mock_get):
     """
     NotifyTwist() login/logout()
 
@@ -266,7 +266,7 @@ def test_plugin_twist_auth(mock_post, mock_get, no_throttling):
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_twist_cache(mock_post, mock_get, no_throttling):
+def test_plugin_twist_cache(mock_post, mock_get):
     """
     NotifyTwist() Cache Handling
 
@@ -351,7 +351,7 @@ def test_plugin_twist_cache(mock_post, mock_get, no_throttling):
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_twist_fetch(mock_post, mock_get, no_throttling):
+def test_plugin_twist_fetch(mock_post, mock_get):
     """
     NotifyTwist() fetch()
 

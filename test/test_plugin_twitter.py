@@ -212,7 +212,7 @@ def test_plugin_twitter_urls():
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_twitter_general(mock_post, mock_get, no_throttling):
+def test_plugin_twitter_general(mock_post, mock_get):
     """
     NotifyTwitter() General Tests
 
@@ -420,7 +420,7 @@ def test_plugin_twitter_edge_cases():
 
 @mock.patch('requests.post')
 @mock.patch('requests.get')
-def test_plugin_twitter_dm_attachments(mock_get, mock_post, no_throttling):
+def test_plugin_twitter_dm_attachments(mock_get, mock_post):
     """
     NotifyTwitter() DM Attachment Checks
 
@@ -636,7 +636,7 @@ def test_plugin_twitter_dm_attachments(mock_get, mock_post, no_throttling):
 
 @mock.patch('requests.post')
 @mock.patch('requests.get')
-def test_plugin_twitter_tweet_attachments(mock_get, mock_post, no_throttling):
+def test_plugin_twitter_tweet_attachments(mock_get, mock_post):
     """
     NotifyTwitter() Tweet Attachment Checks
 

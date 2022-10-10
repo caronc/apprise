@@ -181,7 +181,7 @@ def test_plugin_vonage_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_vonage_edge_cases(mock_post, no_throttling):
+def test_plugin_vonage_edge_cases(mock_post):
     """
     NotifyVonage() Edge Cases
 

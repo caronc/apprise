@@ -269,7 +269,7 @@ def test_plugin_smseagle_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_smseagle_edge_cases(mock_post, no_throttling):
+def test_plugin_smseagle_edge_cases(mock_post):
     """
     NotifySMSEagle() Edge Cases
 
@@ -319,7 +319,7 @@ def test_plugin_smseagle_edge_cases(mock_post, no_throttling):
 
 
 @mock.patch('requests.post')
-def test_plugin_smseagle_result_set(mock_post, no_throttling):
+def test_plugin_smseagle_result_set(mock_post):
     """
     NotifySMSEagle() Result Sets
 
@@ -535,7 +535,7 @@ def test_plugin_smseagle_result_set(mock_post, no_throttling):
 
 
 @mock.patch('requests.post')
-def test_notify_smseagle_plugin_result_list(mock_post, no_throttling):
+def test_notify_smseagle_plugin_result_list(mock_post):
     """
     NotifySMSEagle() Result List Response
 
@@ -577,7 +577,7 @@ def test_notify_smseagle_plugin_result_list(mock_post, no_throttling):
 
 
 @mock.patch('requests.post')
-def test_notify_smseagle_plugin_attachments(mock_post, no_throttling):
+def test_notify_smseagle_plugin_attachments(mock_post):
     """
     NotifySMSEagle() Attachments
 

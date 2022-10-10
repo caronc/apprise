@@ -104,7 +104,7 @@ def test_plugin_messagebird_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_messagebird_edge_cases(mock_post, no_throttling):
+def test_plugin_messagebird_edge_cases(mock_post):
     """
     NotifyMessageBird() Edge Cases
 

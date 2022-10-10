@@ -212,9 +212,6 @@ def test_plugin_telegram_urls():
 
     """
 
-    # Disable Throttling to speed testing
-    NotifyTelegram.request_rate_per_sec = 0
-
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
@@ -225,9 +222,6 @@ def test_plugin_telegram_general(mock_post):
     NotifyTelegram() General Tests
 
     """
-
-    # Disable Throttling to speed testing
-    NotifyTelegram.request_rate_per_sec = 0
 
     # Bot Token
     bot_token = '123456789:abcdefg_hijklmnop'
@@ -541,9 +535,6 @@ def test_plugin_telegram_formatting(mock_post):
     """
     NotifyTelegram() formatting tests
     """
-
-    # Disable Throttling to speed testing
-    NotifyTelegram.request_rate_per_sec = 0
 
     # Prepare Mock
     mock_post.return_value = requests.Request()
@@ -884,9 +875,6 @@ def test_plugin_telegram_html_formatting(mock_post):
 
     """
     # on't send anything other than <b>, <i>, <a>,<code> and <pre>
-
-    # Disable Throttling to speed testing
-    NotifyTelegram.request_rate_per_sec = 0
 
     # Prepare Mock
     mock_post.return_value = requests.Request()

@@ -377,8 +377,6 @@ def test_plugin_ses_attachments(mock_post):
     NotifySES() Attachment Checks
 
     """
-    # Disable Throttling to speed testing
-    NotifySES.request_rate_per_sec = 0
 
     # Prepare Mock return object
     response = mock.Mock()

@@ -128,7 +128,7 @@ def test_plugin_twilio_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_twilio_auth(mock_post, no_throttling):
+def test_plugin_twilio_auth(mock_post):
     """
     NotifyTwilio() Auth
       - account-wide auth token
@@ -197,7 +197,7 @@ def test_plugin_twilio_auth(mock_post, no_throttling):
 
 
 @mock.patch('requests.post')
-def test_plugin_twilio_edge_cases(mock_post, no_throttling):
+def test_plugin_twilio_edge_cases(mock_post):
     """
     NotifyTwilio() Edge Cases
 

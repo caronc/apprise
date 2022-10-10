@@ -329,8 +329,6 @@ def test_plugin_sns_aws_topic_handling(mock_post):
     NotifySNS() AWS Topic Handling
 
     """
-    # Disable Throttling to speed testing
-    NotifySNS.request_rate_per_sec = 0
 
     arn_response = \
         """

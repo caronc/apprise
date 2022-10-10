@@ -88,7 +88,7 @@ def test_plugin_template_urls():
 @mock.patch('requests.get')
 @mock.patch('requests.post')
 def test_plugin_emby_general(mock_post, mock_get, mock_logout,
-                             mock_login, mock_sessions, no_throttling):
+                             mock_login, mock_sessions):
     """
     NotifyEmby General Tests
 
@@ -162,7 +162,7 @@ def test_plugin_emby_general(mock_post, mock_get, mock_logout,
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_emby_login(mock_post, mock_get, no_throttling):
+def test_plugin_emby_login(mock_post, mock_get):
     """
     NotifyEmby() login()
 
@@ -276,8 +276,7 @@ def test_plugin_emby_login(mock_post, mock_get, no_throttling):
 @mock.patch('apprise.plugins.NotifyEmby.NotifyEmby.logout')
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_emby_sessions(mock_post, mock_get, mock_logout, mock_login,
-                              no_throttling):
+def test_plugin_emby_sessions(mock_post, mock_get, mock_logout, mock_login):
     """
     NotifyEmby() sessions()
 
@@ -372,7 +371,7 @@ def test_plugin_emby_sessions(mock_post, mock_get, mock_logout, mock_login,
 @mock.patch('apprise.plugins.NotifyEmby.NotifyEmby.login')
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_emby_logout(mock_post, mock_get, mock_login, no_throttling):
+def test_plugin_emby_logout(mock_post, mock_get, mock_login):
     """
     NotifyEmby() logout()
 

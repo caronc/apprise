@@ -132,7 +132,7 @@ def test_plugin_bulksms_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_bulksms_edge_cases(mock_post, no_throttling):
+def test_plugin_bulksms_edge_cases(mock_post):
     """
     NotifyBulkSMS() Edge Cases
 

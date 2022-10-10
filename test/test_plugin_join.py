@@ -128,7 +128,7 @@ def test_plugin_join_urls():
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_join_edge_cases(mock_post, mock_get, no_throttling):
+def test_plugin_join_edge_cases(mock_post, mock_get):
     """
     NotifyJoin() Edge Cases
 
@@ -169,7 +169,7 @@ def test_plugin_join_edge_cases(mock_post, mock_get, no_throttling):
 
 
 @mock.patch('requests.post')
-def test_plugin_join_config_files(mock_post, no_throttling):
+def test_plugin_join_config_files(mock_post):
     """
     NotifyJoin() Config File Cases
     """

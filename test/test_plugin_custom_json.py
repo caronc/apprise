@@ -151,7 +151,7 @@ def test_plugin_custom_json_urls():
 
 @mock.patch('requests.post')
 @mock.patch('requests.get')
-def test_plugin_custom_json_edge_cases(mock_get, mock_post, no_throttling):
+def test_plugin_custom_json_edge_cases(mock_get, mock_post):
     """
     NotifyJSON() Edge Cases
 
@@ -209,7 +209,7 @@ def test_plugin_custom_json_edge_cases(mock_get, mock_post, no_throttling):
 
 
 @mock.patch('requests.post')
-def test_notify_json_plugin_attachments(mock_post, no_throttling):
+def test_notify_json_plugin_attachments(mock_post):
     """
     NotifyJSON() Attachments
 

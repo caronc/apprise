@@ -192,7 +192,7 @@ def test_plugin_pushbullet_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_pushbullet_attachments(mock_post, no_throttling):
+def test_plugin_pushbullet_attachments(mock_post):
     """
     NotifyPushBullet() Attachment Checks
 
@@ -333,7 +333,7 @@ def test_plugin_pushbullet_attachments(mock_post, no_throttling):
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_pushbullet_edge_cases(mock_post, mock_get, no_throttling):
+def test_plugin_pushbullet_edge_cases(mock_post, mock_get):
     """
     NotifyPushBullet() Edge Cases
 

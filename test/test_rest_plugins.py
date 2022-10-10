@@ -37,7 +37,7 @@ import logging
 logging.disable(logging.CRITICAL)
 
 
-def test_notify_overflow_truncate(no_throttling):
+def test_notify_overflow_truncate():
     """
     API: Overflow Truncate Functionality Testing
 
@@ -206,7 +206,7 @@ def test_notify_overflow_truncate(no_throttling):
     assert title[0:TestNotification.body_maxlen] == chunks[0].get('body')
 
 
-def test_notify_overflow_split(no_throttling):
+def test_notify_overflow_split():
     """
     API: Overflow Split Functionality Testing
 
@@ -379,7 +379,7 @@ def test_notify_overflow_split(no_throttling):
         offset += len(_body)
 
 
-def test_notify_overflow_general(no_throttling):
+def test_notify_overflow_general():
     """
     API: Overflow General Testing
 

@@ -57,7 +57,7 @@ def test_plugin_mqtt_paho_import_error(mock_post):
 @pytest.mark.skipif(
     'paho' not in sys.modules, reason="Requires paho-mqtt")
 @mock.patch('paho.mqtt.client.Client')
-def test_plugin_mqtt_general(mock_client, no_throttling):
+def test_plugin_mqtt_general(mock_client):
     """
     NotifyMQTT() General Checks
 

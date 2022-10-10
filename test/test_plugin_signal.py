@@ -154,7 +154,7 @@ def test_plugin_signal_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_signal_edge_cases(mock_post, no_throttling):
+def test_plugin_signal_edge_cases(mock_post):
     """
     NotifySignalAPI() Edge Cases
 
@@ -207,7 +207,7 @@ def test_plugin_signal_edge_cases(mock_post, no_throttling):
 
 
 @mock.patch('requests.post')
-def test_plugin_signal_test_based_on_feedback(mock_post, no_throttling):
+def test_plugin_signal_test_based_on_feedback(mock_post):
     """
     NotifySignalAPI() User Feedback Test
 
@@ -305,7 +305,7 @@ def test_plugin_signal_test_based_on_feedback(mock_post, no_throttling):
 
 
 @mock.patch('requests.post')
-def test_notify_signal_plugin_attachments(mock_post, no_throttling):
+def test_notify_signal_plugin_attachments(mock_post):
     """
     NotifySignalAPI() Attachments
 
