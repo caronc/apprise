@@ -59,7 +59,7 @@ apprise_url_tests = (
         'instance': TypeError,
     }),
     # Invalid from email address
-    ('sparkpost://!@localhost.localdomain/{}'.format('b' * 32), {
+    ('sparkpost://"@localhost.localdomain/{}'.format('b' * 32), {
         'instance': TypeError,
     }),
     # No To email address, but everything else is valid

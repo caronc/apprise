@@ -58,7 +58,7 @@ apprise_url_tests = (
         'instance': TypeError,
     }),
     # Invalid from email address
-    ('mailgun://!@localhost.localdomain/{}-{}-{}'.format(
+    ('mailgun://"@localhost.localdomain/{}-{}-{}'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
         'instance': TypeError,
     }),
