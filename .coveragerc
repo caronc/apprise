@@ -1,5 +1,4 @@
 [run]
-disable_warnings = no-data-collected
 data_file = .coverage-reports/.coverage
 branch = True
 parallel = True
