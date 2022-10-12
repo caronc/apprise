@@ -81,6 +81,9 @@ def test_plugin_mqtt_paho_import_error():
     assert obj is None
 
 
+@pytest.mark.skipif(
+    hasattr(sys, "pypy_version_info") and sys.version_info < (3, 7),
+    reason="Does not work on PyPy 3.6")
 def test_plugin_mqtt_paho_import_error_emulated():
     """
     Verify `NotifyMQTT` is disabled when `paho.mqtt.client` fails loading.

@@ -129,6 +129,9 @@ def test_plugin_simplepush_cryptography_import_error_real():
     assert obj is None
 
 
+@pytest.mark.skipif(
+    hasattr(sys, "pypy_version_info") and sys.version_info < (3, 7),
+    reason="Does not work on PyPy 3.6")
 def test_plugin_simplepush_cryptography_import_error_emulated():
     """
     Verify `NotifySimplePush` is disabled when `cryptography` fails loading.
