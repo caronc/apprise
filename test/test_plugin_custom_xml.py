@@ -125,6 +125,11 @@ apprise_url_tests = (
     ('xmls://user:pass@localhost:8080', {
         'instance': plugins.NotifyXML,
     }),
+    # Test our GET params
+    ('xml://localhost:8080/path?-ParamA=Value', {
+        'instance': plugins.NotifyXML,
+    }),
+    # Test our Headers
     ('xml://localhost:8080/path?+HeaderKey=HeaderValue', {
         'instance': plugins.NotifyXML,
     }),

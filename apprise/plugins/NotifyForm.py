@@ -123,9 +123,13 @@ class NotifyForm(NotifyBase):
             'name': _('Payload Extras'),
             'prefix': ':',
         },
+        'params': {
+            'name': _('GET Params'),
+            'prefix': '-',
+        },
     }
 
-    def __init__(self, headers=None, method=None, payload=None, **kwargs):
+    def __init__(self, headers=None, method=None, payload=None, params=None, **kwargs):
         """
         Initialize Form Object
 
@@ -146,6 +150,11 @@ class NotifyForm(NotifyBase):
             msg = 'The method specified ({}) is invalid.'.format(method)
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        self.params = {}
+        if params:
+            # Store our extra headers
+            self.params.update(params)
 
         self.headers = {}
         if headers:
@@ -174,6 +183,9 @@ class NotifyForm(NotifyBase):
 
         # Append our headers into our parameters
         params.update({'+{}'.format(k): v for k, v in self.headers.items()})
+
+        # Append our GET params into our parameters
+        params.update({'-{}'.format(k): v for k, v in self.params.items()})
 
         # Append our payload extra's into our parameters
         params.update(
@@ -212,6 +224,7 @@ class NotifyForm(NotifyBase):
         Perform Form Notification
         """
 
+        # Prepare HTTP Headers
         headers = {
             'User-Agent': self.app_id,
         }
@@ -289,6 +302,7 @@ class NotifyForm(NotifyBase):
 
         if self.method == 'GET':
             method = requests.get
+            payload.update(self.params)
 
         elif self.method == 'PUT':
             method = requests.put
@@ -307,7 +321,7 @@ class NotifyForm(NotifyBase):
                 url,
                 files=None if not files else files,
                 data=payload if self.method != 'GET' else None,
-                params=payload if self.method == 'GET' else None,
+                params=payload if self.method == 'GET' else self.params,
                 headers=headers,
                 auth=auth,
                 verify=self.verify_certificate,
@@ -376,6 +390,10 @@ class NotifyForm(NotifyBase):
         # to to our returned result set and tidy entries by unquoting them
         results['headers'] = {NotifyForm.unquote(x): NotifyForm.unquote(y)
                               for x, y in results['qsd+'].items()}
+
+        # Add our GET paramters in the event the user wants to pass these along
+        results['params'] = {NotifyForm.unquote(x): NotifyForm.unquote(y)
+                             for x, y in results['qsd-'].items()}
 
         # Set method if not otherwise set
         if 'method' in results['qsd'] and len(results['qsd']['method']):

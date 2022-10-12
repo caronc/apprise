@@ -130,9 +130,13 @@ class NotifyXML(NotifyBase):
             'name': _('Payload Extras'),
             'prefix': ':',
         },
+        'params': {
+            'name': _('GET Params'),
+            'prefix': '-',
+        },
     }
 
-    def __init__(self, headers=None, method=None, payload=None, **kwargs):
+    def __init__(self, headers=None, method=None, payload=None, params=None, **kwargs):
         """
         Initialize XML Object
 
@@ -166,6 +170,11 @@ class NotifyXML(NotifyBase):
             msg = 'The method specified ({}) is invalid.'.format(method)
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        self.params = {}
+        if params:
+            # Store our extra headers
+            self.params.update(params)
 
         self.headers = {}
         if headers:
@@ -202,6 +211,9 @@ class NotifyXML(NotifyBase):
 
         # Append our headers into our parameters
         params.update({'+{}'.format(k): v for k, v in self.headers.items()})
+
+        # Append our GET params into our parameters
+        params.update({'-{}'.format(k): v for k, v in self.params.items()})
 
         # Append our payload extra's into our parameters
         params.update(
@@ -240,7 +252,7 @@ class NotifyXML(NotifyBase):
         Perform XML Notification
         """
 
-        # prepare XML Object
+        # Prepare HTTP Headers
         headers = {
             'User-Agent': self.app_id,
             'Content-Type': 'application/xml'
@@ -416,6 +428,10 @@ class NotifyXML(NotifyBase):
         # to to our returned result set and tidy entries by unquoting them
         results['headers'] = {NotifyXML.unquote(x): NotifyXML.unquote(y)
                               for x, y in results['qsd+'].items()}
+
+        # Add our GET paramters in the event the user wants to pass these along
+        results['params'] = {NotifyXML.unquote(x): NotifyXML.unquote(y)
+                             for x, y in results['qsd-'].items()}
 
         # Set method if not otherwise set
         if 'method' in results['qsd'] and len(results['qsd']['method']):

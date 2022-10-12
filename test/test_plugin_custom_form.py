@@ -112,6 +112,11 @@ apprise_url_tests = (
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'forms://user:****@localhost:8080',
     }),
+    # Test our GET params
+    ('form://localhost:8080/path?-ParamA=Value', {
+        'instance': plugins.NotifyForm,
+    }),
+    # Test our Headers
     ('form://localhost:8080/path?+HeaderKey=HeaderValue', {
         'instance': plugins.NotifyForm,
     }),
