@@ -60,7 +60,7 @@ setup(
     version='1.1.0',
     description='Push Notifications that work with just about every platform!',
     license='MIT',
-    long_description=open('README.md').read(),
+    long_description=open('README.md', encoding="utf-8").read(),
     long_description_content_type='text/markdown',
     cmdclass=cmdclass,
     url='https://github.com/caronc/apprise',
