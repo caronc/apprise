@@ -29,17 +29,21 @@ from _pytest.monkeypatch import MonkeyPatch
 
 
 @contextlib.contextmanager
-def emulate_import_error(*module_names):
+def emulate_import_error(*module_names, package=None):
     """
     Emulate an `ImportError` on a list of module names.
+
+    http://materials-scientist.com/blog/2021/02/11/mocking-failing-module-import-python/
     """
 
     real_import = builtins.__import__
 
-    def import_hook(name, *args, **kwargs):
+    def import_hook(name, globals, *args, **kwargs):
         if name in module_names:
-            raise ImportError(f"Mocked import error {name}")
-        return real_import(name, *args, **kwargs)
+            pkg = globals["__package__"]
+            if package is None or package == pkg:
+                raise ImportError(f"Mocked import error {name}")
+        return real_import(name, globals, *args, **kwargs)
 
     with MonkeyPatch().context() as m:
         m.setattr(builtins, '__import__', import_hook)

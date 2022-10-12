@@ -38,7 +38,7 @@ import requests
 import json
 from apprise import Apprise
 from apprise.plugins.NotifyFCM import NotifyFCM
-from helpers import AppriseURLTester
+from helpers import AppriseURLTester, emulate_import_error, reload_plugin
 
 try:
     from apprise.plugins.NotifyFCM.oauth import GoogleOAuth
@@ -829,7 +829,7 @@ def test_plugin_fcm_colors():
 @pytest.mark.skipif(
     'cryptography' in sys.modules,
     reason="Requires that cryptography NOT be installed")
-def test_plugin_fcm_cryptography_import_error():
+def test_plugin_fcm_cryptography_import_error_real():
     """
     NotifyFCM Cryptography loading failure
     """
@@ -843,6 +843,27 @@ def test_plugin_fcm_cryptography_import_error():
 
     # It's not possible because our cryptography depedancy is missing
     assert obj is None
+
+
+def test_plugin_fcm_cryptography_import_error_emulated():
+    """
+    Verify `NotifyFCM` is disabled when `NotifyFCM.oauth.GoogleOAuth` fails
+    loading. This will indirectly test the scenario when the `cryptography`
+    package is not installed.
+    """
+    with emulate_import_error("oauth", package="apprise.plugins.NotifyFCM"):
+        reload_plugin("NotifyFCM")
+
+        # Prepare a base keyfile reference to use
+        path = os.path.join(PRIVATE_KEYFILE_DIR, 'service_account.json')
+
+        # Attempt to instantiate our object
+        obj = Apprise.instantiate(
+            f'fcm://mock-project-id/device/#topic/?keyfile={path}')
+        assert obj is None
+
+    # Undo emulating the `ImportError`.
+    reload_plugin("NotifyFCM")
 
 
 @pytest.mark.skipif(

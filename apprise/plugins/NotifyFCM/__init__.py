@@ -69,7 +69,7 @@ try:
     # We're good to go
     NOTIFY_FCM_SUPPORT_ENABLED = True
 
-except ImportError:  # pragma: no cover
+except ImportError:
     # cryptography is the dependency of the .oauth library
 
     # Create a dummy object for init() call to work
