@@ -32,6 +32,7 @@ from unittest.mock import call, Mock, ANY
 import pytest
 
 import apprise
+from helpers import emulate_import_error, reload_plugin
 from apprise.plugins.NotifyMQTT import NotifyMQTT
 
 # Disable logging for a cleaner testing output
@@ -80,6 +81,23 @@ def test_plugin_mqtt_paho_import_error():
     assert obj is None
 
 
+def test_plugin_mqtt_paho_import_error_emulated():
+    """
+    Verify `NotifyMQTT` is disabled when `paho.mqtt.client` fails loading.
+    """
+    with emulate_import_error("paho.mqtt.client"):
+        reload_plugin("NotifyMQTT")
+
+        obj = apprise.Apprise.instantiate(
+            'mqtt://user:pass@localhost/my/topic')
+        assert obj is None
+
+    # Undo emulating the `ImportError`.
+    reload_plugin("NotifyMQTT")
+
+
+@pytest.mark.skipif(
+    'paho' not in sys.modules, reason="Requires paho-mqtt")
 def test_plugin_mqtt_default_success(mqtt_client_mock):
     """
     Verify `NotifyMQTT` succeeds and has appropriate default settings.

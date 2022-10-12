@@ -622,6 +622,9 @@ def test_apprise_cli_details(tmpdir):
         This class is used to test various requirement configurations
         """
 
+        # Just not enabled at all
+        enabled = False
+
         # Set some requirements
         requirements = {
             'packages_required': [
@@ -736,7 +739,7 @@ def test_apprise_cli_details(tmpdir):
             # Pretend everything is okay (so we don't break other tests)
             return True
 
-    NOTIFY_SCHEMA_MAP['req05'] = TestReq04Notification
+    NOTIFY_SCHEMA_MAP['req05'] = TestReq05Notification
 
     class TestDisabled01Notification(NotifyBase):
         """

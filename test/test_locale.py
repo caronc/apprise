@@ -189,13 +189,27 @@ def test_detect_language_windows_users_croaks_please_review():
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Does not work on Windows")
 @mock.patch('locale.getdefaultlocale')
-def test_detect_language_defaultlocale(mock_getlocale):
+def test_detect_language_defaultlocale_unknown(mock_getlocale):
     """
     API: Apprise() Default locale detection
 
     """
     # Handle case where getdefaultlocale() can't be detected
     mock_getlocale.return_value = None
+    assert AppriseLocale.AppriseLocale.detect_language() is None
+
+    # if detect_language and windows env fail us, then we don't
+    # set up a default language on first load
+    AppriseLocale.AppriseLocale()
+
+
+@mock.patch('locale.getdefaultlocale')
+def test_detect_language_defaultlocale_failure(mock_getlocale):
+    """
+    API: Apprise() default locale detection croaks
+    """
+    # Handle case where getdefaultlocale() raises an exception.
+    mock_getlocale.side_effect = ValueError("Something failed")
     assert AppriseLocale.AppriseLocale.detect_language() is None
 
     # if detect_language and windows env fail us, then we don't

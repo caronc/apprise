@@ -34,7 +34,7 @@
 # 3. Access your Web API Key by clicking on:
 #     - The (gear-next-to-project-name) > Project Settings > Cloud Messaging
 
-# Visit the following site to get you're Project information:
+# Visit the following site to get your project information:
 #    - https://console.cloud.google.com/project/_/settings/general/
 #
 # Docs: https://firebase.google.com/docs/cloud-messaging/send-message
@@ -69,7 +69,7 @@ try:
     # We're good to go
     NOTIFY_FCM_SUPPORT_ENABLED = True
 
-except ImportError:
+except ImportError:  # pragma: no cover
     # cryptography is the dependency of the .oauth library
 
     # Create a dummy object for init() call to work

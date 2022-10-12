@@ -28,9 +28,10 @@ from unittest import mock
 import pytest
 import requests
 import json
+
 from apprise import Apprise
 from apprise.plugins.NotifySimplePush import NotifySimplePush
-from helpers import AppriseURLTester
+from helpers import AppriseURLTester, reload_plugin, emulate_import_error
 
 # Disable logging for a cleaner testing output
 import logging
@@ -116,7 +117,7 @@ def test_plugin_simplepush_urls():
 @pytest.mark.skipif(
     'cryptography' in sys.modules,
     reason="Requires that cryptography NOT be installed")
-def test_plugin_fcm_cryptography_import_error():
+def test_plugin_simplepush_cryptography_import_error_real():
     """
     NotifySimplePush() Cryptography loading failure
     """
@@ -126,6 +127,20 @@ def test_plugin_fcm_cryptography_import_error():
 
     # It's not possible because our cryptography depedancy is missing
     assert obj is None
+
+
+def test_plugin_simplepush_cryptography_import_error_emulated():
+    """
+    Verify `NotifySimplePush` is disabled when `cryptography` fails loading.
+    """
+    with emulate_import_error("cryptography.hazmat.primitives"):
+        reload_plugin("NotifySimplePush")
+
+        obj = Apprise.instantiate('spush://{}'.format('Y' * 14))
+        assert obj is None
+
+    # Undo emulating the `ImportError`.
+    reload_plugin("NotifySimplePush")
 
 
 @pytest.mark.skipif(

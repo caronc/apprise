@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2021 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2022 Chris Caron <lead2gold@gmail.com>
 # All rights reserved.
 #
 # This code is licensed under the MIT License.
@@ -22,12 +22,25 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
-from .rest import AppriseURLTester
-from .module import reload_plugin
-from .common import emulate_import_error
+import builtins
+import contextlib
 
-__all__ = [
-    'AppriseURLTester',
-    'reload_plugin',
-    'emulate_import_error',
-]
+from _pytest.monkeypatch import MonkeyPatch
+
+
+@contextlib.contextmanager
+def emulate_import_error(*module_names):
+    """
+    Emulate an `ImportError` on a list of module names.
+    """
+
+    real_import = builtins.__import__
+
+    def import_hook(name, *args, **kwargs):
+        if name in module_names:
+            raise ImportError(f"Mocked import error {name}")
+        return real_import(name, *args, **kwargs)
+
+    with MonkeyPatch().context() as m:
+        m.setattr(builtins, '__import__', import_hook)
+        yield

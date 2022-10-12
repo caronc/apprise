@@ -39,7 +39,7 @@ try:
     # We're good to go!
     NOTIFY_GROWL_SUPPORT_ENABLED = True
 
-except ImportError:
+except ImportError:  # pragma: no cover
     # No problem; we just simply can't support this plugin until
     # gntp is installed
     pass
