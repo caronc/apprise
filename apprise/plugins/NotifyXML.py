@@ -136,7 +136,8 @@ class NotifyXML(NotifyBase):
         },
     }
 
-    def __init__(self, headers=None, method=None, payload=None, params=None, **kwargs):
+    def __init__(self, headers=None, method=None, payload=None, params=None,
+                 **kwargs):
         """
         Initialize XML Object
 
