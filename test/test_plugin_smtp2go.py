@@ -58,7 +58,7 @@ apprise_url_tests = (
         'instance': TypeError,
     }),
     # Invalid from email address
-    ('smtp2go://!@localhost.localdomain/{}-{}-{}'.format(
+    ('smtp2go://"@localhost.localdomain/{}-{}-{}'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
         'instance': TypeError,
     }),

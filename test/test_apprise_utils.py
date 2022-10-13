@@ -1361,6 +1361,30 @@ def test_is_email():
     assert utils.is_email("Just A Name") is False
     assert utils.is_email("Name <bademail>") is False
 
+    # Extended valid emails
+    #
+    # The first + denotes our label, so this test really validates
+    # that there is a correct split and parsing of our email
+    results = utils.is_email('a-z0-9_!#$%&*+/=?%`{|}~^.-@gmail.com')
+    assert '' == results['name']
+    assert 'a-z0-9_!#$%&*' == results['label']
+    assert '/=?%`{|}~^.-@gmail.com' == results['email']
+    assert 'a-z0-9_!#$%&*+/=?%`{|}~^.-@gmail.com' == results['full_email']
+    assert 'gmail.com' == results['domain']
+    assert '/=?%`{|}~^.-' == results['user']
+
+    # A similar test without '+' (use of a label)
+
+    # The first + denotes our label, so this test really validates
+    # that there is a correct split and parsing of our email
+    results = utils.is_email('a-z0-9_!#$%&*/=?%`{|}~^.-@gmail.com')
+    assert '' == results['name']
+    assert '' == results['label']
+    assert 'a-z0-9_!#$%&*/=?%`{|}~^.-@gmail.com' == results['email']
+    assert 'a-z0-9_!#$%&*/=?%`{|}~^.-@gmail.com' == results['full_email']
+    assert 'gmail.com' == results['domain']
+    assert 'a-z0-9_!#$%&*/=?%`{|}~^.-' == results['user']
+
 
 def test_is_call_sign_no():
     """

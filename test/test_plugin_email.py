@@ -191,7 +191,7 @@ TEST_URLS = (
         'response': False,
     }),
     # Valid URL, but can't structure a proper email
-    ('mailtos://nuxref.com?user=%20!&pass=.', {
+    ('mailtos://nuxref.com?user=%20"&pass=.', {
         'instance': TypeError,
     }),
     # Invalid From (and To) Address

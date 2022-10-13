@@ -504,6 +504,7 @@ urls:
     - invalid: test
   - sns://T1JJ3T3L2/:
     - invalid: test
+    - _invalid: Token can not start with an underscore
 
   # some strangeness
   -

@@ -153,10 +153,10 @@ URL_DETAILS_RE = re.compile(
 #   - user@example.com
 #   - label+user@example.com
 GET_EMAIL_RE = re.compile(
-    r'(([\s"\']+)?(?P<name>[^:<"\']+)?[:<\s"\']+)?'
+    r'(([\s"\']+)?(?P<name>[^:<\'"]+)?[:<\s\'"]+)?'
     r'(?P<full_email>((?P<label>[^+]+)\+)?'
-    r'(?P<email>(?P<userid>[a-z0-9$%=_~-]+'
-    r'(?:\.[a-z0-9$%+=_~-]+)'
+    r'(?P<email>(?P<userid>[a-z0-9_!#$%&*/=?%`{|}~^-]+'
+    r'(?:\.[a-z0-9_!#$%&\'*/=?%`{|}~^-]+)'
     r'*)@(?P<domain>('
     r'(?:[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?\.)+'
     r'[a-z0-9](?:[a-z0-9_-]*[a-z0-9]))|'
@@ -188,7 +188,7 @@ URL_DETECTION_RE = re.compile(
 
 EMAIL_DETECTION_RE = re.compile(
     r'[\s,]*([^@]+@.*?)(?=$|[\s,]+'
-    + r'(?:[^:<]+?[:<\s]+?)?'
+    r'(?:[^:<]+?[:<\s]+?)?'
     r'[^@\s,]+@[^\s,]+)',
     re.IGNORECASE)
 
