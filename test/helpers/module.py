@@ -22,8 +22,9 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
-from importlib import import_module, reload
 import sys
+
+from importlib import reload, import_module
 
 
 def reload_plugin(name, replace_in=None):

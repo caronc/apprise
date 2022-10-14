@@ -30,6 +30,7 @@ import pytest
 import apprise
 from apprise import NotifyBase
 from apprise.plugins.NotifyGrowl import GrowlPriority, NotifyGrowl
+from helpers import emulate_import_error, reload_plugin
 
 try:
     from gntp import errors
@@ -57,7 +58,7 @@ logging.disable(logging.CRITICAL)
 @pytest.mark.skipif(
     'gntp' in sys.modules,
     reason="Requires that gntp NOT be installed")
-def test_plugin_growl_gntp_import_error():
+def test_plugin_growl_gntp_import_error_real():
     """
     NotifyGrowl() Import Error
 
@@ -65,6 +66,25 @@ def test_plugin_growl_gntp_import_error():
     # If the object is disabled, then it can't be instantiated
     obj = apprise.Apprise.instantiate('growl://growl.server')
     assert obj is None
+
+
+@pytest.mark.skipif(
+    hasattr(sys, "pypy_version_info") and sys.version_info < (3, 7),
+    reason="Does not work on PyPy 3.6")
+def test_plugin_growl_gntp_import_error_emulated():
+    """
+    Verify `NotifyGrowl` is disabled when `gntp` fails loading.
+    """
+    current_module = sys.modules[__name__]
+
+    with emulate_import_error("gntp.notifier"):
+        reload_plugin("NotifyGrowl", replace_in=current_module)
+
+        obj = apprise.Apprise.instantiate('growl://growl.server')
+        assert obj is None
+
+    # Undo emulating the `ImportError`.
+    reload_plugin("NotifyGrowl", replace_in=current_module)
 
 
 @pytest.mark.skipif(
