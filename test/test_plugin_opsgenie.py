@@ -25,8 +25,8 @@
 from unittest import mock
 
 import requests
-from apprise.plugins.NotifyOpsgenie import OpsgeniePriority
 import apprise
+from apprise.plugins.NotifyOpsgenie import NotifyOpsgenie, OpsgeniePriority
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -56,72 +56,72 @@ apprise_url_tests = (
     }),
     ('opsgenie://apikey/', {
         # No targets specified; this is allowed
-        'instance': apprise.plugins.NotifyOpsgenie,
+        'instance': NotifyOpsgenie,
     }),
     ('opsgenie://apikey/user', {
         # Valid user
-        'instance': apprise.plugins.NotifyOpsgenie,
+        'instance': NotifyOpsgenie,
         'privacy_url': 'opsgenie://a...y/%40user',
     }),
     ('opsgenie://apikey/@user?region=eu', {
         # European Region
-        'instance': apprise.plugins.NotifyOpsgenie,
+        'instance': NotifyOpsgenie,
     }),
     ('opsgenie://apikey/@user?entity=A%20Entity', {
         # Assign an entity
-        'instance': apprise.plugins.NotifyOpsgenie,
+        'instance': NotifyOpsgenie,
     }),
     ('opsgenie://apikey/@user?alias=An%20Alias', {
         # Assign an alias
-        'instance': apprise.plugins.NotifyOpsgenie,
+        'instance': NotifyOpsgenie,
     }),
     ('opsgenie://apikey/@user?priority=p3', {
         # Assign our priority
-        'instance': apprise.plugins.NotifyOpsgenie,
+        'instance': NotifyOpsgenie,
     }),
     ('opsgenie://apikey/?tags=comma,separated', {
         # Test our our 'tags' (tag is reserved in Apprise) but not 'tags'
         # Also test the fact we do not need to define a target
-        'instance': apprise.plugins.NotifyOpsgenie,
+        'instance': NotifyOpsgenie,
     }),
     ('opsgenie://apikey/@user?priority=invalid', {
         # Invalid priority (loads using default)
-        'instance': apprise.plugins.NotifyOpsgenie,
+        'instance': NotifyOpsgenie,
     }),
     ('opsgenie://apikey/user@email.com/#team/*sche/^esc/%20/a', {
         # Valid user (email), valid schedule, Escalated ID,
         # an invalid entry (%20), and too short of an entry (a)
-        'instance': apprise.plugins.NotifyOpsgenie,
+        'instance': NotifyOpsgenie,
     }),
     ('opsgenie://apikey/{}/@{}/#{}/*{}/^{}/'.format(
         UUID4, UUID4, UUID4, UUID4, UUID4), {
         # similar to the above, except we use the UUID's
-        'instance': apprise.plugins.NotifyOpsgenie,
+        'instance': NotifyOpsgenie,
     }),
     ('opsgenie://apikey?to=#team,user&+key=value&+type=override', {
         # Test to= and details (key/value pair) also override 'type'
-        'instance': apprise.plugins.NotifyOpsgenie,
+        'instance': NotifyOpsgenie,
     }),
     ('opsgenie://apikey/#team/@user/?batch=yes', {
         # Test batch=
-        'instance': apprise.plugins.NotifyOpsgenie,
+        'instance': NotifyOpsgenie,
     }),
     ('opsgenie://apikey/#team/@user/?batch=no', {
         # Test batch=
-        'instance': apprise.plugins.NotifyOpsgenie,
+        'instance': NotifyOpsgenie,
     }),
     ('opsgenie://?apikey=abc&to=user', {
         # Test Kwargs
-        'instance': apprise.plugins.NotifyOpsgenie,
+        'instance': NotifyOpsgenie,
     }),
     ('opsgenie://apikey/#team/user/', {
-        'instance': apprise.plugins.NotifyOpsgenie,
+        'instance': NotifyOpsgenie,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('opsgenie://apikey/#topic1/device/', {
-        'instance': apprise.plugins.NotifyOpsgenie,
+        'instance': NotifyOpsgenie,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -136,7 +136,7 @@ def test_plugin_opsgenie_urls():
     """
 
     # Disable Throttling to speed testing
-    apprise.plugins.NotifyOpsgenie.request_rate_per_sec = 0
+    NotifyOpsgenie.request_rate_per_sec = 0
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
@@ -175,7 +175,7 @@ def test_plugin_opsgenie_config_files(mock_post):
     """
 
     # Disable Throttling to speed testing
-    apprise.plugins.NotifyOpsgenie.request_rate_per_sec = 0
+    NotifyOpsgenie.request_rate_per_sec = 0
 
     # Prepare Mock
     mock_post.return_value = requests.Request()

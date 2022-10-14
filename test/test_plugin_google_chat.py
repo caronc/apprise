@@ -23,7 +23,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 import requests
-from apprise import plugins
+
+from apprise.plugins.NotifyGoogleChat import NotifyGoogleChat
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -48,34 +49,34 @@ apprise_url_tests = (
     }),
     # Credentials are good
     ('gchat://workspace/key/token', {
-        'instance': plugins.NotifyGoogleChat,
+        'instance': NotifyGoogleChat,
         'privacy_url': 'gchat://w...e/k...y/t...n',
     }),
     # Test arguments
     ('gchat://?workspace=ws&key=mykey&token=mytoken', {
-        'instance': plugins.NotifyGoogleChat,
+        'instance': NotifyGoogleChat,
         'privacy_url': 'gchat://w...s/m...y/m...n',
     }),
     # Google Native Webhohok URL
     ('https://chat.googleapis.com/v1/spaces/myworkspace/messages'
      '?key=mykey&token=mytoken', {
-         'instance': plugins.NotifyGoogleChat,
+         'instance': NotifyGoogleChat,
          'privacy_url': 'gchat://m...e/m...y/m...n'}),
 
     ('gchat://workspace/key/token', {
-        'instance': plugins.NotifyGoogleChat,
+        'instance': NotifyGoogleChat,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('gchat://workspace/key/token', {
-        'instance': plugins.NotifyGoogleChat,
+        'instance': NotifyGoogleChat,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('gchat://workspace/key/token', {
-        'instance': plugins.NotifyGoogleChat,
+        'instance': NotifyGoogleChat,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,

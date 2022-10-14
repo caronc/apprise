@@ -22,18 +22,12 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
-try:
-    # Python 3.x
-    from unittest import mock
-
-except ImportError:
-    # Python 2.7
-    import mock
+from unittest import mock
 
 import requests
 from json import loads
 from apprise import Apprise
-from apprise import plugins
+from apprise.plugins.NotifyBulkSMS import NotifyBulkSMS
 from helpers import AppriseURLTester
 from apprise import NotifyType
 
@@ -45,53 +39,53 @@ logging.disable(logging.CRITICAL)
 apprise_url_tests = (
     ('bulksms://', {
         # Instantiated but no auth, so no otification can happen
-        'instance': plugins.NotifyBulkSMS,
+        'instance': NotifyBulkSMS,
         # Expected notify() response because we have no one to notify
         'notify_response': False,
     }),
     ('bulksms://:@/', {
         # invalid auth
-        'instance': plugins.NotifyBulkSMS,
+        'instance': NotifyBulkSMS,
         # Expected notify() response because we have no one to notify
         'notify_response': False,
     }),
     ('bulksms://{}@12345678'.format('a' * 10), {
         # Just user provided (no password)
-        'instance': plugins.NotifyBulkSMS,
+        'instance': NotifyBulkSMS,
         # Expected notify() response because we have no one to notify
         'notify_response': False,
     }),
     ('bulksms://{}:{}@{}'.format('a' * 10, 'b' * 10, '3' * 5), {
         # invalid nubmer provided
-        'instance': plugins.NotifyBulkSMS,
+        'instance': NotifyBulkSMS,
         # Expected notify() response because we have no one to notify
         'notify_response': False,
     }),
     ('bulksms://{}:{}@123/{}/abcd/'.format(
         'a' * 5, 'b' * 10, '3' * 11), {
         # included group and phone, short number (123) dropped
-        'instance': plugins.NotifyBulkSMS,
+        'instance': NotifyBulkSMS,
         'privacy_url': 'bulksms://a...a:****@+33333333333/@abcd'
     }),
     ('bulksms://{}:{}@{}?batch=y&unicode=n'.format(
         'b' * 5, 'c' * 10, '4' * 11), {
-            'instance': plugins.NotifyBulkSMS,
+            'instance': NotifyBulkSMS,
 
             # Our expected url(privacy=True) startswith() response:
             'privacy_url': 'bulksms://b...b:****@+4444444444',
     }),
     ('bulksms://{}:{}@123456/{}'.format('a' * 10, 'b' * 10, '4' * 11), {
         # using short-code (6 characters)
-        'instance': plugins.NotifyBulkSMS,
+        'instance': NotifyBulkSMS,
     }),
     ('bulksms://{}:{}@{}'.format('a' * 10, 'b' * 10, '5' * 11), {
         # using phone no with no target - we text ourselves in
         # this case
-        'instance': plugins.NotifyBulkSMS,
+        'instance': NotifyBulkSMS,
     }),
     # Test route group
     ('bulksms://{}:{}@admin?route=premium'.format('a' * 10, 'b' * 10), {
-        'instance': plugins.NotifyBulkSMS,
+        'instance': NotifyBulkSMS,
     }),
     ('bulksms://{}:{}@admin?route=invalid'.format('a' * 10, 'b' * 10), {
         # invalid route
@@ -100,7 +94,7 @@ apprise_url_tests = (
     ('bulksms://_?user={}&password={}&from={}'.format(
         'a' * 10, 'b' * 10, '5' * 11), {
         # use get args to acomplish the same thing
-        'instance': plugins.NotifyBulkSMS,
+        'instance': NotifyBulkSMS,
     }),
     ('bulksms://_?user={}&password={}&from={}'.format(
         'a' * 10, 'b' * 10, '5' * 3), {
@@ -110,16 +104,16 @@ apprise_url_tests = (
     ('bulksms://_?user={}&password={}&from={}&to={}'.format(
         'a' * 10, 'b' * 10, '5' * 11, '7' * 13), {
         # use to=
-        'instance': plugins.NotifyBulkSMS,
+        'instance': NotifyBulkSMS,
     }),
     ('bulksms://{}:{}@{}'.format('a' * 10, 'b' * 10, 'a' * 3), {
-        'instance': plugins.NotifyBulkSMS,
+        'instance': NotifyBulkSMS,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('bulksms://{}:{}@{}'.format('a' * 10, 'b' * 10, '6' * 11), {
-        'instance': plugins.NotifyBulkSMS,
+        'instance': NotifyBulkSMS,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -138,13 +132,11 @@ def test_plugin_bulksms_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_bulksms_edge_cases(mock_post):
+def test_plugin_bulksms_edge_cases(mock_post, no_throttling):
     """
     NotifyBulkSMS() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Initialize some generic (but valid) tokens
     user = 'abcd'

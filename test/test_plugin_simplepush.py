@@ -29,7 +29,7 @@ import pytest
 import requests
 import json
 from apprise import Apprise
-from apprise import plugins
+from apprise.plugins.NotifySimplePush import NotifySimplePush
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -45,13 +45,13 @@ apprise_url_tests = (
     ('spush://{}'.format('A' * 14), {
         # API Key specified however expected server response
         # didn't have 'OK' in JSON response
-        'instance': plugins.NotifySimplePush,
+        'instance': NotifySimplePush,
         # Expected notify() response
         'notify_response': False,
     }),
     ('spush://{}'.format('Y' * 14), {
         # API Key valid and expected response was valid
-        'instance': plugins.NotifySimplePush,
+        'instance': NotifySimplePush,
         # Set our response to OK
         'requests_response_text': {
             'status': 'OK',
@@ -62,7 +62,7 @@ apprise_url_tests = (
     }),
     ('spush://{}?event=Not%20So%20Good'.format('X' * 14), {
         # API Key valid and expected response was valid
-        'instance': plugins.NotifySimplePush,
+        'instance': NotifySimplePush,
         # Set our response to something that is not okay
         'requests_response_text': {
             'status': 'NOT-OK',
@@ -72,7 +72,7 @@ apprise_url_tests = (
     }),
     ('spush://salt:pass@{}'.format('X' * 14), {
         # Now we'll test encrypted messages with new salt
-        'instance': plugins.NotifySimplePush,
+        'instance': NotifySimplePush,
         # Set our response to OK
         'requests_response_text': {
             'status': 'OK',
@@ -82,7 +82,7 @@ apprise_url_tests = (
         'privacy_url': 'spush://****:****@X...X/',
     }),
     ('spush://{}'.format('Y' * 14), {
-        'instance': plugins.NotifySimplePush,
+        'instance': NotifySimplePush,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
@@ -93,7 +93,7 @@ apprise_url_tests = (
         },
     }),
     ('spush://{}'.format('Z' * 14), {
-        'instance': plugins.NotifySimplePush,
+        'instance': NotifySimplePush,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -130,38 +130,34 @@ def test_plugin_fcm_cryptography_import_error():
 
 @pytest.mark.skipif(
     'cryptography' not in sys.modules, reason="Requires cryptography")
-def test_plugin_simplepush_edge_cases():
+def test_plugin_simplepush_edge_cases(no_throttling):
     """
     NotifySimplePush() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # No token
     with pytest.raises(TypeError):
-        plugins.NotifySimplePush(apikey=None)
+        NotifySimplePush(apikey=None)
 
     with pytest.raises(TypeError):
-        plugins.NotifySimplePush(apikey="  ")
+        NotifySimplePush(apikey="  ")
 
     # Bad event
     with pytest.raises(TypeError):
-        plugins.NotifySimplePush(apikey="abc", event=object)
+        NotifySimplePush(apikey="abc", event=object)
 
     with pytest.raises(TypeError):
-        plugins.NotifySimplePush(apikey="abc", event="  ")
+        NotifySimplePush(apikey="abc", event="  ")
 
 
 @pytest.mark.skipif(
     'cryptography' not in sys.modules, reason="Requires cryptography")
 @mock.patch('requests.post')
-def test_plugin_simplepush_general(mock_post):
+def test_plugin_simplepush_general(mock_post, no_throttling):
     """
     NotifySimplePush() General Tests
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare a good response
     response = mock.Mock()

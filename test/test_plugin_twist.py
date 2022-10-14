@@ -27,8 +27,8 @@ from unittest import mock
 
 import requests
 from json import dumps
-from apprise import plugins
 from apprise import Apprise
+from apprise.plugins.NotifyTwist import NotifyTwist
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -50,14 +50,14 @@ apprise_url_tests = (
     }),
     ('twist://user@example.com/password', {
         # Password acceptable as first entry in path
-        'instance': plugins.NotifyTwist,
+        'instance': NotifyTwist,
         # Expected notify() response is False because internally we would
         # have failed to login
         'notify_response': False,
     }),
     ('twist://password:user1@example.com', {
         # password:login acceptable
-        'instance': plugins.NotifyTwist,
+        'instance': NotifyTwist,
         # Expected notify() response is False because internally we would
         # have failed to login
         'notify_response': False,
@@ -67,7 +67,7 @@ apprise_url_tests = (
     }),
     ('twist://password:user2@example.com', {
         # password:login acceptable
-        'instance': plugins.NotifyTwist,
+        'instance': NotifyTwist,
         # Expected notify() response is False because internally we would
         # have logged in, but we would have failed to look up the #General
         # channel and workspace.
@@ -79,13 +79,13 @@ apprise_url_tests = (
         'notify_response': False,
     }),
     ('twist://password:user2@example.com', {
-        'instance': plugins.NotifyTwist,
+        'instance': NotifyTwist,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('twist://password:user2@example.com', {
-        'instance': plugins.NotifyTwist,
+        'instance': NotifyTwist,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -109,21 +109,21 @@ def test_plugin_twist_init():
 
     """
     try:
-        plugins.NotifyTwist(email='invalid', targets=None)
+        NotifyTwist(email='invalid', targets=None)
         assert False
     except TypeError:
         # Invalid email address
         assert True
 
     try:
-        plugins.NotifyTwist(email='user@domain', targets=None)
+        NotifyTwist(email='user@domain', targets=None)
         assert False
     except TypeError:
         # No password was specified
         assert True
 
     # Simple object initialization
-    result = plugins.NotifyTwist(
+    result = NotifyTwist(
         password='abc123', email='user@domain.com', targets=None)
     assert result.user == 'user'
     assert result.host == 'domain.com'
@@ -131,23 +131,23 @@ def test_plugin_twist_init():
 
     # Channel Instantiation by name
     obj = Apprise.instantiate('twist://password:user@example.com/#Channel')
-    assert isinstance(obj, plugins.NotifyTwist)
+    assert isinstance(obj, NotifyTwist)
 
     # Channel Instantiation by id (faster if you know the translation)
     obj = Apprise.instantiate('twist://password:user@example.com/12345')
-    assert isinstance(obj, plugins.NotifyTwist)
+    assert isinstance(obj, NotifyTwist)
 
     # Invalid Channel - (max characters is 64), the below drops it
     obj = Apprise.instantiate(
         'twist://password:user@example.com/{}'.format('a' * 65))
-    assert isinstance(obj, plugins.NotifyTwist)
+    assert isinstance(obj, NotifyTwist)
 
     # No User detect
-    result = plugins.NotifyTwist.parse_url('twist://example.com')
+    result = NotifyTwist.parse_url('twist://example.com')
     assert result is None
 
     # test usage of to=
-    result = plugins.NotifyTwist.parse_url(
+    result = NotifyTwist.parse_url(
         'twist://password:user@example.com?to=#channel')
     assert isinstance(result, dict)
     assert 'user' in result
@@ -164,13 +164,11 @@ def test_plugin_twist_init():
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_twist_auth(mock_post, mock_get):
+def test_plugin_twist_auth(mock_post, mock_get, no_throttling):
     """
     NotifyTwist() login/logout()
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare Mock
     mock_get.return_value = requests.Request()
@@ -185,7 +183,7 @@ def test_plugin_twist_auth(mock_post, mock_get):
 
     # Instantiate an object
     obj = Apprise.instantiate('twist://password:user@example.com/#Channel')
-    assert isinstance(obj, plugins.NotifyTwist)
+    assert isinstance(obj, NotifyTwist)
     # not logged in yet
     obj.logout()
     assert obj.login() is True
@@ -251,7 +249,7 @@ def test_plugin_twist_auth(mock_post, mock_get):
 
     # Instantiate an object
     obj = Apprise.instantiate('twist://password:user@example.com/#Channel')
-    assert isinstance(obj, plugins.NotifyTwist)
+    assert isinstance(obj, NotifyTwist)
 
     # Authentication failed
     assert obj.get_workspaces() == dict()
@@ -260,7 +258,7 @@ def test_plugin_twist_auth(mock_post, mock_get):
     assert obj.send('body', 'title') is False
 
     obj = Apprise.instantiate('twist://password:user@example.com/#Channel')
-    assert isinstance(obj, plugins.NotifyTwist)
+    assert isinstance(obj, NotifyTwist)
 
     # Calling logout on an object already logged out
     obj.logout()
@@ -268,13 +266,11 @@ def test_plugin_twist_auth(mock_post, mock_get):
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_twist_cache(mock_post, mock_get):
+def test_plugin_twist_cache(mock_post, mock_get, no_throttling):
     """
     NotifyTwist() Cache Handling
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     def _response(url, *args, **kwargs):
 
@@ -321,7 +317,7 @@ def test_plugin_twist_cache(mock_post, mock_get):
     obj = Apprise.instantiate(
         'twist://password:user@example.com/'
         '#ChanB/1:1/TeamA:ChanA/Ignore:Chan/3:1')
-    assert isinstance(obj, plugins.NotifyTwist)
+    assert isinstance(obj, NotifyTwist)
 
     # Will detect channels except Ignore:Chan
     assert obj._channel_migration() is False
@@ -355,7 +351,7 @@ def test_plugin_twist_cache(mock_post, mock_get):
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_twist_fetch(mock_post, mock_get):
+def test_plugin_twist_fetch(mock_post, mock_get, no_throttling):
     """
     NotifyTwist() fetch()
 
@@ -364,8 +360,6 @@ def test_plugin_twist_fetch(mock_post, mock_get):
     happens to expire.  This tests these edge cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Track our iteration; by tracing within an object, we can re-reference
     # it within a function scope.
@@ -409,7 +403,7 @@ def test_plugin_twist_fetch(mock_post, mock_get):
 
     # Instantiate an object
     obj = Apprise.instantiate('twist://password:user@example.com/#Channel/34')
-    assert isinstance(obj, plugins.NotifyTwist)
+    assert isinstance(obj, NotifyTwist)
 
     # Simulate a re-authentication
     postokay, response = obj._fetch('threads/add')
@@ -459,7 +453,7 @@ def test_plugin_twist_fetch(mock_post, mock_get):
 
     # Instantiate an object
     obj = Apprise.instantiate('twist://password:user@example.com/#Channel/34')
-    assert isinstance(obj, plugins.NotifyTwist)
+    assert isinstance(obj, NotifyTwist)
 
     # Simulate a re-authentication
     postokay, response = obj._fetch('threads/add')
@@ -509,7 +503,7 @@ def test_plugin_twist_fetch(mock_post, mock_get):
 
     # Instantiate an object
     obj = Apprise.instantiate('twist://password:user@example.com/#Channel/34')
-    assert isinstance(obj, plugins.NotifyTwist)
+    assert isinstance(obj, NotifyTwist)
 
     # Simulate a re-authentication
     postokay, response = obj._fetch('threads/add')
@@ -527,7 +521,7 @@ def test_plugin_twist_fetch(mock_post, mock_get):
 
     # Instantiate our object
     obj = Apprise.instantiate('twist://password:user@example.com/#Channel/34')
-    assert isinstance(obj, plugins.NotifyTwist)
+    assert isinstance(obj, NotifyTwist)
 
     # Simulate a re-authentication
     postokay, response = obj._fetch('threads/add')

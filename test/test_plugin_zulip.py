@@ -23,8 +23,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 import pytest
-from apprise import plugins
 import requests
+
+from apprise.plugins.NotifyZulip import NotifyZulip
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -57,52 +58,52 @@ apprise_url_tests = (
     }),
     # Valid everything - botname with a dash
     ('zulip://bot-name@apprise/{}'.format('a' * 32), {
-        'instance': plugins.NotifyZulip,
+        'instance': NotifyZulip,
         'privacy_url': 'zulip://bot-name@apprise/a...a/',
     }),
     # Valid everything - no target so default is used
     ('zulip://botname@apprise/{}'.format('a' * 32), {
-        'instance': plugins.NotifyZulip,
+        'instance': NotifyZulip,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'zulip://botname@apprise/a...a/',
     }),
     # Valid everything - organization as hostname
     ('zulip://botname@apprise.zulipchat.com/{}'.format('a' * 32), {
-        'instance': plugins.NotifyZulip,
+        'instance': NotifyZulip,
     }),
     # Valid everything - 2 streams specified
     ('zulip://botname@apprise/{}/channel1/channel2'.format('a' * 32), {
-        'instance': plugins.NotifyZulip,
+        'instance': NotifyZulip,
     }),
     # Valid everything - 2 streams specified (using to=)
     ('zulip://botname@apprise/{}/?to=channel1/channel2'.format('a' * 32), {
-        'instance': plugins.NotifyZulip,
+        'instance': NotifyZulip,
     }),
     # Valid everything - 2 emails specified
     ('zulip://botname@apprise/{}/user@example.com/user2@example.com'.format(
         'a' * 32), {
-        'instance': plugins.NotifyZulip,
+        'instance': NotifyZulip,
     }),
     ('zulip://botname@apprise/{}'.format('a' * 32), {
-        'instance': plugins.NotifyZulip,
+        'instance': NotifyZulip,
         # don't include an image by default
         'include_image': False,
     }),
     ('zulip://botname@apprise/{}'.format('a' * 32), {
-        'instance': plugins.NotifyZulip,
+        'instance': NotifyZulip,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('zulip://botname@apprise/{}'.format('a' * 32), {
-        'instance': plugins.NotifyZulip,
+        'instance': NotifyZulip,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('zulip://botname@apprise/{}'.format('a' * 32), {
-        'instance': plugins.NotifyZulip,
+        'instance': NotifyZulip,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -120,18 +121,16 @@ def test_plugin_zulip_urls():
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-def test_plugin_zulip_edge_cases():
+def test_plugin_zulip_edge_cases(no_throttling):
     """
     NotifyZulip() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # must be 32 characters long
     token = 'a' * 32
 
     # Invalid organization
     with pytest.raises(TypeError):
-        plugins.NotifyZulip(
+        NotifyZulip(
             botname='test', organization='#', token=token)

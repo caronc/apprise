@@ -26,7 +26,7 @@
 import os
 from unittest import mock
 
-from helpers import module_reload
+from helpers import reload_plugin
 
 import apprise
 
@@ -59,15 +59,16 @@ def test_plugin_macosx_general(mock_macver, mock_system, mock_popen, tmpdir):
     mock_macver.return_value = ('10.8', ('', '', ''), '')
     mock_popen.return_value = mock_cmd_response
 
-    # Ensure our enviroment is loaded with this configuration
-    module_reload('NotifyMacOSX')
+    # Ensure our environment is loaded with this configuration
+    reload_plugin('NotifyMacOSX')
+    from apprise.plugins.NotifyMacOSX import NotifyMacOSX
 
     # Point our object to our new temporary existing file
-    apprise.plugins.NotifyMacOSX.notify_paths = (str(script), )
+    NotifyMacOSX.notify_paths = (str(script), )
 
     obj = apprise.Apprise.instantiate(
         'macosx://_/?image=True', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyMacOSX) is True
+    assert isinstance(obj, NotifyMacOSX) is True
 
     # Test url() call
     assert isinstance(obj.url(), str) is True
@@ -82,13 +83,13 @@ def test_plugin_macosx_general(mock_macver, mock_system, mock_popen, tmpdir):
 
     obj = apprise.Apprise.instantiate(
         'macosx://_/?image=True', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyMacOSX) is True
+    assert isinstance(obj, NotifyMacOSX) is True
     assert obj.notify(title='title', body='body',
                       notify_type=apprise.NotifyType.INFO) is True
 
     obj = apprise.Apprise.instantiate(
         'macosx://_/?image=False', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyMacOSX) is True
+    assert isinstance(obj, NotifyMacOSX) is True
     assert isinstance(obj.url(), str) is True
     assert obj.notify(title='title', body='body',
                       notify_type=apprise.NotifyType.INFO) is True
@@ -96,7 +97,7 @@ def test_plugin_macosx_general(mock_macver, mock_system, mock_popen, tmpdir):
     # Test Sound
     obj = apprise.Apprise.instantiate(
         'macosx://_/?sound=default', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyMacOSX) is True
+    assert isinstance(obj, NotifyMacOSX) is True
     assert obj.sound == 'default'
     assert isinstance(obj.url(), str) is True
     assert obj.notify(title='title', body='body',
@@ -121,7 +122,7 @@ def test_plugin_macosx_general(mock_macver, mock_system, mock_popen, tmpdir):
     mock_cmd_response.returncode = 1
     obj = apprise.Apprise.instantiate(
         'macosx://', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyMacOSX) is True
+    assert isinstance(obj, NotifyMacOSX) is True
     assert obj.notify(title='title', body='body',
                       notify_type=apprise.NotifyType.INFO) is False
 
@@ -130,10 +131,10 @@ def test_plugin_macosx_general(mock_macver, mock_system, mock_popen, tmpdir):
 
     # Test case where we simply aren't on a mac
     mock_system.return_value = 'Linux'
-    module_reload('NotifyMacOSX')
+    reload_plugin('NotifyMacOSX')
 
     # Point our object to our new temporary existing file
-    apprise.plugins.NotifyMacOSX.notify_paths = (str(script), )
+    NotifyMacOSX.notify_paths = (str(script), )
 
     # Our object is disabled
     obj = apprise.Apprise.instantiate(
@@ -145,10 +146,10 @@ def test_plugin_macosx_general(mock_macver, mock_system, mock_popen, tmpdir):
 
     # Now we must be Mac OS v10.8 or higher...
     mock_macver.return_value = ('10.7', ('', '', ''), '')
-    module_reload('NotifyMacOSX')
+    reload_plugin('NotifyMacOSX')
 
     # Point our object to our new temporary existing file
-    apprise.plugins.NotifyMacOSX.notify_paths = (str(script), )
+    NotifyMacOSX.notify_paths = (str(script), )
 
     obj = apprise.Apprise.instantiate(
         'macosx://_/?sound=default', suppress_exceptions=False)
@@ -156,10 +157,10 @@ def test_plugin_macosx_general(mock_macver, mock_system, mock_popen, tmpdir):
 
     # A newer environment to test edge case where this is tested
     mock_macver.return_value = ('9.12', ('', '', ''), '')
-    module_reload('NotifyMacOSX')
+    reload_plugin('NotifyMacOSX')
 
     # Point our object to our new temporary existing file
-    apprise.plugins.NotifyMacOSX.notify_paths = (str(script), )
+    NotifyMacOSX.notify_paths = (str(script), )
 
     # This is just to test that the the minor (in this case .12)
     # is only weighed with respect to the major number as wel

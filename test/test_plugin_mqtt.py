@@ -33,6 +33,9 @@ import apprise
 
 # Disable logging for a cleaner testing output
 import logging
+
+from apprise.plugins.NotifyMQTT import NotifyMQTT
+
 logging.disable(logging.CRITICAL)
 
 
@@ -54,13 +57,11 @@ def test_plugin_mqtt_paho_import_error(mock_post):
 @pytest.mark.skipif(
     'paho' not in sys.modules, reason="Requires paho-mqtt")
 @mock.patch('paho.mqtt.client.Client')
-def test_plugin_mqtt_general(mock_client):
+def test_plugin_mqtt_general(mock_client, no_throttling):
     """
     NotifyMQTT() General Checks
 
     """
-    # Speed up request rate for testing
-    apprise.plugins.NotifyBase.request_rate_per_sec = 0
 
     # our call to publish() response object
     publish_result = mock.Mock()
@@ -78,7 +79,7 @@ def test_plugin_mqtt_general(mock_client):
     # Instantiate our object
     obj = apprise.Apprise.instantiate(
         'mqtt://localhost:1234/my/topic', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyMQTT)
+    assert isinstance(obj, NotifyMQTT)
     assert obj.url().startswith('mqtt://localhost:1234/my/topic')
     # Detect our defaults
     assert re.search(r'qos=0', obj.url())
@@ -89,7 +90,7 @@ def test_plugin_mqtt_general(mock_client):
     # leverage the to= argument to identify our topic
     obj = apprise.Apprise.instantiate(
         'mqtt://localhost?to=my/topic', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyMQTT)
+    assert isinstance(obj, NotifyMQTT)
     assert obj.url().startswith('mqtt://localhost/my/topic')
     # Detect our defaults
     assert re.search(r'qos=0', obj.url())
@@ -125,7 +126,7 @@ def test_plugin_mqtt_general(mock_client):
     # the URL
     obj = apprise.Apprise.instantiate(
         'mqtt://localhost?qos=1&version=v3.1', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyMQTT)
+    assert isinstance(obj, NotifyMQTT)
     assert obj.url().startswith('mqtt://localhost')
     assert re.search(r'qos=1', obj.url())
     assert re.search(r'version=v3.1', obj.url())
@@ -138,30 +139,30 @@ def test_plugin_mqtt_general(mock_client):
     # A Secure URL
     obj = apprise.Apprise.instantiate(
         'mqtts://user:pass@localhost/my/topic', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyMQTT)
+    assert isinstance(obj, NotifyMQTT)
     assert obj.url().startswith('mqtts://user:pass@localhost/my/topic')
     assert obj.notify(body="test=test") is True
 
     # Clear CA Certificates
     ca_certs_backup = \
-        list(apprise.plugins.NotifyMQTT.CA_CERTIFICATE_FILE_LOCATIONS)
-    apprise.plugins.NotifyMQTT.CA_CERTIFICATE_FILE_LOCATIONS = []
+        list(NotifyMQTT.CA_CERTIFICATE_FILE_LOCATIONS)
+    NotifyMQTT.CA_CERTIFICATE_FILE_LOCATIONS = []
     obj = apprise.Apprise.instantiate(
         'mqtts://user:pass@localhost/my/topic', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyMQTT)
+    assert isinstance(obj, NotifyMQTT)
     assert obj.url().startswith('mqtts://user:pass@localhost/my/topic')
 
     # A notification is not possible now (without ca_certs)
     assert obj.notify(body="test=test") is False
 
     # Restore our certificates (for future tests)
-    apprise.plugins.NotifyMQTT.CA_CERTIFICATE_FILE_LOCATIONS = ca_certs_backup
+    NotifyMQTT.CA_CERTIFICATE_FILE_LOCATIONS = ca_certs_backup
 
     # A single user (not password) + no verifying of host
     obj = apprise.Apprise.instantiate(
         'mqtts://user@localhost/my/topic,my/other/topic?verify=False',
         suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyMQTT)
+    assert isinstance(obj, NotifyMQTT)
     assert obj.url().startswith('mqtts://user@localhost')
     assert re.search(r'my/other/topic', obj.url())
     assert re.search(r'my/topic', obj.url())
@@ -171,7 +172,7 @@ def test_plugin_mqtt_general(mock_client):
     obj = apprise.Apprise.instantiate(
         'mqtts://user@localhost/my/topic?session=yes&client_id=apprise',
         suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyMQTT)
+    assert isinstance(obj, NotifyMQTT)
     assert obj.url().startswith('mqtts://user@localhost')
     assert re.search(r'my/topic', obj.url())
     assert re.search(r'client_id=apprise', obj.url())
@@ -182,7 +183,7 @@ def test_plugin_mqtt_general(mock_client):
     _mock_client.connect.return_value = 2
     obj = apprise.Apprise.instantiate(
         'mqtt://localhost/my/topic', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyMQTT)
+    assert isinstance(obj, NotifyMQTT)
     assert obj.notify(body="test=test") is False
     # Restore our values
     _mock_client.connect.return_value = 0
@@ -192,7 +193,7 @@ def test_plugin_mqtt_general(mock_client):
     _mock_client.is_connected.return_value = False
     obj = apprise.Apprise.instantiate(
         'mqtt://localhost/my/topic', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyMQTT)
+    assert isinstance(obj, NotifyMQTT)
     assert obj.notify(body="test=test") is False
     # Restore our values
     _mock_client.reconnect.return_value = 0
@@ -202,7 +203,7 @@ def test_plugin_mqtt_general(mock_client):
     publish_result.rc = 2
     obj = apprise.Apprise.instantiate(
         'mqtt://localhost/my/topic', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyMQTT)
+    assert isinstance(obj, NotifyMQTT)
     assert obj.notify(body="test=test") is False
     # Restore our values
     publish_result.rc = 0
@@ -222,7 +223,7 @@ def test_plugin_mqtt_general(mock_client):
     # Exception handling
     obj = apprise.Apprise.instantiate(
         'mqtt://localhost/my/topic', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyMQTT)
+    assert isinstance(obj, NotifyMQTT)
     _mock_client.connect.return_value = None
 
     for side_effect in (

@@ -23,7 +23,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 import requests
-from apprise import plugins
+
+from apprise.plugins.NotifySpontit import NotifySpontit
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -50,26 +51,26 @@ apprise_url_tests = (
     }),
     # Provide a valid user and API Key
     ('spontit://%s@%s' % ('u' * 11, 'b' * 100), {
-        'instance': plugins.NotifySpontit,
+        'instance': NotifySpontit,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'spontit://{}@b...b/'.format('u' * 11),
     }),
     # Provide a valid user and API Key, but provide an invalid channel
     ('spontit://%s@%s/#!!' % ('u' * 11, 'b' * 100), {
         # An instance is still created, but the channel won't be notified
-        'instance': plugins.NotifySpontit,
+        'instance': NotifySpontit,
     }),
     # Provide a valid user, API Key and a valid channel
     ('spontit://%s@%s/#abcd' % ('u' * 11, 'b' * 100), {
-        'instance': plugins.NotifySpontit,
+        'instance': NotifySpontit,
     }),
     # Provide a valid user, API Key, and a subtitle
     ('spontit://%s@%s/?subtitle=Test' % ('u' * 11, 'b' * 100), {
-        'instance': plugins.NotifySpontit,
+        'instance': NotifySpontit,
     }),
     # Provide a valid user, API Key, and a lengthy subtitle
     ('spontit://%s@%s/?subtitle=%s' % ('u' * 11, 'b' * 100, 'c' * 300), {
-        'instance': plugins.NotifySpontit,
+        'instance': NotifySpontit,
     }),
     # Provide a valid user and API Key, but provide a valid channel (that is
     # not ours).
@@ -77,30 +78,30 @@ apprise_url_tests = (
     # specifying channel entries. For Apprise we need to encode this
     # so we convert the slash (/) into %2F
     ('spontit://{}@{}/#1245%2Fabcd'.format('u' * 11, 'b' * 100), {
-        'instance': plugins.NotifySpontit,
+        'instance': NotifySpontit,
     }),
     # Provide multipe channels
     ('spontit://{}@{}/#1245%2Fabcd/defg'.format('u' * 11, 'b' * 100), {
-        'instance': plugins.NotifySpontit,
+        'instance': NotifySpontit,
     }),
     # Provide multipe channels through the use of the to= variable
     ('spontit://{}@{}/?to=#1245/abcd'.format('u' * 11, 'b' * 100), {
-        'instance': plugins.NotifySpontit,
+        'instance': NotifySpontit,
     }),
     ('spontit://%s@%s' % ('u' * 11, 'b' * 100), {
-        'instance': plugins.NotifySpontit,
+        'instance': NotifySpontit,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('spontit://%s@%s' % ('u' * 11, 'b' * 100), {
-        'instance': plugins.NotifySpontit,
+        'instance': NotifySpontit,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('spontit://%s@%s' % ('u' * 11, 'b' * 100), {
-        'instance': plugins.NotifySpontit,
+        'instance': NotifySpontit,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,

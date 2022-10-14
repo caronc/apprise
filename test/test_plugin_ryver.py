@@ -24,7 +24,8 @@
 # THE SOFTWARE.
 import pytest
 import requests
-from apprise import plugins
+
+from apprise.plugins.NotifyRyver import NotifyRyver
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -54,57 +55,57 @@ apprise_url_tests = (
     ('ryver://apprise/ckhrjW8w672m6HG?mode=slack', {
         # No username specified; this is still okay as we use whatever
         # the user told the webhook to use; set our slack mode
-        'instance': plugins.NotifyRyver,
+        'instance': NotifyRyver,
     }),
     ('ryver://apprise/ckhrjW8w672m6HG?mode=ryver', {
         # No username specified; this is still okay as we use whatever
         # the user told the webhook to use; set our ryver mode
-        'instance': plugins.NotifyRyver,
+        'instance': NotifyRyver,
     }),
     # Legacy webhook mode setting:
     # Legacy webhook mode setting:
     ('ryver://apprise/ckhrjW8w672m6HG?webhook=slack', {
         # No username specified; this is still okay as we use whatever
         # the user told the webhook to use; set our slack mode
-        'instance': plugins.NotifyRyver,
+        'instance': NotifyRyver,
     }),
     ('ryver://apprise/ckhrjW8w672m6HG?webhook=ryver', {
         # No username specified; this is still okay as we use whatever
         # the user told the webhook to use; set our ryver mode
-        'instance': plugins.NotifyRyver,
+        'instance': NotifyRyver,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'ryver://apprise/c...G',
     }),
     # Support Native URLs
     ('https://apprise.ryver.com/application/webhook/ckhrjW8w672m6HG', {
-        'instance': plugins.NotifyRyver,
+        'instance': NotifyRyver,
     }),
     # Support Native URLs with arguments
     ('https://apprise.ryver.com/application/webhook/ckhrjW8w672m6HG'
      '?webhook=ryver',
         {
-            'instance': plugins.NotifyRyver,
+            'instance': NotifyRyver,
         }),
     ('ryver://caronc@apprise/ckhrjW8w672m6HG', {
-        'instance': plugins.NotifyRyver,
+        'instance': NotifyRyver,
         # don't include an image by default
         'include_image': False,
     }),
     ('ryver://apprise/ckhrjW8w672m6HG', {
-        'instance': plugins.NotifyRyver,
+        'instance': NotifyRyver,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('ryver://apprise/ckhrjW8w672m6HG', {
-        'instance': plugins.NotifyRyver,
+        'instance': NotifyRyver,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('ryver://apprise/ckhrjW8w672m6HG', {
-        'instance': plugins.NotifyRyver,
+        'instance': NotifyRyver,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -122,24 +123,22 @@ def test_plugin_ryver_urls():
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-def test_plugin_ryver_edge_cases():
+def test_plugin_ryver_edge_cases(no_throttling):
     """
     NotifyRyver() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # No token
     with pytest.raises(TypeError):
-        plugins.NotifyRyver(organization="abc", token=None)
+        NotifyRyver(organization="abc", token=None)
 
     with pytest.raises(TypeError):
-        plugins.NotifyRyver(organization="abc", token="  ")
+        NotifyRyver(organization="abc", token="  ")
 
     # No organization
     with pytest.raises(TypeError):
-        plugins.NotifyRyver(organization=None, token="abc")
+        NotifyRyver(organization=None, token="abc")
 
     with pytest.raises(TypeError):
-        plugins.NotifyRyver(organization="  ", token="abc")
+        NotifyRyver(organization="  ", token="abc")

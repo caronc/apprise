@@ -22,7 +22,7 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
-from apprise import plugins
+from apprise.plugins.NotifyClickSend import NotifyClickSend
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -41,31 +41,31 @@ apprise_url_tests = (
     }),
     ('clicksend://user:pass@{}/{}/{}'.format('1' * 9, '2' * 15, 'a' * 13), {
         # invalid target numbers; we'll fail to notify anyone
-        'instance': plugins.NotifyClickSend,
+        'instance': NotifyClickSend,
         'notify_response': False,
     }),
     ('clicksend://user:pass@{}?batch=yes'.format('3' * 14), {
         # valid number
-        'instance': plugins.NotifyClickSend,
+        'instance': NotifyClickSend,
     }),
     ('clicksend://user:pass@{}?batch=yes&to={}'.format('3' * 14, '6' * 14), {
         # valid number but using the to= variable
-        'instance': plugins.NotifyClickSend,
+        'instance': NotifyClickSend,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'clicksend://user:****',
     }),
     ('clicksend://user:pass@{}?batch=no'.format('3' * 14), {
         # valid number - no batch
-        'instance': plugins.NotifyClickSend,
+        'instance': NotifyClickSend,
     }),
     ('clicksend://user:pass@{}'.format('3' * 14), {
-        'instance': plugins.NotifyClickSend,
+        'instance': NotifyClickSend,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('clicksend://user:pass@{}'.format('3' * 14), {
-        'instance': plugins.NotifyClickSend,
+        'instance': NotifyClickSend,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,

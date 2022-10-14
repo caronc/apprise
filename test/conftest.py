@@ -24,4 +24,25 @@
 # THE SOFTWARE.
 import sys
 import os
+
+import pytest
+
+from apprise import NotifyBase
+from apprise.plugins.NotifyPushBullet import NotifyPushBullet
+
 sys.path.append(os.path.join(os.path.dirname(__file__), 'helpers'))
+
+
+@pytest.fixture
+def no_throttling():
+    """
+    A pytest fixture which disables Apprise throttling.
+    """
+    backup = {}
+    backup["NotifyBase"] = NotifyBase.request_rate_per_sec
+    backup["NotifyPushBullet"] = NotifyPushBullet.request_rate_per_sec
+    NotifyBase.request_rate_per_sec = 0
+    NotifyPushBullet.request_rate_per_sec = 0
+    yield
+    NotifyBase.request_rate_per_sec = backup["NotifyBase"]
+    NotifyPushBullet.request_rate_per_sec = backup["NotifyPushBullet"]

@@ -27,10 +27,10 @@ import re
 from unittest import mock
 
 import requests
-from apprise import plugins
 from apprise import Apprise
 from apprise import AppriseAttachment
 from apprise import NotifyType
+from apprise.plugins.NotifyXML import NotifyXML
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -53,16 +53,16 @@ apprise_url_tests = (
         'instance': None,
     }),
     ('xml://localhost', {
-        'instance': plugins.NotifyXML,
+        'instance': NotifyXML,
     }),
     ('xml://user@localhost', {
-        'instance': plugins.NotifyXML,
+        'instance': NotifyXML,
     }),
     ('xml://user@localhost?method=invalid', {
         'instance': TypeError,
     }),
     ('xml://user:pass@localhost', {
-        'instance': plugins.NotifyXML,
+        'instance': NotifyXML,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'xml://user:****@localhost',
@@ -70,83 +70,83 @@ apprise_url_tests = (
 
     # Test method variations
     ('xml://user@localhost?method=put', {
-        'instance': plugins.NotifyXML,
+        'instance': NotifyXML,
     }),
     ('xml://user@localhost?method=get', {
-        'instance': plugins.NotifyXML,
+        'instance': NotifyXML,
     }),
     ('xml://user@localhost?method=post', {
-        'instance': plugins.NotifyXML,
+        'instance': NotifyXML,
     }),
     ('xml://user@localhost?method=head', {
-        'instance': plugins.NotifyXML,
+        'instance': NotifyXML,
     }),
     ('xml://user@localhost?method=delete', {
-        'instance': plugins.NotifyXML,
+        'instance': NotifyXML,
     }),
 
     # Continue testing other cases
     ('xml://localhost:8080', {
-        'instance': plugins.NotifyXML,
+        'instance': NotifyXML,
     }),
     ('xml://user:pass@localhost:8080', {
-        'instance': plugins.NotifyXML,
+        'instance': NotifyXML,
     }),
     ('xmls://localhost', {
-        'instance': plugins.NotifyXML,
+        'instance': NotifyXML,
     }),
     ('xmls://user:pass@localhost', {
-        'instance': plugins.NotifyXML,
+        'instance': NotifyXML,
     }),
     # Continue testing other cases
     ('xml://localhost:8080', {
-        'instance': plugins.NotifyXML,
+        'instance': NotifyXML,
     }),
     ('xml://user:pass@localhost:8080', {
-        'instance': plugins.NotifyXML,
+        'instance': NotifyXML,
     }),
     ('xml://localhost', {
-        'instance': plugins.NotifyXML,
+        'instance': NotifyXML,
     }),
     ('xmls://user:pass@localhost', {
-        'instance': plugins.NotifyXML,
+        'instance': NotifyXML,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'xmls://user:****@localhost',
     }),
     ('xml://user@localhost:8080/path/', {
-        'instance': plugins.NotifyXML,
+        'instance': NotifyXML,
         'privacy_url': 'xml://user@localhost:8080/path',
     }),
     ('xmls://localhost:8080/path/', {
-        'instance': plugins.NotifyXML,
+        'instance': NotifyXML,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'xmls://localhost:8080/path/',
     }),
     ('xmls://user:pass@localhost:8080', {
-        'instance': plugins.NotifyXML,
+        'instance': NotifyXML,
     }),
     # Test our GET params
     ('xml://localhost:8080/path?-ParamA=Value', {
-        'instance': plugins.NotifyXML,
+        'instance': NotifyXML,
     }),
     # Test our Headers
     ('xml://localhost:8080/path?+HeaderKey=HeaderValue', {
-        'instance': plugins.NotifyXML,
+        'instance': NotifyXML,
     }),
     ('xml://user:pass@localhost:8081', {
-        'instance': plugins.NotifyXML,
+        'instance': NotifyXML,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('xml://user:pass@localhost:8082', {
-        'instance': plugins.NotifyXML,
+        'instance': NotifyXML,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('xml://user:pass@localhost:8083', {
-        'instance': plugins.NotifyXML,
+        'instance': NotifyXML,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -165,13 +165,11 @@ def test_plugin_custom_xml_urls():
 
 
 @mock.patch('requests.post')
-def test_notify_xml_plugin_attachments(mock_post):
+def test_notify_xml_plugin_attachments(mock_post, no_throttling):
     """
     NotifyXML() Attachments
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     okay_response = requests.Request()
     okay_response.status_code = requests.codes.ok
@@ -181,7 +179,7 @@ def test_notify_xml_plugin_attachments(mock_post):
     mock_post.return_value = okay_response
 
     obj = Apprise.instantiate('xml://localhost.localdomain/')
-    assert isinstance(obj, plugins.NotifyXML)
+    assert isinstance(obj, NotifyXML)
 
     # Test Valid Attachment
     path = os.path.join(TEST_VAR_DIR, 'apprise-test.gif')
@@ -215,7 +213,7 @@ def test_notify_xml_plugin_attachments(mock_post):
 
     # test the handling of our batch modes
     obj = Apprise.instantiate('xml://no-reply@example.com/')
-    assert isinstance(obj, plugins.NotifyXML)
+    assert isinstance(obj, NotifyXML)
 
     # Now send an attachment normally without issues
     mock_post.reset_mock()
@@ -227,13 +225,11 @@ def test_notify_xml_plugin_attachments(mock_post):
 
 @mock.patch('requests.post')
 @mock.patch('requests.get')
-def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
+def test_plugin_custom_xml_edge_cases(mock_get, mock_post, no_throttling):
     """
     NotifyXML() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare our response
     response = requests.Request()
@@ -243,7 +239,7 @@ def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
     mock_post.return_value = response
     mock_get.return_value = response
 
-    results = plugins.NotifyXML.parse_url(
+    results = NotifyXML.parse_url(
         'xml://localhost:8080/command?:Message=test&method=GET'
         '&:Key=value&:,=invalid')
 
@@ -262,8 +258,8 @@ def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
     assert results['qsd:']['Key'] == 'value'
     assert results['qsd:'][','] == 'invalid'
 
-    instance = plugins.NotifyXML(**results)
-    assert isinstance(instance, plugins.NotifyXML)
+    instance = NotifyXML(**results)
+    assert isinstance(instance, NotifyXML)
 
     response = instance.send(title='title', body='body')
     assert response is True
@@ -276,7 +272,7 @@ def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
         'xml://localhost:8080/command?')
 
     # Generate a new URL based on our last and verify key values are the same
-    new_results = plugins.NotifyXML.parse_url(instance.url(safe=False))
+    new_results = NotifyXML.parse_url(instance.url(safe=False))
     for k in ('user', 'password', 'port', 'host', 'fullpath', 'path', 'query',
               'schema', 'url', 'method'):
         assert new_results[k] == results[k]

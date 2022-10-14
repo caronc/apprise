@@ -23,7 +23,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 import requests
-from apprise import plugins
+from apprise.plugins.NotifyPopcornNotify import NotifyPopcornNotify
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -42,40 +42,40 @@ apprise_url_tests = (
     }),
     ('popcorn://{}/1232348923489234923489234289-32423'.format('a' * 9), {
         # invalid phone number
-        'instance': plugins.NotifyPopcornNotify,
+        'instance': NotifyPopcornNotify,
         'notify_response': False,
     }),
     ('popcorn://{}/abc'.format('b' * 9), {
         # invalid email
-        'instance': plugins.NotifyPopcornNotify,
+        'instance': NotifyPopcornNotify,
         'notify_response': False,
     }),
     ('popcorn://{}/15551232000/user@example.com'.format('c' * 9), {
         # value phone and email
-        'instance': plugins.NotifyPopcornNotify,
+        'instance': NotifyPopcornNotify,
     }),
     ('popcorn://{}/15551232000/user@example.com?batch=yes'.format('w' * 9), {
         # value phone and email with batch mode set
-        'instance': plugins.NotifyPopcornNotify,
+        'instance': NotifyPopcornNotify,
     }),
     ('popcorn://{}/?to=15551232000'.format('w' * 9), {
         # reference to to=
-        'instance': plugins.NotifyPopcornNotify,
+        'instance': NotifyPopcornNotify,
     }),
     ('popcorn://{}/15551232000'.format('x' * 9), {
-        'instance': plugins.NotifyPopcornNotify,
+        'instance': NotifyPopcornNotify,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('popcorn://{}/15551232000'.format('y' * 9), {
-        'instance': plugins.NotifyPopcornNotify,
+        'instance': NotifyPopcornNotify,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('popcorn://{}/15551232000'.format('z' * 9), {
-        'instance': plugins.NotifyPopcornNotify,
+        'instance': NotifyPopcornNotify,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,

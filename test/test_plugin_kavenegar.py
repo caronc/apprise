@@ -22,7 +22,7 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
-from apprise import plugins
+from apprise.plugins.NotifyKavenegar import NotifyKavenegar
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -41,26 +41,26 @@ apprise_url_tests = (
     }),
     ('kavenegar://{}/{}/{}'.format('1' * 10, '2' * 15, 'a' * 13), {
         # valid api key and valid authentication
-        'instance': plugins.NotifyKavenegar,
+        'instance': NotifyKavenegar,
         # Since there are no targets specified we expect a False return on
         # send()
         'notify_response': False,
     }),
     ('kavenegar://{}/{}'.format('a' * 24, '3' * 14), {
         # valid api key and valid number
-        'instance': plugins.NotifyKavenegar,
+        'instance': NotifyKavenegar,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'kavenegar://a...a/',
     }),
     ('kavenegar://{}?to={}'.format('a' * 24, '3' * 14), {
         # valid api key and valid number
-        'instance': plugins.NotifyKavenegar,
+        'instance': NotifyKavenegar,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'kavenegar://a...a/',
     }),
     ('kavenegar://{}@{}/{}'.format('1' * 14, 'b' * 24, '3' * 14), {
         # valid api key and valid number
-        'instance': plugins.NotifyKavenegar,
+        'instance': NotifyKavenegar,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'kavenegar://{}@b...b/'.format('1' * 14),
     }),
@@ -74,18 +74,18 @@ apprise_url_tests = (
     }),
     ('kavenegar://{}/{}?from={}'.format('b' * 24, '3' * 14, '1' * 14), {
         # valid api key and valid number
-        'instance': plugins.NotifyKavenegar,
+        'instance': NotifyKavenegar,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'kavenegar://{}@b...b/'.format('1' * 14),
     }),
     ('kavenegar://{}/{}'.format('b' * 24, '4' * 14), {
-        'instance': plugins.NotifyKavenegar,
+        'instance': NotifyKavenegar,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('kavenegar://{}/{}'.format('c' * 24, '5' * 14), {
-        'instance': plugins.NotifyKavenegar,
+        'instance': NotifyKavenegar,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,

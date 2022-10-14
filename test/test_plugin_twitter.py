@@ -31,9 +31,9 @@ import requests
 from json import dumps
 from datetime import datetime
 from apprise import Apprise
-from apprise import plugins
 from apprise import NotifyType
 from apprise import AppriseAttachment
+from apprise.plugins.NotifyTwitter import NotifyTwitter
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -69,7 +69,7 @@ apprise_url_tests = (
     }),
     ('twitter://consumer_key/consumer_secret/access_token/access_secret', {
         # No user mean's we message ourselves
-        'instance': plugins.NotifyTwitter,
+        'instance': NotifyTwitter,
         # Expected notify() response False (because we won't be able
         # to detect our user)
         'notify_response': False,
@@ -80,7 +80,7 @@ apprise_url_tests = (
     ('twitter://consumer_key/consumer_secret/access_token/access_secret'
         '?cache=no', {
             # No user mean's we message ourselves
-            'instance': plugins.NotifyTwitter,
+            'instance': NotifyTwitter,
             # However we'll be okay if we return a proper response
             'requests_response_text': {
                 'id': 12345,
@@ -91,7 +91,7 @@ apprise_url_tests = (
         }),
     ('twitter://consumer_key/consumer_secret/access_token/access_secret', {
         # No user mean's we message ourselves
-        'instance': plugins.NotifyTwitter,
+        'instance': NotifyTwitter,
         # However we'll be okay if we return a proper response
         'requests_response_text': {
             'id': 12345,
@@ -103,7 +103,7 @@ apprise_url_tests = (
     # A duplicate of the entry above, this will cause cache to be referenced
     ('twitter://consumer_key/consumer_secret/access_token/access_secret', {
         # No user mean's we message ourselves
-        'instance': plugins.NotifyTwitter,
+        'instance': NotifyTwitter,
         # However we'll be okay if we return a proper response
         'requests_response_text': {
             'id': 12345,
@@ -116,7 +116,7 @@ apprise_url_tests = (
     # an exception during parsing
     ('twitter://consumer_key/consumer_secret2/access_token/access_secret', {
         # No user mean's we message ourselves
-        'instance': plugins.NotifyTwitter,
+        'instance': NotifyTwitter,
         # However we'll be okay if we return a proper response
         'requests_response_text': {
             'id': 12345,
@@ -128,7 +128,7 @@ apprise_url_tests = (
     }),
     ('twitter://user@consumer_key/csecret2/access_token/access_secret/-/%/', {
         # One Invalid User
-        'instance': plugins.NotifyTwitter,
+        'instance': NotifyTwitter,
         # Expected notify() response False (because we won't be able
         # to detect our user)
         'notify_response': False,
@@ -136,7 +136,7 @@ apprise_url_tests = (
     ('twitter://user@consumer_key/csecret/access_token/access_secret'
         '?cache=No&batch=No', {
             # No Cache & No Batch
-            'instance': plugins.NotifyTwitter,
+            'instance': NotifyTwitter,
             'requests_response_text': [{
                 'id': 12345,
                 'screen_name': 'user'
@@ -144,7 +144,7 @@ apprise_url_tests = (
         }),
     ('twitter://user@consumer_key/csecret/access_token/access_secret', {
         # We're good!
-        'instance': plugins.NotifyTwitter,
+        'instance': NotifyTwitter,
         'requests_response_text': [{
             'id': 12345,
             'screen_name': 'user'
@@ -154,11 +154,11 @@ apprise_url_tests = (
     # for this reason, we don't even need to return a valid response
     ('twitter://user@consumer_key/csecret/access_token/access_secret', {
         # We're identifying the same user we already sent to
-        'instance': plugins.NotifyTwitter,
+        'instance': NotifyTwitter,
     }),
     ('twitter://ckey/csecret/access_token/access_secret?mode=tweet', {
         # A Public Tweet
-        'instance': plugins.NotifyTwitter,
+        'instance': NotifyTwitter,
     }),
     ('twitter://user@ckey/csecret/access_token/access_secret?mode=invalid', {
         # An invalid mode
@@ -167,7 +167,7 @@ apprise_url_tests = (
     ('twitter://usera@consumer_key/consumer_secret/access_token/'
         'access_secret/user/?to=userb', {
             # We're good!
-            'instance': plugins.NotifyTwitter,
+            'instance': NotifyTwitter,
             'requests_response_text': [{
                 'id': 12345,
                 'screen_name': 'usera'
@@ -180,19 +180,19 @@ apprise_url_tests = (
             }],
         }),
     ('twitter://ckey/csecret/access_token/access_secret', {
-        'instance': plugins.NotifyTwitter,
+        'instance': NotifyTwitter,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('twitter://ckey/csecret/access_token/access_secret', {
-        'instance': plugins.NotifyTwitter,
+        'instance': NotifyTwitter,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
     }),
     ('twitter://ckey/csecret/access_token/access_secret?mode=tweet', {
-        'instance': plugins.NotifyTwitter,
+        'instance': NotifyTwitter,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -212,7 +212,7 @@ def test_plugin_twitter_urls():
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_twitter_general(mock_post, mock_get):
+def test_plugin_twitter_general(mock_post, mock_get, no_throttling):
     """
     NotifyTwitter() General Tests
 
@@ -227,9 +227,6 @@ def test_plugin_twitter_general(mock_post, mock_get):
         'screen_name': screen_name,
         'id': 9876,
     }]
-
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Epoch time:
     epoch = datetime.utcfromtimestamp(0)
@@ -247,14 +244,14 @@ def test_plugin_twitter_general(mock_post, mock_get):
     mock_post.return_value = request
 
     # Variation Initializations
-    obj = plugins.NotifyTwitter(
+    obj = NotifyTwitter(
         ckey=ckey,
         csecret=csecret,
         akey=akey,
         asecret=asecret,
         targets=screen_name)
 
-    assert isinstance(obj, plugins.NotifyTwitter) is True
+    assert isinstance(obj, NotifyTwitter) is True
     assert isinstance(obj.url(), str) is True
 
     # apprise room was found
@@ -322,7 +319,7 @@ def test_plugin_twitter_general(mock_post, mock_get):
     assert obj.send(body="test") is True
 
     # Flush our cache forcing it's re-creating
-    del plugins.NotifyTwitter._user_cache
+    del NotifyTwitter._user_cache
     assert obj.send(body="test") is True
 
     # Cause content response to be None
@@ -336,7 +333,7 @@ def test_plugin_twitter_general(mock_post, mock_get):
     # Return it to a parseable string
     request.content = '{}'
 
-    results = plugins.NotifyTwitter.parse_url(
+    results = NotifyTwitter.parse_url(
         'twitter://{}/{}/{}/{}?to={}'.format(
             ckey, csecret, akey, asecret, screen_name))
     assert isinstance(results, dict) is True
@@ -352,7 +349,7 @@ def test_plugin_twitter_general(mock_post, mock_get):
     # Set ourselves up to handle whoami calls
 
     # Flush out our cache
-    del plugins.NotifyTwitter._user_cache
+    del NotifyTwitter._user_cache
 
     response_obj = {
         'screen_name': screen_name,
@@ -360,7 +357,7 @@ def test_plugin_twitter_general(mock_post, mock_get):
     }
     request.content = dumps(response_obj)
 
-    obj = plugins.NotifyTwitter(
+    obj = NotifyTwitter(
         ckey=ckey,
         csecret=csecret,
         akey=akey,
@@ -369,12 +366,12 @@ def test_plugin_twitter_general(mock_post, mock_get):
     assert obj.send(body="test") is True
 
     # Alter the key forcing us to look up a new value of ourselves again
-    del plugins.NotifyTwitter._user_cache
-    del plugins.NotifyTwitter._whoami_cache
+    del NotifyTwitter._user_cache
+    del NotifyTwitter._whoami_cache
     obj.ckey = 'different.then.it.was'
     assert obj.send(body="test") is True
 
-    del plugins.NotifyTwitter._whoami_cache
+    del NotifyTwitter._whoami_cache
     obj.ckey = 'different.again'
     assert obj.send(body="test") is True
 
@@ -386,44 +383,44 @@ def test_plugin_twitter_edge_cases():
     """
 
     with pytest.raises(TypeError):
-        plugins.NotifyTwitter(
+        NotifyTwitter(
             ckey=None, csecret=None, akey=None, asecret=None)
 
     with pytest.raises(TypeError):
-        plugins.NotifyTwitter(
+        NotifyTwitter(
             ckey='value', csecret=None, akey=None, asecret=None)
 
     with pytest.raises(TypeError):
-        plugins.NotifyTwitter(
+        NotifyTwitter(
             ckey='value', csecret='value', akey=None, asecret=None)
 
     with pytest.raises(TypeError):
-        plugins.NotifyTwitter(
+        NotifyTwitter(
             ckey='value', csecret='value', akey='value', asecret=None)
 
     assert isinstance(
-        plugins.NotifyTwitter(
+        NotifyTwitter(
             ckey='value', csecret='value', akey='value', asecret='value'),
-        plugins.NotifyTwitter,
+        NotifyTwitter,
     )
 
     assert isinstance(
-        plugins.NotifyTwitter(
+        NotifyTwitter(
             ckey='value', csecret='value', akey='value', asecret='value',
             user='l2gnux'),
-        plugins.NotifyTwitter,
+        NotifyTwitter,
     )
 
     # Invalid Target User
     with pytest.raises(TypeError):
-        plugins.NotifyTwitter(
+        NotifyTwitter(
             ckey='value', csecret='value', akey='value', asecret='value',
             targets='%G@rB@g3')
 
 
 @mock.patch('requests.post')
 @mock.patch('requests.get')
-def test_plugin_twitter_dm_attachments(mock_get, mock_post):
+def test_plugin_twitter_dm_attachments(mock_get, mock_post, no_throttling):
     """
     NotifyTwitter() DM Attachment Checks
 
@@ -438,9 +435,6 @@ def test_plugin_twitter_dm_attachments(mock_get, mock_post):
         'screen_name': screen_name,
         'id': 9876,
     }
-
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare a good DM response
     good_dm_response = mock.Mock()
@@ -642,7 +636,7 @@ def test_plugin_twitter_dm_attachments(mock_get, mock_post):
 
 @mock.patch('requests.post')
 @mock.patch('requests.get')
-def test_plugin_twitter_tweet_attachments(mock_get, mock_post):
+def test_plugin_twitter_tweet_attachments(mock_get, mock_post, no_throttling):
     """
     NotifyTwitter() Tweet Attachment Checks
 
@@ -657,9 +651,6 @@ def test_plugin_twitter_tweet_attachments(mock_get, mock_post):
         'screen_name': screen_name,
         'id': 9876,
     }
-
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare a good DM response
     good_tweet_response = mock.Mock()

@@ -31,7 +31,7 @@ import requests
 from json import dumps
 from apprise import Apprise
 from apprise import AppriseAttachment
-from apprise import plugins
+from apprise.plugins.NotifyPushBullet import NotifyPushBullet
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -51,12 +51,12 @@ apprise_url_tests = (
     }),
     # APIkey
     ('pbul://%s' % ('a' * 32), {
-        'instance': plugins.NotifyPushBullet,
+        'instance': NotifyPushBullet,
         'check_attachments': False,
     }),
     # APIkey; but support attachment response
     ('pbul://%s' % ('a' * 32), {
-        'instance': plugins.NotifyPushBullet,
+        'instance': NotifyPushBullet,
 
         # Test what happens if a batch send fails to return a messageCount
         'requests_response_text': {
@@ -68,7 +68,7 @@ apprise_url_tests = (
     }),
     # APIkey; attachment testing that isn't an image type
     ('pbul://%s' % ('a' * 32), {
-        'instance': plugins.NotifyPushBullet,
+        'instance': NotifyPushBullet,
 
         # Test what happens if a batch send fails to return a messageCount
         'requests_response_text': {
@@ -80,7 +80,7 @@ apprise_url_tests = (
     }),
     # APIkey; attachment testing were expected entry in payload is missing
     ('pbul://%s' % ('a' * 32), {
-        'instance': plugins.NotifyPushBullet,
+        'instance': NotifyPushBullet,
 
         # Test what happens if a batch send fails to return a messageCount
         'requests_response_text': {
@@ -94,17 +94,17 @@ apprise_url_tests = (
     }),
     # API Key + channel
     ('pbul://%s/#channel/' % ('a' * 32), {
-        'instance': plugins.NotifyPushBullet,
+        'instance': NotifyPushBullet,
         'check_attachments': False,
     }),
     # API Key + channel (via to=
     ('pbul://%s/?to=#channel' % ('a' * 32), {
-        'instance': plugins.NotifyPushBullet,
+        'instance': NotifyPushBullet,
         'check_attachments': False,
     }),
     # API Key + 2 channels
     ('pbul://%s/#channel1/#channel2' % ('a' * 32), {
-        'instance': plugins.NotifyPushBullet,
+        'instance': NotifyPushBullet,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'pbul://a...a/',
@@ -112,67 +112,67 @@ apprise_url_tests = (
     }),
     # API Key + device
     ('pbul://%s/device/' % ('a' * 32), {
-        'instance': plugins.NotifyPushBullet,
+        'instance': NotifyPushBullet,
         'check_attachments': False,
     }),
     # API Key + 2 devices
     ('pbul://%s/device1/device2/' % ('a' * 32), {
-        'instance': plugins.NotifyPushBullet,
+        'instance': NotifyPushBullet,
         'check_attachments': False,
     }),
     # API Key + email
     ('pbul://%s/user@example.com/' % ('a' * 32), {
-        'instance': plugins.NotifyPushBullet,
+        'instance': NotifyPushBullet,
         'check_attachments': False,
     }),
     # API Key + 2 emails
     ('pbul://%s/user@example.com/abc@def.com/' % ('a' * 32), {
-        'instance': plugins.NotifyPushBullet,
+        'instance': NotifyPushBullet,
         'check_attachments': False,
     }),
     # API Key + Combo
     ('pbul://%s/device/#channel/user@example.com/' % ('a' * 32), {
-        'instance': plugins.NotifyPushBullet,
+        'instance': NotifyPushBullet,
         'check_attachments': False,
     }),
     # ,
     ('pbul://%s' % ('a' * 32), {
-        'instance': plugins.NotifyPushBullet,
+        'instance': NotifyPushBullet,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
         'check_attachments': False,
     }),
     ('pbul://%s' % ('a' * 32), {
-        'instance': plugins.NotifyPushBullet,
+        'instance': NotifyPushBullet,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
         'check_attachments': False,
     }),
     ('pbul://%s' % ('a' * 32), {
-        'instance': plugins.NotifyPushBullet,
+        'instance': NotifyPushBullet,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
         'check_attachments': False,
     }),
     ('pbul://%s' % ('a' * 32), {
-        'instance': plugins.NotifyPushBullet,
+        'instance': NotifyPushBullet,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
         'check_attachments': False,
     }),
     ('pbul://%s' % ('a' * 32), {
-        'instance': plugins.NotifyPushBullet,
+        'instance': NotifyPushBullet,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
         'check_attachments': False,
     }),
     ('pbul://%s' % ('a' * 32), {
-        'instance': plugins.NotifyPushBullet,
+        'instance': NotifyPushBullet,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -192,13 +192,11 @@ def test_plugin_pushbullet_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_pushbullet_attachments(mock_post):
+def test_plugin_pushbullet_attachments(mock_post, no_throttling):
     """
     NotifyPushBullet() Attachment Checks
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyPushBullet.request_rate_per_sec = 0
 
     # Initialize some generic (but valid) tokens
     access_token = 't' * 32
@@ -335,13 +333,11 @@ def test_plugin_pushbullet_attachments(mock_post):
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_pushbullet_edge_cases(mock_post, mock_get):
+def test_plugin_pushbullet_edge_cases(mock_post, mock_get, no_throttling):
     """
     NotifyPushBullet() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Initialize some generic (but valid) tokens
     accesstoken = 'a' * 32
@@ -357,23 +353,23 @@ def test_plugin_pushbullet_edge_cases(mock_post, mock_get):
 
     # Invalid Access Token
     with pytest.raises(TypeError):
-        plugins.NotifyPushBullet(accesstoken=None)
+        NotifyPushBullet(accesstoken=None)
     with pytest.raises(TypeError):
-        plugins.NotifyPushBullet(accesstoken="     ")
+        NotifyPushBullet(accesstoken="     ")
 
-    obj = plugins.NotifyPushBullet(
+    obj = NotifyPushBullet(
         accesstoken=accesstoken, targets=recipients)
-    assert isinstance(obj, plugins.NotifyPushBullet) is True
+    assert isinstance(obj, NotifyPushBullet) is True
     assert len(obj.targets) == 4
 
-    obj = plugins.NotifyPushBullet(accesstoken=accesstoken)
-    assert isinstance(obj, plugins.NotifyPushBullet) is True
+    obj = NotifyPushBullet(accesstoken=accesstoken)
+    assert isinstance(obj, NotifyPushBullet) is True
     # Default is to send to all devices, so there will be a
     # recipient here
     assert len(obj.targets) == 1
 
-    obj = plugins.NotifyPushBullet(accesstoken=accesstoken, targets=set())
-    assert isinstance(obj, plugins.NotifyPushBullet) is True
+    obj = NotifyPushBullet(accesstoken=accesstoken, targets=set())
+    assert isinstance(obj, NotifyPushBullet) is True
     # Default is to send to all devices, so there will be a
     # recipient here
     assert len(obj.targets) == 1

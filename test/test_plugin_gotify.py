@@ -27,8 +27,7 @@ from unittest import mock
 import pytest
 import requests
 import apprise
-from apprise import plugins
-from apprise.plugins.NotifyGotify import GotifyPriority
+from apprise.plugins.NotifyGotify import GotifyPriority, NotifyGotify
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -46,55 +45,55 @@ apprise_url_tests = (
     }),
     # Provide a hostname and token
     ('gotify://hostname/%s' % ('t' * 16), {
-        'instance': plugins.NotifyGotify,
+        'instance': NotifyGotify,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'gotify://hostname/t...t',
     }),
     # Provide a hostname, path, and token
     ('gotify://hostname/a/path/ending/in/a/slash/%s' % ('u' * 16), {
-        'instance': plugins.NotifyGotify,
+        'instance': NotifyGotify,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'gotify://hostname/a/path/ending/in/a/slash/u...u/',
     }),
     # Markdown test
     ('gotify://hostname/%s?format=markdown' % ('t' * 16), {
-        'instance': plugins.NotifyGotify,
+        'instance': NotifyGotify,
     }),
     # Provide a hostname, path, and token
     ('gotify://hostname/a/path/not/ending/in/a/slash/%s' % ('v' * 16), {
-        'instance': plugins.NotifyGotify,
+        'instance': NotifyGotify,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'gotify://hostname/a/path/not/ending/in/a/slash/v...v/',
     }),
     # Provide a priority
     ('gotify://hostname/%s?priority=high' % ('i' * 16), {
-        'instance': plugins.NotifyGotify,
+        'instance': NotifyGotify,
     }),
     # Provide an invalid priority
     ('gotify://hostname:8008/%s?priority=invalid' % ('i' * 16), {
-        'instance': plugins.NotifyGotify,
+        'instance': NotifyGotify,
     }),
     # An invalid url
     ('gotify://:@/', {
         'instance': None,
     }),
     ('gotify://hostname/%s/' % ('t' * 16), {
-        'instance': plugins.NotifyGotify,
+        'instance': NotifyGotify,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('gotifys://localhost/%s/' % ('t' * 16), {
-        'instance': plugins.NotifyGotify,
+        'instance': NotifyGotify,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('gotify://localhost/%s/' % ('t' * 16), {
-        'instance': plugins.NotifyGotify,
+        'instance': NotifyGotify,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -119,10 +118,10 @@ def test_plugin_gotify_edge_cases():
     """
     # Initializes the plugin with an invalid token
     with pytest.raises(TypeError):
-        plugins.NotifyGotify(token=None)
+        NotifyGotify(token=None)
     # Whitespace also acts as an invalid token value
     with pytest.raises(TypeError):
-        plugins.NotifyGotify(token="   ")
+        NotifyGotify(token="   ")
 
 
 @mock.patch('requests.post')
@@ -157,7 +156,7 @@ def test_plugin_gotify_config_files(mock_post):
     """ % ('a' * 16, 'b' * 16)
 
     # Disable Throttling to speed testing
-    plugins.NotifyGotify.request_rate_per_sec = 0
+    NotifyGotify.request_rate_per_sec = 0
 
     # Prepare Mock
     mock_post.return_value = requests.Request()

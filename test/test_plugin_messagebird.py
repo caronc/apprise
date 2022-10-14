@@ -26,7 +26,8 @@ from unittest import mock
 
 import pytest
 import requests
-from apprise import plugins
+
+from apprise.plugins.NotifyMessageBird import NotifyMessageBird
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -49,42 +50,42 @@ apprise_url_tests = (
     }),
     ('msgbird://{}/15551232000'.format('a' * 25), {
         # target phone number becomes who we text too; all is good
-        'instance': plugins.NotifyMessageBird,
+        'instance': NotifyMessageBird,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'msgbird://a...a/15551232000',
     }),
     ('msgbird://{}/15551232000/abcd'.format('a' * 25), {
         # valid credentials
-        'instance': plugins.NotifyMessageBird,
+        'instance': NotifyMessageBird,
         # Since there are no targets specified we expect a False return on
         # send()
         'notify_response': False,
     }),
     ('msgbird://{}/15551232000/123'.format('a' * 25), {
         # valid credentials
-        'instance': plugins.NotifyMessageBird,
+        'instance': NotifyMessageBird,
         # Since there are no targets specified we expect a False return on
         # send()
         'notify_response': False,
     }),
     ('msgbird://{}/?from=15551233000&to=15551232000'.format('a' * 25), {
         # reference to to= and from=
-        'instance': plugins.NotifyMessageBird,
+        'instance': NotifyMessageBird,
     }),
     ('msgbird://{}/15551232000'.format('a' * 25), {
-        'instance': plugins.NotifyMessageBird,
+        'instance': NotifyMessageBird,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('msgbird://{}/15551232000'.format('a' * 25), {
-        'instance': plugins.NotifyMessageBird,
+        'instance': NotifyMessageBird,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('msgbird://{}/15551232000'.format('a' * 25), {
-        'instance': plugins.NotifyMessageBird,
+        'instance': NotifyMessageBird,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -103,13 +104,11 @@ def test_plugin_messagebird_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_messagebird_edge_cases(mock_post):
+def test_plugin_messagebird_edge_cases(mock_post, no_throttling):
     """
     NotifyMessageBird() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare our response
     response = requests.Request()
@@ -124,6 +123,6 @@ def test_plugin_messagebird_edge_cases(mock_post):
 
     # No apikey specified
     with pytest.raises(TypeError):
-        plugins.NotifyMessageBird(apikey=None, source=source)
+        NotifyMessageBird(apikey=None, source=source)
     with pytest.raises(TypeError):
-        plugins.NotifyMessageBird(apikey="     ", source=source)
+        NotifyMessageBird(apikey="     ", source=source)

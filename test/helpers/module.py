@@ -23,16 +23,14 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import re
-import os
 import sys
 
 from importlib import reload
 
 
-def module_reload(filename):
+def reload_plugin(name):
     """
-
+    Reload builtin plugin module, e.g. `NotifyGnome`.
     set filename to plugin to be reloaded (for example NotifyGnome.py)
 
     The following libraries need to be reloaded to prevent
@@ -44,13 +42,13 @@ def module_reload(filename):
 
     """
 
-    module_name = 'apprise.plugins.{}'.format(
-        re.match(r'^(.+)(\.py)?$', os.path.basename(filename), re.I).group(1))
+    module_name = f"apprise.plugins.{name}"
 
     reload(sys.modules['apprise.common'])
     reload(sys.modules['apprise.attachment'])
     reload(sys.modules['apprise.config'])
-    reload(sys.modules[module_name])
+    if module_name in sys.modules:
+        reload(sys.modules[module_name])
     reload(sys.modules['apprise.plugins'])
     reload(sys.modules['apprise.Apprise'])
     reload(sys.modules['apprise.utils'])

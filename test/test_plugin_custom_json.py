@@ -28,10 +28,11 @@ import json
 from unittest import mock
 
 import requests
-from apprise import plugins
 from apprise import Apprise
 from apprise import AppriseAttachment
 from apprise import NotifyType
+
+from apprise.plugins.NotifyJSON import NotifyJSON
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -53,84 +54,84 @@ apprise_url_tests = (
         'instance': None,
     }),
     ('json://localhost', {
-        'instance': plugins.NotifyJSON,
+        'instance': NotifyJSON,
     }),
     ('json://user@localhost?method=invalid', {
         'instance': TypeError,
     }),
     ('json://user:pass@localhost', {
-        'instance': plugins.NotifyJSON,
+        'instance': NotifyJSON,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'json://user:****@localhost',
     }),
     ('json://user@localhost', {
-        'instance': plugins.NotifyJSON,
+        'instance': NotifyJSON,
     }),
 
     # Test method variations
     ('json://user@localhost?method=put', {
-        'instance': plugins.NotifyJSON,
+        'instance': NotifyJSON,
     }),
     ('json://user@localhost?method=get', {
-        'instance': plugins.NotifyJSON,
+        'instance': NotifyJSON,
     }),
     ('json://user@localhost?method=post', {
-        'instance': plugins.NotifyJSON,
+        'instance': NotifyJSON,
     }),
     ('json://user@localhost?method=head', {
-        'instance': plugins.NotifyJSON,
+        'instance': NotifyJSON,
     }),
     ('json://user@localhost?method=delete', {
-        'instance': plugins.NotifyJSON,
+        'instance': NotifyJSON,
     }),
 
     # Continue testing other cases
     ('json://localhost:8080', {
-        'instance': plugins.NotifyJSON,
+        'instance': NotifyJSON,
     }),
     ('json://user:pass@localhost:8080', {
-        'instance': plugins.NotifyJSON,
+        'instance': NotifyJSON,
     }),
     ('jsons://localhost', {
-        'instance': plugins.NotifyJSON,
+        'instance': NotifyJSON,
     }),
     ('jsons://user:pass@localhost', {
-        'instance': plugins.NotifyJSON,
+        'instance': NotifyJSON,
     }),
     ('jsons://localhost:8080/path/', {
-        'instance': plugins.NotifyJSON,
+        'instance': NotifyJSON,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'jsons://localhost:8080/path/',
     }),
     # Test our GET params
     ('json://localhost:8080/path?-ParamA=Value', {
-        'instance': plugins.NotifyJSON,
+        'instance': NotifyJSON,
     }),
     ('jsons://user:password@localhost:8080', {
-        'instance': plugins.NotifyJSON,
+        'instance': NotifyJSON,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'jsons://user:****@localhost:8080',
     }),
     # Test our Headers
     ('json://localhost:8080/path?+HeaderKey=HeaderValue', {
-        'instance': plugins.NotifyJSON,
+        'instance': NotifyJSON,
     }),
     ('json://user:pass@localhost:8081', {
-        'instance': plugins.NotifyJSON,
+        'instance': NotifyJSON,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('json://user:pass@localhost:8082', {
-        'instance': plugins.NotifyJSON,
+        'instance': NotifyJSON,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('json://user:pass@localhost:8083', {
-        'instance': plugins.NotifyJSON,
+        'instance': NotifyJSON,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -150,13 +151,11 @@ def test_plugin_custom_json_urls():
 
 @mock.patch('requests.post')
 @mock.patch('requests.get')
-def test_plugin_custom_json_edge_cases(mock_get, mock_post):
+def test_plugin_custom_json_edge_cases(mock_get, mock_post, no_throttling):
     """
     NotifyJSON() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare our response
     response = requests.Request()
@@ -166,7 +165,7 @@ def test_plugin_custom_json_edge_cases(mock_get, mock_post):
     mock_post.return_value = response
     mock_get.return_value = response
 
-    results = plugins.NotifyJSON.parse_url(
+    results = NotifyJSON.parse_url(
         'json://localhost:8080/command?:message=test&method=GET')
 
     assert isinstance(results, dict)
@@ -182,8 +181,8 @@ def test_plugin_custom_json_edge_cases(mock_get, mock_post):
     assert isinstance(results['qsd:'], dict) is True
     assert results['qsd:']['message'] == 'test'
 
-    instance = plugins.NotifyJSON(**results)
-    assert isinstance(instance, plugins.NotifyJSON)
+    instance = NotifyJSON(**results)
+    assert isinstance(instance, NotifyJSON)
 
     response = instance.send(title='title', body='body')
     assert response is True
@@ -203,20 +202,18 @@ def test_plugin_custom_json_edge_cases(mock_get, mock_post):
         'json://localhost:8080/command?')
 
     # Generate a new URL based on our last and verify key values are the same
-    new_results = plugins.NotifyJSON.parse_url(instance.url(safe=False))
+    new_results = NotifyJSON.parse_url(instance.url(safe=False))
     for k in ('user', 'password', 'port', 'host', 'fullpath', 'path', 'query',
               'schema', 'url', 'method'):
         assert new_results[k] == results[k]
 
 
 @mock.patch('requests.post')
-def test_notify_json_plugin_attachments(mock_post):
+def test_notify_json_plugin_attachments(mock_post, no_throttling):
     """
     NotifyJSON() Attachments
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     okay_response = requests.Request()
     okay_response.status_code = requests.codes.ok
@@ -226,7 +223,7 @@ def test_notify_json_plugin_attachments(mock_post):
     mock_post.return_value = okay_response
 
     obj = Apprise.instantiate('json://localhost.localdomain/')
-    assert isinstance(obj, plugins.NotifyJSON)
+    assert isinstance(obj, NotifyJSON)
 
     # Test Valid Attachment
     path = os.path.join(TEST_VAR_DIR, 'apprise-test.gif')
@@ -267,7 +264,7 @@ def test_notify_json_plugin_attachments(mock_post):
 
     # test the handling of our batch modes
     obj = Apprise.instantiate('json://no-reply@example.com/')
-    assert isinstance(obj, plugins.NotifyJSON)
+    assert isinstance(obj, NotifyJSON)
 
     # Now send an attachment normally without issues
     mock_post.reset_mock()

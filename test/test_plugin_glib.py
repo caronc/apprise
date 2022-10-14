@@ -30,7 +30,7 @@ from unittest import mock
 import sys
 import types
 import apprise
-from helpers import module_reload
+from helpers import reload_plugin
 from importlib import reload
 
 
@@ -113,33 +113,34 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
     mock_mainloop.glib.DBusGMainLoop.side_effect = None
     mock_mainloop.glib.NativeMainLoop.side_effect = None
 
-    module_reload('NotifyDBus')
+    reload_plugin('NotifyDBus')
+    from apprise.plugins.NotifyDBus import NotifyDBus
 
     # Create our instance (identify all supported types)
     obj = apprise.Apprise.instantiate('dbus://', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyDBus) is True
+    assert isinstance(obj, NotifyDBus) is True
     assert isinstance(obj.url(), str) is True
     assert obj.url().startswith('dbus://_/')
     obj = apprise.Apprise.instantiate('kde://', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyDBus) is True
+    assert isinstance(obj, NotifyDBus) is True
     assert isinstance(obj.url(), str) is True
     assert obj.url().startswith('kde://_/')
     obj = apprise.Apprise.instantiate('qt://', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyDBus) is True
+    assert isinstance(obj, NotifyDBus) is True
     assert isinstance(obj.url(), str) is True
     assert obj.url().startswith('qt://_/')
     obj = apprise.Apprise.instantiate('glib://', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyDBus) is True
+    assert isinstance(obj, NotifyDBus) is True
     assert isinstance(obj.url(), str) is True
     assert obj.url().startswith('glib://_/')
     obj.duration = 0
 
     # Test our class loading using a series of arguments
     with pytest.raises(TypeError):
-        apprise.plugins.NotifyDBus(**{'schema': 'invalid'})
+        NotifyDBus(**{'schema': 'invalid'})
 
     # Set our X and Y coordinate and try the notification
-    assert apprise.plugins.NotifyDBus(
+    assert NotifyDBus(
         x_axis=0, y_axis=0, **{'schema': 'dbus'})\
         .notify(title='', body='body',
                 notify_type=apprise.NotifyType.INFO) is True
@@ -157,7 +158,7 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
     # Test our arguments through the instantiate call
     obj = apprise.Apprise.instantiate(
         'dbus://_/?image=True', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyDBus) is True
+    assert isinstance(obj, NotifyDBus) is True
     assert isinstance(obj.url(), str) is True
     assert obj.url().startswith('dbus://_/')
     assert re.search('image=yes', obj.url())
@@ -168,7 +169,7 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
 
     obj = apprise.Apprise.instantiate(
         'dbus://_/?image=False', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyDBus) is True
+    assert isinstance(obj, NotifyDBus) is True
     assert isinstance(obj.url(), str) is True
     assert obj.url().startswith('dbus://_/')
     assert re.search('image=no', obj.url())
@@ -180,7 +181,7 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
     # Test priority (alias to urgency) handling
     obj = apprise.Apprise.instantiate(
         'dbus://_/?priority=invalid', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyDBus) is True
+    assert isinstance(obj, NotifyDBus) is True
     assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
@@ -188,7 +189,7 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
 
     obj = apprise.Apprise.instantiate(
         'dbus://_/?priority=high', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyDBus) is True
+    assert isinstance(obj, NotifyDBus) is True
     assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
@@ -196,7 +197,7 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
 
     obj = apprise.Apprise.instantiate(
         'dbus://_/?priority=2', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyDBus) is True
+    assert isinstance(obj, NotifyDBus) is True
     assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
@@ -205,7 +206,7 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
     # Test urgency handling
     obj = apprise.Apprise.instantiate(
         'dbus://_/?urgency=invalid', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyDBus) is True
+    assert isinstance(obj, NotifyDBus) is True
     assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
@@ -213,7 +214,7 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
 
     obj = apprise.Apprise.instantiate(
         'dbus://_/?urgency=high', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyDBus) is True
+    assert isinstance(obj, NotifyDBus) is True
     assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
@@ -221,7 +222,7 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
 
     obj = apprise.Apprise.instantiate(
         'dbus://_/?urgency=2', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyDBus) is True
+    assert isinstance(obj, NotifyDBus) is True
     assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
@@ -229,7 +230,7 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
 
     obj = apprise.Apprise.instantiate(
         'dbus://_/?urgency=', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyDBus) is True
+    assert isinstance(obj, NotifyDBus) is True
     assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
@@ -238,7 +239,7 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
     # Test x/y
     obj = apprise.Apprise.instantiate(
         'dbus://_/?x=5&y=5', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyDBus) is True
+    assert isinstance(obj, NotifyDBus) is True
     assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
@@ -345,7 +346,7 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
         notify_type=apprise.NotifyType.INFO) is False
 
     # Test the setting of a the urgency
-    apprise.plugins.NotifyDBus(urgency=0)
+    NotifyDBus(urgency=0)
 
     #
     # We can still notify if the gi library is the only inaccessible
@@ -354,11 +355,12 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
 
     # Emulate require_version function:
     gi.require_version.side_effect = ImportError()
-    module_reload('NotifyDBus')
+    reload_plugin('NotifyDBus')
+    from apprise.plugins.NotifyDBus import NotifyDBus
 
     # Create our instance
     obj = apprise.Apprise.instantiate('glib://', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyDBus) is True
+    assert isinstance(obj, NotifyDBus) is True
     obj.duration = 0
 
     # Test url() call
@@ -383,11 +385,12 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
 
     # Emulate require_version function:
     gi.require_version.side_effect = ValueError()
-    module_reload('NotifyDBus')
+    reload_plugin('NotifyDBus')
+    from apprise.plugins.NotifyDBus import NotifyDBus
 
     # Create our instance
     obj = apprise.Apprise.instantiate('glib://', suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyDBus) is True
+    assert isinstance(obj, NotifyDBus) is True
     obj.duration = 0
 
     # Test url() call
@@ -403,7 +406,7 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
     sys.modules['dbus'] = compile('raise ImportError()', 'dbus', 'exec')
 
     # Reload our modules
-    module_reload('NotifyDBus')
+    reload_plugin('NotifyDBus')
 
     # We can no longer instantiate an instance because dbus has been
     # officialy marked unavailable and thus the module is marked
@@ -415,4 +418,4 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
     # let's just put our old configuration back:
     sys.modules['dbus'] = _session_bus
     # Reload our modules
-    module_reload('NotifyDBus')
+    reload_plugin('NotifyDBus')

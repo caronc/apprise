@@ -27,8 +27,9 @@ import os
 from unittest import mock
 
 import requests
+
+from apprise.plugins.NotifyMailgun import NotifyMailgun
 from helpers import AppriseURLTester
-from apprise import plugins
 from apprise import Apprise
 from apprise import AppriseAttachment
 from apprise import NotifyType
@@ -65,29 +66,29 @@ apprise_url_tests = (
     # No To email address, but everything else is valid
     ('mailgun://user@localhost.localdomain/{}-{}-{}'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-        'instance': plugins.NotifyMailgun,
+        'instance': NotifyMailgun,
     }),
     ('mailgun://user@localhost.localdomain/{}-{}-{}?format=markdown'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-        'instance': plugins.NotifyMailgun,
+        'instance': NotifyMailgun,
     }),
     ('mailgun://user@localhost.localdomain/{}-{}-{}?format=html'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-        'instance': plugins.NotifyMailgun,
+        'instance': NotifyMailgun,
     }),
     ('mailgun://user@localhost.localdomain/{}-{}-{}?format=text'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-        'instance': plugins.NotifyMailgun,
+        'instance': NotifyMailgun,
     }),
     # valid url with region specified (case insensitve)
     ('mailgun://user@localhost.localdomain/{}-{}-{}?region=uS'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-            'instance': plugins.NotifyMailgun,
+            'instance': NotifyMailgun,
     }),
     # valid url with region specified (case insensitve)
     ('mailgun://user@localhost.localdomain/{}-{}-{}?region=EU'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-            'instance': plugins.NotifyMailgun,
+            'instance': NotifyMailgun,
     }),
     # invalid url with region specified (case insensitve)
     ('mailgun://user@localhost.localdomain/{}-{}-{}?region=invalid'.format(
@@ -98,38 +99,38 @@ apprise_url_tests = (
     ('mailgun://user@localhost.localdomain/{}-{}-{}'
         '?+X-Customer-Campaign-ID=Apprise'.format(
             'a' * 32, 'b' * 8, 'c' * 8), {
-                'instance': plugins.NotifyMailgun,
+                'instance': NotifyMailgun,
         }),
     # template tokens
     ('mailgun://user@localhost.localdomain/{}-{}-{}'
         '?:name=Chris&:status=admin'.format(
             'a' * 32, 'b' * 8, 'c' * 8), {
-                'instance': plugins.NotifyMailgun,
+                'instance': NotifyMailgun,
         }),
     # bcc and cc
     ('mailgun://user@localhost.localdomain/{}-{}-{}'
         '?bcc=user@example.com&cc=user2@example.com'.format(
             'a' * 32, 'b' * 8, 'c' * 8), {
-                'instance': plugins.NotifyMailgun,
+                'instance': NotifyMailgun,
         }),
     # One To Email address
     ('mailgun://user@localhost.localdomain/{}-{}-{}/test@example.com'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-            'instance': plugins.NotifyMailgun,
+            'instance': NotifyMailgun,
     }),
     ('mailgun://user@localhost.localdomain/'
         '{}-{}-{}?to=test@example.com'.format(
             'a' * 32, 'b' * 8, 'c' * 8), {
-                'instance': plugins.NotifyMailgun}),
+                'instance': NotifyMailgun}),
     # One To Email address, a from name specified too
     ('mailgun://user@localhost.localdomain/{}-{}-{}/'
         'test@example.com?name="Frodo"'.format(
             'a' * 32, 'b' * 8, 'c' * 8), {
-                'instance': plugins.NotifyMailgun}),
+                'instance': NotifyMailgun}),
     # Invalid 'To' Email address
     ('mailgun://user@localhost.localdomain/{}-{}-{}/invalid'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-            'instance': plugins.NotifyMailgun,
+            'instance': NotifyMailgun,
             # Expected notify() response
             'notify_response': False,
     }),
@@ -139,25 +140,25 @@ apprise_url_tests = (
         '/'.join(('user1@example.com', 'invalid', 'User2:user2@example.com')),
         ','.join(('user3@example.com', 'i@v', 'User1:user1@example.com')),
         ','.join(('user4@example.com', 'g@r@b', 'Da:user5@example.com'))), {
-            'instance': plugins.NotifyMailgun,
+            'instance': NotifyMailgun,
     }),
     ('mailgun://user@localhost.localdomain/{}-{}-{}'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-        'instance': plugins.NotifyMailgun,
+        'instance': NotifyMailgun,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('mailgun://user@localhost.localdomain/{}-{}-{}'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-        'instance': plugins.NotifyMailgun,
+        'instance': NotifyMailgun,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('mailgun://user@localhost.localdomain/{}-{}-{}'.format(
         'a' * 32, 'b' * 8, 'c' * 8), {
-        'instance': plugins.NotifyMailgun,
+        'instance': NotifyMailgun,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -176,13 +177,11 @@ def test_plugin_mailgun_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_mailgun_attachments(mock_post):
+def test_plugin_mailgun_attachments(mock_post, no_throttling):
     """
     NotifyMailgun() Attachments
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     okay_response = requests.Request()
     okay_response.status_code = requests.codes.ok
@@ -196,7 +195,7 @@ def test_plugin_mailgun_attachments(mock_post):
 
     obj = Apprise.instantiate(
         'mailgun://user@localhost.localdomain/{}'.format(apikey))
-    assert isinstance(obj, plugins.NotifyMailgun)
+    assert isinstance(obj, NotifyMailgun)
 
     # Test Valid Attachment
     path = os.path.join(TEST_VAR_DIR, 'apprise-test.gif')
@@ -268,7 +267,7 @@ def test_plugin_mailgun_attachments(mock_post):
     obj = Apprise.instantiate(
         'mailgun://no-reply@example.com/{}/'
         'user1@example.com/user2@example.com?batch=yes'.format(apikey))
-    assert isinstance(obj, plugins.NotifyMailgun)
+    assert isinstance(obj, NotifyMailgun)
 
     # Force our batch to break into separate messages
     obj.default_batch_size = 1

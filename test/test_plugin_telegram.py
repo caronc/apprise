@@ -35,7 +35,7 @@ from apprise import AppriseAttachment
 from apprise import AppriseAsset
 from apprise import NotifyType
 from apprise import NotifyFormat
-from apprise import plugins
+from apprise.plugins.NotifyTelegram import NotifyTelegram
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -55,81 +55,81 @@ apprise_url_tests = (
     }),
     # Simple Message
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/', {
-        'instance': plugins.NotifyTelegram,
+        'instance': NotifyTelegram,
     }),
     # Simple Message (no images)
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/', {
-        'instance': plugins.NotifyTelegram,
+        'instance': NotifyTelegram,
         # don't include an image by default
         'include_image': False,
     }),
     # Simple Message with multiple chat names
     ('tgram://123456789:abcdefg_hijklmnop/id1/id2/', {
-        'instance': plugins.NotifyTelegram,
+        'instance': NotifyTelegram,
     }),
     # Simple Message with multiple chat names
     ('tgram://123456789:abcdefg_hijklmnop/?to=id1,id2', {
-        'instance': plugins.NotifyTelegram,
+        'instance': NotifyTelegram,
     }),
     # Simple Message with an invalid chat ID
     ('tgram://123456789:abcdefg_hijklmnop/%$/', {
-        'instance': plugins.NotifyTelegram,
+        'instance': NotifyTelegram,
         # Notify will fail
         'response': False,
     }),
     # Simple Message with multiple chat ids
     ('tgram://123456789:abcdefg_hijklmnop/id1/id2/23423/-30/', {
-        'instance': plugins.NotifyTelegram,
+        'instance': NotifyTelegram,
     }),
     # Simple Message with multiple chat ids (no images)
     ('tgram://123456789:abcdefg_hijklmnop/id1/id2/23423/-30/', {
-        'instance': plugins.NotifyTelegram,
+        'instance': NotifyTelegram,
         # don't include an image by default
         'include_image': False,
     }),
     # Support bot keyword prefix
     ('tgram://bottest@123456789:abcdefg_hijklmnop/lead2gold/', {
-        'instance': plugins.NotifyTelegram,
+        'instance': NotifyTelegram,
     }),
     # Testing image
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?image=Yes', {
-        'instance': plugins.NotifyTelegram,
+        'instance': NotifyTelegram,
     }),
     # Testing invalid format (fall's back to html)
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?format=invalid', {
-        'instance': plugins.NotifyTelegram,
+        'instance': NotifyTelegram,
     }),
     # Testing empty format (falls back to html)
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?format=', {
-        'instance': plugins.NotifyTelegram,
+        'instance': NotifyTelegram,
     }),
     # Testing valid formats
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?format=markdown', {
-        'instance': plugins.NotifyTelegram,
+        'instance': NotifyTelegram,
     }),
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?format=html', {
-        'instance': plugins.NotifyTelegram,
+        'instance': NotifyTelegram,
     }),
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?format=text', {
-        'instance': plugins.NotifyTelegram,
+        'instance': NotifyTelegram,
     }),
     # Test Silent Settings
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?silent=yes', {
-        'instance': plugins.NotifyTelegram,
+        'instance': NotifyTelegram,
     }),
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?silent=no', {
-        'instance': plugins.NotifyTelegram,
+        'instance': NotifyTelegram,
     }),
     # Test Web Page Preview Settings
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?preview=yes', {
-        'instance': plugins.NotifyTelegram,
+        'instance': NotifyTelegram,
     }),
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?preview=no', {
-        'instance': plugins.NotifyTelegram,
+        'instance': NotifyTelegram,
     }),
     # Simple Message without image
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/', {
-        'instance': plugins.NotifyTelegram,
+        'instance': NotifyTelegram,
         # don't include an image by default
         'include_image': False,
     }),
@@ -142,39 +142,39 @@ apprise_url_tests = (
         'instance': None,
     }),
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/', {
-        'instance': plugins.NotifyTelegram,
+        'instance': NotifyTelegram,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?image=Yes', {
-        'instance': plugins.NotifyTelegram,
+        'instance': NotifyTelegram,
         # force a failure without an image specified
         'include_image': False,
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('tgram://123456789:abcdefg_hijklmnop/id1/id2/', {
-        'instance': plugins.NotifyTelegram,
+        'instance': NotifyTelegram,
         # force a failure with multiple chat_ids
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('tgram://123456789:abcdefg_hijklmnop/id1/id2/', {
-        'instance': plugins.NotifyTelegram,
+        'instance': NotifyTelegram,
         # force a failure without an image specified
         'include_image': False,
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/', {
-        'instance': plugins.NotifyTelegram,
+        'instance': NotifyTelegram,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/', {
-        'instance': plugins.NotifyTelegram,
+        'instance': NotifyTelegram,
         # throw a bizzare code forcing us to fail to look it up without
         # having an image included
         'include_image': False,
@@ -183,7 +183,7 @@ apprise_url_tests = (
     }),
     # Test with image set
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?image=Yes', {
-        'instance': plugins.NotifyTelegram,
+        'instance': NotifyTelegram,
         # throw a bizzare code forcing us to fail to look it up without
         # having an image included
         'include_image': True,
@@ -191,13 +191,13 @@ apprise_url_tests = (
         'requests_response_code': 999,
     }),
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/', {
-        'instance': plugins.NotifyTelegram,
+        'instance': NotifyTelegram,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
     }),
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?image=Yes', {
-        'instance': plugins.NotifyTelegram,
+        'instance': NotifyTelegram,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them without images set
         'include_image': True,
@@ -213,7 +213,7 @@ def test_plugin_telegram_urls():
     """
 
     # Disable Throttling to speed testing
-    plugins.NotifyTelegram.request_rate_per_sec = 0
+    NotifyTelegram.request_rate_per_sec = 0
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
@@ -227,7 +227,7 @@ def test_plugin_telegram_general(mock_post):
     """
 
     # Disable Throttling to speed testing
-    plugins.NotifyTelegram.request_rate_per_sec = 0
+    NotifyTelegram.request_rate_per_sec = 0
 
     # Bot Token
     bot_token = '123456789:abcdefg_hijklmnop'
@@ -243,16 +243,16 @@ def test_plugin_telegram_general(mock_post):
 
     # Exception should be thrown about the fact no bot token was specified
     with pytest.raises(TypeError):
-        plugins.NotifyTelegram(bot_token=None, targets=chat_ids)
+        NotifyTelegram(bot_token=None, targets=chat_ids)
 
     # Invalid JSON while trying to detect bot owner
     mock_post.return_value.content = '}'
-    obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+    obj = NotifyTelegram(bot_token=bot_token, targets=None)
     obj.notify(title='hello', body='world')
 
     # Invalid JSON while trying to detect bot owner + 400 error
     mock_post.return_value.status_code = requests.codes.internal_server_error
-    obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+    obj = NotifyTelegram(bot_token=bot_token, targets=None)
     obj.notify(title='hello', body='world')
 
     # Return status back to how they were
@@ -261,11 +261,11 @@ def test_plugin_telegram_general(mock_post):
     # Exception should be thrown about the fact an invalid bot token was
     # specifed
     with pytest.raises(TypeError):
-        plugins.NotifyTelegram(bot_token=invalid_bot_token, targets=chat_ids)
+        NotifyTelegram(bot_token=invalid_bot_token, targets=chat_ids)
 
-    obj = plugins.NotifyTelegram(
+    obj = NotifyTelegram(
         bot_token=bot_token, targets=chat_ids, include_image=True)
-    assert isinstance(obj, plugins.NotifyTelegram) is True
+    assert isinstance(obj, NotifyTelegram) is True
     assert len(obj.targets) == 2
 
     # Test Image Sending Exceptions
@@ -288,8 +288,8 @@ def test_plugin_telegram_general(mock_post):
     assert obj.url(privacy=True).startswith('tgram://1...p/') is True
 
     # Test that we can load the string we generate back:
-    obj = plugins.NotifyTelegram(**plugins.NotifyTelegram.parse_url(obj.url()))
-    assert isinstance(obj, plugins.NotifyTelegram) is True
+    obj = NotifyTelegram(**NotifyTelegram.parse_url(obj.url()))
+    assert isinstance(obj, NotifyTelegram) is True
 
     # Prepare Mock to fail
     response = mock.Mock()
@@ -302,13 +302,13 @@ def test_plugin_telegram_general(mock_post):
     mock_post.return_value = response
 
     # No image asset
-    nimg_obj = plugins.NotifyTelegram(bot_token=bot_token, targets=chat_ids)
+    nimg_obj = NotifyTelegram(bot_token=bot_token, targets=chat_ids)
     nimg_obj.asset = AppriseAsset(image_path_mask=False, image_url_mask=False)
 
     # Test that our default settings over-ride base settings since they are
     # not the same as the one specified in the base; this check merely
     # ensures our plugin inheritance is working properly
-    assert obj.body_maxlen == plugins.NotifyTelegram.body_maxlen
+    assert obj.body_maxlen == NotifyTelegram.body_maxlen
 
     # This tests erroneous messages involving multiple chat ids
     assert obj.notify(
@@ -319,8 +319,8 @@ def test_plugin_telegram_general(mock_post):
         body='body', title='title', notify_type=NotifyType.INFO) is False
 
     # This tests erroneous messages involving a single chat id
-    obj = plugins.NotifyTelegram(bot_token=bot_token, targets='l2g')
-    nimg_obj = plugins.NotifyTelegram(bot_token=bot_token, targets='l2g')
+    obj = NotifyTelegram(bot_token=bot_token, targets='l2g')
+    nimg_obj = NotifyTelegram(bot_token=bot_token, targets='l2g')
     nimg_obj.asset = AppriseAsset(image_path_mask=False, image_url_mask=False)
 
     assert obj.notify(
@@ -386,7 +386,7 @@ def test_plugin_telegram_general(mock_post):
     })
     mock_post.return_value.status_code = requests.codes.ok
 
-    obj = plugins.NotifyTelegram(bot_token=bot_token, targets='12345')
+    obj = NotifyTelegram(bot_token=bot_token, targets='12345')
     assert len(obj.targets) == 1
     assert obj.targets[0] == '12345'
 
@@ -417,7 +417,7 @@ def test_plugin_telegram_general(mock_post):
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=path) is False
 
-    obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+    obj = NotifyTelegram(bot_token=bot_token, targets=None)
     # No user detected; this happens after our firsst notification
     assert len(obj.targets) == 0
 
@@ -432,7 +432,7 @@ def test_plugin_telegram_general(mock_post):
     })
 
     # No user will be detected now
-    obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+    obj = NotifyTelegram(bot_token=bot_token, targets=None)
     # No user detected; this happens after our firsst notification
     assert len(obj.targets) == 0
     assert obj.notify(title='hello', body='world') is False
@@ -468,7 +468,7 @@ def test_plugin_telegram_general(mock_post):
     })
 
     # No user will be detected now
-    obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+    obj = NotifyTelegram(bot_token=bot_token, targets=None)
     # No user detected; this happens after our firsst notification
     assert len(obj.targets) == 0
     assert obj.notify(title='hello', body='world') is False
@@ -481,7 +481,7 @@ def test_plugin_telegram_general(mock_post):
     })
 
     # No user will be detected now
-    obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+    obj = NotifyTelegram(bot_token=bot_token, targets=None)
     # No user detected; this happens after our firsst notification
     assert len(obj.targets) == 0
     assert obj.notify(title='hello', body='world') is False
@@ -494,28 +494,28 @@ def test_plugin_telegram_general(mock_post):
     mock_post.return_value.status_code = requests.codes.internal_server_error
 
     # internal server error prevents notification from being sent
-    obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+    obj = NotifyTelegram(bot_token=bot_token, targets=None)
     assert len(obj.targets) == 0
     assert obj.notify(title='hello', body='world') is False
     assert len(obj.targets) == 0
 
     # Test our bot detection with an unmappable html error
     mock_post.return_value.status_code = 999
-    plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+    NotifyTelegram(bot_token=bot_token, targets=None)
     assert len(obj.targets) == 0
     assert obj.notify(title='hello', body='world') is False
     assert len(obj.targets) == 0
 
     # Do it again but this time provide a failure message
     mock_post.return_value.content = dumps({'description': 'Failure Message'})
-    plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+    NotifyTelegram(bot_token=bot_token, targets=None)
     assert len(obj.targets) == 0
     assert obj.notify(title='hello', body='world') is False
     assert len(obj.targets) == 0
 
     # Do it again but this time provide a failure message and perform a
     # notification without a bot detection by providing at least 1 chat id
-    obj = plugins.NotifyTelegram(bot_token=bot_token, targets=['@abcd'])
+    obj = NotifyTelegram(bot_token=bot_token, targets=['@abcd'])
     assert nimg_obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO) is False
 
@@ -523,7 +523,7 @@ def test_plugin_telegram_general(mock_post):
     mock_post.side_effect = requests.HTTPError
 
     # No chat_ids specified
-    obj = plugins.NotifyTelegram(bot_token=bot_token, targets=None)
+    obj = NotifyTelegram(bot_token=bot_token, targets=None)
     assert len(obj.targets) == 0
     assert obj.notify(title='hello', body='world') is False
     assert len(obj.targets) == 0
@@ -531,7 +531,7 @@ def test_plugin_telegram_general(mock_post):
     # Test Telegram Group
     obj = Apprise.instantiate(
         'tgram://123456789:ABCdefghijkl123456789opqyz/-123456789525')
-    assert isinstance(obj, plugins.NotifyTelegram)
+    assert isinstance(obj, NotifyTelegram)
     assert len(obj.targets) == 1
     assert '-123456789525' in obj.targets
 
@@ -543,7 +543,7 @@ def test_plugin_telegram_formatting(mock_post):
     """
 
     # Disable Throttling to speed testing
-    plugins.NotifyTelegram.request_rate_per_sec = 0
+    NotifyTelegram.request_rate_per_sec = 0
 
     # Prepare Mock
     mock_post.return_value = requests.Request()
@@ -580,11 +580,11 @@ def test_plugin_telegram_formatting(mock_post):
     })
     mock_post.return_value.status_code = requests.codes.ok
 
-    results = plugins.NotifyTelegram.parse_url(
+    results = NotifyTelegram.parse_url(
         'tgram://123456789:abcdefg_hijklmnop/')
 
-    instance = plugins.NotifyTelegram(**results)
-    assert isinstance(instance, plugins.NotifyTelegram)
+    instance = NotifyTelegram(**results)
+    assert isinstance(instance, NotifyTelegram)
 
     response = instance.send(title='title', body='body')
     assert response is True
@@ -886,7 +886,7 @@ def test_plugin_telegram_html_formatting(mock_post):
     # on't send anything other than <b>, <i>, <a>,<code> and <pre>
 
     # Disable Throttling to speed testing
-    plugins.NotifyTelegram.request_rate_per_sec = 0
+    NotifyTelegram.request_rate_per_sec = 0
 
     # Prepare Mock
     mock_post.return_value = requests.Request()
@@ -928,7 +928,7 @@ def test_plugin_telegram_html_formatting(mock_post):
 
     assert len(aobj) == 1
 
-    assert isinstance(aobj[0], plugins.NotifyTelegram)
+    assert isinstance(aobj[0], NotifyTelegram)
 
     # Test our HTML Conversion
     title = '<title>&apos;information&apos</title>'

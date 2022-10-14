@@ -29,8 +29,7 @@ from unittest import mock
 import requests
 import pytest
 from json import dumps
-from apprise.plugins.NotifyPushover import PushoverPriority
-from apprise import plugins
+from apprise.plugins.NotifyPushover import PushoverPriority, NotifyPushover
 import apprise
 from helpers import AppriseURLTester
 
@@ -60,89 +59,89 @@ apprise_url_tests = (
     }),
     # API Key + valid alternate sound picked
     ('pover://%s@%s?sound=spacealarm' % ('u' * 30, 'a' * 30), {
-        'instance': plugins.NotifyPushover,
+        'instance': NotifyPushover,
     }),
     # API Key + valid url_title with url
     ('pover://%s@%s?url=my-url&url_title=title' % ('u' * 30, 'a' * 30), {
-        'instance': plugins.NotifyPushover,
+        'instance': NotifyPushover,
     }),
     # API Key + Valid User
     ('pover://%s@%s' % ('u' * 30, 'a' * 30), {
-        'instance': plugins.NotifyPushover,
+        'instance': NotifyPushover,
         # don't include an image by default
         'include_image': False,
     }),
     # API Key + Valid User + 1 Device
     ('pover://%s@%s/DEVICE' % ('u' * 30, 'a' * 30), {
-        'instance': plugins.NotifyPushover,
+        'instance': NotifyPushover,
     }),
     # API Key + Valid User + 1 Device (via to=)
     ('pover://%s@%s?to=DEVICE' % ('u' * 30, 'a' * 30), {
-        'instance': plugins.NotifyPushover,
+        'instance': NotifyPushover,
     }),
     # API Key + Valid User + 2 Devices
     ('pover://%s@%s/DEVICE1/DEVICE2/' % ('u' * 30, 'a' * 30), {
-        'instance': plugins.NotifyPushover,
+        'instance': NotifyPushover,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'pover://u...u@a...a',
     }),
     # API Key + Valid User + invalid device
     ('pover://%s@%s/%s/' % ('u' * 30, 'a' * 30, 'd' * 30), {
-        'instance': plugins.NotifyPushover,
+        'instance': NotifyPushover,
         # Notify will return False since there is a bad device in our list
         'response': False,
     }),
     # API Key + Valid User + device + invalid device
     ('pover://%s@%s/DEVICE1/%s/' % ('u' * 30, 'a' * 30, 'd' * 30), {
-        'instance': plugins.NotifyPushover,
+        'instance': NotifyPushover,
         # Notify will return False since there is a bad device in our list
         'response': False,
     }),
     # API Key + priority setting
     ('pover://%s@%s?priority=high' % ('u' * 30, 'a' * 30), {
-        'instance': plugins.NotifyPushover,
+        'instance': NotifyPushover,
     }),
     # API Key + priority setting + html mode
     ('pover://%s@%s?priority=high&format=html' % ('u' * 30, 'a' * 30), {
-        'instance': plugins.NotifyPushover,
+        'instance': NotifyPushover,
     }),
     # API Key + priority setting + markdown mode
     ('pover://%s@%s?priority=high&format=markdown' % ('u' * 30, 'a' * 30), {
-        'instance': plugins.NotifyPushover,
+        'instance': NotifyPushover,
     }),
     # API Key + invalid priority setting
     ('pover://%s@%s?priority=invalid' % ('u' * 30, 'a' * 30), {
-        'instance': plugins.NotifyPushover,
+        'instance': NotifyPushover,
     }),
     # API Key + emergency(2) priority setting
     ('pover://%s@%s?priority=emergency' % ('u' * 30, 'a' * 30), {
-        'instance': plugins.NotifyPushover,
+        'instance': NotifyPushover,
     }),
     # API Key + emergency(2) priority setting (via numeric value
     ('pover://%s@%s?priority=2' % ('u' * 30, 'a' * 30), {
-        'instance': plugins.NotifyPushover,
+        'instance': NotifyPushover,
     }),
     # API Key + emergency priority setting with retry and expire
     ('pover://%s@%s?priority=emergency&%s&%s' % ('u' * 30,
                                                  'a' * 30,
                                                  'retry=30',
                                                  'expire=300'), {
-        'instance': plugins.NotifyPushover,
+        'instance': NotifyPushover,
     }),
     # API Key + emergency priority setting with text retry
     ('pover://%s@%s?priority=emergency&%s&%s' % ('u' * 30,
                                                  'a' * 30,
                                                  'retry=invalid',
                                                  'expire=300'), {
-        'instance': plugins.NotifyPushover,
+        'instance': NotifyPushover,
     }),
     # API Key + emergency priority setting with text expire
     ('pover://%s@%s?priority=emergency&%s&%s' % ('u' * 30,
                                                  'a' * 30,
                                                  'retry=30',
                                                  'expire=invalid'), {
-        'instance': plugins.NotifyPushover,
+        'instance': NotifyPushover,
     }),
     # API Key + emergency priority setting with invalid expire
     ('pover://%s@%s?priority=emergency&%s' % ('u' * 30,
@@ -158,22 +157,22 @@ apprise_url_tests = (
     }),
     # API Key + priority setting (empty)
     ('pover://%s@%s?priority=' % ('u' * 30, 'a' * 30), {
-        'instance': plugins.NotifyPushover,
+        'instance': NotifyPushover,
     }),
     ('pover://%s@%s' % ('u' * 30, 'a' * 30), {
-        'instance': plugins.NotifyPushover,
+        'instance': NotifyPushover,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('pover://%s@%s' % ('u' * 30, 'a' * 30), {
-        'instance': plugins.NotifyPushover,
+        'instance': NotifyPushover,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('pover://%s@%s' % ('u' * 30, 'a' * 30), {
-        'instance': plugins.NotifyPushover,
+        'instance': NotifyPushover,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -198,7 +197,7 @@ def test_plugin_pushover_attachments(mock_post, tmpdir):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyPushover.request_rate_per_sec = 0
+    NotifyPushover.request_rate_per_sec = 0
 
     # Initialize some generic (but valid) tokens
     user_key = 'u' * 30
@@ -226,7 +225,7 @@ def test_plugin_pushover_attachments(mock_post, tmpdir):
     # Instantiate our object
     obj = apprise.Apprise.instantiate(
         'pover://{}@{}/'.format(user_key, api_token))
-    assert isinstance(obj, plugins.NotifyPushover)
+    assert isinstance(obj, NotifyPushover)
 
     # Test our attachment
     assert obj.notify(body="test", attach=attach) is True
@@ -254,7 +253,7 @@ def test_plugin_pushover_attachments(mock_post, tmpdir):
     mock_post.reset_mock()
 
     image = tmpdir.mkdir("pover_image").join("test.jpg")
-    image.write('a' * plugins.NotifyPushover.attach_max_size_bytes)
+    image.write('a' * NotifyPushover.attach_max_size_bytes)
 
     attach = apprise.AppriseAttachment.instantiate(str(image))
     assert obj.notify(body="test", attach=attach) is True
@@ -269,7 +268,7 @@ def test_plugin_pushover_attachments(mock_post, tmpdir):
 
     # Add 1 more byte to the file (putting it over the limit)
     image.write(
-        'a' * (plugins.NotifyPushover.attach_max_size_bytes + 1))
+        'a' * (NotifyPushover.attach_max_size_bytes + 1))
 
     attach = apprise.AppriseAttachment.instantiate(str(image))
     assert obj.notify(body="test", attach=attach) is False
@@ -317,11 +316,11 @@ def test_plugin_pushover_edge_cases(mock_post):
 
     """
     # Disable Throttling to speed testing
-    plugins.NotifyPushover.request_rate_per_sec = 0
+    NotifyPushover.request_rate_per_sec = 0
 
     # No token
     with pytest.raises(TypeError):
-        plugins.NotifyPushover(token=None)
+        NotifyPushover(token=None)
 
     # Initialize some generic (but valid) tokens
     token = 'a' * 30
@@ -338,11 +337,11 @@ def test_plugin_pushover_edge_cases(mock_post):
 
     # No webhook id specified
     with pytest.raises(TypeError):
-        plugins.NotifyPushover(user_key=user_key, webhook_id=None)
+        NotifyPushover(user_key=user_key, webhook_id=None)
 
-    obj = plugins.NotifyPushover(
+    obj = NotifyPushover(
         user_key=user_key, token=token, targets=devices)
-    assert isinstance(obj, plugins.NotifyPushover) is True
+    assert isinstance(obj, NotifyPushover) is True
     assert len(obj.targets) == 3
 
     # This call fails because there is 1 invalid device
@@ -350,8 +349,8 @@ def test_plugin_pushover_edge_cases(mock_post):
         body='body', title='title',
         notify_type=apprise.NotifyType.INFO) is False
 
-    obj = plugins.NotifyPushover(user_key=user_key, token=token)
-    assert isinstance(obj, plugins.NotifyPushover) is True
+    obj = NotifyPushover(user_key=user_key, token=token)
+    assert isinstance(obj, NotifyPushover) is True
     # Default is to send to all devices, so there will be a
     # device defined here
     assert len(obj.targets) == 1
@@ -361,23 +360,23 @@ def test_plugin_pushover_edge_cases(mock_post):
         body='body', title='title',
         notify_type=apprise.NotifyType.INFO) is True
 
-    obj = plugins.NotifyPushover(
+    obj = NotifyPushover(
         user_key=user_key, token=token, targets=set())
-    assert isinstance(obj, plugins.NotifyPushover) is True
+    assert isinstance(obj, NotifyPushover) is True
     # Default is to send to all devices, so there will be a
     # device defined here
     assert len(obj.targets) == 1
 
     # No User Key specified
     with pytest.raises(TypeError):
-        plugins.NotifyPushover(user_key=None, token="abcd")
+        NotifyPushover(user_key=None, token="abcd")
 
     # No Access Token specified
     with pytest.raises(TypeError):
-        plugins.NotifyPushover(user_key="abcd", token=None)
+        NotifyPushover(user_key="abcd", token=None)
 
     with pytest.raises(TypeError):
-        plugins.NotifyPushover(user_key="abcd", token="  ")
+        NotifyPushover(user_key="abcd", token="  ")
 
 
 @mock.patch('requests.post')
@@ -409,7 +408,7 @@ def test_plugin_pushover_config_files(mock_post):
     """
 
     # Disable Throttling to speed testing
-    plugins.NotifyPushover.request_rate_per_sec = 0
+    NotifyPushover.request_rate_per_sec = 0
 
     # Prepare Mock
     mock_post.return_value = requests.Request()

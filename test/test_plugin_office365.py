@@ -31,7 +31,7 @@ import requests
 from datetime import datetime
 from json import dumps
 from apprise import Apprise
-from apprise import plugins
+from apprise.plugins.NotifyOffice365 import NotifyOffice365
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -84,7 +84,7 @@ apprise_url_tests = (
         targets='/'.join(['email1@test.ca'])), {
 
         # We're valid and good to go
-        'instance': plugins.NotifyOffice365,
+        'instance': NotifyOffice365,
 
         # Test what happens if a batch send fails to return a messageCount
         'requests_response_text': {
@@ -105,7 +105,7 @@ apprise_url_tests = (
             targets='email1@test.ca'),
         {
             # We're valid and good to go
-            'instance': plugins.NotifyOffice365,
+            'instance': NotifyOffice365,
 
             # Test what happens if a batch send fails to return a messageCount
             'requests_response_text': {
@@ -125,7 +125,7 @@ apprise_url_tests = (
         targets='/'.join(['email1@test.ca'])), {
 
         # We're valid and good to go
-        'instance': plugins.NotifyOffice365,
+        'instance': NotifyOffice365,
 
         # invalid JSON response
         'requests_response_text': '{',
@@ -139,7 +139,7 @@ apprise_url_tests = (
         secret='abcd/123/3343/@jack/test'), {
 
         # We're valid and good to go
-        'instance': plugins.NotifyOffice365,
+        'instance': NotifyOffice365,
 
         # There were no targets to notify; so we use our own email
         'requests_response_text': {
@@ -153,7 +153,7 @@ apprise_url_tests = (
         aid='user@example.com',
         secret='abcd/abc/dcba/@john/test',
         targets='/'.join(['email1@test.ca'])), {
-        'instance': plugins.NotifyOffice365,
+        'instance': NotifyOffice365,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
@@ -164,7 +164,7 @@ apprise_url_tests = (
         aid='user@example.com',
         secret='abcd/321/4321/@test/test',
         targets='/'.join(['email1@test.ca'])), {
-        'instance': plugins.NotifyOffice365,
+        'instance': NotifyOffice365,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -183,13 +183,11 @@ def test_plugin_office365_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_office365_general(mock_post):
+def test_plugin_office365_general(mock_post, no_throttling):
     """
     NotifyOffice365() General Testing
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Initialize some generic (but valid) tokens
     email = 'user@example.net'
@@ -217,7 +215,7 @@ def test_plugin_office365_general(mock_post):
             secret=secret,
             targets=targets))
 
-    assert isinstance(obj, plugins.NotifyOffice365)
+    assert isinstance(obj, NotifyOffice365)
 
     # Test our URL generation
     assert isinstance(obj.url(), str)
@@ -238,7 +236,7 @@ def test_plugin_office365_general(mock_post):
             bcc='Bruce Willis bwillis@hotmail.com, Frodo@lotr.me invalid@!',
         ))
 
-    assert isinstance(obj, plugins.NotifyOffice365)
+    assert isinstance(obj, NotifyOffice365)
 
     # Test our URL generation
     assert isinstance(obj.url(), str)
@@ -248,7 +246,7 @@ def test_plugin_office365_general(mock_post):
 
     with pytest.raises(TypeError):
         # No secret
-        plugins.NotifyOffice365(
+        NotifyOffice365(
             email=email,
             client_id=client_id,
             tenant=tenant,
@@ -258,7 +256,7 @@ def test_plugin_office365_general(mock_post):
 
     with pytest.raises(TypeError):
         # Invalid email
-        plugins.NotifyOffice365(
+        NotifyOffice365(
             email=None,
             client_id=client_id,
             tenant=tenant,
@@ -268,7 +266,7 @@ def test_plugin_office365_general(mock_post):
 
     with pytest.raises(TypeError):
         # Invalid email
-        plugins.NotifyOffice365(
+        NotifyOffice365(
             email='garbage',
             client_id=client_id,
             tenant=tenant,
@@ -277,7 +275,7 @@ def test_plugin_office365_general(mock_post):
         )
 
     # One of the targets are invalid
-    obj = plugins.NotifyOffice365(
+    obj = NotifyOffice365(
         email=email,
         client_id=client_id,
         tenant=tenant,
@@ -288,7 +286,7 @@ def test_plugin_office365_general(mock_post):
     assert obj.notify(title='title', body='test') is True
 
     # all of the targets are invalid
-    obj = plugins.NotifyOffice365(
+    obj = NotifyOffice365(
         email=email,
         client_id=client_id,
         tenant=tenant,
@@ -301,13 +299,11 @@ def test_plugin_office365_general(mock_post):
 
 
 @mock.patch('requests.post')
-def test_plugin_office365_authentication(mock_post):
+def test_plugin_office365_authentication(mock_post, no_throttling):
     """
     NotifyOffice365() Authentication Testing
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Initialize some generic (but valid) tokens
     tenant = 'ff-gg-hh-ii-jj'
@@ -344,7 +340,7 @@ def test_plugin_office365_authentication(mock_post):
             secret=secret,
             targets=targets))
 
-    assert isinstance(obj, plugins.NotifyOffice365)
+    assert isinstance(obj, NotifyOffice365)
 
     # Authenticate
     assert obj.authenticate() is True

@@ -24,7 +24,8 @@
 # THE SOFTWARE.
 
 import requests
-from apprise import plugins
+
+from apprise.plugins.NotifyReddit import NotifyReddit
 from helpers import AppriseURLTester
 from unittest import mock
 
@@ -67,14 +68,14 @@ apprise_url_tests = (
     }),
     ('reddit://user:password@app-id/app-secret/apprise', {
         # Login failed
-        'instance': plugins.NotifyReddit,
+        'instance': NotifyReddit,
         # Expected notify() response is False because internally we would
         # have failed to login
         'notify_response': False,
     }),
     ('reddit://user:password@app-id/app-secret', {
         # Login successful, but there was no subreddit to notify
-        'instance': plugins.NotifyReddit,
+        'instance': NotifyReddit,
         'requests_response_text': {
             "access_token": 'abc123',
             "token_type": "bearer",
@@ -91,7 +92,7 @@ apprise_url_tests = (
         'notify_response': False,
     }),
     ('reddit://user:password@app-id/app-secret/apprise', {
-        'instance': plugins.NotifyReddit,
+        'instance': NotifyReddit,
         'requests_response_text': {
             "access_token": 'abc123',
             "token_type": "bearer",
@@ -110,7 +111,7 @@ apprise_url_tests = (
     }),
 
     ('reddit://user:password@app-id/app-secret/apprise', {
-        'instance': plugins.NotifyReddit,
+        'instance': NotifyReddit,
         'requests_response_text': {
             "access_token": 'abc123',
             "token_type": "bearer",
@@ -128,7 +129,7 @@ apprise_url_tests = (
     }),
     ('reddit://user:password@app-id/app-secret/apprise/subreddit2', {
         # password:login acceptable
-        'instance': plugins.NotifyReddit,
+        'instance': NotifyReddit,
         'requests_response_text': {
             "access_token": 'abc123',
             "token_type": "bearer",
@@ -148,7 +149,7 @@ apprise_url_tests = (
     # Pass in some arguments to over-ride defaults
     ('reddit://user:pass@id/secret/sub/'
      '?ad=yes&nsfw=yes&replies=no&resubmit=yes&spoiler=yes&kind=self', {
-         'instance': plugins.NotifyReddit,
+         'instance': NotifyReddit,
          'requests_response_text': {
              "access_token": 'abc123',
              "token_type": "bearer",
@@ -166,7 +167,7 @@ apprise_url_tests = (
     # Pass in more arguments
     ('reddit://'
      '?user=l2g&pass=pass&app_secret=abc123&app_id=54321&to=sub1,sub2', {
-         'instance': plugins.NotifyReddit,
+         'instance': NotifyReddit,
          'requests_response_text': {
              "access_token": 'abc123',
              "token_type": "bearer",
@@ -184,7 +185,7 @@ apprise_url_tests = (
     # More arguments ...
     ('reddit://user:pass@id/secret/sub7/sub6/sub5/'
      '?flair_id=wonder&flair_text=not%20for%20you', {
-         'instance': plugins.NotifyReddit,
+         'instance': NotifyReddit,
          'requests_response_text': {
              "access_token": 'abc123',
              "token_type": "bearer",
@@ -200,13 +201,13 @@ apprise_url_tests = (
          # Our expected url(privacy=True) startswith() response:
          'privacy_url': 'reddit://user:****@****/****/sub'}),
     ('reddit://user:password@app-id/app-secret/apprise', {
-        'instance': plugins.NotifyReddit,
+        'instance': NotifyReddit,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('reddit://user:password@app-id/app-secret/apprise', {
-        'instance': plugins.NotifyReddit,
+        'instance': NotifyReddit,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -225,14 +226,12 @@ def test_plugin_reddit_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_reddit_general(mock_post):
+def test_plugin_reddit_general(mock_post, no_throttling):
     """
     NotifyReddit() General Tests
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
-    plugins.NotifyReddit.clock_skew = timedelta(seconds=0)
+    NotifyReddit.clock_skew = timedelta(seconds=0)
 
     # Generate a valid credentials:
     kwargs = {
@@ -269,8 +268,8 @@ def test_plugin_reddit_general(mock_post):
     mock_post.return_value = good_response
 
     # Variation Initializations
-    obj = plugins.NotifyReddit(**kwargs)
-    assert isinstance(obj, plugins.NotifyReddit) is True
+    obj = NotifyReddit(**kwargs)
+    assert isinstance(obj, NotifyReddit) is True
     assert isinstance(obj.url(), str) is True
 
     # Dynamically pick up on a link
@@ -348,12 +347,12 @@ def test_plugin_reddit_general(mock_post):
     response.content = '{'
     response.status_code = requests.codes.ok
     mock_post.return_value = response
-    obj = plugins.NotifyReddit(**kwargs)
+    obj = NotifyReddit(**kwargs)
     assert obj.send(body="test") is False
 
     # Return it to a parseable string but missing the entries we expect
     response.content = '{}'
-    obj = plugins.NotifyReddit(**kwargs)
+    obj = NotifyReddit(**kwargs)
     assert obj.send(body="test") is False
 
     # No access token provided
@@ -364,12 +363,12 @@ def test_plugin_reddit_general(mock_post):
             "errors": [],
         },
     })
-    obj = plugins.NotifyReddit(**kwargs)
+    obj = NotifyReddit(**kwargs)
     assert obj.send(body="test") is False
 
     # cause a json parsing issue now
     response.content = None
-    obj = plugins.NotifyReddit(**kwargs)
+    obj = NotifyReddit(**kwargs)
     assert obj.send(body="test") is False
 
     # Reset to what we consider a good response
@@ -397,7 +396,7 @@ def test_plugin_reddit_general(mock_post):
     # Test sucessful re-authentication after failed post
     mock_post.side_effect = [
         good_response, bad_response, good_response, good_response]
-    obj = plugins.NotifyReddit(**kwargs)
+    obj = NotifyReddit(**kwargs)
     assert obj.send(body="test") is True
     assert mock_post.call_count == 4
     assert mock_post.call_args_list[0][0][0] == \
@@ -412,7 +411,7 @@ def test_plugin_reddit_general(mock_post):
     # Test failed re-authentication
     mock_post.side_effect = [
         good_response, bad_response, bad_response]
-    obj = plugins.NotifyReddit(**kwargs)
+    obj = NotifyReddit(**kwargs)
     assert obj.send(body="test") is False
 
     # Test exception handing on re-auth attempt
@@ -420,5 +419,5 @@ def test_plugin_reddit_general(mock_post):
     response.status_code = requests.codes.ok
     mock_post.side_effect = [
         good_response, bad_response, good_response, response]
-    obj = plugins.NotifyReddit(**kwargs)
+    obj = NotifyReddit(**kwargs)
     assert obj.send(body="test") is False

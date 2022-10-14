@@ -28,8 +28,9 @@ from unittest import mock
 
 import pytest
 import requests
+
+from apprise.plugins.NotifyGuilded import NotifyGuilded
 from helpers import AppriseURLTester
-from apprise import plugins
 
 # Disable logging for a cleaner testing output
 import logging
@@ -53,80 +54,80 @@ apprise_url_tests = (
     }),
     # Provide both an webhook id and a webhook token
     ('guilded://%s/%s' % ('i' * 24, 't' * 64), {
-        'instance': plugins.NotifyGuilded,
+        'instance': NotifyGuilded,
         'requests_response_code': requests.codes.no_content,
     }),
     # Provide a temporary username
     ('guilded://l2g@%s/%s' % ('i' * 24, 't' * 64), {
-        'instance': plugins.NotifyGuilded,
+        'instance': NotifyGuilded,
         'requests_response_code': requests.codes.no_content,
     }),
     # test image= field
     ('guilded://%s/%s?format=markdown&footer=Yes&image=Yes' % (
         'i' * 24, 't' * 64), {
-            'instance': plugins.NotifyGuilded,
+            'instance': NotifyGuilded,
             'requests_response_code': requests.codes.no_content,
             # don't include an image by default
             'include_image': False,
     }),
     ('guilded://%s/%s?format=markdown&footer=Yes&image=No&fields=no' % (
         'i' * 24, 't' * 64), {
-            'instance': plugins.NotifyGuilded,
+            'instance': NotifyGuilded,
             'requests_response_code': requests.codes.no_content,
     }),
     ('guilded://%s/%s?format=markdown&footer=Yes&image=Yes' % (
         'i' * 24, 't' * 64), {
-            'instance': plugins.NotifyGuilded,
+            'instance': NotifyGuilded,
             'requests_response_code': requests.codes.no_content,
     }),
     ('https://media.guilded.gg/webhooks/{}/{}'.format(
         '0' * 10, 'B' * 40), {
             # Native URL Support, support the provided guilded URL from their
             # webpage.
-            'instance': plugins.NotifyGuilded,
+            'instance': NotifyGuilded,
             'requests_response_code': requests.codes.no_content,
     }),
     ('guilded://%s/%s?format=markdown&avatar=No&footer=No' % (
         'i' * 24, 't' * 64), {
-            'instance': plugins.NotifyGuilded,
+            'instance': NotifyGuilded,
             'requests_response_code': requests.codes.no_content,
     }),
     # different format support
     ('guilded://%s/%s?format=markdown' % ('i' * 24, 't' * 64), {
-        'instance': plugins.NotifyGuilded,
+        'instance': NotifyGuilded,
         'requests_response_code': requests.codes.no_content,
     }),
     ('guilded://%s/%s?format=text' % ('i' * 24, 't' * 64), {
-        'instance': plugins.NotifyGuilded,
+        'instance': NotifyGuilded,
         'requests_response_code': requests.codes.no_content,
     }),
     # Test with avatar URL
     ('guilded://%s/%s?avatar_url=http://localhost/test.jpg' % (
         'i' * 24, 't' * 64), {
-            'instance': plugins.NotifyGuilded,
+            'instance': NotifyGuilded,
             'requests_response_code': requests.codes.no_content,
     }),
     # Test without image set
     ('guilded://%s/%s' % ('i' * 24, 't' * 64), {
-        'instance': plugins.NotifyGuilded,
+        'instance': NotifyGuilded,
         'requests_response_code': requests.codes.no_content,
         # don't include an image by default
         'include_image': False,
     }),
     ('guilded://%s/%s/' % ('a' * 24, 'b' * 64), {
-        'instance': plugins.NotifyGuilded,
+        'instance': NotifyGuilded,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('guilded://%s/%s/' % ('a' * 24, 'b' * 64), {
-        'instance': plugins.NotifyGuilded,
+        'instance': NotifyGuilded,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('guilded://%s/%s/' % ('a' * 24, 'b' * 64), {
-        'instance': plugins.NotifyGuilded,
+        'instance': NotifyGuilded,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -145,13 +146,11 @@ def test_plugin_guilded_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_guilded_general(mock_post):
+def test_plugin_guilded_general(mock_post, no_throttling):
     """
     NotifyGuilded() General Checks
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Initialize some generic (but valid) tokens
     webhook_id = 'A' * 24
@@ -163,19 +162,19 @@ def test_plugin_guilded_general(mock_post):
 
     # Invalid webhook id
     with pytest.raises(TypeError):
-        plugins.NotifyGuilded(webhook_id=None, webhook_token=webhook_token)
+        NotifyGuilded(webhook_id=None, webhook_token=webhook_token)
     # Invalid webhook id (whitespace)
     with pytest.raises(TypeError):
-        plugins.NotifyGuilded(webhook_id="  ", webhook_token=webhook_token)
+        NotifyGuilded(webhook_id="  ", webhook_token=webhook_token)
 
     # Invalid webhook token
     with pytest.raises(TypeError):
-        plugins.NotifyGuilded(webhook_id=webhook_id, webhook_token=None)
+        NotifyGuilded(webhook_id=webhook_id, webhook_token=None)
     # Invalid webhook token (whitespace)
     with pytest.raises(TypeError):
-        plugins.NotifyGuilded(webhook_id=webhook_id, webhook_token="   ")
+        NotifyGuilded(webhook_id=webhook_id, webhook_token="   ")
 
-    obj = plugins.NotifyGuilded(
+    obj = NotifyGuilded(
         webhook_id=webhook_id,
         webhook_token=webhook_token,
         footer=True, thumbnail=False)

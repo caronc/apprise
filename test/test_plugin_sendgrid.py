@@ -26,7 +26,8 @@ from unittest import mock
 
 import pytest
 import requests
-from apprise import plugins
+
+from apprise.plugins.NotifySendGrid import NotifySendGrid
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -59,54 +60,54 @@ apprise_url_tests = (
     ('sendgrid://abcd:user@example.com', {
         # No To/Target Address(es) specified; so we sub in the same From
         # address
-        'instance': plugins.NotifySendGrid,
+        'instance': NotifySendGrid,
     }),
     ('sendgrid://abcd:user@example.com/newuser@example.com', {
         # A good email
-        'instance': plugins.NotifySendGrid,
+        'instance': NotifySendGrid,
     }),
     ('sendgrid://abcd:user@example.com/newuser@example.com'
      '?bcc=l2g@nuxref.com', {
          # A good email with Blind Carbon Copy
-         'instance': plugins.NotifySendGrid,
+         'instance': NotifySendGrid,
      }),
     ('sendgrid://abcd:user@example.com/newuser@example.com'
      '?cc=l2g@nuxref.com', {
          # A good email with Carbon Copy
-         'instance': plugins.NotifySendGrid,
+         'instance': NotifySendGrid,
      }),
     ('sendgrid://abcd:user@example.com/newuser@example.com'
      '?to=l2g@nuxref.com', {
          # A good email with Carbon Copy
-         'instance': plugins.NotifySendGrid,
+         'instance': NotifySendGrid,
      }),
     ('sendgrid://abcd:user@example.com/newuser@example.com'
      '?template={}'.format(UUID4), {
          # A good email with a template + no substitutions
-         'instance': plugins.NotifySendGrid,
+         'instance': NotifySendGrid,
      }),
     ('sendgrid://abcd:user@example.com/newuser@example.com'
      '?template={}&+sub=value&+sub2=value2'.format(UUID4), {
          # A good email with a template + substitutions
-         'instance': plugins.NotifySendGrid,
+         'instance': NotifySendGrid,
 
          # Our expected url(privacy=True) startswith() response:
          'privacy_url': 'sendgrid://a...d:user@example.com/',
      }),
     ('sendgrid://abcd:user@example.ca/newuser@example.ca', {
-        'instance': plugins.NotifySendGrid,
+        'instance': NotifySendGrid,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('sendgrid://abcd:user@example.uk/newuser@example.uk', {
-        'instance': plugins.NotifySendGrid,
+        'instance': NotifySendGrid,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('sendgrid://abcd:user@example.au/newuser@example.au', {
-        'instance': plugins.NotifySendGrid,
+        'instance': NotifySendGrid,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -126,35 +127,33 @@ def test_plugin_sendgrid_urls():
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_sendgrid_edge_cases(mock_post, mock_get):
+def test_plugin_sendgrid_edge_cases(mock_post, mock_get, no_throttling):
     """
     NotifySendGrid() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # no apikey
     with pytest.raises(TypeError):
-        plugins.NotifySendGrid(
+        NotifySendGrid(
             apikey=None, from_email='user@example.com')
 
     # invalid from email
     with pytest.raises(TypeError):
-        plugins.NotifySendGrid(
+        NotifySendGrid(
             apikey='abcd', from_email='!invalid')
 
     # no email
     with pytest.raises(TypeError):
-        plugins.NotifySendGrid(apikey='abcd', from_email=None)
+        NotifySendGrid(apikey='abcd', from_email=None)
 
     # Invalid To email address
-    plugins.NotifySendGrid(
+    NotifySendGrid(
         apikey='abcd', from_email='user@example.com', targets="!invalid")
 
     # Test invalid bcc/cc entries mixed with good ones
-    assert isinstance(plugins.NotifySendGrid(
+    assert isinstance(NotifySendGrid(
         apikey='abcd',
         from_email='l2g@example.com',
         bcc=('abc@def.com', '!invalid'),
-        cc=('abc@test.org', '!invalid')), plugins.NotifySendGrid)
+        cc=('abc@test.org', '!invalid')), NotifySendGrid)

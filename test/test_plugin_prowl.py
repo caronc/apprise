@@ -26,9 +26,8 @@ from unittest import mock
 
 import pytest
 import requests
-from apprise.plugins.NotifyProwl import ProwlPriority
-from apprise import plugins
 import apprise
+from apprise.plugins.NotifyProwl import NotifyProwl, ProwlPriority
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -50,7 +49,7 @@ apprise_url_tests = (
     }),
     # Provider Key
     ('prowl://%s/%s' % ('a' * 40, 'b' * 40), {
-        'instance': plugins.NotifyProwl,
+        'instance': NotifyProwl,
     }),
     # Invalid Provider Key
     ('prowl://%s/%s' % ('a' * 40, 'b' * 20), {
@@ -58,58 +57,58 @@ apprise_url_tests = (
     }),
     # APIkey; no device
     ('prowl://%s' % ('a' * 40), {
-        'instance': plugins.NotifyProwl,
+        'instance': NotifyProwl,
     }),
     # API Key
     ('prowl://%s' % ('a' * 40), {
-        'instance': plugins.NotifyProwl,
+        'instance': NotifyProwl,
         # don't include an image by default
         'include_image': False,
     }),
     # API Key + priority setting
     ('prowl://%s?priority=high' % ('a' * 40), {
-        'instance': plugins.NotifyProwl,
+        'instance': NotifyProwl,
     }),
     # API Key + invalid priority setting
     ('prowl://%s?priority=invalid' % ('a' * 40), {
-        'instance': plugins.NotifyProwl,
+        'instance': NotifyProwl,
     }),
     # API Key + priority setting (empty)
     ('prowl://%s?priority=' % ('a' * 40), {
-        'instance': plugins.NotifyProwl,
+        'instance': NotifyProwl,
     }),
     # API Key + No Provider Key (empty)
     ('prowl://%s///' % ('w' * 40), {
-        'instance': plugins.NotifyProwl,
+        'instance': NotifyProwl,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'prowl://w...w/',
     }),
     # API Key + Provider Key
     ('prowl://%s/%s' % ('a' * 40, 'b' * 40), {
-        'instance': plugins.NotifyProwl,
+        'instance': NotifyProwl,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'prowl://a...a/b...b',
     }),
     # API Key + with image
     ('prowl://%s' % ('a' * 40), {
-        'instance': plugins.NotifyProwl,
+        'instance': NotifyProwl,
     }),
     ('prowl://%s' % ('a' * 40), {
-        'instance': plugins.NotifyProwl,
+        'instance': NotifyProwl,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('prowl://%s' % ('a' * 40), {
-        'instance': plugins.NotifyProwl,
+        'instance': NotifyProwl,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('prowl://%s' % ('a' * 40), {
-        'instance': plugins.NotifyProwl,
+        'instance': NotifyProwl,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -134,16 +133,16 @@ def test_plugin_prowl_edge_cases():
     """
     # Initializes the plugin with an invalid apikey
     with pytest.raises(TypeError):
-        plugins.NotifyProwl(apikey=None)
+        NotifyProwl(apikey=None)
     # Whitespace also acts as an invalid apikey value
     with pytest.raises(TypeError):
-        plugins.NotifyProwl(apikey='  ')
+        NotifyProwl(apikey='  ')
 
     # Whitespace also acts as an invalid provider key
     with pytest.raises(TypeError):
-        plugins.NotifyProwl(apikey='abcd', providerkey=object())
+        NotifyProwl(apikey='abcd', providerkey=object())
     with pytest.raises(TypeError):
-        plugins.NotifyProwl(apikey='abcd', providerkey='  ')
+        NotifyProwl(apikey='abcd', providerkey='  ')
 
 
 @mock.patch('requests.post')
@@ -175,7 +174,7 @@ def test_plugin_prowl_config_files(mock_post):
     """ % ('a' * 40, 'b' * 40)
 
     # Disable Throttling to speed testing
-    plugins.NotifyProwl.request_rate_per_sec = 0
+    NotifyProwl.request_rate_per_sec = 0
 
     # Prepare Mock
     mock_post.return_value = requests.Request()

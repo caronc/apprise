@@ -28,7 +28,6 @@ from random import choice
 from string import ascii_uppercase as str_alpha
 from string import digits as str_num
 
-from apprise import plugins
 from apprise import NotifyBase
 from apprise.common import NotifyFormat
 from apprise.common import OverflowMode
@@ -38,7 +37,7 @@ import logging
 logging.disable(logging.CRITICAL)
 
 
-def test_notify_overflow_truncate():
+def test_notify_overflow_truncate(no_throttling):
     """
     API: Overflow Truncate Functionality Testing
 
@@ -46,9 +45,6 @@ def test_notify_overflow_truncate():
     #
     # A little preparation
     #
-
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Number of characters per line
     row = 24
@@ -210,7 +206,7 @@ def test_notify_overflow_truncate():
     assert title[0:TestNotification.body_maxlen] == chunks[0].get('body')
 
 
-def test_notify_overflow_split():
+def test_notify_overflow_split(no_throttling):
     """
     API: Overflow Split Functionality Testing
 
@@ -219,9 +215,6 @@ def test_notify_overflow_split():
     #
     # A little preparation
     #
-
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Number of characters per line
     row = 24
@@ -386,7 +379,7 @@ def test_notify_overflow_split():
         offset += len(_body)
 
 
-def test_notify_overflow_general():
+def test_notify_overflow_general(no_throttling):
     """
     API: Overflow General Testing
 
@@ -395,9 +388,6 @@ def test_notify_overflow_general():
     #
     # A little preparation
     #
-
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     #
     # First Test: Truncated Title

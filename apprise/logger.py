@@ -181,6 +181,7 @@ class LogCapture:
         if self.__path:
             # Close our file pointer
             self.__buffer_ptr.close()
+            self.__handler.close()
             if self.__delete:
                 try:
                     # Always remove file afterwards

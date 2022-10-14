@@ -26,7 +26,8 @@ from unittest import mock
 
 import pytest
 import requests
-from apprise import plugins
+
+from apprise.plugins.NotifyPushed import NotifyPushed
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -48,15 +49,15 @@ apprise_url_tests = (
     }),
     # Application Key+Secret
     ('pushed://%s/%s' % ('a' * 32, 'a' * 64), {
-        'instance': plugins.NotifyPushed,
+        'instance': NotifyPushed,
     }),
     # Application Key+Secret + channel
     ('pushed://%s/%s/#channel/' % ('a' * 32, 'a' * 64), {
-        'instance': plugins.NotifyPushed,
+        'instance': NotifyPushed,
     }),
     # Application Key+Secret + channel (via to=)
     ('pushed://%s/%s?to=channel' % ('a' * 32, 'a' * 64), {
-        'instance': plugins.NotifyPushed,
+        'instance': NotifyPushed,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'pushed://a...a/****/',
     }),
@@ -67,65 +68,65 @@ apprise_url_tests = (
     }),
     # Application Key+Secret + 2 channels
     ('pushed://%s/%s/#channel1/#channel2' % ('a' * 32, 'a' * 64), {
-        'instance': plugins.NotifyPushed,
+        'instance': NotifyPushed,
     }),
     # Application Key+Secret + User Pushed ID
     ('pushed://%s/%s/@ABCD/' % ('a' * 32, 'a' * 64), {
-        'instance': plugins.NotifyPushed,
+        'instance': NotifyPushed,
     }),
     # Application Key+Secret + 2 devices
     ('pushed://%s/%s/@ABCD/@DEFG/' % ('a' * 32, 'a' * 64), {
-        'instance': plugins.NotifyPushed,
+        'instance': NotifyPushed,
     }),
     # Application Key+Secret + Combo
     ('pushed://%s/%s/@ABCD/#channel' % ('a' * 32, 'a' * 64), {
-        'instance': plugins.NotifyPushed,
+        'instance': NotifyPushed,
     }),
     # ,
     ('pushed://%s/%s' % ('a' * 32, 'a' * 64), {
-        'instance': plugins.NotifyPushed,
+        'instance': NotifyPushed,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('pushed://%s/%s' % ('a' * 32, 'a' * 64), {
-        'instance': plugins.NotifyPushed,
+        'instance': NotifyPushed,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('pushed://%s/%s' % ('a' * 32, 'a' * 64), {
-        'instance': plugins.NotifyPushed,
+        'instance': NotifyPushed,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
     }),
     ('pushed://%s/%s' % ('a' * 32, 'a' * 64), {
-        'instance': plugins.NotifyPushed,
+        'instance': NotifyPushed,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('pushed://%s/%s' % ('a' * 32, 'a' * 64), {
-        'instance': plugins.NotifyPushed,
+        'instance': NotifyPushed,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('pushed://%s/%s/#channel' % ('a' * 32, 'a' * 64), {
-        'instance': plugins.NotifyPushed,
+        'instance': NotifyPushed,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('pushed://%s/%s/@user' % ('a' * 32, 'a' * 64), {
-        'instance': plugins.NotifyPushed,
+        'instance': NotifyPushed,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('pushed://%s/%s' % ('a' * 32, 'a' * 64), {
-        'instance': plugins.NotifyPushed,
+        'instance': NotifyPushed,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -145,13 +146,11 @@ def test_plugin_pushed_urls():
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_pushed_edge_cases(mock_post, mock_get):
+def test_plugin_pushed_edge_cases(mock_post, mock_get, no_throttling):
     """
     NotifyPushed() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Chat ID
     recipients = '@ABCDEFG, @DEFGHIJ, #channel, #channel2'
@@ -168,49 +167,49 @@ def test_plugin_pushed_edge_cases(mock_post, mock_get):
 
     # No application Key specified
     with pytest.raises(TypeError):
-        plugins.NotifyPushed(
+        NotifyPushed(
             app_key=None,
             app_secret=app_secret,
             recipients=None,
         )
 
     with pytest.raises(TypeError):
-        plugins.NotifyPushed(
+        NotifyPushed(
             app_key="  ",
             app_secret=app_secret,
             recipients=None,
         )
     # No application Secret specified
     with pytest.raises(TypeError):
-        plugins.NotifyPushed(
+        NotifyPushed(
             app_key=app_key,
             app_secret=None,
             recipients=None,
         )
 
     with pytest.raises(TypeError):
-        plugins.NotifyPushed(
+        NotifyPushed(
             app_key=app_key,
             app_secret="   ",
         )
 
     # recipients list set to (None) is perfectly fine; in this case it will
     # notify the App
-    obj = plugins.NotifyPushed(
+    obj = NotifyPushed(
         app_key=app_key,
         app_secret=app_secret,
         recipients=None,
     )
-    assert isinstance(obj, plugins.NotifyPushed) is True
+    assert isinstance(obj, NotifyPushed) is True
     assert len(obj.channels) == 0
     assert len(obj.users) == 0
 
-    obj = plugins.NotifyPushed(
+    obj = NotifyPushed(
         app_key=app_key,
         app_secret=app_secret,
         targets=recipients,
     )
-    assert isinstance(obj, plugins.NotifyPushed) is True
+    assert isinstance(obj, NotifyPushed) is True
     assert len(obj.channels) == 2
     assert len(obj.users) == 2
 

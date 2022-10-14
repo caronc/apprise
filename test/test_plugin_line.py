@@ -22,7 +22,7 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
-from apprise import plugins
+from apprise.plugins.NotifyLine import NotifyLine
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -41,41 +41,41 @@ apprise_url_tests = (
     }),
     ('line://token', {
         # no target specified
-        'instance': plugins.NotifyLine,
+        'instance': NotifyLine,
         # Expected notify() response
         'notify_response': False,
 
     }),
     ('line://token=/target', {
         # minimum requirements met
-        'instance': plugins.NotifyLine,
+        'instance': NotifyLine,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'line://****/t...t?',
     }),
     ('line://token/target?image=no', {
         # minimum requirements met; no icon display
-        'instance': plugins.NotifyLine,
+        'instance': NotifyLine,
     }),
     ('line://a/very/long/token=/target?image=no', {
         # minimum requirements met; no icon display
-        'instance': plugins.NotifyLine,
+        'instance': NotifyLine,
     }),
     ('line://?token=token&to=target1', {
         # minimum requirements met
-        'instance': plugins.NotifyLine,
+        'instance': NotifyLine,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'line://****/t...1?',
     }),
     ('line://token/target', {
-        'instance': plugins.NotifyLine,
+        'instance': NotifyLine,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('line://token/target', {
-        'instance': plugins.NotifyLine,
+        'instance': NotifyLine,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,

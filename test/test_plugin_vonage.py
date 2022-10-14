@@ -27,7 +27,8 @@ from unittest import mock
 import pytest
 import requests
 from json import dumps
-from apprise import plugins
+
+from apprise.plugins.NotifyVonage import NotifyVonage
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -63,7 +64,7 @@ apprise_url_tests = (
     ('vonage://AC{}:{}@{}/123/{}/abcd/'.format(
         'f' * 8, 'g' * 16, '3' * 11, '9' * 15), {
         # valid everything but target numbers
-        'instance': plugins.NotifyVonage,
+        'instance': NotifyVonage,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'vonage://A...f:****@',
@@ -71,31 +72,31 @@ apprise_url_tests = (
     ('vonage://AC{}:{}@{}'.format('h' * 8, 'i' * 16, '5' * 11), {
         # using phone no with no target - we text ourselves in
         # this case
-        'instance': plugins.NotifyVonage,
+        'instance': NotifyVonage,
     }),
     ('vonage://_?key=AC{}&secret={}&from={}'.format(
         'a' * 8, 'b' * 16, '5' * 11), {
         # use get args to acomplish the same thing
-        'instance': plugins.NotifyVonage,
+        'instance': NotifyVonage,
     }),
     ('vonage://_?key=AC{}&secret={}&source={}'.format(
         'a' * 8, 'b' * 16, '5' * 11), {
         # use get args to acomplish the same thing (use source instead of from)
-        'instance': plugins.NotifyVonage,
+        'instance': NotifyVonage,
     }),
     ('vonage://_?key=AC{}&secret={}&from={}&to={}'.format(
         'a' * 8, 'b' * 16, '5' * 11, '7' * 13), {
         # use to=
-        'instance': plugins.NotifyVonage,
+        'instance': NotifyVonage,
     }),
     ('vonage://AC{}:{}@{}'.format('a' * 8, 'b' * 16, '6' * 11), {
-        'instance': plugins.NotifyVonage,
+        'instance': NotifyVonage,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('vonage://AC{}:{}@{}'.format('a' * 8, 'b' * 16, '6' * 11), {
-        'instance': plugins.NotifyVonage,
+        'instance': NotifyVonage,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -129,7 +130,7 @@ apprise_url_tests = (
     ('nexmo://AC{}:{}@{}/123/{}/abcd/'.format(
         'f' * 8, 'g' * 16, '3' * 11, '9' * 15), {
         # valid everything but target numbers
-        'instance': plugins.NotifyVonage,
+        'instance': NotifyVonage,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'vonage://A...f:****@',
@@ -137,31 +138,31 @@ apprise_url_tests = (
     ('nexmo://AC{}:{}@{}'.format('h' * 8, 'i' * 16, '5' * 11), {
         # using phone no with no target - we text ourselves in
         # this case
-        'instance': plugins.NotifyVonage,
+        'instance': NotifyVonage,
     }),
     ('nexmo://_?key=AC{}&secret={}&from={}'.format(
         'a' * 8, 'b' * 16, '5' * 11), {
         # use get args to acomplish the same thing
-        'instance': plugins.NotifyVonage,
+        'instance': NotifyVonage,
     }),
     ('nexmo://_?key=AC{}&secret={}&source={}'.format(
         'a' * 8, 'b' * 16, '5' * 11), {
         # use get args to acomplish the same thing (use source instead of from)
-        'instance': plugins.NotifyVonage,
+        'instance': NotifyVonage,
     }),
     ('nexmo://_?key=AC{}&secret={}&from={}&to={}'.format(
         'a' * 8, 'b' * 16, '5' * 11, '7' * 13), {
         # use to=
-        'instance': plugins.NotifyVonage,
+        'instance': NotifyVonage,
     }),
     ('nexmo://AC{}:{}@{}'.format('a' * 8, 'b' * 16, '6' * 11), {
-        'instance': plugins.NotifyVonage,
+        'instance': NotifyVonage,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('nexmo://AC{}:{}@{}'.format('a' * 8, 'b' * 16, '6' * 11), {
-        'instance': plugins.NotifyVonage,
+        'instance': NotifyVonage,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -180,13 +181,11 @@ def test_plugin_vonage_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_vonage_edge_cases(mock_post):
+def test_plugin_vonage_edge_cases(mock_post, no_throttling):
     """
     NotifyVonage() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare our response
     response = requests.Request()
@@ -202,17 +201,17 @@ def test_plugin_vonage_edge_cases(mock_post):
 
     # No apikey specified
     with pytest.raises(TypeError):
-        plugins.NotifyVonage(apikey=None, secret=secret, source=source)
+        NotifyVonage(apikey=None, secret=secret, source=source)
 
     with pytest.raises(TypeError):
-        plugins.NotifyVonage(apikey="  ", secret=secret, source=source)
+        NotifyVonage(apikey="  ", secret=secret, source=source)
 
     # No secret specified
     with pytest.raises(TypeError):
-        plugins.NotifyVonage(apikey=apikey, secret=None, source=source)
+        NotifyVonage(apikey=apikey, secret=None, source=source)
 
     with pytest.raises(TypeError):
-        plugins.NotifyVonage(apikey=apikey, secret="  ", source=source)
+        NotifyVonage(apikey=apikey, secret="  ", source=source)
 
     # a error response
     response.status_code = 400
@@ -223,7 +222,7 @@ def test_plugin_vonage_edge_cases(mock_post):
     mock_post.return_value = response
 
     # Initialize our object
-    obj = plugins.NotifyVonage(
+    obj = NotifyVonage(
         apikey=apikey, secret=secret, source=source)
 
     # We will fail with the above error code

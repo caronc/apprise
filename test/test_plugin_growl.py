@@ -28,7 +28,8 @@ from unittest import mock
 
 import pytest
 import apprise
-from apprise.plugins.NotifyGrowl import GrowlPriority
+from apprise import NotifyBase
+from apprise.plugins.NotifyGrowl import GrowlPriority, NotifyGrowl
 
 try:
     from gntp import errors
@@ -145,85 +146,85 @@ def test_plugin_growl_general(mock_gntp):
         }),
 
         ('growl://pass@growl.server', {
-            'instance': apprise.plugins.NotifyGrowl,
+            'instance': NotifyGrowl,
         }),
         ('growl://ignored:pass@growl.server', {
-            'instance': apprise.plugins.NotifyGrowl,
+            'instance': NotifyGrowl,
         }),
         ('growl://growl.server', {
-            'instance': apprise.plugins.NotifyGrowl,
+            'instance': NotifyGrowl,
             # don't include an image by default
             'include_image': False,
         }),
         ('growl://growl.server?version=1', {
-            'instance': apprise.plugins.NotifyGrowl,
+            'instance': NotifyGrowl,
         }),
         # Test sticky flag
         ('growl://growl.server?sticky=yes', {
-            'instance': apprise.plugins.NotifyGrowl,
+            'instance': NotifyGrowl,
         }),
         ('growl://growl.server?sticky=no', {
-            'instance': apprise.plugins.NotifyGrowl,
+            'instance': NotifyGrowl,
         }),
         # Force a failure
         ('growl://growl.server?version=1', {
-            'instance': apprise.plugins.NotifyGrowl,
+            'instance': NotifyGrowl,
             'growl_response': None,
         }),
         ('growl://growl.server?version=2', {
             # don't include an image by default
             'include_image': False,
-            'instance': apprise.plugins.NotifyGrowl,
+            'instance': NotifyGrowl,
         }),
         ('growl://growl.server?version=2', {
             # don't include an image by default
             'include_image': False,
-            'instance': apprise.plugins.NotifyGrowl,
+            'instance': NotifyGrowl,
             'growl_response': None,
         }),
 
         # Priorities
         ('growl://pass@growl.server?priority=low', {
-            'instance': apprise.plugins.NotifyGrowl,
+            'instance': NotifyGrowl,
         }),
         ('growl://pass@growl.server?priority=moderate', {
-            'instance': apprise.plugins.NotifyGrowl,
+            'instance': NotifyGrowl,
         }),
         ('growl://pass@growl.server?priority=normal', {
-            'instance': apprise.plugins.NotifyGrowl,
+            'instance': NotifyGrowl,
         }),
         ('growl://pass@growl.server?priority=high', {
-            'instance': apprise.plugins.NotifyGrowl,
+            'instance': NotifyGrowl,
         }),
         ('growl://pass@growl.server?priority=emergency', {
-            'instance': apprise.plugins.NotifyGrowl,
+            'instance': NotifyGrowl,
         }),
 
         # Invalid Priorities
         ('growl://pass@growl.server?priority=invalid', {
-            'instance': apprise.plugins.NotifyGrowl,
+            'instance': NotifyGrowl,
         }),
         ('growl://pass@growl.server?priority=', {
-            'instance': apprise.plugins.NotifyGrowl,
+            'instance': NotifyGrowl,
         }),
 
         # invalid version
         ('growl://growl.server?version=', {
-            'instance': apprise.plugins.NotifyGrowl,
+            'instance': NotifyGrowl,
         }),
         ('growl://growl.server?version=crap', {
-            'instance': apprise.plugins.NotifyGrowl,
+            'instance': NotifyGrowl,
         }),
 
         # Ports
         ('growl://growl.changeport:2000', {
-            'instance': apprise.plugins.NotifyGrowl,
+            'instance': NotifyGrowl,
         }),
         ('growl://growl.garbageport:garbage', {
-            'instance': apprise.plugins.NotifyGrowl,
+            'instance': NotifyGrowl,
         }),
         ('growl://growl.colon:', {
-            'instance': apprise.plugins.NotifyGrowl,
+            'instance': NotifyGrowl,
         }),
     )
 
@@ -269,7 +270,7 @@ def test_plugin_growl_general(mock_gntp):
 
             assert isinstance(obj, instance) is True
 
-            if isinstance(obj, apprise.plugins.NotifyBase):
+            if isinstance(obj, NotifyBase):
                 # We loaded okay; now lets make sure we can reverse this url
                 assert isinstance(obj.url(), str) is True
 
@@ -283,7 +284,7 @@ def test_plugin_growl_general(mock_gntp):
 
                 # Our object should be the same instance as what we had
                 # originally expected above.
-                if not isinstance(obj_cmp, apprise.plugins.NotifyBase):
+                if not isinstance(obj_cmp, NotifyBase):
                     # Assert messages are hard to trace back with the way
                     # these tests work. Just printing before throwing our
                     # assertion failure makes things easier to debug later on
@@ -323,7 +324,7 @@ def test_plugin_growl_general(mock_gntp):
 @pytest.mark.skipif(
     'gntp' not in sys.modules, reason="Requires gntp")
 @mock.patch('gntp.notifier.GrowlNotifier')
-def test_plugin_growl_config_files(mock_gntp):
+def test_plugin_growl_config_files(mock_gntp, no_throttling):
     """
     NotifyGrowl() Config File Cases
     """
@@ -349,9 +350,6 @@ def test_plugin_growl_config_files(mock_gntp):
           - priority: emergency
             tag: growl_str emerg
     """
-
-    # Disable Throttling to speed testing
-    apprise.plugins.NotifyGrowl.request_rate_per_sec = 0
 
     mock_notifier = mock.Mock()
     mock_gntp.return_value = mock_notifier

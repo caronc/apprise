@@ -27,11 +27,10 @@ import json
 from unittest import mock
 
 import requests
-from apprise import plugins
 import apprise
 from helpers import AppriseURLTester
 
-from apprise.plugins.NotifyNtfy import NtfyPriority
+from apprise.plugins.NotifyNtfy import NtfyPriority, NotifyNtfy
 
 # Disable logging for a cleaner testing output
 import logging
@@ -50,7 +49,7 @@ GOOD_RESPONSE_TEXT = {
 apprise_url_tests = (
     ('ntfy://', {
         # Initializes okay (as cloud mode) but has no topics to notify
-        'instance': plugins.NotifyNtfy,
+        'instance': NotifyNtfy,
         # invalid topics specified (nothing to notify)
         # as a result the response type will be false
         'requests_response_text': GOOD_RESPONSE_TEXT,
@@ -58,7 +57,7 @@ apprise_url_tests = (
     }),
     ('ntfys://', {
         # Initializes okay (as cloud mode) but has no topics to notify
-        'instance': plugins.NotifyNtfy,
+        'instance': NotifyNtfy,
         # invalid topics specified (nothing to notify)
         # as a result the response type will be false
         'requests_response_text': GOOD_RESPONSE_TEXT,
@@ -66,7 +65,7 @@ apprise_url_tests = (
     }),
     ('ntfy://:@/', {
         # Initializes okay (as cloud mode) but has no topics to notify
-        'instance': plugins.NotifyNtfy,
+        'instance': NotifyNtfy,
         # invalid topics specified (nothing to notify)
         # as a result the response type will be false
         'requests_response_text': GOOD_RESPONSE_TEXT,
@@ -74,7 +73,7 @@ apprise_url_tests = (
     }),
     # No topics
     ('ntfy://user:pass@localhost?mode=private', {
-        'instance': plugins.NotifyNtfy,
+        'instance': NotifyNtfy,
         # invalid topics specified (nothing to notify)
         # as a result the response type will be false
         'requests_response_text': GOOD_RESPONSE_TEXT,
@@ -82,7 +81,7 @@ apprise_url_tests = (
     }),
     # No valid topics
     ('ntfy://user:pass@localhost/#/!/@', {
-        'instance': plugins.NotifyNtfy,
+        'instance': NotifyNtfy,
         # invalid topics specified (nothing to notify)
         # as a result the response type will be false
         'requests_response_text': GOOD_RESPONSE_TEXT,
@@ -90,83 +89,83 @@ apprise_url_tests = (
     }),
     # user/pass combos
     ('ntfy://user@localhost/topic/', {
-        'instance': plugins.NotifyNtfy,
+        'instance': NotifyNtfy,
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
     # Ntfy cloud mode (enforced)
     ('ntfy://ntfy.sh/topic1/topic2/', {
-        'instance': plugins.NotifyNtfy,
+        'instance': NotifyNtfy,
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
     # No user/pass combo
     ('ntfy://localhost/topic1/topic2/', {
-        'instance': plugins.NotifyNtfy,
+        'instance': NotifyNtfy,
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
     # A Email Testing
     ('ntfy://localhost/topic1/?email=user@gmail.com', {
-        'instance': plugins.NotifyNtfy,
+        'instance': NotifyNtfy,
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
     # Tags
     ('ntfy://localhost/topic1/?tags=tag1,tag2,tag3', {
-        'instance': plugins.NotifyNtfy,
+        'instance': NotifyNtfy,
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
     # Delay
     ('ntfy://localhost/topic1/?delay=3600', {
-        'instance': plugins.NotifyNtfy,
+        'instance': NotifyNtfy,
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
     # Title
     ('ntfy://localhost/topic1/?title=A%20Great%20Title', {
-        'instance': plugins.NotifyNtfy,
+        'instance': NotifyNtfy,
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
     # Click
     ('ntfy://localhost/topic1/?click=yes', {
-        'instance': plugins.NotifyNtfy,
+        'instance': NotifyNtfy,
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
     # Email
     ('ntfy://localhost/topic1/?email=user@example.com', {
-        'instance': plugins.NotifyNtfy,
+        'instance': NotifyNtfy,
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
     # Attach
     ('ntfy://localhost/topic1/?attach=http://example.com/file.jpg', {
-        'instance': plugins.NotifyNtfy,
+        'instance': NotifyNtfy,
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
     # Attach with filename over-ride
     ('ntfy://localhost/topic1/'
      '?attach=http://example.com/file.jpg&filename=smoke.jpg', {
-         'instance': plugins.NotifyNtfy,
+         'instance': NotifyNtfy,
          'requests_response_text': GOOD_RESPONSE_TEXT}),
     # Attach with bad url
     ('ntfy://localhost/topic1/?attach=http://-%20', {
-        'instance': plugins.NotifyNtfy,
+        'instance': NotifyNtfy,
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
     # Priority
     ('ntfy://localhost/topic1/?priority=default', {
-        'instance': plugins.NotifyNtfy,
+        'instance': NotifyNtfy,
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
     # Priority higher
     ('ntfy://localhost/topic1/?priority=high', {
-        'instance': plugins.NotifyNtfy,
+        'instance': NotifyNtfy,
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
     # A topic and port identifier
     ('ntfy://user:pass@localhost:8080/topic/', {
-        'instance': plugins.NotifyNtfy,
+        'instance': NotifyNtfy,
         # The response text is expected to be the following on a success
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
     # A topic (using the to=)
     ('ntfys://user:pass@localhost?to=topic', {
-        'instance': plugins.NotifyNtfy,
+        'instance': NotifyNtfy,
         # The response text is expected to be the following on a success
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
@@ -176,19 +175,19 @@ apprise_url_tests = (
     }),
     # reference the ntfy.sh url
     ('https://ntfy.sh?to=topic', {
-        'instance': plugins.NotifyNtfy,
+        'instance': NotifyNtfy,
         # The response text is expected to be the following on a success
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
     # Several topics
     ('ntfy://user:pass@topic1/topic2/topic3/?mode=cloud', {
-        'instance': plugins.NotifyNtfy,
+        'instance': NotifyNtfy,
         # The response text is expected to be the following on a success
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
     # Several topics (but do not add ntfy.sh)
     ('ntfy://user:pass@ntfy.sh/topic1/topic2/?mode=cloud', {
-        'instance': plugins.NotifyNtfy,
+        'instance': NotifyNtfy,
         # The response text is expected to be the following on a success
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
@@ -201,20 +200,20 @@ apprise_url_tests = (
         'instance': None,
     }),
     ('ntfy://user:pass@localhost:8089/topic/topic2', {
-        'instance': plugins.NotifyNtfy,
+        'instance': NotifyNtfy,
         # force a failure using basic mode
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
     ('ntfy://user:pass@localhost:8082/topic', {
-        'instance': plugins.NotifyNtfy,
+        'instance': NotifyNtfy,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
     ('ntfy://user:pass@localhost:8083/topic1/topic2/', {
-        'instance': plugins.NotifyNtfy,
+        'instance': NotifyNtfy,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -234,13 +233,11 @@ def test_plugin_ntfy_chat_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_ntfy_attachments(mock_post):
+def test_plugin_ntfy_attachments(mock_post, no_throttling):
     """
     NotifyNtfy() Attachment Checks
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyNtfy.request_rate_per_sec = 0
 
     # Prepare Mock return object
     response = mock.Mock()
@@ -351,13 +348,11 @@ def test_plugin_ntfy_attachments(mock_post):
 
 
 @mock.patch('requests.post')
-def test_plugin_custom_ntfy_edge_cases(mock_post):
+def test_plugin_custom_ntfy_edge_cases(mock_post, no_throttling):
     """
     NotifyNtfy() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare our response
     response = requests.Request()
@@ -367,7 +362,7 @@ def test_plugin_custom_ntfy_edge_cases(mock_post):
     # Prepare Mock
     mock_post.return_value = response
 
-    results = plugins.NotifyNtfy.parse_url(
+    results = NotifyNtfy.parse_url(
         'ntfys://abc---,topic2,~~,,?priority=max&tags=smile,de')
 
     assert isinstance(results, dict)
@@ -384,13 +379,13 @@ def test_plugin_custom_ntfy_edge_cases(mock_post):
     assert results['qsd']['priority'] == 'max'
     assert results['qsd']['tags'] == 'smile,de'
 
-    instance = plugins.NotifyNtfy(**results)
-    assert isinstance(instance, plugins.NotifyNtfy)
+    instance = NotifyNtfy(**results)
+    assert isinstance(instance, NotifyNtfy)
     assert len(instance.topics) == 2
     assert 'abc---' in instance.topics
     assert 'topic2' in instance.topics
 
-    results = plugins.NotifyNtfy.parse_url(
+    results = NotifyNtfy.parse_url(
         'ntfy://localhost/topic1/'
         '?attach=http://example.com/file.jpg&filename=smoke.jpg')
 
@@ -407,8 +402,8 @@ def test_plugin_custom_ntfy_edge_cases(mock_post):
     assert results['attach'] == 'http://example.com/file.jpg'
     assert results['filename'] == 'smoke.jpg'
 
-    instance = plugins.NotifyNtfy(**results)
-    assert isinstance(instance, plugins.NotifyNtfy)
+    instance = NotifyNtfy(**results)
+    assert isinstance(instance, NotifyNtfy)
     assert len(instance.topics) == 1
     assert 'topic1' in instance.topics
 
@@ -430,7 +425,7 @@ def test_plugin_custom_ntfy_edge_cases(mock_post):
 
 @mock.patch('requests.post')
 @mock.patch('requests.get')
-def test_plugin_ntfy_config_files(mock_post, mock_get):
+def test_plugin_ntfy_config_files(mock_post, mock_get, no_throttling):
     """
     NotifyNtfy() Config File Cases
     """
@@ -458,9 +453,6 @@ def test_plugin_ntfy_config_files(mock_post, mock_get):
           - priority: max
             tag: ntfy_str max
     """
-
-    # Disable Throttling to speed testing
-    plugins.NotifyNtfy.request_rate_per_sec = 0
 
     # Prepare Mock
     mock_post.return_value = requests.Request()

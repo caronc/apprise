@@ -27,7 +27,8 @@ from unittest import mock
 import pytest
 import requests
 from json import dumps
-from apprise import plugins
+
+from apprise.plugins.NotifySinch import NotifySinch
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -55,7 +56,7 @@ apprise_url_tests = (
     ('sinch://{}:{}@{}'.format('a' * 32, 'b' * 32, '3' * 5), {
         # using short-code (5 characters) without a target
         # We can still instantiate ourselves with a valid short code
-        'instance': plugins.NotifySinch,
+        'instance': NotifySinch,
         # Expected notify() response because we have no one to notify
         'notify_response': False,
     }),
@@ -66,27 +67,27 @@ apprise_url_tests = (
     ('sinch://{}:{}@{}/123/{}/abcd/'.format(
         'a' * 32, 'b' * 32, '3' * 11, '9' * 15), {
         # valid everything but target numbers
-        'instance': plugins.NotifySinch,
+        'instance': NotifySinch,
     }),
     ('sinch://{}:{}@12345/{}'.format('a' * 32, 'b' * 32, '4' * 11), {
         # using short-code (5 characters)
-        'instance': plugins.NotifySinch,
+        'instance': NotifySinch,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'sinch://...aaaa:b...b@12345',
     }),
     ('sinch://{}:{}@123456/{}'.format('a' * 32, 'b' * 32, '4' * 11), {
         # using short-code (6 characters)
-        'instance': plugins.NotifySinch,
+        'instance': NotifySinch,
     }),
     ('sinch://{}:{}@{}'.format('a' * 32, 'b' * 32, '5' * 11), {
         # using phone no with no target - we text ourselves in
         # this case
-        'instance': plugins.NotifySinch,
+        'instance': NotifySinch,
     }),
     ('sinch://{}:{}@{}?region=eu'.format('a' * 32, 'b' * 32, '5' * 11), {
         # Specify a region
-        'instance': plugins.NotifySinch,
+        'instance': NotifySinch,
     }),
     ('sinch://{}:{}@{}?region=invalid'.format('a' * 32, 'b' * 32, '5' * 11), {
         # Invalid region
@@ -95,26 +96,26 @@ apprise_url_tests = (
     ('sinch://_?spi={}&token={}&from={}'.format(
         'a' * 32, 'b' * 32, '5' * 11), {
         # use get args to acomplish the same thing
-        'instance': plugins.NotifySinch,
+        'instance': NotifySinch,
     }),
     ('sinch://_?spi={}&token={}&source={}'.format(
         'a' * 32, 'b' * 32, '5' * 11), {
         # use get args to acomplish the same thing (use source instead of from)
-        'instance': plugins.NotifySinch,
+        'instance': NotifySinch,
     }),
     ('sinch://_?spi={}&token={}&from={}&to={}'.format(
         'a' * 32, 'b' * 32, '5' * 11, '7' * 13), {
         # use to=
-        'instance': plugins.NotifySinch,
+        'instance': NotifySinch,
     }),
     ('sinch://{}:{}@{}'.format('a' * 32, 'b' * 32, '6' * 11), {
-        'instance': plugins.NotifySinch,
+        'instance': NotifySinch,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('sinch://{}:{}@{}'.format('a' * 32, 'b' * 32, '6' * 11), {
-        'instance': plugins.NotifySinch,
+        'instance': NotifySinch,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -133,13 +134,11 @@ def test_plugin_sinch_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_sinch_edge_cases(mock_post):
+def test_plugin_sinch_edge_cases(mock_post, no_throttling):
     """
     NotifySinch() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    plugins.NotifyBase.request_rate_per_sec = 0
 
     # Prepare our response
     response = requests.Request()
@@ -155,12 +154,12 @@ def test_plugin_sinch_edge_cases(mock_post):
 
     # No service_plan_id specified
     with pytest.raises(TypeError):
-        plugins.NotifySinch(
+        NotifySinch(
             service_plan_id=None, api_token=api_token, source=source)
 
     # No api_token specified
     with pytest.raises(TypeError):
-        plugins.NotifySinch(
+        NotifySinch(
             service_plan_id=service_plan_id, api_token=None, source=source)
 
     # a error response
@@ -172,7 +171,7 @@ def test_plugin_sinch_edge_cases(mock_post):
     mock_post.return_value = response
 
     # Initialize our object
-    obj = plugins.NotifySinch(
+    obj = NotifySinch(
         service_plan_id=service_plan_id, api_token=api_token, source=source)
 
     # We will fail with the above error code

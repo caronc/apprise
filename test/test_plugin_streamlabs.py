@@ -22,7 +22,7 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
-from apprise import plugins
+from apprise.plugins.NotifyStreamlabs import NotifyStreamlabs
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -41,7 +41,7 @@ apprise_url_tests = (
     }),
     ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso', {
         # access token
-        'instance': plugins.NotifyStreamlabs,
+        'instance': NotifyStreamlabs,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'strmlabs://I...o',
@@ -53,17 +53,17 @@ apprise_url_tests = (
     # Test complete params - donations
     ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/'
      '?name=tt&identifier=pyt&amount=20&currency=USD&call=donations',
-     {'instance': plugins.NotifyStreamlabs, }),
+     {'instance': NotifyStreamlabs, }),
     # Test complete params - donations
     ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/'
      '?image_href=https://example.org/rms.jpg'
      '&sound_href=https://example.org/rms.mp3',
-     {'instance': plugins.NotifyStreamlabs, }),
+     {'instance': NotifyStreamlabs, }),
     # Test complete params - alerts
     ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/'
      '?duration=1000&image_href=&'
      'sound_href=&alert_type=donation&special_text_color=crimson',
-     {'instance': plugins.NotifyStreamlabs, }),
+     {'instance': NotifyStreamlabs, }),
     # Test incorrect call
     ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/'
      '?name=tt&identifier=pyt&amount=20&currency=USD&call=rms',
@@ -77,7 +77,7 @@ apprise_url_tests = (
         'instance': TypeError,
     }),
     ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/?call=donations', {
-        'instance': plugins.NotifyStreamlabs,
+        'instance': NotifyStreamlabs,
         # A failure has status set to zero
         # Test without an 'error' flag
         'requests_response_text': {
@@ -89,7 +89,7 @@ apprise_url_tests = (
         'requests_response_code': 999,
     }),
     ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/?call=alerts', {
-        'instance': plugins.NotifyStreamlabs,
+        'instance': NotifyStreamlabs,
         # A failure has status set to zero
         # Test without an 'error' flag
         'requests_response_text': {
@@ -101,13 +101,13 @@ apprise_url_tests = (
         'requests_response_code': 999,
     }),
     ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/?call=alerts', {
-        'instance': plugins.NotifyStreamlabs,
+        'instance': NotifyStreamlabs,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
     }),
     ('strmlabs://IcIcArukDQtuC1is1X1UdKZjTg118Lag2vScOmso/?call=donations', {
-        'instance': plugins.NotifyStreamlabs,
+        'instance': NotifyStreamlabs,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
