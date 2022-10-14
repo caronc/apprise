@@ -24,6 +24,7 @@
 
 import requests
 
+from json import dumps
 from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyType
@@ -134,7 +135,9 @@ class NotifyNextcloudTalk(NotifyBase):
         # Prepare our Header
         headers = {
             'User-Agent': self.app_id,
-            'OCS-APIREQUEST': 'true',
+            'OCS-APIRequest': 'true',
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
         }
 
         # Apply any/all header over-rides defined
@@ -183,7 +186,7 @@ class NotifyNextcloudTalk(NotifyBase):
             try:
                 r = requests.post(
                     notify_url,
-                    data=payload,
+                    data=dumps(payload),
                     headers=headers,
                     auth=(self.user, self.password),
                     verify=self.verify_certificate,
