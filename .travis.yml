@@ -19,6 +19,8 @@ matrix:
       env: TOXENV=py39
     - python: "3.10"
       env: TOXENV=py310
+    - python: "3.11-dev"
+      env: TOXENV=py311
     # PyPy Environments
     - python: "pypy3.6-7.3.3"
       env: TOXENV=pypy36
