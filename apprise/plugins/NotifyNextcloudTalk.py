@@ -24,6 +24,7 @@
 
 import requests
 
+from json import dumps
 from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyType
@@ -185,7 +186,7 @@ class NotifyNextcloudTalk(NotifyBase):
             try:
                 r = requests.post(
                     notify_url,
-                    json=payload,
+                    data=dumps(payload),
                     headers=headers,
                     auth=(self.user, self.password),
                     verify=self.verify_certificate,
