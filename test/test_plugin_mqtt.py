@@ -225,12 +225,7 @@ def test_plugin_mqtt_no_topic_failure(mqtt_client_mock):
 def test_plugin_mqtt_tls_connect_success(mqtt_client_mock):
     """
     Verify TLS encrypted connections work.
-
-    # TODO: Make it work on macOS.
     """
-
-    if sys.platform == "darwin":
-        raise pytest.xfail(reason="Fails on macOS")
 
     obj = apprise.Apprise.instantiate(
         'mqtts://user:pass@localhost/my/topic', suppress_exceptions=False)
@@ -259,14 +254,11 @@ def test_plugin_mqtt_tls_connect_success(mqtt_client_mock):
     ]
 
 
-    # TODO: Make it work on macOS.
 def test_plugin_mqtt_tls_no_certificates_failure(mqtt_client_mock, mocker):
     """
     Verify TLS does not work without access to CA root certificates.
     """
 
-    if sys.platform == "darwin":
-        raise pytest.xfail(reason="Fails on macOS")
     # Clear CA certificates.
     mocker.patch.object(NotifyMQTT, "CA_CERTIFICATE_FILE_LOCATIONS", [])
 
@@ -288,12 +280,7 @@ def test_plugin_mqtt_tls_no_certificates_failure(mqtt_client_mock, mocker):
 def test_plugin_mqtt_tls_no_verify_success(mqtt_client_mock):
     """
     Verify TLS encrypted connections work with `verify=False`.
-
-    # TODO: Make it work on macOS.
     """
-
-    if sys.platform == "darwin":
-        raise pytest.xfail(reason="Fails on macOS")
 
     # A single user (not password) + no verifying of host
     obj = apprise.Apprise.instantiate(

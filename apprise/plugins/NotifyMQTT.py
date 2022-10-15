@@ -145,6 +145,8 @@ class NotifyMQTT(NotifyBase):
         "/etc/pki/tls/cacert.pem",
         # CentOS/RHEL 7
         "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
+        # macOS Homebrew; brew install ca-certificates
+        "/usr/local/etc/ca-certificates/cert.pem",
     ]
 
     # Define object templates
