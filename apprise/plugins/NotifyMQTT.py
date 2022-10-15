@@ -133,6 +133,7 @@ class NotifyMQTT(NotifyBase):
     mqtt_inflight_messages = 200
 
     # Taken from https://golang.org/src/crypto/x509/root_linux.go
+    # TODO: Maybe migrate to a general utility function?
     CA_CERTIFICATE_FILE_LOCATIONS = [
         # Debian/Ubuntu/Gentoo etc.
         "/etc/ssl/certs/ca-certificates.crt",
@@ -264,6 +265,9 @@ class NotifyMQTT(NotifyBase):
         self.ca_certs = None
         if self.secure:
             # verify SSL key or abort
+            # TODO: There is no error reporting or aborting here?
+            #       It could be useful to inform the user _where_ Apprise
+            #       tried to find the root CA certificates file.
             self.ca_certs = next(
                 (cert for cert in self.CA_CERTIFICATE_FILE_LOCATIONS
                  if isfile(cert)), None)
@@ -316,9 +320,9 @@ class NotifyMQTT(NotifyBase):
 
                 if self.secure:
                     if self.ca_certs is None:
-                        self.logger.warning(
-                            'MQTT Secure comunication can not be verified; '
-                            'no local CA certificate file')
+                        self.logger.error(
+                            'MQTT secure communication can not be verified, '
+                            'CA certificates file missing')
                         return False
 
                     self.client.tls_set(
