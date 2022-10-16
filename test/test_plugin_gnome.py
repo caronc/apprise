@@ -305,8 +305,8 @@ def test_plugin_gnome_missing_icon(mocker, obj):
     assert obj.notify(title='title', body='body',
                       notify_type=apprise.NotifyType.INFO) is True
     assert logger.mock_calls == [
-        call.warning('Could not load notification icon (%s). '
-                     'Reason: Something failed', ANY),
+        call.warning('Could not load notification icon (%s).', ANY),
+        call.debug('Gnome Exception: Something failed'),
         call.info('Sent Gnome notification.'),
     ]
 
@@ -365,7 +365,6 @@ def test_plugin_gnome_notify_croaks(mocker, obj):
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is False
     assert logger.mock_calls == [
-        call.warning('Failed to send Gnome notification. '
-                     'Reason: Something failed'),
-        call.exception('Gnome Exception')
+        call.warning('Failed to send Gnome notification.'),
+        call.debug('Gnome Exception: Something failed'),
     ]
