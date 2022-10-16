@@ -291,10 +291,10 @@ class NotifyDBus(NotifyBase):
         try:
             session = SessionBus(mainloop=MAINLOOP_MAP[self.schema])
 
-        except DBusException:
+        except DBusException as e:
             # Handle exception
             self.logger.warning('Failed to send DBus notification.')
-            self.logger.exception('DBus Exception')
+            self.logger.debug(f'DBus Exception: {e}')
             return False
 
         # If there is no title, but there is a body, swap the two to get rid
@@ -347,8 +347,8 @@ class NotifyDBus(NotifyBase):
 
             except Exception as e:
                 self.logger.warning(
-                    f"Could not load notification icon (%s). "
-                    f"Reason: {e}", icon_path)
+                    "Could not load notification icon (%s).", icon_path)
+                self.logger.debug(f'DBus Exception: {e}')
 
         try:
             # Always call throttle() before any remote execution is made
@@ -376,9 +376,8 @@ class NotifyDBus(NotifyBase):
             self.logger.info('Sent DBus notification.')
 
         except Exception as e:
-            self.logger.warning(f'Failed to send DBus notification. '
-                                f'Reason: {e}')
-            self.logger.exception('DBus Exception')
+            self.logger.warning('Failed to send DBus notification.')
+            self.logger.debug(f'DBus Exception: {e}')
             return False
 
         return True

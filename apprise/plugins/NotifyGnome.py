@@ -211,16 +211,15 @@ class NotifyGnome(NotifyBase):
 
                 except Exception as e:
                     self.logger.warning(
-                        f"Could not load notification icon (%s). "
-                        f"Reason: {e}", icon_path)
+                        "Could not load notification icon (%s). ", icon_path)
+                    self.logger.debug(f'Gnome Exception: {e}')
 
             notification.show()
             self.logger.info('Sent Gnome notification.')
 
         except Exception as e:
-            self.logger.warning(f'Failed to send Gnome notification. '
-                                f'Reason: {e}')
-            self.logger.exception('Gnome Exception')
+            self.logger.warning('Failed to send Gnome notification.')
+            self.logger.debug(f'Gnome Exception: {e}')
             return False
 
         return True
