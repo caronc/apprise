@@ -47,6 +47,10 @@ jobs:
             python-version: "3.10"
             bare: true
 
+    defaults:
+      run:
+        shell: bash
+
     env:
       OS: ${{ matrix.os }}
       PYTHON: ${{ matrix.python-version }}
