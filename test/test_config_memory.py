@@ -39,7 +39,7 @@ def test_config_memory():
     assert ConfigMemory.parse_url('garbage://') is None
 
     # Initialize our object
-    cm = ConfigMemory(content="syslog://", format='text')
+    cm = ConfigMemory(content="json://localhost", format='text')
 
     # one entry added
     assert len(cm) == 1
@@ -49,7 +49,7 @@ def test_config_memory():
     assert isinstance(cm.read(), str) is True
 
     # Test situation where an auto-detect is required:
-    cm = ConfigMemory(content="syslog://")
+    cm = ConfigMemory(content="json://localhost")
 
     # one entry added
     assert len(cm) == 1
