@@ -32,10 +32,14 @@ import socket
 
 # Disable logging for a cleaner testing output
 import logging
-
-from apprise.plugins.NotifySyslog import NotifySyslog
-
 logging.disable(logging.CRITICAL)
+
+
+# The `syslog` module is not available on Windows.
+# `ModuleNotFoundError: No module named 'syslog'`
+NotifySyslog = pytest.importorskip(
+    "apprise.plugins.NotifySyslog",
+    reason="`syslog` module not available on Windows").NotifySyslog
 
 
 @mock.patch('syslog.syslog')
