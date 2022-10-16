@@ -98,7 +98,7 @@ jobs:
     - name: Install project dependencies (Windows)
       if: runner.os == 'Windows'
       run: |
-        pip install -r win-requirements.txt
+        [[ $PYTHON != 'pypy'* ]] && pip install -r win-requirements.txt || true
 
     # Install package in editable mode,
     # and run project-specific tasks.

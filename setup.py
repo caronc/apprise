@@ -27,6 +27,8 @@
 import re
 import os
 import platform
+import sys
+
 from setuptools import find_packages, setup
 
 cmdclass = {}
@@ -43,7 +45,8 @@ except ImportError:
 
 install_options = os.environ.get("APPRISE_INSTALL", "").split(",")
 install_requires = open('requirements.txt').readlines()
-if platform.system().lower().startswith('win'):
+if platform.system().lower().startswith('win') \
+        and not hasattr(sys, "pypy_version_info"):
     # Windows Notification Support
     install_requires += open('win-requirements.txt').readlines()
 
