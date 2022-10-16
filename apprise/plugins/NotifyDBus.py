@@ -26,6 +26,7 @@
 from __future__ import absolute_import
 from __future__ import print_function
 
+import sys
 from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
 from ..common import NotifyType
@@ -76,6 +77,13 @@ try:
     # We're good as long as at least one
     NOTIFY_DBUS_SUPPORT_ENABLED = (
         LOOP_GLIB is not None or LOOP_QT is not None)
+
+    # ImportError: When using gi.repository you must not import static modules
+    # like "gobject". Please change all occurrences of "import gobject" to
+    # "from gi.repository import GObject".
+    # See: https://bugzilla.gnome.org/show_bug.cgi?id=709183
+    if "gobject" in sys.modules:  # pragma: no cover
+        del sys.modules["gobject"]
 
     try:
         # The following is required for Image/Icon loading only
@@ -272,11 +280,8 @@ class NotifyDBus(NotifyBase):
             self.x_axis = None
             self.y_axis = None
 
-        # Track whether or not we want to send an image with our notification
-        # or not.
+        # Track whether we want to add an image to the notification.
         self.include_image = include_image
-
-        return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
@@ -286,10 +291,10 @@ class NotifyDBus(NotifyBase):
         try:
             session = SessionBus(mainloop=MAINLOOP_MAP[self.schema])
 
-        except DBusException:
+        except DBusException as e:
             # Handle exception
             self.logger.warning('Failed to send DBus notification.')
-            self.logger.exception('DBus Exception')
+            self.logger.debug(f'DBus Exception: {e}')
             return False
 
         # If there is no title, but there is a body, swap the two to get rid
@@ -342,8 +347,8 @@ class NotifyDBus(NotifyBase):
 
             except Exception as e:
                 self.logger.warning(
-                    "Could not load Gnome notification icon ({}): {}"
-                    .format(icon_path, e))
+                    "Could not load notification icon (%s).", icon_path)
+                self.logger.debug(f'DBus Exception: {e}')
 
         try:
             # Always call throttle() before any remote execution is made
@@ -370,9 +375,9 @@ class NotifyDBus(NotifyBase):
 
             self.logger.info('Sent DBus notification.')
 
-        except Exception:
+        except Exception as e:
             self.logger.warning('Failed to send DBus notification.')
-            self.logger.exception('DBus Exception')
+            self.logger.debug(f'DBus Exception: {e}')
             return False
 
         return True

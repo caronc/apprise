@@ -1,8 +1,8 @@
 # Base
 FROM python:3.6-buster
 RUN apt-get update && \
-    apt-get install -y libdbus-1-dev build-essential musl-dev bash
-RUN pip install dbus-python
+    apt-get install -y libdbus-1-dev libgirepository1.0-dev build-essential musl-dev bash
+RUN pip install dbus-python PyGObject
 
 # Apprise Setup
 VOLUME ["/apprise"]

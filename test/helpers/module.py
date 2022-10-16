@@ -22,24 +22,18 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
-
+from importlib import import_module, reload
 import sys
 
-from importlib import reload
 
-
-def reload_plugin(name):
+def reload_plugin(name, replace_in=None):
     """
-    Reload builtin plugin module, e.g. `NotifyGnome`.
-    set filename to plugin to be reloaded (for example NotifyGnome.py)
+    Reload built-in plugin module, e.g. `NotifyGnome`.
 
-    The following libraries need to be reloaded to prevent
-     TypeError: super(type, obj): obj must be an instance or subtype of type
-     This is better explained in this StackOverflow post:
-        https://stackoverflow.com/questions/31363311/\
-          any-way-to-manually-fix-operation-of-\
-             super-after-ipython-reload-avoiding-ty
+    Reloading plugin modules is needed when testing module-level code of
+    notification plugins.
 
+    See also https://stackoverflow.com/questions/31363311.
     """
 
     module_name = f"apprise.plugins.{name}"
@@ -53,3 +47,10 @@ def reload_plugin(name):
     reload(sys.modules['apprise.Apprise'])
     reload(sys.modules['apprise.utils'])
     reload(sys.modules['apprise'])
+
+    # Fix reference to new plugin class in given module.
+    # Needed for updating the module-level import reference like
+    # `from apprise.plugins.NotifyMacOSX import NotifyMacOSX`.
+    if replace_in is not None:
+        mod = import_module(module_name)
+        setattr(replace_in, name, getattr(mod, name))

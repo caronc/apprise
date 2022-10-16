@@ -54,8 +54,8 @@ except (ImportError, ValueError, AttributeError):
     # be in microsoft windows, or we just don't have the python-gobject
     # library available to us (or maybe one we don't support)?
 
-    # Alternativey A ValueError will get thrown upon calling
-    # gi.require_version() if the requested Notify namespace isn't available
+    # Alternatively, a `ValueError` will get raised upon calling
+    # gi.require_version() if the requested Notify namespace isn't available.
     pass
 
 
@@ -175,11 +175,8 @@ class NotifyGnome(NotifyBase):
                 if str(urgency).lower().startswith(k)),
                 NotifyGnome.template_args['urgency']['default']))
 
-        # Track whether or not we want to send an image with our notification
-        # or not.
+        # Track whether we want to add an image to the notification.
         self.include_image = include_image
-
-        return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
@@ -214,15 +211,15 @@ class NotifyGnome(NotifyBase):
 
                 except Exception as e:
                     self.logger.warning(
-                        "Could not load Gnome notification icon ({}): {}"
-                        .format(icon_path, e))
+                        "Could not load notification icon (%s). ", icon_path)
+                    self.logger.debug(f'Gnome Exception: {e}')
 
             notification.show()
             self.logger.info('Sent Gnome notification.')
 
-        except Exception:
+        except Exception as e:
             self.logger.warning('Failed to send Gnome notification.')
-            self.logger.exception('Gnome Exception')
+            self.logger.debug(f'Gnome Exception: {e}')
             return False
 
         return True

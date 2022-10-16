@@ -22,40 +22,37 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
-
+import importlib
+import logging
 import re
-import pytest
-from unittest import mock
-
 import sys
 import types
+from unittest.mock import Mock, call, ANY
+
+import pytest
+
 import apprise
 from helpers import reload_plugin
-from importlib import reload
 
 
 # Disable logging for a cleaner testing output
-import logging
 logging.disable(logging.CRITICAL)
 
+
+# Skip tests when Python environment does not provide the `dbus` package.
 if 'dbus' not in sys.modules:
-    # Environment doesn't allow for dbus
     pytest.skip("Skipping dbus-python based tests", allow_module_level=True)
 
+
 from dbus import DBusException  # noqa E402
-from apprise.plugins.NotifyDBus import DBusUrgency  # noqa E402
+from apprise.plugins.NotifyDBus import DBusUrgency, NotifyDBus  # noqa E402
 
 
-@mock.patch('dbus.SessionBus')
-@mock.patch('dbus.Interface')
-@mock.patch('dbus.ByteArray')
-@mock.patch('dbus.Byte')
-@mock.patch('dbus.mainloop')
-def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
-                             mock_interface, mock_sessionbus):
+def setup_glib_environment():
     """
-    NotifyDBus() General Tests
+    Setup a heavily mocked Glib environment.
     """
+    mock_mainloop = Mock()
 
     # Our module base
     gi_name = 'gi'
@@ -68,15 +65,15 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
         # for the purpose of testing and capture the handling of the
         # library when it is missing
         del sys.modules[gi_name]
-        reload(sys.modules['apprise.plugins.NotifyDBus'])
+        importlib.reload(sys.modules['apprise.plugins.NotifyDBus'])
 
     # We need to fake our dbus environment for testing purposes since
     # the gi library isn't available in Travis CI
     gi = types.ModuleType(gi_name)
     gi.repository = types.ModuleType(gi_name + '.repository')
 
-    mock_pixbuf = mock.Mock()
-    mock_image = mock.Mock()
+    mock_pixbuf = Mock()
+    mock_image = Mock()
     mock_pixbuf.new_from_file.return_value = mock_image
 
     mock_image.get_width.return_value = 100
@@ -92,7 +89,7 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
     gi.repository.GdkPixbuf.Pixbuf = mock_pixbuf
 
     # Emulate require_version function:
-    gi.require_version = mock.Mock(
+    gi.require_version = Mock(
         name=gi_name + '.require_version')
 
     # Force the fake module to exist
@@ -103,18 +100,53 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
     mock_mainloop.qt.DBusQtMainLoop.return_value = True
     mock_mainloop.qt.DBusQtMainLoop.side_effect = ImportError
     sys.modules['dbus.mainloop.qt'] = mock_mainloop.qt
-    reload(sys.modules['apprise.plugins.NotifyDBus'])
     mock_mainloop.qt.DBusQtMainLoop.side_effect = None
 
     mock_mainloop.glib.NativeMainLoop.return_value = True
     mock_mainloop.glib.NativeMainLoop.side_effect = ImportError()
     sys.modules['dbus.mainloop.glib'] = mock_mainloop.glib
-    reload(sys.modules['apprise.plugins.NotifyDBus'])
     mock_mainloop.glib.DBusGMainLoop.side_effect = None
     mock_mainloop.glib.NativeMainLoop.side_effect = None
 
-    reload_plugin('NotifyDBus')
-    from apprise.plugins.NotifyDBus import NotifyDBus
+    # When patching something which has a side effect on the module-level code
+    # of a plugin, make sure to reload it.
+    current_module = sys.modules[__name__]
+    reload_plugin('NotifyDBus', replace_in=current_module)
+
+
+@pytest.fixture
+def dbus_environment(mocker):
+    """
+    Fixture to provide a mocked Dbus environment to test case functions.
+    """
+    interface_mock = mocker.patch('dbus.Interface', spec=True,
+                                  Notify=Mock())
+    mocker.patch('dbus.SessionBus', spec=True,
+                 **{"get_object.return_value": interface_mock})
+
+
+@pytest.fixture
+def glib_environment():
+    """
+    Fixture to provide a mocked Glib environment to test case functions.
+    """
+    setup_glib_environment()
+
+
+@pytest.fixture
+def dbus_glib_environment(dbus_environment, glib_environment):
+    """
+    Fixture to provide a mocked Glib/DBus environment to test case functions.
+    """
+    pass
+
+
+def test_plugin_dbus_general_success(mocker, dbus_glib_environment):
+    """
+    NotifyDBus() general tests
+
+    Test class loading using different arguments, provided via URL.
+    """
 
     # Create our instance (identify all supported types)
     obj = apprise.Apprise.instantiate('dbus://', suppress_exceptions=False)
@@ -134,10 +166,6 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
     assert isinstance(obj.url(), str) is True
     assert obj.url().startswith('glib://_/')
     obj.duration = 0
-
-    # Test our class loading using a series of arguments
-    with pytest.raises(TypeError):
-        NotifyDBus(**{'schema': 'invalid'})
 
     # Set our X and Y coordinate and try the notification
     assert NotifyDBus(
@@ -245,9 +273,21 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True
 
+
+def test_plugin_dbus_general_failure(dbus_glib_environment):
+    """
+    Verify a few failure conditions.
+    """
+
     with pytest.raises(TypeError):
-        obj = apprise.Apprise.instantiate(
-            'dbus://_/?x=invalid&y=invalid', suppress_exceptions=False)
+        NotifyDBus(**{'schema': 'invalid'})
+
+    with pytest.raises(TypeError):
+        apprise.Apprise.instantiate('dbus://_/?x=invalid&y=invalid',
+                                    suppress_exceptions=False)
+
+
+def test_plugin_dbus_parse_configuration(dbus_glib_environment):
 
     # Test configuration parsing
     content = """
@@ -318,104 +358,160 @@ def test_plugin_dbus_general(mock_mainloop, mock_byte, mock_bytearray,
     for s in aobj.find(tag='dbus_invalid'):
         assert s.urgency == DBusUrgency.NORMAL
 
-    # If our underlining object throws for whatever rea on, we will
-    # gracefully fail
-    mock_notify = mock.Mock()
-    mock_interface.return_value = mock_notify
-    mock_notify.Notify.side_effect = AttributeError()
-    assert obj.notify(
-        title='', body='body',
-        notify_type=apprise.NotifyType.INFO) is False
-    mock_notify.Notify.side_effect = None
 
-    # Test our loading of our icon exception; it will still allow the
-    # notification to be sent
-    mock_pixbuf.new_from_file.side_effect = AttributeError()
+def test_plugin_dbus_missing_icon(mocker, dbus_glib_environment):
+    """
+    Test exception when loading icon; the notification will still be sent.
+    """
+
+    # Inject error when loading icon.
+    gi = importlib.import_module("gi")
+    gi.repository.GdkPixbuf.Pixbuf.new_from_file.side_effect = \
+        AttributeError("Something failed")
+
+    obj = apprise.Apprise.instantiate('dbus://', suppress_exceptions=False)
+    logger: Mock = mocker.spy(obj, "logger")
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True
-    # Undo our change
-    mock_pixbuf.new_from_file.side_effect = None
+    assert logger.mock_calls == [
+        call.warning('Could not load notification icon (%s). '
+                     'Reason: Something failed', ANY),
+        call.info('Sent DBus notification.'),
+    ]
 
-    # Test our exception handling during initialization
-    # Toggle our testing for when we can't send notifications because the
-    # package has been made unavailable to us
+
+def test_plugin_dbus_disabled_plugin(dbus_glib_environment):
+    """
+    Verify notification will not be submitted if plugin is disabled.
+    """
+    obj = apprise.Apprise.instantiate('dbus://', suppress_exceptions=False)
+
     obj.enabled = False
+
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is False
 
-    # Test the setting of a the urgency
+
+def test_plugin_dbus_set_urgency():
+    """
+    Test the setting of an urgency.
+    """
     NotifyDBus(urgency=0)
 
-    #
-    # We can still notify if the gi library is the only inaccessible
-    # compontent
-    #
 
-    # Emulate require_version function:
+def test_plugin_dbus_gi_missing(dbus_glib_environment):
+    """
+    Verify notification succeeds even if the `gi` package is not available.
+    """
+
+    # Make `require_version` function raise an ImportError.
+    gi = importlib.import_module("gi")
     gi.require_version.side_effect = ImportError()
-    reload_plugin('NotifyDBus')
-    from apprise.plugins.NotifyDBus import NotifyDBus
 
-    # Create our instance
+    # When patching something which has a side effect on the module-level code
+    # of a plugin, make sure to reload it.
+    current_module = sys.modules[__name__]
+    reload_plugin('NotifyDBus', replace_in=current_module)
+
+    # Create the instance.
     obj = apprise.Apprise.instantiate('glib://', suppress_exceptions=False)
     assert isinstance(obj, NotifyDBus) is True
     obj.duration = 0
 
-    # Test url() call
+    # Test url() call.
     assert isinstance(obj.url(), str) is True
 
-    # Our notification succeeds even though the gi library was not loaded
+    # The notification succeeds even though the gi library was not loaded.
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True
 
-    # Verify this all works in the event a ValueError is also thronw
-    # out of the call to gi.require_version()
 
-    mock_sessionbus.side_effect = DBusException('test')
-    # Handle Dbus Session Initialization error
-    assert obj.notify(
-        title='title', body='body',
-        notify_type=apprise.NotifyType.INFO) is False
+def test_plugin_dbus_gi_require_version_error(dbus_glib_environment):
+    """
+    Verify notification succeeds even if `gi.require_version()` croaks.
+    """
 
-    # Return side effect to normal
-    mock_sessionbus.side_effect = None
+    # Make `require_version` function raise a ValueError.
+    gi = importlib.import_module("gi")
+    gi.require_version.side_effect = ValueError("Something failed")
 
-    # Emulate require_version function:
-    gi.require_version.side_effect = ValueError()
-    reload_plugin('NotifyDBus')
-    from apprise.plugins.NotifyDBus import NotifyDBus
+    # When patching something which has a side effect on the module-level code
+    # of a plugin, make sure to reload it.
+    current_module = sys.modules[__name__]
+    reload_plugin('NotifyDBus', replace_in=current_module)
 
-    # Create our instance
+    # Create instance.
     obj = apprise.Apprise.instantiate('glib://', suppress_exceptions=False)
     assert isinstance(obj, NotifyDBus) is True
     obj.duration = 0
 
-    # Test url() call
+    # Test url() call.
     assert isinstance(obj.url(), str) is True
 
-    # Our notification succeeds even though the gi library was not loaded
+    # The notification succeeds even though the gi library was not loaded.
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True
 
-    # Force a global import error
-    _session_bus = sys.modules['dbus']
-    sys.modules['dbus'] = compile('raise ImportError()', 'dbus', 'exec')
 
-    # Reload our modules
-    reload_plugin('NotifyDBus')
+def test_plugin_dbus_module_croaks(mocker, dbus_glib_environment):
+    """
+    Verify plugin is not available when `dbus` module is missing.
+    """
 
-    # We can no longer instantiate an instance because dbus has been
-    # officialy marked unavailable and thus the module is marked
-    # as such
+    # Make importing `dbus` raise an ImportError.
+    mocker.patch.dict(
+        sys.modules, {'dbus': compile('raise ImportError()', 'dbus', 'exec')})
+
+    # When patching something which has a side effect on the module-level code
+    # of a plugin, make sure to reload it.
+    current_module = sys.modules[__name__]
+    reload_plugin('NotifyDBus', replace_in=current_module)
+
+    # Verify plugin is not available.
     obj = apprise.Apprise.instantiate('glib://', suppress_exceptions=False)
     assert obj is None
 
-    # Since playing with the sys.modules is not such a good idea,
-    # let's just put our old configuration back:
-    sys.modules['dbus'] = _session_bus
-    # Reload our modules
-    reload_plugin('NotifyDBus')
+
+def test_plugin_dbus_session_croaks(mocker, dbus_glib_environment):
+    """
+    Verify notification fails if DBus croaks.
+    """
+
+    mocker.patch('dbus.SessionBus', side_effect=DBusException('test'))
+    setup_glib_environment()
+
+    obj = apprise.Apprise.instantiate('dbus://', suppress_exceptions=False)
+
+    # Emulate DBus session initialization error.
+    assert obj.notify(
+        title='title', body='body',
+        notify_type=apprise.NotifyType.INFO) is False
+
+
+def test_plugin_dbus_interface_notify_croaks(mocker):
+    """
+    Fail gracefully if underlying object croaks for whatever reason.
+    """
+
+    # Inject an error when invoking `dbus.Interface().Notify()`.
+    mocker.patch('dbus.SessionBus', spec=True)
+    mocker.patch('dbus.Interface', spec=True,
+                 Notify=Mock(side_effect=AttributeError("Something failed")))
+    setup_glib_environment()
+
+    obj = apprise.Apprise.instantiate('dbus://', suppress_exceptions=False)
+    assert isinstance(obj, NotifyDBus) is True
+
+    logger: Mock = mocker.spy(obj, "logger")
+    assert obj.notify(
+        title='title', body='body',
+        notify_type=apprise.NotifyType.INFO) is False
+    assert [
+        call.warning('Failed to send DBus notification. '
+                     'Reason: Something failed'),
+        call.exception('DBus Exception')
+    ] in logger.mock_calls
