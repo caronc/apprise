@@ -169,7 +169,7 @@ def test_plugin_discord_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_discord_general(mock_post, no_throttling):
+def test_plugin_discord_general(mock_post):
     """
     NotifyDiscord() General Checks
 
@@ -363,7 +363,7 @@ def test_plugin_discord_general(mock_post, no_throttling):
 
 
 @mock.patch('requests.post')
-def test_plugin_discord_attachments(mock_post, no_throttling):
+def test_plugin_discord_attachments(mock_post):
     """
     NotifyDiscord() Attachment Checks
 

@@ -121,7 +121,7 @@ def test_plugin_zulip_urls():
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-def test_plugin_zulip_edge_cases(no_throttling):
+def test_plugin_zulip_edge_cases():
     """
     NotifyZulip() Edge Cases
 

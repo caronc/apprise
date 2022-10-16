@@ -196,8 +196,6 @@ def test_plugin_pushover_attachments(mock_post, tmpdir):
     NotifyPushover() Attachment Checks
 
     """
-    # Disable Throttling to speed testing
-    NotifyPushover.request_rate_per_sec = 0
 
     # Initialize some generic (but valid) tokens
     user_key = 'u' * 30
@@ -315,8 +313,6 @@ def test_plugin_pushover_edge_cases(mock_post):
     NotifyPushover() Edge Cases
 
     """
-    # Disable Throttling to speed testing
-    NotifyPushover.request_rate_per_sec = 0
 
     # No token
     with pytest.raises(TypeError):
@@ -406,9 +402,6 @@ def test_plugin_pushover_config_files(mock_post):
           - priority: emergency
             tag: pushover_str emerg
     """
-
-    # Disable Throttling to speed testing
-    NotifyPushover.request_rate_per_sec = 0
 
     # Prepare Mock
     mock_post.return_value = requests.Request()

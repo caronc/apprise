@@ -183,7 +183,7 @@ def test_plugin_office365_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_office365_general(mock_post, no_throttling):
+def test_plugin_office365_general(mock_post):
     """
     NotifyOffice365() General Testing
 
@@ -299,7 +299,7 @@ def test_plugin_office365_general(mock_post, no_throttling):
 
 
 @mock.patch('requests.post')
-def test_plugin_office365_authentication(mock_post, no_throttling):
+def test_plugin_office365_authentication(mock_post):
     """
     NotifyOffice365() Authentication Testing
 

@@ -124,7 +124,7 @@ def test_plugin_homeassistant_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_homeassistant_general(mock_post, no_throttling):
+def test_plugin_homeassistant_general(mock_post):
     """
     NotifyHomeAssistant() General Checks
 

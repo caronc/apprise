@@ -130,7 +130,7 @@ def test_plugin_fcm_cryptography_import_error():
 
 @pytest.mark.skipif(
     'cryptography' not in sys.modules, reason="Requires cryptography")
-def test_plugin_simplepush_edge_cases(no_throttling):
+def test_plugin_simplepush_edge_cases():
     """
     NotifySimplePush() Edge Cases
 
@@ -154,7 +154,7 @@ def test_plugin_simplepush_edge_cases(no_throttling):
 @pytest.mark.skipif(
     'cryptography' not in sys.modules, reason="Requires cryptography")
 @mock.patch('requests.post')
-def test_plugin_simplepush_general(mock_post, no_throttling):
+def test_plugin_simplepush_general(mock_post):
     """
     NotifySimplePush() General Tests
     """

@@ -127,7 +127,7 @@ def test_plugin_sendgrid_urls():
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_sendgrid_edge_cases(mock_post, mock_get, no_throttling):
+def test_plugin_sendgrid_edge_cases(mock_post, mock_get):
     """
     NotifySendGrid() Edge Cases
 

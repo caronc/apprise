@@ -115,8 +115,6 @@ class AppriseURLTester:
         """
         Run a specific test
         """
-        # Disable Throttling to speed testing
-        NotifyBase.request_rate_per_sec = 0
 
         # Our expected instance
         instance = meta.get('instance', None)
@@ -387,8 +385,6 @@ class AppriseURLTester:
 
         try:
             if test_requests_exceptions is False:
-                # Disable throttling
-                obj.request_rate_per_sec = 0
 
                 # check that we're as expected
                 assert obj.notify(
@@ -472,8 +468,6 @@ class AppriseURLTester:
                         attach=attach) == attach_response
 
             else:
-                # Disable throttling
-                obj.request_rate_per_sec = 0
 
                 for _exception in self.req_exceptions:
                     mock_post.side_effect = _exception

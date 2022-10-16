@@ -207,7 +207,7 @@ def test_plugin_fcm_urls():
 @pytest.mark.skipif(
     hasattr(sys, "pypy_version_info"), reason="Does not work reliably on PyPy")
 @mock.patch('requests.post')
-def test_plugin_fcm_general_legacy(mock_post, no_throttling):
+def test_plugin_fcm_general_legacy(mock_post):
     """
     NotifyFCM() General Legacy/APIKey Checks
 
@@ -332,7 +332,7 @@ def test_plugin_fcm_general_legacy(mock_post, no_throttling):
 @pytest.mark.skipif(
     'cryptography' not in sys.modules, reason="Requires cryptography")
 @mock.patch('requests.post')
-def test_plugin_fcm_general_oauth(mock_post, no_throttling):
+def test_plugin_fcm_general_oauth(mock_post):
     """
     NotifyFCM() General OAuth Checks
 
@@ -848,7 +848,7 @@ def test_plugin_fcm_cryptography_import_error():
 @pytest.mark.skipif(
     'cryptography' not in sys.modules, reason="Requires cryptography")
 @mock.patch('requests.post')
-def test_plugin_fcm_edge_cases(mock_post, no_throttling):
+def test_plugin_fcm_edge_cases(mock_post):
     """
     NotifyFCM() Edge Cases
 

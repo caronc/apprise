@@ -134,7 +134,7 @@ def test_plugin_sinch_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_sinch_edge_cases(mock_post, no_throttling):
+def test_plugin_sinch_edge_cases(mock_post):
     """
     NotifySinch() Edge Cases
 

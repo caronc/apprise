@@ -135,9 +135,6 @@ def test_plugin_opsgenie_urls():
 
     """
 
-    # Disable Throttling to speed testing
-    NotifyOpsgenie.request_rate_per_sec = 0
-
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
@@ -173,9 +170,6 @@ def test_plugin_opsgenie_config_files(mock_post):
           - priority: emergency
             tag: opsgenie_str emerg
     """
-
-    # Disable Throttling to speed testing
-    NotifyOpsgenie.request_rate_per_sec = 0
 
     # Prepare Mock
     mock_post.return_value = requests.Request()

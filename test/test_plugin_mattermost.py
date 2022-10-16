@@ -123,7 +123,7 @@ def test_plugin_mattermost_urls():
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-def test_plugin_mattermost_edge_cases(no_throttling):
+def test_plugin_mattermost_edge_cases():
     """
     NotifyMattermost() Edge Cases
 

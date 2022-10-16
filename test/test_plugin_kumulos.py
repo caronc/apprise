@@ -96,7 +96,7 @@ def test_plugin_kumulos_urls():
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-def test_plugin_kumulos_edge_cases(no_throttling):
+def test_plugin_kumulos_edge_cases():
     """
     NotifyKumulos() Edge Cases
 

@@ -176,7 +176,7 @@ def test_plugin_msteams_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_msteams_templating(mock_post, tmpdir, no_throttling):
+def test_plugin_msteams_templating(mock_post, tmpdir):
     """
     NotifyMSTeams() Templating
 
@@ -385,7 +385,7 @@ def test_plugin_msteams_templating(mock_post, tmpdir, no_throttling):
 @pytest.mark.skipif(
     hasattr(sys, "pypy_version_info"), reason="Does not work reliably on PyPy")
 @mock.patch('requests.post')
-def test_msteams_yaml_config(mock_post, tmpdir, no_throttling):
+def test_msteams_yaml_config(mock_post, tmpdir):
     """
     NotifyMSTeams() YAML Configuration Entries
 

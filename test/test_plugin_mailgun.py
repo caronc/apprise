@@ -177,7 +177,7 @@ def test_plugin_mailgun_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_mailgun_attachments(mock_post, no_throttling):
+def test_plugin_mailgun_attachments(mock_post):
     """
     NotifyMailgun() Attachments
 

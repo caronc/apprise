@@ -121,7 +121,7 @@ def test_plugin_nextcloudtalk_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_nextcloudtalk_edge_cases(mock_post, no_throttling):
+def test_plugin_nextcloudtalk_edge_cases(mock_post):
     """
     NotifyNextcloud() Edge Cases
 

@@ -155,9 +155,6 @@ def test_plugin_gotify_config_files(mock_post):
             tag: gotify_str emerg
     """ % ('a' * 16, 'b' * 16)
 
-    # Disable Throttling to speed testing
-    NotifyGotify.request_rate_per_sec = 0
-
     # Prepare Mock
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.ok

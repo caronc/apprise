@@ -226,8 +226,6 @@ def test_plugin_pushsafer_general(mock_post):
     NotifyPushSafer() General Tests
 
     """
-    # Disable Throttling to speed testing
-    NotifyPushSafer.request_rate_per_sec = 0
 
     # Private Key
     privatekey = 'abc123'

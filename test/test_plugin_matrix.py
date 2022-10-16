@@ -197,7 +197,7 @@ def test_plugin_matrix_urls():
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_matrix_general(mock_post, mock_get, no_throttling):
+def test_plugin_matrix_general(mock_post, mock_get):
     """
     NotifyMatrix() General Tests
 
@@ -352,7 +352,7 @@ def test_plugin_matrix_general(mock_post, mock_get, no_throttling):
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_matrix_fetch(mock_post, mock_get, no_throttling):
+def test_plugin_matrix_fetch(mock_post, mock_get):
     """
     NotifyMatrix() Server Fetch/API Tests
 
@@ -454,7 +454,7 @@ def test_plugin_matrix_fetch(mock_post, mock_get, no_throttling):
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_matrix_auth(mock_post, mock_get, no_throttling):
+def test_plugin_matrix_auth(mock_post, mock_get):
     """
     NotifyMatrix() Server Authentication
 
@@ -548,7 +548,7 @@ def test_plugin_matrix_auth(mock_post, mock_get, no_throttling):
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_matrix_rooms(mock_post, mock_get, no_throttling):
+def test_plugin_matrix_rooms(mock_post, mock_get):
     """
     NotifyMatrix() Room Testing
 

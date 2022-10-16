@@ -173,9 +173,6 @@ def test_plugin_prowl_config_files(mock_post):
             tag: prowl_str emerg
     """ % ('a' * 40, 'b' * 40)
 
-    # Disable Throttling to speed testing
-    NotifyProwl.request_rate_per_sec = 0
-
     # Prepare Mock
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.ok

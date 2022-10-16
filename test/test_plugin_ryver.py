@@ -123,7 +123,7 @@ def test_plugin_ryver_urls():
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-def test_plugin_ryver_edge_cases(no_throttling):
+def test_plugin_ryver_edge_cases():
     """
     NotifyRyver() Edge Cases
 

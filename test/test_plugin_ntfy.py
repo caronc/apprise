@@ -233,7 +233,7 @@ def test_plugin_ntfy_chat_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_ntfy_attachments(mock_post, no_throttling):
+def test_plugin_ntfy_attachments(mock_post):
     """
     NotifyNtfy() Attachment Checks
 
@@ -348,7 +348,7 @@ def test_plugin_ntfy_attachments(mock_post, no_throttling):
 
 
 @mock.patch('requests.post')
-def test_plugin_custom_ntfy_edge_cases(mock_post, no_throttling):
+def test_plugin_custom_ntfy_edge_cases(mock_post):
     """
     NotifyNtfy() Edge Cases
 
@@ -425,7 +425,7 @@ def test_plugin_custom_ntfy_edge_cases(mock_post, no_throttling):
 
 @mock.patch('requests.post')
 @mock.patch('requests.get')
-def test_plugin_ntfy_config_files(mock_post, mock_get, no_throttling):
+def test_plugin_ntfy_config_files(mock_post, mock_get):
     """
     NotifyNtfy() Config File Cases
     """

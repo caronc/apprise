@@ -146,7 +146,7 @@ def test_plugin_pushed_urls():
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_pushed_edge_cases(mock_post, mock_get, no_throttling):
+def test_plugin_pushed_edge_cases(mock_post, mock_get):
     """
     NotifyPushed() Edge Cases
 

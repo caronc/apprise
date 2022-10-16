@@ -161,9 +161,6 @@ def test_plugin_dapnet_config_files(mock_post):
             tag: dapnet_str emerg
     """
 
-    # Disable Throttling to speed testing
-    NotifyDapnet.request_rate_per_sec = 0
-
     # Prepare Mock
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.created

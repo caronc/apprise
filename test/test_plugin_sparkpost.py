@@ -263,7 +263,7 @@ def test_plugin_sparkpost_urls():
 
 
 @mock.patch('requests.post')
-def test_plugin_sparkpost_throttling(mock_post, no_throttling):
+def test_plugin_sparkpost_throttling(mock_post):
     """
     NotifySparkPost() Throttling
 
@@ -332,7 +332,7 @@ def test_plugin_sparkpost_throttling(mock_post, no_throttling):
 
 
 @mock.patch('requests.post')
-def test_plugin_sparkpost_attachments(mock_post, no_throttling):
+def test_plugin_sparkpost_attachments(mock_post):
     """
     NotifySparkPost() Attachments
 

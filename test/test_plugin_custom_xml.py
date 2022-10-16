@@ -165,7 +165,7 @@ def test_plugin_custom_xml_urls():
 
 
 @mock.patch('requests.post')
-def test_notify_xml_plugin_attachments(mock_post, no_throttling):
+def test_notify_xml_plugin_attachments(mock_post):
     """
     NotifyXML() Attachments
 
@@ -225,7 +225,7 @@ def test_notify_xml_plugin_attachments(mock_post, no_throttling):
 
 @mock.patch('requests.post')
 @mock.patch('requests.get')
-def test_plugin_custom_xml_edge_cases(mock_get, mock_post, no_throttling):
+def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
     """
     NotifyXML() Edge Cases
 

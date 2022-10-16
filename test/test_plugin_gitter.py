@@ -115,7 +115,7 @@ def test_plugin_gitter_urls():
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_gitter_general(mock_post, mock_get, no_throttling):
+def test_plugin_gitter_general(mock_post, mock_get):
     """
     NotifyGitter() General Tests
 
