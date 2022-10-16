@@ -47,6 +47,9 @@ if [ $FOUNDROOT -ne 0 ]; then
    exit 1
 fi
 
+# Tidy previous reports (if present)
+[ -d .coverage-reports ] && rm -rf .coverage-reports
+
 # This is a useful tool for checking for any lint errors and additionally
 # checking the overall coverage.
 which flake8 &>/dev/null
@@ -86,6 +89,12 @@ if [ $RET -ne 0 ]; then
    echo "Tests failed."
    exit 1
 fi
+
+# Build our report
+LANG=C.UTF-8 PYTHONPATH=$PYTHONPATH coverage combine
+
+# Prepare XML Reference
+LANG=C.UTF-8 PYTHONPATH=$PYTHONPATH coverage xml
 
 # Print our report
 LANG=C.UTF-8 PYTHONPATH=$PYTHONPATH coverage report --show-missing
