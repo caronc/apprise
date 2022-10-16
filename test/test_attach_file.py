@@ -25,6 +25,7 @@
 
 import re
 import time
+import urllib
 from unittest import mock
 
 from os.path import dirname
@@ -98,8 +99,13 @@ def test_attach_file():
     # Download is successful and has already been called by now; below pulls
     # results from cache
     assert response.download()
-    assert response.url().startswith('file://{}'.format(path))
-    # No mime-type and/or filename over-ride was specified, so therefore it
+
+    # On Windows, it is `file://D%3A%5Ca%5Capprise%5Capprise%5Ctest%5Cvar%5Capprise-test.gif`.  # noqa E501
+    # TODO: Review - is this correct?
+    path_in_url = urllib.parse.quote(path)
+    assert response.url().startswith('file://{}'.format(path_in_url))
+
+    # No mime-type and/or filename over-ride was specified, so it
     # won't show up in the generated URL
     assert re.search(r'[?&]mime=', response.url()) is None
     assert re.search(r'[?&]name=', response.url()) is None
