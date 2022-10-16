@@ -58,7 +58,7 @@ def setup_glib_environment():
         reload_plugin('NotifyGnome')
 
     # We need to fake our gnome environment for testing purposes since
-    # the gi library isn't available in Travis CI
+    # the gi library isn't available on CI
     gi = types.ModuleType(gi_name)
     gi.repository = types.ModuleType(gi_name + '.repository')
     gi.module = types.ModuleType(gi_name + '.module')
