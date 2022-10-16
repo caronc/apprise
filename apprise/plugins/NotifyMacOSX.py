@@ -97,6 +97,8 @@ class NotifyMacOSX(NotifyBase):
     notify_paths = (
         '/opt/homebrew/bin/terminal-notifier',
         '/usr/local/bin/terminal-notifier',
+        '/usr/bin/terminal-notifier',
+        '/bin/terminal-notifier',
     )
 
     # Define object templates
