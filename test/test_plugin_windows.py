@@ -195,8 +195,9 @@ def test_plugin_windows_mocked():
 @mock.patch('win32gui.UpdateWindow')
 @mock.patch('win32gui.Shell_NotifyIcon')
 @mock.patch('win32gui.LoadImage')
-def test_plugin_windows_native(
-        mock_update_window, mock_loadimage, mock_notify):
+def test_plugin_windows_native(mock_loadimage,
+                               mock_notify,
+                               mock_update_window):
     """
     NotifyWindows() General Checks (via Windows platform)
 
@@ -261,6 +262,7 @@ def test_plugin_windows_native(
     assert obj.duration == obj.default_popup_duration_sec
 
     # To avoid slowdowns (for testing), turn it to zero for now
+    obj = apprise.Apprise.instantiate('windows://', suppress_exceptions=False)
     obj.duration = 0
 
     # Test our loading of our icon exception; it will still allow the
