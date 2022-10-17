@@ -133,7 +133,9 @@ def test_detect_language_windows_users():
 
     """
 
-    if not hasattr(ctypes, 'windll'):
+    if hasattr(ctypes, 'windll'):
+        from ctypes import windll
+    else:
         windll = mock.Mock()
         # 4105 = en_CA
         windll.kernel32.GetUserDefaultUILanguage.return_value = 4105
