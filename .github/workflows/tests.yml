@@ -47,6 +47,18 @@ jobs:
             python-version: "3.10"
             bare: true
 
+        exclude:
+
+          # `coverage` segfaults on Windows/PyPy, so skip it.
+          - os: "windows-latest"
+            python-version: "pypy3.6"
+          - os: "windows-latest"
+            python-version: "pypy3.7"
+          - os: "windows-latest"
+            python-version: "pypy3.8"
+          - os: "windows-latest"
+            python-version: "pypy3.9"
+
     defaults:
       run:
         shell: bash
