@@ -132,23 +132,6 @@ class NotifyMQTT(NotifyBase):
     # through their network flow at once.
     mqtt_inflight_messages = 200
 
-    # Taken from https://golang.org/src/crypto/x509/root_linux.go
-    # TODO: Maybe migrate to a general utility function?
-    CA_CERTIFICATE_FILE_LOCATIONS = [
-        # Debian/Ubuntu/Gentoo etc.
-        "/etc/ssl/certs/ca-certificates.crt",
-        # Fedora/RHEL 6
-        "/etc/pki/tls/certs/ca-bundle.crt",
-        # OpenSUSE
-        "/etc/ssl/ca-bundle.pem",
-        # OpenELEC
-        "/etc/pki/tls/cacert.pem",
-        # CentOS/RHEL 7
-        "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
-        # macOS Homebrew; brew install ca-certificates
-        "/usr/local/etc/ca-certificates/cert.pem",
-    ]
-
     # Define object templates
     templates = (
         '{schema}://{user}@{host}/{topic}',
@@ -534,3 +517,38 @@ class NotifyMQTT(NotifyBase):
 
         # return results
         return results
+
+    @property
+    def CA_CERTIFICATE_FILE_LOCATIONS(self):
+        """
+        Return possible locations to root certificate authority (CA) bundles.
+
+        Taken from https://golang.org/src/crypto/x509/root_linux.go
+        TODO: Maybe refactor to a general utility function?
+        """
+        candidates = [
+            # Debian/Ubuntu/Gentoo etc.
+            "/etc/ssl/certs/ca-certificates.crt",
+            # Fedora/RHEL 6
+            "/etc/pki/tls/certs/ca-bundle.crt",
+            # OpenSUSE
+            "/etc/ssl/ca-bundle.pem",
+            # OpenELEC
+            "/etc/pki/tls/cacert.pem",
+            # CentOS/RHEL 7
+            "/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem",
+            # macOS Homebrew; brew install ca-certificates
+            "/usr/local/etc/ca-certificates/cert.pem",
+        ]
+
+        # Certifi provides Mozilla’s carefully curated collection of Root
+        # Certificates for validating the trustworthiness of SSL certificates
+        # while verifying the identity of TLS hosts. It has been extracted from
+        # the Requests project.
+        try:
+            import certifi
+            candidates.append(certifi.where())
+        except ImportError:  # pragma: no cover
+            pass
+
+        return candidates
