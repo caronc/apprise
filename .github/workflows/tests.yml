@@ -92,8 +92,8 @@ jobs:
       run: |
         pip install -r all-plugin-requirements.txt
         
-        # Installing `dbus-python` will croak on PyPy, so skip it.
-        [[ $PYTHON != 'pypy'* ]] && pip install dbus-python || true
+        # Installing `dbus-python` will only work on Linux/CPython.
+        [[ $RUNNER_OS = "Linux" && $PYTHON != 'pypy'* ]] && pip install dbus-python || true
 
     - name: Install project dependencies (Windows)
       if: runner.os == 'Windows'
