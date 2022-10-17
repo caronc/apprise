@@ -24,9 +24,11 @@
 # THE SOFTWARE.
 
 import os
+import sys
 from unittest import mock
 
 import ctypes
+import pytest
 
 from apprise import AppriseLocale
 from apprise.utils import environ
@@ -180,6 +182,7 @@ def test_detect_language_windows_users():
     delattr(ctypes, 'windll')
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Does not work on Windows")
 @mock.patch('locale.getdefaultlocale')
 def test_detect_language_defaultlocale(mock_getlocale):
     """
