@@ -375,8 +375,8 @@ def test_plugin_dbus_missing_icon(mocker, dbus_glib_environment):
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True
     assert logger.mock_calls == [
-        call.warning('Could not load notification icon (%s). '
-                     'Reason: Something failed', ANY),
+        call.warning('Could not load notification icon (%s).', ANY),
+        call.debug('DBus Exception: Something failed'),
         call.info('Sent DBus notification.'),
     ]
 
@@ -511,7 +511,6 @@ def test_plugin_dbus_interface_notify_croaks(mocker):
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is False
     assert [
-        call.warning('Failed to send DBus notification. '
-                     'Reason: Something failed'),
-        call.exception('DBus Exception')
+        call.warning('Failed to send DBus notification.'),
+        call.debug('DBus Exception: Something failed'),
     ] in logger.mock_calls
