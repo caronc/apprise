@@ -175,6 +175,9 @@ def test_plugin_msteams_urls():
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
+@pytest.mark.skipif(
+    hasattr(sys, "pypy_version_info") and sys.version_info < (3, 7),
+    reason="Does not work or is flaky on PyPy 3.6")
 @mock.patch('requests.post')
 def test_plugin_msteams_templating(mock_post, tmpdir):
     """

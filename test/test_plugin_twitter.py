@@ -24,6 +24,7 @@
 # THE SOFTWARE.
 
 import os
+import sys
 from unittest import mock
 
 import pytest
@@ -418,6 +419,9 @@ def test_plugin_twitter_edge_cases():
             targets='%G@rB@g3')
 
 
+@pytest.mark.skipif(
+    hasattr(sys, "pypy_version_info") and sys.version_info < (3, 7),
+    reason="Does not work or is flaky on PyPy 3.6")
 @mock.patch('requests.post')
 @mock.patch('requests.get')
 def test_plugin_twitter_dm_attachments(mock_get, mock_post):
