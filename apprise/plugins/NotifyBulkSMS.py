@@ -30,7 +30,6 @@
 # API is documented here:
 #   - https://www.bulksms.com/developer/json/v1/#tag/Message
 import re
-import six
 import requests
 import json
 from itertools import chain
@@ -192,7 +191,7 @@ class NotifyBulkSMS(NotifyBase):
 
         # Setup our route
         self.route = self.template_args['route']['default'] \
-            if not isinstance(route, six.string_types) else route.upper()
+            if not isinstance(route, str) else route.upper()
         if self.route not in BULKSMS_ROUTING_GROUPS:
             msg = 'The route specified ({}) is invalid.'.format(route)
             self.logger.warning(msg)
