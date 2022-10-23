@@ -287,7 +287,7 @@ Once you've defined your custom hook, you just need to tell Apprise where it is 
 ```bash
 # By default if no plugin path is specified apprise will attempt to load
 # all plugin files (if present) from the following directory paths:
-#  ~/.apprise/apprise/plugins
+#  ~/.apprise/plugins
 #  ~/.config/apprise/plugins
 
 # Windows users can store their default plugin files in these directories:
