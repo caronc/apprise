@@ -107,6 +107,12 @@ apprise_url_tests = (
             'a' * 32, 'b' * 8, 'c' * 8), {
                 'instance': NotifyMailgun,
         }),
+    # We can use the `from=` directive as well:
+    ('mailgun://user@localhost.localdomain/{}-{}-{}'
+        '?:from=Chris&:status=admin'.format(
+            'a' * 32, 'b' * 8, 'c' * 8), {
+                'instance': NotifyMailgun,
+        }),
     # bcc and cc
     ('mailgun://user@localhost.localdomain/{}-{}-{}'
         '?bcc=user@example.com&cc=user2@example.com'.format(
