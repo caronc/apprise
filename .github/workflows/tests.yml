@@ -51,6 +51,7 @@ jobs:
       OS: ${{ matrix.os }}
       PYTHON: ${{ matrix.python-version }}
       BARE: ${{ matrix.bare }}
+      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
     name: Python ${{ matrix.python-version }} on ${{ matrix.os }} (bare=${{ matrix.bare }})
     steps:
