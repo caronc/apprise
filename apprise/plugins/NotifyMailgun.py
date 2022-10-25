@@ -160,6 +160,9 @@ class NotifyMailgun(NotifyBase):
             'type': 'string',
             'map_to': 'from_name',
         },
+        'from': {
+            'alias_of': 'name',
+        },
         'region': {
             'name': _('Region Name'),
             'type': 'choice:string',
@@ -638,6 +641,12 @@ class NotifyMailgun(NotifyBase):
             results['apikey'] = None
 
         if 'name' in results['qsd'] and len(results['qsd']['name']):
+            # Extract from name to associate with from address
+            results['from_name'] = \
+                NotifyMailgun.unquote(results['qsd']['name'])
+
+        # Support from= for consistency with `mail://`
+        elif 'from' in results['qsd'] and len(results['qsd']['from']):
             # Extract from name to associate with from address
             results['from_name'] = \
                 NotifyMailgun.unquote(results['qsd']['name'])
