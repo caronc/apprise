@@ -380,8 +380,8 @@ def test_plugin_discord_markdown_extra(mock_post):
     # Reset our apprise object
     a = Apprise()
 
-    # We want to further test our markdown support to accomodate bug rased on 2022.10.25
-    # see https://github.com/caronc/apprise/issues/717
+    # We want to further test our markdown support to accomodate bug rased on
+    # 2022.10.25; see https://github.com/caronc/apprise/issues/717
     assert a.add(
         'discord://{webhook_id}/{webhook_token}/'
         '?format=markdown&footer=Yes'.format(
