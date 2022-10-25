@@ -363,6 +363,43 @@ def test_plugin_discord_general(mock_post):
 
 
 @mock.patch('requests.post')
+def test_plugin_discord_markdown_extra(mock_post):
+    """
+    NotifyDiscord() Markdown Extra Checks
+
+    """
+
+    # Initialize some generic (but valid) tokens
+    webhook_id = 'A' * 24
+    webhook_token = 'B' * 64
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    # Reset our apprise object
+    a = Apprise()
+
+    # We want to further test our markdown support to accomodate bug rased on 2022.10.25
+    # see https://github.com/caronc/apprise/issues/717
+    assert a.add(
+        'discord://{webhook_id}/{webhook_token}/'
+        '?format=markdown&footer=Yes'.format(
+            webhook_id=webhook_id,
+            webhook_token=webhook_token)) is True
+
+    test_markdown = "[green-blue](https://google.com)"
+
+    # This call includes an image with it's payload:
+    assert a.notify(body=test_markdown, title='title',
+                    notify_type=NotifyType.INFO,
+                    body_format=NotifyFormat.TEXT) is True
+
+    assert a.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
+
+
+@mock.patch('requests.post')
 def test_plugin_discord_attachments(mock_post):
     """
     NotifyDiscord() Attachment Checks

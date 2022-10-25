@@ -580,7 +580,7 @@ class NotifyDiscord(NotifyBase):
         if description:
             # Strip description from our string since it has been handled
             # now.
-            markdown = re.sub(description, '', markdown, count=1)
+            markdown = re.sub(re.escape(description), '', markdown, count=1)
 
         regex = re.compile(
             r'\s*#[# \t\v]*(?P<name>[^\n]+)(\n|\s*$)'
