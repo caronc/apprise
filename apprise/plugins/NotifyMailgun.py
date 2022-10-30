@@ -263,12 +263,19 @@ class NotifyMailgun(NotifyBase):
             raise TypeError(msg)
 
         # Get our From username (if specified)
-        self.from_name = from_name
+        self.from_addr = [
+            self.app_id, '{user}@{host}'.format(
+                user=self.user, host=self.host)]
+        if from_name:
+            result = is_email(from_name)
+            if result:
+                self.from_addr = (
+                    result['name'] if result['name'] else False,
+                    result['full_email'])
+            else:
+                self.from_addr[0] = from_name
 
-        # Get our from email address
-        self.from_addr = '{user}@{host}'.format(user=self.user, host=self.host)
-
-        if not is_email(self.from_addr):
+        if not is_email(self.from_addr[1]):
             # Parse Source domain based on from_addr
             msg = 'Invalid ~From~ email format: {}'.format(self.from_addr)
             self.logger.warning(msg)
@@ -291,8 +298,7 @@ class NotifyMailgun(NotifyBase):
 
         else:
             # If our target email list is empty we want to add ourselves to it
-            self.targets.append(
-                (self.from_name if self.from_name else False, self.from_addr))
+            self.targets.append((False, self.from_addr[1]))
 
         # Validate recipients (cc:) and drop bad ones:
         for recipient in parse_emails(cc):
@@ -386,9 +392,7 @@ class NotifyMailgun(NotifyBase):
 
                     return False
 
-        reply_to = formataddr(
-            (self.from_name if self.from_name else False,
-             self.from_addr), charset='utf-8')
+        reply_to = formataddr(self.from_addr, charset='utf-8')
 
         # Prepare our payload
         payload = {
@@ -584,9 +588,9 @@ class NotifyMailgun(NotifyBase):
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        if self.from_name is not None:
+        if self.from_addr[0]:
             # from_name specified; pass it back on the url
-            params['name'] = self.from_name
+            params['name'] = self.from_addr[0]
 
         if self.cc:
             # Handle our Carbon Copy Addresses
@@ -649,7 +653,7 @@ class NotifyMailgun(NotifyBase):
         elif 'from' in results['qsd'] and len(results['qsd']['from']):
             # Extract from name to associate with from address
             results['from_name'] = \
-                NotifyMailgun.unquote(results['qsd']['name'])
+                NotifyMailgun.unquote(results['qsd']['from'])
 
         if 'region' in results['qsd'] and len(results['qsd']['region']):
             # Extract from name to associate with from address

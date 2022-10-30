@@ -294,3 +294,113 @@ def test_plugin_mailgun_attachments(mock_post):
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=attach) is True
     assert mock_post.call_count == 1
+
+
+@mock.patch('requests.post')
+def test_plugin_mailgun_header_check(mock_post):
+    """
+    NotifyMailgun() Test Header Prep
+
+    """
+
+    okay_response = requests.Request()
+    okay_response.status_code = requests.codes.ok
+    okay_response.content = ""
+
+    # Assign our mock object our return value
+    mock_post.return_value = okay_response
+
+    # API Key
+    apikey = 'abc123'
+
+    obj = Apprise.instantiate(
+        'mailgun://user@localhost.localdomain/{}'.format(apikey))
+    assert isinstance(obj, NotifyMailgun)
+    assert isinstance(obj.url(), str) is True
+
+    # No calls made yet
+    assert mock_post.call_count == 0
+
+    # Send our notification
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
+
+    # 2 calls were made, one to perform an email lookup, the second
+    # was the notification itself
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.mailgun.net/v3/localhost.localdomain/messages'
+
+    payload = mock_post.call_args_list[0][1]['data']
+    assert 'from' in payload
+    assert 'Apprise <user@localhost.localdomain>' == payload['from']
+    assert 'user@localhost.localdomain' == payload['to']
+
+    # Reset our mock object
+    mock_post.reset_mock()
+
+    obj = Apprise.instantiate(
+        'mailgun://user@localhost.localdomain/'
+        '{}?from=Luke%20Skywalker'.format(apikey))
+    assert isinstance(obj, NotifyMailgun)
+    assert isinstance(obj.url(), str) is True
+
+    # No calls made yet
+    assert mock_post.call_count == 0
+
+    # Send our notification
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
+
+    assert mock_post.call_count == 1
+    payload = mock_post.call_args_list[0][1]['data']
+    assert 'from' in payload
+    assert 'to' in payload
+    assert 'Luke Skywalker <user@localhost.localdomain>' == payload['from']
+    assert 'user@localhost.localdomain' == payload['to']
+
+    # Reset our mock object
+    mock_post.reset_mock()
+
+    obj = Apprise.instantiate(
+        'mailgun://user@localhost.localdomain/{}'
+        '?from=Luke%20Skywalker<luke@rebels.com>'.format(apikey))
+    assert isinstance(obj, NotifyMailgun)
+    assert isinstance(obj.url(), str) is True
+
+    # No calls made yet
+    assert mock_post.call_count == 0
+
+    # Send our notification
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
+
+    assert mock_post.call_count == 1
+    payload = mock_post.call_args_list[0][1]['data']
+    assert 'from' in payload
+    assert 'to' in payload
+    assert 'Luke Skywalker <luke@rebels.com>' == payload['from']
+    assert 'luke@rebels.com' == payload['to']
+
+    # Reset our mock object
+    mock_post.reset_mock()
+
+    obj = Apprise.instantiate(
+        'mailgun://user@localhost.localdomain/{}'
+        '?from=luke@rebels.com'.format(apikey))
+    assert isinstance(obj, NotifyMailgun)
+    assert isinstance(obj.url(), str) is True
+
+    # No calls made yet
+    assert mock_post.call_count == 0
+
+    # Send our notification
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
+
+    assert mock_post.call_count == 1
+    payload = mock_post.call_args_list[0][1]['data']
+    assert 'from' in payload
+    assert 'to' in payload
+    assert 'luke@rebels.com' == payload['from']
+    assert 'luke@rebels.com' == payload['to']
