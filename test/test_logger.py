@@ -25,6 +25,8 @@
 
 import re
 import os
+import sys
+
 import pytest
 import requests
 from unittest import mock
@@ -281,12 +283,16 @@ def test_apprise_log_file_captures(tmpdir):
 
         assert len(logs) == 5
 
-        # Remove our file before we exit the with clause
-        # this causes our delete() call to throw gracefully inside
-        os.unlink(str(log_file))
+        # Concurrent file access is not possible on Windows.
+        # PermissionError: [WinError 32] The process cannot access the file
+        # because it is being used by another process.
+        if sys.platform != "win32":
+            # Remove our file before we exit the with clause
+            # this causes our delete() call to throw gracefully inside
+            os.unlink(str(log_file))
 
-        # Verify file is gone
-        assert not os.path.isfile(str(log_file))
+            # Verify file is gone
+            assert not os.path.isfile(str(log_file))
 
     # Verify that we did not lose our effective log level even though
     # the above steps the level up for the duration of the capture

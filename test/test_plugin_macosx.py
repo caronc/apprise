@@ -38,6 +38,11 @@ from helpers import reload_plugin
 logging.disable(logging.CRITICAL)
 
 
+if sys.platform not in ["darwin", "linux"]:
+    pytest.skip("Only makes sense on macOS, but also works on Linux",
+                allow_module_level=True)
+
+
 @pytest.fixture
 def pretend_macos(mocker):
     """

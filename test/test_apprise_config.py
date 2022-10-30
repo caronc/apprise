@@ -783,8 +783,8 @@ json://localhost:8080
 include {}""".format(str(cfg01)))
 
     cfg02.write("""
-# syslog entry
-syslog://
+# json entry
+json://localhost:8080
 
 # recursively include ourselves
 include cfg02.cfg""")

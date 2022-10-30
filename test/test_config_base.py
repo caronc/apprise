@@ -182,7 +182,7 @@ version: 1
 urls:
   - pbul://o.gn5kj6nfhv736I7jC3cj3QLRiyhgl98b
   - mailto://test:password@gmail.com
-  - syslog://:
+  - json://localhost:
       - tag: devops, admin
     """, asset=AppriseAsset())
 

@@ -27,25 +27,54 @@ jobs:
       # all jobs once the first one fails (true).
       fail-fast: true
 
+      # Define a minimal test matrix, it will be
+      # expanded using subsequent `include` items.
       matrix:
-        os: [
-          "ubuntu-latest",
-          # "macos-latest",
-          # "windows-latest",
-        ]
-        python-version: [
-          "3.6", "3.7", "3.8", "3.9", "3.10", "3.11-dev",
-          "pypy3.6", "pypy3.7", "pypy3.8", "pypy3.9",
-        ]
+        os: ["ubuntu-latest"]
+        python-version: ["3.10"]
         bare: [false]
 
-        # Add another single item to the test matrix. It is the `bare` environment,
-        # where `all-plugin-requirements.txt` will NOT be installed, in order to
-        # verify the application also works well without those optional dependencies.
         include:
+
+          # Within the `bare` environment, `all-plugin-requirements.txt` will NOT be
+          # installed, to verify the application also works without those dependencies.
           - os: "ubuntu-latest"
             python-version: "3.10"
             bare: true
+
+          # Let's save resources and only build a single slot on macOS- and Windows.
+          - os: "macos-latest"
+            python-version: "3.10"
+          - os: "windows-latest"
+            python-version: "3.10"
+
+          # Test more available versions of CPython on Linux.
+          - os: "ubuntu-latest"
+            python-version: "3.6"
+          - os: "ubuntu-latest"
+            python-version: "3.7"
+          - os: "ubuntu-latest"
+            python-version: "3.8"
+          - os: "ubuntu-latest"
+            python-version: "3.9"
+          - os: "ubuntu-latest"
+            python-version: "3.10"
+          - os: "ubuntu-latest"
+            python-version: "3.11"
+
+          # Test more available versions of PyPy on Linux.
+          - os: "ubuntu-latest"
+            python-version: "pypy3.6"
+          - os: "ubuntu-latest"
+            python-version: "pypy3.7"
+          - os: "ubuntu-latest"
+            python-version: "pypy3.8"
+          - os: "ubuntu-latest"
+            python-version: "pypy3.9"
+
+    defaults:
+      run:
+        shell: bash
 
     env:
       OS: ${{ matrix.os }}
@@ -53,7 +82,7 @@ jobs:
       BARE: ${{ matrix.bare }}
       CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
-    name: Python ${{ matrix.python-version }} on ${{ matrix.os }} (bare=${{ matrix.bare }})
+    name: Python ${{ matrix.python-version }} on ${{ matrix.os }} ${{ matrix.bare && '(bare)' || '' }}
     steps:
 
     - name: Acquire sources
@@ -88,13 +117,13 @@ jobs:
       run: |
         pip install -r all-plugin-requirements.txt
         
-        # Installing `dbus-python` will croak on PyPy, so skip it.
-        [[ $PYTHON != 'pypy'* ]] && pip install dbus-python || true
+        # Installing `dbus-python` will only work on Linux/CPython.
+        [[ $RUNNER_OS = "Linux" && $PYTHON != 'pypy'* ]] && pip install dbus-python || true
 
     - name: Install project dependencies (Windows)
       if: runner.os == 'Windows'
       run: |
-        pip install -r win-requirements.txt
+        [[ $PYTHON != 'pypy'* ]] && pip install -r win-requirements.txt || true
 
     # Install package in editable mode,
     # and run project-specific tasks.

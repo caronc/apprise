@@ -27,6 +27,8 @@
 import re
 import os
 import platform
+import sys
+
 from setuptools import find_packages, setup
 
 cmdclass = {}
@@ -43,7 +45,8 @@ except ImportError:
 
 install_options = os.environ.get("APPRISE_INSTALL", "").split(",")
 install_requires = open('requirements.txt').readlines()
-if platform.system().lower().startswith('win'):
+if platform.system().lower().startswith('win') \
+        and not hasattr(sys, "pypy_version_info"):
     # Windows Notification Support
     install_requires += open('win-requirements.txt').readlines()
 
@@ -60,7 +63,7 @@ setup(
     version='1.1.0',
     description='Push Notifications that work with just about every platform!',
     license='MIT',
-    long_description=open('README.md').read(),
+    long_description=open('README.md', encoding="utf-8").read(),
     long_description_content_type='text/markdown',
     cmdclass=cmdclass,
     url='https://github.com/caronc/apprise',

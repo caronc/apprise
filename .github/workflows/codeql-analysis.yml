@@ -8,6 +8,11 @@ on:
   schedule:
     - cron: '42 15 * * 5'
 
+# Cancel in-progress jobs when pushing to the same branch.
+concurrency:
+  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+
 jobs:
   analyze:
     name: Analyze
