@@ -60,7 +60,7 @@ jobs:
           - os: "ubuntu-latest"
             python-version: "3.10"
           - os: "ubuntu-latest"
-            python-version: "3.11-dev"
+            python-version: "3.11"
 
           # Test more available versions of PyPy on Linux.
           - os: "ubuntu-latest"
