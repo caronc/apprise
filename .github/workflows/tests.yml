@@ -62,6 +62,7 @@ jobs:
     - name: Install prerequisites (Linux)
       if: runner.os == 'Linux'
       run: |
+        sudo apt-get update
         sudo apt-get install libdbus-1-dev
 
     - name: Setup Python
@@ -123,7 +124,4 @@ jobs:
       uses: codecov/codecov-action@v3
       with:
         files: ./coverage.xml
-        flags: unittests
-        env_vars: OS,PYTHON,BARE
-        name: codecov-umbrella
         fail_ci_if_error: false
