@@ -59,6 +59,10 @@ apprise_url_tests = (
         # invalid region
         'instance': TypeError,
     }),
+    ('pagerduty://myroutekey@myapikey?severity=invalid', {
+        # invalid severity
+        'instance': TypeError,
+    }),
     ('pagerduty://myroutekey@myapikey', {
         # minimum requirements met
         'instance': NotifyPagerDuty,
@@ -72,6 +76,14 @@ apprise_url_tests = (
     }),
     ('pagerduty://myroutekey@myapikey?region=eu', {
         # european region
+        'instance': NotifyPagerDuty,
+    }),
+    ('pagerduty://myroutekey@myapikey?severity=critical', {
+        # Severity over-ride
+        'instance': NotifyPagerDuty,
+    }),
+    ('pagerduty://myroutekey@myapikey?severity=err', {
+        # Severity over-ride (short-form)
         'instance': NotifyPagerDuty,
     }),
     # Custom values
