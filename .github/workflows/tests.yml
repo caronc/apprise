@@ -80,7 +80,6 @@ jobs:
       OS: ${{ matrix.os }}
       PYTHON: ${{ matrix.python-version }}
       BARE: ${{ matrix.bare }}
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
     name: Python ${{ matrix.python-version }} on ${{ matrix.os }} ${{ matrix.bare && '(bare)' || '' }}
     steps:
@@ -154,3 +153,4 @@ jobs:
       with:
         files: ./coverage.xml
         fail_ci_if_error: false
+        token: ${{ secrets.CODECOV_TOKEN }}
