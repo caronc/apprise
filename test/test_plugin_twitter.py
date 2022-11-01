@@ -23,14 +23,15 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import json
+import logging
 import os
-import sys
-from unittest import mock
+from datetime import datetime
+from unittest.mock import Mock, patch
 
 import pytest
 import requests
-from json import dumps
-from datetime import datetime
+
 from apprise import Apprise
 from apprise import NotifyType
 from apprise import AppriseAttachment
@@ -38,11 +39,13 @@ from apprise.plugins.NotifyTwitter import NotifyTwitter
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
-import logging
 logging.disable(logging.CRITICAL)
 
 # Attachment Directory
 TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), 'var')
+
+TWITTER_SCREEN_NAME = 'apprise'
+
 
 # Our Testing URLs
 apprise_url_tests = (
@@ -200,39 +203,141 @@ apprise_url_tests = (
 )
 
 
+def good_response(data):
+    """
+    Prepare a good response.
+    """
+    response = Mock()
+    response.content = json.dumps(data)
+    response.status_code = requests.codes.ok
+    return response
+
+
+def bad_response(data):
+    """
+    Prepare a bad response.
+    """
+    response = Mock()
+    response.content = json.dumps(data)
+    response.status_code = requests.codes.internal_server_error
+    return response
+
+
+@pytest.fixture
+def twitter_url():
+    ckey = 'ckey'
+    csecret = 'csecret'
+    akey = 'akey'
+    asecret = 'asecret'
+    url = 'twitter://{}/{}/{}/{}'.format(ckey, csecret, akey, asecret)
+    return url
+
+
+@pytest.fixture
+def good_message_response():
+    """
+    Prepare a good tweet response.
+    """
+    response = good_response({
+        'screen_name': TWITTER_SCREEN_NAME,
+        'id': 9876,
+    })
+    return response
+
+
+@pytest.fixture
+def bad_message_response():
+    """
+    Prepare a bad message response.
+    """
+    response = bad_response({
+        "errors": [
+            {
+                "code": 999,
+                "message": "Something failed",
+            }]})
+    return response
+
+
+@pytest.fixture
+def good_media_response():
+    """
+    Prepare a good media response.
+    """
+    response = Mock()
+    response.content = json.dumps({
+        "media_id": 710511363345354753,
+        "media_id_string": "710511363345354753",
+        "media_key": "3_710511363345354753",
+        "size": 11065,
+        "expires_after_secs": 86400,
+        "image": {
+            "image_type": "image/jpeg",
+            "w": 800,
+            "h": 320
+        }
+    })
+    response.status_code = requests.codes.ok
+    return response
+
+
+@pytest.fixture
+def bad_media_response():
+    """
+    Prepare a bad media response.
+    """
+    response = bad_response({
+        "errors": [
+            {
+                "code": 93,
+                "message": "This application is not allowed to access or "
+                "delete your direct messages.",
+            }]})
+    return response
+
+
+@pytest.fixture(autouse=True)
+def ensure_get_verify_credentials_is_mocked(mocker, good_message_response):
+    """
+    Make sure requests to https://api.twitter.com/1.1/account/verify_credentials.json
+    do not escape the test harness, for all test case functions.
+    """  # noqa:E501
+    mock_get = mocker.patch("requests.get")
+    mock_get.return_value = good_message_response
+
+
 def test_plugin_twitter_urls():
     """
     NotifyTwitter() Apprise URLs
-
     """
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-@mock.patch('requests.get')
-@mock.patch('requests.post')
-def test_plugin_twitter_general(mock_post, mock_get):
+def test_plugin_twitter_general(mocker):
     """
     NotifyTwitter() General Tests
-
     """
+
+    mock_get = mocker.patch("requests.get")
+    mock_post = mocker.patch("requests.post")
+
     ckey = 'ckey'
     csecret = 'csecret'
     akey = 'akey'
     asecret = 'asecret'
-    screen_name = 'apprise'
 
     response_obj = [{
-        'screen_name': screen_name,
+        'screen_name': TWITTER_SCREEN_NAME,
         'id': 9876,
     }]
 
     # Epoch time:
     epoch = datetime.utcfromtimestamp(0)
 
-    request = mock.Mock()
-    request.content = dumps(response_obj)
+    request = Mock()
+    request.content = json.dumps(response_obj)
     request.status_code = requests.codes.ok
     request.headers = {
         'x-rate-limit-reset': (datetime.utcnow() - epoch).total_seconds(),
@@ -249,7 +354,7 @@ def test_plugin_twitter_general(mock_post, mock_get):
         csecret=csecret,
         akey=akey,
         asecret=asecret,
-        targets=screen_name)
+        targets=TWITTER_SCREEN_NAME)
 
     assert isinstance(obj, NotifyTwitter) is True
     assert isinstance(obj.url(), str) is True
@@ -310,7 +415,7 @@ def test_plugin_twitter_general(mock_post, mock_get):
 
     # Alter pending targets
     obj.targets.append('usera')
-    request.content = dumps(response_obj)
+    request.content = json.dumps(response_obj)
     response_obj = [{
         'screen_name': 'usera',
         'id': 1234,
@@ -318,7 +423,7 @@ def test_plugin_twitter_general(mock_post, mock_get):
 
     assert obj.send(body="test") is True
 
-    # Flush our cache forcing it's re-creating
+    # Flush our cache forcing it is re-creating
     NotifyTwitter._user_cache = {}
     assert obj.send(body="test") is True
 
@@ -335,9 +440,9 @@ def test_plugin_twitter_general(mock_post, mock_get):
 
     results = NotifyTwitter.parse_url(
         'twitter://{}/{}/{}/{}?to={}'.format(
-            ckey, csecret, akey, asecret, screen_name))
+            ckey, csecret, akey, asecret, TWITTER_SCREEN_NAME))
     assert isinstance(results, dict) is True
-    assert screen_name in results['targets']
+    assert TWITTER_SCREEN_NAME in results['targets']
 
     # cause a json parsing issue now
     response_obj = None
@@ -352,10 +457,10 @@ def test_plugin_twitter_general(mock_post, mock_get):
     NotifyTwitter._user_cache = {}
 
     response_obj = {
-        'screen_name': screen_name,
+        'screen_name': TWITTER_SCREEN_NAME,
         'id': 9876,
     }
-    request.content = dumps(response_obj)
+    request.content = json.dumps(response_obj)
 
     obj = NotifyTwitter(
         ckey=ckey,
@@ -379,7 +484,6 @@ def test_plugin_twitter_general(mock_post, mock_get):
 def test_plugin_twitter_edge_cases():
     """
     NotifyTwitter() Edge Cases
-
     """
 
     with pytest.raises(TypeError):
@@ -418,171 +522,188 @@ def test_plugin_twitter_edge_cases():
             targets='%G@rB@g3')
 
 
-@pytest.mark.skipif(
-    hasattr(sys, "pypy_version_info") and sys.version_info < (3, 7),
-    reason="Does not work or is flaky on PyPy 3.6")
-@mock.patch('requests.post')
-@mock.patch('requests.get')
-def test_plugin_twitter_dm_attachments(mock_get, mock_post):
+def test_plugin_twitter_dm_caching(
+        mocker, twitter_url,
+        good_message_response, good_media_response):
     """
-    NotifyTwitter() DM Attachment Checks
-
+    Verify that the `NotifyTwitter.{_user_cache,_whoami_cache}` caches
+    work as intended.
     """
-    ckey = 'ckey'
-    csecret = 'csecret'
-    akey = 'akey'
-    asecret = 'asecret'
-    screen_name = 'apprise'
 
-    good_dm_response_obj = {
-        'screen_name': screen_name,
-        'id': 9876,
-    }
+    # This is the request to `account/verify_credentials.json`.
+    # Explicitly mock it here so the calls to it can be evaluated.
+    mock_get = mocker.patch("requests.get")
+    mock_get.return_value = good_message_response
+
+    # This test case submits two notifications, so make sure to provide two
+    # mocked responses.
+    mock_post = mocker.patch("requests.post")
+    mock_post.side_effect = [good_message_response, good_message_response]
+
+    # Make sure to start with empty caches.
+    if hasattr(NotifyTwitter, "_user_cache"):
+        NotifyTwitter._user_cache = {}
+    if hasattr(NotifyTwitter, "_whoami_cache"):
+        NotifyTwitter._whoami_cache = {}
+
+    # Create application objects.
+    obj = Apprise.instantiate(twitter_url)
+
+    # Send the first notification.
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
+
+    # Test call counts.
+    assert mock_get.call_count == 1
+    assert mock_get.call_args_list[0][0][0] == \
+        'https://api.twitter.com/1.1/account/verify_credentials.json'
+
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.twitter.com/1.1/direct_messages/events/new.json'
+
+    # Reset the mocks to start counting calls from scratch.
+    mock_get.reset_mock()
+    mock_post.reset_mock()
+
+    # Send another notification.
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
+
+    # Calls to `verify_credentials.json` will get cached by `NotifyTwitter`.
+    # So, the `GET` request to `verify_credentials.json` should only have been
+    # issued once.
+    assert mock_get.call_count == 0
+    assert mock_post.call_count == 1
+
+
+def test_plugin_twitter_dm_attachments_basic(
+        mocker, twitter_url,
+        good_message_response, good_media_response):
+    """
+    NotifyTwitter() DM Attachment Checks - Basic
+    """
+
+    mock_get = mocker.patch("requests.get")
+    mock_post = mocker.patch("requests.post")
 
     # Epoch time:
     epoch = datetime.utcfromtimestamp(0)
-
-    # Prepare a good DM response
-    good_dm_response = mock.Mock()
-    good_dm_response.content = dumps(good_dm_response_obj)
-    good_dm_response.status_code = requests.codes.ok
-    good_dm_response.headers = {
+    mock_get.return_value = good_message_response
+    mock_post.return_value.headers = {
         'x-rate-limit-reset': (datetime.utcnow() - epoch).total_seconds(),
         'x-rate-limit-remaining': 1,
     }
 
-    # Prepare bad response
-    bad_response = mock.Mock()
-    bad_response.content = dumps({})
-    bad_response.status_code = requests.codes.internal_server_error
+    # The first response is for uploading the attachment,
+    # the second one for posting the actual message.
+    mock_post.side_effect = [good_media_response, good_message_response]
 
-    # Prepare a good media response
-    good_media_response = mock.Mock()
-    good_media_response.content = dumps({
-        "media_id": 710511363345354753,
-        "media_id_string": "710511363345354753",
-        "media_key": "3_710511363345354753",
-        "size": 11065,
-        "expires_after_secs": 86400,
-        "image": {
-            "image_type": "image/jpeg",
-            "w": 800,
-            "h": 320
-        }
-    })
-    good_media_response.status_code = requests.codes.ok
-
-    # Prepare a bad media response
-    bad_media_response = mock.Mock()
-    bad_media_response.content = dumps({
-        "errors": [
-            {
-                "code": 93,
-                "message": "This application is not allowed to access or "
-                "delete your direct messages.",
-            }]})
-    bad_media_response.status_code = requests.codes.internal_server_error
-
-    mock_post.side_effect = [good_media_response, good_dm_response]
-    mock_get.return_value = good_dm_response
-
-    twitter_url = 'twitter://{}/{}/{}/{}'.format(ckey, csecret, akey, asecret)
-
-    # attach our content
+    # Create application objects.
+    obj = Apprise.instantiate(twitter_url)
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
 
-    # instantiate our object
-    obj = Apprise.instantiate(twitter_url)
-
-    # Send our notification
+    # Send our notification.
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=attach) is True
 
-    # Test our call count
+    # Test call counts.
     assert mock_get.call_count == 1
     assert mock_get.call_args_list[0][0][0] == \
         'https://api.twitter.com/1.1/account/verify_credentials.json'
+
     assert mock_post.call_count == 2
     assert mock_post.call_args_list[0][0][0] == \
         'https://upload.twitter.com/1.1/media/upload.json'
     assert mock_post.call_args_list[1][0][0] == \
         'https://api.twitter.com/1.1/direct_messages/events/new.json'
 
-    mock_get.reset_mock()
-    mock_post.reset_mock()
 
-    # Test case where upload fails
-    mock_get.return_value = good_dm_response
-    mock_post.side_effect = [bad_media_response, good_dm_response]
+def test_plugin_twitter_dm_attachments_message_fails(
+        mocker, twitter_url,
+        good_media_response, bad_message_response):
+    """
+    Test case with a bad media response.
+    """
 
-    # instantiate our object
+    mock_post = mocker.patch("requests.post")
+    mock_post.side_effect = [good_media_response, bad_message_response]
+
+    # Create application objects.
     obj = Apprise.instantiate(twitter_url)
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
 
-    # Send our notification; it will fail because of the media response
+    # Send our notification; it will fail because of the message response.
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=attach) is False
 
-    # Test our call count
-    assert mock_get.call_count == 0
-    # No get request as cached response is used
+    assert mock_post.call_count == 2
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://upload.twitter.com/1.1/media/upload.json'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://api.twitter.com/1.1/direct_messages/events/new.json'
+
+
+def test_plugin_twitter_dm_attachments_upload_fails(
+        mocker, twitter_url,
+        good_message_response, bad_media_response):
+    """
+    Test case where upload fails.
+    """
+
+    mock_post = mocker.patch("requests.post")
+    mock_post.side_effect = [bad_media_response, good_message_response]
+
+    # Create application objects.
+    obj = Apprise.instantiate(twitter_url)
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
+
+    # Send our notification; it will fail because of the media response.
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=attach) is False
+
+    # Test call counts.
     assert mock_post.call_count == 1
     assert mock_post.call_args_list[0][0][0] == \
         'https://upload.twitter.com/1.1/media/upload.json'
 
-    mock_get.reset_mock()
-    mock_post.reset_mock()
 
-    # Test case where upload fails
-    mock_get.return_value = good_dm_response
-    mock_post.side_effect = [good_media_response, bad_response]
+def test_plugin_twitter_dm_attachments_invalid_attachment(
+        mocker, twitter_url, good_message_response):
+    """
+    Test case with an invalid attachment.
+    """
 
-    # instantiate our object
+    mock_post: Mock = mocker.patch("requests.post")
+    mock_post.side_effect = [good_media_response, good_message_response]
+
+    # Create application objects.
+    # An invalid attachment will cause a failure.
     obj = Apprise.instantiate(twitter_url)
+    attach = AppriseAttachment(
+        os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg'))
 
-    # Send our notification; it will fail because of the media response
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=attach) is False
 
-    assert mock_get.call_count == 1
-    assert mock_get.call_args_list[0][0][0] == \
-        'https://api.twitter.com/1.1/account/verify_credentials.json'
+    # Verify no post requests have been issued, because attachment is not good.
+    assert mock_post.mock_calls == []
 
-    # No get request as cached response is used
-    assert mock_post.call_count == 2
-    assert mock_post.call_args_list[0][0][0] == \
-        'https://upload.twitter.com/1.1/media/upload.json'
-    assert mock_post.call_args_list[1][0][0] == \
-        'https://api.twitter.com/1.1/direct_messages/events/new.json'
 
-    mock_get.reset_mock()
-    mock_post.reset_mock()
+def test_plugin_twitter_dm_attachments_multiple(
+        mocker, twitter_url,
+        good_message_response, good_media_response):
 
-    mock_post.side_effect = [good_media_response, good_dm_response]
-    mock_get.return_value = good_dm_response
-
-    # An invalid attachment will cause a failure
-    path = os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
-    assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO,
-        attach=path) is False
-
-    # No get request as cached response is used
-    assert mock_get.call_count == 0
-
-    # No post request as attachment is no good anyway
-    assert mock_post.call_count == 0
-
-    mock_get.reset_mock()
-    mock_post.reset_mock()
+    mock_post = mocker.patch("requests.post")
 
     mock_post.side_effect = [
         good_media_response, good_media_response, good_media_response,
-        good_media_response, good_dm_response, good_dm_response,
-        good_dm_response, good_dm_response]
-    mock_get.return_value = good_dm_response
+        good_media_response, good_message_response, good_message_response,
+        good_message_response, good_message_response]
 
     # 4 images are produced
     attach = [
@@ -594,12 +715,13 @@ def test_plugin_twitter_dm_attachments(mock_get, mock_post):
         os.path.join(TEST_VAR_DIR, 'apprise-test.mp4'),
     ]
 
+    # Create application objects.
+    obj = Apprise.instantiate(twitter_url)
+
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=attach) is True
 
-    assert mock_get.call_count == 0
-    # No get request as cached response is used
     assert mock_post.call_count == 8
     assert mock_post.call_args_list[0][0][0] == \
         'https://upload.twitter.com/1.1/media/upload.json'
@@ -618,12 +740,14 @@ def test_plugin_twitter_dm_attachments(mock_get, mock_post):
     assert mock_post.call_args_list[7][0][0] == \
         'https://api.twitter.com/1.1/direct_messages/events/new.json'
 
-    mock_get.reset_mock()
-    mock_post.reset_mock()
 
-    # We have an OSError thrown in the middle of our preparation
+def test_plugin_twitter_dm_attachments_multiple_oserror(
+        mocker, twitter_url,
+        good_message_response, good_media_response):
+
+    # Inject an `OSError` into the middle of the operation.
+    mock_post = mocker.patch("requests.post")
     mock_post.side_effect = [good_media_response, OSError()]
-    mock_get.return_value = good_dm_response
 
     # 2 images are produced
     attach = [
@@ -633,13 +757,14 @@ def test_plugin_twitter_dm_attachments(mock_get, mock_post):
         os.path.join(TEST_VAR_DIR, 'apprise-test.mp4'),
     ]
 
+    # Create application objects.
+    obj = Apprise.instantiate(twitter_url)
+
     # We'll fail to send this time
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=attach) is False
 
-    assert mock_get.call_count == 0
-    # No get request as cached response is used
     assert mock_post.call_count == 2
     assert mock_post.call_args_list[0][0][0] == \
         'https://upload.twitter.com/1.1/media/upload.json'
@@ -647,263 +772,184 @@ def test_plugin_twitter_dm_attachments(mock_get, mock_post):
         'https://upload.twitter.com/1.1/media/upload.json'
 
 
-@mock.patch('requests.post')
-@mock.patch('requests.get')
-def test_plugin_twitter_tweet_attachments(mock_get, mock_post):
+@patch('requests.post')
+def test_plugin_twitter_tweet_attachments_basic(
+        mock_post, twitter_url, good_message_response, good_media_response):
     """
-    NotifyTwitter() Tweet Attachment Checks
-
+    NotifyTwitter() Tweet Attachment Checks - Basic
     """
-    ckey = 'ckey'
-    csecret = 'csecret'
-    akey = 'akey'
-    asecret = 'asecret'
-    screen_name = 'apprise'
 
-    good_tweet_response_obj = {
-        'screen_name': screen_name,
-        'id': 9876,
-    }
+    mock_post.side_effect = [good_media_response, good_message_response]
 
-    # Prepare a good DM response
-    good_tweet_response = mock.Mock()
-    good_tweet_response.content = dumps(good_tweet_response_obj)
-    good_tweet_response.status_code = requests.codes.ok
-
-    # Prepare bad response
-    bad_response = mock.Mock()
-    bad_response.content = dumps({})
-    bad_response.status_code = requests.codes.internal_server_error
-
-    # Prepare a good media response
-    good_media_response = mock.Mock()
-    good_media_response.content = dumps({
-        "media_id": 710511363345354753,
-        "media_id_string": "710511363345354753",
-        "media_key": "3_710511363345354753",
-        "size": 11065,
-        "expires_after_secs": 86400,
-        "image": {
-            "image_type": "image/jpeg",
-            "w": 800,
-            "h": 320
-        }
-    })
-    good_media_response.status_code = requests.codes.ok
-
-    # Prepare a bad media response
-    bad_media_response = mock.Mock()
-    bad_media_response.content = dumps({
-        "errors": [
-            {
-                "code": 93,
-                "message": "This application is not allowed to access or "
-                "delete your direct messages.",
-            }]})
-    bad_media_response.status_code = requests.codes.internal_server_error
-
-    mock_post.side_effect = [good_media_response, good_tweet_response]
-    mock_get.return_value = good_tweet_response
-
-    twitter_url = 'twitter://{}/{}/{}/{}?mode=tweet'.format(
-        ckey, csecret, akey, asecret)
-
-    # attach our content
-    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
-
-    # instantiate our object
+    # Create application objects.
+    twitter_url += '?mode=tweet'
     obj = Apprise.instantiate(twitter_url)
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
 
     # Send our notification
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=attach) is True
 
-    # Test our call count
-    assert mock_get.call_count == 0
+    # Verify API calls.
     assert mock_post.call_count == 2
     assert mock_post.call_args_list[0][0][0] == \
         'https://upload.twitter.com/1.1/media/upload.json'
     assert mock_post.call_args_list[1][0][0] == \
         'https://api.twitter.com/1.1/statuses/update.json'
 
-    # Update our good response to have more details in it
-    good_tweet_response_obj = {
-        'screen_name': screen_name,
+
+@patch('requests.post')
+def test_plugin_twitter_tweet_attachments_more_logging(
+        mock_post, twitter_url, good_media_response):
+    """
+    NotifyTwitter() Tweet Attachment Checks - More logging
+
+    TODO: The "more logging" aspect is not verified yet?
+    """
+
+    good_tweet_response = good_response({
+        'screen_name': TWITTER_SCREEN_NAME,
         'id': 9876,
         # needed for additional logging
         'id_str': '12345',
         'user': {
-            'screen_name': screen_name,
+            'screen_name': TWITTER_SCREEN_NAME,
         }
-    }
-
-    good_tweet_response.content = dumps(good_tweet_response_obj)
-
-    mock_get.reset_mock()
-    mock_post.reset_mock()
+    })
 
     mock_post.side_effect = [good_media_response, good_tweet_response]
-    mock_get.return_value = good_tweet_response
 
-    # instantiate our object
+    # Create application objects.
+    twitter_url += '?mode=tweet'
     obj = Apprise.instantiate(twitter_url)
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
 
-    # Send our notification (again); this time there willb e more tweet logging
+    # Send our notification (again); this time there will be more logging
+    # TODO: The "more logging" aspect is not verified yet?
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=attach) is True
 
-    # Test our call count
-    assert mock_get.call_count == 0
+    # Verify API calls.
     assert mock_post.call_count == 2
     assert mock_post.call_args_list[0][0][0] == \
         'https://upload.twitter.com/1.1/media/upload.json'
     assert mock_post.call_args_list[1][0][0] == \
         'https://api.twitter.com/1.1/statuses/update.json'
 
-    mock_get.reset_mock()
-    mock_post.reset_mock()
 
-    mock_post.side_effect = [good_media_response, bad_media_response]
+@patch('requests.post')
+def test_plugin_twitter_tweet_attachments_bad_message_response(
+        mock_post, twitter_url, good_media_response, bad_message_response):
 
-    # instantiate our object
+    mock_post.side_effect = [good_media_response, bad_message_response]
+
+    # Create application objects.
+    twitter_url += '?mode=tweet'
     obj = Apprise.instantiate(twitter_url)
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
 
-    # Our notification will fail now since our tweet will error out
+    # Our notification will fail now since our tweet will error out.
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=attach) is False
 
-    # Test our call count
-    assert mock_get.call_count == 0
+    # Verify API calls.
     assert mock_post.call_count == 2
     assert mock_post.call_args_list[0][0][0] == \
         'https://upload.twitter.com/1.1/media/upload.json'
     assert mock_post.call_args_list[1][0][0] == \
         'https://api.twitter.com/1.1/statuses/update.json'
 
-    mock_get.reset_mock()
-    mock_post.reset_mock()
 
-    bad_media_response.content = ''
+@patch('requests.post')
+def test_plugin_twitter_tweet_attachments_bad_message_response_unparseable(
+        mock_post, twitter_url, good_media_response):
 
-    mock_post.side_effect = [good_media_response, bad_media_response]
+    bad_message_response = bad_response("")
+    mock_post.side_effect = [good_media_response, bad_message_response]
 
-    # instantiate our object
+    # Create application objects.
+    twitter_url += '?mode=tweet'
     obj = Apprise.instantiate(twitter_url)
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
 
-    # Our notification will fail now since our tweet will error out
-    # This is the same test as above, except our error response isn't parseable
+    # The notification will fail now since the tweet will error out.
+    # This is the same test as above, except that the error response is not
+    # parseable.
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=attach) is False
 
-    # Test our call count
-    assert mock_get.call_count == 0
+    # Verify API calls.
     assert mock_post.call_count == 2
     assert mock_post.call_args_list[0][0][0] == \
         'https://upload.twitter.com/1.1/media/upload.json'
     assert mock_post.call_args_list[1][0][0] == \
         'https://api.twitter.com/1.1/statuses/update.json'
 
-    mock_get.reset_mock()
-    mock_post.reset_mock()
 
-    # Test case where upload fails
-    mock_get.return_value = good_tweet_response
-    mock_post.side_effect = [good_media_response, bad_response]
+@patch('requests.post')
+def test_plugin_twitter_tweet_attachments_upload_fails(
+        mock_post, twitter_url, good_media_response):
 
-    # instantiate our object
+    # Prepare a bad tweet response.
+    bad_tweet_response = bad_response({})
+
+    # Test case where upload fails.
+    mock_post.side_effect = [good_media_response, bad_tweet_response]
+
+    # Create application objects.
+    twitter_url += '?mode=tweet'
     obj = Apprise.instantiate(twitter_url)
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
 
-    # Send our notification; it will fail because of the media response
+    # Send our notification; it will fail because of the message response.
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=attach) is False
 
-    assert mock_get.call_count == 0
+    # Verify API calls.
     assert mock_post.call_count == 2
     assert mock_post.call_args_list[0][0][0] == \
         'https://upload.twitter.com/1.1/media/upload.json'
     assert mock_post.call_args_list[1][0][0] == \
         'https://api.twitter.com/1.1/statuses/update.json'
 
-    mock_get.reset_mock()
-    mock_post.reset_mock()
 
-    mock_post.side_effect = [good_media_response, good_tweet_response]
-    mock_get.return_value = good_tweet_response
+@patch('requests.post')
+def test_plugin_twitter_tweet_attachments_invalid_attachment(
+        mock_post, twitter_url, good_message_response, good_media_response):
 
-    # An invalid attachment will cause a failure
-    path = os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
+    mock_post.side_effect = [good_media_response, good_message_response]
+
+    # Create application objects.
+    twitter_url += '?mode=tweet'
+    obj = Apprise.instantiate(twitter_url)
+    attach = AppriseAttachment(
+        os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg'))
+
+    # An invalid attachment will cause a failure.
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
-        attach=path) is False
+        attach=attach) is False
 
-    # No get request as cached response is used
-    assert mock_get.call_count == 0
-
-    # No post request as attachment is no good anyway
+    # No post request as attachment is not good.
     assert mock_post.call_count == 0
 
-    mock_get.reset_mock()
-    mock_post.reset_mock()
+
+@patch('requests.post')
+def test_plugin_twitter_tweet_attachments_multiple_batch(
+        mock_post, twitter_url, good_message_response, good_media_response):
 
     mock_post.side_effect = [
         good_media_response, good_media_response, good_media_response,
-        good_media_response, good_tweet_response, good_tweet_response,
-        good_tweet_response, good_tweet_response]
-    mock_get.return_value = good_tweet_response
-
-    # instantiate our object (without a batch mode)
-    obj = Apprise.instantiate(twitter_url + "&batch=no")
-
-    # 4 images are produced
-    attach = [
-        os.path.join(TEST_VAR_DIR, 'apprise-test.gif'),
-        os.path.join(TEST_VAR_DIR, 'apprise-test.gif'),
-        os.path.join(TEST_VAR_DIR, 'apprise-test.jpeg'),
-        os.path.join(TEST_VAR_DIR, 'apprise-test.png'),
-        # This one is not supported, so it's ignored gracefully
-        os.path.join(TEST_VAR_DIR, 'apprise-test.mp4'),
-    ]
-
-    assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO,
-        attach=attach) is True
-
-    assert mock_get.call_count == 0
-    # No get request as cached response is used
-    assert mock_post.call_count == 8
-    assert mock_post.call_args_list[0][0][0] == \
-        'https://upload.twitter.com/1.1/media/upload.json'
-    assert mock_post.call_args_list[1][0][0] == \
-        'https://upload.twitter.com/1.1/media/upload.json'
-    assert mock_post.call_args_list[2][0][0] == \
-        'https://upload.twitter.com/1.1/media/upload.json'
-    assert mock_post.call_args_list[3][0][0] == \
-        'https://upload.twitter.com/1.1/media/upload.json'
-    assert mock_post.call_args_list[4][0][0] == \
-        'https://api.twitter.com/1.1/statuses/update.json'
-    assert mock_post.call_args_list[5][0][0] == \
-        'https://api.twitter.com/1.1/statuses/update.json'
-    assert mock_post.call_args_list[6][0][0] == \
-        'https://api.twitter.com/1.1/statuses/update.json'
-    assert mock_post.call_args_list[7][0][0] == \
-        'https://api.twitter.com/1.1/statuses/update.json'
-
-    mock_get.reset_mock()
-    mock_post.reset_mock()
-
-    mock_post.side_effect = [
-        good_media_response, good_media_response, good_media_response,
-        good_media_response, good_tweet_response, good_tweet_response,
-        good_tweet_response, good_tweet_response]
-    mock_get.return_value = good_tweet_response
+        good_media_response, good_message_response, good_message_response,
+        good_message_response, good_message_response]
 
     # instantiate our object
-    obj = Apprise.instantiate(twitter_url)
+    obj = Apprise.instantiate(twitter_url + "?mode=tweet")
 
     # 4 images are produced
     attach = [
@@ -919,8 +965,6 @@ def test_plugin_twitter_tweet_attachments(mock_get, mock_post):
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=attach) is True
 
-    assert mock_get.call_count == 0
-    # No get request as cached response is used
     assert mock_post.call_count == 7
     assert mock_post.call_args_list[0][0][0] == \
         'https://upload.twitter.com/1.1/media/upload.json'
@@ -938,12 +982,58 @@ def test_plugin_twitter_tweet_attachments(mock_get, mock_post):
     assert mock_post.call_args_list[6][0][0] == \
         'https://api.twitter.com/1.1/statuses/update.json'
 
-    mock_get.reset_mock()
-    mock_post.reset_mock()
+
+@patch('requests.post')
+def test_plugin_twitter_tweet_attachments_multiple_nobatch(
+        mock_post, twitter_url, good_message_response, good_media_response):
+
+    mock_post.side_effect = [
+        good_media_response, good_media_response, good_media_response,
+        good_media_response, good_message_response, good_message_response,
+        good_message_response, good_message_response]
+
+    # instantiate our object (without a batch mode)
+    obj = Apprise.instantiate(twitter_url + "?mode=tweet&batch=no")
+
+    # 4 images are produced
+    attach = [
+        os.path.join(TEST_VAR_DIR, 'apprise-test.gif'),
+        os.path.join(TEST_VAR_DIR, 'apprise-test.gif'),
+        os.path.join(TEST_VAR_DIR, 'apprise-test.jpeg'),
+        os.path.join(TEST_VAR_DIR, 'apprise-test.png'),
+        # This one is not supported, so it's ignored gracefully
+        os.path.join(TEST_VAR_DIR, 'apprise-test.mp4'),
+    ]
+
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=attach) is True
+
+    assert mock_post.call_count == 8
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://upload.twitter.com/1.1/media/upload.json'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://upload.twitter.com/1.1/media/upload.json'
+    assert mock_post.call_args_list[2][0][0] == \
+        'https://upload.twitter.com/1.1/media/upload.json'
+    assert mock_post.call_args_list[3][0][0] == \
+        'https://upload.twitter.com/1.1/media/upload.json'
+    assert mock_post.call_args_list[4][0][0] == \
+        'https://api.twitter.com/1.1/statuses/update.json'
+    assert mock_post.call_args_list[5][0][0] == \
+        'https://api.twitter.com/1.1/statuses/update.json'
+    assert mock_post.call_args_list[6][0][0] == \
+        'https://api.twitter.com/1.1/statuses/update.json'
+    assert mock_post.call_args_list[7][0][0] == \
+        'https://api.twitter.com/1.1/statuses/update.json'
+
+
+@patch('requests.post')
+def test_plugin_twitter_tweet_attachments_multiple_oserror(
+        mock_post, twitter_url, good_media_response):
 
     # We have an OSError thrown in the middle of our preparation
     mock_post.side_effect = [good_media_response, OSError()]
-    mock_get.return_value = good_tweet_response
 
     # 2 images are produced
     attach = [
@@ -954,12 +1044,11 @@ def test_plugin_twitter_tweet_attachments(mock_get, mock_post):
     ]
 
     # We'll fail to send this time
+    obj = Apprise.instantiate(twitter_url + "?mode=tweet")
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=attach) is False
 
-    assert mock_get.call_count == 0
-    # No get request as cached response is used
     assert mock_post.call_count == 2
     assert mock_post.call_args_list[0][0][0] == \
         'https://upload.twitter.com/1.1/media/upload.json'
