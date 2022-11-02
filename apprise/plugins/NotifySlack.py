@@ -449,20 +449,17 @@ class NotifySlack(NotifyBase):
                 )
 
                 # Support <url|desc>, <url> entries
-                urlfix = []
                 for match in self._re_url_support.findall(body):
                     # Swap back any ampersands previously updaated
                     url = match[1].replace('&amp;', '&')
                     desc = match[2].strip()
-                    urlfix.append({
-                        'replace': re.escape(match[0]),
-                        'with': '<{url}|{desc}>'.format(url=url, desc=desc)
-                        if desc else '<{url}>'.format(url=url)
-                    })
 
-                for entry in urlfix:
+                    # Update our string
                     body = re.sub(
-                        entry['replace'], entry['with'], body,
+                        re.escape(match[0]),
+                        '<{url}|{desc}>'.format(url=url, desc=desc)
+                        if desc else '<{url}>'.format(url=url),
+                        body,
                         re.IGNORECASE)
 
             # Perform Formatting on title here; this is not needed for block
