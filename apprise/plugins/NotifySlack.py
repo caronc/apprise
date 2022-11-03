@@ -347,6 +347,15 @@ class NotifySlack(NotifyBase):
             r'>': '&gt;',
         }
 
+        # The markdown in slack isn't [desc](url), it's <url|desc>
+        #
+        # To accomodate this, we need to ensure we don't escape URLs that match
+        self._re_url_support = re.compile(
+            r'(?P<match>(?:<|\&lt;)?[ \t]*'
+            r'(?P<url>(?:https?|mailto)://[^| \n]+)'
+            r'(?:[ \t]*\|[ \t]*(?:(?P<val>[^\n]+?)[ \t]*)?(?:>|\&gt;)'
+            r'|(?:>|\&gt;)))', re.IGNORECASE)
+
         # Iterate over above list and store content accordingly
         self._re_formatting_rules = re.compile(
             r'(' + '|'.join(self._re_formatting_map.keys()) + r')',
@@ -438,6 +447,20 @@ class NotifySlack(NotifyBase):
                 body = self._re_formatting_rules.sub(  # pragma: no branch
                     lambda x: self._re_formatting_map[x.group()], body,
                 )
+
+                # Support <url|desc>, <url> entries
+                for match in self._re_url_support.findall(body):
+                    # Swap back any ampersands previously updaated
+                    url = match[1].replace('&amp;', '&')
+                    desc = match[2].strip()
+
+                    # Update our string
+                    body = re.sub(
+                        re.escape(match[0]),
+                        '<{url}|{desc}>'.format(url=url, desc=desc)
+                        if desc else '<{url}>'.format(url=url),
+                        body,
+                        re.IGNORECASE)
 
             # Perform Formatting on title here; this is not needed for block
             # mode above
@@ -803,7 +826,7 @@ class NotifySlack(NotifyBase):
             # The text 'ok' is returned if this is a Webhook request
             # So the below captures that as well.
             status_okay = (response and response.get('ok', False)) \
-                if self.mode is SlackMode.BOT else r.text == 'ok'
+                if self.mode is SlackMode.BOT else r.content == 'ok'
 
             if r.status_code != requests.codes.ok or not status_okay:
                 # We had a problem

@@ -25,15 +25,17 @@
 
 import os
 from unittest import mock
+from inspect import cleandoc
 
 import pytest
 import requests
+from apprise import Apprise
 from apprise import NotifyType
 from apprise import AppriseAttachment
 from apprise.plugins.NotifySlack import NotifySlack
 from helpers import AppriseURLTester
 
-from json import dumps
+from json import loads, dumps
 
 # Disable logging for a cleaner testing output
 import logging
@@ -640,3 +642,55 @@ def test_plugin_slack_send_by_email(mock_get, mock_post):
     assert mock_post.call_count == 0
     assert mock_get.call_args_list[0][0][0] == \
         'https://slack.com/api/users.lookupByEmail'
+
+
+@mock.patch('requests.post')
+@mock.patch('requests.get')
+def test_plugin_slack_markdown(mock_get, mock_post):
+    """
+    NotifySlack() Markdown tests
+
+    """
+
+    request = mock.Mock()
+    request.content = 'ok'
+    request.status_code = requests.codes.ok
+
+    # Prepare Mock
+    mock_post.return_value = request
+    mock_get.return_value = request
+
+    # Variation Initializations
+    aobj = Apprise()
+    assert aobj.add(
+        'slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#channel')
+
+    body = cleandoc("""
+    Here is a <https://slack.com|Slack Link> we want to support as part of it's
+    markdown.
+
+    This one has arguments we want to preserve:
+       <https://slack.com?arg=val&arg2=val2|Slack Link>.
+    We also want to be able to support <https://slack.com> links without the
+    description.
+    """)
+
+    # Send our notification
+    assert aobj.notify(
+        body=body, title='title', notify_type=NotifyType.INFO)
+
+    # We would have failed to look up the email, therefore we wouldn't have
+    # even bothered to attempt to send the notification
+    assert mock_get.call_count == 0
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://hooks.slack.com/services/T1JJ3T3L2/A1BRTD4JD/' \
+        'TIiajkdnlazkcOXrIdevi7FQ'
+
+    data = loads(mock_post.call_args_list[0][1]['data'])
+    assert data['attachments'][0]['text'] == \
+        "Here is a <https://slack.com|Slack Link> we want to support as part "\
+        "of it's\nmarkdown.\n\nThis one has arguments we want to preserve:"\
+        "\n   <https://slack.com?arg=val&arg2=val2|Slack Link>.\n"\
+        "We also want to be able to support <https://slack.com> "\
+        "links without the\ndescription."
