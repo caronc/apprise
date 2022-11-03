@@ -22,10 +22,11 @@ The contributors have been listed in chronological order:
 * Hitesh Sondhi <hitesh@cropsly.com>
   * Mar 2019 - Added Flock Support
 
-* Andreas Motl <andreas@getkotori.org>
+* Andreas Motl <andreas.motl@panodata.org>
   * Mar 2020 - Fix XMPP Support
   * Oct 2022 - Drop support for Python 2
   * Oct 2022 - Add support for Python 3.11
+  * Oct 2022 - Improve efficiency of NotifyEmail
 
 * Joey Espinosa <@particledecay>
   * Apr 3rd 2022 - Added Ntfy Support

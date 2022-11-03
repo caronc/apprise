@@ -539,6 +539,38 @@ def test_plugin_email_smtplib_send_okay(mock_smtplib):
 
 
 @mock.patch('smtplib.SMTP')
+def test_plugin_email_smtplib_send_multiple_recipients(mock_smtplib):
+    """
+    Verify that NotifyEmail() will use a single SMTP session for submitting
+    multiple emails.
+    """
+
+    # Defaults to HTML
+    obj = Apprise.instantiate(
+        'mailto://user:pass@mail.example.org?'
+        'to=foo@example.net,bar@example.com&'
+        'cc=baz@example.org&bcc=qux@example.org', suppress_exceptions=False)
+    assert isinstance(obj, NotifyEmail)
+
+    assert obj.notify(
+        body='body', title='test', notify_type=NotifyType.INFO) is True
+
+    assert mock_smtplib.mock_calls == [
+        mock.call('mail.example.org', 25, None, timeout=15),
+        mock.call().login('user', 'pass'),
+        mock.call().sendmail(
+            'user@mail.example.org',
+            ['foo@example.net', 'baz@example.org', 'qux@example.org'],
+            mock.ANY),
+        mock.call().sendmail(
+            'user@mail.example.org',
+            ['bar@example.com', 'baz@example.org', 'qux@example.org'],
+            mock.ANY),
+        mock.call().quit(),
+    ]
+
+
+@mock.patch('smtplib.SMTP')
 def test_plugin_email_smtplib_internationalization(mock_smtp):
     """
     NotifyEmail() Internationalization Handling
