@@ -895,7 +895,8 @@ class NotifyEmail(NotifyBase):
             params['from'] = formataddr((False, from_addr), charset='utf-8')
 
         elif not self.user:
-            params['from'] = formataddr((False, self.from_addr[1]), charset='utf-8')
+            params['from'] = \
+                formataddr((False, self.from_addr[1]), charset='utf-8')
 
         if len(self.cc) > 0:
             # Handle our Carbon Copy Addresses
