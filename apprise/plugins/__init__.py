@@ -32,6 +32,7 @@ from os.path import abspath
 
 # Used for testing
 from . import NotifyEmail as NotifyEmailBase
+from .NotifyXMPP import SliXmppAdapter
 
 # NotifyBase object is passed in as a module not class
 from . import NotifyBase
@@ -58,6 +59,9 @@ __all__ = [
 
     # Tokenizer
     'url_to_dict',
+
+    # slixmpp access points (used for NotifyXMPP Testing)
+    'SliXmppAdapter',
 ]
 
 

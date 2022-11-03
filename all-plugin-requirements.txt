@@ -5,6 +5,9 @@
 # Provides fcm:// and spush://
 cryptography
 
+# Provides xmpp:// support
+slixmpp; python_version >= '3.7'
+
 # Provides growl:// support
 gntp
 
