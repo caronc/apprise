@@ -23,17 +23,17 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import logging
 import sys
 import ssl
 from unittest import mock
 import pytest
+
 import apprise
+from apprise import NotifyBase
+from apprise.plugins.NotifyXMPP import NotifyXMPP, SliXmppAdapter
 
 # Disable logging for a cleaner testing output
-import logging
-
-from apprise.plugins.NotifyXMPP import NotifyXMPP
-
 logging.disable(logging.CRITICAL)
 
 
@@ -57,20 +57,19 @@ def test_plugin_xmpp_general(tmpdir):
     """
 
     # Set success flag
-    apprise.plugins.SliXmppAdapter.success = True
+    SliXmppAdapter.success = True
 
     # Enforce Adapter
-    apprise.plugins.NotifyXMPP._adapter = apprise.plugins.SliXmppAdapter
+    NotifyXMPP._adapter = SliXmppAdapter
 
     # Create a restore point
-    ca_backup = apprise.plugins.SliXmppAdapter\
-        .CA_CERTIFICATE_FILE_LOCATIONS
+    ca_backup = SliXmppAdapter.CA_CERTIFICATE_FILE_LOCATIONS
 
     # Clear CA Certificates
-    apprise.plugins.SliXmppAdapter.CA_CERTIFICATE_FILE_LOCATIONS = []
+    SliXmppAdapter.CA_CERTIFICATE_FILE_LOCATIONS = []
 
     # Disable Throttling to speed testing
-    apprise.plugins.NotifyBase.request_rate_per_sec = 0
+    NotifyBase.request_rate_per_sec = 0
 
     # Create our instance
     obj = apprise.Apprise.instantiate('xmpp://', suppress_exceptions=False)
@@ -119,7 +118,7 @@ def test_plugin_xmpp_general(tmpdir):
         obj = apprise.Apprise.instantiate(url, suppress_exceptions=False)
 
         # Test we loaded
-        assert isinstance(obj, apprise.plugins.NotifyXMPP) is True
+        assert isinstance(obj, NotifyXMPP) is True
 
         # Check that it found our mocked environments
         assert obj.enabled is True
@@ -236,8 +235,7 @@ def test_plugin_xmpp_general(tmpdir):
     ca_cert.write('')
 
     # Update our path
-    apprise.plugins.SliXmppAdapter.CA_CERTIFICATE_FILE_LOCATIONS = \
-        [str(ca_cert), ]
+    SliXmppAdapter.CA_CERTIFICATE_FILE_LOCATIONS = [str(ca_cert), ]
 
     obj = apprise.Apprise.instantiate(
         'xmpps://user:pass@localhost/user@test.com?verify=yes',
@@ -252,8 +250,7 @@ def test_plugin_xmpp_general(tmpdir):
             title='', body='body', notify_type=apprise.NotifyType.INFO) is True
 
     # Restore our CA Certificates from backup
-    apprise.plugins.SliXmppAdapter.CA_CERTIFICATE_FILE_LOCATIONS = \
-        ca_backup
+    SliXmppAdapter.CA_CERTIFICATE_FILE_LOCATIONS = ca_backup
 
 
 @pytest.mark.skipif(
@@ -299,18 +296,18 @@ def test_plugin_xmpp_slixmpp_callbacks():
     }
 
     # Set success flag
-    apprise.plugins.SliXmppAdapter.success = False
+    SliXmppAdapter.success = False
 
     # Enforce Adapter
-    apprise.plugins.NotifyXMPP._adapter = apprise.plugins.SliXmppAdapter
+    NotifyXMPP._adapter = SliXmppAdapter
 
     with mock.patch('slixmpp.ClientXMPP') as mock_stream:
         client_stream = mock.Mock()
         client_stream.send_message.return_value = True
         mock_stream.return_value = client_stream
 
-        adapter = apprise.plugins.SliXmppAdapter(**kwargs)
-        assert isinstance(adapter, apprise.plugins.SliXmppAdapter)
+        adapter = SliXmppAdapter(**kwargs)
+        assert isinstance(adapter, SliXmppAdapter)
 
         # Ensure we are initialized in a failure state; our return flag after
         # we actually attempt to send the notification(s). This get's toggled
@@ -321,8 +318,8 @@ def test_plugin_xmpp_slixmpp_callbacks():
 
     # Now we'll do a test with no one to notify
     kwargs['targets'] = []
-    adapter = apprise.plugins.SliXmppAdapter(**kwargs)
-    assert isinstance(adapter, apprise.plugins.SliXmppAdapter)
+    adapter = SliXmppAdapter(**kwargs)
+    assert isinstance(adapter, SliXmppAdapter)
 
     # success flag should be back to a False state
     assert adapter.success is False
@@ -339,4 +336,4 @@ def test_plugin_xmpp_slixmpp_callbacks():
     kwargs['targets'] = ['user2@localhost']
     kwargs['xep'] = [1, 999]
     with pytest.raises(ValueError):
-        apprise.plugins.SliXmppAdapter(**kwargs)
+        SliXmppAdapter(**kwargs)
