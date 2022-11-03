@@ -23,15 +23,17 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import six
 import sys
 import ssl
-import mock
+from unittest import mock
 import pytest
 import apprise
 
 # Disable logging for a cleaner testing output
 import logging
+
+from apprise.plugins.NotifyXMPP import NotifyXMPP
+
 logging.disable(logging.CRITICAL)
 
 
@@ -91,7 +93,7 @@ def test_plugin_xmpp_general(tmpdir):
         obj = apprise.Apprise.instantiate(url, suppress_exceptions=False)
 
         # Test we loaded
-        assert isinstance(obj, apprise.plugins.NotifyXMPP) is True
+        assert isinstance(obj, NotifyXMPP) is True
 
         # Check that it found our mocked environments
         assert obj.enabled is True
@@ -174,16 +176,16 @@ def test_plugin_xmpp_general(tmpdir):
         obj = apprise.Apprise.instantiate(url, suppress_exceptions=False)
 
         # Test we loaded
-        assert isinstance(obj, apprise.plugins.NotifyXMPP) is True
+        assert isinstance(obj, NotifyXMPP) is True
 
         # Check that it found our mocked environments
         assert obj.enabled is True
 
         # Test url() call
-        assert isinstance(obj.url(), six.string_types) is True
+        assert isinstance(obj.url(), str) is True
 
         # Test url(privacy=True) call
-        assert isinstance(obj.url(privacy=True), six.string_types) is True
+        assert isinstance(obj.url(privacy=True), str) is True
 
         assert obj.url(privacy=True).startswith(privacy_url)
 
@@ -240,7 +242,7 @@ def test_plugin_xmpp_general(tmpdir):
     obj = apprise.Apprise.instantiate(
         'xmpps://user:pass@localhost/user@test.com?verify=yes',
         suppress_exceptions=False)
-    assert isinstance(obj, apprise.plugins.NotifyXMPP) is True
+    assert isinstance(obj, NotifyXMPP) is True
 
     with mock.patch('slixmpp.ClientXMPP') as mock_client:
         # Allow a connection to succeed
