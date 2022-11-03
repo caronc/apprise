@@ -870,10 +870,7 @@ class NotifyEmail(NotifyBase):
         """
 
         # Define an URL parameters
-        params = {
-            'mode': self.secure_mode,
-            'smtp': self.smtp_host,
-        }
+        params = {}
 
         # Append our headers into our parameters
         params.update({'+{}'.format(k): v for k, v in self.headers.items()})
@@ -885,6 +882,14 @@ class NotifyEmail(NotifyBase):
         if len(self.targets) == 1 and self.targets[0][1] != self.from_addr[1]:
             # A custom email was provided
             from_addr = self.from_addr[1]
+
+        if self.smtp_host != self.host:
+            # Apply our SMTP Host only if it differs from the provided hostname
+            params['smtp'] = self.smtp_host
+
+        if self.secure:
+            # Mode is only requried if we're dealing with a secure connection
+            params['mode'] = self.secure_mode
 
         if self.from_addr[0] and self.from_addr[0] != self.app_id:
             # A custom name was provided
@@ -900,25 +905,33 @@ class NotifyEmail(NotifyBase):
 
         if len(self.cc) > 0:
             # Handle our Carbon Copy Addresses
-            params['cc'] = ','.join(
-                ['{}{}'.format(
-                    '' if not e not in self.names
-                    else '{}:'.format(self.names[e]), e) for e in self.cc])
+            params['cc'] = ','.join([
+                formataddr(
+                    (self.names[e] if e in self.names else False, e),
+                    # Swap comma for it's escaped url code (if detected) since
+                    # we're using that as a delimiter
+                    charset='utf-8').replace(',', '%2C')
+                for e in self.cc])
 
         if len(self.bcc) > 0:
             # Handle our Blind Carbon Copy Addresses
-            params['bcc'] = ','.join(
-                ['{}{}'.format(
-                    '' if not e not in self.names
-                    else '{}:'.format(self.names[e]), e) for e in self.bcc])
+            params['bcc'] = ','.join([
+                formataddr(
+                    (self.names[e] if e in self.names else False, e),
+                    # Swap comma for it's escaped url code (if detected) since
+                    # we're using that as a delimiter
+                    charset='utf-8').replace(',', '%2C')
+                for e in self.bcc])
 
         if self.reply_to:
             # Handle our Reply-To Addresses
-            params['reply'] = ','.join(
-                ['{}{}'.format(
-                    '' if not e not in self.names
-                    else '{}:'.format(self.names[e]), e)
-                    for e in self.reply_to])
+            params['reply'] = ','.join([
+                formataddr(
+                    (self.names[e] if e in self.names else False, e),
+                    # Swap comma for it's escaped url code (if detected) since
+                    # we're using that as a delimiter
+                    charset='utf-8').replace(',', '%2C')
+                for e in self.reply_to])
 
         # pull email suffix from username (if present)
         user = None if not self.user else self.user.split('@')[0]
