@@ -24,6 +24,7 @@
 # THE SOFTWARE.
 
 from __future__ import print_function
+import asyncio
 import re
 import sys
 import pytest
@@ -1756,8 +1757,8 @@ def test_apprise_details_plugin_verification():
 
 
 @mock.patch('requests.post')
-@mock.patch('apprise.py3compat.asyncio.notify', wraps=py3aio.notify)
-def test_apprise_async_mode(mock_async_notify, mock_post, tmpdir):
+@mock.patch('asyncio.gather', wraps=asyncio.gather)
+def test_apprise_async_mode(mock_gather, mock_post, tmpdir):
     """
     API: Apprise() async_mode tests
 
@@ -1791,8 +1792,8 @@ def test_apprise_async_mode(mock_async_notify, mock_post, tmpdir):
     assert a.notify("async") is True
 
     # Verify our async code got executed
-    assert mock_async_notify.call_count == 1
-    mock_async_notify.reset_mock()
+    assert mock_gather.call_count == 1
+    mock_gather.reset_mock()
 
     # Provide an over-ride now
     asset = AppriseAsset(async_mode=False)
@@ -1817,8 +1818,8 @@ def test_apprise_async_mode(mock_async_notify, mock_post, tmpdir):
     # Send Notifications Syncronously
     assert a.notify("sync") is True
     # Verify our async code got called
-    assert mock_async_notify.call_count == 1
-    mock_async_notify.reset_mock()
+    assert mock_gather.call_count == 1
+    mock_gather.reset_mock()
 
     # another way of looking a our false set asset configuration
     assert a[0].asset.async_mode is False
@@ -1840,8 +1841,8 @@ def test_apprise_async_mode(mock_async_notify, mock_post, tmpdir):
     assert a.notify("a mixed batch") is True
 
     # Verify our async code got called
-    assert mock_async_notify.call_count == 1
-    mock_async_notify.reset_mock()
+    assert mock_gather.call_count == 1
+    mock_gather.reset_mock()
 
 
 def test_notify_matrix_dynamic_importing(tmpdir):

@@ -23,6 +23,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import asyncio
 import os
 from itertools import chain
 from . import common
@@ -379,12 +380,10 @@ class Apprise:
             debug=self.debug
         )
 
-    def async_notify(self, *args, **kwargs):
+    async def async_notify(self, *args, **kwargs):
         """
         Send a notification to all the plugins previously loaded, for
-        asynchronous callers. This method is an async method that should be
-        awaited on, even if it is missing the async keyword in its signature.
-        (This is omitted to preserve syntax compatibility with Python 2.)
+        asynchronous callers.
 
         The arguments are identical to those of Apprise.notify().
 
@@ -396,16 +395,26 @@ class Apprise:
 
         except TypeError:
             # No notifications sent, and there was an internal error.
-            return py3compat.asyncio.toasyncwrapvalue(False)
+            return False
 
         else:
             if len(coroutines) > 0:
-                # All notifications sent, return False if any failed.
-                return py3compat.asyncio.notify(coroutines)
+                # Create log entry
+                logger.info(
+                    f'Notifying {len(coroutines)} service(s) asynchronously.')
+
+                results = await asyncio.gather(
+                    *coroutines, return_exceptions=True)
+
+                # Returns True if all notifications succeeded, otherwise False
+                # is returned.
+                failed = any(not status or isinstance(status, Exception)
+                             for status in results)
+                return not failed
 
             else:
                 # No notifications sent.
-                return py3compat.asyncio.toasyncwrapvalue(None)
+                return None
 
     @staticmethod
     def _notifyhandler(server, **kwargs):
@@ -429,20 +438,17 @@ class Apprise:
             return False
 
     @staticmethod
-    def _notifyhandlerasync(server, **kwargs):
+    async def _notifyhandlerasync(server, **kwargs):
         """
         The asynchronous notification sender. Returns a coroutine that yields
         True if the notification sent successfully.
         """
 
         if server.asset.async_mode:
-            return server.async_notify(**kwargs)
+            return await server.async_notify(**kwargs)
 
         else:
-            # Send the notification immediately, and wrap the result in a
-            # coroutine.
-            status = Apprise._notifyhandler(server, **kwargs)
-            return py3compat.asyncio.toasyncwrapvalue(status)
+            return Apprise._notifyhandler(server, **kwargs)
 
     def _notifyall(self, handler, body, title='',
                    notify_type=common.NotifyType.INFO, body_format=None,

@@ -36,25 +36,6 @@ ASYNCIO_RUN_SUPPORT = \
     (sys.version_info.major == 3 and sys.version_info.minor >= 7)
 
 
-async def notify(coroutines):
-    """
-    An async wrapper to the AsyncNotifyBase.async_notify() calls allowing us
-    to call gather() and collect the responses
-    """
-
-    # Create log entry
-    logger.info(
-        'Notifying {} service(s) asynchronously.'.format(len(coroutines)))
-
-    results = await asyncio.gather(*coroutines, return_exceptions=True)
-
-    # Returns True if all notifications succeeded, otherwise False is
-    # returned.
-    failed = any(not status or isinstance(status, Exception)
-                 for status in results)
-    return not failed
-
-
 def tosync(cor, debug=False):
     """
     Await a coroutine from non-async code.
@@ -94,22 +75,6 @@ def tosync(cor, debug=False):
         loop.set_debug(debug)
 
         return loop.run_until_complete(cor)
-
-
-async def toasyncwrapvalue(v):
-    """
-    Create a coroutine that, when run, returns the provided value.
-    """
-
-    return v
-
-
-async def toasyncwrap(fn):
-    """
-    Create a coroutine that, when run, executes the provided function.
-    """
-
-    return fn()
 
 
 class AsyncNotifyBase(URLBase):

@@ -32,8 +32,6 @@ from apprise import NotifyFormat
 
 from apprise.common import NOTIFY_SCHEMA_MAP
 
-import apprise.py3compat.asyncio as py3aio
-
 # Disable logging for a cleaner testing output
 import logging
 logging.disable(logging.CRITICAL)
@@ -151,11 +149,8 @@ def test_apprise_works_in_async_loop():
     # see https://github.com/caronc/apprise/issues/610
     import asyncio
 
-    def try_notify():
+    async def try_notify():
         a.notify(title="title", body="body")
 
-    # Convert to a coroutine to run asynchronously.
-    cor = py3aio.toasyncwrap(try_notify)
-
     # Should execute successfully.
-    asyncio.run(cor)
+    asyncio.run(try_notify())
