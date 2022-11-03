@@ -23,8 +23,10 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import dataclasses
 import re
 import smtplib
+import typing as t
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
@@ -280,6 +282,13 @@ EMAIL_TEMPLATES = (
         },
     ),
 )
+
+
+@dataclasses.dataclass
+class EmailMessage:
+    recipient: str
+    to_addrs: t.List[str]
+    body: str
 
 
 class NotifyEmail(NotifyBase):
@@ -659,14 +668,13 @@ class NotifyEmail(NotifyBase):
         # Initialize our default from name
         from_name = self.from_name if self.from_name else self.app_desc
 
-        # error tracking (used for function return)
-        has_error = False
-
         if not self.targets:
             # There is no one to email; we're done
             self.logger.warning(
                 'There are no Email recipients to notify')
             return False
+
+        messages: t.List[EmailMessage] = []
 
         # Create a copy of the targets list
         emails = list(self.targets)
@@ -778,58 +786,79 @@ class NotifyEmail(NotifyBase):
             if reply_to:
                 base['Reply-To'] = ','.join(reply_to)
 
-            # bind the socket variable to the current namespace
-            socket = None
+            message = EmailMessage(
+                recipient=to_addr,
+                to_addrs=[to_addr] + list(cc) + list(bcc),
+                body=base.as_string())
+            messages.append(message)
 
-            # Always call throttle before any remote server i/o is made
-            self.throttle()
+        return self.submit(messages)
 
-            try:
-                self.logger.debug('Connecting to remote SMTP server...')
-                socket_func = smtplib.SMTP
-                if self.secure and self.secure_mode == SecureMailMode.SSL:
-                    self.logger.debug('Securing connection with SSL...')
-                    socket_func = smtplib.SMTP_SSL
+    def submit(self, messages: t.List[EmailMessage]):
 
-                socket = socket_func(
-                    self.smtp_host,
-                    self.port,
-                    None,
-                    timeout=self.socket_connect_timeout,
-                )
+        # error tracking (used for function return)
+        has_error = False
 
-                if self.secure and self.secure_mode == SecureMailMode.STARTTLS:
-                    # Handle Secure Connections
-                    self.logger.debug('Securing connection with STARTTLS...')
-                    socket.starttls()
+        # bind the socket variable to the current namespace
+        socket = None
 
-                if self.user and self.password:
-                    # Apply Login credetials
-                    self.logger.debug('Applying user credentials...')
-                    socket.login(self.user, self.password)
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
 
-                # Send the email
-                socket.sendmail(
-                    self.from_addr,
-                    [to_addr] + list(cc) + list(bcc),
-                    base.as_string())
+        try:
+            self.logger.debug('Connecting to remote SMTP server...')
+            socket_func = smtplib.SMTP
+            if self.secure and self.secure_mode == SecureMailMode.SSL:
+                self.logger.debug('Securing connection with SSL...')
+                socket_func = smtplib.SMTP_SSL
 
-                self.logger.info(
-                    'Sent Email notification to "{}".'.format(to_addr))
+            socket = socket_func(
+                self.smtp_host,
+                self.port,
+                None,
+                timeout=self.socket_connect_timeout,
+            )
 
-            except (SocketError, smtplib.SMTPException, RuntimeError) as e:
-                self.logger.warning(
-                    'A Connection error occurred sending Email '
-                    'notification to {}.'.format(self.smtp_host))
-                self.logger.debug('Socket Exception: %s' % str(e))
+            if self.secure and self.secure_mode == SecureMailMode.STARTTLS:
+                # Handle Secure Connections
+                self.logger.debug('Securing connection with STARTTLS...')
+                socket.starttls()
 
-                # Mark our failure
-                has_error = True
+            if self.user and self.password:
+                # Apply Login credetials
+                self.logger.debug('Applying user credentials...')
+                socket.login(self.user, self.password)
 
-            finally:
-                # Gracefully terminate the connection with the server
-                if socket is not None:  # pragma: no branch
-                    socket.quit()
+            # Send the emails
+            for message in messages:
+                try:
+                    socket.sendmail(
+                        self.from_addr,
+                        message.to_addrs,
+                        message.body)
+
+                    self.logger.info(
+                        f'Sent Email notification to "{message.recipient}".')
+                except (SocketError, smtplib.SMTPException, RuntimeError) as e:
+                    self.logger.warning(
+                        f'Sending email to "{message.recipient}" failed. '
+                        f'Reason: {e}')
+
+                    # Mark as failure
+                    has_error = True
+
+        except (SocketError, smtplib.SMTPException, RuntimeError) as e:
+            self.logger.warning(
+                f'Connection error while submitting email to {self.smtp_host}.'
+                f' Reason: {e}')
+
+            # Mark as failure
+            has_error = True
+
+        finally:
+            # Gracefully terminate the connection with the server
+            if socket is not None:  # pragma: no branch
+                socket.quit()
 
         return not has_error
 
