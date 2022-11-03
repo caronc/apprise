@@ -323,10 +323,6 @@ class NotifyGoogleChat(NotifyBase):
         """
         results = NotifyBase.parse_url(url, verify_host=False)
 
-        # print("\nstart results:")
-        # print(results)
-        # print("\n")
-
         if not results:
             # We're done early as we couldn't load the results
             return results
@@ -366,11 +362,6 @@ class NotifyGoogleChat(NotifyBase):
                 results["qsd"]["threadkey"]
             )
 
-
-        # print("\nend results:")
-        # print(results)
-        # print("\n")
-
         return results
 
     @staticmethod
@@ -381,32 +372,19 @@ class NotifyGoogleChat(NotifyBase):
                  '?key={key}&token={token}
         """
 
-        # print("on passe par parse native url")
-        # print("url initale:", url)
-
         result = re.match(
             r"^https://chat\.googleapis\.com/v1/spaces/"
-            r"(?P<workspace>[a-zA-Z0-9_-]+)/"
-            r"messages(?:/|)(?:\?|)(?P<params>.*)$",
+            r"(?P<workspace>[a-zA-Z0-9_-]+)/messages/*(?P<params>.*)$",
             url,
             re.I,
         )
 
-        # print("what's returned", NotifyGoogleChat.parse_url(
-        #         "{schema}://{workspace}{params}".format(
-        #             schema=NotifyGoogleChat.secure_protocol,
-        #             workspace=result.group("workspace"),
-        #             params="/".join(re.split(r"&?[a-zA-Z]*=", result.group("params"))),
-        #         )
-        #     ))
-
-        # without regex, params aren't delimited by `/`
         if result:
             return NotifyGoogleChat.parse_url(
-                "{schema}://{workspace}{params}".format(
+                "{schema}://{workspace}/{params}".format(
                     schema=NotifyGoogleChat.secure_protocol,
                     workspace=result.group("workspace"),
-                    params="/".join(re.split(r"&?[a-zA-Z]*=", result.group("params"))),
+                    params=result.group("params"),
                 )
             )
 
