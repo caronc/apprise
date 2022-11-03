@@ -95,6 +95,12 @@ apprise_url_tests = (
         'a' * 32, 'b' * 8, 'c' * 8), {
             'instance': TypeError,
     }),
+    # Use of both 'name' and 'from' together; these are synonymous
+    ('mailgun://user@localhost.localdomain/{}-{}-{}?'
+     'from=jack@gmail.com&name=Jason<jason@gmail.com>'.format(
+         'a' * 32, 'b' * 8, 'c' * 8), {
+             'instance': NotifyMailgun}),
+
     # headers
     ('mailgun://user@localhost.localdomain/{}-{}-{}'
         '?+X-Customer-Campaign-ID=Apprise'.format(

@@ -43,6 +43,7 @@ from ..common import NotifyFormat, NotifyType
 from ..conversion import convert_between
 from ..utils import is_email, parse_emails
 from ..AppriseLocale import gettext_lazy as _
+from ..logger import logger
 
 # Globally Default encoding mode set to Quoted Printable.
 charset.add_charset('utf-8', charset.QP, charset.QP, 'utf-8')
@@ -382,7 +383,7 @@ class NotifyEmail(NotifyBase):
         'name': {
             'name': _('From Name'),
             'type': 'string',
-            'map_to': 'from_name',
+            'map_to': 'from_addr',
         },
         'cc': {
             'name': _('Carbon Copy'),
@@ -419,9 +420,9 @@ class NotifyEmail(NotifyBase):
         },
     }
 
-    def __init__(self, smtp_host=None, from_name=None,
-                 from_addr=None, secure_mode=None, targets=None, cc=None,
-                 bcc=None, reply_to=None, headers=None, **kwargs):
+    def __init__(self, smtp_host=None, from_addr=None, secure_mode=None,
+                 targets=None, cc=None, bcc=None, reply_to=None, headers=None,
+                 **kwargs):
         """
         Initialize Email Object
 
@@ -460,31 +461,35 @@ class NotifyEmail(NotifyBase):
 
         # Now we want to construct the To and From email
         # addresses from the URL provided
-        self.from_addr = from_addr
+        self.from_addr = [False, '']
 
-        if self.user and not self.from_addr:
-            # detect our email address
-            self.from_addr = '{}@{}'.format(
+        if self.user and self.host:
+            # Prepare the bases of our email
+            self.from_addr = [self.app_id, '{}@{}'.format(
                 re.split(r'[\s@]+', self.user)[0],
                 self.host,
-            )
+            )]
 
-        result = is_email(self.from_addr)
+        if from_addr:
+            result = is_email(from_addr)
+            if result:
+                self.from_addr = (
+                    result['name'] if result['name'] else False,
+                    result['full_email'])
+            else:
+                self.from_addr[0] = from_addr
+
+        result = is_email(self.from_addr[1])
         if not result:
             # Parse Source domain based on from_addr
-            msg = 'Invalid ~From~ email specified: {}'.format(self.from_addr)
+            msg = 'Invalid ~From~ email specified: {}'.format(
+                '{} <{}>'.format(self.from_addr[0], self.from_addr[1])
+                if self.from_addr[0] else '{}'.format(self.from_addr[1]))
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # Store our email address
-        self.from_addr = result['full_email']
-
-        # Set our from name
-        self.from_name = from_name if from_name else result['name']
-
         # Store our lookup
-        self.names[self.from_addr] = \
-            self.from_name if self.from_name else False
+        self.names[self.from_addr[1]] = self.from_addr[0]
 
         # Now detect the SMTP Server
         self.smtp_host = \
@@ -517,8 +522,7 @@ class NotifyEmail(NotifyBase):
 
         else:
             # If our target email list is empty we want to add ourselves to it
-            self.targets.append(
-                (self.from_name if self.from_name else False, self.from_addr))
+            self.targets.append((False, self.from_addr[1]))
 
         # Validate recipients (cc:) and drop bad ones:
         for recipient in parse_emails(cc):
@@ -665,8 +669,8 @@ class NotifyEmail(NotifyBase):
         Perform Email Notification
         """
 
-        # Initialize our default from name
-        from_name = self.from_name if self.from_name else self.app_desc
+        # error tracking (used for function return)
+        has_error = False
 
         if not self.targets:
             # There is no one to email; we're done
@@ -708,7 +712,10 @@ class NotifyEmail(NotifyBase):
                     for addr in reply_to]
 
             self.logger.debug(
-                'Email From: {} <{}>'.format(from_name, self.from_addr))
+                'Email From: {}'.format(
+                    '{} <{}>'.format(self.from_addr[0], self.from_addr[1])
+                    if self.from_addr[0] else '{}'.format(self.from_addr[1])))
+
             self.logger.debug('Email To: {}'.format(to_addr))
             if cc:
                 self.logger.debug('Email Cc: {}'.format(', '.join(cc)))
@@ -771,9 +778,7 @@ class NotifyEmail(NotifyBase):
                 base[k] = Header(v, self._get_charset(v))
 
             base['Subject'] = Header(title, self._get_charset(title))
-            base['From'] = formataddr(
-                (from_name if from_name else False, self.from_addr),
-                charset='utf-8')
+            base['From'] = formataddr(self.from_addr, charset='utf-8')
             base['To'] = formataddr((to_name, to_addr), charset='utf-8')
             base['Message-ID'] = make_msgid(domain=self.smtp_host)
             base['Date'] = \
@@ -869,7 +874,6 @@ class NotifyEmail(NotifyBase):
 
         # Define an URL parameters
         params = {
-            'from': self.from_addr,
             'mode': self.secure_mode,
             'smtp': self.smtp_host,
             'user': self.user,
@@ -881,8 +885,9 @@ class NotifyEmail(NotifyBase):
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        if self.from_name:
-            params['name'] = self.from_name
+        if self.from_addr[0] != self.app_id:
+            # A custom entry was provided
+            params['from'] = formataddr(self.from_addr, charset='utf-8')
 
         if len(self.cc) > 0:
             # Handle our Carbon Copy Addresses
@@ -931,7 +936,7 @@ class NotifyEmail(NotifyBase):
         # or not
         has_targets = \
             not (len(self.targets) == 1
-                 and self.targets[0][1] == self.from_addr)
+                 and self.targets[0][1] == self.from_addr[1])
 
         return '{schema}://{auth}{hostname}{port}/{targets}?{params}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
@@ -975,13 +980,23 @@ class NotifyEmail(NotifyBase):
         if 'from' in results['qsd'] and len(results['qsd']['from']):
             from_addr = NotifyEmail.unquote(results['qsd']['from'])
 
+            if 'name' in results['qsd'] and len(results['qsd']['name']):
+                # Depricate use of both `from=` and `name=` in the same url as
+                # they will be synomomus of one another in the future.
+                from_addr = formataddr(
+                    (NotifyEmail.unquote(results['qsd']['name']), from_addr),
+                    charset='utf-8')
+                logger.warning(
+                    'Email name= and from= are synonymous; '
+                    'use one or the other.')
+
+        elif 'name' in results['qsd'] and len(results['qsd']['name']):
+            # Extract from name to associate with from address
+            from_addr = NotifyEmail.unquote(results['qsd']['name'])
+
         # Attempt to detect 'to' email address
         if 'to' in results['qsd'] and len(results['qsd']['to']):
             results['targets'].append(results['qsd']['to'])
-
-        if 'name' in results['qsd'] and len(results['qsd']['name']):
-            # Extract from name to associate with from address
-            results['from_name'] = NotifyEmail.unquote(results['qsd']['name'])
 
         # Store SMTP Host if specified
         if 'smtp' in results['qsd'] and len(results['qsd']['smtp']):
