@@ -669,9 +669,6 @@ class NotifyEmail(NotifyBase):
         Perform Email Notification
         """
 
-        # error tracking (used for function return)
-        has_error = False
-
         if not self.targets:
             # There is no one to email; we're done
             self.logger.warning(
@@ -838,7 +835,7 @@ class NotifyEmail(NotifyBase):
             for message in messages:
                 try:
                     socket.sendmail(
-                        self.from_addr,
+                        self.from_addr[1],
                         message.to_addrs,
                         message.body)
 
@@ -876,7 +873,6 @@ class NotifyEmail(NotifyBase):
         params = {
             'mode': self.secure_mode,
             'smtp': self.smtp_host,
-            'user': self.user,
         }
 
         # Append our headers into our parameters
@@ -885,9 +881,21 @@ class NotifyEmail(NotifyBase):
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        if self.from_addr[0] != self.app_id:
-            # A custom entry was provided
-            params['from'] = formataddr(self.from_addr, charset='utf-8')
+        from_addr = None
+        if len(self.targets) == 1 and self.targets[0][1] != self.from_addr[1]:
+            # A custom email was provided
+            from_addr = self.from_addr[1]
+
+        if self.from_addr[0] and self.from_addr[0] != self.app_id:
+            # A custom name was provided
+            params['from'] = self.from_addr[0] if not from_addr else \
+                formataddr((self.from_addr[0], from_addr), charset='utf-8')
+
+        elif from_addr:
+            params['from'] = formataddr((False, from_addr), charset='utf-8')
+
+        elif not self.user:
+            params['from'] = formataddr((False, self.from_addr[1]), charset='utf-8')
 
         if len(self.cc) > 0:
             # Handle our Carbon Copy Addresses
