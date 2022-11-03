@@ -269,6 +269,12 @@ def test_plugin_xmpp_slixmpp_callbacks():
     test coverage of the NotifyXMPP plugin, but it's better than nothing at
     all.
     """
+
+    # FIXME: NameError: name 'PROTOCOL_TLS' is not defined.
+    # https://github.com/caronc/apprise/actions/runs/3389598314/jobs/5632865058#step:10:535
+    if not hasattr(ssl, "PROTOCOL_TLS"):
+        ssl.PROTOCOL_TLS = 2
+
     def dummy_before_message():
         # Just a dummy function for testing purposes
         return
