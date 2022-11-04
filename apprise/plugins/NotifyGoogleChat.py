@@ -80,9 +80,7 @@ class NotifyGoogleChat(NotifyBase):
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_googlechat'
 
     # Google Chat Webhook
-    notify_url = (
-        'https://chat.googleapis.com/v1/{}'
-    )
+    notify_url = 'https://chat.googleapis.com/v1/{}'
 
     # Default Notify Format
     notify_format = NotifyFormat.MARKDOWN
