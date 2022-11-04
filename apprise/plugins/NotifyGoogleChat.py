@@ -172,7 +172,7 @@ class NotifyGoogleChat(NotifyBase):
                   '({}) was specified.'.format(webhook_token)
             self.logger.warning(msg)
             raise TypeError(msg)
-        
+
         # Webhook Thread Key (associated with thread)
         try:
             self.webhook_threadkey = validate_regex(webhook_threadkey)
@@ -267,12 +267,14 @@ class NotifyGoogleChat(NotifyBase):
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         if self.webhook_threadkey:
-            return '{schema}://{workspace}/{key}/{token}/{threadkey}/?{params}'.format(
+            return \
+                '{schema}://{workspace}/{key}/{token}/{threadkey}/?{params}'.format(
                 schema=self.secure_protocol,
                 workspace=self.pprint(self.workspace, privacy, safe=''),
                 key=self.pprint(self.webhook_key, privacy, safe=''),
                 token=self.pprint(self.webhook_token, privacy, safe=''),
-                threadkey=self.pprint(self.webhook_threadkey, privacy, safe=''),
+                threadkey= \
+                    self.pprint(self.webhook_threadkey, privacy, safe=''),
                 params=NotifyGoogleChat.urlencode(params),
             )
 
@@ -329,7 +331,7 @@ class NotifyGoogleChat(NotifyBase):
         if 'token' in results['qsd']:
             results['webhook_token'] = \
                 NotifyGoogleChat.unquote(results['qsd']['token'])
-        
+
         if 'threadkey' in results['qsd']:
             results['webhook_threadkey'] = \
                 NotifyGoogleChat.unquote(results['qsd']['threadkey'])
