@@ -44,7 +44,7 @@ except ImportError:
     pass
 
 
-class SliXmppAdapter(object):
+class SliXmppAdapter:
     """
     Wrapper to slixmpp
 

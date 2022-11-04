@@ -135,7 +135,7 @@ class NotifyXMPP(NotifyBase):
         """
         Initialize XMPP Object
         """
-        super(NotifyXMPP, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # JID Details:
         #  - JID's normally have an @ symbol in them, but it is not required
