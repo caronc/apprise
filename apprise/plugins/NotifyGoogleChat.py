@@ -119,7 +119,7 @@ class NotifyGoogleChat(NotifyBase):
             'required': True,
         },
         'threadkey': {
-            'name': _('Webhook Thread Key'),
+            'name': _('Thread Key'),
             'type': 'string',
             'private': True,
             'required': False,
@@ -175,7 +175,7 @@ class NotifyGoogleChat(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # Webhook Thread Key (associated with thread)
+        # Thread Key (associated with thread)
         try:
             self.threadkey = validate_regex(threadkey)
         except:
@@ -321,7 +321,7 @@ class NotifyGoogleChat(NotifyBase):
         # Store our Webhook Token
         results['webhook_token'] = tokens.pop(0) if tokens else None
 
-        # Store our Webhook Thread Key
+        # Store our Thread Key
         results['threadkey'] = tokens.pop(0) if tokens else None
 
         # Support arguments as overrides (if specified)
