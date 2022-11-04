@@ -222,7 +222,7 @@ class NotifyGoogleChat(NotifyBase):
             )
 
         self.logger.debug('Google Chat POST URL: %s (cert_verify=%r)' % (
-                notify_url, self.verify_certificate,
+            notify_url, self.verify_certificate,
         ))
         self.logger.debug('Google Chat Payload: %s' % str(payload))
 
@@ -237,20 +237,17 @@ class NotifyGoogleChat(NotifyBase):
                 timeout=self.request_timeout,
             )
             if r.status_code not in (
-                requests.codes.ok,
-                requests.codes.no_content,
-            ):
+                requests.codes.ok, requests.codes.no_content):
 
                 # We had a problem
-                status_str = NotifyBase.http_response_code_lookup(
-                    r.status_code
-                )
+                status_str = \
+                    NotifyBase.http_response_code_lookup(r.status_code)
 
                 self.logger.warning(
                     'Failed to send Google Chat notification: '
                     '{}{}error={}.'.format(
-                        status_str, 
-                        ', ' if status_str else '', 
+                        status_str,
+                        ', ' if status_str else '',
                         r.status_code))
 
                 self.logger.debug('Response Details:\r\n{}'.format(r.content))
@@ -314,6 +311,7 @@ class NotifyGoogleChat(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
+        # Store our Workspace
         results['workspace'] = NotifyGoogleChat.unquote(results['host'])
 
         # Acquire our tokens
@@ -358,17 +356,13 @@ class NotifyGoogleChat(NotifyBase):
         result = re.match(
             r'^https://chat\.googleapis\.com/v1/spaces/'
             r'(?P<workspace>[a-zA-Z0-9_-]+)/messages/*(?P<params>.*)$',
-            url,
-            re.I,
-        )
+            url, re.I,)
 
         if result:
             return NotifyGoogleChat.parse_url(
                 '{schema}://{workspace}/{params}'.format(
                     schema=NotifyGoogleChat.secure_protocol,
                     workspace=result.group('workspace'),
-                    params=result.group('params'),
-                )
-            )
+                    params=result.group('params'),))
 
         return None
