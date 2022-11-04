@@ -98,57 +98,51 @@ class NotifyGoogleChat(NotifyBase):
     templates = (
         '{schema}://{workspace}/{webhook_key}/{webhook_token}',
         '{schema}://{workspace}/{webhook_key}/{webhook_token}/{webhook_threadkey}',
-        )
+    )
 
     # Define our template tokens
-    template_tokens = dict(
-        NotifyBase.template_tokens,
-        **{
-            'workspace': {
-                'name': _('Workspace'),
-                'type': 'string',
-                'private': True,
-                'required': True,
-            },
-            'webhook_key': {
-                'name': _('Webhook Key'),
-                'type': 'string',
-                'private': True,
-                'required': True,
-            },
-            'webhook_token': {
-                'name': _('Webhook Token'),
-                'type': 'string',
-                'private': True,
-                'required': True,
-            },
-            'webhook_threadkey': {
-                'name': _('Webhook Thread Key'),
-                'type': 'string',
-                'private': True,
-                'required': False,
-            },
-        }
-    )
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'workspace': {
+            'name': _('Workspace'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+        },
+        'webhook_key': {
+            'name': _('Webhook Key'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+        },
+        'webhook_token': {
+            'name': _('Webhook Token'),
+            'type': 'string',
+            'private': True,
+            'required': True,
+        },
+        'webhook_threadkey': {
+            'name': _('Webhook Thread Key'),
+            'type': 'string',
+            'private': True,
+            'required': False,
+        },
+    })
 
     # Define our template arguments
-    template_args = dict(
-        NotifyBase.template_args,
-        **{
-            'workspace': {
-                'alias_of': 'workspace',
-            },
-            'key': {
-                'alias_of': 'webhook_key',
-            },
-            'token': {
-                'alias_of': 'webhook_token',
-            },
-            'threadkey': {
-                'alias_of': 'webhook_threadkey',
-            },
-        }
-    )
+    template_args = dict(NotifyBase.template_args, **{
+        'workspace': {
+            'alias_of': 'workspace',
+        },
+        'key': {
+            'alias_of': 'webhook_key',
+        },
+        'token': {
+            'alias_of': 'webhook_token',
+        },
+        'threadkey': {
+            'alias_of': 'webhook_threadkey',
+        },
+    })
 
     def __init__(self, workspace, webhook_key, webhook_token, webhook_threadkey=None, **kwargs):
         """
@@ -237,7 +231,7 @@ class NotifyGoogleChat(NotifyBase):
                 timeout=self.request_timeout,
             )
             if r.status_code not in (
-                requests.codes.ok, requests.codes.no_content):
+                    requests.codes.ok, requests.codes.no_content):
 
                 # We had a problem
                 status_str = \
@@ -306,7 +300,6 @@ class NotifyGoogleChat(NotifyBase):
 
         """
         results = NotifyBase.parse_url(url, verify_host=False)
-
         if not results:
             # We're done early as we couldn't load the results
             return results
@@ -363,6 +356,6 @@ class NotifyGoogleChat(NotifyBase):
                 '{schema}://{workspace}/{params}'.format(
                     schema=NotifyGoogleChat.secure_protocol,
                     workspace=result.group('workspace'),
-                    params=result.group('params'),))
+                    params=result.group('params')))
 
         return None
