@@ -201,9 +201,9 @@ class NotifyGoogleChat(NotifyBase):
         }
 
         path = (
-            f"spaces/{self.workspace}/messages?"
-            f"key={self.webhook_key}"
-            f"&token={self.webhook_token}"
+            f'spaces/{self.workspace}/messages?'
+            f'key={self.webhook_key}'
+            f'&token={self.webhook_token}'
         )
 
         path_and_params = (
