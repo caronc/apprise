@@ -25,7 +25,7 @@ jobs:
 
       # Run all jobs to completion (false), or cancel
       # all jobs once the first one fails (true).
-      fail-fast: true
+      fail-fast: false
 
       # Define a minimal test matrix, it will be
       # expanded using subsequent `include` items.
