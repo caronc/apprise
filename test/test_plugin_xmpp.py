@@ -49,13 +49,8 @@ def test_plugin_xmpp_slixmpp_import_error():
     assert obj is None
 
 
-@pytest.mark.skipif(
-    'slixmpp' not in sys.modules, reason="Requires slixmpp")
-def test_plugin_xmpp_general(tmpdir):
-    """
-    NotifyXMPP() General Checks
-    """
-
+@pytest.fixture
+def xmpp_environment():
     # Set success flag
     SliXmppAdapter.success = True
 
@@ -71,70 +66,15 @@ def test_plugin_xmpp_general(tmpdir):
     # Disable Throttling to speed testing
     NotifyBase.request_rate_per_sec = 0
 
-    # Create our instance
-    obj = apprise.Apprise.instantiate('xmpp://', suppress_exceptions=False)
+    yield
 
-    # Not possible because no password or host was specified
-    assert obj is None
+    # Restore our CA Certificates from backup
+    SliXmppAdapter.CA_CERTIFICATE_FILE_LOCATIONS = ca_backup
 
-    with pytest.raises(TypeError):
-        apprise.Apprise.instantiate(
-            'xmpp://hostname', suppress_exceptions=False)
 
-    # SSL Flags
-    if hasattr(ssl, "PROTOCOL_TLS"):
-        # Test cases where PROTOCOL_TLS simply isn't available
-        ssl_temp_swap = ssl.PROTOCOL_TLS
-        del ssl.PROTOCOL_TLS
-
-        # Test our URL
-        url = 'xmpps://user:pass@127.0.0.1'
-        obj = apprise.Apprise.instantiate(url, suppress_exceptions=False)
-
-        # Test we loaded
-        # print("TYPE:", type(obj))
-        # assert isinstance(obj, NotifyXMPP) is True
-
-        # Check that it found our mocked environments
-        assert obj.enabled is True
-
-        with mock.patch('slixmpp.ClientXMPP') as mock_stream:
-            client_stream = mock.Mock()
-            client_stream.connect.return_value = True
-            mock_stream.return_value = client_stream
-
-            # We fail because we could not verify the host
-            assert obj.notify(
-                title='title', body='body',
-                notify_type=apprise.NotifyType.INFO) is False
-
-        # Restore the variable for remaining tests
-        setattr(ssl, 'PROTOCOL_TLS', ssl_temp_swap)
-
-    else:
-        # Handle case where it is not missing
-        setattr(ssl, 'PROTOCOL_TLS', ssl.PROTOCOL_TLSv1)
-        # Test our URL
-        url = 'xmpps://user:pass@localhost'
-        obj = apprise.Apprise.instantiate(url, suppress_exceptions=False)
-
-        # Test we loaded
-        # assert isinstance(obj, NotifyXMPP) is True
-
-        # Check that it found our mocked environments
-        assert obj.enabled is True
-
-        with mock.patch('slixmpp.ClientXMPP') as mock_stream:
-            client_stream = mock.Mock()
-            client_stream.connect.return_value = True
-            mock_stream.return_value = client_stream
-
-            assert obj.notify(
-                title='title', body='body',
-                notify_type=apprise.NotifyType.INFO) is True
-
-        # Restore settings as they were
-        del ssl.PROTOCOL_TLS
+@pytest.mark.skipif(
+    'slixmpp' not in sys.modules, reason="Requires slixmpp")
+def test_plugin_xmpp_general(tmpdir, xmpp_environment):
 
     urls = (
         {
@@ -250,8 +190,78 @@ def test_plugin_xmpp_general(tmpdir):
         assert obj.notify(
             title='', body='body', notify_type=apprise.NotifyType.INFO) is True
 
-    # Restore our CA Certificates from backup
-    SliXmppAdapter.CA_CERTIFICATE_FILE_LOCATIONS = ca_backup
+
+@pytest.mark.skipif(
+    'slixmpp' not in sys.modules, reason="Requires slixmpp")
+def test_plugin_xmpp_tls(xmpp_environment):
+    """
+    NotifyXMPP() General Checks
+    """
+
+    # Create our instance
+    obj = apprise.Apprise.instantiate('xmpp://', suppress_exceptions=False)
+
+    # Not possible because no password or host was specified
+    assert obj is None
+
+    with pytest.raises(TypeError):
+        apprise.Apprise.instantiate(
+            'xmpp://hostname', suppress_exceptions=False)
+
+    # SSL Flags
+    if hasattr(ssl, "PROTOCOL_TLS"):
+        # Test cases where PROTOCOL_TLS simply isn't available
+        ssl_temp_swap = ssl.PROTOCOL_TLS
+        del ssl.PROTOCOL_TLS
+
+        # Test our URL
+        url = 'xmpps://user:pass@127.0.0.1'
+        obj = apprise.Apprise.instantiate(url, suppress_exceptions=False)
+
+        # Test we loaded
+        # print("TYPE:", type(obj))
+        # assert isinstance(obj, NotifyXMPP) is True
+
+        # Check that it found our mocked environments
+        assert obj.enabled is True
+
+        with mock.patch('slixmpp.ClientXMPP') as mock_stream:
+            client_stream = mock.Mock()
+            client_stream.connect.return_value = True
+            mock_stream.return_value = client_stream
+
+            # We fail because we could not verify the host
+            assert obj.notify(
+                title='title', body='body',
+                notify_type=apprise.NotifyType.INFO) is False
+
+        # Restore the variable for remaining tests
+        setattr(ssl, 'PROTOCOL_TLS', ssl_temp_swap)
+
+    else:
+        # Handle case where it is not missing
+        setattr(ssl, 'PROTOCOL_TLS', ssl.PROTOCOL_TLSv1)
+        # Test our URL
+        url = 'xmpps://user:pass@localhost'
+        obj = apprise.Apprise.instantiate(url, suppress_exceptions=False)
+
+        # Test we loaded
+        # assert isinstance(obj, NotifyXMPP) is True
+
+        # Check that it found our mocked environments
+        assert obj.enabled is True
+
+        with mock.patch('slixmpp.ClientXMPP') as mock_stream:
+            client_stream = mock.Mock()
+            client_stream.connect.return_value = True
+            mock_stream.return_value = client_stream
+
+            assert obj.notify(
+                title='title', body='body',
+                notify_type=apprise.NotifyType.INFO) is True
+
+        # Restore settings as they were
+        del ssl.PROTOCOL_TLS
 
 
 @pytest.mark.skipif(
