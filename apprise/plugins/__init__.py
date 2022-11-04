@@ -518,7 +518,6 @@ def url_to_dict(url, secure_logging=True):
 
     # Ensure our schema is always in lower case
     schema = schema.group('schema').lower()
-
     if schema not in common.NOTIFY_SCHEMA_MAP:
         # Give the user the benefit of the doubt that the user may be using
         # one of the URLs provided to them by their notification service.
