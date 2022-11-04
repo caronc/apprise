@@ -92,6 +92,7 @@ def test_plugin_xmpp_general(tmpdir):
         obj = apprise.Apprise.instantiate(url, suppress_exceptions=False)
 
         # Test we loaded
+        print("TYPE:", type(obj))
         assert isinstance(obj, NotifyXMPP) is True
 
         # Check that it found our mocked environments
