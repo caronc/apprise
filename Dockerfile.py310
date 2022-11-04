@@ -9,8 +9,9 @@ VOLUME ["/apprise"]
 WORKDIR /apprise
 COPY requirements.txt /
 COPY dev-requirements.txt /
+COPY all-plugin-requirements.txt /
 ENV PYTHONPATH /apprise
 ENV PYTHONPYCACHEPREFIX /apprise/__pycache__/py310
 
 
-RUN pip install -r /requirements.txt -r /dev-requirements.txt
+RUN pip install -r /requirements.txt -r /dev-requirements.txt -r /all-plugin-requirements.txt
