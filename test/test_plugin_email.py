@@ -178,9 +178,10 @@ TEST_URLS = (
     ('mailtos://user:@nuxref.com', {
         'instance': NotifyEmail,
     }),
-    # Invalid From Address
+    # Invalid From Address; but just gets put as the from name instead
+    # Hence the below generats From: "@ <user@nuxref.com>"
     ('mailtos://user:pass@nuxref.com?from=@', {
-        'instance': TypeError,
+        'instance': NotifyEmail,
     }),
     # Invalid From Address
     ('mailtos://nuxref.com?user=&pass=.', {
@@ -226,6 +227,10 @@ TEST_URLS = (
         # is set and tests that we gracfully handle them
         'test_smtplib_exceptions': True,
     }),
+    # Use of both 'name' and 'from' together; these are synonymous
+    ('mailtos://user:pass@nuxref.com?'
+     'from=jack@gmail.com&name=Jason<jason@gmail.com>', {
+         'instance': NotifyEmail}),
     # Test no auth at all
     ('mailto://localhost?from=test@example.com&to=test@example.com', {
         'instance': NotifyEmail,
@@ -435,7 +440,8 @@ def test_plugin_email_webbase_lookup(mock_smtp, mock_smtpssl):
     assert isinstance(obj, NotifyEmail)
     assert len(obj.targets) == 1
     assert (False, 'user@l2g.com') in obj.targets
-    assert obj.from_addr == 'user@l2g.com'
+    assert obj.from_addr[0] == obj.app_id
+    assert obj.from_addr[1] == 'user@l2g.com'
     assert obj.password == 'pass'
     assert obj.user == 'user'
     assert obj.secure is True
@@ -569,6 +575,23 @@ def test_plugin_email_smtplib_send_multiple_recipients(mock_smtplib):
         mock.call().quit(),
     ]
 
+    # No from= used in the above
+    assert re.match(r'.*from=.*', obj.url()) is None
+    # No mode= as this isn't a secure connection
+    assert re.match(r'.*mode=.*', obj.url()) is None
+    # No smtp= as the SMTP server is the same as the hostname in this case
+    assert re.match(r'.*smtp=.*', obj.url()) is None
+    # URL is assembled based on provided user
+    assert re.match(
+        r'^mailto://user:pass\@mail.example.org/.*', obj.url()) is not None
+
+    # Verify our added emails are still part of the URL
+    assert re.match(r'.*/foo%40example.net[/?].*', obj.url()) is not None
+    assert re.match(r'.*/bar%40example.com[/?].*', obj.url()) is not None
+
+    assert re.match(r'.*bcc=qux%40example.org.*', obj.url()) is not None
+    assert re.match(r'.*cc=baz%40example.org.*', obj.url()) is not None
+
 
 @mock.patch('smtplib.SMTP')
 def test_plugin_email_smtplib_internationalization(mock_smtp):
@@ -672,7 +695,7 @@ def test_plugin_email_url_variations():
     # Test variations of username required to be an email address
     # user@example.com
     obj = Apprise.instantiate(
-        'mailto://{user}:{passwd}@example.com'.format(
+        'mailto://{user}:{passwd}@example.com?smtp=example.com'.format(
             user='apprise%40example21.ca',
             passwd='abcd123'),
         suppress_exceptions=False)
@@ -680,6 +703,17 @@ def test_plugin_email_url_variations():
 
     assert obj.password == 'abcd123'
     assert obj.user == 'apprise@example21.ca'
+
+    # No from= used in the above
+    assert re.match(r'.*from=.*', obj.url()) is None
+    # No mode= as this isn't a secure connection
+    assert re.match(r'.*mode=.*', obj.url()) is None
+    # No smtp= as the SMTP server is the same as the hostname in this case
+    # even though it was explicitly specified
+    assert re.match(r'.*smtp=.*', obj.url()) is None
+    # URL is assembled based on provided user
+    assert re.match(
+        r'^mailto://apprise:abcd123\@example.com/.*', obj.url()) is not None
 
     # test username specified in the url body (as an argument)
     # this always over-rides the entry at the front of the url
@@ -693,10 +727,20 @@ def test_plugin_email_url_variations():
     assert obj.password == 'abcd123'
     assert obj.user == 'apprise@example21.ca'
 
+    # No from= used in the above
+    assert re.match(r'.*from=.*', obj.url()) is None
+    # No mode= as this isn't a secure connection
+    assert re.match(r'.*mode=.*', obj.url()) is None
+    # No smtp= as the SMTP server is the same as the hostname in this case
+    assert re.match(r'.*smtp=.*', obj.url()) is None
+    # URL is assembled based on provided user
+    assert re.match(
+        r'^mailto://apprise:abcd123\@example.com/.*', obj.url()) is not None
+
     # test user and password specified in the url body (as an argument)
     # this always over-rides the entries at the front of the url
     obj = Apprise.instantiate(
-        'mailto://_:_@example.com?user={user}&pass={passwd}'.format(
+        'mailtos://_:_@example.com?user={user}&pass={passwd}'.format(
             user='apprise%40example21.ca',
             passwd='abcd123'),
         suppress_exceptions=False)
@@ -706,7 +750,20 @@ def test_plugin_email_url_variations():
     assert obj.user == 'apprise@example21.ca'
     assert len(obj.targets) == 1
     assert (False, 'apprise@example.com') in obj.targets
-    assert obj.targets[0][1] == obj.from_addr
+    assert obj.from_addr[0] == obj.app_id
+    assert obj.from_addr[1] == 'apprise@example.com'
+    assert obj.targets[0][0] is False
+    assert obj.targets[0][1] == obj.from_addr[1]
+
+    # No from= used in the above
+    assert re.match(r'.*from=.*', obj.url()) is None
+    # Default mode is starttls
+    assert re.match(r'.*mode=starttls.*', obj.url()) is not None
+    # No smtp= as the SMTP server is the same as the hostname in this case
+    assert re.match(r'.*smtp=.*', obj.url()) is None
+    # URL is assembled based on provided user
+    assert re.match(
+        r'^mailtos://apprise:abcd123\@example.com/.*', obj.url()) is not None
 
     # test user and password specified in the url body (as an argument)
     # this always over-rides the entries at the front of the url
@@ -723,13 +780,26 @@ def test_plugin_email_url_variations():
     assert obj.user == 'apprise@example21.ca'
     assert len(obj.targets) == 1
     assert (False, 'apprise@example.com') in obj.targets
-    assert obj.targets[0][1] == obj.from_addr
+    assert obj.from_addr[0] == obj.app_id
+    assert obj.from_addr[1] == 'apprise@example.com'
+    assert obj.targets[0][0] is False
+    assert obj.targets[0][1] == obj.from_addr[1]
     assert obj.smtp_host == 'example.com'
+
+    # No from= used in the above
+    assert re.match(r'.*from=.*', obj.url()) is None
+    # No mode= as this isn't a secure connection
+    assert re.match(r'.*mode=.*', obj.url()) is None
+    # No smtp= as the SMTP server is the same as the hostname in this case
+    assert re.match(r'.*smtp=.*', obj.url()) is None
+    # URL is assembled based on provided user
+    assert re.match(
+        r'^mailto://apprise:abcd123\@example.com/.*', obj.url()) is not None
 
     # test a complicated example
     obj = Apprise.instantiate(
         'mailtos://{user}:{passwd}@{host}:{port}'
-        '?smtp={smtp_host}&format=text&from={this}&to={that}'.format(
+        '?smtp={smtp_host}&format=text&from=Charles<{this}>&to={that}'.format(
             user='apprise%40example21.ca',
             passwd='abcd123',
             host='example.com',
@@ -747,7 +817,28 @@ def test_plugin_email_url_variations():
     assert obj.smtp_host == 'smtp.example.edu'
     assert len(obj.targets) == 1
     assert (False, 'to@example.jp') in obj.targets
-    assert obj.from_addr == 'from@example.jp'
+    assert obj.from_addr[0] == 'Charles'
+    assert obj.from_addr[1] == 'from@example.jp'
+    assert re.match(
+        r'.*from=Charles\+%3Cfrom%40example.jp%3E.*', obj.url()) is not None
+
+    # Test Tagging under various urll encodings
+    for toaddr in ('/john.smith+mytag@domain.com',
+                   '?to=john.smith+mytag@domain.com',
+                   '/john.smith%2Bmytag@domain.com',
+                   '?to=john.smith%2Bmytag@domain.com'):
+
+        obj = Apprise.instantiate(
+            'mailto://user:pass@domain.com{}'.format(toaddr))
+        assert isinstance(obj, NotifyEmail) is True
+        assert obj.password == 'pass'
+        assert obj.user == 'user'
+        assert obj.host == 'domain.com'
+        assert obj.from_addr[0] == obj.app_id
+        assert obj.from_addr[1] == 'user@domain.com'
+        assert len(obj.targets) == 1
+        assert obj.targets[0][0] is False
+        assert obj.targets[0][1] == 'john.smith+mytag@domain.com'
 
 
 def test_plugin_email_dict_variations():
@@ -784,7 +875,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
         'mailtos://user:pass123@hotmail.com:444'
         '?to=user2@yahoo.com&name=test%20name')
     assert isinstance(results, dict)
-    assert 'test name' == results['from_name']
+    assert 'test name' == results['from_addr']
     assert 'user' == results['user']
     assert 444 == results['port']
     assert 'hotmail.com' == results['host']
@@ -832,7 +923,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
         'mailtos://user:pass123@hotmail.com?smtp=override.com'
         '&name=test%20name&to=user2@yahoo.com&mode=ssl')
     assert isinstance(results, dict)
-    assert 'test name' == results['from_name']
+    assert 'test name' == results['from_addr']
     assert 'user' == results['user']
     assert 'hotmail.com' == results['host']
     assert 'pass123' == results['password']
@@ -918,10 +1009,21 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     # Verify our over-rides are in place
     assert obj.smtp_host == 'smtp.exmail.qq.com'
     assert obj.port == 465
-    assert obj.from_addr == 'abc@xyz.cn'
+    assert obj.from_addr[0] == obj.app_id
+    assert obj.from_addr[1] == 'abc@xyz.cn'
     assert obj.secure_mode == 'ssl'
     # No entries in the reply_to
     assert not obj.reply_to
+
+    # No from= used in the above
+    assert re.match(r'.*from=.*', obj.url()) is None
+    # No Our secure connection is SSL
+    assert re.match(r'.*mode=ssl.*', obj.url()) is not None
+    # No smtp= as the SMTP server is the same as the hostname in this case
+    assert re.match(r'.*smtp=smtp.exmail.qq.com.*', obj.url()) is not None
+    # URL is assembled based on provided user
+    assert re.match(
+        r'^mailtos://abc:password@xyz.cn:465/.*', obj.url()) is not None
 
     results = NotifyEmail.parse_url(
         "mailtos://abc:password@xyz.cn?"
@@ -932,7 +1034,8 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     # Verify our over-rides are in place
     assert obj.smtp_host == 'smtp.exmail.qq.com'
     assert obj.port == 465
-    assert obj.from_addr == 'abc@xyz.cn'
+    assert obj.from_addr[0] == obj.app_id
+    assert obj.from_addr[1] == 'abc@xyz.cn'
     assert obj.secure_mode == 'ssl'
     # No entries in the reply_to
     assert not obj.reply_to
@@ -946,9 +1049,27 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert isinstance(obj, NotifyEmail) is True
     # Verify our over-rides are in place
     assert obj.smtp_host == 'example.com'
-    assert obj.from_addr == 'user@example.com'
+    assert obj.from_addr[0] == obj.app_id
+    assert obj.from_addr[1] == 'user@example.com'
     assert obj.secure_mode == 'starttls'
     assert obj.url().startswith(
         'mailtos://user:pass@example.com')
     # Test that our template over-ride worked
     assert 'reply=noreply%40example.com' in obj.url()
+
+    #
+    # Test Reply-To Email with Name Inline
+    #
+    results = NotifyEmail.parse_url(
+        "mailtos://user:pass@example.com?reply=Chris<noreply@example.ca>")
+    obj = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(obj, NotifyEmail) is True
+    # Verify our over-rides are in place
+    assert obj.smtp_host == 'example.com'
+    assert obj.from_addr[0] == obj.app_id
+    assert obj.from_addr[1] == 'user@example.com'
+    assert obj.secure_mode == 'starttls'
+    assert obj.url().startswith(
+        'mailtos://user:pass@example.com')
+    # Test that our template over-ride worked
+    assert 'reply=Chris+%3Cnoreply%40example.ca%3E' in obj.url()
