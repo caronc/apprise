@@ -400,7 +400,6 @@ def test_parse_url_general():
     assert result['qsd']['+key'] == result['qsd+']['KeY']
     assert result['qsd']['-key'] == result['qsd-']['kEy']
 
-
     result = utils.parse_url(
         'http://hostname/?+KeY=ValueA&-kEy=ValueB&KEY=Value%20+C&:colon=y',
         plus_to_space=True)
