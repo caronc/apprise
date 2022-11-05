@@ -710,8 +710,7 @@ class NotifyEmail(NotifyBase):
 
             self.logger.debug(
                 'Email From: {}'.format(
-                    '{} <{}>'.format(self.from_addr[0], self.from_addr[1])
-                    if self.from_addr[0] else '{}'.format(self.from_addr[1])))
+                    formataddr(self.from_addr, charset='utf-8')))
 
             self.logger.debug('Email To: {}'.format(to_addr))
             if cc:

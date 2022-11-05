@@ -822,6 +822,24 @@ def test_plugin_email_url_variations():
     assert re.match(
         r'.*from=Charles\+%3Cfrom%40example.jp%3E.*', obj.url()) is not None
 
+    # Test Tagging under various urll encodings
+    for toaddr in ('/john.smith+mytag@domain.com',
+                   '?to=john.smith+mytag@domain.com',
+                   '/john.smith%2Bmytag@domain.com',
+                   '?to=john.smith%2Bmytag@domain.com'):
+
+        obj = Apprise.instantiate(
+            'mailto://user:pass@domain.com{}'.format(toaddr))
+        assert isinstance(obj, NotifyEmail) is True
+        assert obj.password == 'pass'
+        assert obj.user == 'user'
+        assert obj.host == 'domain.com'
+        assert obj.from_addr[0] == obj.app_id
+        assert obj.from_addr[1] == 'user@domain.com'
+        assert len(obj.targets) == 1
+        assert obj.targets[0][0] is False
+        assert obj.targets[0][1] == 'john.smith+mytag@domain.com'
+
 
 def test_plugin_email_dict_variations():
     """

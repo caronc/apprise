@@ -519,7 +519,7 @@ def tidy_path(path):
     return path
 
 
-def parse_qsd(qs, simple=False):
+def parse_qsd(qs, simple=False, plus_to_space=False):
     """
     Query String Dictionary Builder
 
@@ -541,6 +541,11 @@ def parse_qsd(qs, simple=False):
 
     if simple is set to true, then a ONE dictionary is returned and is not
     sub-parsed for additional elements
+
+    plus_to_space will cause all `+` references to become a space as
+    per normal URL Encoded defininition. Normal URL parsing applies
+    this, but `+` is very actively used character with passwords,
+    api keys, tokens, etc.  So Apprise does not do this by default.
     """
 
     # Our return result set:
@@ -575,7 +580,7 @@ def parse_qsd(qs, simple=False):
         key = unquote(key)
         key = '' if not key else key
 
-        val = nv[1].replace('+', ' ')
+        val = nv[1].replace('+', ' ') if plus_to_space else nv[1]
         val = unquote(val)
         val = '' if not val else val.strip()
 
@@ -609,7 +614,7 @@ def parse_qsd(qs, simple=False):
 
 
 def parse_url(url, default_schema='http', verify_host=True, strict_port=False,
-              simple=False):
+              simple=False, plus_to_space=False):
     """A function that greatly simplifies the parsing of a url
     specified by the end user.
 
@@ -722,7 +727,8 @@ def parse_url(url, default_schema='http', verify_host=True, strict_port=False,
     # Parse Query Arugments ?val=key&key=val
     # while ensuring that all keys are lowercase
     if qsdata:
-        result.update(parse_qsd(qsdata, simple=simple))
+        result.update(parse_qsd(
+            qsdata, simple=simple, plus_to_space=plus_to_space))
 
     # Now do a proper extraction of data; http:// is just substitued in place
     # to allow urlparse() to function as expected, we'll swap this back to the

@@ -396,6 +396,32 @@ def test_parse_url_general():
     assert result['qsd+']['KeY'] == 'ValueA'
     assert 'kEy' in result['qsd-']
     assert result['qsd-']['kEy'] == 'ValueB'
+    assert result['qsd']['key'] == 'Value +C'
+    assert result['qsd']['+key'] == result['qsd+']['KeY']
+    assert result['qsd']['-key'] == result['qsd-']['kEy']
+
+
+    result = utils.parse_url(
+        'http://hostname/?+KeY=ValueA&-kEy=ValueB&KEY=Value%20+C&:colon=y',
+        plus_to_space=True)
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname'
+    assert result['port'] is None
+    assert result['user'] is None
+    assert result['password'] is None
+    assert result['fullpath'] == '/'
+    assert result['path'] == '/'
+    assert result['query'] is None
+    assert result['url'] == 'http://hostname/'
+    assert '+key' in result['qsd']
+    assert '-key' in result['qsd']
+    assert ':colon' in result['qsd']
+    assert result['qsd:']['colon'] == 'y'
+    assert 'key' in result['qsd']
+    assert 'KeY' in result['qsd+']
+    assert result['qsd+']['KeY'] == 'ValueA'
+    assert 'kEy' in result['qsd-']
+    assert result['qsd-']['kEy'] == 'ValueB'
     assert result['qsd']['key'] == 'Value  C'
     assert result['qsd']['+key'] == result['qsd+']['KeY']
     assert result['qsd']['-key'] == result['qsd-']['kEy']
@@ -893,7 +919,7 @@ def test_parse_url_simple():
     assert '-key' in result['qsd']
     assert ':colon' in result['qsd']
     assert result['qsd'][':colon'] == 'y'
-    assert result['qsd']['key'] == 'Value  C'
+    assert result['qsd']['key'] == 'Value +C'
     assert result['qsd']['+key'] == 'ValueA'
     assert result['qsd']['-key'] == 'ValueB'
 
