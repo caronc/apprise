@@ -562,6 +562,12 @@ def test_plugin_twitter_dm_caching(
     assert mock_post.call_args_list[0][0][0] == \
         'https://api.twitter.com/1.1/direct_messages/events/new.json'
 
+    # Test cache contents.
+    assert NotifyTwitter._user_cache == \
+           {'apprise': 9876}
+    assert NotifyTwitter._whoami_cache == \
+           {'ckeycsecretakeyasecret': {'apprise': 9876}}
+
     # Reset the mocks to start counting calls from scratch.
     mock_get.reset_mock()
     mock_post.reset_mock()
