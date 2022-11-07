@@ -180,7 +180,7 @@ class NotifyGoogleChat(NotifyBase):
             self.threadkey = validate_regex(threadkey)
         except:
             msg = 'No valid threadKey found in provided URI.'
-            self.logger.warning(msg)
+            self.logger.debug(msg)
 
         return
 
