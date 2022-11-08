@@ -60,6 +60,7 @@ from ..utils import parse_emails
 from ..utils import parse_bool
 from ..utils import is_email
 from ..utils import validate_regex
+from ..logger import logger
 from ..AppriseLocale import gettext_lazy as _
 
 # Provide some known codes Mailgun uses and what they translate to:
@@ -158,7 +159,7 @@ class NotifyMailgun(NotifyBase):
         'name': {
             'name': _('From Name'),
             'type': 'string',
-            'map_to': 'from_name',
+            'map_to': 'from_addr',
         },
         'from': {
             'alias_of': 'name',
@@ -200,7 +201,7 @@ class NotifyMailgun(NotifyBase):
         },
     }
 
-    def __init__(self, apikey, targets, cc=None, bcc=None, from_name=None,
+    def __init__(self, apikey, targets, cc=None, bcc=None, from_addr=None,
                  region_name=None, headers=None, tokens=None, batch=False,
                  **kwargs):
         """
@@ -266,14 +267,15 @@ class NotifyMailgun(NotifyBase):
         self.from_addr = [
             self.app_id, '{user}@{host}'.format(
                 user=self.user, host=self.host)]
-        if from_name:
-            result = is_email(from_name)
+
+        if from_addr:
+            result = is_email(from_addr)
             if result:
                 self.from_addr = (
                     result['name'] if result['name'] else False,
                     result['full_email'])
             else:
-                self.from_addr[0] = from_name
+                self.from_addr[0] = from_addr
 
         if not is_email(self.from_addr[1]):
             # Parse Source domain based on from_addr
@@ -589,7 +591,7 @@ class NotifyMailgun(NotifyBase):
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         if self.from_addr[0]:
-            # from_name specified; pass it back on the url
+            # from_addr specified; pass it back on the url
             params['name'] = self.from_addr[0]
 
         if self.cc:
@@ -644,16 +646,25 @@ class NotifyMailgun(NotifyBase):
             # We're done - no API Key found
             results['apikey'] = None
 
-        if 'name' in results['qsd'] and len(results['qsd']['name']):
-            # Extract from name to associate with from address
-            results['from_name'] = \
-                NotifyMailgun.unquote(results['qsd']['name'])
-
-        # Support from= for consistency with `mail://`
-        elif 'from' in results['qsd'] and len(results['qsd']['from']):
-            # Extract from name to associate with from address
-            results['from_name'] = \
+        # Attempt to detect 'from' email address
+        if 'from' in results['qsd'] and len(results['qsd']['from']):
+            results['from_addr'] = \
                 NotifyMailgun.unquote(results['qsd']['from'])
+
+            if 'name' in results['qsd'] and len(results['qsd']['name']):
+                # Depricate use of both `from=` and `name=` in the same url as
+                # they will be synomomus of one another in the future.
+                results['from_addr'] = formataddr(
+                    (NotifyMailgun.unquote(results['qsd']['name']),
+                     results['from_addr']), charset='utf-8')
+                logger.warning(
+                    'Mailgun name= and from= are synonymous; '
+                    'use one or the other.')
+
+        elif 'name' in results['qsd'] and len(results['qsd']['name']):
+            # Extract from name to associate with from address
+            results['from_addr'] = \
+                NotifyMailgun.unquote(results['qsd']['name'])
 
         if 'region' in results['qsd'] and len(results['qsd']['region']):
             # Extract from name to associate with from address

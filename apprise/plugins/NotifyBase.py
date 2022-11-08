@@ -468,7 +468,7 @@ class NotifyBase(URLBase):
         return params
 
     @staticmethod
-    def parse_url(url, verify_host=True):
+    def parse_url(url, verify_host=True, plus_to_space=False):
         """Parses the URL and returns it broken apart into a dictionary.
 
         This is very specific and customized for Apprise.
@@ -486,7 +486,8 @@ class NotifyBase(URLBase):
             A dictionary is returned containing the URL fully parsed if
             successful, otherwise None is returned.
         """
-        results = URLBase.parse_url(url, verify_host=verify_host)
+        results = URLBase.parse_url(
+            url, verify_host=verify_host, plus_to_space=plus_to_space)
 
         if not results:
             # We're done; we failed to parse our url
