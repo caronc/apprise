@@ -23,7 +23,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import asyncio
 import re
+from functools import partial
 
 from ..URLBase import URLBase
 from ..common import NotifyType
@@ -36,12 +38,7 @@ from ..AppriseLocale import gettext_lazy as _
 from ..AppriseAttachment import AppriseAttachment
 
 
-# Wrap our base with the asyncio wrapper
-from ..py3compat.asyncio import AsyncNotifyBase
-BASE_OBJECT = AsyncNotifyBase
-
-
-class NotifyBase(BASE_OBJECT):
+class NotifyBase(URLBase):
     """
     This is the base class for all notification services
     """
@@ -267,19 +264,64 @@ class NotifyBase(BASE_OBJECT):
             color_type=color_type,
         )
 
-    def notify(self, body, title=None, notify_type=NotifyType.INFO,
-               overflow=None, attach=None, body_format=None, **kwargs):
+    def notify(self, *args, **kwargs):
         """
         Performs notification
+        """
+        try:
+            # Build a list of dictionaries that can be used to call send().
+            send_calls = list(self._build_send_calls(*args, **kwargs))
 
+        except TypeError:
+            # Internal error
+            return False
+
+        else:
+            # Loop through each call, one at a time. (Use a list rather than a
+            # generator to call all the partials, even in case of a failure.)
+            the_calls = [self.send(**kwargs2) for kwargs2 in send_calls]
+            return all(the_calls)
+
+    async def async_notify(self, *args, **kwargs):
+        """
+        Performs notification for asynchronous callers
+        """
+        try:
+            # Build a list of dictionaries that can be used to call send().
+            send_calls = list(self._build_send_calls(*args, **kwargs))
+
+        except TypeError:
+            # Internal error
+            return False
+
+        else:
+            loop = asyncio.get_event_loop()
+
+            # Wrap each call in a coroutine that uses the default executor.
+            # TODO: In the future, allow plugins to supply a native
+            # async_send() method.
+            async def do_send(**kwargs2):
+                send = partial(self.send, **kwargs2)
+                result = await loop.run_in_executor(None, send)
+                return result
+
+            # gather() all calls in parallel.
+            the_cors = (do_send(**kwargs2) for kwargs2 in send_calls)
+            return all(await asyncio.gather(*the_cors))
+
+    def _build_send_calls(self, body, title=None,
+                          notify_type=NotifyType.INFO, overflow=None,
+                          attach=None, body_format=None, **kwargs):
+        """
+        Get a list of dictionaries that can be used to call send() or
+        (in the future) async_send().
         """
 
         if not self.enabled:
             # Deny notifications issued to services that are disabled
-            self.logger.warning(
-                "{} is currently disabled on this system.".format(
-                    self.service_name))
-            return False
+            msg = f"{self.service_name} is currently disabled on this system."
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         # Prepare attachments if required
         if attach is not None and not isinstance(attach, AppriseAttachment):
@@ -288,7 +330,7 @@ class NotifyBase(BASE_OBJECT):
 
             except TypeError:
                 # bad attachments
-                return False
+                raise
 
         # Handle situations where the title is None
         title = '' if not title else title
@@ -299,14 +341,11 @@ class NotifyBase(BASE_OBJECT):
                 body_format=body_format):
 
             # Send notification
-            if not self.send(body=chunk['body'], title=chunk['title'],
-                             notify_type=notify_type, attach=attach,
-                             body_format=body_format):
-
-                # Toggle our return status flag
-                return False
-
-        return True
+            yield dict(
+                body=chunk['body'], title=chunk['title'],
+                notify_type=notify_type, attach=attach,
+                body_format=body_format
+            )
 
     def _apply_overflow(self, body, title=None, overflow=None,
                         body_format=None):

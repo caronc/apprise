@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2021 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2022 Chris Caron <lead2gold@gmail.com>
 # All rights reserved.
 #
 # This code is licensed under the MIT License.
@@ -22,12 +22,24 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
-from .rest import AppriseURLTester
-from .asyncio import OuterEventLoop
-from .module import reload_plugin
+import asyncio
 
-__all__ = [
-    'AppriseURLTester',
-    'OuterEventLoop',
-    'reload_plugin',
-]
+
+class OuterEventLoop():
+    """
+    An event loop that is easy to put up and tear down from synchronous test
+    code.
+    """
+
+    def __init__(self):
+        self._loop = None
+
+    def __enter__(self):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        self._loop = loop
+        return loop
+
+    def __exit__(self, type, value, traceback):
+        asyncio.set_event_loop(None)
+        self._loop.close()

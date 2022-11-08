@@ -25,6 +25,7 @@
 
 import asyncio
 import os
+from functools import partial
 from itertools import chain
 from . import common
 from .conversion import convert_between
@@ -43,11 +44,6 @@ from .plugins.NotifyBase import NotifyBase
 
 from . import plugins
 from . import __version__
-
-# Python v3+ support code made importable, so it can remain backwards
-# compatible with Python v2
-# TODO: Review after dropping support for Python 2.
-from . import py3compat
 
 
 class Apprise:
@@ -370,15 +366,63 @@ class Apprise:
         such as turning a \n into an actual new line, etc.
         """
 
-        return py3compat.asyncio.tosync(
-            self.async_notify(
+        try:
+            # Process arguments and build synchronous and asynchronous calls
+            # (this step can throw internal errors).
+            sync_partials, async_cors = self._create_notify_calls(
                 body, title,
                 notify_type=notify_type, body_format=body_format,
                 tag=tag, match_always=match_always, attach=attach,
-                interpret_escapes=interpret_escapes,
-            ),
-            debug=self.debug
-        )
+                interpret_escapes=interpret_escapes
+            )
+
+        except TypeError:
+            # No notifications sent, and there was an internal error.
+            return False
+
+        if not sync_partials and not async_cors:
+            # Nothing to send
+            return None
+
+        sync_result = Apprise._notify_all(*sync_partials)
+
+        if async_cors:
+            # A single coroutine sends all asynchronous notifications in
+            # parallel.
+            all_cor = Apprise._async_notify_all(*async_cors)
+
+            try:
+                # Python <3.7 automatically starts an event loop if there isn't
+                # already one for the main thread.
+                loop = asyncio.get_event_loop()
+
+            except RuntimeError:
+                # Python >=3.7 raises this exception if there isn't already an
+                # event loop. So, we can spin up our own.
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                loop.set_debug(self.debug)
+
+                # Run the coroutine and wait for the result.
+                async_result = loop.run_until_complete(all_cor)
+
+                # Clean up the loop.
+                loop.close()
+                asyncio.set_event_loop(None)
+
+            else:
+                old_debug = loop.get_debug()
+                loop.set_debug(self.debug)
+
+                # Run the coroutine and wait for the result.
+                async_result = loop.run_until_complete(all_cor)
+
+                loop.set_debug(old_debug)
+
+        else:
+            async_result = True
+
+        return sync_result and async_result
 
     async def async_notify(self, *args, **kwargs):
         """
@@ -389,77 +433,51 @@ class Apprise:
 
         """
         try:
-            coroutines = list(
-                self._notifyall(
-                    Apprise._notifyhandlerasync, *args, **kwargs))
+            # Process arguments and build synchronous and asynchronous calls
+            # (this step can throw internal errors).
+            sync_partials, async_cors = self._create_notify_calls(
+                *args, **kwargs)
 
         except TypeError:
             # No notifications sent, and there was an internal error.
             return False
 
-        else:
-            if len(coroutines) > 0:
-                # Create log entry
-                logger.info(
-                    f'Notifying {len(coroutines)} service(s) asynchronously.')
+        if not sync_partials and not async_cors:
+            # Nothing to send
+            return None
 
-                results = await asyncio.gather(
-                    *coroutines, return_exceptions=True)
+        sync_result = Apprise._notify_all(*sync_partials)
+        async_result = await Apprise._async_notify_all(*async_cors)
+        return sync_result and async_result
 
-                # Returns True if all notifications succeeded, otherwise False
-                # is returned.
-                failed = any(not status or isinstance(status, Exception)
-                             for status in results)
-                return not failed
-
-            else:
-                # No notifications sent.
-                return None
-
-    @staticmethod
-    def _notifyhandler(server, **kwargs):
-        """
-        The synchronous notification sender. Returns True if the notification
-        sent successfully.
-        """
-
-        try:
-            # Send notification
-            return server.notify(**kwargs)
-
-        except TypeError:
-            # These our our internally thrown notifications
-            return False
-
-        except Exception:
-            # A catch all so we don't have to abort early
-            # just because one of our plugins has a bug in it.
-            logger.exception("Unhandled Notification Exception")
-            return False
-
-    @staticmethod
-    async def _notifyhandlerasync(server, **kwargs):
-        """
-        The asynchronous notification sender. Returns a coroutine that yields
-        True if the notification sent successfully.
-        """
-
-        if server.asset.async_mode:
-            return await server.async_notify(**kwargs)
-
-        else:
-            return Apprise._notifyhandler(server, **kwargs)
-
-    def _notifyall(self, handler, body, title='',
-                   notify_type=common.NotifyType.INFO, body_format=None,
-                   tag=common.MATCH_ALL_TAG, match_always=True, attach=None,
-                   interpret_escapes=None):
+    def _create_notify_calls(self, *args, **kwargs):
         """
         Creates notifications for all the plugins loaded.
 
-        Returns a generator that calls handler for each notification. The first
-        and only argument supplied to handler is the server, and the keyword
-        arguments are exactly as they would be passed to server.notify().
+        Returns a list of synchronous calls (partial functions with no
+        arguments required) for plugins with async disabled and a list of
+        asynchronous calls (coroutines) for plugins with async enabled.
+        """
+
+        all_calls = list(self._create_notify_gen(*args, **kwargs))
+
+        # Split into synchronous partials and asynchronous coroutines.
+        sync_partials, async_cors = [], []
+        for notify in all_calls:
+            if asyncio.iscoroutine(notify):
+                async_cors.append(notify)
+            else:
+                sync_partials.append(notify)
+
+        return sync_partials, async_cors
+
+    def _create_notify_gen(self, body, title='',
+                           notify_type=common.NotifyType.INFO,
+                           body_format=None, tag=common.MATCH_ALL_TAG,
+                           match_always=True, attach=None,
+                           interpret_escapes=None):
+        """
+        Internal generator function for _create_notify_calls().
         """
 
         if len(self) == 0:
@@ -552,14 +570,67 @@ class Apprise:
                         logger.error(msg)
                         raise TypeError(msg)
 
-            yield handler(
-                server,
+            kwargs = dict(
                 body=conversion_body_map[server.notify_format],
                 title=conversion_title_map[server.notify_format],
                 notify_type=notify_type,
                 attach=attach,
-                body_format=body_format,
+                body_format=body_format
             )
+            if server.asset.async_mode:
+                yield server.async_notify(**kwargs)
+            else:
+                yield partial(server.notify, **kwargs)
+
+    @staticmethod
+    def _notify_all(*partials):
+        """
+        Process a list of synchronous notify() calls.
+        """
+
+        success = True
+
+        for notify in partials:
+            try:
+                # Send notification
+                result = notify()
+                success = success and result
+
+            except TypeError:
+                # These are our internally thrown notifications.
+                success = False
+
+            except Exception:
+                # A catch all so we don't have to abort early
+                # just because one of our plugins has a bug in it.
+                logger.exception("Unhandled Notification Exception")
+                success = False
+
+        return success
+
+    @staticmethod
+    async def _async_notify_all(*cors):
+        """
+        Process a list of asynchronous async_notify() calls.
+        """
+
+        # Create log entry
+        logger.info('Notifying %d service(s) asynchronously.', len(cors))
+
+        results = await asyncio.gather(*cors, return_exceptions=True)
+
+        if any(isinstance(status, Exception)
+               and not isinstance(status, TypeError) for status in results):
+            # A catch all so we don't have to abort early just because
+            # one of our plugins has a bug in it.
+            logger.exception("Unhandled Notification Exception")
+            return False
+
+        if any(isinstance(status, TypeError) for status in results):
+            # These are our internally thrown notifications.
+            return False
+
+        return all(results)
 
     def details(self, lang=None, show_requirements=False, show_disabled=False):
         """

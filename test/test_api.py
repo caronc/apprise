@@ -50,11 +50,8 @@ from apprise import common
 from apprise.plugins import __load_matrix
 from apprise.plugins import __reset_matrix
 from apprise.utils import parse_list
+from helpers import OuterEventLoop
 import inspect
-
-# Sending notifications requires the coroutines to be awaited, so we need to
-# wrap the original function when mocking it.
-import apprise.py3compat.asyncio as py3aio
 
 # Disable logging for a cleaner testing output
 import logging
@@ -80,10 +77,12 @@ def test_apprise_async():
     API: Apprise() object asynchronous methods
 
     """
-    def do_notify(server, *args, **kwargs):
-        return py3aio.tosync(server.async_notify(*args, **kwargs))
+    with OuterEventLoop() as loop:
+        def do_notify(server, *args, **kwargs):
+            return loop.run_until_complete(
+                server.async_notify(*args, **kwargs))
 
-    apprise_test(do_notify)
+        apprise_test(do_notify)
 
 
 def apprise_test(do_notify):
@@ -293,6 +292,10 @@ def apprise_test(do_notify):
             # Pretend everything is okay
             raise TypeError()
 
+        async def async_notify(self, **kwargs):
+            # Pretend everything is okay (async)
+            raise TypeError()
+
         def url(self, **kwargs):
             # Support URL
             return ''
@@ -301,6 +304,10 @@ def apprise_test(do_notify):
         def notify(self, **kwargs):
             # Pretend everything is okay
             raise RuntimeError()
+
+        async def async_notify(self, **kwargs):
+            # Pretend everything is okay (async)
+            raise TypeError()
 
         def url(self, **kwargs):
             # Support URL
@@ -311,6 +318,10 @@ def apprise_test(do_notify):
         def notify(self, **kwargs):
             # Pretend everything is okay
             return False
+
+        async def async_notify(self, **kwargs):
+            # Pretend everything is okay (async)
+            raise TypeError()
 
         def url(self, **kwargs):
             # Support URL
@@ -540,10 +551,12 @@ def test_apprise_tagging_async(mock_post, mock_get):
     API: Apprise() object tagging functionality asynchronous methods
 
     """
-    def do_notify(server, *args, **kwargs):
-        return py3aio.tosync(server.async_notify(*args, **kwargs))
+    with OuterEventLoop() as loop:
+        def do_notify(server, *args, **kwargs):
+            return loop.run_until_complete(
+                server.async_notify(*args, **kwargs))
 
-    apprise_tagging_test(mock_post, mock_get, do_notify)
+        apprise_tagging_test(mock_post, mock_get, do_notify)
 
 
 def apprise_tagging_test(mock_post, mock_get, do_notify):
@@ -727,7 +740,10 @@ def test_apprise_notify_formats(tmpdir):
     # other if/else parts of the code that aren't otherwise called
     __load_matrix()
 
-    a = Apprise()
+    # Need to set async_mode=False to call notify() instead of async_notify().
+    asset = AppriseAsset(async_mode=False)
+
+    a = Apprise(asset=asset)
 
     # no items
     assert len(a) == 0
@@ -737,7 +753,7 @@ def test_apprise_notify_formats(tmpdir):
         notify_format = NotifyFormat.TEXT
 
         def __init__(self, **kwargs):
-            super().__init__()
+            super().__init__(**kwargs)
 
         def notify(self, **kwargs):
             # Pretend everything is okay
@@ -753,7 +769,7 @@ def test_apprise_notify_formats(tmpdir):
         notify_format = NotifyFormat.HTML
 
         def __init__(self, **kwargs):
-            super().__init__()
+            super().__init__(**kwargs)
 
         def notify(self, **kwargs):
             # Pretend everything is okay
@@ -769,7 +785,7 @@ def test_apprise_notify_formats(tmpdir):
         notify_format = NotifyFormat.MARKDOWN
 
         def __init__(self, **kwargs):
-            super().__init__()
+            super().__init__(**kwargs)
 
         def notify(self, **kwargs):
             # Pretend everything is okay
@@ -1792,7 +1808,7 @@ def test_apprise_async_mode(mock_gather, mock_post, tmpdir):
     assert a.notify("async") is True
 
     # Verify our async code got executed
-    assert mock_gather.call_count == 1
+    assert mock_gather.call_count > 0
     mock_gather.reset_mock()
 
     # Provide an over-ride now
@@ -1817,8 +1833,8 @@ def test_apprise_async_mode(mock_gather, mock_post, tmpdir):
 
     # Send Notifications Syncronously
     assert a.notify("sync") is True
-    # Verify our async code got called
-    assert mock_gather.call_count == 1
+    # Sequential send doesn't require a gather
+    assert mock_gather.call_count == 0
     mock_gather.reset_mock()
 
     # another way of looking a our false set asset configuration
@@ -1841,7 +1857,7 @@ def test_apprise_async_mode(mock_gather, mock_post, tmpdir):
     assert a.notify("a mixed batch") is True
 
     # Verify our async code got called
-    assert mock_gather.call_count == 1
+    assert mock_gather.call_count > 0
     mock_gather.reset_mock()
 
 
