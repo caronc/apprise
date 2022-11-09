@@ -25,6 +25,7 @@
 
 import re
 import requests
+from copy import deepcopy
 from json import dumps, loads
 from itertools import chain
 from datetime import datetime
@@ -35,6 +36,7 @@ from ..common import NotifyImageSize
 from ..common import NotifyFormat
 from ..common import NotifyType
 from ..utils import parse_list
+from ..utils import parse_bool
 from ..AppriseLocale import gettext_lazy as _
 from ..attachment.AttachBase import AttachBase
 
@@ -63,6 +65,10 @@ class NotifyMastodon(NotifyBase):
     # through the webhook
     image_size = NotifyImageSize.XY_128
 
+    # it is documented on the site that the maximum images per toot
+    # is 4 (unless it's a GIF, then it's only 1)
+    __toot_non_gif_images_batch = 4
+
     # URL for posting media files
     mastodon_media = '/api/v1/media'
 
@@ -89,7 +95,7 @@ class NotifyMastodon(NotifyBase):
     # For Tracking Purposes
     ratelimit_reset = datetime.utcnow()
 
-    # Default to 1000; users can send up to 1000 DM's and 2400 tweets a day
+    # Default to 1000; users can send up to 1000 DM's and 2400 toot a day
     # This value only get's adjusted if the server sets it that way
     ratelimit_remaining = 1
 
@@ -135,12 +141,17 @@ class NotifyMastodon(NotifyBase):
         'token': {
             'alias_of': 'token',
         },
+        'batch': {
+            'name': _('Batch Mode'),
+            'type': 'bool',
+            'default': True,
+        },
         'to': {
             'alias_of': 'targets',
         },
     })
 
-    def __init__(self, token=None, targets=None, **kwargs):
+    def __init__(self, token=None, targets=None, batch=True, **kwargs):
         """
         Initialize Notify Mastodon Object
         """
@@ -155,11 +166,8 @@ class NotifyMastodon(NotifyBase):
         if isinstance(self.port, int):
             self.api_url += ':%d' % self.port
 
-        # Initialize channels list
-        self.channels = list()
-
-        # Initialize room list
-        self.rooms = list()
+        # Prepare Image Batch Mode Flag
+        self.batch = batch
 
         # Assign our access token
         self.token = token
@@ -288,11 +296,189 @@ class NotifyMastodon(NotifyBase):
             'status': body,
         }
 
-        if attachments:
-            payload['media_ids'] = [x['id'] for x in attachments]
+        payloads = []
+        if not attachments:
+            payloads.append(payload)
 
-        postokay, response = self._request(self.mastodon_toot, payload)
-        return postokay
+        else:
+            # Group our images if batch is set to do so
+            batch_size = 1 if not self.batch \
+                else self.__toot_non_gif_images_batch
+
+            # Track our batch control in our message generation
+            batches = []
+            batch = []
+            for attachment in attachments:
+                batch.append(attachment['id'])
+
+                # Mastodon supports batching images together.  This allows
+                # the batching of multiple images together.  Mastodon also
+                # makes it clear that you can't batch `gif` files; they need
+                # to be separate.  So the below preserves the ordering that
+                # a user passed their attachments in.  if 4-non-gif images
+                # are passed, they are all part of a single message.
+                #
+                # however, if they pass in image, gif, image, gif.  The
+                # gif's inbetween break apart the batches so this would
+                # produce 4 separate toots.
+                #
+                # If you passed in, image, image, gif, image. <- This would
+                # produce 3 images (as the first 2 images could be lumped
+                # together as a batch)
+                if not re.match(
+                        r'^image/(png|jpe?g)', attachment['file_mime'], re.I) \
+                        or len(batch) >= batch_size:
+                    batches.append(batch)
+                    batch = []
+
+            if batch:
+                batches.append(batch)
+
+            for no, media_ids in enumerate(batches):
+                _payload = deepcopy(payload)
+                _payload['media_ids'] = media_ids
+
+                if no:
+                    # strip text and replace it with the image representation
+                    _payload['status'] = \
+                        '{:02d}/{:02d}'.format(no + 1, len(batches))
+                payloads.append(_payload)
+
+        # Error Tracking
+        has_error = False
+
+        for no, payload in enumerate(payloads, start=1):
+            # Send Toot
+            postokay, response = self._request(self.mastodon_toot, payload)
+            if not postokay:
+                # Track our error
+                has_error = True
+
+                errors = []
+                try:
+                    errors = ['Error Code {}: {}'.format(
+                        e.get('code', 'unk'), e.get('message'))
+                        for e in response['errors']]
+
+                except (KeyError, TypeError):
+                    pass
+
+                for error in errors:
+                    self.logger.debug(
+                        'Toot [%.2d/%.2d] Details: %s',
+                        no, len(payloads), error)
+                continue
+
+            # Example output
+            # {
+            #    "id":"109315796435904505",
+            #    "created_at":"2022-11-09T20:44:39.017Z",
+            #    "in_reply_to_id":null,
+            #    "in_reply_to_account_id":null,
+            #    "sensitive":false,
+            #    "spoiler_text":"",
+            #    "visibility":"public",
+            #    "language":"en",
+            #    "uri":"https://host/users/caronc/statuses/109315796435904505",
+            #    "url":"https://host/@caronc/109315796435904505",
+            #    "replies_count":0,
+            #    "reblogs_count":0,
+            #    "favourites_count":0,
+            #    "edited_at":null,
+            #    "favourited":false,
+            #    "reblogged":false,
+            #    "muted":false,
+            #    "bookmarked":false,
+            #    "pinned":false,
+            #    "content":"<p>test</p>",
+            #    "reblog":null,
+            #    "application":{
+            #       "name":"Apprise Notifications",
+            #       "website":"https://github.com/caronc/apprise"
+            #    },
+            #    "account":{
+            #       "id":"109310334138718878",
+            #       "username":"caronc",
+            #       "acct":"caronc",
+            #       "display_name":"Chris",
+            #       "locked":false,
+            #       "bot":false,
+            #       "discoverable":false,
+            #       "group":false,
+            #       "created_at":"2022-11-08T00:00:00.000Z",
+            #       "note":"content",
+            #       "url":"https://host/@caronc",
+            #       "avatar":"https://host/path/file.png",
+            #       "avatar_static":"https://host/path/file.png",
+            #       "header":"https://host/headers/original/missing.png",
+            #       "header_static":"https://host/path/missing.png",
+            #       "followers_count":0,
+            #       "following_count":0,
+            #       "statuses_count":15,
+            #       "last_status_at":"2022-11-09",
+            #       "emojis":[
+            #
+            #       ],
+            #       "fields":[
+            #
+            #       ]
+            #    },
+            #    "media_attachments":[
+            #       {
+            #          "id":"109315796405707501",
+            #          "type":"image",
+            #          "url":"https://host/path/file.jpeg",
+            #          "preview_url":"https://host/path/file.jpeg",
+            #          "remote_url":null,
+            #          "preview_remote_url":null,
+            #          "text_url":null,
+            #          "meta":{
+            #             "original":{
+            #                "width":640,
+            #                "height":640,
+            #                "size":"640x640",
+            #                "aspect":1.0
+            #             },
+            #             "small":{
+            #                "width":400,
+            #                "height":400,
+            #                "size":"400x400",
+            #                "aspect":1.0
+            #             }
+            #          },
+            #          "description":null,
+            #          "blurhash":"UmIsdJnT^mX4V@XQofnQ~Ebq%4o3ofnQjZbt"
+            #       }
+            #    ],
+            #    "mentions":[
+            #
+            #    ],
+            #    "tags":[
+            #
+            #    ],
+            #    "emojis":[
+            #
+            #    ],
+            #    "card":null,
+            #    "poll":null
+            # }
+
+            try:
+                url = '{}/web/@{}'.format(
+                    self.api_url,
+                    response['account']['username'])
+
+            except (KeyError, TypeError):
+                url = 'unknown'
+
+            self.logger.debug(
+                'Toot [%.2d/%.2d] Details: %s', no, len(payloads), url)
+
+            self.logger.info(
+                'Sent [%.2d/%.2d] Mastodon notification as public toot.',
+                no, len(payloads))
+
+        return not has_error
 
     def _request(self, path, payload=None):
         """
@@ -336,7 +522,7 @@ class NotifyMastodon(NotifyBase):
             # Determine how long we should wait for or if we should wait at
             # all. This isn't fool-proof because we can't be sure the client
             # time (calling this script) is completely synced up with the
-            # Twitter server.  One would hope we're on NTP and our clocks are
+            # Mastodon server.  One would hope we're on NTP and our clocks are
             # the same allowing this to role smoothly:
 
             now = datetime.utcnow()
@@ -444,6 +630,11 @@ class NotifyMastodon(NotifyBase):
 
         # Apply our targets
         results['targets'] = NotifyMastodon.split_path(results['fullpath'])
+
+        # Get Batch Mode Flag
+        results['batch'] = \
+            parse_bool(results['qsd'].get(
+                'batch', NotifyMastodon.template_args['batch']['default']))
 
         # The 'to' makes it easier to use yaml configuration
         if 'to' in results['qsd'] and len(results['qsd']['to']):
