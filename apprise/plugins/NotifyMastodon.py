@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# Copyright (C) 2019 Chris Caron <lead2gold@gmail.com>
+# Copyright (C) 2022 Chris Caron <lead2gold@gmail.com>
 # All rights reserved.
 #
 # This code is licensed under the MIT License.
@@ -27,7 +27,6 @@ import re
 import requests
 from copy import deepcopy
 from json import dumps, loads
-from itertools import chain
 from datetime import datetime
 
 from .NotifyBase import NotifyBase
@@ -39,6 +38,45 @@ from ..utils import parse_list
 from ..utils import parse_bool
 from ..AppriseLocale import gettext_lazy as _
 from ..attachment.AttachBase import AttachBase
+
+# Accept:
+# - @username
+# - username
+# - username@host.com
+# - @username@host.com
+IS_USER = re.compile(
+    r'^\s*@?(?P<user>[A-Z0-9_]+(@(?P<host>[A-Z0-9_.-]+))?)$', re.I)
+
+
+class MastodonMessageVisibility:
+    """
+    The visibility of any status message made
+    """
+    # post visibility defaults to the accounts default-visibilty setting
+    DEFAULT = 'default'
+
+    # post will be visible only to mentioned users
+    # similar to a Twitter DM
+    DIRECT = 'direct'
+
+    # post will be visible only to followers
+    PRIVATE = 'private'
+
+    # post will be public but not appear on the public timeline
+    UNLISTED = 'unlisted'
+
+    # post will be public
+    PUBLIC = 'public'
+
+
+# Define the types in a list for validation purposes
+MASTODON_MESSAGE_VISIBILITIES = (
+    MastodonMessageVisibility.DEFAULT,
+    MastodonMessageVisibility.DIRECT,
+    MastodonMessageVisibility.PRIVATE,
+    MastodonMessageVisibility.UNLISTED,
+    MastodonMessageVisibility.PUBLIC,
+)
 
 
 class NotifyMastodon(NotifyBase):
@@ -53,10 +91,10 @@ class NotifyMastodon(NotifyBase):
     service_url = 'https://joinmastodon.org'
 
     # The default protocol
-    protocol = 'mastodon'
+    protocol = ('mastodon', 'toot')
 
     # The default secure protocol
-    secure_protocol = 'mastodons'
+    secure_protocol = ('mastodons', 'toots')
 
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_mastodon'
@@ -69,11 +107,24 @@ class NotifyMastodon(NotifyBase):
     # is 4 (unless it's a GIF, then it's only 1)
     __toot_non_gif_images_batch = 4
 
+    # API Reference To Acquire Someone's Mastodon's ID
+    # See: https://docs.joinmastodon.org/methods/search/
+    # Requires Scope Element: read:search
+    mastodon_lookup = '/api/v2/search'
+
+    # Mastodon API Reference To Acquire Current Users Information
+    # See: https://docs.joinmastodon.org/methods/accounts/
+    # Requires Scope Element: read:accounts
+    mastodon_whoami = '/api/v1/accounts/verify_credentials'
+
     # URL for posting media files
     mastodon_media = '/api/v1/media'
 
     # URL for posting status messages
     mastodon_toot = '/api/v1/statuses'
+
+    # URL for posting direct messages
+    mastodon_dm = '/api/v1/dm'
 
     # The title is not used
     title_maxlen = 0
@@ -82,7 +133,7 @@ class NotifyMastodon(NotifyBase):
     body_maxlen = 500
 
     # Default to text
-    notify_format = NotifyFormat.TEXT
+    notify_format = NotifyFormat.HTML
 
     # Mastodon is kind enough to return how many more requests we're allowed to
     # continue to make within it's header response as:
@@ -141,6 +192,18 @@ class NotifyMastodon(NotifyBase):
         'token': {
             'alias_of': 'token',
         },
+        'vis': {
+            'name': _('Visibility'),
+            'type': 'choice:string',
+            'values': MASTODON_MESSAGE_VISIBILITIES,
+            'default': MastodonMessageVisibility.DEFAULT,
+            'map_to': 'visibility',
+        },
+        'cache': {
+            'name': _('Cache Results'),
+            'type': 'bool',
+            'default': True,
+        },
         'batch': {
             'name': _('Batch Mode'),
             'type': 'bool',
@@ -151,7 +214,8 @@ class NotifyMastodon(NotifyBase):
         },
     })
 
-    def __init__(self, token=None, targets=None, batch=True, **kwargs):
+    def __init__(self, token=None, targets=None, batch=True,
+                 visibility=None, cache=True, **kwargs):
         """
         Initialize Notify Mastodon Object
         """
@@ -160,11 +224,35 @@ class NotifyMastodon(NotifyBase):
         # Set our schema
         self.schema = 'https' if self.secure else 'http'
 
+        if visibility:
+            # Input is a string; attempt to get the lookup from our
+            # sound mapping
+            vis = 'invalid' if not isinstance(visibility, str) \
+                else visibility.lower().strip()
+
+            # This little bit of black magic allows us to match against
+            # against multiple versions of the same string
+            # ... etc
+            self.visibility = \
+                next((v for v in MASTODON_MESSAGE_VISIBILITIES
+                      if v.startswith(vis)), None)
+
+            if self.visibility not in MASTODON_MESSAGE_VISIBILITIES:
+                msg = 'The Mastodon visibility specified ({}) is invalid.' \
+                    .format(visibility)
+                self.logger.warning(msg)
+
+        else:
+            self.visibility = self.template_args['vis']['default']
+
         # Prepare our URL
         self.api_url = '%s://%s' % (self.schema, self.host)
 
         if isinstance(self.port, int):
             self.api_url += ':%d' % self.port
+
+        # Set Cache Flag
+        self.cache = cache
 
         # Prepare Image Batch Mode Flag
         self.batch = batch
@@ -173,7 +261,33 @@ class NotifyMastodon(NotifyBase):
         self.token = token
 
         # Our target users
-        self.targets = parse_list(targets)
+        self.targets = []
+
+        # Track any errors
+        has_error = False
+
+        # Identify our targets
+        self.targets = []
+        for target in parse_list(targets):
+            match = IS_USER.match(target)
+            if match and match.group('user'):
+                self.targets.append('@' + match.group('user'))
+                continue
+
+            has_error = True
+            self.logger.warning(
+                'Dropped invalid Mastodon user ({}) specified.'.format(target),
+            )
+
+        if has_error and not self.targets:
+            # We have specified that we want to notify one or more individual
+            # and we failed to load any of them.  Since it's also valid to
+            # notify no one at all (which means we notify ourselves), it's
+            # important we don't switch from the users original intentions
+            msg = 'No Mastodon targets to notify.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
         return
 
     def url(self, privacy=False, *args, **kwargs):
@@ -182,7 +296,10 @@ class NotifyMastodon(NotifyBase):
         """
 
         # Define any URL parameters
-        params = {}
+        params = {
+            'vis': self.visibility,
+            'batch': 'yes' if self.batch else 'no',
+        }
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
@@ -190,7 +307,8 @@ class NotifyMastodon(NotifyBase):
         default_port = 443 if self.secure else 80
 
         return '{schema}://{token}@{host}{port}/{targets}/?{params}'.format(
-            schema=self.secure_protocol if self.secure else self.protocol,
+            schema=self.secure_protocol[0]
+            if self.secure else self.protocol[1],
             token=self.pprint(
                 self.token, privacy, mode=PrivacyMode.Secret, safe=''),
             # never encode hostname since we're expecting it to be a valid one
@@ -198,10 +316,7 @@ class NotifyMastodon(NotifyBase):
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
             targets='/'.join(
-                [NotifyMastodon.quote(x, safe='') for x in chain(
-                    # Users
-                    ['@{}'.format(x) for x in self.targets],
-                )]),
+                [NotifyMastodon.quote(x, safe='@') for x in self.targets]),
             params=NotifyMastodon.urlencode(params),
         )
 
@@ -213,6 +328,14 @@ class NotifyMastodon(NotifyBase):
 
         # Build a list of our attachments
         attachments = []
+
+        if not self.targets and self.visibility == \
+                MastodonMessageVisibility.DIRECT:
+            result = self._whoami()
+            if not result:
+                # Could not access our status
+                return False
+            self.targets.append('@' + next(iter(result.keys())))
 
         if attach:
             # We need to upload our payload first so that we can source it
@@ -227,7 +350,24 @@ class NotifyMastodon(NotifyBase):
                             attachment.url(privacy=True)))
                     return False
 
-                if not re.match(r'^image/.*', attachment.mimetype, re.I):
+                #
+                # Images (PNG, JPG, GIF) up to 8MB.
+                #  - Images will be downscaled to 1.6 megapixels (enough for a
+                #    1280x1280 image).
+                #  -  Up to 4 images can be attached.
+                #  -  Animated GIFs are converted to soundless MP4s like on
+                #     Imgur/Gfycat (GIFV).
+                #  - You can also upload soundless MP4 and WebM, which will
+                #     be handled the same way.
+                # Videos (MP4, M4V, MOV, WebM) up to 40MB.
+                #  - Video will be transcoded to H.264 MP4 with a maximum
+                #     bitrate of 1300kbps and framerate of 60fps.
+                # Audio (MP3, OGG, WAV, FLAC, OPUS, AAC, M4A, 3GP) up to 40MB.
+                #  - Audio will be transcoded to MP3 using V2 VBR (roughly
+                #      192kbps).
+                #
+                if not re.match(r'^(image|video|audio))/.*',
+                                attachment.mimetype, re.I):
                     # Only support images at this time
                     self.logger.warning(
                         'Ignoring unsupported Mastodon attachment {}.'.format(
@@ -257,7 +397,7 @@ class NotifyMastodon(NotifyBase):
 
                 # If we get here, our output will look something like this:
                 # {
-                #  'id': '109315674515729186',
+                #  'id': '12345',
                 #  'type': 'image',
                 #  'url': 'https://.../6dad4663a.jpeg',
                 #  'preview_url': 'https://.../adde6dad4663a.jpeg',
@@ -293,8 +433,12 @@ class NotifyMastodon(NotifyBase):
                 attachments.append(response)
 
         payload = {
-            'status': body,
+            'status': '{} {}'.format(' '.join(self.targets), body)
+            if self.targets else body,
         }
+
+        if self.visibility != MastodonMessageVisibility.DEFAULT:
+            payload['visibility'] = self.visibility
 
         payloads = []
         if not attachments:
@@ -310,7 +454,6 @@ class NotifyMastodon(NotifyBase):
             batch = []
             for attachment in attachments:
                 batch.append(attachment['id'])
-
                 # Mastodon supports batching images together.  This allows
                 # the batching of multiple images together.  Mastodon also
                 # makes it clear that you can't batch `gif` files; they need
@@ -369,7 +512,7 @@ class NotifyMastodon(NotifyBase):
                         no, len(payloads), error)
                 continue
 
-            # Example output
+            # Example Attachment Output:
             # {
             #    "id":"109315796435904505",
             #    "created_at":"2022-11-09T20:44:39.017Z",
@@ -480,7 +623,152 @@ class NotifyMastodon(NotifyBase):
 
         return not has_error
 
-    def _request(self, path, payload=None):
+    def _whoami(self, lazy=True):
+        """
+        Looks details of current authenticated user
+
+        """
+
+        if lazy and hasattr(self, '_whoami_cache'):
+            # Use cached response
+            return self._whoami_cache
+
+        # Contains a mapping of screen_name to id
+        results = {}
+
+        # Send Mastodon DM
+        postokay, response = self._request(
+            self.mastodon_whoami,
+            method='GET',
+        )
+
+        if postokay:
+            # Sample Response:
+            # {
+            #   'id': '12345',
+            #   'username': 'caronc',
+            #   'acct': 'caronc',
+            #   'display_name': 'Chris',
+            #   'locked': False,
+            #   'bot': False,
+            #   'discoverable': False,
+            #   'group': False,
+            #   'created_at': '2022-11-08T00:00:00.000Z',
+            #   'note': 'details',
+            #   'url': 'https://noc.social/@caronc',
+            #   'avatar': 'https://host/path/image.png',
+            #   'avatar_static': 'https://host/path/image.png',
+            #   'header': 'https://host/path/missing.png',
+            #   'header_static': 'https://host/path/missing.png',
+            #   'followers_count': 0,
+            #   'following_count': 0,
+            #   'statuses_count': 2,
+            #   'last_status_at': '2022-11-09',
+            #   'source': {
+            #     'privacy': 'public',
+            #     'sensitive': False,
+            #     'language': None,
+            #     'note': 'details',
+            #     'fields': [],
+            #     'follow_requests_count': 0
+            #   },
+            #   'emojis': [],
+            #   'fields': []
+            # }
+            try:
+                results[response['username']] = response['id']
+
+                # Cache our response for future references
+                if not hasattr(self, '_whoami_cache'):
+                    setattr(self, '_whoami_cache', {
+                        response['username']: response['id']})
+
+                else:
+                    self._whoami_cache = {
+                        response['username']: response['id']}
+
+                # Update our user cache as well
+                if not hasattr(self, '_user_cache'):
+                    setattr(self, '_user_cache', results)
+
+                else:
+                    self._user_cache.update(results)
+
+            except (TypeError, KeyError):
+                pass
+
+        elif response and 'authorized scopes' in response.get('error', ''):
+            self.logger.warning(
+                'Failed to lookup Mastodon Auth details; '
+                'missing scope: read:accounts')
+
+        return results
+
+    def _user_lookup(self, screen_name, lazy=True):
+        """
+        Looks up a screen name and returns the user id
+
+        the screen_name can be a list/set/tuple as well
+        """
+
+        # Contains a mapping of screen_name to id
+        results = {}
+
+        # Build a unique set of names
+        names = parse_list(screen_name)
+
+        if lazy and hasattr(self, '_user_cache'):
+            # Use cached response
+            results = {
+                k: v for k, v in self._user_cache.items() if k in names}
+
+            # limit our names if they already exist in our cache
+            names = [name for name in names if name not in results]
+
+        if not len(names):
+            # They're is nothing further to do
+            return results
+
+        # Mastodon API Search only appears to be able to do 1 account
+        # at a time.See: https://docs.joinmastodon.org/methods/search/
+        for name in names:
+            # Lookup our names
+            postokay, response = self._request(
+                self.mastodon_lookup,
+                payload={
+                    'q': name,
+                    'type': 'accounts',
+                },
+                method='GET',
+            )
+
+            if not postokay or not (isinstance(response, dict)
+                                    and isinstance(
+                                        response.get('accounts'), list)):
+                # Track our error
+                self.logger.warning(
+                    'Mastodon user @{}@{} not found.', name, self.host)
+                continue
+
+            # Update our user index
+            for entry in response['accounts']:
+                try:
+                    results[entry['username']] = entry['id']
+
+                except (TypeError, KeyError):
+                    pass
+
+        # Cache our response for future use; this saves on un-nessisary extra
+        # hits against the Mastodon API when we already know the answer
+        if not hasattr(self, '_user_cache'):
+            setattr(self, '_user_cache', results)
+
+        else:
+            self._user_cache.update(results)
+
+        return results
+
+    def _request(self, path, payload=None, method='POST'):
         """
         Wrapper to Mastodon API requests object
         """
@@ -497,8 +785,8 @@ class NotifyMastodon(NotifyBase):
         url = '{}{}'.format(self.api_url, path)
 
         # Some Debug Logging
-        self.logger.debug('Mastodon POST URL: %s (cert_verify=%r)' % (
-            url, self.verify_certificate))
+        self.logger.debug('Mastodon {} URL: {} (cert_verify={})'.format(
+            method, url, self.verify_certificate))
 
         # Open our attachment path if required:
         if isinstance(payload, AttachBase):
@@ -536,8 +824,10 @@ class NotifyMastodon(NotifyBase):
         self.throttle(wait=wait)
 
         # acquire our request mode
+        fn = requests.post if method == 'POST' else requests.get
+
         try:
-            r = requests.post(
+            r = fn(
                 url,
                 data=data,
                 files=files,
@@ -561,8 +851,9 @@ class NotifyMastodon(NotifyBase):
                     NotifyMastodon.http_response_code_lookup(r.status_code)
 
                 self.logger.warning(
-                    'Failed to send Mastodon POST to {}: '
+                    'Failed to send Mastodon {} to {}: '
                     '{}error={}.'.format(
+                        method,
                         url,
                         ', ' if status_str else '',
                         r.status_code))
@@ -587,8 +878,8 @@ class NotifyMastodon(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'Exception received when sending Mastodon POST to {}: '.
-                format(url))
+                'Exception received when sending Mastodon {} to {}: '.
+                format(method, url))
             self.logger.debug('Socket Exception: %s' % str(e))
 
             # Mark our failure
@@ -630,6 +921,15 @@ class NotifyMastodon(NotifyBase):
 
         # Apply our targets
         results['targets'] = NotifyMastodon.split_path(results['fullpath'])
+
+        # The defined Mastodon visibility
+        if 'vis' in results['qsd'] and len(results['qsd']['vis']):
+            # Simplified version
+            results['visibility'] = \
+                NotifyMastodon.unquote(results['qsd']['vis'])
+
+        elif results['schema'].startswith('toot'):
+            results['visibility'] = MastodonMessageVisibility.PUBLIC
 
         # Get Batch Mode Flag
         results['batch'] = \
