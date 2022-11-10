@@ -39,29 +39,44 @@ apprise_url_tests = (
     ('gchat://:@/', {
         'instance': TypeError,
     }),
-    # Workspace, but not Key or Token
+    # Workspace, but not Key, Token or threadKey
     ('gchat://workspace', {
         'instance': TypeError,
     }),
-    # Workspace and key, but no Token
+    # Workspace and key, but no Token or threadKey
     ('gchat://workspace/key/', {
         'instance': TypeError,
     }),
-    # Credentials are good
+    # Credentials are good without threadKey
     ('gchat://workspace/key/token', {
         'instance': NotifyGoogleChat,
         'privacy_url': 'gchat://w...e/k...y/t...n',
     }),
-    # Test arguments
+    # Credentials are good with threadKey
+    ('gchat://workspace/key/token/treadKey', {
+        'instance': NotifyGoogleChat,
+        'privacy_url': 'gchat://w...e/k...y/t...n/t...y',
+    }),
+    # Test arguments without threadKey
     ('gchat://?workspace=ws&key=mykey&token=mytoken', {
         'instance': NotifyGoogleChat,
         'privacy_url': 'gchat://w...s/m...y/m...n',
+    }),
+    # Test arguments with threadKey
+    ('gchat://?workspace=ws&key=mykey&token=mytoken&threadKey=mythreadKey', {
+        'instance': NotifyGoogleChat,
+        'privacy_url': 'gchat://w...s/m...y/m...n/t...y',
     }),
     # Google Native Webhohok URL
     ('https://chat.googleapis.com/v1/spaces/myworkspace/messages'
      '?key=mykey&token=mytoken', {
          'instance': NotifyGoogleChat,
          'privacy_url': 'gchat://m...e/m...y/m...n'}),
+    # Google Native Webhohok URL with manually added threadKey
+    ('https://chat.googleapis.com/v1/spaces/myworkspace/messages'
+     '?key=mykey&token=mytoken&threadKey=mythreadKey', {
+         'instance': NotifyGoogleChat,
+         'privacy_url': 'gchat://m...e/m...y/m...n/y...y'}),
 
     ('gchat://workspace/key/token', {
         'instance': NotifyGoogleChat,
@@ -76,6 +91,26 @@ apprise_url_tests = (
         'requests_response_code': 999,
     }),
     ('gchat://workspace/key/token', {
+        'instance': NotifyGoogleChat,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+
+    # Redo with threadkey
+    ('gchat://workspace/key/token/threadKey', {
+        'instance': NotifyGoogleChat,
+        # force a failure
+        'response': False,
+        'requests_response_code': requests.codes.internal_server_error,
+    }),
+    ('gchat://workspace/key/token/threadKey', {
+        'instance': NotifyGoogleChat,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('gchat://workspace/key/token/threadKey', {
         'instance': NotifyGoogleChat,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them

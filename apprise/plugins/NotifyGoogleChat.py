@@ -176,10 +176,10 @@ class NotifyGoogleChat(NotifyBase):
             raise TypeError(msg)
 
         # Thread Key (associated with thread)
-        try:
-            self.threadkey = validate_regex(threadkey)
-        except:
-            msg = 'No valid threadKey found in provided URI.'
+        self.threadkey = validate_regex(threadkey)
+        if not self.threadkey:
+            msg = 'No valid thread key could be found in ' \
+                  'provided url: {}.'.format(threadkey)
             self.logger.debug(msg)
 
         return
