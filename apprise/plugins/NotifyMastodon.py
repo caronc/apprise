@@ -45,7 +45,10 @@ from ..attachment.AttachBase import AttachBase
 # - username@host.com
 # - @username@host.com
 IS_USER = re.compile(
-    r'^\s*@?(?P<user>[A-Z0-9_]+(@(?P<host>[A-Z0-9_.-]+))?)$', re.I)
+    r'^\s*@?(?P<user>[A-Z0-9_]+(?:@(?P<host>[A-Z0-9_.-]+))?)$', re.I)
+
+USER_DETECTION_RE = re.compile(
+    r'(@[A-Z0-9_]+(?:@[A-Z0-9_.-]+)?)(?=$|[\s,.&()\[\]]+)', re.I)
 
 
 class MastodonMessageVisibility:
@@ -107,11 +110,6 @@ class NotifyMastodon(NotifyBase):
     # is 4 (unless it's a GIF, then it's only 1)
     __toot_non_gif_images_batch = 4
 
-    # API Reference To Acquire Someone's Mastodon's ID
-    # See: https://docs.joinmastodon.org/methods/search/
-    # Requires Scope Element: read:search
-    mastodon_lookup = '/api/v2/search'
-
     # Mastodon API Reference To Acquire Current Users Information
     # See: https://docs.joinmastodon.org/methods/accounts/
     # Requires Scope Element: read:accounts
@@ -133,7 +131,7 @@ class NotifyMastodon(NotifyBase):
     body_maxlen = 500
 
     # Default to text
-    notify_format = NotifyFormat.HTML
+    notify_format = NotifyFormat.TEXT
 
     # Mastodon is kind enough to return how many more requests we're allowed to
     # continue to make within it's header response as:
@@ -329,13 +327,20 @@ class NotifyMastodon(NotifyBase):
         # Build a list of our attachments
         attachments = []
 
-        if not self.targets and self.visibility == \
+        # Smart Target Detection for Direct Messages; this prevents us from
+        # adding @user entries that were already placed in the message body
+        users = set(USER_DETECTION_RE.findall(body))
+        targets = users - set(self.targets.copy())
+
+        if not targets and self.visibility == \
                 MastodonMessageVisibility.DIRECT:
-            result = self._whoami()
-            if not result:
-                # Could not access our status
-                return False
-            self.targets.append('@' + next(iter(result.keys())))
+
+            if not users:
+                result = self._whoami()
+                if not result:
+                    # Could not access our status
+                    return False
+                targets.append('@' + next(iter(result.keys())))
 
         if attach:
             # We need to upload our payload first so that we can source it
@@ -365,7 +370,6 @@ class NotifyMastodon(NotifyBase):
                 # Audio (MP3, OGG, WAV, FLAC, OPUS, AAC, M4A, 3GP) up to 40MB.
                 #  - Audio will be transcoded to MP3 using V2 VBR (roughly
                 #      192kbps).
-                #
                 if not re.match(r'^(image|video|audio))/.*',
                                 attachment.mimetype, re.I):
                     # Only support images at this time
@@ -386,6 +390,13 @@ class NotifyMastodon(NotifyBase):
 
                 if not postokay:
                     # We can't post our attachment
+                    if response and 'authorized scopes' \
+                            in response.get('error', ''):
+                        self.logger.warning(
+                            'Failed to Send Attachment to Mastodon: '
+                            'missing scope: write:media')
+
+                    # All other failures should cause us to abort
                     return False
 
                 if not (isinstance(response, dict)
@@ -433,8 +444,8 @@ class NotifyMastodon(NotifyBase):
                 attachments.append(response)
 
         payload = {
-            'status': '{} {}'.format(' '.join(self.targets), body)
-            if self.targets else body,
+            'status': '{} {}'.format(' '.join(targets), body)
+            if targets else body,
         }
 
         if self.visibility != MastodonMessageVisibility.DEFAULT:
@@ -497,19 +508,18 @@ class NotifyMastodon(NotifyBase):
                 # Track our error
                 has_error = True
 
-                errors = []
-                try:
-                    errors = ['Error Code {}: {}'.format(
-                        e.get('code', 'unk'), e.get('message'))
-                        for e in response['errors']]
+                # We can't post our attachment
+                if response and 'authorized scopes' \
+                        in response.get('error', ''):
+                    self.logger.warning(
+                        'Failed to Send Status to Mastodon: '
+                        'missing scope: write:statuses')
 
-                except (KeyError, TypeError):
-                    pass
-
-                for error in errors:
+                else:
                     self.logger.debug(
                         'Toot [%.2d/%.2d] Details: %s',
-                        no, len(payloads), error)
+                        no, len(payloads), str(response))
+
                 continue
 
             # Example Attachment Output:
@@ -687,13 +697,6 @@ class NotifyMastodon(NotifyBase):
                     self._whoami_cache = {
                         response['username']: response['id']}
 
-                # Update our user cache as well
-                if not hasattr(self, '_user_cache'):
-                    setattr(self, '_user_cache', results)
-
-                else:
-                    self._user_cache.update(results)
-
             except (TypeError, KeyError):
                 pass
 
@@ -701,70 +704,6 @@ class NotifyMastodon(NotifyBase):
             self.logger.warning(
                 'Failed to lookup Mastodon Auth details; '
                 'missing scope: read:accounts')
-
-        return results
-
-    def _user_lookup(self, screen_name, lazy=True):
-        """
-        Looks up a screen name and returns the user id
-
-        the screen_name can be a list/set/tuple as well
-        """
-
-        # Contains a mapping of screen_name to id
-        results = {}
-
-        # Build a unique set of names
-        names = parse_list(screen_name)
-
-        if lazy and hasattr(self, '_user_cache'):
-            # Use cached response
-            results = {
-                k: v for k, v in self._user_cache.items() if k in names}
-
-            # limit our names if they already exist in our cache
-            names = [name for name in names if name not in results]
-
-        if not len(names):
-            # They're is nothing further to do
-            return results
-
-        # Mastodon API Search only appears to be able to do 1 account
-        # at a time.See: https://docs.joinmastodon.org/methods/search/
-        for name in names:
-            # Lookup our names
-            postokay, response = self._request(
-                self.mastodon_lookup,
-                payload={
-                    'q': name,
-                    'type': 'accounts',
-                },
-                method='GET',
-            )
-
-            if not postokay or not (isinstance(response, dict)
-                                    and isinstance(
-                                        response.get('accounts'), list)):
-                # Track our error
-                self.logger.warning(
-                    'Mastodon user @{}@{} not found.', name, self.host)
-                continue
-
-            # Update our user index
-            for entry in response['accounts']:
-                try:
-                    results[entry['username']] = entry['id']
-
-                except (TypeError, KeyError):
-                    pass
-
-        # Cache our response for future use; this saves on un-nessisary extra
-        # hits against the Mastodon API when we already know the answer
-        if not hasattr(self, '_user_cache'):
-            setattr(self, '_user_cache', results)
-
-        else:
-            self._user_cache.update(results)
 
         return results
 
