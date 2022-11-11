@@ -48,10 +48,6 @@ RC_HTTP_ERROR_MAP = {
     401: 'Authentication tokens provided is invalid or missing.',
 }
 
-# Used to break apart list of potential tags by their delimiter
-# into a usable list.
-LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
-
 
 class RocketChatAuthMode:
     """
@@ -320,7 +316,8 @@ class NotifyRocketChat(NotifyBase):
             auth = '{user}{webhook}@'.format(
                 user='{}:'.format(NotifyRocketChat.quote(self.user, safe=''))
                 if self.user else '',
-                webhook=self.pprint(self.webhook, privacy, safe=''),
+                webhook=self.pprint(self.webhook, privacy,
+                                    mode=PrivacyMode.Secret, safe=''),
             )
 
         default_port = 443 if self.secure else 80
@@ -333,7 +330,7 @@ class NotifyRocketChat(NotifyBase):
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
             targets='/'.join(
-                [NotifyRocketChat.quote(x, safe='') for x in chain(
+                [NotifyRocketChat.quote(x, safe='@#') for x in chain(
                     # Channels are prefixed with a pound/hashtag symbol
                     ['#{}'.format(x) for x in self.channels],
                     # Rooms are as is
