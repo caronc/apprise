@@ -580,7 +580,6 @@ class NotifyMastodon(NotifyBase):
         has_error = False
 
         for no, payload in enumerate(payloads, start=1):
-            # Send Toot
             postokay, response = self._request(self.mastodon_toot, payload)
             if not postokay:
                 # Track our error
@@ -592,11 +591,6 @@ class NotifyMastodon(NotifyBase):
                     self.logger.warning(
                         'Failed to Send Status to Mastodon: '
                         'missing scope: write:statuses')
-
-                else:
-                    self.logger.debug(
-                        'Toot [%.2d/%.2d] Details: %s',
-                        no, len(payloads), str(response))
 
                 continue
 
@@ -703,7 +697,8 @@ class NotifyMastodon(NotifyBase):
                 url = 'unknown'
 
             self.logger.debug(
-                'Toot [%.2d/%.2d] Details: %s', no, len(payloads), url)
+                'Mastodon [%.2d/%.2d] (%d attached) delivered to %s',
+                no, len(payloads), len(payload.get('media_ids', [])), url)
 
             self.logger.info(
                 'Sent [%.2d/%.2d] Mastodon notification as public toot.',
@@ -802,6 +797,11 @@ class NotifyMastodon(NotifyBase):
                 'file': (payload.name, open(payload.path, 'rb'),
                          'application/octet-stream')}
 
+            # Provide a description
+            data = {
+                'description': payload.name,
+            }
+
         else:
             headers['Content-Type'] = 'application/json'
             data = dumps(payload)
@@ -852,7 +852,10 @@ class NotifyMastodon(NotifyBase):
                 # AttributeError = r is None
                 content = {}
 
-            if r.status_code != requests.codes.ok:
+            if r.status_code not in (
+                    requests.codes.ok, requests.codes.created,
+                    requests.codes.accepted):
+
                 # We had a problem
                 status_str = \
                     NotifyMastodon.http_response_code_lookup(r.status_code)
