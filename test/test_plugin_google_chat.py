@@ -23,7 +23,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 import requests
-
+import pytest
 from apprise.plugins.NotifyGoogleChat import NotifyGoogleChat
 from helpers import AppriseURLTester
 
@@ -54,6 +54,11 @@ apprise_url_tests = (
     }),
     # Test arguments
     ('gchat://?workspace=ws&key=mykey&token=mytoken', {
+        'instance': NotifyGoogleChat,
+        'privacy_url': 'gchat://w...s/m...y/m...n',
+    }),
+    ('gchat://?workspace=ws&key=mykey&token=mytoken&thread=abc123', {
+        # Test our thread key
         'instance': NotifyGoogleChat,
         'privacy_url': 'gchat://w...s/m...y/m...n',
     }),
@@ -92,3 +97,12 @@ def test_plugin_google_chat_urls():
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+def test_plugin_google_chat_edge_case():
+    """
+    NotifyGoogleChat() Edge Cases
+
+    """
+    with pytest.raises(TypeError):
+        NotifyGoogleChat('workspace', 'webhook', 'token', thread_key=object())

@@ -131,9 +131,16 @@ class NotifyGoogleChat(NotifyBase):
         'token': {
             'alias_of': 'webhook_token',
         },
+        'thread': {
+            'name': _('Thread Key'),
+            'type': 'string',
+            'private': True,
+            'alias_of': 'thread_key',
+        },
     })
 
-    def __init__(self, workspace, webhook_key, webhook_token, **kwargs):
+    def __init__(self, workspace, webhook_key, webhook_token,
+                 thread_key=None, **kwargs):
         """
         Initialize Google Chat Object
 
@@ -164,6 +171,17 @@ class NotifyGoogleChat(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
+        if thread_key:
+            self.thread_key = validate_regex(thread_key)
+            if not self.thread_key:
+                msg = 'An invalid Google Chat Thread Key ' \
+                      '({}) was specified.'.format(thread_key)
+                self.logger.warning(msg)
+                raise TypeError(msg)
+
+        else:
+            self.thread_key = None
+
         return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
@@ -188,6 +206,9 @@ class NotifyGoogleChat(NotifyBase):
             key=self.webhook_key,
             token=self.webhook_token,
         )
+
+        if self.thread_key:
+            notify_url += '&threadKey={}'.format(self.thread_key)
 
         self.logger.debug('Google Chat POST URL: %s (cert_verify=%r)' % (
             notify_url, self.verify_certificate,
@@ -242,6 +263,9 @@ class NotifyGoogleChat(NotifyBase):
         # Set our parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
+        if self.thread_key:
+            params['thread'] = self.thread_key
+
         return '{schema}://{workspace}/{key}/{token}/?{params}'.format(
             schema=self.secure_protocol,
             workspace=self.pprint(self.workspace, privacy, safe=''),
@@ -289,6 +313,10 @@ class NotifyGoogleChat(NotifyBase):
         if 'token' in results['qsd']:
             results['webhook_token'] = \
                 NotifyGoogleChat.unquote(results['qsd']['token'])
+
+        if 'thread' in results['qsd']:
+            results['thread_key'] = \
+                NotifyGoogleChat.unquote(results['qsd']['thread'])
 
         return results
 
