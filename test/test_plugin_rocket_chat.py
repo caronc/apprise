@@ -75,6 +75,7 @@ apprise_url_tests = (
                 'userId': 'user',
             },
         },
+        'privacy_url': 'rocket://user:****@localhost',
     }),
     # A channel (using the to=)
     ('rockets://user:pass@localhost?to=#channel', {
@@ -87,6 +88,7 @@ apprise_url_tests = (
                 'userId': 'user',
             },
         },
+        'privacy_url': 'rockets://user:****@localhost',
     }),
     # A channel
     ('rockets://user:pass@localhost/#channel', {
@@ -99,6 +101,7 @@ apprise_url_tests = (
                 'userId': 'user',
             },
         },
+        'privacy_url': 'rockets://user:****@localhost',
     }),
     # Several channels
     ('rocket://user:pass@localhost/#channel1/#channel2/?avatar=Yes', {
@@ -111,6 +114,7 @@ apprise_url_tests = (
                 'userId': 'user',
             },
         },
+        'privacy_url': 'rocket://user:****@localhost',
     }),
     # Several Rooms
     ('rocket://user:pass@localhost/room1/room2', {
@@ -123,6 +127,7 @@ apprise_url_tests = (
                 'userId': 'user',
             },
         },
+        'privacy_url': 'rocket://user:****@localhost',
     }),
     # A room and channel
     ('rocket://user:pass@localhost/room/#channel?mode=basic&avatar=Yes', {
@@ -151,6 +156,7 @@ apprise_url_tests = (
                 'userId': 'user',
             },
         },
+        'privacy_url': 'rockets://user:****@localhost',
     }),
     # A room and channel
     ('rockets://user:pass@localhost/rooma/#channela', {
@@ -168,9 +174,11 @@ apprise_url_tests = (
     # A web token
     ('rockets://web/token@localhost/@user/#channel/roomid', {
         'instance': NotifyRocketChat,
+        'privacy_url': 'rockets://****@localhost/#channel/roomid',
     }),
     ('rockets://user:web/token@localhost/@user/?mode=webhook', {
         'instance': NotifyRocketChat,
+        'privacy_url': 'rockets://user:****@localhost',
     }),
     ('rockets://user:web/token@localhost?to=@user2,#channel2', {
         'instance': NotifyRocketChat,
@@ -180,10 +188,11 @@ apprise_url_tests = (
         'instance': NotifyRocketChat,
 
         # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'rockets://w...n@localhost',
+        'privacy_url': 'rockets://****@localhost/',
     }),
     ('rockets://localhost/@user/?mode=webhook&webhook=web/token', {
         'instance': NotifyRocketChat,
+        'privacy_url': 'rockets://****@localhost/@user'
     }),
     ('rockets://user:web/token@localhost/@user/?mode=invalid', {
         # invalid mode
@@ -228,7 +237,7 @@ def test_plugin_rocket_chat_urls():
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_rocketchat_edge_cases(mock_post, mock_get):
+def test_plugin_rocket_chat_edge_cases(mock_post, mock_get):
     """
     NotifyRocketChat() Edge Cases
 
