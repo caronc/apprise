@@ -163,15 +163,16 @@ class NotifyMastodon(NotifyBase):
             'type': 'string',
             'required': True,
         },
+        'token': {
+            'name': _('Access Token'),
+            'type': 'string',
+            'required': True,
+        },
         'port': {
             'name': _('Port'),
             'type': 'int',
             'min': 1,
             'max': 65535,
-        },
-        'token': {
-            'name': _('Access Token'),
-            'type': 'string',
         },
         'target_user': {
             'name': _('Target User'),
@@ -190,12 +191,11 @@ class NotifyMastodon(NotifyBase):
         'token': {
             'alias_of': 'token',
         },
-        'vis': {
+        'visibility': {
             'name': _('Visibility'),
             'type': 'choice:string',
             'values': MASTODON_MESSAGE_VISIBILITIES,
             'default': MastodonMessageVisibility.DEFAULT,
-            'map_to': 'visibility',
         },
         'cache': {
             'name': _('Cache Results'),
@@ -207,13 +207,23 @@ class NotifyMastodon(NotifyBase):
             'type': 'bool',
             'default': True,
         },
+        'sensitive': {
+            'name': _('Sensitive Attachments'),
+            'type': 'bool',
+            'default': False,
+        },
+        'spoiler': {
+            'name': _('Spoiler Text'),
+            'type': 'string',
+        },
         'to': {
             'alias_of': 'targets',
         },
     })
 
     def __init__(self, token=None, targets=None, batch=True,
-                 visibility=None, cache=True, **kwargs):
+                 sensitive=None, spoiler=None, visibility=None, cache=True,
+                 **kwargs):
         """
         Initialize Notify Mastodon Object
         """
@@ -241,7 +251,8 @@ class NotifyMastodon(NotifyBase):
                 self.logger.warning(msg)
 
         else:
-            self.visibility = self.template_args['vis']['default']
+            self.visibility = \
+                self.template_args['visibility']['default']
 
         # Prepare our URL
         self.api_url = '%s://%s' % (self.schema, self.host)
@@ -253,7 +264,15 @@ class NotifyMastodon(NotifyBase):
         self.cache = cache
 
         # Prepare Image Batch Mode Flag
-        self.batch = batch
+        self.batch = self.template_args['batch']['default'] \
+            if batch is None else batch
+
+        # Images to be marked sensitive
+        self.sensitive = self.template_args['sensitive']['default'] \
+            if sensitive is None else sensitive
+
+        # Text marked as being a spoiler
+        self.spoiler = spoiler if isinstance(spoiler, str) else None
 
         # Assign our access token
         self.token = token
@@ -295,12 +314,17 @@ class NotifyMastodon(NotifyBase):
 
         # Define any URL parameters
         params = {
-            'vis': self.visibility,
+            'visibility': self.visibility,
             'batch': 'yes' if self.batch else 'no',
+            'sensitive': 'yes' if self.sensitive else 'no',
         }
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+
+        if self.spoiler:
+            # Store our Spoiler if one was specified
+            params['spoiler'] = self.spoiler
 
         default_port = 443 if self.secure else 80
 
@@ -446,10 +470,16 @@ class NotifyMastodon(NotifyBase):
         payload = {
             'status': '{} {}'.format(' '.join(targets), body)
             if targets else body,
+            'sensitive': self.sensitive,
         }
 
+        # Handle Visibility Flag
         if self.visibility != MastodonMessageVisibility.DEFAULT:
             payload['visibility'] = self.visibility
+
+        # Set Spoiler text (if set)
+        if self.spoiler:
+            payload['spoiler_text'] = self.spoiler
 
         payloads = []
         if not attachments:
@@ -862,13 +892,25 @@ class NotifyMastodon(NotifyBase):
         results['targets'] = NotifyMastodon.split_path(results['fullpath'])
 
         # The defined Mastodon visibility
-        if 'vis' in results['qsd'] and len(results['qsd']['vis']):
+        if 'visibility' in results['qsd'] and \
+                len(results['qsd']['visibility']):
             # Simplified version
             results['visibility'] = \
-                NotifyMastodon.unquote(results['qsd']['vis'])
+                NotifyMastodon.unquote(results['qsd']['visibility'])
 
         elif results['schema'].startswith('toot'):
             results['visibility'] = MastodonMessageVisibility.PUBLIC
+
+        # Get Spoiler Text
+        if 'spoiler' in results['qsd'] and len(results['qsd']['spoiler']):
+            results['spoiler'] = \
+                NotifyMastodon.unquote(results['qsd']['spoiler'])
+
+        # Get Sensitive Flag (for Attachments)
+        results['sensitive'] = \
+            parse_bool(results['qsd'].get(
+                'sensitive',
+                NotifyMastodon.template_args['sensitive']['default']))
 
         # Get Batch Mode Flag
         results['batch'] = \
