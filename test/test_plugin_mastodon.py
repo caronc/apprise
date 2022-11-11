@@ -74,6 +74,12 @@ apprise_url_tests = (
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'mastodon://****@hostname/@user/@user2'
     }),
+    ('mastodon://hostname/@user/@user2?token=abcd123', {
+        # Our access token can be provided as a token= variable
+        'instance': NotifyMastodon,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'mastodon://****@hostname/@user/@user2'
+    }),
     ('mastodon://access_token@hostname?to=@user, @user2', {
         # We're good; it's another simple notification
         'instance': NotifyMastodon,
@@ -90,6 +96,10 @@ apprise_url_tests = (
     }),
     ('mastodon://access_token@hostname/?language=en', {
         # over-ride our language
+        'instance': NotifyMastodon,
+    }),
+    ('mastodons://access_token@hostname:8443', {
+        # A custom port specified
         'instance': NotifyMastodon,
     }),
     ('mastodon://access_token@hostname/?key=My%20Idempotency%20Key', {
@@ -179,7 +189,7 @@ def test_plugin_mastodon_general(mock_post, mock_get):
     mock_post.return_value = request
 
     # Instantiate our object
-    obj = NotifyMastodon(token=token, host=host, visibility='direct')
+    obj = NotifyMastodon(token=token, host=host)
 
     assert isinstance(obj, NotifyMastodon) is True
     assert isinstance(obj.url(), str) is True
@@ -269,6 +279,36 @@ def test_plugin_mastodon_general(mock_post, mock_get):
     response_obj = '{'
     assert obj.send(body="test") is True
 
+    mock_get.reset_mock()
+    mock_post.reset_mock()
+
+    #
+    # Test our lazy lookups
+    #
+
+    # Prepare a good status response
+    request = mock.Mock()
+    request.content = dumps({'id': '1234', 'username': 'caronc'})
+    request.status_code = requests.codes.ok
+    mock_get.return_value = request
+
+    mastodon_url = 'mastodons://key@host?visibility=direct'
+    obj = Apprise.instantiate(mastodon_url)
+    obj._whoami(lazy=True)
+    assert mock_get.call_count == 1
+    assert mock_get.call_args_list[0][0][0] == \
+        'https://host/api/v1/accounts/verify_credentials'
+
+    mock_get.reset_mock()
+    obj._whoami(lazy=True)
+    assert mock_get.call_count == 0
+
+    mock_get.reset_mock()
+    obj._whoami(lazy=False)
+    assert mock_get.call_count == 1
+    assert mock_get.call_args_list[0][0][0] == \
+        'https://host/api/v1/accounts/verify_credentials'
+
 
 @mock.patch('requests.post')
 @mock.patch('requests.get')
@@ -279,7 +319,7 @@ def test_plugin_mastodon_attachments(mock_get, mock_post):
     """
     akey = 'access_key'
     host = 'nuxref.com'
-    screen_name = 'caronc'
+    username = 'caronc'
 
     # Prepare a good status response
     good_response_obj = {
@@ -292,7 +332,7 @@ def test_plugin_mastodon_attachments(mock_get, mock_post):
 
     # Prepare a good whoami response
     good_whoami_response_obj = {
-        'username': screen_name,
+        'username': username,
         'id': '9876',
     }
 
@@ -442,8 +482,8 @@ def test_plugin_mastodon_attachments(mock_get, mock_post):
     mock_get.return_value = good_whoami_response
 
     # instantiate our object
-    mastodon_url = 'mastodons://{}@{}?visibility=direct&sensitive=yes'.format(
-        akey, host)
+    mastodon_url = 'mastodons://{}@{}' \
+        '?visibility=direct&sensitive=yes&key=abcd'.format(akey, host)
     obj = Apprise.instantiate(mastodon_url)
 
     # Send ourselves a direct message where our ID was already found
@@ -479,6 +519,9 @@ def test_plugin_mastodon_attachments(mock_get, mock_post):
     assert payload['status'] == 'Apprise\r\nCheck this out @caronc'
     assert 'sensitive' in payload
     assert payload['sensitive'] is True
+    assert 'language' not in payload
+    assert 'Idempotency-Key' in payload
+    assert payload['Idempotency-Key'] == 'abcd'
     assert 'media_ids' in payload
     assert isinstance(payload['media_ids'], list)
     assert len(payload['media_ids']) == 1
@@ -489,6 +532,9 @@ def test_plugin_mastodon_attachments(mock_get, mock_post):
     assert payload['status'] == '02/02'
     assert 'sensitive' in payload
     assert payload['sensitive'] is False
+    assert 'language' not in payload
+    assert 'Idempotency-Key' in payload
+    assert payload['Idempotency-Key'] == 'abcd-part01'
     assert 'media_ids' in payload
     assert isinstance(payload['media_ids'], list)
     assert len(payload['media_ids']) == 2

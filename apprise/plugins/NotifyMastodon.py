@@ -241,6 +241,9 @@ class NotifyMastodon(NotifyBase):
         # Set our schema
         self.schema = 'https' if self.secure else 'http'
 
+        # Initialize our cache value
+        self._whoami_cache = None
+
         self.token = validate_regex(token)
         if not self.token:
             msg = 'An invalid Twitter Consumer Key was specified.'
@@ -566,6 +569,11 @@ class NotifyMastodon(NotifyBase):
                         '{:02d}/{:02d}'.format(no + 1, len(batches))
                     # No longer sensitive information
                     _payload['sensitive'] = False
+                    if self.idempotency_key:
+                        # Support multiposts while a Idempotency Key has been
+                        # defined
+                        _payload['Idempotency-Key'] = '{}-part{:02d}'.format(
+                            self.idempotency_key, no)
                 payloads.append(_payload)
 
         # Error Tracking
@@ -709,12 +717,9 @@ class NotifyMastodon(NotifyBase):
 
         """
 
-        if lazy and hasattr(self, '_whoami_cache'):
+        if lazy and self._whoami_cache is not None:
             # Use cached response
             return self._whoami_cache
-
-        # Contains a mapping of screen_name to id
-        results = {}
 
         # Send Mastodon Whoami request
         postokay, response = self._request(
@@ -756,16 +761,9 @@ class NotifyMastodon(NotifyBase):
             #   'fields': []
             # }
             try:
-                results[response['username']] = response['id']
-
                 # Cache our response for future references
-                if not hasattr(self, '_whoami_cache'):
-                    setattr(self, '_whoami_cache', {
-                        response['username']: response['id']})
-
-                else:
-                    self._whoami_cache = {
-                        response['username']: response['id']}
+                self._whoami_cache = {
+                    response['username']: response['id']}
 
             except (TypeError, KeyError):
                 pass
@@ -775,7 +773,7 @@ class NotifyMastodon(NotifyBase):
                 'Failed to lookup Mastodon Auth details; '
                 'missing scope: read:accounts')
 
-        return results if postokay else {}
+        return self._whoami_cache if postokay else {}
 
     def _request(self, path, payload=None, method='POST'):
         """
