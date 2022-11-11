@@ -64,11 +64,11 @@ apprise_url_tests = (
         # Missing Keys
         'instance': TypeError,
     }),
-    ('twitter://consumer_key/consumer_secret/access_token/', {
+    ('twitter://consumer_key/consumer_secret/atoken1/', {
         # Missing Access Secret
         'instance': TypeError,
     }),
-    ('twitter://consumer_key/consumer_secret/access_token/access_secret', {
+    ('twitter://consumer_key/consumer_secret/atoken2/access_secret', {
         # No user mean's we message ourselves
         'instance': NotifyTwitter,
         # Expected notify() response False (because we won't be able
@@ -76,9 +76,9 @@ apprise_url_tests = (
         'notify_response': False,
 
         # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'twitter://c...y/****/a...n/****',
+        'privacy_url': 'twitter://c...y/****/a...2/****',
     }),
-    ('twitter://consumer_key/consumer_secret/access_token/access_secret'
+    ('twitter://consumer_key/consumer_secret/atoken3/access_secret'
         '?cache=no', {
             # No user mean's we message ourselves
             'instance': NotifyTwitter,
@@ -90,7 +90,7 @@ apprise_url_tests = (
                 'media_id': 123,
             },
         }),
-    ('twitter://consumer_key/consumer_secret/access_token/access_secret', {
+    ('twitter://consumer_key/consumer_secret/atoken4/access_secret', {
         # No user mean's we message ourselves
         'instance': NotifyTwitter,
         # However we'll be okay if we return a proper response
@@ -102,7 +102,7 @@ apprise_url_tests = (
         },
     }),
     # A duplicate of the entry above, this will cause cache to be referenced
-    ('twitter://consumer_key/consumer_secret/access_token/access_secret', {
+    ('twitter://consumer_key/consumer_secret/atoken5/access_secret', {
         # No user mean's we message ourselves
         'instance': NotifyTwitter,
         # However we'll be okay if we return a proper response
@@ -115,7 +115,7 @@ apprise_url_tests = (
     }),
     # handle cases where the screen_name is missing from the response causing
     # an exception during parsing
-    ('twitter://consumer_key/consumer_secret2/access_token/access_secret', {
+    ('twitter://consumer_key/consumer_secret2/atoken6/access_secret', {
         # No user mean's we message ourselves
         'instance': NotifyTwitter,
         # However we'll be okay if we return a proper response
@@ -127,14 +127,14 @@ apprise_url_tests = (
         # due to a mangled response_text we'll fail
         'notify_response': False,
     }),
-    ('twitter://user@consumer_key/csecret2/access_token/access_secret/-/%/', {
+    ('twitter://user@consumer_key/csecret2/atoken7/access_secret/-/%/', {
         # One Invalid User
         'instance': NotifyTwitter,
         # Expected notify() response False (because we won't be able
         # to detect our user)
         'notify_response': False,
     }),
-    ('twitter://user@consumer_key/csecret/access_token/access_secret'
+    ('twitter://user@consumer_key/csecret/atoken8/access_secret'
         '?cache=No&batch=No', {
             # No Cache & No Batch
             'instance': NotifyTwitter,
@@ -143,7 +143,7 @@ apprise_url_tests = (
                 'screen_name': 'user'
             }],
         }),
-    ('twitter://user@consumer_key/csecret/access_token/access_secret', {
+    ('twitter://user@consumer_key/csecret/atoken9/access_secret', {
         # We're good!
         'instance': NotifyTwitter,
         'requests_response_text': [{
@@ -151,21 +151,20 @@ apprise_url_tests = (
             'screen_name': 'user'
         }],
     }),
-    # A duplicate of the entry above, this will cause cache to be referenced
-    # for this reason, we don't even need to return a valid response
-    ('twitter://user@consumer_key/csecret/access_token/access_secret', {
+    ('twitter://user@consumer_key/csecret/atoken11/access_secret', {
         # We're identifying the same user we already sent to
         'instance': NotifyTwitter,
+        'notify_response': False,
     }),
-    ('twitter://ckey/csecret/access_token/access_secret?mode=tweet', {
+    ('tweet://ckey/csecret/atoken12/access_secret', {
         # A Public Tweet
         'instance': NotifyTwitter,
     }),
-    ('twitter://user@ckey/csecret/access_token/access_secret?mode=invalid', {
+    ('twitter://user@ckey/csecret/atoken13/access_secret?mode=invalid', {
         # An invalid mode
         'instance': TypeError,
     }),
-    ('twitter://usera@consumer_key/consumer_secret/access_token/'
+    ('twitter://usera@consumer_key/consumer_secret/atoken14/'
         'access_secret/user/?to=userb', {
             # We're good!
             'instance': NotifyTwitter,
@@ -180,19 +179,19 @@ apprise_url_tests = (
                 'id': 123,
             }],
         }),
-    ('twitter://ckey/csecret/access_token/access_secret', {
+    ('twitter://ckey/csecret/atoken15/access_secret', {
         'instance': NotifyTwitter,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
-    ('twitter://ckey/csecret/access_token/access_secret', {
+    ('twitter://ckey/csecret/atoken16/access_secret', {
         'instance': NotifyTwitter,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
     }),
-    ('twitter://ckey/csecret/access_token/access_secret?mode=tweet', {
+    ('twitter://ckey/csecret/atoken17/access_secret?mode=tweet', {
         'instance': NotifyTwitter,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
@@ -320,7 +319,7 @@ def test_plugin_twitter_general(mock_post, mock_get):
     assert obj.send(body="test") is True
 
     # Flush our cache forcing it's re-creating
-    del NotifyTwitter._user_cache
+    NotifyTwitter._user_cache = {}
     assert obj.send(body="test") is True
 
     # Cause content response to be None
@@ -350,7 +349,7 @@ def test_plugin_twitter_general(mock_post, mock_get):
     # Set ourselves up to handle whoami calls
 
     # Flush out our cache
-    del NotifyTwitter._user_cache
+    NotifyTwitter._user_cache = {}
 
     response_obj = {
         'screen_name': screen_name,
@@ -367,12 +366,12 @@ def test_plugin_twitter_general(mock_post, mock_get):
     assert obj.send(body="test") is True
 
     # Alter the key forcing us to look up a new value of ourselves again
-    del NotifyTwitter._user_cache
-    del NotifyTwitter._whoami_cache
+    NotifyTwitter._user_cache = {}
+    NotifyTwitter._whoami_cache = None
     obj.ckey = 'different.then.it.was'
     assert obj.send(body="test") is True
 
-    del NotifyTwitter._whoami_cache
+    NotifyTwitter._whoami_cache = None
     obj.ckey = 'different.again'
     assert obj.send(body="test") is True
 
@@ -440,10 +439,17 @@ def test_plugin_twitter_dm_attachments(mock_get, mock_post):
         'id': 9876,
     }
 
+    # Epoch time:
+    epoch = datetime.utcfromtimestamp(0)
+
     # Prepare a good DM response
     good_dm_response = mock.Mock()
     good_dm_response.content = dumps(good_dm_response_obj)
     good_dm_response.status_code = requests.codes.ok
+    good_dm_response.headers = {
+        'x-rate-limit-reset': (datetime.utcnow() - epoch).total_seconds(),
+        'x-rate-limit-remaining': 1,
+    }
 
     # Prepare bad response
     bad_response = mock.Mock()
@@ -540,7 +546,10 @@ def test_plugin_twitter_dm_attachments(mock_get, mock_post):
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=attach) is False
 
-    assert mock_get.call_count == 0
+    assert mock_get.call_count == 1
+    assert mock_get.call_args_list[0][0][0] == \
+        'https://api.twitter.com/1.1/account/verify_credentials.json'
+
     # No get request as cached response is used
     assert mock_post.call_count == 2
     assert mock_post.call_args_list[0][0][0] == \
