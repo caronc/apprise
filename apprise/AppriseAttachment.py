@@ -170,6 +170,11 @@ class AppriseAttachment:
                     return_status = False
                     continue
 
+            elif isinstance(_attachment, AppriseAttachment):
+                # We were provided a list of Apprise Attachments
+                # append our content together
+                instance = _attachment.attachments
+
             elif not isinstance(_attachment, attachment.AttachBase):
                 logger.warning(
                     "An invalid attachment (type={}) was specified.".format(
@@ -196,7 +201,11 @@ class AppriseAttachment:
                 continue
 
             # Add our initialized plugin to our server listings
-            self.attachments.append(instance)
+            if isinstance(instance, list):
+                self.attachments.extend(instance)
+
+            else:
+                self.attachments.append(instance)
 
         # Return our status
         return return_status

@@ -36,6 +36,7 @@ from ..common import NotifyFormat
 from ..common import NotifyType
 from ..utils import parse_list
 from ..utils import parse_bool
+from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 from ..attachment.AttachBase import AttachBase
 
@@ -216,6 +217,14 @@ class NotifyMastodon(NotifyBase):
             'name': _('Spoiler Text'),
             'type': 'string',
         },
+        'key': {
+            'name': _('Idempotency-Key'),
+            'type': 'string',
+        },
+        'language': {
+            'name': _('Language Code'),
+            'type': 'string',
+        },
         'to': {
             'alias_of': 'targets',
         },
@@ -223,7 +232,7 @@ class NotifyMastodon(NotifyBase):
 
     def __init__(self, token=None, targets=None, batch=True,
                  sensitive=None, spoiler=None, visibility=None, cache=True,
-                 **kwargs):
+                 key=None, language=None, **kwargs):
         """
         Initialize Notify Mastodon Object
         """
@@ -231,6 +240,12 @@ class NotifyMastodon(NotifyBase):
 
         # Set our schema
         self.schema = 'https' if self.secure else 'http'
+
+        self.token = validate_regex(token)
+        if not self.token:
+            msg = 'An invalid Twitter Consumer Key was specified.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         if visibility:
             # Input is a string; attempt to get the lookup from our
@@ -249,6 +264,7 @@ class NotifyMastodon(NotifyBase):
                 msg = 'The Mastodon visibility specified ({}) is invalid.' \
                     .format(visibility)
                 self.logger.warning(msg)
+                raise TypeError(msg)
 
         else:
             self.visibility = \
@@ -274,8 +290,11 @@ class NotifyMastodon(NotifyBase):
         # Text marked as being a spoiler
         self.spoiler = spoiler if isinstance(spoiler, str) else None
 
-        # Assign our access token
-        self.token = token
+        # Idempotency Key
+        self.idempotency_key = key if isinstance(key, str) else None
+
+        # Over-ride default language (ISO 639) (e.g: en, fr, es, etc)
+        self.language = language if isinstance(language, str) else None
 
         # Our target users
         self.targets = []
@@ -284,7 +303,6 @@ class NotifyMastodon(NotifyBase):
         has_error = False
 
         # Identify our targets
-        self.targets = []
         for target in parse_list(targets):
             match = IS_USER.match(target)
             if match and match.group('user'):
@@ -323,14 +341,22 @@ class NotifyMastodon(NotifyBase):
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         if self.spoiler:
-            # Store our Spoiler if one was specified
+            # Our Spoiler if one was specified
             params['spoiler'] = self.spoiler
+
+        if self.idempotency_key:
+            # Our Idempotency Key
+            params['key'] = self.idempotency_key
+
+        if self.language:
+            # Override Language
+            params['language'] = self.language
 
         default_port = 443 if self.secure else 80
 
-        return '{schema}://{token}@{host}{port}/{targets}/?{params}'.format(
+        return '{schema}://{token}@{host}{port}/{targets}?{params}'.format(
             schema=self.secure_protocol[0]
-            if self.secure else self.protocol[1],
+            if self.secure else self.protocol[0],
             token=self.pprint(
                 self.token, privacy, mode=PrivacyMode.Secret, safe=''),
             # never encode hostname since we're expecting it to be a valid one
@@ -355,16 +381,20 @@ class NotifyMastodon(NotifyBase):
         # adding @user entries that were already placed in the message body
         users = set(USER_DETECTION_RE.findall(body))
         targets = users - set(self.targets.copy())
-
-        if not targets and self.visibility == \
+        if not self.targets and self.visibility == \
                 MastodonMessageVisibility.DIRECT:
 
-            if not users:
-                result = self._whoami()
-                if not result:
-                    # Could not access our status
-                    return False
-                targets.append('@' + next(iter(result.keys())))
+            result = self._whoami()
+            if not result:
+                # Could not access our status
+                return False
+
+            myself = '@' + next(iter(result.keys()))
+            if myself in users:
+                targets.remove(myself)
+
+            else:
+                targets.add(myself)
 
         if attach:
             # We need to upload our payload first so that we can source it
@@ -394,7 +424,7 @@ class NotifyMastodon(NotifyBase):
                 # Audio (MP3, OGG, WAV, FLAC, OPUS, AAC, M4A, 3GP) up to 40MB.
                 #  - Audio will be transcoded to MP3 using V2 VBR (roughly
                 #      192kbps).
-                if not re.match(r'^(image|video|audio))/.*',
+                if not re.match(r'^(image|video|audio)/.*',
                                 attachment.mimetype, re.I):
                     # Only support images at this time
                     self.logger.warning(
@@ -481,6 +511,14 @@ class NotifyMastodon(NotifyBase):
         if self.spoiler:
             payload['spoiler_text'] = self.spoiler
 
+        # Set Idempotency-Key (if set)
+        if self.idempotency_key:
+            payload['Idempotency-Key'] = self.idempotency_key
+
+        # Set Language
+        if self.language:
+            payload['language'] = self.language
+
         payloads = []
         if not attachments:
             payloads.append(payload)
@@ -526,6 +564,8 @@ class NotifyMastodon(NotifyBase):
                     # strip text and replace it with the image representation
                     _payload['status'] = \
                         '{:02d}/{:02d}'.format(no + 1, len(batches))
+                    # No longer sensitive information
+                    _payload['sensitive'] = False
                 payloads.append(_payload)
 
         # Error Tracking
@@ -676,7 +716,7 @@ class NotifyMastodon(NotifyBase):
         # Contains a mapping of screen_name to id
         results = {}
 
-        # Send Mastodon DM
+        # Send Mastodon Whoami request
         postokay, response = self._request(
             self.mastodon_whoami,
             method='GET',
@@ -735,7 +775,7 @@ class NotifyMastodon(NotifyBase):
                 'Failed to lookup Mastodon Auth details; '
                 'missing scope: read:accounts')
 
-        return results
+        return results if postokay else {}
 
     def _request(self, path, payload=None, method='POST'):
         """
@@ -901,10 +941,20 @@ class NotifyMastodon(NotifyBase):
         elif results['schema'].startswith('toot'):
             results['visibility'] = MastodonMessageVisibility.PUBLIC
 
+        # Get Idempotency Key (if specified)
+        if 'key' in results['qsd'] and len(results['qsd']['key']):
+            results['key'] = \
+                NotifyMastodon.unquote(results['qsd']['key'])
+
         # Get Spoiler Text
         if 'spoiler' in results['qsd'] and len(results['qsd']['spoiler']):
             results['spoiler'] = \
                 NotifyMastodon.unquote(results['qsd']['spoiler'])
+
+        # Get Language (if specified)
+        if 'language' in results['qsd'] and len(results['qsd']['language']):
+            results['language'] = \
+                NotifyMastodon.unquote(results['qsd']['language'])
 
         # Get Sensitive Flag (for Attachments)
         results['sensitive'] = \
