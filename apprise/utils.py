@@ -1498,8 +1498,13 @@ def environ(*remove, **update):
     finally:
         # Restore our snapshot
         os.environ = env_orig.copy()
-        # Restore locale
-        locale.setlocale(locale.LC_ALL, loc_orig)
+        try:
+            # Restore locale
+            locale.setlocale(locale.LC_ALL, loc_orig)
+
+        except locale.Error:
+            # Thrown in py3.6
+            pass
 
 
 def apply_template(template, app_mode=TemplateType.RAW, **kwargs):
