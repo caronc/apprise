@@ -24,8 +24,12 @@
 # THE SOFTWARE.
 import requests
 import pytest
+from apprise import Apprise
 from apprise.plugins.NotifyGoogleChat import NotifyGoogleChat
 from helpers import AppriseURLTester
+from unittest import mock
+from apprise import NotifyType
+from json import loads
 
 # Disable logging for a cleaner testing output
 import logging
@@ -105,6 +109,64 @@ def test_plugin_google_chat_urls():
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+@mock.patch('requests.post')
+def test_plugin_google_chat_general(mock_post):
+    """
+    NotifyGoogleChat() General Checks
+
+    """
+
+    # Initialize some generic (but valid) tokens
+    workspace = 'ws'
+    key = 'key'
+    threadkey = 'threadkey'
+    token = 'token'
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    # Test our messaging
+    obj = Apprise.instantiate(
+        'gchat://{}/{}/{}'.format(workspace, key, token))
+    assert isinstance(obj, NotifyGoogleChat)
+    assert obj.notify(
+        body="test body", title='title',
+        notify_type=NotifyType.INFO) is True
+
+    # Test our call count
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://chat.googleapis.com/v1/spaces/ws/messages'
+    params = mock_post.call_args_list[0][1]['params']
+    assert params.get('token') == token
+    assert params.get('key') == key
+    assert 'threadKey' not in params
+    payload = loads(mock_post.call_args_list[0][1]['data'])
+    assert payload['text'] == "title\r\ntest body"
+
+    mock_post.reset_mock()
+
+    # Test our messaging with the threadKey
+    obj = Apprise.instantiate(
+        'gchat://{}/{}/{}/{}'.format(workspace, key, token, threadkey))
+    assert isinstance(obj, NotifyGoogleChat)
+    assert obj.notify(
+        body="test body", title='title',
+        notify_type=NotifyType.INFO) is True
+
+    # Test our call count
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://chat.googleapis.com/v1/spaces/ws/messages'
+    params = mock_post.call_args_list[0][1]['params']
+    assert params.get('token') == token
+    assert params.get('key') == key
+    assert params.get('threadKey') == threadkey
+    payload = loads(mock_post.call_args_list[0][1]['data'])
+    assert payload['text'] == "title\r\ntest body"
 
 
 def test_plugin_google_chat_edge_case():
