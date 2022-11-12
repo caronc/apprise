@@ -112,10 +112,25 @@ EMAIL_TEMPLATES = (
         'Microsoft Hotmail',
         re.compile(
             r'^((?P<label>[^+]+)\+)?(?P<id>[^@]+)@'
-            r'(?P<domain>(outlook|hotmail|live)\.com(\.au)?)$', re.I),
+            r'(?P<domain>(hotmail|live)\.com(\.au)?)$', re.I),
         {
             'port': 587,
             'smtp_host': 'smtp-mail.outlook.com',
+            'secure': True,
+            'secure_mode': SecureMailMode.STARTTLS,
+            'login_type': (WebBaseLogin.EMAIL, )
+        },
+    ),
+
+    # Microsoft Outlook
+    (
+        'Microsoft Outlook',
+        re.compile(
+            r'^((?P<label>[^+]+)\+)?(?P<id>[^@]+)@'
+            r'(?P<domain>(smtp\.)?outlook\.com(\.au)?)$', re.I),
+        {
+            'port': 587,
+            'smtp_host': 'smtp.outlook.com',
             'secure': True,
             'secure_mode': SecureMailMode.STARTTLS,
             'login_type': (WebBaseLogin.EMAIL, )
