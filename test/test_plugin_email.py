@@ -971,7 +971,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
         'mailtos://user:pass123@outlook.com')
     obj = Apprise.instantiate(results, suppress_exceptions=False)
     assert isinstance(obj, NotifyEmail) is True
-    assert obj.smtp_host == 'smtp-mail.outlook.com'
+    assert obj.smtp_host == 'smtp.outlook.com'
     # No entries in the reply_to
     assert not obj.reply_to
 
@@ -979,9 +979,31 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
         'mailtos://user:pass123@outlook.com.au')
     obj = Apprise.instantiate(results, suppress_exceptions=False)
     assert isinstance(obj, NotifyEmail) is True
-    assert obj.smtp_host == 'smtp-mail.outlook.com'
+    assert obj.smtp_host == 'smtp.outlook.com'
     # No entries in the reply_to
     assert not obj.reply_to
+
+    # Consisitency Checks
+    results = NotifyEmail.parse_url(
+        'mailtos://outlook.com?smtp=smtp.outlook.com'
+        '&user=user@outlook.com&pass=app.pw')
+    obj1 = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(obj1, NotifyEmail) is True
+    assert obj1.smtp_host == 'smtp.outlook.com'
+    assert obj1.user == 'user@outlook.com'
+    assert obj1.password == 'app.pw'
+    assert obj1.secure_mode == 'starttls'
+    assert obj1.port == 587
+
+    results = NotifyEmail.parse_url(
+        'mailtos://user:app.pw@outlook.com')
+    obj2 = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(obj2, NotifyEmail) is True
+    assert obj2.smtp_host == obj1.smtp_host
+    assert obj2.user == obj1.user
+    assert obj2.password == obj1.password
+    assert obj2.secure_mode == obj1.secure_mode
+    assert obj2.port == obj1.port
 
     results = NotifyEmail.parse_url(
         'mailtos://user:pass123@live.com')
