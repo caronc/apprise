@@ -27,6 +27,7 @@ import pytest
 from apprise.AppriseAsset import AppriseAsset
 from apprise.config.ConfigBase import ConfigBase
 from apprise import ConfigFormat
+from inspect import cleandoc
 import yaml
 
 # Disable logging for a cleaner testing output
@@ -955,6 +956,44 @@ def test_yaml_vs_text_tagging():
     assert isinstance(text_result[0], NotifyEmail)
     assert 'mytag' in text_result[0]
     assert 'mytag' in yaml_result[0]
+
+
+def test_config_base_config_parse_yaml_globals():
+    """
+    API: ConfigBase.config_parse_yaml globals
+
+    """
+
+    # general reference used below
+    asset = AppriseAsset()
+
+    # Invalid Syntax (throws a ScannerError)
+    results, config = ConfigBase.config_parse_yaml(cleandoc("""
+    urls:
+      - jsons://localhost1:
+         - to: jeff@gmail.com
+           tag: jeff, customer
+           cto: 30
+           rto: 30
+           verify: no
+
+      - jsons://localhost2?cto=30&rto=30&verify=no:
+         - to: json@gmail.com
+           tag: json, customer
+    """), asset=asset)
+
+    # Invalid data gets us an empty result set
+    assert isinstance(results, list)
+
+    # Our results loaded
+    assert len(results) == 2
+    assert len(config) == 0
+
+    # Now verify that our global variables correctly initialized
+    for entry in results:
+        assert entry.verify_certificate is False
+        assert entry.socket_read_timeout == 30
+        assert entry.socket_connect_timeout == 30
 
 
 # This test fails on CentOS 8.x so it was moved into it's own function
