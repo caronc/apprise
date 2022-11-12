@@ -23,9 +23,13 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 import requests
-
+import pytest
+from apprise import Apprise
 from apprise.plugins.NotifyGoogleChat import NotifyGoogleChat
 from helpers import AppriseURLTester
+from unittest import mock
+from apprise import NotifyType
+from json import loads
 
 # Disable logging for a cleaner testing output
 import logging
@@ -57,12 +61,25 @@ apprise_url_tests = (
         'instance': NotifyGoogleChat,
         'privacy_url': 'gchat://w...s/m...y/m...n',
     }),
-    # Google Native Webhohok URL
+    ('gchat://?workspace=ws&key=mykey&token=mytoken&thread=abc123', {
+        # Test our thread key
+        'instance': NotifyGoogleChat,
+        'privacy_url': 'gchat://w...s/m...y/m...n/a...3',
+    }),
+    ('gchat://?workspace=ws&key=mykey&token=mytoken&threadKey=abc345', {
+        # Test our thread key
+        'instance': NotifyGoogleChat,
+        'privacy_url': 'gchat://w...s/m...y/m...n/a...5',
+    }),
+    # Google Native Webhook URL
     ('https://chat.googleapis.com/v1/spaces/myworkspace/messages'
      '?key=mykey&token=mytoken', {
          'instance': NotifyGoogleChat,
          'privacy_url': 'gchat://m...e/m...y/m...n'}),
-
+    ('https://chat.googleapis.com/v1/spaces/myworkspace/messages'
+     '?key=mykey&token=mytoken&threadKey=mythreadkey', {
+         'instance': NotifyGoogleChat,
+         'privacy_url': 'gchat://m...e/m...y/m...n/m...y'}),
     ('gchat://workspace/key/token', {
         'instance': NotifyGoogleChat,
         # force a failure
@@ -92,3 +109,70 @@ def test_plugin_google_chat_urls():
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+@mock.patch('requests.post')
+def test_plugin_google_chat_general(mock_post):
+    """
+    NotifyGoogleChat() General Checks
+
+    """
+
+    # Initialize some generic (but valid) tokens
+    workspace = 'ws'
+    key = 'key'
+    threadkey = 'threadkey'
+    token = 'token'
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    # Test our messaging
+    obj = Apprise.instantiate(
+        'gchat://{}/{}/{}'.format(workspace, key, token))
+    assert isinstance(obj, NotifyGoogleChat)
+    assert obj.notify(
+        body="test body", title='title',
+        notify_type=NotifyType.INFO) is True
+
+    # Test our call count
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://chat.googleapis.com/v1/spaces/ws/messages'
+    params = mock_post.call_args_list[0][1]['params']
+    assert params.get('token') == token
+    assert params.get('key') == key
+    assert 'threadKey' not in params
+    payload = loads(mock_post.call_args_list[0][1]['data'])
+    assert payload['text'] == "title\r\ntest body"
+
+    mock_post.reset_mock()
+
+    # Test our messaging with the threadKey
+    obj = Apprise.instantiate(
+        'gchat://{}/{}/{}/{}'.format(workspace, key, token, threadkey))
+    assert isinstance(obj, NotifyGoogleChat)
+    assert obj.notify(
+        body="test body", title='title',
+        notify_type=NotifyType.INFO) is True
+
+    # Test our call count
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://chat.googleapis.com/v1/spaces/ws/messages'
+    params = mock_post.call_args_list[0][1]['params']
+    assert params.get('token') == token
+    assert params.get('key') == key
+    assert params.get('threadKey') == threadkey
+    payload = loads(mock_post.call_args_list[0][1]['data'])
+    assert payload['text'] == "title\r\ntest body"
+
+
+def test_plugin_google_chat_edge_case():
+    """
+    NotifyGoogleChat() Edge Cases
+
+    """
+    with pytest.raises(TypeError):
+        NotifyGoogleChat('workspace', 'webhook', 'token', thread_key=object())
