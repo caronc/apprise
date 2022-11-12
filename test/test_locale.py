@@ -174,8 +174,9 @@ def test_detect_language_windows_users_croaks_please_review():
     # The below accesses the windows fallback code and fail
     # then it will resort to the environment variables.
     with environ('LANG', 'LANGUAGE', 'LC_ALL', 'LC_CTYPE'):
-        # Language can't be detected
-        assert AppriseLocale.AppriseLocale.detect_language() is None
+        # Language can now be detected in this case
+        assert isinstance(
+            AppriseLocale.AppriseLocale.detect_language(), str)
 
     # Detect French language.
     with environ('LANGUAGE', 'LC_ALL', 'LC_CTYPE', LANG="fr_CA"):
@@ -187,21 +188,21 @@ def test_detect_language_windows_users_croaks_please_review():
     # dropped, but just to ensure this issue does not come back, we keep
     # this test:
     with environ(*list(os.environ.keys()), LC_CTYPE="UTF-8"):
-        assert AppriseLocale.AppriseLocale.detect_language() is None
+        assert isinstance(AppriseLocale.AppriseLocale.detect_language(), str)
 
     # Test with absolutely no environment variables what-so-ever
     with environ(*list(os.environ.keys())):
-        assert AppriseLocale.AppriseLocale.detect_language() is None
+        assert isinstance(AppriseLocale.AppriseLocale.detect_language(), str)
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Does not work on Windows")
-@mock.patch('locale.getdefaultlocale')
-def test_detect_language_defaultlocale(mock_getlocale):
+@mock.patch('locale.getlocale')
+def test_detect_language_locale(mock_getlocale):
     """
     API: Apprise() Default locale detection
 
     """
-    # Handle case where getdefaultlocale() can't be detected
+    # Handle case where getlocale() can't be detected
     mock_getlocale.return_value = None
     assert AppriseLocale.AppriseLocale.detect_language() is None
 

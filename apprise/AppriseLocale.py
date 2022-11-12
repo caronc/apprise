@@ -33,6 +33,7 @@
 import ctypes
 import locale
 import contextlib
+import os
 from os.path import join
 from os.path import dirname
 from os.path import abspath
@@ -181,7 +182,7 @@ class AppriseLocale:
     @staticmethod
     def detect_language(lang=None, detect_fallback=True):
         """
-        returns the language (if it's retrievable)
+        Returns the language (if it's retrievable)
         """
         # We want to only use the 2 character version of this language
         # hence en_CA becomes en, en_US becomes en.
@@ -203,11 +204,31 @@ class AppriseLocale:
                     # Fallback to posix detection
                     pass
 
-            try:
-                # Detect language
-                lang = locale.getdefaultlocale()[0]
+            # Posix lookup
+            lookup = os.environ.get
+            localename = None
+            for variable in ('LC_ALL', 'LC_CTYPE', 'LANG', 'LANGUAGE'):
+                localename = lookup(variable, None)
+                if localename:
+                    if variable == 'LANGUAGE':
+                        localename = localename.split(':')[0]
 
-            except ValueError as e:
+                    try:
+                        locale.setlocale(locale.LC_ALL, localename)
+
+                    except locale.Error:
+                        logger.warning(
+                            'Invalid language define %s=%s',
+                            variable,
+                            lookup(variable, None))
+                        continue
+                    break
+
+            try:
+                # Acquire our locale
+                lang = locale.getlocale()[0]
+
+            except TypeError as e:
                 # This occurs when an invalid locale was parsed from the
                 # environment variable. While we still return None in this
                 # case, we want to better notify the end user of this. Users
@@ -215,11 +236,6 @@ class AppriseLocale:
                 # variables.
                 logger.warning(
                     'Language detection failure / {}'.format(str(e)))
-                return None
-
-            except TypeError:
-                # None is returned if the default can't be determined
-                # we're done in this case
                 return None
 
         return None if not lang else lang[0:2].lower()
