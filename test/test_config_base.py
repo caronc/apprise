@@ -995,6 +995,7 @@ def test_config_base_config_parse_yaml_globals():
         assert entry.socket_read_timeout == 30
         assert entry.socket_connect_timeout == 30
 
+
 # This test fails on CentOS 8.x so it was moved into it's own function
 # so it could be bypassed. The ability to use lists in YAML files didn't
 # appear to happen until later on; it's certainly not available in v3.12
