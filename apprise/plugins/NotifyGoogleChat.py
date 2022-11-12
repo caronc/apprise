@@ -135,7 +135,7 @@ class NotifyGoogleChat(NotifyBase):
             'name': _('Thread Key'),
             'type': 'string',
             'private': True,
-            'alias_of': 'thread_key',
+            'map_to': 'thread_key',
         },
     })
 
