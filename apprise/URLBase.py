@@ -194,7 +194,7 @@ class URLBase:
             asset if isinstance(asset, AppriseAsset) else AppriseAsset()
 
         # Certificate Verification (for SSL calls); default to being enabled
-        self.verify_certificate = kwargs.get('verify', True)
+        self.verify_certificate = parse_bool(kwargs.get('verify', True))
 
         # Secure Mode
         self.secure = kwargs.get('secure', False)
@@ -222,24 +222,22 @@ class URLBase:
             self.password = URLBase.unquote(self.password)
 
         # Store our Timeout Variables
-        if 'socket_read_timeout' in kwargs:
+        if 'rto' in kwargs:
             try:
-                self.socket_read_timeout = \
-                    float(kwargs.get('socket_read_timeout'))
+                self.socket_read_timeout = float(kwargs.get('rto'))
             except (TypeError, ValueError):
                 self.logger.warning(
                     'Invalid socket read timeout (rto) was specified {}'
-                    .format(kwargs.get('socket_read_timeout')))
+                    .format(kwargs.get('rto')))
 
-        if 'socket_connect_timeout' in kwargs:
+        if 'cto' in kwargs:
             try:
-                self.socket_connect_timeout = \
-                    float(kwargs.get('socket_connect_timeout'))
+                self.socket_connect_timeout = float(kwargs.get('cto'))
 
             except (TypeError, ValueError):
                 self.logger.warning(
                     'Invalid socket connect timeout (cto) was specified {}'
-                    .format(kwargs.get('socket_connect_timeout')))
+                    .format(kwargs.get('cto')))
 
         if 'tag' in kwargs:
             # We want to associate some tags with our notification service.
@@ -647,11 +645,11 @@ class URLBase:
 
         # Store our socket read timeout if specified
         if 'rto' in results['qsd']:
-            results['socket_read_timeout'] = results['qsd']['rto']
+            results['rto'] = results['qsd']['rto']
 
         # Store our socket connect timeout if specified
         if 'cto' in results['qsd']:
-            results['socket_connect_timeout'] = results['qsd']['cto']
+            results['cto'] = results['qsd']['cto']
 
         if 'port' in results['qsd']:
             results['port'] = results['qsd']['port']
