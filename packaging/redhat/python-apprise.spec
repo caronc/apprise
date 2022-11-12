@@ -86,11 +86,18 @@ BuildRequires: python%{python3_pkgversion}-markdown
 BuildRequires: python%{python3_pkgversion}-yaml
 BuildRequires: python%{python3_pkgversion}-babel
 BuildRequires: python%{python3_pkgversion}-cryptography
+BuildRequires: python%{python3_pkgversion}-paho-mqtt
 Requires: python%{python3_pkgversion}-requests
 Requires: python%{python3_pkgversion}-requests-oauthlib
 Requires: python%{python3_pkgversion}-markdown
 Requires: python%{python3_pkgversion}-cryptography
 Requires: python%{python3_pkgversion}-yaml
+Recommends: python%{python3_pkgversion}-paho-mqtt
+
+%if 0%{?rhel} && 0%{?rhel} <= 8
+BuildRequires: python%{python3_pkgversion}-dataclasses
+Requires: python%{python3_pkgversion}-dataclasses
+%endif
 
 %if %{with tests}
 %if 0%{?rhel} >= 9
@@ -100,7 +107,10 @@ Requires: python%{python3_pkgversion}-yaml
 BuildRequires: python%{python3_pkgversion}-mock
 %endif
 BuildRequires: python%{python3_pkgversion}-pytest
+BuildRequires: python%{python3_pkgversion}-pytest-mock
 BuildRequires: python%{python3_pkgversion}-pytest-runner
+BuildRequires: python%{python3_pkgversion}-pytest-cov
+BuildRequires: python%{python3_pkgversion}-pytest-xdist
 %endif
 
 %description -n python%{python3_pkgversion}-%{pypi_name} %{common_description}
