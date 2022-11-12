@@ -60,14 +60,22 @@ apprise_url_tests = (
     ('gchat://?workspace=ws&key=mykey&token=mytoken&thread=abc123', {
         # Test our thread key
         'instance': NotifyGoogleChat,
-        'privacy_url': 'gchat://w...s/m...y/m...n',
+        'privacy_url': 'gchat://w...s/m...y/m...n/a...3',
     }),
-    # Google Native Webhohok URL
+    ('gchat://?workspace=ws&key=mykey&token=mytoken&threadKey=abc345', {
+        # Test our thread key
+        'instance': NotifyGoogleChat,
+        'privacy_url': 'gchat://w...s/m...y/m...n/a...5',
+    }),
+    # Google Native Webhook URL
     ('https://chat.googleapis.com/v1/spaces/myworkspace/messages'
      '?key=mykey&token=mytoken', {
          'instance': NotifyGoogleChat,
          'privacy_url': 'gchat://m...e/m...y/m...n'}),
-
+    ('https://chat.googleapis.com/v1/spaces/myworkspace/messages'
+     '?key=mykey&token=mytoken&threadKey=mythreadkey', {
+         'instance': NotifyGoogleChat,
+         'privacy_url': 'gchat://m...e/m...y/m...n/m...y'}),
     ('gchat://workspace/key/token', {
         'instance': NotifyGoogleChat,
         # force a failure
