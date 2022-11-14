@@ -21,12 +21,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 ###############################################################################
-%if 0%{?_module_build}
-%bcond_with tests
-%else
-# When bootstrapping Python, we cannot test this yet
-%bcond_without tests
-%endif
 
 %global pypi_name apprise
 
@@ -54,10 +48,6 @@ Summary:        A simple wrapper to many popular notification services used toda
 License:        MIT
 URL:            https://github.com/caronc/%{pypi_name}
 Source0:        %{url}/archive/v%{version}/%{pypi_name}-%{version}.tar.gz
-# RHEL/Rocky 8 ship with Click v6.7 which does not support the .stdout
-# directive used in the unit testing.  This patch just makes it so our package
-# continues to be compatible with these linux distributions
-Patch0:         %{pypi_name}-click67-support.patch
 BuildArch:      noarch
 
 %description %{common_description}
@@ -77,16 +67,6 @@ services.
 Summary: A simple wrapper to many popular notification services used today
 %{?python_provide:%python_provide python%{python3_pkgversion}-%{pypi_name}}
 
-BuildRequires: python%{python3_pkgversion}-devel
-BuildRequires: python%{python3_pkgversion}-setuptools
-BuildRequires: python%{python3_pkgversion}-requests
-BuildRequires: python%{python3_pkgversion}-requests-oauthlib
-BuildRequires: python%{python3_pkgversion}-click >= 5.0
-BuildRequires: python%{python3_pkgversion}-markdown
-BuildRequires: python%{python3_pkgversion}-yaml
-BuildRequires: python%{python3_pkgversion}-babel
-BuildRequires: python%{python3_pkgversion}-cryptography
-BuildRequires: python%{python3_pkgversion}-paho-mqtt
 Requires: python%{python3_pkgversion}-requests
 Requires: python%{python3_pkgversion}-requests-oauthlib
 Requires: python%{python3_pkgversion}-markdown
@@ -95,40 +75,13 @@ Requires: python%{python3_pkgversion}-yaml
 Recommends: python%{python3_pkgversion}-paho-mqtt
 
 %if 0%{?rhel} && 0%{?rhel} <= 8
-BuildRequires: python%{python3_pkgversion}-dataclasses
 Requires: python%{python3_pkgversion}-dataclasses
-%endif
-
-%if %{with tests}
-%if 0%{?rhel} >= 9
-# Do not import python3-mock
-%else
-# python-mock switched to unittest.mock
-BuildRequires: python%{python3_pkgversion}-mock
-%endif
-BuildRequires: python%{python3_pkgversion}-pytest
-BuildRequires: python%{python3_pkgversion}-pytest-mock
-BuildRequires: python%{python3_pkgversion}-pytest-runner
-BuildRequires: python%{python3_pkgversion}-pytest-cov
-BuildRequires: python%{python3_pkgversion}-pytest-xdist
 %endif
 
 %description -n python%{python3_pkgversion}-%{pypi_name} %{common_description}
 
 %prep
 %setup -q -n %{pypi_name}-%{version}
-%if 0%{?rhel} && 0%{?rhel} <= 8
-# Rocky/RHEL 8 click v6.7 unit testing support
-%patch0 -p1
-%endif
-
-%if 0%{?rhel} >= 9
-# Do nothing
-%else
-# CentOS 8.x requires python-mock (cororlates with import ab)ve
-find test -type f -name '*.py' -exec \
-   sed -i -e 's|^from unittest import mock|import mock|g' {} \;
-%endif
 
 %build
 %py3_build
@@ -138,11 +91,6 @@ find test -type f -name '*.py' -exec \
 
 install -p -D -T -m 0644 packaging/man/%{pypi_name}.1 \
    %{buildroot}%{_mandir}/man1/%{pypi_name}.1
-
-%if %{with tests}
-%check
-LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version}
-%endif
 
 %files -n python%{python3_pkgversion}-%{pypi_name}
 %license LICENSE
