@@ -32,12 +32,12 @@ from apprise.common import NOTIFY_MODULE_MAP
 sys.path.append(os.path.join(os.path.dirname(__file__), 'helpers'))
 
 
-@pytest.fixture(scope="session", autouse=True)
-def no_throttling_everywhere(session_mocker):
+@pytest.fixture(autouse=True)
+def no_throttling_everywhere(mocker):
     """
     A pytest session fixture which disables throttling on all notifiers.
     It is automatically enabled.
     """
     for notifier in NOTIFY_MODULE_MAP.values():
         plugin = notifier["plugin"]
-        session_mocker.patch.object(plugin, "request_rate_per_sec", 0)
+        mocker.patch.object(plugin, "request_rate_per_sec", 0)
