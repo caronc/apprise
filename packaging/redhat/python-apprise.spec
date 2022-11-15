@@ -61,10 +61,18 @@ Source0:        %{url}/archive/v%{version}/%{pypi_name}-%{version}.tar.gz
 Patch0:         %{pypi_name}-click67-support.patch
 
 # RHEL/Rocky 8 ship with Pytest v3.4.2 which does not support the
-# session_mocker plugin.  This patch removes the session_mocker
+# session_mocker fixture.  This patch removes the session_mocker
 # Patch thanks to Andreas Motl and his PR:
 #   - https://github.com/caronc/apprise/pull/763
-Patch1:         %{pypi_name}-py36-session_mocker-removal.patch
+Patch1:         %{pypi_name}-pytest-session_mocker-removal.patch
+
+# RHEL/Rocky 8 ship with Pytest v3.4.2 which does not support the
+# tmp_path fixture.  This patch removes the macos testing as it
+# leverages this unavailabe fixture.
+# At the end of the day, the macos testing it is not needed by a
+# RHEL/Fedora environment anyway for obvious reasons.
+Patch2:         %{pypi_name}-no-macosx-testing.patch
+
 BuildArch:      noarch
 
 %description %{common_description}
@@ -127,8 +135,10 @@ BuildRequires: python%{python3_pkgversion}-pytest-xdist
 %if 0%{?rhel} && 0%{?rhel} <= 8
 # Rocky/RHEL 8 click v6.7 unit testing support
 %patch0 -p1
-# Python 3.6 test case support
+# Rocky/RHEL 8 Drop session_mocker support
 %patch1 -p1
+# Rocky/RHEL 8 Lose MacOSX Testing
+%patch2 -p1
 %endif
 
 %if 0%{?rhel} >= 9

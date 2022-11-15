@@ -1,0 +1,12 @@
+diff -Naur apprise-1.2.0/test/test_plugin_macosx.py apprise-1.2.0.patched/test/test_plugin_macosx.py
+--- apprise-1.2.0/test/test_plugin_macosx.py	2022-11-02 14:59:59.000000000 -0400
++++ apprise-1.2.0.patched/test/test_plugin_macosx.py	2022-11-15 13:25:27.991284405 -0500
+@@ -38,7 +38,7 @@
+ logging.disable(logging.CRITICAL)
+ 
+ 
+-if sys.platform not in ["darwin", "linux"]:
++if sys.platform not in ["darwin"]:
+     pytest.skip("Only makes sense on macOS, but also works on Linux",
+                 allow_module_level=True)
+ 

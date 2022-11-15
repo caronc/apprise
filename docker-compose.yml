@@ -21,6 +21,21 @@ services:
     volumes:
       - ./:/apprise
 
+  rpmbuild.el9:
+    build:
+      context: .
+      dockerfile: Dockerfile.el9
+    volumes:
+      - ./:/apprise
+
+  rpmbuild.f37:
+    build:
+      context: .
+      dockerfile: Dockerfile.f37
+    volumes:
+      - ./:/apprise
+
+
 # Connect to web and create a new project using the manage script
 # -> docker-compose run --rm test.py36 bash
 # bin/apprise -
@@ -41,6 +56,13 @@ services:
 # # Now produce a report
 # docker-compose run --rm test.py310 coverage report --show-missing
 
-## RPM Building
+#
+# RPM Building
+#
+
 # el8
 #  - docker-compose run --rm rpmbuild.el8 build-rpm.sh
+# el9
+#  - docker-compose run --rm rpmbuild.el9 build-rpm.sh
+# f37 (Fedora)
+#  - docker-compose run --rm rpmbuild.f37 build-rpm.sh
