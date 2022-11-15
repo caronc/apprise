@@ -1,0 +1,19 @@
+diff -Naur apprise-1.2.0/test/conftest.py apprise-1.2.0.patched/test/conftest.py
+--- apprise-1.2.0/test/conftest.py	2022-11-02 14:00:13.000000000 -0400
++++ apprise-1.2.0.patched/test/conftest.py	2022-11-15 10:28:23.793969418 -0500
+@@ -32,12 +32,12 @@
+ sys.path.append(os.path.join(os.path.dirname(__file__), 'helpers'))
+ 
+ 
+-@pytest.fixture(scope="session", autouse=True)
+-def no_throttling_everywhere(session_mocker):
++@pytest.fixture(autouse=True)
++def no_throttling_everywhere(mocker):
+     """
+     A pytest session fixture which disables throttling on all notifiers.
+     It is automatically enabled.
+     """
+     for notifier in NOTIFY_MODULE_MAP.values():
+         plugin = notifier["plugin"]
+-        session_mocker.patch.object(plugin, "request_rate_per_sec", 0)
++        mocker.patch.object(plugin, "request_rate_per_sec", 0)

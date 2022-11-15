@@ -1,5 +1,6 @@
 # Apprise Development Tools
 
+# Common Testing
 This directory just contains some tools that are useful when developing with Apprise.  It is presumed that you've set yourself up with a working development environment before using the tools identified here:
 
 ```bash
@@ -47,3 +48,16 @@ export PATH="$(pwd)/bin:$PATH"
 # Now you can call the scripts identified above from anywhere...
 ```
 
+## RPM Testing
+
+Apprise is also packaged for Redhat/Fedora as an RPM. To verify this processs works correctly an additional tool called `build-rpm.sh` is provided.  It's best tested using the Docker environments:
+   ```bash
+   # To test with el8; do the following:
+   docker-compose run --rm rpmbuild.el8 build-rpm.sh
+
+   # To test with el9; do the following:
+   docker-compose run --rm rpmbuild.el9 build-rpm.sh
+
+   # To test with f37; do the following:
+   docker-compose run --rm rpmbuild.f37 build-rpm.sh
+   ```

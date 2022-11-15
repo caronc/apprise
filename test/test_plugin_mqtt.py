@@ -45,7 +45,7 @@ def mqtt_client_mock(mocker):
     """
 
     if "paho" not in sys.modules:
-        raise pytest.skip(reason="Requires that `paho-mqtt` is installed")
+        raise pytest.skip("Requires that `paho-mqtt` is installed")
 
     # Establish mock of the `publish()` response object.
     publish_result = Mock(**{
