@@ -24,6 +24,7 @@
 # THE SOFTWARE.
 
 import re
+import sys
 import pytest
 from unittest import mock
 
@@ -34,12 +35,11 @@ import socket
 import logging
 logging.disable(logging.CRITICAL)
 
+# Skip tests when Python environment does not provide the `syslog` package.
+if 'syslog' not in sys.modules:
+    pytest.skip("Skipping syslog based tests", allow_module_level=True)
 
-# The `syslog` module is not available on Windows.
-# `ModuleNotFoundError: No module named 'syslog'`
-NotifySyslog = pytest.importorskip(
-    "apprise.plugins.NotifySyslog",
-    reason="`syslog` module not available on Windows").NotifySyslog
+from apprise.plugins.NotifySyslog import NotifySyslog  # noqa E402
 
 
 @mock.patch('syslog.syslog')
