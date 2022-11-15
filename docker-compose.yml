@@ -14,6 +14,13 @@ services:
     volumes:
       - ./:/apprise
 
+  rpmbuild.el8:
+    build:
+      context: .
+      dockerfile: Dockerfile.el8
+    volumes:
+      - ./:/apprise
+
 # Connect to web and create a new project using the manage script
 # -> docker-compose run --rm test.py36 bash
 # bin/apprise -
@@ -33,3 +40,7 @@ services:
 #
 # # Now produce a report
 # docker-compose run --rm test.py310 coverage report --show-missing
+
+## RPM Building
+# el8
+#  - docker-compose run --rm rpmbuild.el8 build-rpm.sh

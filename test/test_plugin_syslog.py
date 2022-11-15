@@ -35,7 +35,7 @@ import socket
 import logging
 logging.disable(logging.CRITICAL)
 
-# Skip tests when Python environment does not provide the `dbus` package.
+# Skip tests when Python environment does not provide the `syslog` package.
 if 'syslog' not in sys.modules:
     pytest.skip("Skipping syslog based tests", allow_module_level=True)
 

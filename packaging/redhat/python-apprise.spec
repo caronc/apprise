@@ -54,10 +54,17 @@ Summary:        A simple wrapper to many popular notification services used toda
 License:        MIT
 URL:            https://github.com/caronc/%{pypi_name}
 Source0:        %{url}/archive/v%{version}/%{pypi_name}-%{version}.tar.gz
+
 # RHEL/Rocky 8 ship with Click v6.7 which does not support the .stdout
 # directive used in the unit testing.  This patch just makes it so our package
 # continues to be compatible with these linux distributions
 Patch0:         %{pypi_name}-click67-support.patch
+
+# RHEL/Rocky 8 ship with Pytest v3.4.2 which does not support the
+# session_mocker plugin.  This patch removes the session_mocker
+# Patch thanks to Andreas Motl and his PR:
+#   - https://github.com/caronc/apprise/pull/763
+Patch1:         %{pypi_name}-py36-session_mocker-removal.patch
 BuildArch:      noarch
 
 %description %{common_description}
@@ -120,6 +127,8 @@ BuildRequires: python%{python3_pkgversion}-pytest-xdist
 %if 0%{?rhel} && 0%{?rhel} <= 8
 # Rocky/RHEL 8 click v6.7 unit testing support
 %patch0 -p1
+# Python 3.6 test case support
+%patch1 -p1
 %endif
 
 %if 0%{?rhel} >= 9
