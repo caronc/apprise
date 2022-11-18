@@ -325,7 +325,7 @@ def test_config_base_config_parse_text():
     assert isinstance(result, list)
     assert len(result) == 0
 
-    # There was 1 valid entry
+    # There were no include entries defined
     assert len(config) == 0
 
     # Test case where a comment is on it's own line with nothing else
@@ -335,6 +335,56 @@ def test_config_base_config_parse_text():
     assert len(result) == 0
 
     # There were no include entries defined
+    assert len(config) == 0
+
+    # Verify our tagging works when multiple tags are provided
+    result, config = ConfigBase.config_parse_text("""
+    tag1, tag2, tag3=json://user:pass@localhost
+    """)
+
+    assert isinstance(result, list)
+    assert len(result) == 1
+    assert len(result[0].tags) == 3
+    assert 'tag1' in result[0].tags
+    assert 'tag2' in result[0].tags
+    assert 'tag3' in result[0].tags
+
+
+def test_config_base_config_parse_text_with_url():
+    """
+    API: ConfigBase.config_parse_text object_with_url
+
+    """
+    # Here is a similar result set however this one has an invalid line
+    # in it which invalidates the entire file
+    result, config = ConfigBase.config_parse_text("""
+    # Test a URL that has a URL as an argument
+    json://user:pass@localhost?+arg=http://example.com?arg2=1&arg3=3
+    """)
+
+    # No tag is parsed, but our URL successfully parses as is
+
+    assert isinstance(result, list)
+    assert len(result) == 1
+    assert len(result[0].tags) == 0
+
+    # Verify our URL is correctly captured
+    assert '%2Barg=http%3A%2F%2Fexample.com%3Farg2%3D1' in result[0].url()
+    assert 'json://user:pass@localhost/' in result[0].url()
+
+    # There were no include entries defined
+    assert len(config) == 0
+
+    # Pass in our configuration again
+    result, config = ConfigBase.config_parse_text(result[0].url())
+
+    # Verify that our results repeat themselves
+    assert isinstance(result, list)
+    assert len(result) == 1
+    assert len(result[0].tags) == 0
+    assert '%2Barg=http%3A%2F%2Fexample.com%3Farg2%3D1' in result[0].url()
+    assert 'json://user:pass@localhost/' in result[0].url()
+
     assert len(config) == 0
 
 
