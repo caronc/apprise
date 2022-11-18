@@ -548,7 +548,7 @@ class ConfigBase(URLBase):
         # Define what a valid line should look like
         valid_line_re = re.compile(
             r'^\s*(?P<line>([;#]+(?P<comment>.*))|'
-            r'(\s*(?P<tags>[^=]+)=|=)?\s*'
+            r'(\s*(?P<tags>[a-z0-9, \t_-]+)\s*=|=)?\s*'
             r'(?P<url>[a-z0-9]{2,9}://.*)|'
             r'include\s+(?P<config>.+))?\s*$', re.I)
 
