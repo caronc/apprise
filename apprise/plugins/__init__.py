@@ -31,10 +31,7 @@ from os.path import dirname
 from os.path import abspath
 
 # Used for testing
-from . import NotifyEmail as NotifyEmailBase
-
-# NotifyBase object is passed in as a module not class
-from . import NotifyBase
+from .NotifyBase import NotifyBase
 
 from ..common import NotifyImageSize
 from ..common import NOTIFY_IMAGE_SIZES
@@ -52,9 +49,6 @@ __all__ = [
     # Reference
     'NotifyImageSize', 'NOTIFY_IMAGE_SIZES', 'NotifyType', 'NOTIFY_TYPES',
     'NotifyBase',
-
-    # NotifyEmail Base Module (used for NotifyEmail testing)
-    'NotifyEmailBase',
 
     # Tokenizer
     'url_to_dict',

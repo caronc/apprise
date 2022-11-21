@@ -23,6 +23,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import logging
 import os
 import re
 from unittest import mock
@@ -34,14 +35,12 @@ from apprise import NotifyType, NotifyBase
 from apprise import Apprise
 from apprise import AttachBase
 from apprise import AppriseAttachment
-from apprise.plugins import NotifyEmailBase
+from apprise.plugins.NotifyEmail import NotifyEmail
+from apprise.plugins import NotifyEmail as NotifyEmailModule
 
 # Disable logging for a cleaner testing output
-import logging
-
-from apprise.plugins.NotifyEmail import NotifyEmail
-
 logging.disable(logging.CRITICAL)
+
 
 # Attachment Directory
 TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), 'var')
@@ -420,7 +419,7 @@ def test_plugin_email_webbase_lookup(mock_smtp, mock_smtpssl):
     """
 
     # Insert a test email at the head of our table
-    NotifyEmailBase.EMAIL_TEMPLATES = (
+    NotifyEmailModule.EMAIL_TEMPLATES = (
         (
             # Testing URL
             'Testing Lookup',
@@ -429,10 +428,10 @@ def test_plugin_email_webbase_lookup(mock_smtp, mock_smtpssl):
                 'port': 123,
                 'smtp_host': 'smtp.l2g.com',
                 'secure': True,
-                'login_type': (NotifyEmailBase.WebBaseLogin.USERID, )
+                'login_type': (NotifyEmailModule.WebBaseLogin.USERID, )
             },
         ),
-    ) + NotifyEmailBase.EMAIL_TEMPLATES
+    ) + NotifyEmailModule.EMAIL_TEMPLATES
 
     obj = Apprise.instantiate(
         'mailto://user:pass@l2g.com', suppress_exceptions=True)
