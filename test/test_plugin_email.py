@@ -1042,9 +1042,10 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert re.match(r'.*mode=ssl.*', obj.url()) is not None
     # No smtp= as the SMTP server is the same as the hostname in this case
     assert re.match(r'.*smtp=smtp.exmail.qq.com.*', obj.url()) is not None
-    # URL is assembled based on provided user
+    # URL is assembled based on provided user (:465 is dropped because it
+    # is a default port when using xyz.cn)
     assert re.match(
-        r'^mailtos://abc:password@xyz.cn:465/.*', obj.url()) is not None
+        r'^mailtos://abc:password@xyz.cn/.*', obj.url()) is not None
 
     results = NotifyEmail.parse_url(
         "mailtos://abc:password@xyz.cn?"
@@ -1094,3 +1095,56 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
         'mailtos://user:pass@example.com')
     # Test that our template over-ride worked
     assert 'reply=Chris+%3Cnoreply%40example.ca%3E' in obj.url()
+
+    mock_smtp.reset_mock()
+    mock_smtp_ssl.reset_mock()
+    response.reset_mock()
+
+    # Fast Mail Handling
+    response = mock.Mock()
+    mock_smtp_ssl.return_value = response
+    mock_smtp.return_value = response
+
+    # Test variations of username required to be an email address
+    # user@example.com; we also test an over-ride port on a template driven
+    # mailto:// entry
+    results = NotifyEmail.parse_url(
+        'mailto://fastmail.com/?to=hello@concordium-explorer.nl'
+        '&user=joe@mydomain.nl&pass=abc123'
+        '&from=Concordium Explorer Bot<bot@concordium-explorer.nl>')
+    assert isinstance(results, dict)
+    assert 'Concordium Explorer Bot<bot@concordium-explorer.nl>' == \
+        results['from_addr']
+    assert 'joe@mydomain.nl' == results['user']
+    assert results['port'] is None
+    assert 'fastmail.com' == results['host']
+    assert 'abc123' == results['password']
+    assert 'hello@concordium-explorer.nl' in results['targets']
+
+    obj = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(obj, NotifyEmail) is True
+
+    assert mock_smtp.call_count == 0
+    assert mock_smtp_ssl.call_count == 0
+    assert obj.notify("test") is True
+    assert mock_smtp.call_count == 0
+    assert mock_smtp_ssl.call_count == 1
+    assert response.starttls.call_count == 0
+    assert response.login.call_count == 1
+    assert response.sendmail.call_count == 1
+    # Store our Sent Arguments
+    # Syntax is:
+    #  sendmail(from_addr, to_addrs, msg, mail_options=(), rcpt_options=())
+    #             [0]        [1]     [2]
+    _from = response.sendmail.call_args[0][0]
+    _to = response.sendmail.call_args[0][1]
+    _msg = response.sendmail.call_args[0][2]
+    assert _from == 'bot@concordium-explorer.nl'
+    assert isinstance(_to, list)
+    assert len(_to) == 1
+    assert _to[0] == 'hello@concordium-explorer.nl'
+    assert _msg.split('\n')[-3] == 'test'
+
+    user, pw = response.login.call_args[0]
+    assert pw == 'abc123'
+    assert user == 'joe@mydomain.nl'
