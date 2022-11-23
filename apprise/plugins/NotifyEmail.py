@@ -63,15 +63,23 @@ class WebBaseLogin:
 
 # Secure Email Modes
 class SecureMailMode:
+    INSECURE = "insecure"
     SSL = "ssl"
     STARTTLS = "starttls"
 
 
 # Define all of the secure modes (used during validation)
-SECURE_MODES = (
-    SecureMailMode.SSL,
-    SecureMailMode.STARTTLS,
-)
+SECURE_MODES = {
+    SecureMailMode.STARTTLS: {
+        'default_port': 587,
+    },
+    SecureMailMode.SSL: {
+        'default_port': 465,
+    },
+    SecureMailMode.INSECURE: {
+        'default_port': 25,
+    },
+}
 
 # To attempt to make this script stupid proof, if we detect an email address
 # that is part of the this table, we can pre-use a lot more defaults if they
@@ -328,15 +336,6 @@ class NotifyEmail(NotifyBase):
     # Default Notify Format
     notify_format = NotifyFormat.HTML
 
-    # Default Non-Encryption Port
-    default_port = 25
-
-    # Default Secure Port
-    default_secure_port = 587
-
-    # Default Secure Mode
-    default_secure_mode = SecureMailMode.STARTTLS
-
     # Default SMTP Timeout (in seconds)
     socket_connect_timeout = 15
 
@@ -446,14 +445,6 @@ class NotifyEmail(NotifyBase):
         """
         super().__init__(**kwargs)
 
-        # Handle SMTP vs SMTPS (Secure vs UnSecure)
-        if not self.port:
-            if self.secure:
-                self.port = self.default_secure_port
-
-            else:
-                self.port = self.default_port
-
         # Acquire Email 'To'
         self.targets = list()
 
@@ -511,9 +502,14 @@ class NotifyEmail(NotifyBase):
             smtp_host if isinstance(smtp_host, str) else ''
 
         # Now detect secure mode
-        self.secure_mode = self.default_secure_mode \
-            if not isinstance(secure_mode, str) \
-            else secure_mode.lower()
+        if secure_mode:
+            self.secure_mode = None \
+                if not isinstance(secure_mode, str) \
+                else secure_mode.lower()
+        else:
+            self.secure_mode = SecureMailMode.INSECURE \
+                if not self.secure else self.template_args['mode']['default']
+
         if self.secure_mode not in SECURE_MODES:
             msg = 'The secure mode specified ({}) is invalid.'\
                   .format(secure_mode)
@@ -590,6 +586,15 @@ class NotifyEmail(NotifyBase):
         # Apply any defaults based on certain known configurations
         self.NotifyEmailDefaults(secure_mode=secure_mode, **kwargs)
 
+        if not self.secure and self.secure_mode != SecureMailMode.INSECURE:
+            # Enable Secure mode if not otherwise set
+            self.secure = True
+
+        if not self.port:
+            # Assign our port based on our secure_mode if not otherwise
+            # detected
+            self.port = SECURE_MODES[self.secure_mode]['default_port']
+
         # if there is still no smtp_host then we fall back to the hostname
         if not self.smtp_host:
             self.smtp_host = self.host
@@ -653,11 +658,11 @@ class NotifyEmail(NotifyBase):
                 if login_type:
                     # only apply additional logic to our user if a login_type
                     # was specified.
-                    if is_email(self.user) and \
-                       WebBaseLogin.EMAIL not in login_type:
-                        # Email specified but login type
-                        # not supported; switch it to user id
-                        self.user = match.group('id')
+                    if is_email(self.user):
+                        if WebBaseLogin.EMAIL not in login_type:
+                            # Email specified but login type
+                            # not supported; switch it to user id
+                            self.user = match.group('id')
 
                     elif WebBaseLogin.USERID not in login_type:
                         # user specified but login type
@@ -824,7 +829,7 @@ class NotifyEmail(NotifyBase):
         try:
             self.logger.debug('Connecting to remote SMTP server...')
             socket_func = smtplib.SMTP
-            if self.secure and self.secure_mode == SecureMailMode.SSL:
+            if self.secure_mode == SecureMailMode.SSL:
                 self.logger.debug('Securing connection with SSL...')
                 socket_func = smtplib.SMTP_SSL
 
@@ -835,7 +840,7 @@ class NotifyEmail(NotifyBase):
                 timeout=self.socket_connect_timeout,
             )
 
-            if self.secure and self.secure_mode == SecureMailMode.STARTTLS:
+            if self.secure_mode == SecureMailMode.STARTTLS:
                 # Handle Secure Connections
                 self.logger.debug('Securing connection with STARTTLS...')
                 socket.starttls()
@@ -965,8 +970,7 @@ class NotifyEmail(NotifyBase):
             )
 
         # Default Port setup
-        default_port = \
-            self.default_secure_port if self.secure else self.default_port
+        default_port = SECURE_MODES[self.secure_mode]['default_port']
 
         # a simple boolean check as to whether we display our target emails
         # or not
