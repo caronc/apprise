@@ -122,29 +122,12 @@ class AppriseURLTester:
         # Our expected server objects
         _self = meta.get('self', None)
 
-        # Our expected Query response (True, False, or exception type)
-        response = meta.get('response', True)
-
         # Our expected privacy url
         # Don't set this if don't need to check it's value
         privacy_url = meta.get('privacy_url')
 
         # Our regular expression
         url_matches = meta.get('url_matches')
-
-        # Allow us to force the server response code to be something other then
-        # the defaults
-        requests_response_code = meta.get(
-            'requests_response_code',
-            requests.codes.ok if response else requests.codes.not_found,
-        )
-
-        # Allow us to force the server response text to be something other then
-        # the defaults
-        requests_response_text = meta.get('requests_response_text')
-        if not isinstance(requests_response_text, str):
-            # Convert to string
-            requests_response_text = dumps(requests_response_text)
 
         # Whether or not we should include an image with our request; unless
         # otherwise specified, we assume that images are to be included
@@ -158,34 +141,11 @@ class AppriseURLTester:
             asset = AppriseAsset(image_path_mask=False, image_url_mask=False)
             asset.image_url_logo = None
 
-        test_requests_exceptions = meta.get(
-            'test_requests_exceptions', False)
-
         # Mock our request object
         robj = mock.Mock()
         robj.content = u''
         mock_get.return_value = robj
         mock_post.return_value = robj
-
-        if test_requests_exceptions is False:
-            # Handle our default response
-            mock_post.return_value.status_code = requests_response_code
-            mock_get.return_value.status_code = requests_response_code
-
-            # Handle our default text response
-            mock_get.return_value.content = requests_response_text
-            mock_post.return_value.content = requests_response_text
-            mock_get.return_value.text = requests_response_text
-            mock_post.return_value.text = requests_response_text
-
-            # Ensure there is no side effect set
-            mock_post.side_effect = None
-            mock_get.side_effect = None
-
-        else:
-            # Handle exception testing; first we turn the boolean flag
-            # into a list of exceptions
-            test_requests_exceptions = self.req_exceptions
 
         try:
             # We can now instantiate our object:
@@ -338,9 +298,19 @@ class AppriseURLTester:
         # Allow us to force the server response text to be something other then
         # the defaults
         requests_response_text = meta.get('requests_response_text')
-        if not isinstance(requests_response_text, str):
+        requests_response_content = None
+
+        if isinstance(requests_response_text, str):
+            requests_response_content = requests_response_text.encode('utf-8')
+
+        elif isinstance(requests_response_text, bytes):
+            requests_response_content = requests_response_text
+            requests_response_text = requests_response_text.decode('utf-8')
+
+        elif not isinstance(requests_response_text, str):
             # Convert to string
             requests_response_text = dumps(requests_response_text)
+            requests_response_content = requests_response_text.encode('utf-8')
 
         # A request
         robj = mock.Mock()
@@ -360,11 +330,11 @@ class AppriseURLTester:
             mock_get.return_value.status_code = requests_response_code
 
             # Handle our default text response
-            mock_get.return_value.content = requests_response_text
-            mock_post.return_value.content = requests_response_text
-            mock_del.return_value.content = requests_response_text
-            mock_put.return_value.content = requests_response_text
-            mock_head.return_value.content = requests_response_text
+            mock_get.return_value.content = requests_response_content
+            mock_post.return_value.content = requests_response_content
+            mock_del.return_value.content = requests_response_content
+            mock_put.return_value.content = requests_response_content
+            mock_head.return_value.content = requests_response_content
 
             mock_get.return_value.text = requests_response_text
             mock_post.return_value.text = requests_response_text

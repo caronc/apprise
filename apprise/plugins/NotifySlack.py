@@ -826,7 +826,7 @@ class NotifySlack(NotifyBase):
             # The text 'ok' is returned if this is a Webhook request
             # So the below captures that as well.
             status_okay = (response and response.get('ok', False)) \
-                if self.mode is SlackMode.BOT else r.content == 'ok'
+                if self.mode is SlackMode.BOT else r.content == b'ok'
 
             if r.status_code != requests.codes.ok or not status_okay:
                 # We had a problem
