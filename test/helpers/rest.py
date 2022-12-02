@@ -122,27 +122,12 @@ class AppriseURLTester:
         # Our expected server objects
         _self = meta.get('self', None)
 
-        # Our expected Query response (True, False, or exception type)
-        response = meta.get('response', True)
-
         # Our expected privacy url
         # Don't set this if don't need to check it's value
         privacy_url = meta.get('privacy_url')
 
         # Our regular expression
         url_matches = meta.get('url_matches')
-
-        # Allow us to force the server response code to be something other then
-        # the defaults
-        requests_response_code = meta.get(
-            'requests_response_code',
-            requests.codes.ok if response else requests.codes.not_found,
-        )
-
-        # Allow us to force the server response text to be something other then
-        # the defaults
-        requests_response_text = meta.get('requests_response_text', '')
-        requests_response_content = None
 
         # Whether or not we should include an image with our request; unless
         # otherwise specified, we assume that images are to be included
