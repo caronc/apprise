@@ -394,7 +394,7 @@ def test_plugin_slack_webhook_mode(mock_post):
     # Prepare Mock
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.ok
-    mock_post.return_value.content = 'ok'
+    mock_post.return_value.content = b'ok'
     mock_post.return_value.text = 'ok'
 
     # Initialize some generic (but valid) tokens
@@ -653,7 +653,7 @@ def test_plugin_slack_markdown(mock_get, mock_post):
     """
 
     request = mock.Mock()
-    request.content = 'ok'
+    request.content = b'ok'
     request.status_code = requests.codes.ok
 
     # Prepare Mock
