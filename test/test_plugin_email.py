@@ -1360,3 +1360,144 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     user, pw = response.login.call_args[0]
     assert pw == 'abc123'
     assert user == 'joe@mydomain.nl'
+
+
+@mock.patch('smtplib.SMTP_SSL')
+@mock.patch('smtplib.SMTP')
+def test_plugin_email_plus_in_toemail(mock_smtp, mock_smtp_ssl):
+    """
+    NotifyEmail() support + in To Email address
+
+    """
+
+    response = mock.Mock()
+    mock_smtp_ssl.return_value = response
+    mock_smtp.return_value = response
+
+    # We want to test the case where a + is found in the To address; we want to
+    # ensure that it is supported
+    results = NotifyEmail.parse_url(
+        'mailtos://user:pass123@gmail.com'
+        '?to=Plus Support<test+notification@gmail.com>')
+    assert isinstance(results, dict)
+    assert 'user' == results['user']
+    assert 'gmail.com' == results['host']
+    assert 'pass123' == results['password']
+    assert results['port'] is None
+    assert 'Plus Support<test+notification@gmail.com>' in results['targets']
+
+    obj = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(obj, NotifyEmail) is True
+
+    assert len(obj.targets) == 1
+    assert ('Plus Support', 'test+notification@gmail.com') in obj.targets
+
+    assert mock_smtp.call_count == 0
+    assert mock_smtp_ssl.call_count == 0
+    assert obj.notify("test") is True
+    assert mock_smtp.call_count == 1
+    assert mock_smtp_ssl.call_count == 0
+    assert response.starttls.call_count == 1
+    assert response.login.call_count == 1
+    assert response.sendmail.call_count == 1
+    # Store our Sent Arguments
+    # Syntax is:
+    #  sendmail(from_addr, to_addrs, msg, mail_options=(), rcpt_options=())
+    #             [0]        [1]     [2]
+    _from = response.sendmail.call_args[0][0]
+    _to = response.sendmail.call_args[0][1]
+    _msg = response.sendmail.call_args[0][2]
+    assert _from == 'user@gmail.com'
+    assert isinstance(_to, list)
+    assert len(_to) == 1
+    assert _to[0] == 'test+notification@gmail.com'
+    assert _msg.split('\n')[-3] == 'test'
+
+    mock_smtp.reset_mock()
+    mock_smtp_ssl.reset_mock()
+    response.reset_mock()
+
+    #
+    # Perform the same test where the To field jsut contains the + in the
+    # address
+    #
+    results = NotifyEmail.parse_url(
+        'mailtos://user:pass123@gmail.com'
+        '?to=test+notification@gmail.com')
+    assert isinstance(results, dict)
+    assert 'user' == results['user']
+    assert 'gmail.com' == results['host']
+    assert 'pass123' == results['password']
+    assert results['port'] is None
+    assert 'test+notification@gmail.com' in results['targets']
+
+    obj = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(obj, NotifyEmail) is True
+
+    assert len(obj.targets) == 1
+    assert (False, 'test+notification@gmail.com') in obj.targets
+
+    assert mock_smtp.call_count == 0
+    assert mock_smtp_ssl.call_count == 0
+    assert obj.notify("test") is True
+    assert mock_smtp.call_count == 1
+    assert mock_smtp_ssl.call_count == 0
+    assert response.starttls.call_count == 1
+    assert response.login.call_count == 1
+    assert response.sendmail.call_count == 1
+    # Store our Sent Arguments
+    # Syntax is:
+    #  sendmail(from_addr, to_addrs, msg, mail_options=(), rcpt_options=())
+    #             [0]        [1]     [2]
+    _from = response.sendmail.call_args[0][0]
+    _to = response.sendmail.call_args[0][1]
+    _msg = response.sendmail.call_args[0][2]
+    assert _from == 'user@gmail.com'
+    assert isinstance(_to, list)
+    assert len(_to) == 1
+    assert _to[0] == 'test+notification@gmail.com'
+    assert _msg.split('\n')[-3] == 'test'
+
+    mock_smtp.reset_mock()
+    mock_smtp_ssl.reset_mock()
+    response.reset_mock()
+
+    #
+    # Perform the same test where the To field is in the URL itself
+    #
+    results = NotifyEmail.parse_url(
+        'mailtos://user:pass123@gmail.com'
+        '/test+notification@gmail.com')
+    assert isinstance(results, dict)
+    assert 'user' == results['user']
+    assert 'gmail.com' == results['host']
+    assert 'pass123' == results['password']
+    assert results['port'] is None
+    assert 'test+notification@gmail.com' in results['targets']
+
+    obj = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(obj, NotifyEmail) is True
+
+    assert len(obj.targets) == 1
+    assert (False, 'test+notification@gmail.com') in obj.targets
+
+    assert mock_smtp.call_count == 0
+    assert mock_smtp_ssl.call_count == 0
+    assert obj.notify("test") is True
+    assert mock_smtp.call_count == 1
+    assert mock_smtp_ssl.call_count == 0
+    assert response.starttls.call_count == 1
+    assert response.login.call_count == 1
+    assert response.sendmail.call_count == 1
+    # Store our Sent Arguments
+    # Syntax is:
+    #  sendmail(from_addr, to_addrs, msg, mail_options=(), rcpt_options=())
+    #             [0]        [1]     [2]
+    _from = response.sendmail.call_args[0][0]
+    _to = response.sendmail.call_args[0][1]
+    _msg = response.sendmail.call_args[0][2]
+    assert _from == 'user@gmail.com'
+    assert isinstance(_to, list)
+    assert len(_to) == 1
+    assert _to[0] == 'test+notification@gmail.com'
+    assert _msg.split('\n')[-3] == 'test'
