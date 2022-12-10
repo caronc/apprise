@@ -1,0 +1,60 @@
+#
+# Verify on CI/GHA that package building works.
+#
+# TODO: Currently, this supports RPM-based systems only.
+#       By adjusting a few details, it can be made work
+#       for other distribution types as well.
+#
+name: Test packaging
+
+on:
+
+  # On which repository actions to trigger the build.
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+  # Allow job to be triggered manually.
+  workflow_dispatch:
+
+# Cancel in-progress jobs when pushing to the same branch.
+concurrency:
+  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+
+  tests:
+
+    runs-on: "ubuntu-latest"
+    strategy:
+
+      # Run all jobs to completion (false), or cancel
+      # all jobs once the first one fails (true).
+      fail-fast: false
+
+      # Define a list of build targets. The labels should match the
+      # items within the `services` section of `docker-compose.yml`.
+      matrix:
+        target: [
+          "rpmbuild.el8",
+        ]
+
+    defaults:
+      run:
+        shell: bash
+
+    name: Target ${{ matrix.target }}
+    steps:
+
+    - name: Acquire sources
+      uses: actions/checkout@v3
+
+    - name: Build package
+      run: |
+        docker compose run --user root --rm ${{ matrix.target }} build-rpm.sh
+
+    - name: Verify package has been produced
+      run: |
+        ls -alF dist/rpm/noarch/*.noarch.rpm
