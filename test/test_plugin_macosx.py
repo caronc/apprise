@@ -126,6 +126,15 @@ def test_plugin_macosx_general_success(macos_notify_environment):
     assert obj.notify(title='title', body='body',
                       notify_type=apprise.NotifyType.INFO) is True
 
+    # Test Click (-open support)
+    obj = apprise.Apprise.instantiate(
+        'macosx://_/?click=http://google.com', suppress_exceptions=False)
+    assert isinstance(obj, NotifyMacOSX) is True
+    assert obj.click == 'http://google.com'
+    assert isinstance(obj.url(), str) is True
+    assert obj.notify(title='title', body='body',
+                      notify_type=apprise.NotifyType.INFO) is True
+
 
 def test_plugin_macosx_terminal_notifier_not_executable(
         pretend_macos, terminal_notifier):
