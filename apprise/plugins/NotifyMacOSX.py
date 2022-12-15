@@ -121,9 +121,13 @@ class NotifyMacOSX(NotifyBase):
             'name': _('Sound'),
             'type': 'string',
         },
+        'click': {
+            'name': _('Open/Click URL'),
+            'type': 'string',
+        },
     })
 
-    def __init__(self, sound=None, include_image=True, **kwargs):
+    def __init__(self, sound=None, include_image=True, click=None, **kwargs):
         """
         Initialize MacOSX Object
         """
@@ -136,6 +140,10 @@ class NotifyMacOSX(NotifyBase):
         # Acquire the path to the `terminal-notifier` program.
         self.notify_path = next(  # pragma: no branch
             (p for p in self.notify_paths if os.access(p, os.X_OK)), None)
+
+        # Click URL
+        # Allow user to provide the `--open` argument on the notify wrapper
+        self.click = click
 
         # Set sound object (no q/a for now)
         self.sound = sound
@@ -161,6 +169,9 @@ class NotifyMacOSX(NotifyBase):
         # Title is an optional switch
         if title:
             cmd.extend(['-title', title])
+
+        if self.click:
+            cmd.extend(['-open', self.click])
 
         # The sound to play
         if self.sound:
@@ -203,6 +214,9 @@ class NotifyMacOSX(NotifyBase):
             'image': 'yes' if self.include_image else 'no',
         }
 
+        if self.click:
+            params['click'] = self.click
+
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
@@ -229,6 +243,10 @@ class NotifyMacOSX(NotifyBase):
         # Include images with our message
         results['include_image'] = \
             parse_bool(results['qsd'].get('image', True))
+
+        # Support 'click'
+        if 'click' in results['qsd'] and len(results['qsd']['click']):
+            results['click'] = NotifyMacOSX.unquote(results['qsd']['click'])
 
         # Support 'sound'
         if 'sound' in results['qsd'] and len(results['qsd']['sound']):
