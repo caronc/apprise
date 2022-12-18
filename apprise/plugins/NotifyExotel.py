@@ -25,6 +25,8 @@
 
 import requests
 
+from itertools import chain
+
 from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyType
@@ -193,7 +195,7 @@ class NotifyExotel(NotifyBase):
         """
         super().__init__(**kwargs)
 
-        # API SID (associated with account)
+        # Account SID
         self.sid = validate_regex(sid)
         if not self.sid:
             msg = 'An invalid Exotel SID ' \
@@ -201,14 +203,16 @@ class NotifyExotel(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # API Key (associated with project)
-        self.token = validate_regex(
-            token, *self.template_tokens['token']['regex'])
+        # API Token (associated with account)
+        self.token = validate_regex(token)
         if not self.token:
             msg = 'An invalid Exotel API Token ' \
                   '({}) was specified.'.format(token)
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        # Used for URL generation afterwards only
+        self.invalid_targets = list()
 
         # Store our region
         try:
@@ -232,27 +236,21 @@ class NotifyExotel(NotifyBase):
         #
         # Priority
         #
-        try:
-            # Acquire our priority if we can:
-            #  - We accept both the integer form as well as a string
-            #    representation
-            self.priority = int(priority)
-
-        except TypeError:
-            # NoneType means use Default; this is an okay exception
+        if priority is None:
+            # Default
             self.priority = self.template_args['priority']['default']
 
-        except ValueError:
+        else:
             # Input is a string; attempt to get the lookup from our
             # priority mapping
-            priority = priority.lower().strip()
+            self.priority = priority.lower().strip()
 
             # This little bit of black magic allows us to match against
             # low, lo, l (for low);
             # normal, norma, norm, nor, no, n (for normal)
             # ... etc
             result = next((key for key in EXOTEL_PRIORITY_MAP.keys()
-                          if key.startswith(priority)), None) \
+                          if key.startswith(self.priority)), None) \
                 if priority else None
 
             # Now test to see if we got a match
@@ -265,17 +263,10 @@ class NotifyExotel(NotifyBase):
             # store our successfully looked up priority
             self.priority = EXOTEL_PRIORITY_MAP[result]
 
-        if self.priority is not None and \
-                self.priority not in EXOTEL_PRIORITY_MAP.values():
-            msg = 'An invalid Exotel priority ' \
-                  '({}) was specified.'.format(priority)
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
         # The Source Phone #
         self.source = source
 
-        result = is_phone_no(source)
+        result = is_phone_no(source, min_len=9)
         if not result:
             msg = 'The Account (From) Phone # specified ' \
                   '({}) is invalid.'.format(source)
@@ -290,16 +281,21 @@ class NotifyExotel(NotifyBase):
 
         for target in parse_phone_no(targets):
             # Validate targets and drop bad ones:
-            result = is_phone_no(target)
+            result = is_phone_no(target, min_len=9)
             if not result:
                 self.logger.warning(
                     'Dropped invalid phone # '
                     '({}) specified.'.format(target),
                 )
+                self.invalid_targets.append(target)
                 continue
 
             # store valid phone number
             self.targets.append(result['full'])
+
+        if len(self.targets) == 0 and not self.invalid_targets:
+            # No sources specified, use our own phone no
+            self.targets.append(self.source)
 
         return
 
@@ -307,6 +303,11 @@ class NotifyExotel(NotifyBase):
         """
         Perform Exotel Notification
         """
+
+        if not self.targets:
+            # There were no endpoints to notify
+            self.logger.warning('There were no Exotel targets to notify.')
+            return False
 
         # error tracking (used for function return)
         has_error = False
@@ -338,10 +339,6 @@ class NotifyExotel(NotifyBase):
 
         # Prepare our notify_url
         notify_url = EXOTEL_API_LOOKUP[self.region_name].format(sid=self.sid)
-
-        if len(targets) == 0:
-            # No sources specified, use our own phone no
-            targets.append(self.source)
 
         while len(targets):
             # Get our target to notify
@@ -422,13 +419,14 @@ class NotifyExotel(NotifyBase):
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         return '{schema}://{sid}:{token}@{source}/{targets}/?{params}'.format(
-            schema=self.secure_protocol[0],
+            schema=self.secure_protocol,
             sid=self.pprint(
                 self.sid, privacy, mode=PrivacyMode.Secret, safe=''),
             token=self.pprint(self.token, privacy, safe=''),
             source=NotifyExotel.quote(self.source, safe=''),
             targets='/'.join(
-                [NotifyExotel.quote(x, safe='') for x in self.targets]),
+                [NotifyExotel.quote(x, safe='') for x in chain(
+                    self.targets, self.invalid_targets)]),
             params=NotifyExotel.urlencode(params))
 
     @staticmethod
