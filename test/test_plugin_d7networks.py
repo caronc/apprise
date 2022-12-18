@@ -39,20 +39,44 @@ apprise_url_tests = (
         # We failed to identify any valid authentication
         'instance': TypeError,
     }),
-    ('d7sms://user:pass@{}/{}/{}'.format('1' * 9, '2' * 15, 'a' * 13), {
+    ('d7sms://token@{}/{}/{}'.format('1' * 9, '2' * 15, 'a' * 13), {
         # No valid targets to notify
         'instance': NotifyD7Networks,
         # Since there are no targets specified we expect a False return on
         # send()
         'notify_response': False,
     }),
-    ('d7sms://user:pass@{}?batch=yes'.format('3' * 14), {
+    ('d7sms://token1@{}?batch=yes'.format('3' * 14), {
         # valid number
         'instance': NotifyD7Networks,
         # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'd7sms://user:****@',
+        'privacy_url': 'd7sms://t...1@',
     }),
-    ('d7sms://user:pass@{}?batch=yes'.format('7' * 14), {
+    ('d7sms://token:colon2@{}?batch=yes'.format('3' * 14), {
+        # valid number - token containing a colon
+        'instance': NotifyD7Networks,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'd7sms://t...2@',
+    }),
+    ('d7sms://:token3@{}?batch=yes'.format('3' * 14), {
+        # valid number - token starting wit a colon
+        'instance': NotifyD7Networks,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'd7sms://:...3@',
+    }),
+    ('d7sms://{}?token=token6'.format('3' * 14), {
+        # valid number - token starting wit a colon
+        'instance': NotifyD7Networks,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'd7sms://t...6@',
+    }),
+    ('d7sms://token4@{}?unicode=no'.format('3' * 14), {
+        # valid number - test unicode
+        'instance': NotifyD7Networks,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'd7sms://t...4@',
+    }),
+    ('d7sms://token@{}?batch=yes'.format('7' * 14), {
         # valid number
         'instance': NotifyD7Networks,
         # Test what happens if a batch send fails to return a messageCount
@@ -64,41 +88,29 @@ apprise_url_tests = (
         # Expected notify() response
         'notify_response': False,
     }),
-    ('d7sms://user:pass@{}?batch=yes&to={}'.format('3' * 14, '6' * 14), {
+    ('d7sms://token@{}?batch=yes&to={}'.format('3' * 14, '6' * 14), {
         # valid number
         'instance': NotifyD7Networks,
     }),
-    ('d7sms://user:pass@{}?batch=yes&from=apprise'.format('3' * 14), {
+    ('d7sms://token@{}?batch=yes&from=apprise'.format('3' * 14), {
         # valid number, utilizing the optional from= variable
         'instance': NotifyD7Networks,
     }),
-    ('d7sms://user:pass@{}?batch=yes&source=apprise'.format('3' * 14), {
+    ('d7sms://token@{}?batch=yes&source=apprise'.format('3' * 14), {
         # valid number, utilizing the optional source= variable (same as from)
         'instance': NotifyD7Networks,
     }),
-    ('d7sms://user:pass@{}?priority=invalid'.format('3' * 14), {
-        # valid number; invalid priority
-        'instance': NotifyD7Networks,
-    }),
-    ('d7sms://user:pass@{}?priority=3'.format('3' * 14), {
-        # valid number; adjusted priority
-        'instance': NotifyD7Networks,
-    }),
-    ('d7sms://user:pass@{}?priority=high'.format('3' * 14), {
-        # valid number; adjusted priority (string supported)
-        'instance': NotifyD7Networks,
-    }),
-    ('d7sms://user:pass@{}?batch=no'.format('3' * 14), {
+    ('d7sms://token@{}?batch=no'.format('3' * 14), {
         # valid number - no batch
         'instance': NotifyD7Networks,
     }),
-    ('d7sms://user:pass@{}'.format('3' * 14), {
+    ('d7sms://token@{}'.format('3' * 14), {
         'instance': NotifyD7Networks,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
-    ('d7sms://user:pass@{}'.format('3' * 14), {
+    ('d7sms://token@{}'.format('3' * 14), {
         'instance': NotifyD7Networks,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
