@@ -117,9 +117,6 @@ class NotifyMailgun(NotifyBase):
     # Default Notify Format
     notify_format = NotifyFormat.HTML
 
-    # The default region to use if one isn't otherwise specified
-    mailgun_default_region = MailgunRegion.US
-
     # The maximum amount of emails that can reside within a single
     # batch transfer
     default_batch_size = 2000
@@ -250,7 +247,8 @@ class NotifyMailgun(NotifyBase):
 
         # Store our region
         try:
-            self.region_name = self.mailgun_default_region \
+            self.region_name = \
+                NotifyMailgun.template_args['region']['default'] \
                 if region_name is None else region_name.lower()
 
             if self.region_name not in MAILGUN_REGIONS:
@@ -667,7 +665,7 @@ class NotifyMailgun(NotifyBase):
                 NotifyMailgun.unquote(results['qsd']['name'])
 
         if 'region' in results['qsd'] and len(results['qsd']['region']):
-            # Extract from name to associate with from address
+            # Acquire region if defined
             results['region_name'] = \
                 NotifyMailgun.unquote(results['qsd']['region'])
 

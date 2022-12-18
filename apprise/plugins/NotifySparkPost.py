@@ -79,8 +79,10 @@ SPARKPOST_HTTP_ERROR_MAP = {
 }
 
 
-# Priorities
 class SparkPostRegion:
+    """
+    Regions
+    """
     US = 'us'
     EU = 'eu'
 
@@ -140,9 +142,6 @@ class NotifySparkPost(NotifyBase):
 
     # Default Notify Format
     notify_format = NotifyFormat.HTML
-
-    # The default region to use if one isn't otherwise specified
-    sparkpost_default_region = SparkPostRegion.US
 
     # Define object templates
     templates = (
@@ -254,7 +253,7 @@ class NotifySparkPost(NotifyBase):
 
         # Store our region
         try:
-            self.region_name = self.sparkpost_default_region \
+            self.region_name = self.template_args['region']['default'] \
                 if region_name is None else region_name.lower()
 
             if self.region_name not in SPARKPOST_REGIONS:
@@ -746,7 +745,7 @@ class NotifySparkPost(NotifyBase):
                 NotifySparkPost.unquote(results['qsd']['name'])
 
         if 'region' in results['qsd'] and len(results['qsd']['region']):
-            # Extract from name to associate with from address
+            # Extract region
             results['region_name'] = \
                 NotifySparkPost.unquote(results['qsd']['region'])
 
