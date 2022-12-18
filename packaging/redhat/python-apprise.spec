@@ -69,8 +69,9 @@ notification services. It supports sending alerts to platforms such as: \
 `Matrix`, `MessageBird`, `Microsoft Windows`, `Microsoft Teams`, `Misskey`, \
 `MQTT`, `MSG91`, `MyAndroid`, `Nexmo`, `Nextcloud`, \
 `NextcloudTalk`, `Notica`, `NotificationAPI`, `Notifiarr`, `Notifico`, \
-`ntfy`, `Office365`, `OneSignal`, `Opsgenie`, `PagerDuty`, `PagerTree`, \
-`ParsePlatform`, `Plivo`, `PopcornNotify`, `Prowl`, `Pushalot`, `PushBullet`, \
+`ntfy`, `Octopush`, `Office365`, `OneSignal`, `Opsgenie`, `PagerDuty`, \
+`PagerTree`, `ParsePlatform`, `Plivo`, `PopcornNotify`, `Prowl`, \
+`Pushalot`, `PushBullet`, \
 `Pushjet`, `PushMe`, `Pushover`, `Pushplus`, `PushSafer`, `Pushy`, `PushDeer`, \
 `QQ Push`, `Revolt`, `Reddit`, `Resend`, `Rocket.Chat`, `RSyslog`, `SendGrid`, \
 `SendPulse`, `ServerChan`, `Seven`, `SFR`, `Signal`, `SIGNL4`, `SimplePush`, \
