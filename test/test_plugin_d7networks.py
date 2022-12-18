@@ -22,8 +22,13 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
+import requests
+from json import loads
+from unittest import mock
 from apprise.plugins.NotifyD7Networks import NotifyD7Networks
 from helpers import AppriseURLTester
+from apprise import Apprise
+from apprise import NotifyType
 
 # Disable logging for a cleaner testing output
 import logging
@@ -76,17 +81,11 @@ apprise_url_tests = (
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'd7sms://t...4@',
     }),
-    ('d7sms://token@{}?batch=yes'.format('7' * 14), {
-        # valid number
+    ('d7sms://token8@{}/{}/?unicode=yes'.format('3' * 14, '4' * 14), {
+        # valid number - test unicode
         'instance': NotifyD7Networks,
-        # Test what happens if a batch send fails to return a messageCount
-        'requests_response_text': {
-            'data': {
-                'messageCount': 0,
-            },
-        },
-        # Expected notify() response
-        'notify_response': False,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'd7sms://t...8@',
     }),
     ('d7sms://token@{}?batch=yes&to={}'.format('3' * 14, '6' * 14), {
         # valid number
@@ -127,3 +126,81 @@ def test_plugin_d7networks_urls():
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+@mock.patch('requests.post')
+def test_plugin_d7networks_edge_cases(mock_post):
+    """
+    NotifyD7Networks() Edge Cases tests
+
+    """
+
+    # Prepare Mock
+    request = mock.Mock()
+    request.content = '{}'
+    request.status_code = requests.codes.ok
+    mock_post.return_value = request
+
+    # Initializations
+    aobj = Apprise()
+    assert aobj.add('d7sms://Token@15551231234/15551231236')
+
+    body = "test message"
+
+    # Send our notification
+    assert aobj.notify(
+        body=body, title='title', notify_type=NotifyType.INFO)
+
+    # Not set to batch, so we send 2 different messages
+    assert mock_post.call_count == 2
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.d7networks.com/messages/v1/send'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://api.d7networks.com/messages/v1/send'
+
+    # our first post
+    data = loads(mock_post.call_args_list[0][1]['data'])
+    assert len(data['messages']) == 1
+    message = data['messages'][0]
+    assert len(message['recipients']) == 1
+    assert message['content'] == 'title\r\ntest message'
+    assert message['data_coding'] == 'auto'
+
+    # our second post
+    data = loads(mock_post.call_args_list[1][1]['data'])
+    assert len(data['messages']) == 1
+    message = data['messages'][0]
+    assert len(message['recipients']) == 1
+    assert message['content'] == 'title\r\ntest message'
+    assert message['data_coding'] == 'auto'
+
+    #
+    # Do a batch test now
+    #
+
+    mock_post.reset_mock()
+
+    # Initializations
+    aobj = Apprise()
+    assert aobj.add('d7sms://Token@15551231234/15551231236?batch=yes')
+
+    body = "test message"
+
+    # Send our notification
+    assert aobj.notify(
+        body=body, title='title', notify_type=NotifyType.INFO)
+
+    # All notifications go through in a batch
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.d7networks.com/messages/v1/send'
+
+    data = loads(mock_post.call_args_list[0][1]['data'])
+    assert len(data['messages']) == 1
+    message = data['messages'][0]
+    # All of our phone numbers were added here
+    assert len(message['recipients']) == 2
+    assert '15551231234' in message['recipients']
+    assert '15551231236' in message['recipients']
+    assert message['content'] == 'title\r\ntest message'
+    assert message['data_coding'] == 'auto'

@@ -29,6 +29,8 @@
 # After you've established your account you can get your api login credentials
 # (both user and password) from the API Details section from within your
 # account profile area:  https://d7networks.com/accounts/profile/
+#
+# API Reference: https://d7networks.com/docs/Messages/Send_Message/
 
 import requests
 from json import dumps
@@ -110,10 +112,10 @@ class NotifyD7Networks(NotifyBase):
     # Define our template arguments
     template_args = dict(NotifyBase.template_args, **{
         'unicode': {
-            # Unicode characters
+            # Unicode characters (default is 'auto')
             'name': _('Unicode Characters'),
             'type': 'bool',
-            'default': True,
+            'default': False,
         },
         'batch': {
             'name': _('Batch Mode'),
@@ -207,8 +209,15 @@ class NotifyD7Networks(NotifyBase):
             'message_globals': {
                 'channel': 'sms',
             },
-            # Populated later on
-            'messages': [],
+            'messages': [{
+                # Populated later on
+                'recipients': None,
+                'content': body,
+                'data_coding':
+                # auto is a better substitute over 'text' as text is easier to
+                # detect from a post than `unicode` is.
+                'auto' if not self.unicode else 'unicode',
+            }],
         }
 
         # use the list directly
@@ -222,12 +231,7 @@ class NotifyD7Networks(NotifyBase):
 
             if self.batch:
                 # Prepare our payload
-                payload['messages'] = [{
-                    'recipients': self.targets,
-                    'content': body,
-                    'data_coding':
-                    'text' if not self.unicode else 'unicode',
-                }]
+                payload['messages'][0]['recipients'] = self.targets
 
                 # Reset our targets so we don't keep going. This is required
                 # because we're in batch mode; we only need to loop once.
@@ -239,12 +243,7 @@ class NotifyD7Networks(NotifyBase):
                 target = targets.pop(0)
 
                 # Prepare our payload
-                payload['messages'] = [{
-                    'recipients': [target],
-                    'content': body,
-                    'data_coding':
-                    'text' if not self.unicode else 'unicode',
-                }]
+                payload['messages'][0]['recipients'] = [target]
 
             # Some Debug Logging
             self.logger.debug(
@@ -302,29 +301,9 @@ class NotifyD7Networks(NotifyBase):
                 else:
 
                     if self.batch:
-                        count = len(self.targets)
-                        try:
-                            # Get our message delivery count if we can
-                            json_response = loads(r.content)
-                            count = int(json_response.get(
-                                'data', {}).get('messageCount', -1))
-
-                        except (AttributeError, TypeError, ValueError):
-                            # ValueError = r.content is Unparsable
-                            # TypeError = r.content is None
-                            # AttributeError = r is None
-
-                            # We could not parse JSON response. Assume that
-                            # our delivery is okay for now.
-                            pass
-
-                        if count != len(self.targets):
-                            has_error = True
-
                         self.logger.info(
                             'Sent D7 Networks batch SMS notification to '
-                            '{} of {} target(s).'.format(
-                                count, len(self.targets)))
+                            '{} target(s).'.format(len(self.targets)))
 
                     else:
                         self.logger.info(
@@ -416,7 +395,7 @@ class NotifyD7Networks(NotifyBase):
 
         # Get Unicode Flag
         results['unicode'] = \
-            parse_bool(results['qsd'].get('unicode', True))
+            parse_bool(results['qsd'].get('unicode', False))
 
         # Support the 'to' variable so that we can support targets this way too
         # The 'to' makes it easier to use yaml configuration
