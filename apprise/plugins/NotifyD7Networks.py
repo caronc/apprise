@@ -95,6 +95,7 @@ class NotifyD7Networks(NotifyBase):
             'name': _('API Access Token'),
             'type': 'string',
             'required': True,
+            'private': True,
         },
         'target_phone': {
             'name': _('Target Phone No'),
@@ -202,7 +203,7 @@ class NotifyD7Networks(NotifyBase):
             'User-Agent': self.app_id,
             'Content-Type': 'application/json',
             'Accept': 'application/json',
-            'Authorization: Bearer ': self.token,
+            'Authorization': f'Bearer {self.token}',
         }
 
         payload = {
