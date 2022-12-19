@@ -183,8 +183,8 @@ class AppriseURLTester:
             assert False
 
         if not isinstance(obj, instance):
-            print('%s instantiated %s (but expected %s)' % (
-                url, type(instance), str(obj)))
+            print('%s instantiated as %s (but expected %s)' % (
+                url, type(obj), str(instance)))
             assert False
 
         if isinstance(obj, NotifyBase):
@@ -228,8 +228,8 @@ class AppriseURLTester:
                 # way these tests work. Just printing before
                 # throwing our assertion failure makes things
                 # easier to debug later on
-                print('TEST FAIL: {} regenerated as {}'.format(
-                    url, obj.url()))
+                print('TEST FAIL: {} became {} and then regenerated as {}'
+                      .format(url, obj.url(), type(obj_cmp)))
                 assert False
 
             # Tidy our object
@@ -358,9 +358,19 @@ class AppriseURLTester:
             if test_requests_exceptions is False:
 
                 # check that we're as expected
-                assert obj.notify(
+                response = obj.notify(
                     body=self.body, title=self.title,
-                    notify_type=notify_type) == notify_response
+                    notify_type=notify_type)
+
+                if response != notify_response:
+                    # We did not get the notify() response we thought
+                    print(
+                        'TEST FAIL: {} notify_response from {}.send() was '
+                        '{} expected {}'
+                        .format(
+                            url, obj.__class__.__name__, response,
+                            notify_response))
+                    assert False
 
                 # check that this doesn't change using different overflow
                 # methods
