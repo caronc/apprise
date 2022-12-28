@@ -192,7 +192,6 @@ def request_mock(mocker):
 
 @pytest.fixture
 def simple_template(tmpdir):
-    # Test cases where our URL is invalid.
     template = tmpdir.join("simple.json")
     template.write("""
     {
