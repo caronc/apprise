@@ -583,6 +583,8 @@ class NotifySMSEagle(NotifyBase):
                     ['@{}'.format(x) for x in self.target_contacts],
                     # Groups
                     ['#{}'.format(x) for x in self.target_groups],
+                    # Pass along the same invalid entries as were provided
+                    self.invalid_targets,
                 )]),
             params=NotifySMSEagle.urlencode(params),
         )
@@ -633,6 +635,7 @@ class NotifySMSEagle(NotifyBase):
         results['status'] = \
             parse_bool(results['qsd'].get('status', False))
 
+        # Get priority
         if 'priority' in results['qsd'] and len(results['qsd']['priority']):
             results['priority'] = \
                 NotifySMSEagle.unquote(results['qsd']['priority'])
