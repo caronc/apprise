@@ -6,21 +6,24 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: apprise 1.2.0\n"
+"Project-Id-Version: apprise 1.2.1\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2022-11-15 18:36+0000\n"
+"POT-Creation-Date: 2022-12-28 09:43-0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.11.0\n"
+"Generated-By: Babel 2.9.1\n"
 
 msgid "A local Gnome environment is required."
 msgstr ""
 
 msgid "A local Microsoft Windows environment is required."
+msgstr ""
+
+msgid "API Access Token"
 msgstr ""
 
 msgid "API Key"
@@ -386,6 +389,9 @@ msgstr ""
 msgid ""
 "Only works with Mac OS X 10.8 and higher. Additionally  requires that "
 "/usr/local/bin/terminal-notifier is locally accessible."
+msgstr ""
+
+msgid "Open/Click URL"
 msgstr ""
 
 msgid "Organization"
