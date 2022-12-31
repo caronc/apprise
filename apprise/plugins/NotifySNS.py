@@ -60,9 +60,8 @@ IS_REGION = re.compile(
 
 # Extend HTTP Error Messages
 AWS_HTTP_ERROR_MAP = {
-    403: 'Unauthorized - Invalid Access/Secret Key Combination.',
+    403: 'Unauthorized - Invalid Access/Secret Key Combination, or insufficient IAM Permissions [`sns:Publish`,`sns:CreateTopic`]',
 }
-
 
 class NotifySNS(NotifyBase):
     """
