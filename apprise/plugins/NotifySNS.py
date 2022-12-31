@@ -88,9 +88,10 @@ class NotifySNS(NotifyBase):
     # Source: https://docs.aws.amazon.com/sns/latest/api/API_Publish.html
     body_maxlen = 160
 
-    # A title can not be used for SMS Messages.  Setting this to zero will
-    # cause any title (if defined) to get placed into the message body.
-    title_maxlen = 0
+    # Topic Targets on SNS may accept titles up to 100 characters. The title
+    # of the message will also be placed in the message body where present.
+    # Source: https://docs.aws.amazon.com/sns/latest/api/API_Publish.html
+    title_maxlen = 100
 
     # Define object templates
     templates = (
@@ -247,6 +248,10 @@ class NotifySNS(NotifyBase):
             # Get Phone No
             no = phone.pop(0)
 
+            # Includes the title if present, simulating `title_maxlen = 0`
+            if title != '':
+                body = title + "\n" + body
+
             # Prepare SNS Message Payload
             payload = {
                 'Action': u'Publish',
@@ -284,6 +289,10 @@ class NotifySNS(NotifyBase):
                 error_count += 1
                 continue
 
+            # Backwards Compatibility: Prepends the body with the title,
+            # simulating the behaviour of `title_maxlen = 0`
+            body = title + '\n' + body
+
             # Build our payload now that we know our topic_arn
             payload = {
                 'Action': u'Publish',
@@ -291,6 +300,13 @@ class NotifySNS(NotifyBase):
                 'TopicArn': topic_arn,
                 'Message': body,
             }
+
+            # If a Title exists, add it to the payload, since it's supported
+            # for SNS Topic Targets
+            if title != '':
+                payload.update({
+                    'Subject': title
+                })
 
             # Send our payload to AWS
             (result, _) = self._post(payload=payload, to=topic)
