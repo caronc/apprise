@@ -54,10 +54,6 @@ def import_module(path, name):
     """
     Load our module based on path
     """
-    # if path.endswith('test_module_detection0/a/hook.py'):
-    #     import pdb
-    #     pdb.set_trace()
-
     spec = importlib.util.spec_from_file_location(name, path)
     try:
         module = importlib.util.module_from_spec(spec)
