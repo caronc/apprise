@@ -29,12 +29,11 @@ from json import dumps
 from uuid import uuid4
 
 from .NotifyBase import NotifyBase
-from ..URLBase import PrivacyMode
 from ..common import NotifyType
-from ..common import NotifyFormat
 from ..utils import parse_list
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
+
 
 # Actions
 class PagerTreeAction:
@@ -42,11 +41,6 @@ class PagerTreeAction:
     ACKNOWLEDGE = 'acknowledge'
     RESOLVE = 'resolve'
 
-PAGERTREE_ACTIONS = {
-    PagerTreeAction.CREATE: 'create',
-    PagerTreeAction.ACKNOWLEDGE: 'acknowledge',
-    PagerTreeAction.RESOLVE: 'resolve',
-}
 
 # Urgencies
 class PagerTreeUrgency:
@@ -55,6 +49,13 @@ class PagerTreeUrgency:
     MEDIUM = "medium"
     HIGH = "high"
     CRITICAL = "critical"
+
+
+PAGERTREE_ACTIONS = {
+    PagerTreeAction.CREATE: 'create',
+    PagerTreeAction.ACKNOWLEDGE: 'acknowledge',
+    PagerTreeAction.RESOLVE: 'resolve',
+}
 
 PAGERTREE_URGENCIES = {
     # Note: This also acts as a reverse lookup mapping
@@ -120,13 +121,11 @@ class NotifyPagerTree(NotifyBase):
         'thirdparty_id': {
             'name': _('Third Party ID'),
             'type': 'string',
-            'default': None,
         },
         'urgency': {
             'name': _('Urgency'),
             'type': 'choice:string',
             'values': PAGERTREE_URGENCIES,
-            'default': None,
         },
         'tags': {
             'name': _('Tags'),
@@ -150,16 +149,17 @@ class NotifyPagerTree(NotifyBase):
         },
     }
 
-    def __init__(self, integration_id, action=None, thirdparty_id=None, 
-                urgency=None, tags=None, meta=None, headers=None, payload_extras=None, 
-                meta_extras=None, **kwargs):
+    def __init__(self, integration_id, action=None, thirdparty_id=None,
+                 urgency=None, tags=None, headers=None,
+                 payload_extras=None, meta_extras=None, **kwargs):
         """
         Initialize PagerTree Object
         """
         super().__init__(**kwargs)
 
         # Integration ID (associated with account)
-        self.integration_id = validate_regex(integration_id)
+        self.integration_id = \
+            validate_regex(integration_id, r'^int_[a-zA-Z0-9\-_]{7,14}$')
         if not self.integration_id:
             msg = 'An invalid PagerTree Integration ID ' \
                   '({}) was specified.'.format(integration_id)
@@ -181,15 +181,20 @@ class NotifyPagerTree(NotifyBase):
             # Store our extra payload entries
             self.meta_extras.update(meta_extras)
 
-        # thirdparty_id (optional, in case they want to pass the acknowledge or resolve action)
-        self.thirdparty_id = validate_regex(thirdparty_id) if thirdparty_id is not None else str(uuid4())
-
+        # thirdparty_id (optional, in case they want to pass the
+        # acknowledge or resolve action)
+        self.thirdparty_id = validate_regex(thirdparty_id) \
+            if thirdparty_id is not None else str(uuid4())
 
         # Setup our action
-        self.action = NotifyPagerTree.template_args['action']['default'] if action not in PAGERTREE_ACTIONS else PAGERTREE_ACTIONS[action]
+        self.action = NotifyPagerTree.template_args['action']['default'] \
+            if action not in PAGERTREE_ACTIONS else \
+            PAGERTREE_ACTIONS[action]
 
         # Setup our urgency
-        self.urgency = None if urgency not in PAGERTREE_URGENCIES else PAGERTREE_URGENCIES[urgency]
+        self.urgency = \
+            None if urgency not in PAGERTREE_URGENCIES else \
+            PAGERTREE_URGENCIES[urgency]
 
         # Any optional tags to attach to the notification
         self.__tags = parse_list(tags)
@@ -208,26 +213,25 @@ class NotifyPagerTree(NotifyBase):
         }
 
         # Apply any/all header over-rides defined
+        # For things like PagerTree Token
         headers.update(self.headers)
 
         # prepare JSON Object
         payload = {
             'event_type': self.action,
-            'title': title if title else self.app_desc,
-            'description': body,
         }
 
-        if self.thirdparty_id is not None:
-            payload['id'] = self.thirdparty_id
+        payload['id'] = self.thirdparty_id
 
-        if self.urgency is not None:
-            payload['urgency'] = self.urgency
+        if self.action == PagerTreeAction.CREATE:
+            payload['title'] = title if title else self.app_desc
+            payload['description'] = body
 
-        if self.__tags is not None:
+            payload['meta'] = self.meta_extras
             payload['tags'] = self.__tags
 
-        if self.meta_extras is not None:
-            payload['meta'] = self.meta_extras
+            if self.urgency is not None:
+                payload['urgency'] = self.urgency
 
         # Apply any/all payload over-rides defined
         payload.update(self.payload_extras)
@@ -292,16 +296,21 @@ class NotifyPagerTree(NotifyBase):
 
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
+        # Headers prefixed with a '+' sign
         # Append our headers into our parameters
         params.update({'+{}'.format(k): v for k, v in self.headers.items()})
 
+        # Meta: {} prefixed with a '-' sign
         # Append our meta extras into our parameters
-        params.update({'-{}'.format(k): v for k, v in self.meta_extras.items()})
+        params.update(
+            {'-{}'.format(k): v for k, v in self.meta_extras.items()})
 
+        # Payload body extras prefixed with a ':' sign
         # Append our payload extras into our parameters
-        params.update({':{}'.format(k): v for k, v in self.payload_extras.items()})
+        params.update(
+            {':{}'.format(k): v for k, v in self.payload_extras.items()})
 
-        return '{schema}://{integration_id}'.format(
+        return '{schema}://{integration_id}?{params}'.format(
             schema=self.secure_protocol,
             # never encode hostname since we're expecting it to be a valid one
             integration_id=self.pprint(self.integration_id, privacy, safe=''),
@@ -323,16 +332,22 @@ class NotifyPagerTree(NotifyBase):
 
         # Add our headers that the user can potentially over-ride if they wish
         # to to our returned result set and tidy entries by unquoting them
-        results['headers'] = {NotifyPagerTree.unquote(x): NotifyPagerTree.unquote(y)
-                              for x, y in results['qsd+'].items()}
+        results['headers'] = {
+            NotifyPagerTree.unquote(x): NotifyPagerTree.unquote(y)
+            for x, y in results['qsd+'].items()
+        }
 
         # store any additional payload extra's defined
-        results['payload_extras'] = {NotifyPagerTree.unquote(x): NotifyPagerTree.unquote(y)
-                              for x, y in results['qsd:'].items()}
+        results['payload_extras'] = {
+            NotifyPagerTree.unquote(x): NotifyPagerTree.unquote(y)
+            for x, y in results['qsd:'].items()
+        }
 
         # store any additional meta extra's defined
-        results['meta_extras'] = {NotifyPagerTree.unquote(x): NotifyPagerTree.unquote(y)
-                              for x, y in results['qsd-'].items()}
+        results['meta_extras'] = {
+            NotifyPagerTree.unquote(x): NotifyPagerTree.unquote(y)
+            for x, y in results['qsd-'].items()
+        }
 
         # Integration ID
         if 'integration_id' in results['qsd'] and \
@@ -344,12 +359,14 @@ class NotifyPagerTree(NotifyBase):
                 NotifyPagerTree.unquote(results['host'])
 
         # Set our thirdparty_id
-        if 'thirdparty_id' in results['qsd'] and len(results['qsd']['thirdparty_id']):
+        if 'thirdparty_id' in results['qsd'] and \
+                len(results['qsd']['thirdparty_id']):
             results['thirdparty_id'] = \
                 NotifyPagerTree.unquote(results['qsd']['thirdparty_id'])
 
         # Set our urgency
-        if 'action' in results['qsd'] and len(results['qsd']['action']):
+        if 'action' in results['qsd'] and \
+                len(results['qsd']['action']):
             results['action'] = \
                 NotifyPagerTree.unquote(results['qsd']['action'])
 
