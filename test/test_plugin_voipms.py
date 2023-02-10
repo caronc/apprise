@@ -66,7 +66,7 @@ apprise_url_tests = (
         # Check valid email
         'instance': TypeError,
     }),
-    ('voipms://{email}:{password}'.format(
+    ('voipms://{password}:{email}'.format(
         email='user@example.com',
         password='password'), {
 
@@ -74,7 +74,7 @@ apprise_url_tests = (
         'instance': TypeError,
     }),
     # Invalid phone number test
-    ('voipms://{email}:{password}/1613'.format(
+    ('voipms://{password}:{email}/1613'.format(
         email='user@example.com',
         password='password'), {
 
@@ -82,14 +82,14 @@ apprise_url_tests = (
         'instance': TypeError,
     }),
     # Invalid country code phone number test
-    ('voipms://{email}:{password}/01133122446688'.format(
+    ('voipms://{password}:{email}/01133122446688'.format(
         email='user@example.com',
         password='password'), {
 
         # Non North American phone number
         'instance': TypeError,
     }),
-    ('voipms://{email}:{password}/{from_phone}/{targets}/'.format(
+    ('voipms://{password}:{email}/{from_phone}/{targets}/'.format(
         email='user@example.com',
         password='password',
         from_phone='16134448888',
@@ -100,7 +100,7 @@ apprise_url_tests = (
         'response': False,
         'requests_response_code': 999,
     }),
-    ('voipms://{email}:{password}/{from_phone}'.format(
+    ('voipms://{password}:{email}/{from_phone}'.format(
         email='user@example.com',
         password='password',
         from_phone='16138884444'), {
@@ -110,7 +110,7 @@ apprise_url_tests = (
         'response': False,
         'requests_response_code': 999,
     }),
-    ('voipms://{email}:{password}/?from={from_phone}'.format(
+    ('voipms://{password}:{email}/?from={from_phone}'.format(
         email='user@example.com',
         password='password',
         from_phone='16138884444'), {
@@ -120,7 +120,7 @@ apprise_url_tests = (
         'response': False,
         'requests_response_code': 999,
     }),
-    ('voipms://{email}:{password}/{from_phone}/{targets}/'.format(
+    ('voipms://{password}:{email}/{from_phone}/{targets}/'.format(
         email='user@example.com',
         password='password',
         from_phone='16138884444',
@@ -129,9 +129,9 @@ apprise_url_tests = (
         # Valid
         'instance': NotifyVoipms,
         'response': True,
-        'privacy_url': 'voipms://user@example.com:p...d/16...4',
+        'privacy_url': 'voipms://p...d:user@example.com/16...4',
     }),
-    ('voipms://{email}:{password}/{from_phone}/{targets}/'.format(
+    ('voipms://{password}:{email}/{from_phone}/{targets}/'.format(
         email='user@example.com',
         password='password',
         from_phone='16138884444',
@@ -140,9 +140,9 @@ apprise_url_tests = (
         # Valid multiple targets
         'instance': NotifyVoipms,
         'response': True,
-        'privacy_url': 'voipms://user@example.com:p...d/16...4',
+        'privacy_url': 'voipms://p...d:user@example.com/16...4',
     }),
-    ('voipms://{email}:{password}/?from={from_phone}&to={targets}'.format(
+    ('voipms://{password}:{email}/?from={from_phone}&to={targets}'.format(
         email='user@example.com',
         password='password',
         from_phone='16138884444',
@@ -151,7 +151,7 @@ apprise_url_tests = (
         # Valid
         'instance': NotifyVoipms,
     }),
-    ('voipms://{email}:{password}/{from_phone}/{targets}/'.format(
+    ('voipms://{password}:{email}/{from_phone}/{targets}/'.format(
         email='user@example.com',
         password='password',
         from_phone='16138884444',
@@ -208,7 +208,7 @@ def test_plugin_voipms_edge_cases(mock_get):
 
     # Initialize our object
     obj = Apprise.instantiate(
-        'voipms://{email}:{password}/{source}/{targets}'.format(
+        'voipms://{password}:{email}/{source}/{targets}'.format(
             email=email,
             password=password,
             source=source,
@@ -242,7 +242,7 @@ def test_plugin_voipms_non_success_status(mock_get):
     })
 
     obj = Apprise.instantiate(
-        'voipms://{email}:{password}/{source}/{targets}'.format(
+        'voipms://{password}:{email}/{source}/{targets}'.format(
             email='user@example.com',
             password='badpassword',
             source='16134448888',

@@ -78,8 +78,8 @@ class NotifyVoipms(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{email}:{password}',
-        '{schema}://{email}:{password}/{from_phone}/{targets}',
+        '{schema}://{password}:{email}',
+        '{schema}://{password}:{email}/{from_phone}/{targets}',
     )
 
     # Define our template tokens
@@ -124,7 +124,7 @@ class NotifyVoipms(NotifyBase):
         },
     })
 
-    def __init__(self, email, source, targets=None, **kwargs):
+    def __init__(self, email, source=None, targets=None, **kwargs):
         """
         Initialize Voipms Object
         """
@@ -146,19 +146,19 @@ class NotifyVoipms(NotifyBase):
             raise TypeError(msg)
         self.email = result['full_email']
 
-        # Store our source Phone #
-        self.source = source
-        result = is_phone_no(self.source)
+        # Validate our source Phone #
+        result = is_phone_no(source)
         if not result:
             msg = 'An invalid Voipms source phone # ' \
-                  '({}) was specified.'.format(self.source)
+                  '({}) was specified.'.format(source)
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Source Phone # only supports +1 country code
-        if result['country'] != '1':
+        # Allow 7 digit phones (presume they're local with +1 country code)
+        if result['country'] and result['country'] != '1':
             msg = 'Voipms only supports +1 country code ' \
-                  '({}) was specified.'.format(self.source)
+                  '({}) was specified.'.format(source)
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -324,7 +324,7 @@ class NotifyVoipms(NotifyBase):
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         schemaStr =  \
-            '{schema}://{email}:{password}/{from_phone}/{targets}/?{params}'
+            '{schema}://{password}:{email}/{from_phone}/{targets}/?{params}'
         return schemaStr.format(
             schema=self.secure_protocol,
             email=self.email,
@@ -358,15 +358,15 @@ class NotifyVoipms(NotifyBase):
             # The from phone no is the first entry in the list otherwise
             results['source'] = results['targets'].pop(0)
 
-        # Split host on ':' and store first entry as host
-        # and second entry as password
-        fields = results['host'].split(':', 1)
-        results['host'] = fields[0]
-        if len(fields) == 2:
-            results['password'] = fields[1]
+        # Swap user for pass since our input is: password:email
+        #   where email is user@hostname (or user@domain)
+        user = results['password']
+        password = results['user']
+        results['password'] = password
+        results['user'] = user
 
         results['email'] = '{}@{}'.format(
-            NotifyVoipms.unquote(results['user']),
+            NotifyVoipms.unquote(user),
             NotifyVoipms.unquote(results['host']),
         )
 
