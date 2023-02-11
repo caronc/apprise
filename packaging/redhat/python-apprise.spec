@@ -54,7 +54,7 @@ Opsgenie, PagerDuty, ParsePlatform, PopcornNotify, Prowl, Pushalot, PushBullet,
 Pushjet, Pushover, PushSafer, Reddit, Rocket.Chat, SendGrid, ServerChan, Signal,
 SimplePush, Sinch, Slack, SMSEagle, SMTP2Go, Spontit, SparkPost, Super Toasty,
 Streamlabs, Stride, Syslog, Techulus Push, Telegram, Twilio, Twitter, Twist,
-XBMC, Vonage, Webex Teams}
+XBMC, Voipms, Vonage, Webex Teams}
 
 Name:           python-%{pypi_name}
 Version:        1.2.1
