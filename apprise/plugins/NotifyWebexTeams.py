@@ -95,7 +95,7 @@ class NotifyWebexTeams(NotifyBase):
     service_url = 'https://webex.teams.com/'
 
     # The default secure protocol
-    secure_protocol = 'wxteams'
+    secure_protocol = ('wxteams', 'webex')
 
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_wxteams'
@@ -220,7 +220,7 @@ class NotifyWebexTeams(NotifyBase):
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         return '{schema}://{token}/?{params}'.format(
-            schema=self.secure_protocol,
+            schema=self.secure_protocol[0],
             token=self.pprint(self.token, privacy, safe=''),
             params=NotifyWebexTeams.urlencode(params),
         )
@@ -257,7 +257,7 @@ class NotifyWebexTeams(NotifyBase):
         if result:
             return NotifyWebexTeams.parse_url(
                 '{schema}://{webhook_token}/{params}'.format(
-                    schema=NotifyWebexTeams.secure_protocol,
+                    schema=NotifyWebexTeams.secure_protocol[0],
                     webhook_token=result.group('webhook_token'),
                     params='' if not result.group('params')
                     else result.group('params')))
