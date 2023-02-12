@@ -62,6 +62,11 @@ apprise_url_tests = (
         # token provided - we're good
         'instance': NotifyWebexTeams,
     }),
+    # Support New Native URLs
+    ('https://webexapis.com/v1/webhooks/incoming/{}'.format('a' * 100), {
+        # token provided - we're good
+        'instance': NotifyWebexTeams,
+    }),
     # Support Native URLs with arguments
     ('https://api.ciscospark.com/v1/webhooks/incoming/{}?format=text'.format(
         'a' * 80), {
