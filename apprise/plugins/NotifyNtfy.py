@@ -47,8 +47,10 @@ from os.path import basename
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
+from ..common import NotifyImageSize
 from ..AppriseLocale import gettext_lazy as _
 from ..utils import parse_list
+from ..utils import parse_bool
 from ..utils import is_hostname
 from ..utils import is_ipaddr
 from ..utils import validate_regex
@@ -149,6 +151,9 @@ class NotifyNtfy(NotifyBase):
     # Default upstream/cloud host if none is defined
     cloud_notify_url = 'https://ntfy.sh'
 
+    # Allows the user to specify the NotifyImageSize object
+    image_size = NotifyImageSize.XY_256
+
     # Message time to live (if remote client isn't around to receive it)
     time_to_live = 2419200
 
@@ -206,6 +211,16 @@ class NotifyNtfy(NotifyBase):
             'name': _('Attach'),
             'type': 'string',
         },
+        'image': {
+            'name': _('Include Image'),
+            'type': 'bool',
+            'default': True,
+            'map_to': 'include_image',
+        },
+        'avatar_url': {
+            'name': _('Avatar URL'),
+            'type': 'string',
+        },
         'filename': {
             'name': _('Attach Filename'),
             'type': 'string',
@@ -245,7 +260,7 @@ class NotifyNtfy(NotifyBase):
 
     def __init__(self, targets=None, attach=None, filename=None, click=None,
                  delay=None, email=None, priority=None, tags=None, mode=None,
-                 **kwargs):
+                 include_image=True, avatar_url=None, **kwargs):
         """
         Initialize ntfy Object
         """
@@ -260,6 +275,9 @@ class NotifyNtfy(NotifyBase):
             msg = 'An invalid ntfy Mode ({}) was specified.'.format(mode)
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        # Show image associated with notification
+        self.include_image = include_image
 
         # Attach a file (URL supported)
         self.attach = attach
@@ -286,6 +304,11 @@ class NotifyNtfy(NotifyBase):
 
         # Any optional tags to attach to the notification
         self.__tags = parse_list(tags)
+
+        # Avatar URL
+        # This allows a user to provide an over-ride to the otherwise
+        # dynamically generated avatar url images
+        self.avatar_url = avatar_url
 
         # Build list of topics
         topics = parse_list(targets)
@@ -315,6 +338,15 @@ class NotifyNtfy(NotifyBase):
             self.logger.warning('There are no ntfy topics to notify')
             return False
 
+        # Acquire image_url
+        image_url = self.image_url(notify_type)
+
+        if self.include_image and (image_url or self.avatar_url):
+            image_url = \
+                self.avatar_url if self.avatar_url else image_url
+        else:
+            image_url = None
+
         # Create a copy of the topics
         topics = list(self.topics)
         while len(topics) > 0:
@@ -343,20 +375,23 @@ class NotifyNtfy(NotifyBase):
                             attachment.url(privacy=True)))
 
                     okay, response = self._send(
-                        topic, body=_body, title=_title, attach=attachment)
+                        topic, body=_body, title=_title, image_url=image_url,
+                        attach=attachment)
                     if not okay:
                         # We can't post our attachment; abort immediately
                         return False
             else:
                 # Send our Notification Message
-                okay, response = self._send(topic, body=body, title=title)
+                okay, response = self._send(
+                    topic, body=body, title=title, image_url=image_url)
                 if not okay:
                     # Mark our failure, but contiue to move on
                     has_error = True
 
         return not has_error
 
-    def _send(self, topic, body=None, title=None, attach=None, **kwargs):
+    def _send(self, topic, body=None, title=None, attach=None, image_url=None,
+              **kwargs):
         """
         Wrapper to the requests (post) object
         """
@@ -403,6 +438,9 @@ class NotifyNtfy(NotifyBase):
             # Point our payload to our parameters
             virt_payload = params
             notify_url += '/{topic}'.format(topic=topic)
+
+        if image_url:
+            headers['X-Icon'] = image_url
 
         if title:
             virt_payload['title'] = title
@@ -536,7 +574,11 @@ class NotifyNtfy(NotifyBase):
         params = {
             'priority': self.priority,
             'mode': self.mode,
+            'image': 'yes' if self.include_image else 'no',
         }
+
+        if self.avatar_url:
+            params['avatar_url'] = self.avatar_url
 
         if self.attach is not None:
             params['attach'] = self.attach
@@ -629,6 +671,15 @@ class NotifyNtfy(NotifyBase):
         if 'tags' in results['qsd'] and len(results['qsd']['tags']):
             results['tags'] = \
                 parse_list(NotifyNtfy.unquote(results['qsd']['tags']))
+
+        # Boolean to include an image or not
+        results['include_image'] = parse_bool(results['qsd'].get(
+            'image', NotifyNtfy.template_args['image']['default']))
+
+        # Extract avatar url if it was specified
+        if 'avatar_url' in results['qsd']:
+            results['avatar_url'] = \
+                NotifyNtfy.unquote(results['qsd']['avatar_url'])
 
         # Acquire our targets/topics
         results['targets'] = NotifyNtfy.split_path(results['fullpath'])
