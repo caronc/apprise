@@ -49,6 +49,8 @@ from apprise.utils import environ
 from apprise.plugins import __load_matrix
 from apprise.plugins import __reset_matrix
 
+from apprise.AppriseLocale import gettext_lazy as _
+
 from importlib import reload
 
 

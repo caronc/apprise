@@ -51,43 +51,13 @@ try:
     # Initialize gettext
     import gettext
 
-    # install() creates a _() in our builtins
-    gettext.install(DOMAIN, localedir=LOCALE_DIR)
-
     # Toggle our flag
     GETTEXT_LOADED = True
 
 except ImportError:
-    # gettext isn't available; no problem, just fall back to using
-    # the library features without multi-language support.
-    import builtins
-    builtins.__dict__['_'] = lambda x: x  # pragma: no branch
-
-
-class LazyTranslation:
-    """
-    Doesn't translate anything until str() or unicode() references
-    are made.
-
-    """
-    def __init__(self, text, *args, **kwargs):
-        """
-        Store our text
-        """
-        self.text = text
-
-        super().__init__(*args, **kwargs)
-
-    def __str__(self):
-        return gettext.gettext(self.text)
-
-
-# Lazy translation handling
-def gettext_lazy(text):
-    """
-    A dummy function that can be referenced
-    """
-    return LazyTranslation(text=text)
+    # gettext isn't available; no problem; Use the library features without
+    # multi-language support.
+    pass
 
 
 class AppriseLocale:
@@ -105,7 +75,10 @@ class AppriseLocale:
     # Define our default encoding
     _default_encoding = 'utf-8'
 
-    # Define our default language
+    # The function to assign `_` by default
+    _fn = 'gettext'
+
+    # The language we should fall back to if all else fails
     _default_language = 'en'
 
     def __init__(self, language=None):
@@ -123,25 +96,48 @@ class AppriseLocale:
         # Get our language
         self.lang = AppriseLocale.detect_language(language)
 
+        # Our mapping to our _fn
+        self.__fn_map = None
+
         if GETTEXT_LOADED is False:
             # We're done
             return
 
+        # Add default language
         if self.lang:
+            self.add(self.lang)
+
+        else:
+            # Fall back to our default
+            self.add(self._default_language)
+            self.lang = self._default_language
+
+        logger.debug('Language set to %s', self.lang)
+
+    def add(self, lang):
+        """
+        Add a language to our list
+        """
+        if lang not in self._gtobjs:
             # Load our gettext object and install our language
             try:
-                self._gtobjs[self.lang] = gettext.translation(
-                    DOMAIN, localedir=LOCALE_DIR, languages=[self.lang])
+                self._gtobjs[lang] = gettext.translation(
+                    DOMAIN, localedir=LOCALE_DIR, languages=[lang])
 
-                # Install our language
-                self._gtobjs[self.lang].install()
+                # The non-intrusive method of applying the gettext change to
+                # the global namespace only
+                self.__fn_map = getattr(self._gtobjs[lang], self._fn)
 
             except IOError:
                 # This occurs if we can't access/load our translations
-                pass
+                return False
+
+            logger.trace('Loaded language %s', lang)
+
+        return True
 
     @contextlib.contextmanager
-    def lang_at(self, lang):
+    def lang_at(self, lang, mapto=_fn):
         """
         The syntax works as:
             with at.lang_at('fr'):
@@ -151,45 +147,36 @@ class AppriseLocale:
         """
 
         if GETTEXT_LOADED is False:
-            # yield
-            yield
+            # Do nothing
+            yield None
 
             # we're done
             return
 
         # Tidy the language
         lang = AppriseLocale.detect_language(lang, detect_fallback=False)
-
-        # Now attempt to load it
-        try:
-            if lang in self._gtobjs:
-                if lang != self.lang:
-                    # Install our language only if we aren't using it
-                    # already
-                    self._gtobjs[lang].install()
+        if lang not in self._gtobjs and not self.add(lang):
+            if self._default_language not in self._gtobjs \
+                    and not self.add(self._default_language):
+                # Do Nothing
+                yield None
 
             else:
-                self._gtobjs[lang] = gettext.translation(
-                    DOMAIN, localedir=LOCALE_DIR, languages=[self.lang])
-
-                # Install our language
-                self._gtobjs[lang].install()
-
+                yield getattr(self._gtobjs[self._default_language], mapto)
+        else:
             # Yield
-            yield
-
-        except (IOError, KeyError):
-            # This occurs if we can't access/load our translations
-            # Yield reguardless
-            yield
-
-        finally:
-            # Fall back to our previous language
-            if lang != self.lang and lang in self._gtobjs:
-                # Install our language
-                self._gtobjs[self.lang].install()
+            yield getattr(self._gtobjs[lang], mapto)
 
         return
+
+    @property
+    def gettext(self):
+        """
+        Return the current language gettext() function
+
+        Useful for assigning to `_`
+        """
+        return self._gtobjs[self.lang].gettext
 
     @staticmethod
     def detect_language(lang=None, detect_fallback=True):
@@ -227,7 +214,7 @@ class AppriseLocale:
                     # Fallback to posix detection
                     pass
 
-            # Linux Handling
+            # Built in locale library check
             try:
                 # Acquire our locale
                 lang = locale.getlocale()[0]
@@ -259,3 +246,35 @@ class AppriseLocale:
         """
         self.__dict__.update(state)
         self._gtobjs = {}
+
+
+#
+# Prepare our default LOCALE Singleton
+#
+LOCALE = AppriseLocale()
+
+
+class LazyTranslation:
+    """
+    Doesn't translate anything until str() or unicode() references
+    are made.
+
+    """
+    def __init__(self, text, *args, **kwargs):
+        """
+        Store our text
+        """
+        self.text = text
+
+        super().__init__(*args, **kwargs)
+
+    def __str__(self):
+        return LOCALE.gettext(self.text) if GETTEXT_LOADED else self.text
+
+
+# Lazy translation handling
+def gettext_lazy(text):
+    """
+    A dummy function that can be referenced
+    """
+    return LazyTranslation(text=text)

@@ -41,14 +41,12 @@ from apprise import AppriseLocale
 from apprise.utils import environ
 from importlib import reload
 
-
 # Disable logging for a cleaner testing output
 import logging
 logging.disable(logging.CRITICAL)
 
 
-@mock.patch('gettext.install')
-def test_apprise_locale(mock_gettext_install):
+def test_apprise_locale():
     """
     API: Test apprise locale object
     """
@@ -56,29 +54,30 @@ def test_apprise_locale(mock_gettext_install):
     assert str(lazytrans) == 'Token'
 
 
-@mock.patch('gettext.install')
-def test_gettext_init(mock_gettext_install):
+@pytest.mark.skipif(
+    'gettext' not in sys.modules, reason="Requires gettext")
+def test_apprise_locale_gettext_init():
     """
-    API: Mock Gettext init
+    API: Handle gettext
     """
-    mock_gettext_install.side_effect = ImportError()
-    # Test our fall back to not supporting translations
-    reload(AppriseLocale)
+    # Toggle
+    AppriseLocale.GETTEXT_LOADED = False
 
     # Objects can still be created
     al = AppriseLocale.AppriseLocale()
 
-    with al.lang_at('en'):
+    with al.lang_at('en') as _:
         # functions still behave as normal
-        pass
+        assert _ is None
 
-    # restore the object
-    mock_gettext_install.side_effect = None
-    reload(AppriseLocale)
+    # Restore the object
+    AppriseLocale.GETTEXT_LOADED = True
 
 
+@pytest.mark.skipif(
+    'gettext' not in sys.modules, reason="Requires gettext")
 @mock.patch('gettext.translation')
-def test_gettext_translations(mock_gettext_trans):
+def test_apprise_locale_gettext_translations(mock_gettext_trans):
     """
     API: Apprise() Gettext translations
 
@@ -97,16 +96,13 @@ def test_gettext_translations(mock_gettext_trans):
     AppriseLocale.AppriseLocale(language="fr")
 
 
-@mock.patch('gettext.translation')
-def test_gettext_installs(mock_gettext_trans):
+@pytest.mark.skipif(
+    'gettext' not in sys.modules, reason="Requires gettext")
+def test_apprise_locale_gettext_lang_at():
     """
-    API: Apprise() Gettext install
+    API: Apprise() Gettext lang_at
 
     """
-
-    mock_lang = mock.Mock()
-    mock_lang.install.return_value = True
-    mock_gettext_trans.return_value = mock_lang
 
     # This throws internally but we handle it gracefully
     al = AppriseLocale.AppriseLocale()
@@ -118,25 +114,42 @@ def test_gettext_installs(mock_gettext_trans):
     # This throws internally but we handle it gracefully
     AppriseLocale.AppriseLocale(language="fr")
 
-    # Force a few different languages
-    al._gtobjs['en'] = mock_lang
-    al._gtobjs['es'] = mock_lang
-    al.lang = 'en'
-
-    with al.lang_at('en'):
+    with al.lang_at('en') as _:
         # functions still behave as normal
-        pass
+        assert callable(_)
 
-    with al.lang_at('es'):
+    with al.lang_at('es') as _:
         # functions still behave as normal
-        pass
+        assert callable(_)
 
-    with al.lang_at('fr'):
+    with al.lang_at('fr') as _:
         # functions still behave as normal
-        pass
+        assert callable(_)
 
 
-def test_detect_language_windows_users():
+@pytest.mark.skipif(
+    'gettext' not in sys.modules, reason="Requires gettext")
+def test_apprise_locale_add():
+    """
+    API: Apprise() Gettext add
+
+    """
+
+    # This throws internally but we handle it gracefully
+    al = AppriseLocale.AppriseLocale()
+
+    assert al.add('en') is True
+
+    # Double add (copy of above) to access logic that prevents adding it again
+    assert al.add('en') is True
+
+    # Invalid Language
+    assert al.add('bad') is False
+
+
+@pytest.mark.skipif(
+    'gettext' not in sys.modules, reason="Requires gettext")
+def test_apprise_locale_detect_language_windows_users():
     """
     API: Apprise() Detect language
 
@@ -213,3 +226,36 @@ def test_detect_language_locale(mock_getlocale):
     # if detect_language and windows env fail us, then we don't
     # set up a default language on first load
     AppriseLocale.AppriseLocale()
+
+
+@pytest.mark.skipif(
+    'gettext' not in sys.modules, reason="Requires gettext")
+def test_apprise_locale_gettext_missing(tmpdir):
+    """
+    Verify we can still operate without the gettext library
+    """
+
+    # remove gettext from our system enviroment
+    del sys.modules["gettext"]
+
+    # Make our new path to a fake gettext (used to over-ride real one)
+    # have it fail right out of the gate
+    gettext_dir = tmpdir.mkdir("gettext")
+    gettext_dir.join("__init__.py").write("")
+    gettext_dir.join("gettext.py").write("""raise ImportError()""")
+
+    # Update our path to point path to head
+    sys.path.insert(0, str(gettext_dir))
+
+    # reload our module (forcing the import error when it tries to load gettext
+    reload(sys.modules['apprise.AppriseLocale'])
+    from apprise import AppriseLocale
+    assert AppriseLocale.GETTEXT_LOADED is False
+
+    # Now roll our changes back
+    sys.path.pop(0)
+
+    # Reload again (reverting back)
+    reload(sys.modules['apprise.AppriseLocale'])
+    from apprise import AppriseLocale
+    assert AppriseLocale.GETTEXT_LOADED is True
