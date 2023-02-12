@@ -165,7 +165,7 @@ class NotifyPushover(NotifyBase):
     notify_url = 'https://api.pushover.net/1/messages.json'
 
     # The maximum allowable characters allowed in the body per message
-    body_maxlen = 512
+    body_maxlen = 1024
 
     # Default Pushover sound
     default_pushover_sound = PushoverSound.PUSHOVER
