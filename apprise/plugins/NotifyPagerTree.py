@@ -1,27 +1,34 @@
 # -*- coding: utf-8 -*-
+# BSD 3-Clause License
 #
-# Copyright (C) 2019 Chris Caron <lead2gold@gmail.com>
-# All rights reserved.
+# Apprise - Push Notification Library.
+# Copyright (c) 2023, Chris Caron <lead2gold@gmail.com>
 #
-# This code is licensed under the MIT License.
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
 #
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files(the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and / or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions :
+# 1. Redistributions of source code must retain the above copyright notice,
+#    this list of conditions and the following disclaimer.
 #
-# The above copyright notice and this permission notice shall be included in
-# all copies or substantial portions of the Software.
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
 #
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-# THE SOFTWARE.
+# 3. Neither the name of the copyright holder nor the names of its
+#    contributors may be used to endorse or promote products derived from
+#    this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
 
 import requests
 from json import dumps
@@ -97,12 +104,12 @@ class NotifyPagerTree(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{integration_id}',
+        '{schema}://{integration}',
     )
 
     # Define our template tokens
     template_tokens = dict(NotifyBase.template_tokens, **{
-        'integration_id': {
+        'integration': {
             'name': _('Integration ID'),
             'type': 'string',
             'private': True,
@@ -118,7 +125,7 @@ class NotifyPagerTree(NotifyBase):
             'values': PAGERTREE_ACTIONS,
             'default': PagerTreeAction.CREATE,
         },
-        'thirdparty_id': {
+        'thirdparty': {
             'name': _('Third Party ID'),
             'type': 'string',
         },
@@ -149,7 +156,7 @@ class NotifyPagerTree(NotifyBase):
         },
     }
 
-    def __init__(self, integration_id, action=None, thirdparty_id=None,
+    def __init__(self, integration, action=None, thirdparty=None,
                  urgency=None, tags=None, headers=None,
                  payload_extras=None, meta_extras=None, **kwargs):
         """
@@ -158,13 +165,25 @@ class NotifyPagerTree(NotifyBase):
         super().__init__(**kwargs)
 
         # Integration ID (associated with account)
-        self.integration_id = \
-            validate_regex(integration_id, r'^int_[a-zA-Z0-9\-_]{7,14}$')
-        if not self.integration_id:
+        self.integration = \
+            validate_regex(integration, r'^int_[a-zA-Z0-9\-_]{7,14}$')
+        if not self.integration:
             msg = 'An invalid PagerTree Integration ID ' \
-                  '({}) was specified.'.format(integration_id)
+                  '({}) was specified.'.format(integration)
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        # thirdparty (optional, in case they want to pass the
+        # acknowledge or resolve action)
+        self.thirdparty = None
+        if thirdparty:
+            # An id was specified, we want to validate it
+            self.thirdparty = validate_regex(thirdparty)
+            if not self.thirdparty:
+                msg = 'An invalid PagerTree third party ID ' \
+                      '({}) was specified.'.format(thirdparty)
+                self.logger.warning(msg)
+                raise TypeError(msg)
 
         self.headers = {}
         if headers:
@@ -180,11 +199,6 @@ class NotifyPagerTree(NotifyBase):
         if meta_extras:
             # Store our extra payload entries
             self.meta_extras.update(meta_extras)
-
-        # thirdparty_id (optional, in case they want to pass the
-        # acknowledge or resolve action)
-        self.thirdparty_id = validate_regex(thirdparty_id) \
-            if thirdparty_id is not None else str(uuid4())
 
         # Setup our action
         self.action = NotifyPagerTree.template_args['action']['default'] \
@@ -218,10 +232,10 @@ class NotifyPagerTree(NotifyBase):
 
         # prepare JSON Object
         payload = {
+            # Generate an ID (unless one was explicitly forced to be used)
+            'id': self.thirdparty if self.thirdparty else str(uuid4()),
             'event_type': self.action,
         }
-
-        payload['id'] = self.thirdparty_id
 
         if self.action == PagerTreeAction.CREATE:
             payload['title'] = title if title else self.app_desc
@@ -236,8 +250,8 @@ class NotifyPagerTree(NotifyBase):
         # Apply any/all payload over-rides defined
         payload.update(self.payload_extras)
 
-        # Prepare our URL based on integration_id
-        notify_url = self.notify_url.format(self.integration_id)
+        # Prepare our URL based on integration
+        notify_url = self.notify_url.format(self.integration)
 
         self.logger.debug('PagerTree POST URL: %s (cert_verify=%r)' % (
             notify_url, self.verify_certificate,
@@ -294,7 +308,22 @@ class NotifyPagerTree(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        params = self.url_parameters(privacy=privacy, *args, **kwargs)
+        # Define any URL parameters
+        params = {
+            'action': self.action,
+        }
+
+        if self.thirdparty:
+            params['tid'] = self.thirdparty
+
+        if self.urgency:
+            params['urgency'] = self.urgency
+
+        if self.__tags:
+            params['tags'] = ','.join([x for x in self.__tags])
+
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Headers prefixed with a '+' sign
         # Append our headers into our parameters
@@ -310,10 +339,10 @@ class NotifyPagerTree(NotifyBase):
         params.update(
             {':{}'.format(k): v for k, v in self.payload_extras.items()})
 
-        return '{schema}://{integration_id}?{params}'.format(
+        return '{schema}://{integration}?{params}'.format(
             schema=self.secure_protocol,
             # never encode hostname since we're expecting it to be a valid one
-            integration_id=self.pprint(self.integration_id, privacy, safe=''),
+            integration=self.pprint(self.integration, privacy, safe=''),
             params=NotifyPagerTree.urlencode(params),
         )
 
@@ -350,19 +379,31 @@ class NotifyPagerTree(NotifyBase):
         }
 
         # Integration ID
-        if 'integration_id' in results['qsd'] and \
-                len(results['qsd']['integration_id']):
-            results['integration_id'] = \
-                NotifyPagerTree.unquote(results['qsd']['integration_id'])
+        if 'id' in results['qsd'] and len(results['qsd']['id']):
+            # Shortened version of integration id
+            results['integration'] = \
+                NotifyPagerTree.unquote(results['qsd']['id'])
+
+        elif 'integration' in results['qsd'] and \
+                len(results['qsd']['integration']):
+            results['integration'] = \
+                NotifyPagerTree.unquote(results['qsd']['integration'])
+
         else:
-            results['integration_id'] = \
+            results['integration'] = \
                 NotifyPagerTree.unquote(results['host'])
 
-        # Set our thirdparty_id
-        if 'thirdparty_id' in results['qsd'] and \
-                len(results['qsd']['thirdparty_id']):
-            results['thirdparty_id'] = \
-                NotifyPagerTree.unquote(results['qsd']['thirdparty_id'])
+        # Set our thirdparty
+
+        if 'tid' in results['qsd'] and len(results['qsd']['tid']):
+            # Shortened version of thirdparty
+            results['thirdparty'] = \
+                NotifyPagerTree.unquote(results['qsd']['tid'])
+
+        elif 'thirdparty' in results['qsd'] and \
+                len(results['qsd']['thirdparty']):
+            results['thirdparty'] = \
+                NotifyPagerTree.unquote(results['qsd']['thirdparty'])
 
         # Set our urgency
         if 'action' in results['qsd'] and \
