@@ -31,9 +31,11 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 from .rest import AppriseURLTester
+from .asyncio import OuterEventLoop
 from .module import reload_plugin
 
 __all__ = [
     'AppriseURLTester',
+    'OuterEventLoop',
     'reload_plugin',
 ]

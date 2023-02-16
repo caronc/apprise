@@ -561,7 +561,7 @@ def test_apprise_config_with_apprise_obj(tmpdir):
             super().__init__(
                 notify_format=NotifyFormat.HTML, **kwargs)
 
-        def notify(self, **kwargs):
+        async def async_notify(self, **kwargs):
             # Pretend everything is okay
             return True
 

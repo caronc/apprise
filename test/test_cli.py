@@ -68,6 +68,10 @@ def test_apprise_cli_nux_env(tmpdir):
             super().__init__(*args, **kwargs)
 
         def notify(self, **kwargs):
+            # Pretend everything is okay (when passing --disable-async)
+            return True
+
+        async def async_notify(self, **kwargs):
             # Pretend everything is okay
             return True
 
@@ -79,8 +83,8 @@ def test_apprise_cli_nux_env(tmpdir):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
 
-        def notify(self, **kwargs):
-            # Force a notification failure
+        async def async_notify(self, **kwargs):
+            # Pretend everything is okay
             return False
 
         def url(self, *args, **kwargs):
