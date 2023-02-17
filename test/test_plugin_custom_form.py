@@ -295,6 +295,10 @@ def test_plugin_custom_form_attachments(mock_post):
             body='body', title='title', notify_type=NotifyType.INFO,
             attach=attach) is True
 
+    # Test invalid attach-as input
+    obj = Apprise.instantiate(
+        'form://user@localhost.localdomain/?attach-as={')
+    assert obj is None
 
 @mock.patch('requests.post')
 @mock.patch('requests.get')
