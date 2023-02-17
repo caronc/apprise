@@ -208,12 +208,9 @@ class NotifyForm(NotifyBase):
                 if result.group('id1a'):
                     self.attach_as += result.group('id1a')
 
-                if result.group('wc1'):
-                    self.attach_as += self.attach_as_count
-                    self.attach_multi_support = True
-
-                if result.group('id1b'):
-                    self.attach_as += result.group('id1b')
+                self.attach_as += self.attach_as_count
+                self.attach_multi_support = True
+                self.attach_as += result.group('id1b')
 
             else:  # result.group('match2'):
                 self.attach_as += result.group('id2')
