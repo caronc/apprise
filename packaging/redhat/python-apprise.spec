@@ -110,11 +110,13 @@ BuildRequires: python%{python3_pkgversion}-markdown
 BuildRequires: python%{python3_pkgversion}-yaml
 BuildRequires: python%{python3_pkgversion}-babel
 BuildRequires: python%{python3_pkgversion}-cryptography
+BuildRequires: python%{python3_pkgversion}-certifi
 BuildRequires: python%{python3_pkgversion}-paho-mqtt
 Requires: python%{python3_pkgversion}-requests
 Requires: python%{python3_pkgversion}-requests-oauthlib
 Requires: python%{python3_pkgversion}-markdown
 Requires: python%{python3_pkgversion}-cryptography
+Requires: python%{python3_pkgversion}-certifi
 Requires: python%{python3_pkgversion}-yaml
 Recommends: python%{python3_pkgversion}-paho-mqtt
 
