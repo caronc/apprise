@@ -68,7 +68,8 @@ class NotifyForm(NotifyBase):
     __attach_as_re = re.compile(
         r'((?P<match1>(?P<id1a>[a-z0-9_-]+)?'
         r'(?P<wc1>[*?+$:.%]+)(?P<id1b>[a-z0-9_-]+))'
-        r'|(?P<match2>(?P<id2>[a-z0-9_-]+)(?P<wc2>[*?+$:.%]?)))', re.IGNORECASE)
+        r'|(?P<match2>(?P<id2>[a-z0-9_-]+)(?P<wc2>[*?+$:.%]?)))',
+        re.IGNORECASE)
 
     # Our count
     attach_as_count = '{:02d}'
