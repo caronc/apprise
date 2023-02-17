@@ -267,12 +267,6 @@ class NotifyForm(NotifyBase):
                     self.logger.debug('I/O Exception: %s' % str(e))
                     return False
 
-                finally:
-                    for file in files:
-                        # Ensure all files are closed
-                        if file[1][1]:
-                            file[1][1].close()
-
         # prepare Form Object
         payload = {
             # Version: Major.Minor,  Major is only updated if the entire
