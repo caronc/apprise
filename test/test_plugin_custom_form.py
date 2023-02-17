@@ -300,6 +300,7 @@ def test_plugin_custom_form_attachments(mock_post):
         'form://user@localhost.localdomain/?attach-as={')
     assert obj is None
 
+
 @mock.patch('requests.post')
 @mock.patch('requests.get')
 def test_plugin_custom_form_edge_cases(mock_get, mock_post):
