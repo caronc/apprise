@@ -93,6 +93,9 @@ apprise_url_tests = (
     ('json://user@localhost?method=delete', {
         'instance': NotifyJSON,
     }),
+    ('json://user@localhost?method=patch', {
+        'instance': NotifyJSON,
+    }),
 
     # Continue testing other cases
     ('json://localhost:8080', {
