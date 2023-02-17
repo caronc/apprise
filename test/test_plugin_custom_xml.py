@@ -92,6 +92,9 @@ apprise_url_tests = (
     ('xml://user@localhost?method=delete', {
         'instance': NotifyXML,
     }),
+    ('xml://user@localhost?method=patch', {
+        'instance': NotifyXML,
+    }),
 
     # Continue testing other cases
     ('xml://localhost:8080', {

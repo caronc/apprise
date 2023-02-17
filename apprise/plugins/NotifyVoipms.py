@@ -316,12 +316,7 @@ class NotifyVoipms(NotifyBase):
         """
 
         # Define any URL parameters
-        params = {
-            'method': 'sendSMS'
-        }
-
-        # Extend our parameters
-        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+        params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         schemaStr =  \
             '{schema}://{password}:{email}/{from_phone}/{targets}/?{params}'

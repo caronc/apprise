@@ -47,7 +47,8 @@ METHODS = (
     'GET',
     'DELETE',
     'PUT',
-    'HEAD'
+    'HEAD',
+    'PATCH'
 )
 
 
@@ -366,6 +367,9 @@ class NotifyXML(NotifyBase):
 
         elif self.method == 'PUT':
             method = requests.put
+
+        elif self.method == 'PATCH':
+            method = requests.patch
 
         elif self.method == 'DELETE':
             method = requests.delete

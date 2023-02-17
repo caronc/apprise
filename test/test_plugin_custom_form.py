@@ -91,6 +91,9 @@ apprise_url_tests = (
     ('form://user@localhost?method=delete', {
         'instance': NotifyForm,
     }),
+    ('form://user@localhost?method=patch', {
+        'instance': NotifyForm,
+    }),
 
     # Custom payload options
     ('form://localhost:8080?:key=value&:key2=value2', {
@@ -229,6 +232,73 @@ def test_plugin_custom_form_attachments(mock_post):
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=attach) is False
+
+    #
+    # Test attach-as
+    #
+
+    # Assign our mock object our return value
+    mock_post.return_value = okay_response
+    mock_post.side_effect = None
+
+    obj = Apprise.instantiate(
+        'form://user@localhost.localdomain/?attach-as=file')
+    assert isinstance(obj, NotifyForm)
+
+    # Test Single Valid Attachment
+    path = os.path.join(TEST_VAR_DIR, 'apprise-test.gif')
+    attach = AppriseAttachment(path)
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=attach) is True
+
+    # Test Valid Attachment (load 3) (produces a warning)
+    path = (
+        os.path.join(TEST_VAR_DIR, 'apprise-test.gif'),
+        os.path.join(TEST_VAR_DIR, 'apprise-test.gif'),
+        os.path.join(TEST_VAR_DIR, 'apprise-test.gif'),
+    )
+    attach = AppriseAttachment(path)
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=attach) is True
+
+    # Test our other variations of accepted values
+    # we support *, :, ?, ., +, %, and $
+    for attach_as in (
+            'file*', '*file', 'file*file',
+            'file:', ':file', 'file:file',
+            'file?', '?file', 'file?file',
+            'file.', '.file', 'file.file',
+            'file+', '+file', 'file+file',
+            'file$', '$file', 'file$file'):
+
+        obj = Apprise.instantiate(
+            f'form://user@localhost.localdomain/?attach-as={attach_as}')
+        assert isinstance(obj, NotifyForm)
+
+        # Test Single Valid Attachment
+        path = os.path.join(TEST_VAR_DIR, 'apprise-test.gif')
+        attach = AppriseAttachment(path)
+        assert obj.notify(
+            body='body', title='title', notify_type=NotifyType.INFO,
+            attach=attach) is True
+
+        # Test Valid Attachment (load 3) (produces a warning)
+        path = (
+            os.path.join(TEST_VAR_DIR, 'apprise-test.gif'),
+            os.path.join(TEST_VAR_DIR, 'apprise-test.gif'),
+            os.path.join(TEST_VAR_DIR, 'apprise-test.gif'),
+        )
+        attach = AppriseAttachment(path)
+        assert obj.notify(
+            body='body', title='title', notify_type=NotifyType.INFO,
+            attach=attach) is True
+
+    # Test invalid attach-as input
+    obj = Apprise.instantiate(
+        'form://user@localhost.localdomain/?attach-as={')
+    assert obj is None
 
 
 @mock.patch('requests.post')
