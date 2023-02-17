@@ -242,7 +242,7 @@ def test_plugin_custom_form_attachments(mock_post):
     mock_post.side_effect = None
 
     obj = Apprise.instantiate(
-        'form://user@localhost.localdomain/attach-as=file')
+        'form://user@localhost.localdomain/?attach-as=file')
     assert isinstance(obj, NotifyForm)
 
     # Test Single Valid Attachment
@@ -274,7 +274,7 @@ def test_plugin_custom_form_attachments(mock_post):
             'file$', '$file', 'file$file'):
 
         obj = Apprise.instantiate(
-            'form://user@localhost.localdomain/attach-as=file')
+            f'form://user@localhost.localdomain/?attach-as={attach_as}')
         assert isinstance(obj, NotifyForm)
 
         # Test Single Valid Attachment
