@@ -219,7 +219,7 @@ class NotifyNtfy(NotifyBase):
         'token': {
             'name': _('Token'),
             'type': 'string',
-            'map_to': 'password',
+            'private': True,
         },
         'topic': {
             'name': _('Topic'),
@@ -281,6 +281,9 @@ class NotifyNtfy(NotifyBase):
             'values': NTFY_MODES,
             'default': NtfyMode.PRIVATE,
         },
+        'token': {
+            'alias_of': 'token',
+        },
         'auth': {
             'name': _('Authentication Type'),
             'type': 'choice:string',
@@ -294,7 +297,8 @@ class NotifyNtfy(NotifyBase):
 
     def __init__(self, targets=None, attach=None, filename=None, click=None,
                  delay=None, email=None, priority=None, tags=None, mode=None,
-                 include_image=True, avatar_url=None, auth=None, **kwargs):
+                 include_image=True, avatar_url=None, auth=None, token=None,
+                 **kwargs):
         """
         Initialize ntfy Object
         """
@@ -338,6 +342,9 @@ class NotifyNtfy(NotifyBase):
 
         # An email to forward notifications to
         self.email = email
+
+        # Save our token
+        self.token = token
 
         # The Priority of the message
         self.priority = NotifyNtfy.template_args['priority']['default'] \
@@ -467,12 +474,12 @@ class NotifyNtfy(NotifyBase):
                 auth = (self.user, self.password)
 
             elif self.auth == NtfyAuth.TOKEN:
-                if not self.password:
+                if not self.token:
                     self.logger.warning('No Ntfy Token was specified')
                     return False, None
 
                 # Set Token
-                headers['Authorization'] = f'Bearer {self.password}'
+                headers['Authorization'] = f'Bearer {self.token}'
 
             # Prepare our ntfy Template URL
             schema = 'https' if self.secure else 'http'
@@ -628,6 +635,7 @@ class NotifyNtfy(NotifyBase):
             'priority': self.priority,
             'mode': self.mode,
             'image': 'yes' if self.include_image else 'no',
+            'auth': self.auth,
         }
 
         if self.avatar_url:
@@ -665,9 +673,9 @@ class NotifyNtfy(NotifyBase):
                     user=NotifyNtfy.quote(self.user, safe=''),
                 )
 
-        elif self.password:  # NtfyAuth.TOKEN also
+        elif self.token:  # NtfyAuth.TOKEN also
             auth = '{token}@'.format(
-                token=NotifyNtfy.quote(self.password, safe=''),
+                token=self.pprint(self.token, privacy, safe=''),
             )
 
         if self.mode == NtfyMode.PRIVATE:
@@ -749,12 +757,19 @@ class NotifyNtfy(NotifyBase):
             results['targets'] += \
                 NotifyNtfy.parse_list(results['qsd']['to'])
 
+        # Token Specified
+        if 'token' in results['qsd'] and len(results['qsd']['token']):
+            # Token presumed to be the one in use
+            results['auth'] = NtfyAuth.TOKEN
+            results['token'] = NotifyNtfy.unquote(results['qsd']['token'])
+
         # Auth override
         if 'auth' in results['qsd'] and results['qsd']['auth']:
             results['auth'] = NotifyNtfy.unquote(
                 results['qsd']['auth'].strip().lower())
 
-        elif results['user'] and not results['password']:
+        if not results.get('auth') and results['user'] \
+                and not results['password']:
             # We can try to detect the authentication type on the formatting of
             # the username. Look for tk_.*
             #
@@ -764,11 +779,14 @@ class NotifyNtfy(NotifyBase):
                 if NTFY_AUTH_DETECT_RE.match(results['user']) \
                 else NtfyAuth.BASIC
 
-        if results.get('auth') == NtfyAuth.TOKEN and results['user'] \
-                and not results['password']:
+        if results.get('auth') == NtfyAuth.TOKEN and not results.get('token'):
+            if results['user'] and not results['password']:
+                # Make sure we properly set our token
+                results['token'] = NotifyNtfy.unquote(results['user'])
 
-            # Make sure we always reference the password field for our token
-            results['password'] = results['user']
+            elif results['password']:
+                # Make sure we properly set our token
+                results['token'] = NotifyNtfy.unquote(results['password'])
 
         # Mode override
         if 'mode' in results['qsd'] and results['qsd']['mode']:
