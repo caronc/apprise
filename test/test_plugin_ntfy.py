@@ -165,6 +165,22 @@ apprise_url_tests = (
         'instance': NotifyNtfy,
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
+    # Auth Token Types (tk_ gets detected as a auth=token)
+    ('ntfy://tk_abcd123456@localhost/topic1', {
+        'instance': NotifyNtfy,
+        'requests_response_text': GOOD_RESPONSE_TEXT,
+    }),
+    # Force an auth token since tk_ prevents auto-detection
+    ('ntfy://abcd123456@localhost/topic1?auth=token', {
+        'instance': NotifyNtfy,
+        'requests_response_text': GOOD_RESPONSE_TEXT,
+    }),
+    # Token mode force, but there was no token provided
+    ('ntfy://localhost/topic1?auth=token', {
+        'instance': NotifyNtfy,
+        # We'll out-right fail to send the notification
+        'response': False,
+    }),
     # Priority
     ('ntfy://localhost/topic1/?priority=default', {
         'instance': NotifyNtfy,
@@ -211,6 +227,10 @@ apprise_url_tests = (
     }),
     ('ntfys://user:web/token@localhost/topic/?mode=invalid', {
         # Invalid mode
+        'instance': TypeError,
+    }),
+    ('ntfys://token@localhost/topic/?auth=invalid', {
+        # Invalid Authentication type
         'instance': TypeError,
     }),
     # Invalid hostname on localhost/private mode

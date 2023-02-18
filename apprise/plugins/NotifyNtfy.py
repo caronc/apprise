@@ -74,6 +74,27 @@ NTFY_MODES = (
     NtfyMode.PRIVATE,
 )
 
+# A Simple regular expression used to auto detect Auth mode if it isn't
+# otherwise specified:
+NTFY_AUTH_DETECT_RE = re.compile('tk_[^ \t]+', re.IGNORECASE)
+
+
+class NtfyAuth:
+    """
+    Define ntfy Authentication Modes
+    """
+    # Basic auth (user and password provided)
+    BASIC = "basic"
+
+    # Auth Token based
+    TOKEN = "token"
+
+
+NTFY_AUTH = (
+    NtfyAuth.BASIC,
+    NtfyAuth.TOKEN,
+)
+
 
 class NtfyPriority:
     """
@@ -170,6 +191,8 @@ class NotifyNtfy(NotifyBase):
         '{schema}://{user}@{host}:{port}/{targets}',
         '{schema}://{user}:{password}@{host}/{targets}',
         '{schema}://{user}:{password}@{host}:{port}/{targets}',
+        '{schema}://{token}@{host}/{targets}',
+        '{schema}://{token}@{host}:{port}/{targets}',
     )
 
     # Define our template tokens
@@ -192,6 +215,11 @@ class NotifyNtfy(NotifyBase):
             'name': _('Password'),
             'type': 'string',
             'private': True,
+        },
+        'token': {
+            'name': _('Token'),
+            'type': 'string',
+            'map_to': 'password',
         },
         'topic': {
             'name': _('Topic'),
@@ -253,6 +281,12 @@ class NotifyNtfy(NotifyBase):
             'values': NTFY_MODES,
             'default': NtfyMode.PRIVATE,
         },
+        'auth': {
+            'name': _('Authentication Type'),
+            'type': 'choice:string',
+            'values': NTFY_AUTH,
+            'default': NtfyAuth.BASIC,
+        },
         'to': {
             'alias_of': 'targets',
         },
@@ -260,7 +294,7 @@ class NotifyNtfy(NotifyBase):
 
     def __init__(self, targets=None, attach=None, filename=None, click=None,
                  delay=None, email=None, priority=None, tags=None, mode=None,
-                 include_image=True, avatar_url=None, **kwargs):
+                 include_image=True, avatar_url=None, auth=None, **kwargs):
         """
         Initialize ntfy Object
         """
@@ -278,6 +312,17 @@ class NotifyNtfy(NotifyBase):
 
         # Show image associated with notification
         self.include_image = include_image
+
+        # Prepare our authentication type
+        self.auth = auth.strip().lower() \
+            if isinstance(auth, str) \
+            else self.template_args['auth']['default']
+
+        if self.auth not in NTFY_AUTH:
+            msg = 'An invalid ntfy Authentication type ({}) was specified.' \
+                .format(auth)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         # Attach a file (URL supported)
         self.attach = attach
@@ -418,8 +463,16 @@ class NotifyNtfy(NotifyBase):
 
         else:  # NotifyNtfy.PRVATE
             # Allow more settings to be applied now
-            if self.user:
+            if self.auth == NtfyAuth.BASIC and self.user:
                 auth = (self.user, self.password)
+
+            elif self.auth == NtfyAuth.TOKEN:
+                if not self.password:
+                    self.logger.warning('No Ntfy Token was specified')
+                    return False, None
+
+                # Set Token
+                headers['Authorization'] = f'Bearer {self.password}'
 
             # Prepare our ntfy Template URL
             schema = 'https' if self.secure else 'http'
@@ -599,15 +652,22 @@ class NotifyNtfy(NotifyBase):
 
         # Determine Authentication
         auth = ''
-        if self.user and self.password:
-            auth = '{user}:{password}@'.format(
-                user=NotifyNtfy.quote(self.user, safe=''),
-                password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
-            )
-        elif self.user:
-            auth = '{user}@'.format(
-                user=NotifyNtfy.quote(self.user, safe=''),
+        if self.auth == NtfyAuth.BASIC:
+            if self.user and self.password:
+                auth = '{user}:{password}@'.format(
+                    user=NotifyNtfy.quote(self.user, safe=''),
+                    password=self.pprint(
+                        self.password, privacy, mode=PrivacyMode.Secret,
+                        safe=''),
+                )
+            elif self.user:
+                auth = '{user}@'.format(
+                    user=NotifyNtfy.quote(self.user, safe=''),
+                )
+
+        elif self.password:  # NtfyAuth.TOKEN also
+            auth = '{token}@'.format(
+                token=NotifyNtfy.quote(self.password, safe=''),
             )
 
         if self.mode == NtfyMode.PRIVATE:
@@ -688,6 +748,27 @@ class NotifyNtfy(NotifyBase):
         if 'to' in results['qsd'] and len(results['qsd']['to']):
             results['targets'] += \
                 NotifyNtfy.parse_list(results['qsd']['to'])
+
+        # Auth override
+        if 'auth' in results['qsd'] and results['qsd']['auth']:
+            results['auth'] = NotifyNtfy.unquote(
+                results['qsd']['auth'].strip().lower())
+
+        elif results['user'] and not results['password']:
+            # We can try to detect the authentication type on the formatting of
+            # the username. Look for tk_.*
+            #
+            # This isn't a surfire way to do things though; it's best to
+            # specify the auth= flag
+            results['auth'] = NtfyAuth.TOKEN \
+                if NTFY_AUTH_DETECT_RE.match(results['user']) \
+                else NtfyAuth.BASIC
+
+        if results.get('auth') == NtfyAuth.TOKEN and results['user'] \
+                and not results['password']:
+
+            # Make sure we always reference the password field for our token
+            results['password'] = results['user']
 
         # Mode override
         if 'mode' in results['qsd'] and results['qsd']['mode']:
