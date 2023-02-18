@@ -135,7 +135,14 @@ class NotifyMatrix(NotifyBase):
     image_size = NotifyImageSize.XY_32
 
     # The maximum allowable characters allowed in the body per message
-    body_maxlen = 1000
+    # https://spec.matrix.org/v1.6/client-server-api/#size-limits
+    # The complete event MUST NOT be larger than 65536 bytes, when formatted
+    # with the federation event format, including any signatures, and encoded
+    # as Canonical JSON.
+    #
+    # To gracefully allow for some overhead' we'll define a max body length
+    # of just slighty lower then the limit of the full message itself.
+    body_maxlen = 65000
 
     # Throttle a wee-bit to avoid thrashing
     request_rate_per_sec = 0.5
