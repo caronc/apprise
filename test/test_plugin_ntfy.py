@@ -99,6 +99,8 @@ apprise_url_tests = (
     ('ntfy://user@localhost/topic/', {
         'instance': NotifyNtfy,
         'requests_response_text': GOOD_RESPONSE_TEXT,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'ntfy://user@localhost/topic',
     }),
     # Ntfy cloud mode (enforced)
     ('ntfy://ntfy.sh/topic1/topic2/', {
@@ -165,10 +167,55 @@ apprise_url_tests = (
         'instance': NotifyNtfy,
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
+    # Auth Token Types (tk_ gets detected as a auth=token)
+    ('ntfy://tk_abcd123456@localhost/topic1', {
+        'instance': NotifyNtfy,
+        'requests_response_text': GOOD_RESPONSE_TEXT,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'ntfy://t...6@localhost/topic1',
+    }),
+    # Force an auth token since lack of tk_ prevents auto-detection
+    ('ntfy://abcd123456@localhost/topic1?auth=token', {
+        'instance': NotifyNtfy,
+        'requests_response_text': GOOD_RESPONSE_TEXT,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'ntfy://a...6@localhost/topic1',
+    }),
+    # Force an auth token since lack of tk_ prevents auto-detection
+    ('ntfy://:abcd123456@localhost/topic1?auth=token', {
+        'instance': NotifyNtfy,
+        'requests_response_text': GOOD_RESPONSE_TEXT,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'ntfy://a...6@localhost/topic1',
+    }),
+    # Token detection already implied when token keyword is set
+    ('ntfy://localhost/topic1?token=abc1234', {
+        'instance': NotifyNtfy,
+        'requests_response_text': GOOD_RESPONSE_TEXT,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'ntfy://a...4@localhost/topic1',
+    }),
+    # Token enforced, but since a user/pass provided, only the pass is kept
+    ('ntfy://user:token@localhost/topic1?auth=token', {
+        'instance': NotifyNtfy,
+        'requests_response_text': GOOD_RESPONSE_TEXT,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'ntfy://t...n@localhost/topic1',
+    }),
+    # Token mode force, but there was no token provided
+    ('ntfy://localhost/topic1?auth=token', {
+        'instance': NotifyNtfy,
+        # We'll out-right fail to send the notification
+        'response': False,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'ntfy://localhost/topic1',
+    }),
     # Priority
     ('ntfy://localhost/topic1/?priority=default', {
         'instance': NotifyNtfy,
         'requests_response_text': GOOD_RESPONSE_TEXT,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'ntfy://localhost/topic1',
     }),
     # Priority higher
     ('ntfy://localhost/topic1/?priority=high', {
@@ -211,6 +258,10 @@ apprise_url_tests = (
     }),
     ('ntfys://user:web/token@localhost/topic/?mode=invalid', {
         # Invalid mode
+        'instance': TypeError,
+    }),
+    ('ntfys://token@localhost/topic/?auth=invalid', {
+        # Invalid Authentication type
         'instance': TypeError,
     }),
     # Invalid hostname on localhost/private mode
