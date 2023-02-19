@@ -140,6 +140,16 @@ apprise_url_tests = (
         'instance': NotifyNtfy,
         'requests_response_text': GOOD_RESPONSE_TEXT,
     }),
+    # No images
+    ('ntfy://localhost/topic1/?image=False', {
+        'instance': NotifyNtfy,
+        'requests_response_text': GOOD_RESPONSE_TEXT,
+    }),
+    # Over-ride Image Path
+    ('ntfy://localhost/topic1/?avatar_url=ttp://localhost/test.jpg', {
+        'instance': NotifyNtfy,
+        'requests_response_text': GOOD_RESPONSE_TEXT,
+    }),
     # Attach
     ('ntfy://localhost/topic1/?attach=http://example.com/file.jpg', {
         'instance': NotifyNtfy,
