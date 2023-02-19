@@ -253,7 +253,7 @@ class NotifyMastodon(NotifyBase):
 
         self.token = validate_regex(token)
         if not self.token:
-            msg = 'An invalid Twitter Consumer Key was specified.'
+            msg = 'An invalid Mastodon Access Token was specified.'
             self.logger.warning(msg)
             raise TypeError(msg)
 
