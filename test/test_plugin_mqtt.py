@@ -252,7 +252,7 @@ def test_plugin_mqtt_tls_connect_success(mqtt_client_mock):
             tls_version=ssl.PROTOCOL_TLS,
             ciphers=None,
         ),
-        call.tls_insecure_set(True),
+        call.tls_insecure_set(False),
         call.connect('localhost', port=8883, keepalive=30),
         call.loop_start(),
         call.is_connected(),
@@ -299,7 +299,7 @@ def test_plugin_mqtt_tls_no_verify_success(mqtt_client_mock):
     # Verify the right calls have been made to the MQTT client object.
     # Let's only validate the single call of interest is present.
     # Everything else is identical with `test_plugin_mqtt_tls_connect_success`.
-    assert call.tls_insecure_set(False) in mqtt_client_mock.mock_calls
+    assert call.tls_insecure_set(True) in mqtt_client_mock.mock_calls
 
 
 def test_plugin_mqtt_session_client_id_success(mqtt_client_mock):

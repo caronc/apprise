@@ -324,7 +324,7 @@ class NotifyMQTT(NotifyBase):
                         ciphers=None)
 
                     # Set our TLS Verify Flag
-                    self.client.tls_insecure_set(self.verify_certificate)
+                    self.client.tls_insecure_set(not self.verify_certificate)
 
                 # Establish our connection
                 if self.client.connect(
