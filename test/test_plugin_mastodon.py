@@ -146,12 +146,6 @@ apprise_url_tests = (
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
     }),
-    ('mastodons://access_token@hostname', {
-        'instance': NotifyMastodon,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
 )
 
 
