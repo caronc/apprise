@@ -66,9 +66,9 @@ else:
 
 setup(
     name='apprise',
-    version='1.2.1',
+    version='1.3.0',
     description='Push Notifications that work with just about every platform!',
-    license='GPLv2',
+    license='BSD',
     long_description=open('README.md', encoding="utf-8").read(),
     long_description_content_type='text/markdown',
     cmdclass=cmdclass,

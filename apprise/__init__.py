@@ -31,9 +31,9 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 __title__ = 'Apprise'
-__version__ = '1.2.1'
+__version__ = '1.3.0'
 __author__ = 'Chris Caron'
-__license__ = 'GPLv2'
+__license__ = 'BSD'
 __copywrite__ = 'Copyright (C) 2023 Chris Caron <lead2gold@gmail.com>'
 __email__ = 'lead2gold@gmail.com'
 __status__ = 'Production'

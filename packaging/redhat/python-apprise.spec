@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 3-Clause License
 #
 # Apprise - Push Notification Library.
@@ -57,7 +56,7 @@ SparkPost, Super Toasty, Streamlabs, Stride, Syslog, Techulus Push, Telegram,
 Twilio, Twitter, Twist, XBMC, Voipms, Vonage, Webex Teams}
 
 Name:           python-%{pypi_name}
-Version:        1.2.1
+Version:        1.3.0
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        BSD
@@ -187,6 +186,12 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 %{python3_sitelib}/%{pypi_name}/cli.*
 
 %changelog
+* Wed Feb 22 2023 Chris Caron <lead2gold@gmail.com> - 1.3.0
+- Updated to v1.3.0
+
+* Fri Jan 20 2023 Fedora Release Engineering <releng@fedoraproject.org> - 1.2.1-2
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_38_Mass_Rebuild
+
 * Wed Dec 28 2022 Chris Caron <lead2gold@gmail.com> - 1.2.1-1
 - Updated to v1.2.1
 

@@ -1,14 +1,14 @@
 # Translations template for apprise.
-# Copyright (C) 2022 Chris Caron
+# Copyright (C) 2023 Chris Caron
 # This file is distributed under the same license as the apprise project.
-# FIRST AUTHOR <EMAIL@ADDRESS>, 2022.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2023.
 #
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: apprise 1.2.1\n"
+"Project-Id-Version: apprise 1.3.0\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2022-12-28 09:43-0500\n"
+"POT-Creation-Date: 2023-02-22 17:31-0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -50,6 +50,9 @@ msgstr ""
 msgid "Account SID"
 msgstr ""
 
+msgid "Action"
+msgstr ""
+
 msgid "Add Tokens"
 msgstr ""
 
@@ -83,6 +86,9 @@ msgstr ""
 msgid "Attach"
 msgstr ""
 
+msgid "Attach File As"
+msgstr ""
+
 msgid "Attach Filename"
 msgstr ""
 
@@ -90,6 +96,9 @@ msgid "Auth Token"
 msgstr ""
 
 msgid "Authentication Key"
+msgstr ""
+
+msgid "Authentication Type"
 msgstr ""
 
 msgid "Authorization Token"
@@ -305,6 +314,9 @@ msgstr ""
 msgid "Include Segment"
 msgstr ""
 
+msgid "Integration ID"
+msgstr ""
+
 msgid "Is Ad?"
 msgstr ""
 
@@ -351,6 +363,9 @@ msgid "Message Mode"
 msgstr ""
 
 msgid "Message Type"
+msgstr ""
+
+msgid "Meta Extras"
 msgstr ""
 
 msgid "Modal"
@@ -658,6 +673,9 @@ msgstr ""
 msgid "Text To Speech"
 msgstr ""
 
+msgid "Third Party ID"
+msgstr ""
+
 msgid "Thread ID"
 msgstr ""
 
@@ -713,6 +731,9 @@ msgid "Use Fields"
 msgstr ""
 
 msgid "Use Session"
+msgstr ""
+
+msgid "User Email"
 msgstr ""
 
 msgid "User ID"
