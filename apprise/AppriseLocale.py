@@ -106,18 +106,12 @@ class AppriseLocale:
             # We're done
             return
 
-        # Add default language
-        if self.lang:
-            self.add(self.lang)
-
-        else:
+        # Add language
+        if not (self.lang and self.add(self.lang)):
             # Fall back to our default
             self.add(self._default_language)
-            self.lang = self._default_language
 
-        logger.debug('Language set to %s', self.lang)
-
-    def add(self, lang):
+    def add(self, lang, set_default=True):
         """
         Add a language to our list
         """
@@ -132,12 +126,25 @@ class AppriseLocale:
                 # the global namespace only
                 self.__fn_map = getattr(self._gtobjs[lang], self._fn)
 
-            except IOError as e:
-                # This occurs if we can't access/load our translations
-                logger.debug('IOError: %s' % str(e))
+            except FileNotFoundError:
+                # The translation directory does not exist
+                logger.debug(
+                    'Could not load translation path: %s',
+                    join(self._locale_dir, lang))
+
+                # Fallback
+                if None not in self._gtobjs:
+                    self._gtobjs[None] = gettext
+                    self.__fn_map = getattr(self._gtobjs[None], self._fn)
+                if set_default:
+                    self.lang = None
                 return False
 
             logger.trace('Loaded language %s', lang)
+
+        if set_default:
+            logger.debug('Language set to %s', self.lang)
+            self.lang = self._default_language
 
         return True
 
@@ -160,9 +167,10 @@ class AppriseLocale:
 
         # Tidy the language
         lang = AppriseLocale.detect_language(lang, detect_fallback=False)
-        if lang not in self._gtobjs and not self.add(lang):
+        if lang not in self._gtobjs and not self.add(lang, set_default=False):
             if self._default_language not in self._gtobjs \
-                    and not self.add(self._default_language):
+                    and not self.add(self._default_language,
+                                     set_default=False):
                 # Do Nothing
                 yield None
 

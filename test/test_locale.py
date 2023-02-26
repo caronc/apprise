@@ -83,7 +83,7 @@ def test_apprise_locale_gettext_translations(mock_gettext_trans):
 
     """
 
-    mock_gettext_trans.side_effect = IOError()
+    mock_gettext_trans.side_effect = FileNotFoundError()
 
     # This throws internally but we handle it gracefully
     al = AppriseLocale.AppriseLocale()
@@ -107,6 +107,10 @@ def test_apprise_locale_gettext_lang_at():
     # This throws internally but we handle it gracefully
     al = AppriseLocale.AppriseLocale()
 
+    # Edge Cases
+    assert al.add('en', set_default=False) is True
+    assert al.add('en', set_default=True) is True
+
     with al.lang_at('en'):
         # functions still behave as normal
         pass
@@ -125,6 +129,26 @@ def test_apprise_locale_gettext_lang_at():
     with al.lang_at('fr') as _:
         # functions still behave as normal
         assert callable(_)
+
+    # Test our initialization when our fallback is a language we do
+    # not have. This is only done to test edge cases when for whatever
+    # reason the person who set up apprise does not have the languages
+    # installed.
+    fallback = AppriseLocale.AppriseLocale._default_language
+    with environ('LANG', 'LANGUAGE', 'LC_ALL', 'LC_CTYPE', LANG="en_CA"):
+        AppriseLocale.AppriseLocale._default_language = 'zz'
+        al = AppriseLocale.AppriseLocale()
+        assert al.gettext('test') == 'test'
+
+        # Test case with set_default set to False (so we're still set to 'zz')
+        assert al.add('zy', set_default=False) is False
+        assert al.gettext('test') == 'test'
+
+        al.add('ab', set_default=True)
+        assert al.gettext('test') == 'test'
+
+        assert al.add('zy', set_default=False) is False
+    AppriseLocale.AppriseLocale._default_language = fallback
 
 
 @pytest.mark.skipif(
