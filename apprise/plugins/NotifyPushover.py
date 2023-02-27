@@ -288,7 +288,9 @@ class NotifyPushover(NotifyBase):
         self.sound = NotifyPushover.default_pushover_sound \
             if not isinstance(sound, str) else sound.lower()
         if self.sound and self.sound not in PUSHOVER_SOUNDS:
-            msg = 'The sound specified ({}) is not a default sound. Ensure you have a custom sound with this name defined.'.format(sound)
+            msg = 'The sound specified ({}) is not a default sound. ' \
+                  'Ensure you have a custom sound with this name defined.' \
+                  .format(sound)
             self.logger.info(msg)
 
         # The Priority of the message
