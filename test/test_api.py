@@ -32,6 +32,7 @@
 
 from __future__ import print_function
 import asyncio
+import concurrent.futures
 import re
 import sys
 import pytest
@@ -1781,7 +1782,9 @@ def test_apprise_details_plugin_verification():
 
 @mock.patch('requests.post')
 @mock.patch('asyncio.gather', wraps=asyncio.gather)
-def test_apprise_async_mode(mock_gather, mock_post, tmpdir):
+@mock.patch('concurrent.futures.ThreadPoolExecutor',
+            wraps=concurrent.futures.ThreadPoolExecutor)
+def test_apprise_async_mode(mock_threadpool, mock_gather, mock_post, tmpdir):
     """
     API: Apprise() async_mode tests
 
@@ -1814,9 +1817,9 @@ def test_apprise_async_mode(mock_gather, mock_post, tmpdir):
     # Send Notifications Asyncronously
     assert a.notify("async") is True
 
-    # Verify our async code got executed
-    assert mock_gather.call_count > 0
-    mock_gather.reset_mock()
+    # Verify our thread pool was created
+    assert mock_threadpool.call_count == 1
+    mock_threadpool.reset_mock()
 
     # Provide an over-ride now
     asset = AppriseAsset(async_mode=False)
@@ -1863,9 +1866,9 @@ def test_apprise_async_mode(mock_gather, mock_post, tmpdir):
     # Send 1 Notification Syncronously, the other Asyncronously
     assert a.notify("a mixed batch") is True
 
-    # Verify our async code got called
-    assert mock_gather.call_count > 0
-    mock_gather.reset_mock()
+    # Verify our thread pool was created
+    assert mock_threadpool.call_count == 1
+    mock_threadpool.reset_mock()
 
 
 def test_notify_matrix_dynamic_importing(tmpdir):
