@@ -1866,8 +1866,8 @@ def test_apprise_async_mode(mock_threadpool, mock_gather, mock_post, tmpdir):
     # Send 1 Notification Syncronously, the other Asyncronously
     assert a.notify("a mixed batch") is True
 
-    # Verify our thread pool was created
-    assert mock_threadpool.call_count == 1
+    # Verify we didn't use a thread pool for a single notification
+    assert mock_threadpool.call_count == 0
     mock_threadpool.reset_mock()
 
 

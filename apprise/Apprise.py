@@ -583,9 +583,15 @@ class Apprise:
         Process a list of notify() calls in parallel and synchronously.
         """
 
+        n_calls = len(servers_kwargs)
+
         # 0-length case
-        if not servers_kwargs:
+        if n_calls == 0:
             return True
+
+        # There's no need to use a thread pool for just a single notification
+        if n_calls == 1:
+            return Apprise._notify_sequential(servers_kwargs[0])
 
         # Create log entry
         logger.info(
@@ -619,9 +625,15 @@ class Apprise:
         Process a list of async_notify() calls in parallel and asynchronously.
         """
 
+        n_calls = len(servers_kwargs)
+
         # 0-length case
-        if not servers_kwargs:
+        if n_calls == 0:
             return True
+
+        # (Unlike with the thread pool, we don't optimize for the single-
+        # notification case because asyncio can do useful work while waiting
+        # for that thread to complete)
 
         # Create log entry
         logger.info(
