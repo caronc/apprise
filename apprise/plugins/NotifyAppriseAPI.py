@@ -228,7 +228,7 @@ class NotifyAppriseAPI(NotifyBase):
         }
 
         if self.__tags:
-            payload['tag'] = self.__tags
+            payload['tag'] = ','.join([x for x in self.__tags])
 
         auth = None
         if self.user:
