@@ -2026,7 +2026,8 @@ def test_import_module(tmpdir):
 
     I can't be loaded
     """))
-    assert utils.import_module(str(bad_file), 'invalidfile') is None
+    assert utils.import_module(str(bad_file), 'invalidfile1') is None
+    assert utils.import_module(str(bad_file_base), 'invalidfile2') is None
 
 
 def test_module_detection(tmpdir):
@@ -2065,8 +2066,10 @@ def test_module_detection(tmpdir):
 
     # load entry by string
     utils.module_detection(str(notify_hook_a))
+    utils.module_detection(str(notify_ignore))
+    utils.module_detection(str(notify_hook_a_base))
 
-    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 1
+    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 3
     assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 1
 
     # Now loaded
@@ -2076,7 +2079,7 @@ def test_module_detection(tmpdir):
     utils.module_detection([str(notify_hook_a)])
 
     # No changes to our path
-    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 1
+    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 3
     assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 1
 
     # Reset our variables for the next test

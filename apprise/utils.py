@@ -206,6 +206,9 @@ UUID4_RE = re.compile(
     r'[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}',
     re.IGNORECASE)
 
+# Validate if we're a loadable Python file or not
+VALID_PYTHON_FILE_RE = re.compile(r'.+\.py(o|c)?$', re.IGNORECASE)
+
 # validate_regex() utilizes this mapping to track and re-use pre-complied
 # regular expressions
 REGEX_VALIDATE_LOOKUP = {}
@@ -1571,6 +1574,11 @@ def module_detection(paths, cache=True):
         # Since our plugin name can conflict (as a module) with another
         # we want to generate random strings to avoid steping on
         # another's namespace
+        if not (path and VALID_PYTHON_FILE_RE.match(path)):
+            # Ignore file/module type
+            logger.trace('Plugin Scan: Skipping %s', path)
+            return None
+
         module_name = hashlib.sha1(path.encode('utf-8')).hexdigest()
         module_pyname = "{prefix}.{name}".format(
             prefix='apprise.custom.module', name=module_name)
@@ -1585,11 +1593,6 @@ def module_detection(paths, cache=True):
 
             # Reset
             del common.NOTIFY_CUSTOM_MODULE_MAP[module_pyname]
-
-        if not (path and path.endswith('.py')):
-            # Ignore file/module type
-            logger.debug('Ignoring: %s', _path)
-            return None
 
         # Load our module
         module = import_module(path, module_pyname)
