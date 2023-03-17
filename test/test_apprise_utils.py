@@ -2015,6 +2015,20 @@ def test_parse_list():
     ])
 
 
+def test_import_module(tmpdir):
+    """utils: imort_module testing
+    """
+    # Prepare ourselves a file to work with
+    bad_file_base = tmpdir.mkdir('a')
+    bad_file = bad_file_base.join('README.md')
+    bad_file.write(cleandoc("""
+    I'm a README file, not a Python one.
+
+    I can't be loaded
+    """))
+    assert utils.import_module(str(bad_file), 'invalidfile') is None
+
+
 def test_module_detection(tmpdir):
     """utils: test_module_detection() testing
     """
@@ -2039,6 +2053,11 @@ def test_module_detection(tmpdir):
     @notify(on="clihook")
     def mywrapper(body, title, notify_type, *args, **kwargs):
         pass
+    """))
+
+    notify_ignore = notify_hook_a_base.join('README.md')
+    notify_ignore.write(cleandoc("""
+    We're not a .py file, so this file gets gracefully skipped
     """))
 
     # Not previously loaded

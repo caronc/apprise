@@ -63,7 +63,13 @@ def import_module(path, name):
 
     except Exception as e:
         # module isn't loadable
-        del sys.modules[name]
+        try:
+            del sys.modules[name]
+
+        except KeyError:
+            # nothing to clean up
+            pass
+
         module = None
 
         logger.debug(
@@ -1579,6 +1585,11 @@ def module_detection(paths, cache=True):
 
             # Reset
             del common.NOTIFY_CUSTOM_MODULE_MAP[module_pyname]
+
+        if not (path and path.endswith('.py')):
+            # Ignore file/module type
+            logger.debug('Ignoring: %s', _path)
+            return None
 
         # Load our module
         module = import_module(path, module_pyname)
