@@ -2015,6 +2015,21 @@ def test_parse_list():
     ])
 
 
+def test_import_module(tmpdir):
+    """utils: imort_module testing
+    """
+    # Prepare ourselves a file to work with
+    bad_file_base = tmpdir.mkdir('a')
+    bad_file = bad_file_base.join('README.md')
+    bad_file.write(cleandoc("""
+    I'm a README file, not a Python one.
+
+    I can't be loaded
+    """))
+    assert utils.import_module(str(bad_file), 'invalidfile1') is None
+    assert utils.import_module(str(bad_file_base), 'invalidfile2') is None
+
+
 def test_module_detection(tmpdir):
     """utils: test_module_detection() testing
     """
@@ -2041,13 +2056,20 @@ def test_module_detection(tmpdir):
         pass
     """))
 
+    notify_ignore = notify_hook_a_base.join('README.md')
+    notify_ignore.write(cleandoc("""
+    We're not a .py file, so this file gets gracefully skipped
+    """))
+
     # Not previously loaded
     assert 'clihook' not in common.NOTIFY_SCHEMA_MAP
 
     # load entry by string
     utils.module_detection(str(notify_hook_a))
+    utils.module_detection(str(notify_ignore))
+    utils.module_detection(str(notify_hook_a_base))
 
-    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 1
+    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 3
     assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 1
 
     # Now loaded
@@ -2057,7 +2079,7 @@ def test_module_detection(tmpdir):
     utils.module_detection([str(notify_hook_a)])
 
     # No changes to our path
-    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 1
+    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 3
     assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 1
 
     # Reset our variables for the next test
