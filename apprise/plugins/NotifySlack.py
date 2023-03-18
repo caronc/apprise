@@ -354,6 +354,13 @@ class NotifySlack(NotifyBase):
             r'>': '&gt;',
         }
 
+        # To notify a channel, one uses <!channel|channel>
+        self._re_channel_support = re.compile(
+            r'(?P<match>(?:<|\&lt;)?[ \t]*'
+            r'!(?P<channel>[^| \n]+)'
+            r'(?:[ \t]*\|[ \t]*(?:(?P<val>[^\n]+?)[ \t]*)?(?:>|\&gt;)'
+            r'|(?:>|\&gt;)))', re.IGNORECASE)
+
         # The markdown in slack isn't [desc](url), it's <url|desc>
         #
         # To accomodate this, we need to ensure we don't escape URLs that match
@@ -454,6 +461,21 @@ class NotifySlack(NotifyBase):
                 body = self._re_formatting_rules.sub(  # pragma: no branch
                     lambda x: self._re_formatting_map[x.group()], body,
                 )
+
+                # Support <!channel|desc>, <!channel> entries
+                for match in self._re_channel_support.findall(body):
+                    # Swap back any ampersands previously updaated
+                    channel = match[1].strip()
+                    desc = match[2].strip()
+
+                    # Update our string
+                    body = re.sub(
+                        re.escape(match[0]),
+                        '<!{channel}|{desc}>'.format(
+                            channel=channel, desc=desc)
+                        if desc else '<!{channel}>'.format(channel=channel),
+                        body,
+                        re.IGNORECASE)
 
                 # Support <url|desc>, <url> entries
                 for match in self._re_url_support.findall(body):

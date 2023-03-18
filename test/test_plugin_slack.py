@@ -680,6 +680,10 @@ def test_plugin_slack_markdown(mock_get, mock_post):
        <https://slack.com?arg=val&arg2=val2|Slack Link>.
     We also want to be able to support <https://slack.com> links without the
     description.
+
+    Channel Testing
+    <!channelA>
+    <!channelA|Description>
     """)
 
     # Send our notification
@@ -700,4 +704,5 @@ def test_plugin_slack_markdown(mock_get, mock_post):
         "of it's\nmarkdown.\n\nThis one has arguments we want to preserve:"\
         "\n   <https://slack.com?arg=val&arg2=val2|Slack Link>.\n"\
         "We also want to be able to support <https://slack.com> "\
-        "links without the\ndescription."
+        "links without the\ndescription."\
+        "\n\nChannel Testing\n<!channelA>\n<!channelA|Description>"
