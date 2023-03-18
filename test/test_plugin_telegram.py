@@ -98,6 +98,14 @@ apprise_url_tests = (
     ('tgram://bottest@123456789:abcdefg_hijklmnop/lead2gold/', {
         'instance': NotifyTelegram,
     }),
+    # Support Thread Topics
+    ('tgram://bottest@123456789:abcdefg_hijklmnop/id1/?thread=12345', {
+        'instance': NotifyTelegram,
+    }),
+    # Threads must be numeric
+    ('tgram://bottest@123456789:abcdefg_hijklmnop/id1/?thread=invalid', {
+        'instance': TypeError,
+    }),
     # Testing image
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?image=Yes', {
         'instance': NotifyTelegram,
