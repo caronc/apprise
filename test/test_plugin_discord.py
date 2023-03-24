@@ -368,6 +368,27 @@ def test_plugin_discord_general(mock_post):
     assert a.notify(
         body='body', title='title', notify_type=NotifyType.INFO) is True
 
+    # Create an apprise instance
+    a = Apprise()
+
+    # Reset our object
+    mock_post.reset_mock()
+
+    # Test our threading
+    assert a.add(
+        'discord://{webhook_id}/{webhook_token}/'
+        '?thread=12345'.format(
+            webhook_id=webhook_id,
+            webhook_token=webhook_token)) is True
+
+    # This call includes an image with it's payload:
+    assert a.notify(body='test', title='title') is True
+
+    assert mock_post.call_count == 1
+    response = mock_post.call_args_list[0][1]
+    assert 'params' in response
+    assert response['params'].get('thread_id') == '12345'
+
 
 @mock.patch('requests.post')
 def test_plugin_discord_markdown_extra(mock_post):

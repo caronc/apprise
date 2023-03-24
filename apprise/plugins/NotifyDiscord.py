@@ -290,9 +290,6 @@ class NotifyDiscord(NotifyBase):
             payload['content'] = \
                 body if not title else "{}\r\n{}".format(title, body)
 
-        if self.thread_id:
-            payload['thread_id'] = self.thread_id
-
         if self.avatar and (image_url or self.avatar_url):
             payload['avatar_url'] = \
                 self.avatar_url if self.avatar_url else image_url
@@ -301,7 +298,8 @@ class NotifyDiscord(NotifyBase):
             # Optionally override the default username of the webhook
             payload['username'] = self.user
 
-        if not self._send(payload):
+        params = {'thread_id': self.thread_id} if self.thread_id else None
+        if not self._send(payload, params=params):
             # We failed to post our message
             return False
 
@@ -345,7 +343,7 @@ class NotifyDiscord(NotifyBase):
         # Otherwise return
         return True
 
-    def _send(self, payload, attach=None, **kwargs):
+    def _send(self, payload, attach=None, params=None, **kwargs):
         """
         Wrapper to the requests (post) object
         """
@@ -396,6 +394,7 @@ class NotifyDiscord(NotifyBase):
 
             r = requests.post(
                 notify_url,
+                params=params,
                 data=payload if files else dumps(payload),
                 headers=headers,
                 files=files,
