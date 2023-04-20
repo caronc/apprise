@@ -142,7 +142,7 @@ class NotifyWindows(NotifyBase):
         win32gui.Shell_NotifyIcon(win32gui.NIM_DELETE, nid)
         win32api.PostQuitMessage(0)
 
-        return None
+        return 0
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
