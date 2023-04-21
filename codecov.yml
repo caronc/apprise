@@ -1,0 +1,14 @@
+# https://docs.codecov.com/docs/common-recipe-list
+# https://docs.codecov.com/docs/commit-status#patch-status
+
+coverage:
+  status:
+
+    project:
+      default:
+        target: auto    # the required coverage value
+        threshold: 2%   # the leniency in hitting the target
+
+    patch:
+      default:
+        informational: true
