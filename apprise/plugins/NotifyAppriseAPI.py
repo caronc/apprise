@@ -33,6 +33,7 @@
 import re
 import requests
 from json import dumps
+import base64
 
 from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
@@ -209,14 +210,50 @@ class NotifyAppriseAPI(NotifyBase):
                    token=self.pprint(self.token, privacy, safe=''),
                    params=NotifyAppriseAPI.urlencode(params))
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
+             **kwargs):
         """
         Perform Apprise API Notification
         """
 
-        headers = {}
+        # Prepare HTTP Headers
+        headers = {
+            'User-Agent': self.app_id,
+            'Content-Type': 'application/json'
+        }
+
         # Apply any/all header over-rides defined
         headers.update(self.headers)
+
+        # Track our potential attachments
+        attachments = []
+        if attach:
+            for attachment in attach:
+                # Perform some simple error checking
+                if not attachment:
+                    # We could not access the attachment
+                    self.logger.error(
+                        'Could not access attachment {}.'.format(
+                            attachment.url(privacy=True)))
+                    return False
+
+                try:
+                    with open(attachment.path, 'rb') as f:
+                        # Output must be in a DataURL format (that's what
+                        # PushSafer calls it):
+                        attachments.append({
+                            'filename': attachment.name,
+                            'base64': base64.b64encode(f.read())
+                            .decode('utf-8'),
+                            'mimetype': attachment.mimetype,
+                        })
+
+                except (OSError, IOError) as e:
+                    self.logger.warning(
+                        'An I/O error occurred while reading {}.'.format(
+                            attachment.name if attachment else 'attachment'))
+                    self.logger.debug('I/O Exception: %s' % str(e))
+                    return False
 
         # prepare Apprise API Object
         payload = {
@@ -225,6 +262,7 @@ class NotifyAppriseAPI(NotifyBase):
             'body': body,
             'type': notify_type,
             'format': self.notify_format,
+            'attachments': attachments,
         }
 
         if self.__tags:

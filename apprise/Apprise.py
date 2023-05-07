@@ -684,6 +684,7 @@ class Apprise:
                 'setup_url': getattr(plugin, 'setup_url', None),
                 # Placeholder - populated below
                 'details': None,
+
                 # Differentiat between what is a custom loaded plugin and
                 # which is native.
                 'category': getattr(plugin, 'category', None)
