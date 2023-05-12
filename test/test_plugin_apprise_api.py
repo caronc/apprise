@@ -30,13 +30,21 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import os
+from unittest import mock
 from apprise.plugins.NotifyAppriseAPI import NotifyAppriseAPI
 from helpers import AppriseURLTester
 import requests
+from apprise import Apprise
+from apprise import AppriseAttachment
+from apprise import NotifyType
 
 # Disable logging for a cleaner testing output
 import logging
 logging.disable(logging.CRITICAL)
+
+# Attachment Directory
+TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), 'var')
 
 # Our Testing URLs
 apprise_url_tests = (
@@ -172,3 +180,62 @@ def test_plugin_apprise_urls():
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+@mock.patch('requests.post')
+def test_notify_apprise_api_attachments(mock_post):
+    """
+    NotifyAppriseAPI() Attachments
+
+    """
+
+    okay_response = requests.Request()
+    okay_response.status_code = requests.codes.ok
+    okay_response.content = ""
+
+    # Assign our mock object our return value
+    mock_post.return_value = okay_response
+
+    obj = Apprise.instantiate('apprise://user@localhost/mytoken1/')
+    assert isinstance(obj, NotifyAppriseAPI)
+
+    # Test Valid Attachment
+    path = os.path.join(TEST_VAR_DIR, 'apprise-test.gif')
+    attach = AppriseAttachment(path)
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=attach) is True
+
+    # Test invalid attachment
+    path = os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=path) is False
+
+    # Test Valid Attachment (load 3)
+    path = (
+        os.path.join(TEST_VAR_DIR, 'apprise-test.gif'),
+        os.path.join(TEST_VAR_DIR, 'apprise-test.gif'),
+        os.path.join(TEST_VAR_DIR, 'apprise-test.gif'),
+    )
+    attach = AppriseAttachment(path)
+
+    # Return our good configuration
+    mock_post.side_effect = None
+    mock_post.return_value = okay_response
+    with mock.patch('builtins.open', side_effect=OSError()):
+        # We can't send the message we can't open the attachment for reading
+        assert obj.notify(
+            body='body', title='title', notify_type=NotifyType.INFO,
+            attach=attach) is False
+
+    # test the handling of our batch modes
+    obj = Apprise.instantiate('apprise://user@localhost/mytoken1/')
+    assert isinstance(obj, NotifyAppriseAPI)
+
+    # Now send an attachment normally without issues
+    mock_post.reset_mock()
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=attach) is True
+    assert mock_post.call_count == 1
