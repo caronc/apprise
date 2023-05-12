@@ -172,7 +172,7 @@ class NotifyOpsgenie(NotifyBase):
     opsgenie_default_region = OpsgenieRegion.US
 
     # The maximum allowable targets within a notification
-    maximum_batch_size = 50
+    default_batch_size = 50
 
     # Define object templates
     templates = (
@@ -308,7 +308,7 @@ class NotifyOpsgenie(NotifyBase):
             self.details.update(details)
 
         # Prepare Batch Mode Flag
-        self.batch_size = self.maximum_batch_size if batch else 1
+        self.batch_size = self.default_batch_size if batch else 1
 
         # Assign our tags (if defined)
         self.__tags = parse_list(tags)
@@ -540,7 +540,15 @@ class NotifyOpsgenie(NotifyBase):
         """
         Returns the number of targets associated with this notification
         """
-        return len(self.targets)
+        #
+        # Factor batch into calculation
+        #
+        targets = len(self.targets)
+        if self.batch_size > 1:
+            targets = int(targets / self.batch_size) + \
+                (1 if targets % self.batch_size else 0)
+
+        return targets
 
     @staticmethod
     def parse_url(url):

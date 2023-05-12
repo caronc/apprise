@@ -51,7 +51,7 @@ from ..utils import is_email
 from ..AppriseLocale import gettext_lazy as _
 
 
-class OneSignalCategory(NotifyBase):
+class OneSignalCategory:
     """
     We define the different category types that we can notify via OneSignal
     """
@@ -92,7 +92,7 @@ class NotifyOneSignal(NotifyBase):
     image_size = NotifyImageSize.XY_72
 
     # The maximum allowable batch sizes per message
-    maximum_batch_size = 2000
+    default_batch_size = 2000
 
     # Define object templates
     templates = (
@@ -121,7 +121,7 @@ class NotifyOneSignal(NotifyBase):
             'private': True,
             'required': True,
         },
-        'target_device': {
+        'target_player': {
             'name': _('Target Player ID'),
             'type': 'string',
             'map_to': 'targets',
@@ -204,7 +204,7 @@ class NotifyOneSignal(NotifyBase):
             raise TypeError(msg)
 
         # Prepare Batch Mode Flag
-        self.batch_size = self.maximum_batch_size if batch else 1
+        self.batch_size = self.default_batch_size if batch else 1
 
         # Place a thumbnail image inline with the message body
         self.include_image = include_image
@@ -436,6 +436,20 @@ class NotifyOneSignal(NotifyBase):
         """
         Returns the number of targets associated with this notification
         """
+        #
+        # Factor batch into calculation
+        #
+        if self.batch_size > 1:
+            # Batches can only be sent by group (you can't combine groups into
+            # a single batch)
+            total_targets = 0
+            for k, m in self.targets.items():
+                targets = len(m)
+                total_targets += int(targets / self.batch_size) + \
+                    (1 if targets % self.batch_size else 0)
+            return total_targets
+
+        # Normal batch count; just count the targets
         return sum([len(m) for _, m in self.targets.items()])
 
     @staticmethod

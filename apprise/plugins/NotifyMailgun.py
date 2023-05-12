@@ -631,8 +631,15 @@ class NotifyMailgun(NotifyBase):
         """
         Returns the number of targets associated with this notification
         """
-        count = len(self.targets)
-        return count if count > 0 else 1
+        #
+        # Factor batch into calculation
+        #
+        batch_size = 1 if not self.batch else self.default_batch_size
+        targets = len(self.targets)
+        if batch_size > 1:
+            targets = int(targets / batch_size) + \
+                (1 if targets % batch_size else 0)
+        return targets if targets > 0 else 1
 
     @staticmethod
     def parse_url(url):

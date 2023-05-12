@@ -418,7 +418,19 @@ class NotifyBulkSMS(NotifyBase):
         """
         Returns the number of targets associated with this notification
         """
-        return len(self.targets) + len(self.groups)
+
+        #
+        # Factor batch into calculation
+        #
+        # Note: Groups always require a separate request (and can not be
+        # included in batch calculations)
+        batch_size = 1 if not self.batch else self.default_batch_size
+        targets = len(self.targets)
+        if batch_size > 1:
+            targets = int(targets / batch_size) + \
+                (1 if targets % batch_size else 0)
+
+        return targets + len(self.groups)
 
     @staticmethod
     def parse_url(url):

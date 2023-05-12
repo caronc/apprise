@@ -173,6 +173,9 @@ def test_plugin_bulksms_edge_cases(mock_post):
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO) is True
 
+    # We know there are 4 targets
+    assert len(obj) == 4
+
     # Test our call count
     assert mock_post.call_count == 4
 
@@ -205,3 +208,9 @@ def test_plugin_bulksms_edge_cases(mock_post):
             ['+15551231234', '+15555555555', '@group', '@12'])))
 
     assert 'batch=no' in obj.url()
+
+    # With our batch in place, our calculations are different
+    obj = Apprise.instantiate(
+        'bulksms://{}:{}@{}?batch=y'.format(user, pwd, '/'.join(targets)))
+    # 2 groups and 2 phones are lumped together
+    assert len(obj) == 3

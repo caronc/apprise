@@ -361,7 +361,10 @@ class NotifyD7Networks(NotifyBase):
         """
         Returns the number of targets associated with this notification
         """
-        return len(self.targets)
+        #
+        # Factor batch into calculation
+        #
+        return len(self.targets) if not self.batch else 1
 
     @staticmethod
     def parse_url(url):
