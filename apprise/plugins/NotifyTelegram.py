@@ -312,7 +312,7 @@ class NotifyTelegram(NotifyBase):
             'type': 'bool',
             'default': False,
         },
-        'thread': {
+        'topic': {
             'name': _('Topic Thread ID'),
             'type': 'int',
         },
@@ -322,7 +322,7 @@ class NotifyTelegram(NotifyBase):
     })
 
     def __init__(self, bot_token, targets, detect_owner=True,
-                 include_image=False, silent=None, preview=None, thread=None,
+                 include_image=False, silent=None, preview=None, topic=None,
                  **kwargs):
         """
         Initialize Telegram Object
@@ -349,19 +349,19 @@ class NotifyTelegram(NotifyBase):
         self.preview = self.template_args['preview']['default'] \
             if preview is None else bool(preview)
 
-        if thread:
+        if topic:
             try:
-                self.thread = int(thread)
+                self.topic = int(topic)
 
             except (TypeError, ValueError):
                 # Not a valid integer; ignore entry
-                err = 'The Telegram Topic specified ({}) is invalid.'.format(
-                    thread)
+                err = 'The Telegram Topic ID specified ({}) is invalid.'.format(
+                    topic)
                 self.logger.warning(err)
                 raise TypeError(err)
         else:
             # No Topic Thread
-            self.thread = None
+            self.topic = None
 
         # if detect_owner is set to True, we will attempt to determine who
         # the bot owner is based on the first person who messaged it.  This
@@ -654,8 +654,8 @@ class NotifyTelegram(NotifyBase):
             'disable_web_page_preview': not self.preview,
         }
 
-        if self.thread:
-            payload['message_thread_id'] = self.thread
+        if self.topic:
+            payload['message_thread_id'] = self.topic
 
         # Prepare Message Body
         if self.notify_format == NotifyFormat.MARKDOWN:
@@ -804,8 +804,8 @@ class NotifyTelegram(NotifyBase):
             'preview': 'yes' if self.preview else 'no',
         }
 
-        if self.thread:
-            params['thread'] = self.thread
+        if self.topic:
+            params['topic'] = self.topic
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
@@ -889,8 +889,8 @@ class NotifyTelegram(NotifyBase):
         results['bot_token'] = bot_token
 
         # Support Thread Topic
-        if 'thread' in results['qsd'] and len(results['qsd']['thread']):
-            results['thread'] = results['qsd']['thread']
+        if 'topic' in results['qsd'] and len(results['qsd']['topic']):
+            results['topic'] = results['qsd']['topic']
 
         # Silent (Sends the message Silently); users will receive
         # notification with no sound.

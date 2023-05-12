@@ -99,11 +99,11 @@ apprise_url_tests = (
         'instance': NotifyTelegram,
     }),
     # Support Thread Topics
-    ('tgram://bottest@123456789:abcdefg_hijklmnop/id1/?thread=12345', {
+    ('tgram://bottest@123456789:abcdefg_hijklmnop/id1/?topic=12345', {
         'instance': NotifyTelegram,
     }),
     # Threads must be numeric
-    ('tgram://bottest@123456789:abcdefg_hijklmnop/id1/?thread=invalid', {
+    ('tgram://bottest@123456789:abcdefg_hijklmnop/id1/?topic=invalid', {
         'instance': TypeError,
     }),
     # Testing image
