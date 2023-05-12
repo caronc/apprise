@@ -31,7 +31,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import os
-import mock
+from unittest import mock
 from apprise.plugins.NotifyAppriseAPI import NotifyAppriseAPI
 from helpers import AppriseURLTester
 import requests
