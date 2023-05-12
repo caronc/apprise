@@ -355,8 +355,8 @@ class NotifyTelegram(NotifyBase):
 
             except (TypeError, ValueError):
                 # Not a valid integer; ignore entry
-                err = 'The Telegram Topic ID specified ({}) is invalid.'.format(
-                    topic)
+                err = 'The Telegram Topic ID specified ({}) is invalid.'\
+                    .format(topic)
                 self.logger.warning(err)
                 raise TypeError(err)
         else:
