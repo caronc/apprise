@@ -685,6 +685,15 @@ class URLBase:
 
         return response
 
+    def __len__(self):
+        """
+        Should be over-ridden and allows the tracking of how many targets
+        are associated with each URLBase object.
+
+        Default is always 1
+        """
+        return 1
+
     def schemas(self):
         """A simple function that returns a set of all schemas associated
         with this object based on the object.protocol and

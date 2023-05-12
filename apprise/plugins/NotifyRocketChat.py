@@ -348,6 +348,12 @@ class NotifyRocketChat(NotifyBase):
             params=NotifyRocketChat.urlencode(params),
         )
 
+    def __len__(self):
+        """
+        Returns the number of targets associated with this notification
+        """
+        return len(self.channels) + len(self.rooms) + len(self.users)
+
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         wrapper to _send since we can alert more then one channel

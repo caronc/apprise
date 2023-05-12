@@ -168,8 +168,14 @@ def test_plugin_boxcar_edge_cases(mock_post, mock_get):
 
     # Test comma, separate values
     device = 'a' * 64
-
     p = NotifyBoxcar(
         access=access, secret=secret,
         targets=','.join([device, device, device]))
+    # unique entries are colapsed into 1
+    assert len(p.device_tokens) == 1
+
+    p = NotifyBoxcar(
+        access=access, secret=secret,
+        targets=','.join(['a' * 64, 'b' * 64, 'c' * 64]))
+    # not unique, so we get the same data here
     assert len(p.device_tokens) == 3

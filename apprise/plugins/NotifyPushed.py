@@ -329,6 +329,12 @@ class NotifyPushed(NotifyBase):
                 )]),
             params=NotifyPushed.urlencode(params))
 
+    def __len__(self):
+        """
+        Returns the number of targets associated with this notification
+        """
+        return len(self.channels) + len(self.users)
+
     @staticmethod
     def parse_url(url):
         """

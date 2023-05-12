@@ -367,6 +367,12 @@ class NotifyReddit(NotifyBase):
                 params=NotifyReddit.urlencode(params),
             )
 
+    def __len__(self):
+        """
+        Returns the number of targets associated with this notification
+        """
+        return len(self.subreddits)
+
     def login(self):
         """
         A simple wrapper to authenticate with the Reddit Server

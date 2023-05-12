@@ -1196,6 +1196,13 @@ class NotifyMatrix(NotifyBase):
             params=NotifyMatrix.urlencode(params),
         )
 
+    def __len__(self):
+        """
+        Returns the number of targets associated with this notification
+        """
+        count = len(self.rooms)
+        return count if count > 0 else 1
+
     @staticmethod
     def parse_url(url):
         """

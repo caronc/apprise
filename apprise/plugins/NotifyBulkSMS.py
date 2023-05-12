@@ -414,6 +414,12 @@ class NotifyBulkSMS(NotifyBase):
                  for x in self.groups])),
             params=NotifyBulkSMS.urlencode(params))
 
+    def __len__(self):
+        """
+        Returns the number of targets associated with this notification
+        """
+        return len(self.targets) + len(self.groups)
+
     @staticmethod
     def parse_url(url):
         """

@@ -229,6 +229,14 @@ class AppriseURLTester:
             # from the one that was already created properly
             obj_cmp = Apprise.instantiate(obj.url())
 
+            # Verify there is no change from the old and the new
+            if len(obj) != len(obj_cmp):
+                print('%d targets found in %s' % (
+                    len(obj), obj.url(privacy=True)))
+                print('But %d targets found in %s' % (
+                    len(obj_cmp), obj_cmp.url(privacy=True)))
+                raise AssertionError("Target miscount %d != %d")
+
             # Our object should be the same instance as what we had
             # originally expected above.
             if not isinstance(obj_cmp, NotifyBase):
@@ -371,10 +379,18 @@ class AppriseURLTester:
         try:
             if test_requests_exceptions is False:
 
+                # Verify we can acquire a target count as an integer
+                targets = isinstance(len(obj), int)
+
                 # check that we're as expected
                 assert obj.notify(
                     body=self.body, title=self.title,
                     notify_type=notify_type) == notify_response
+
+                if notify_response:
+                    # If we successfully got a response, there must have been
+                    # at least 1 target present
+                    assert targets > 0
 
                 # check that this doesn't change using different overflow
                 # methods
@@ -447,6 +463,7 @@ class AppriseURLTester:
                         os.path.join(self.__test_var_dir, 'apprise-test.png'),
                         os.path.join(self.__test_var_dir, 'apprise-test.jpeg'),
                     ))
+
                     assert obj.notify(
                         body=self.body, title=self.title,
                         notify_type=notify_type,

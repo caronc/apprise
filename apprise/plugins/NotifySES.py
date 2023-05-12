@@ -816,6 +816,13 @@ class NotifySES(NotifyBase):
                 params=NotifySES.urlencode(params),
             )
 
+    def __len__(self):
+        """
+        Returns the number of targets associated with this notification
+        """
+        count = len(self.targets)
+        return count if count > 0 else 1
+
     @staticmethod
     def parse_url(url):
         """

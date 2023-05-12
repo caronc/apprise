@@ -432,6 +432,12 @@ class NotifyOneSignal(NotifyBase):
             params=NotifyOneSignal.urlencode(params),
         )
 
+    def __len__(self):
+        """
+        Returns the number of targets associated with this notification
+        """
+        return sum([len(m) for _, m in self.targets.items()])
+
     @staticmethod
     def parse_url(url):
         """

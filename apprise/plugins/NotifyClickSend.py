@@ -288,6 +288,12 @@ class NotifyClickSend(NotifyBase):
             params=NotifyClickSend.urlencode(params),
         )
 
+    def __len__(self):
+        """
+        Returns the number of targets associated with this notification
+        """
+        return len(self.targets)
+
     @staticmethod
     def parse_url(url):
         """

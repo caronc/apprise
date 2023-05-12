@@ -101,8 +101,15 @@ apprise_url_tests = (
         # an invalid entry (%20), and too short of an entry (a)
         'instance': NotifyOpsgenie,
     }),
-    ('opsgenie://apikey/{}/@{}/#{}/*{}/^{}/'.format(
-        UUID4, UUID4, UUID4, UUID4, UUID4), {
+    ('opsgenie://apikey/@{}/#{}/*{}/^{}/'.format(
+        UUID4, UUID4, UUID4, UUID4), {
+        # similar to the above, except we use the UUID's
+        'instance': NotifyOpsgenie,
+    }),
+    # Same link as before but @ missing at the front causing an ambigious
+    # lookup however the entry is treated a though a @ was in front (user)
+    ('opsgenie://apikey/{}/#{}/*{}/^{}/'.format(
+        UUID4, UUID4, UUID4, UUID4), {
         # similar to the above, except we use the UUID's
         'instance': NotifyOpsgenie,
     }),

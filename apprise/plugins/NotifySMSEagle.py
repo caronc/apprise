@@ -596,6 +596,13 @@ class NotifySMSEagle(NotifyBase):
             params=NotifySMSEagle.urlencode(params),
         )
 
+    def __len__(self):
+        """
+        Returns the number of targets associated with this notification
+        """
+        return len(self.target_phones) + len(self.target_contacts) + \
+            len(self.target_groups)
+
     @staticmethod
     def parse_url(url):
         """

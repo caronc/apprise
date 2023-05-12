@@ -256,6 +256,12 @@ class NotifyTwist(NotifyBase):
                 params=NotifyTwist.urlencode(params),
             )
 
+    def __len__(self):
+        """
+        Returns the number of targets associated with this notification
+        """
+        return len(self.channels) + len(self.channel_ids)
+
     def login(self):
         """
         A simple wrapper to authenticate with the Twist Server
