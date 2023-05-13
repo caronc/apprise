@@ -151,6 +151,7 @@ files and loads them:
 
     ~/.apprise/plugins
     ~/.config/apprise/plugins
+    /var/lib/apprise/plugins
 
 Simply create your own python file with the following bare minimum content in
 it:
@@ -192,6 +193,11 @@ in the following local locations for configuration files and loads them:
     ~/.config/apprise/apprise
     ~/.config/apprise/apprise.yaml
 
+    /etc/apprise
+    /etc/apprise.yml
+    /etc/apprise/apprise
+    /etc/apprise/apprise.yml
+
 If a default configuration file is referenced in any way by the **apprise**
 tool, you no longer need to provide it a Service URL.  Usage of the **apprise**
 tool simplifies to:
@@ -215,4 +221,4 @@ If you find any bugs, please make them known at:
 
 ## COPYRIGHT
 
-Apprise is Copyright (C) 2021 Chris Caron <lead2gold@gmail.com>
+Apprise is Copyright (C) 2023 Chris Caron <lead2gold@gmail.com>

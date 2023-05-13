@@ -80,28 +80,64 @@ DEFAULT_CONFIG_PATHS = (
     '~/.apprise/apprise.yml',
     '~/.config/apprise/apprise',
     '~/.config/apprise/apprise.yml',
+
+    # Global Configuration Support
+    '/etc/apprise',
+    '/etc/apprise.yml',
+    '/etc/apprise/apprise',
+    '/etc/apprise/apprise.yml',
 )
 
 # Define our paths to search for plugins
 DEFAULT_PLUGIN_PATHS = (
     '~/.apprise/plugins',
     '~/.config/apprise/plugins',
+
+    # Global Plugin Support
+    '/var/lib/apprise/plugins',
 )
 
 # Detect Windows
 if platform.system() == 'Windows':
     # Default Config Search Path for Windows Users
     DEFAULT_CONFIG_PATHS = (
-        expandvars('%APPDATA%/Apprise/apprise'),
-        expandvars('%APPDATA%/Apprise/apprise.yml'),
-        expandvars('%LOCALAPPDATA%/Apprise/apprise'),
-        expandvars('%LOCALAPPDATA%/Apprise/apprise.yml'),
+        expandvars('%APPDATA%\\Apprise\\apprise'),
+        expandvars('%APPDATA%\\Apprise\\apprise.yml'),
+        expandvars('%LOCALAPPDATA%\\Apprise\\apprise'),
+        expandvars('%LOCALAPPDATA%\\Apprise\\apprise.yml'),
+
+        #
+        # Global Support
+        #
+
+        # C:\ProgramData\Apprise\
+        expandvars('%ALLUSERSPROFILE%\\Apprise\\apprise'),
+        expandvars('%ALLUSERSPROFILE%\\Apprise\\apprise.yml'),
+
+        # C:\Program Files\Apprise
+        expandvars('%PROGRAMFILES%\\Apprise\\apprise'),
+        expandvars('%PROGRAMFILES%\\Apprise\\apprise.yml'),
+
+        # C:\Program Files\Common Files
+        expandvars('%COMMONPROGRAMFILES%\\Apprise\\apprise'),
+        expandvars('%COMMONPROGRAMFILES%\\Apprise\\apprise.yml'),
     )
 
     # Default Plugin Search Path for Windows Users
     DEFAULT_PLUGIN_PATHS = (
-        expandvars('%APPDATA%/Apprise/plugins'),
-        expandvars('%LOCALAPPDATA%/Apprise/plugins'),
+        expandvars('%APPDATA%\\Apprise\\plugins'),
+        expandvars('%LOCALAPPDATA%\\Apprise\\plugins'),
+
+        #
+        # Global Support
+        #
+
+        # C:\ProgramData\Apprise\plugins
+        expandvars('%ALLUSERSPROFILE%\\Apprise\\plugins'),
+        # C:\Program Files\Apprise\plugins
+        expandvars('%PROGRAMFILES%\\Apprise\\plugins'),
+        # C:\Program Files\Common Files
+        expandvars('%COMMONPROGRAMFILES%\\Apprise\\plugins'),
     )
 
 
