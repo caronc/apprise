@@ -309,6 +309,13 @@ class NotifyDingTalk(NotifyBase):
                 [NotifyDingTalk.quote(x, safe='') for x in self.targets]),
             args=NotifyDingTalk.urlencode(args))
 
+    def __len__(self):
+        """
+        Returns the number of targets associated with this notification
+        """
+        targets = len(self.targets)
+        return targets if targets > 0 else 1
+
     @staticmethod
     def parse_url(url):
         """

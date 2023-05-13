@@ -391,9 +391,14 @@ def test_plugin_sparkpost_attachments(mock_post):
         'user1@example.com/user2@example.com?batch=yes'.format(apikey))
     assert isinstance(obj, NotifySparkPost)
 
+    # As a batch mode, both emails can be lumped into 1
+    assert len(obj) == 1
+
     # Force our batch to break into separate messages
     obj.default_batch_size = 1
-    # We'll send 2 messages
+
+    # We'll send 2 messages no
+    assert len(obj) == 2
     mock_post.reset_mock()
 
     assert obj.notify(

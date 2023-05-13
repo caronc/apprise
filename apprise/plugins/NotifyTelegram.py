@@ -819,6 +819,12 @@ class NotifyTelegram(NotifyBase):
                 [NotifyTelegram.quote('@{}'.format(x)) for x in self.targets]),
             params=NotifyTelegram.urlencode(params))
 
+    def __len__(self):
+        """
+        Returns the number of targets associated with this notification
+        """
+        return len(self.targets)
+
     @staticmethod
     def parse_url(url):
         """

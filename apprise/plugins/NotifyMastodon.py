@@ -378,6 +378,13 @@ class NotifyMastodon(NotifyBase):
             params=NotifyMastodon.urlencode(params),
         )
 
+    def __len__(self):
+        """
+        Returns the number of targets associated with this notification
+        """
+        targets = len(self.targets)
+        return targets if targets > 0 else 1
+
     def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
              **kwargs):
         """

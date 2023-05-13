@@ -73,6 +73,22 @@ SMSEAGLE_PRIORITY_MAP = {
 }
 
 
+class SMSEagleCategory:
+    """
+    We define the different category types that we can notify via SMS Eagle
+    """
+    PHONE = 'phone'
+    GROUP = 'group'
+    CONTACT = 'contact'
+
+
+SMSEAGLE_CATEGORIES = (
+    SMSEagleCategory.PHONE,
+    SMSEagleCategory.GROUP,
+    SMSEagleCategory.CONTACT,
+)
+
+
 class NotifySMSEagle(NotifyBase):
     """
     A wrapper for SMSEagle Notifications
@@ -403,15 +419,15 @@ class NotifySMSEagle(NotifyBase):
         batch_size = 1 if not self.batch else self.default_batch_size
 
         notify_by = {
-            'phone': {
+            SMSEagleCategory.PHONE: {
                 "method": "sms.send_sms",
                 'target': 'to',
             },
-            'group': {
+            SMSEagleCategory.GROUP: {
                 "method": "sms.send_togroup",
                 'target': 'groupname',
             },
-            'contact': {
+            SMSEagleCategory.CONTACT: {
                 "method": "sms.send_tocontact",
                 'target': 'contactname',
             },
@@ -420,7 +436,7 @@ class NotifySMSEagle(NotifyBase):
         # categories separated into a tuple since notify_by.keys()
         # returns an unpredicable list in Python 2.7 which causes
         # tests to fail every so often
-        for category in ('phone', 'group', 'contact'):
+        for category in SMSEAGLE_CATEGORIES:
             # Create a copy of our template
             payload = {
                 'method': notify_by[category]['method'],
@@ -595,6 +611,28 @@ class NotifySMSEagle(NotifyBase):
                 )]),
             params=NotifySMSEagle.urlencode(params),
         )
+
+    def __len__(self):
+        """
+        Returns the number of targets associated with this notification
+        """
+        #
+        # Factor batch into calculation
+        #
+        batch_size = 1 if not self.batch else self.default_batch_size
+        if batch_size > 1:
+            # Batches can only be sent by group (you can't combine groups into
+            # a single batch)
+            total_targets = 0
+            for c in SMSEAGLE_CATEGORIES:
+                targets = len(getattr(self, f'target_{c}s'))
+                total_targets += int(targets / batch_size) + \
+                    (1 if targets % batch_size else 0)
+            return total_targets
+
+        # Normal batch count; just count the targets
+        return len(self.target_phones) + len(self.target_contacts) + \
+            len(self.target_groups)
 
     @staticmethod
     def parse_url(url):

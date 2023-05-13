@@ -476,6 +476,12 @@ class NotifyMQTT(NotifyBase):
             params=NotifyMQTT.urlencode(params),
         )
 
+    def __len__(self):
+        """
+        Returns the number of targets associated with this notification
+        """
+        return len(self.topics)
+
     @staticmethod
     def parse_url(url):
         """

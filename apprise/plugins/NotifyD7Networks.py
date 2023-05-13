@@ -357,6 +357,15 @@ class NotifyD7Networks(NotifyBase):
                 [NotifyD7Networks.quote(x, safe='') for x in self.targets]),
             params=NotifyD7Networks.urlencode(params))
 
+    def __len__(self):
+        """
+        Returns the number of targets associated with this notification
+        """
+        #
+        # Factor batch into calculation
+        #
+        return len(self.targets) if not self.batch else 1
+
     @staticmethod
     def parse_url(url):
         """

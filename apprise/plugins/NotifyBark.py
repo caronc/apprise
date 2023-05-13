@@ -280,7 +280,7 @@ class NotifyBark(NotifyBase):
         # error tracking (used for function return)
         has_error = False
 
-        if not len(self.targets):
+        if not self.targets:
             # We have nothing to notify; we're done
             self.logger.warning('There are no Bark devices to notify')
             return False
@@ -455,6 +455,12 @@ class NotifyBark(NotifyBase):
                 [NotifyBark.quote('{}'.format(x)) for x in self.targets]),
             params=NotifyBark.urlencode(params),
         )
+
+    def __len__(self):
+        """
+        Returns the number of targets associated with this notification
+        """
+        return len(self.targets)
 
     @staticmethod
     def parse_url(url):

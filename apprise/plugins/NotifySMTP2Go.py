@@ -513,6 +513,21 @@ class NotifySMTP2Go(NotifyBase):
                     safe='') for e in self.targets]),
             params=NotifySMTP2Go.urlencode(params))
 
+    def __len__(self):
+        """
+        Returns the number of targets associated with this notification
+        """
+        #
+        # Factor batch into calculation
+        #
+        batch_size = 1 if not self.batch else self.default_batch_size
+        targets = len(self.targets)
+        if batch_size > 1:
+            targets = int(targets / batch_size) + \
+                (1 if targets % batch_size else 0)
+
+        return targets if targets > 0 else 1
+
     @staticmethod
     def parse_url(url):
         """

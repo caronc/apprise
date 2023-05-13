@@ -329,6 +329,12 @@ class NotifyMSG91(NotifyBase):
                 [NotifyMSG91.quote(x, safe='') for x in self.targets]),
             params=NotifyMSG91.urlencode(params))
 
+    def __len__(self):
+        """
+        Returns the number of targets associated with this notification
+        """
+        return len(self.targets)
+
     @staticmethod
     def parse_url(url):
         """

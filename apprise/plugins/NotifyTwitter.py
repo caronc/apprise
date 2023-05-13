@@ -793,10 +793,6 @@ class NotifyTwitter(NotifyBase):
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        if len(self.targets) > 0:
-            params['to'] = ','.join(
-                [NotifyTwitter.quote(x, safe='') for x in self.targets])
-
         return '{schema}://{ckey}/{csecret}/{akey}/{asecret}' \
             '/{targets}/?{params}'.format(
                 schema=self.secure_protocol[0],
@@ -811,6 +807,13 @@ class NotifyTwitter(NotifyBase):
                      for target in self.targets]),
                 params=NotifyTwitter.urlencode(params))
 
+    def __len__(self):
+        """
+        Returns the number of targets associated with this notification
+        """
+        targets = len(self.targets)
+        return targets if targets > 0 else 1
+
     @staticmethod
     def parse_url(url):
         """
@@ -823,28 +826,22 @@ class NotifyTwitter(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
-        # The first token is stored in the hostname
-        consumer_key = NotifyTwitter.unquote(results['host'])
-
         # Acquire remaining tokens
         tokens = NotifyTwitter.split_path(results['fullpath'])
 
+        # The consumer token is stored in the hostname
+        results['ckey'] = NotifyTwitter.unquote(results['host'])
+
+        #
         # Now fetch the remaining tokens
-        try:
-            consumer_secret, access_token_key, access_token_secret = \
-                tokens[0:3]
+        #
 
-        except (ValueError, AttributeError, IndexError):
-            # Force some bad values that will get caught
-            # in parsing later
-            consumer_secret = None
-            access_token_key = None
-            access_token_secret = None
-
-        results['ckey'] = consumer_key
-        results['csecret'] = consumer_secret
-        results['akey'] = access_token_key
-        results['asecret'] = access_token_secret
+        # Consumer Secret
+        results['csecret'] = tokens.pop(0) if tokens else None
+        # Access Token Key
+        results['akey'] = tokens.pop(0) if tokens else None
+        # Access Token Secret
+        results['asecret'] = tokens.pop(0) if tokens else None
 
         # The defined twitter mode
         if 'mode' in results['qsd'] and len(results['qsd']['mode']):
@@ -861,7 +858,7 @@ class NotifyTwitter(NotifyBase):
             results['targets'].append(results.get('user'))
 
         # Store any remaining items as potential targets
-        results['targets'].extend(tokens[3:])
+        results['targets'].extend(tokens)
 
         # Get Cache Flag (reduces lookup hits)
         if 'cache' in results['qsd'] and len(results['qsd']['cache']):
