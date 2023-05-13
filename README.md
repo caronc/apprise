@@ -221,18 +221,28 @@ No one wants to put their credentials out for everyone to see on the command lin
 #  ~/.apprise.yml
 #  ~/.config/apprise
 #  ~/.config/apprise.yml
+#  /etc/apprise
+#  /etc/apprise.yml
 
 # Also a subdirectory handling allows you to leverage plugins
 #  ~/.apprise/apprise
 #  ~/.apprise/apprise.yml
 #  ~/.config/apprise/apprise
 #  ~/.config/apprise/apprise.yml
+#  /etc/apprise/apprise
+#  /etc/apprise/apprise.yml
 
 # Windows users can store their default configuration files here:
 #  %APPDATA%/Apprise/apprise
 #  %APPDATA%/Apprise/apprise.yml
 #  %LOCALAPPDATA%/Apprise/apprise
 #  %LOCALAPPDATA%/Apprise/apprise.yml
+#  %ALLUSERSPROFILE%\Apprise\apprise
+#  %ALLUSERSPROFILE%\Apprise\apprise.yml
+#  %PROGRAMFILES%\Apprise\apprise
+#  %PROGRAMFILES%\Apprise\apprise.yml
+#  %COMMONPROGRAMFILES%\Apprise\apprise
+#  %COMMONPROGRAMFILES%\Apprise\apprise.yml
 
 # If you loaded one of those files, your command line gets really easy:
 apprise -vv -t 'my title' -b 'my notification body'
@@ -293,10 +303,14 @@ Once you've defined your custom hook, you just need to tell Apprise where it is 
 # all plugin files (if present) from the following directory paths:
 #  ~/.apprise/plugins
 #  ~/.config/apprise/plugins
+#  /var/lib/apprise/plugins
 
 # Windows users can store their default plugin files in these directories:
 #  %APPDATA%/Apprise/plugins
 #  %LOCALAPPDATA%/Apprise/plugins
+#  %ALLUSERSPROFILE%\Apprise\plugins
+#  %PROGRAMFILES%\Apprise\plugins
+#  %COMMONPROGRAMFILES%\Apprise\plugins
 
 # If you placed your plugin file within one of the directories already defined
 # above, then your call simply needs to look like:

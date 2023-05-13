@@ -81,7 +81,9 @@ DEFAULT_CONFIG_PATHS = (
     '~/.config/apprise/apprise',
     '~/.config/apprise/apprise.yml',
 
-    # Global Support
+    # Global Configuration Support
+    '/etc/apprise',
+    '/etc/apprise.yml',
     '/etc/apprise/apprise',
     '/etc/apprise/apprise.yml',
 )
@@ -91,7 +93,7 @@ DEFAULT_PLUGIN_PATHS = (
     '~/.apprise/plugins',
     '~/.config/apprise/plugins',
 
-    # Global Support
+    # Global Plugin Support
     '/var/lib/apprise/plugins',
 )
 
