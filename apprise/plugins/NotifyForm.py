@@ -40,6 +40,16 @@ from ..common import NotifyType
 from ..AppriseLocale import gettext_lazy as _
 
 
+class FORMPayloadField:
+    """
+    Identifies the fields available in the FORM Payload
+    """
+    VERSION = 'version'
+    TITLE = 'title'
+    MESSAGE = 'message'
+    MESSAGETYPE = 'type'
+
+
 # Defines the method to send the notification
 METHODS = (
     'POST',
@@ -95,6 +105,12 @@ class NotifyForm(NotifyBase):
     # Disable throttle rate for Form requests since they are normally
     # local anyway
     request_rate_per_sec = 0
+
+    # Define the FORM version to place in all payloads
+    # Version: Major.Minor,  Major is only updated if the entire schema is
+    # changed. If just adding new items (or removing old ones, only increment
+    # the Minor!
+    form_version = '1.0'
 
     # Define object templates
     templates = (
@@ -218,6 +234,18 @@ class NotifyForm(NotifyBase):
                     self.attach_as += self.attach_as_count
                     self.attach_multi_support = True
 
+        # A payload map allows users to over-ride the default mapping if
+        # they're detected with the :overide=value.  Normally this would
+        # create a new key and assign it the value specified.  However
+        # if the key you specify is actually an internally mapped one,
+        # then a re-mapping takes place using the value
+        self.payload_map = {
+            FORMPayloadField.VERSION: FORMPayloadField.VERSION,
+            FORMPayloadField.TITLE: FORMPayloadField.TITLE,
+            FORMPayloadField.MESSAGE: FORMPayloadField.MESSAGE,
+            FORMPayloadField.MESSAGETYPE: FORMPayloadField.MESSAGETYPE,
+        }
+
         self.params = {}
         if params:
             # Store our extra headers
@@ -228,10 +256,20 @@ class NotifyForm(NotifyBase):
             # Store our extra headers
             self.headers.update(headers)
 
+        self.payload_overrides = {}
         self.payload_extras = {}
         if payload:
             # Store our extra payload entries
             self.payload_extras.update(payload)
+            for key in list(self.payload_extras.keys()):
+                # Any values set in the payload to alter a system related one
+                # alters the system key.  Hence :message=msg maps the 'message'
+                # variable that otherwise already contains the payload to be
+                # 'msg' instead (containing the payload)
+                if key in self.payload_map:
+                    self.payload_map[key] = self.payload_extras[key]
+                    self.payload_overrides[key] = self.payload_extras[key]
+                    del self.payload_extras[key]
 
         return
 
@@ -257,6 +295,8 @@ class NotifyForm(NotifyBase):
         # Append our payload extra's into our parameters
         params.update(
             {':{}'.format(k): v for k, v in self.payload_extras.items()})
+        params.update(
+            {':{}'.format(k): v for k, v in self.payload_overrides.items()})
 
         if self.attach_as != self.attach_as_default:
             # Provide Attach-As extension details
@@ -337,15 +377,18 @@ class NotifyForm(NotifyBase):
                     'form:// Multi-Attachment Support not enabled')
 
         # prepare Form Object
-        payload = {
-            # Version: Major.Minor,  Major is only updated if the entire
-            # schema is changed. If just adding new items (or removing
-            # old ones, only increment the Minor!
-            'version': '1.0',
-            'title': title,
-            'message': body,
-            'type': notify_type,
-        }
+        payload = {}
+
+        for key, value in (
+                (FORMPayloadField.VERSION, self.form_version),
+                (FORMPayloadField.TITLE, title),
+                (FORMPayloadField.MESSAGE, body),
+                (FORMPayloadField.MESSAGETYPE, notify_type)):
+
+            if not self.payload_map[key]:
+                # Do not store element in payload response
+                continue
+            payload[self.payload_map[key]] = value
 
         # Apply any/all payload over-rides defined
         payload.update(self.payload_extras)

@@ -41,6 +41,17 @@ from ..common import NotifyType
 from ..AppriseLocale import gettext_lazy as _
 
 
+class JSONPayloadField:
+    """
+    Identifies the fields available in the JSON Payload
+    """
+    VERSION = 'version'
+    TITLE = 'title'
+    MESSAGE = 'message'
+    ATTACHMENTS = 'attachments'
+    MESSAGETYPE = 'type'
+
+
 # Defines the method to send the notification
 METHODS = (
     'POST',
@@ -75,6 +86,12 @@ class NotifyJSON(NotifyBase):
     # Disable throttle rate for JSON requests since they are normally
     # local anyway
     request_rate_per_sec = 0
+
+    # Define the JSON version to place in all payloads
+    # Version: Major.Minor,  Major is only updated if the entire schema is
+    # changed. If just adding new items (or removing old ones, only increment
+    # the Minor!
+    json_version = '1.0'
 
     # Define object templates
     templates = (
@@ -162,6 +179,19 @@ class NotifyJSON(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
+        # A payload map allows users to over-ride the default mapping if
+        # they're detected with the :overide=value.  Normally this would
+        # create a new key and assign it the value specified.  However
+        # if the key you specify is actually an internally mapped one,
+        # then a re-mapping takes place using the value
+        self.payload_map = {
+            JSONPayloadField.VERSION: JSONPayloadField.VERSION,
+            JSONPayloadField.TITLE: JSONPayloadField.TITLE,
+            JSONPayloadField.MESSAGE: JSONPayloadField.MESSAGE,
+            JSONPayloadField.ATTACHMENTS: JSONPayloadField.ATTACHMENTS,
+            JSONPayloadField.MESSAGETYPE: JSONPayloadField.MESSAGETYPE,
+        }
+
         self.params = {}
         if params:
             # Store our extra headers
@@ -172,10 +202,21 @@ class NotifyJSON(NotifyBase):
             # Store our extra headers
             self.headers.update(headers)
 
+        self.payload_overrides = {}
         self.payload_extras = {}
         if payload:
             # Store our extra payload entries
             self.payload_extras.update(payload)
+            for key in list(self.payload_extras.keys()):
+                # Any values set in the payload to alter a system related one
+                # alters the system key.  Hence :message=msg maps the 'message'
+                # variable that otherwise already contains the payload to be
+                # 'msg' instead (containing the payload)
+                if key in self.payload_map:
+                    self.payload_map[key] = self.payload_extras[key].strip()
+                    self.payload_overrides[key] = \
+                        self.payload_extras[key].strip()
+                    del self.payload_extras[key]
 
         return
 
@@ -201,6 +242,8 @@ class NotifyJSON(NotifyBase):
         # Append our payload extra's into our parameters
         params.update(
             {':{}'.format(k): v for k, v in self.payload_extras.items()})
+        params.update(
+            {':{}'.format(k): v for k, v in self.payload_overrides.items()})
 
         # Determine Authentication
         auth = ''
@@ -275,16 +318,18 @@ class NotifyJSON(NotifyBase):
                     return False
 
         # prepare JSON Object
-        payload = {
-            # Version: Major.Minor,  Major is only updated if the entire
-            # schema is changed. If just adding new items (or removing
-            # old ones, only increment the Minor!
-            'version': '1.0',
-            'title': title,
-            'message': body,
-            'attachments': attachments,
-            'type': notify_type,
-        }
+        payload = {}
+        for key, value in (
+                (JSONPayloadField.VERSION, self.json_version),
+                (JSONPayloadField.TITLE, title),
+                (JSONPayloadField.MESSAGE, body),
+                (JSONPayloadField.ATTACHMENTS, attachments),
+                (JSONPayloadField.MESSAGETYPE, notify_type)):
+
+            if not self.payload_map[key]:
+                # Do not store element in payload response
+                continue
+            payload[self.payload_map[key]] = value
 
         # Apply any/all payload over-rides defined
         payload.update(self.payload_extras)
