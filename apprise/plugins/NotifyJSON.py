@@ -162,6 +162,19 @@ class NotifyJSON(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
+        # A payload map allows users to over-ride the default mapping if
+        # they're detected with the :overide=value.  Normally this would
+        # create a new key and assign it the value specified.  However
+        # if the key you specify is actually an internally mapped one,
+        # then a re-mapping takes place using the value
+        self.payload_map = {
+            'version': 'version',
+            'title': 'title',
+            'message': 'message',
+            'attachments': 'attachments',
+            'type': 'type',
+        }
+
         self.params = {}
         if params:
             # Store our extra headers
@@ -172,10 +185,20 @@ class NotifyJSON(NotifyBase):
             # Store our extra headers
             self.headers.update(headers)
 
+        self.payload_overrides = {}
         self.payload_extras = {}
         if payload:
             # Store our extra payload entries
             self.payload_extras.update(payload)
+            for key in list(self.payload_extras.keys()):
+                # Any values set in the payload to alter a system related one
+                # alters the system key.  Hence :message=msg maps the 'message'
+                # variable that otherwise already contains the payload to be
+                # 'msg' instead (containing the payload)
+                if key in self.payload_map:
+                    self.payload_map[key] = self.payload_extras[key]
+                    self.payload_overrides[key] = self.payload_extras[key]
+                    del self.payload_extras[key]
 
         return
 
@@ -201,6 +224,8 @@ class NotifyJSON(NotifyBase):
         # Append our payload extra's into our parameters
         params.update(
             {':{}'.format(k): v for k, v in self.payload_extras.items()})
+        params.update(
+            {':{}'.format(k): v for k, v in self.payload_overrides.items()})
 
         # Determine Authentication
         auth = ''
@@ -279,11 +304,11 @@ class NotifyJSON(NotifyBase):
             # Version: Major.Minor,  Major is only updated if the entire
             # schema is changed. If just adding new items (or removing
             # old ones, only increment the Minor!
-            'version': '1.0',
-            'title': title,
-            'message': body,
-            'attachments': attachments,
-            'type': notify_type,
+            self.payload_map['version']: '1.0',
+            self.payload_map['title']: title,
+            self.payload_map['message']: body,
+            self.payload_map['attachments']: attachments,
+            self.payload_map['type']: notify_type,
         }
 
         # Apply any/all payload over-rides defined

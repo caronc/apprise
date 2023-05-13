@@ -177,7 +177,7 @@ def test_plugin_custom_json_edge_cases(mock_get, mock_post):
     mock_get.return_value = response
 
     results = NotifyJSON.parse_url(
-        'json://localhost:8080/command?:message=test&method=GET')
+        'json://localhost:8080/command?:message=msg&:test=value&method=GET')
 
     assert isinstance(results, dict)
     assert results['user'] is None
@@ -190,7 +190,7 @@ def test_plugin_custom_json_edge_cases(mock_get, mock_post):
     assert results['schema'] == 'json'
     assert results['url'] == 'json://localhost:8080/command'
     assert isinstance(results['qsd:'], dict) is True
-    assert results['qsd:']['message'] == 'test'
+    assert results['qsd:']['message'] == 'msg'
 
     instance = NotifyJSON(**results)
     assert isinstance(instance, NotifyJSON)
@@ -205,9 +205,14 @@ def test_plugin_custom_json_edge_cases(mock_get, mock_post):
     assert 'title' in details[1]['data']
     dataset = json.loads(details[1]['data'])
     assert dataset['title'] == 'title'
-    assert 'message' in dataset
-    # message over-ride was provided
-    assert dataset['message'] == 'test'
+    assert 'message' not in dataset
+    assert 'msg' in dataset
+    # message over-ride was provided; the body is now in `msg` and not
+    # `message`
+    assert dataset['msg'] == 'body'
+
+    assert 'test' in dataset
+    assert dataset['test'] == 'value'
 
     assert instance.url(privacy=False).startswith(
         'json://localhost:8080/command?')
