@@ -96,6 +96,8 @@ def test_plugin_mqtt_default_success(mqtt_client_mock):
     obj = apprise.Apprise.instantiate(
         'mqtt://localhost:1234/my/topic', suppress_exceptions=False)
     assert isinstance(obj, NotifyMQTT)
+    # We only loaded 1 topic
+    assert len(obj) == 1
     assert obj.url().startswith('mqtt://localhost:1234/my/topic')
 
     # Verify default settings.
@@ -134,6 +136,9 @@ def test_plugin_mqtt_multiple_topics_success(mqtt_client_mock):
     obj = apprise.Apprise.instantiate(
         'mqtt://localhost/my/topic,my/other/topic',
         suppress_exceptions=False)
+
+    # Verify we have loaded 2 topics
+    assert len(obj) == 2
 
     assert isinstance(obj, NotifyMQTT)
     assert obj.url().startswith('mqtt://localhost')
