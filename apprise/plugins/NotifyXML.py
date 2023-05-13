@@ -41,6 +41,16 @@ from ..common import NotifyType
 from ..AppriseLocale import gettext_lazy as _
 
 
+class XMLPayloadField:
+    """
+    Identifies the fields available in the JSON Payload
+    """
+    VERSION = 'Version'
+    TITLE = 'Subject'
+    MESSAGE = 'Message'
+    MESSAGETYPE = 'MessageType'
+
+
 # Defines the method to send the notification
 METHODS = (
     'POST',
@@ -187,10 +197,10 @@ class NotifyXML(NotifyBase):
         # if the key you specify is actually an internally mapped one,
         # then a re-mapping takes place using the value
         self.payload_map = {
-            'Version': 'Version',
-            'Subject': 'Subject',
-            'MessageType': 'MessageType',
-            'Message': 'Message',
+            XMLPayloadField.VERSION: XMLPayloadField.VERSION,
+            XMLPayloadField.TITLE: XMLPayloadField.TITLE,
+            XMLPayloadField.MESSAGE: XMLPayloadField.MESSAGE,
+            XMLPayloadField.MESSAGETYPE: XMLPayloadField.MESSAGETYPE,
         }
 
         self.params = {}
@@ -304,16 +314,21 @@ class NotifyXML(NotifyBase):
         # Our XML Attachmement subsitution
         xml_attachments = ''
 
-        # Our Payload Base
-        payload_base = {
-            self.payload_map['Version']: self.xsd_ver,
-            self.payload_map['Subject']: NotifyXML.escape_html(
-                title, whitespace=False),
-            self.payload_map['MessageType']: NotifyXML.escape_html(
-                notify_type, whitespace=False),
-            self.payload_map['Message']: NotifyXML.escape_html(
-                body, whitespace=False),
-        }
+        payload_base = {}
+
+        for key, value in (
+                (XMLPayloadField.VERSION, self.xsd_ver),
+                (XMLPayloadField.TITLE, NotifyXML.escape_html(
+                    title, whitespace=False)),
+                (XMLPayloadField.MESSAGE, NotifyXML.escape_html(
+                    body, whitespace=False)),
+                (XMLPayloadField.MESSAGETYPE, NotifyXML.escape_html(
+                    notify_type, whitespace=False))):
+
+            if not self.payload_map[key]:
+                # Do not store element in payload response
+                continue
+            payload_base[self.payload_map[key]] = value
 
         # Apply our payload extras
         payload_base.update(

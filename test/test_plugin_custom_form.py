@@ -368,7 +368,7 @@ def test_plugin_custom_form_edge_cases(mock_get, mock_post):
     mock_get.reset_mock()
 
     results = NotifyForm.parse_url(
-        'form://localhost:8080/command?:message=msg&method=POST')
+        'form://localhost:8080/command?:type=&:message=msg&method=POST')
 
     assert isinstance(results, dict)
     assert results['user'] is None
@@ -395,6 +395,9 @@ def test_plugin_custom_form_edge_cases(mock_get, mock_post):
     assert details[0][0] == 'http://localhost:8080/command'
     assert 'title' in details[1]['data']
     assert details[1]['data']['title'] == 'title'
+
+    # type was removed from response object
+    assert 'type' not in details[1]['data']
 
     # message over-ride was provided; the body is now in `msg` and not
     # `message`

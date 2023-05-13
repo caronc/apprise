@@ -41,6 +41,17 @@ from ..common import NotifyType
 from ..AppriseLocale import gettext_lazy as _
 
 
+class JSONPayloadField:
+    """
+    Identifies the fields available in the JSON Payload
+    """
+    VERSION = 'version'
+    TITLE = 'title'
+    MESSAGE = 'message'
+    ATTACHMENTS = 'attachments'
+    MESSAGETYPE = 'type'
+
+
 # Defines the method to send the notification
 METHODS = (
     'POST',
@@ -75,6 +86,12 @@ class NotifyJSON(NotifyBase):
     # Disable throttle rate for JSON requests since they are normally
     # local anyway
     request_rate_per_sec = 0
+
+    # Define the JSON version to place in all payloads
+    # Version: Major.Minor,  Major is only updated if the entire schema is
+    # changed. If just adding new items (or removing old ones, only increment
+    # the Minor!
+    json_version = '1.0'
 
     # Define object templates
     templates = (
@@ -168,11 +185,11 @@ class NotifyJSON(NotifyBase):
         # if the key you specify is actually an internally mapped one,
         # then a re-mapping takes place using the value
         self.payload_map = {
-            'version': 'version',
-            'title': 'title',
-            'message': 'message',
-            'attachments': 'attachments',
-            'type': 'type',
+            JSONPayloadField.VERSION: JSONPayloadField.VERSION,
+            JSONPayloadField.TITLE: JSONPayloadField.TITLE,
+            JSONPayloadField.MESSAGE: JSONPayloadField.MESSAGE,
+            JSONPayloadField.ATTACHMENTS: JSONPayloadField.ATTACHMENTS,
+            JSONPayloadField.MESSAGETYPE: JSONPayloadField.MESSAGETYPE,
         }
 
         self.params = {}
@@ -196,8 +213,9 @@ class NotifyJSON(NotifyBase):
                 # variable that otherwise already contains the payload to be
                 # 'msg' instead (containing the payload)
                 if key in self.payload_map:
-                    self.payload_map[key] = self.payload_extras[key]
-                    self.payload_overrides[key] = self.payload_extras[key]
+                    self.payload_map[key] = self.payload_extras[key].strip()
+                    self.payload_overrides[key] = \
+                        self.payload_extras[key].strip()
                     del self.payload_extras[key]
 
         return
@@ -300,16 +318,18 @@ class NotifyJSON(NotifyBase):
                     return False
 
         # prepare JSON Object
-        payload = {
-            # Version: Major.Minor,  Major is only updated if the entire
-            # schema is changed. If just adding new items (or removing
-            # old ones, only increment the Minor!
-            self.payload_map['version']: '1.0',
-            self.payload_map['title']: title,
-            self.payload_map['message']: body,
-            self.payload_map['attachments']: attachments,
-            self.payload_map['type']: notify_type,
-        }
+        payload = {}
+        for key, value in (
+                (JSONPayloadField.VERSION, self.json_version),
+                (JSONPayloadField.TITLE, title),
+                (JSONPayloadField.MESSAGE, body),
+                (JSONPayloadField.ATTACHMENTS, attachments),
+                (JSONPayloadField.MESSAGETYPE, notify_type)):
+
+            if not self.payload_map[key]:
+                # Do not store element in payload response
+                continue
+            payload[self.payload_map[key]] = value
 
         # Apply any/all payload over-rides defined
         payload.update(self.payload_extras)

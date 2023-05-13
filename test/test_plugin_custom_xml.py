@@ -252,7 +252,7 @@ def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
 
     results = NotifyXML.parse_url(
         'xml://localhost:8080/command?:Message=Body&method=GET'
-        '&:Key=value&:,=invalid')
+        '&:Key=value&:,=invalid&:MessageType=')
 
     assert isinstance(results, dict)
     assert results['user'] is None
@@ -293,11 +293,12 @@ def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
 
     # Test our data set for our key/value pair
     assert re.search(r'<Version>[1-9]+\.[0-9]+</Version>', details[1]['data'])
-    assert re.search('<MessageType>info</MessageType>', details[1]['data'])
     assert re.search('<Subject>title</Subject>', details[1]['data'])
 
     assert re.search('<Message>test</Message>', details[1]['data']) is None
     assert re.search('<Message>', details[1]['data']) is None
+    # MessageType was removed from the payload
+    assert re.search('<MessageType>', details[1]['data']) is None
     # However we can find our mapped Message to the new value Body
     assert re.search('<Body>body</Body>', details[1]['data'])
     # Custom entry

@@ -40,6 +40,16 @@ from ..common import NotifyType
 from ..AppriseLocale import gettext_lazy as _
 
 
+class FORMPayloadField:
+    """
+    Identifies the fields available in the FORM Payload
+    """
+    VERSION = 'version'
+    TITLE = 'title'
+    MESSAGE = 'message'
+    MESSAGETYPE = 'type'
+
+
 # Defines the method to send the notification
 METHODS = (
     'POST',
@@ -95,6 +105,12 @@ class NotifyForm(NotifyBase):
     # Disable throttle rate for Form requests since they are normally
     # local anyway
     request_rate_per_sec = 0
+
+    # Define the FORM version to place in all payloads
+    # Version: Major.Minor,  Major is only updated if the entire schema is
+    # changed. If just adding new items (or removing old ones, only increment
+    # the Minor!
+    form_version = '1.0'
 
     # Define object templates
     templates = (
@@ -224,10 +240,10 @@ class NotifyForm(NotifyBase):
         # if the key you specify is actually an internally mapped one,
         # then a re-mapping takes place using the value
         self.payload_map = {
-            'version': 'version',
-            'title': 'title',
-            'message': 'message',
-            'type': 'type',
+            FORMPayloadField.VERSION: FORMPayloadField.VERSION,
+            FORMPayloadField.TITLE: FORMPayloadField.TITLE,
+            FORMPayloadField.MESSAGE: FORMPayloadField.MESSAGE,
+            FORMPayloadField.MESSAGETYPE: FORMPayloadField.MESSAGETYPE,
         }
 
         self.params = {}
@@ -361,15 +377,18 @@ class NotifyForm(NotifyBase):
                     'form:// Multi-Attachment Support not enabled')
 
         # prepare Form Object
-        payload = {
-            # Version: Major.Minor,  Major is only updated if the entire
-            # schema is changed. If just adding new items (or removing
-            # old ones, only increment the Minor!
-            self.payload_map['version']: '1.0',
-            self.payload_map['title']: title,
-            self.payload_map['message']: body,
-            self.payload_map['type']: notify_type,
-        }
+        payload = {}
+
+        for key, value in (
+                (FORMPayloadField.VERSION, self.form_version),
+                (FORMPayloadField.TITLE, title),
+                (FORMPayloadField.MESSAGE, body),
+                (FORMPayloadField.MESSAGETYPE, notify_type)):
+
+            if not self.payload_map[key]:
+                # Do not store element in payload response
+                continue
+            payload[self.payload_map[key]] = value
 
         # Apply any/all payload over-rides defined
         payload.update(self.payload_extras)
