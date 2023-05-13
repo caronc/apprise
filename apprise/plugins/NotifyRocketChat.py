@@ -352,7 +352,8 @@ class NotifyRocketChat(NotifyBase):
         """
         Returns the number of targets associated with this notification
         """
-        return len(self.channels) + len(self.rooms) + len(self.users)
+        targets = len(self.channels) + len(self.rooms) + len(self.users)
+        return targets if targets > 0 else 1
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """

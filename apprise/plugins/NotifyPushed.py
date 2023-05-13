@@ -333,7 +333,8 @@ class NotifyPushed(NotifyBase):
         """
         Returns the number of targets associated with this notification
         """
-        return len(self.channels) + len(self.users)
+        targets = len(self.channels) + len(self.users)
+        return targets if targets > 0 else 1
 
     @staticmethod
     def parse_url(url):

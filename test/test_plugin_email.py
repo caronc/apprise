@@ -342,6 +342,9 @@ def test_plugin_email(mock_smtp, mock_smtpssl):
                 # We loaded okay; now lets make sure we can reverse this url
                 assert isinstance(obj.url(), str) is True
 
+                # Verify we can acquire a target count as an integer
+                assert isinstance(len(obj), int)
+
                 # Test url() with privacy=True
                 assert isinstance(
                     obj.url(privacy=True), str) is True
@@ -369,6 +372,14 @@ def test_plugin_email(mock_smtp, mock_smtpssl):
                         url, obj.url()))
                     assert False
 
+                # Verify there is no change from the old and the new
+                if len(obj) != len(obj_cmp):
+                    print('%d targets found in %s' % (
+                        len(obj), obj.url(privacy=True)))
+                    print('But %d targets found in %s' % (
+                        len(obj_cmp), obj_cmp.url(privacy=True)))
+                    raise AssertionError("Target miscount %d != %d")
+
             if self:
                 # Iterate over our expected entries inside of our object
                 for key, val in self.items():
@@ -378,10 +389,18 @@ def test_plugin_email(mock_smtp, mock_smtpssl):
 
             try:
                 if test_smtplib_exceptions is False:
+                    # Verify we can acquire a target count as an integer
+                    targets = len(obj)
+
                     # check that we're as expected
                     assert obj.notify(
                         title='test', body='body',
                         notify_type=NotifyType.INFO) == response
+
+                    if response:
+                        # If we successfully got a response, there must have
+                        # been at least 1 target present
+                        assert targets > 0
 
                 else:
                     for exception in test_smtplib_exceptions:

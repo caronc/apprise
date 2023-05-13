@@ -203,6 +203,9 @@ class AppriseURLTester:
             # this url
             assert isinstance(obj.url(), str) is True
 
+            # Verify we can acquire a target count as an integer
+            assert isinstance(len(obj), int)
+
             # Test url() with privacy=True
             assert isinstance(
                 obj.url(privacy=True), str) is True
@@ -229,14 +232,6 @@ class AppriseURLTester:
             # from the one that was already created properly
             obj_cmp = Apprise.instantiate(obj.url())
 
-            # Verify there is no change from the old and the new
-            if len(obj) != len(obj_cmp):
-                print('%d targets found in %s' % (
-                    len(obj), obj.url(privacy=True)))
-                print('But %d targets found in %s' % (
-                    len(obj_cmp), obj_cmp.url(privacy=True)))
-                raise AssertionError("Target miscount %d != %d")
-
             # Our object should be the same instance as what we had
             # originally expected above.
             if not isinstance(obj_cmp, NotifyBase):
@@ -247,6 +242,14 @@ class AppriseURLTester:
                 print('TEST FAIL: {} regenerated as {}'.format(
                     url, obj.url()))
                 assert False
+
+            # Verify there is no change from the old and the new
+            if len(obj) != len(obj_cmp):
+                print('%d targets found in %s' % (
+                    len(obj), obj.url(privacy=True)))
+                print('But %d targets found in %s' % (
+                    len(obj_cmp), obj_cmp.url(privacy=True)))
+                raise AssertionError("Target miscount %d != %d")
 
             # Tidy our object
             del obj_cmp
@@ -380,7 +383,7 @@ class AppriseURLTester:
             if test_requests_exceptions is False:
 
                 # Verify we can acquire a target count as an integer
-                targets = isinstance(len(obj), int)
+                targets = len(obj)
 
                 # check that we're as expected
                 assert obj.notify(

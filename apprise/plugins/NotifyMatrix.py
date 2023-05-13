@@ -1200,8 +1200,8 @@ class NotifyMatrix(NotifyBase):
         """
         Returns the number of targets associated with this notification
         """
-        count = len(self.rooms)
-        return count if count > 0 else 1
+        targets = len(self.rooms)
+        return targets if targets > 0 else 1
 
     @staticmethod
     def parse_url(url):

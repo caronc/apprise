@@ -548,7 +548,7 @@ class NotifyOpsgenie(NotifyBase):
             targets = int(targets / self.batch_size) + \
                 (1 if targets % self.batch_size else 0)
 
-        return targets
+        return targets if targets > 0 else 1
 
     @staticmethod
     def parse_url(url):

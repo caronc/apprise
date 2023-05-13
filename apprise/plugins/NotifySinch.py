@@ -412,7 +412,8 @@ class NotifySinch(NotifyBase):
         """
         Returns the number of targets associated with this notification
         """
-        return len(self.targets)
+        targets = len(self.targets)
+        return targets if targets > 0 else 1
 
     @staticmethod
     def parse_url(url):

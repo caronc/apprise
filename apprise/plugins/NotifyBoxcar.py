@@ -348,9 +348,9 @@ class NotifyBoxcar(NotifyBase):
         """
         Returns the number of targets associated with this notification
         """
-        count = len(self._tags) + len(self.device_tokens)
+        targets = len(self._tags) + len(self.device_tokens)
         # DEFAULT_TAG is set if no tokens/tags are otherwise set
-        return count if count > 0 else 1
+        return targets if targets > 0 else 1
 
     @staticmethod
     def parse_url(url):

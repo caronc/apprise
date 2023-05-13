@@ -382,7 +382,8 @@ class NotifyMastodon(NotifyBase):
         """
         Returns the number of targets associated with this notification
         """
-        return len(self.targets)
+        targets = len(self.targets)
+        return targets if targets > 0 else 1
 
     def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
              **kwargs):

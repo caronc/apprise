@@ -36,6 +36,7 @@ from unittest import mock
 import apprise
 from apprise.plugins.NotifyDapnet import DapnetPriority, NotifyDapnet
 from helpers import AppriseURLTester
+from apprise import NotifyType
 
 # Disable logging for a cleaner testing output
 import logging
@@ -139,6 +140,35 @@ def test_plugin_dapnet_urls():
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+@mock.patch('requests.post')
+def test_plugin_dapnet_edge_cases(mock_post):
+    """
+    NotifyDapnet() Edge Cases
+    """
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.created
+
+    # test the handling of our batch modes
+    obj = apprise.Apprise.instantiate(
+        'dapnet://user:pass@{}?batch=yes'.format(
+            '/'.join(['DF1ABC', 'DF1DEF'])))
+    assert isinstance(obj, NotifyDapnet)
+
+    # objects will be combined into a single post in batch mode
+    assert len(obj) == 1
+
+    # Force our batch to break into separate messages
+    obj.default_batch_size = 1
+
+    # We'll send 2 messages now
+    assert len(obj) == 2
+
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
+    assert mock_post.call_count == 2
 
 
 @mock.patch('requests.post')
