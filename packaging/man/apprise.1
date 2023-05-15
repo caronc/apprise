@@ -1,6 +1,6 @@
 .\" generated with Ronn-NG/v0.9.1
 .\" http://github.com/apjanke/ronn-ng/tree/0.9.1
-.TH "APPRISE" "1" "July 2022" ""
+.TH "APPRISE" "1" "May 2023" ""
 .SH "NAME"
 \fBapprise\fR \- Push Notifications that work with just about every platform!
 .SH "SYNOPSIS"
@@ -120,6 +120,7 @@ By default \fBapprise\fR looks in the following local locations for custom plugi
 .nf
 ~/\.apprise/plugins
 ~/\.config/apprise/plugins
+/var/lib/apprise/plugins
 .fi
 .IP "" 0
 .P
@@ -153,6 +154,11 @@ Configuration files can be directly referenced via \fBapprise\fR when referencin
 ~/\.apprise/apprise\.yaml
 ~/\.config/apprise/apprise
 ~/\.config/apprise/apprise\.yaml
+
+/etc/apprise
+/etc/apprise\.yml
+/etc/apprise/apprise
+/etc/apprise/apprise\.yml
 .fi
 .IP "" 0
 .P
@@ -173,4 +179,4 @@ $ apprise \-vv \-t "Will Be Late" \-b "Go ahead and make dinner without me" \e
 .SH "BUGS"
 If you find any bugs, please make them known at: \fIhttps://github\.com/caronc/apprise/issues\fR
 .SH "COPYRIGHT"
-Apprise is Copyright (C) 2021 Chris Caron \fIlead2gold@gmail\.com\fR
+Apprise is Copyright (C) 2023 Chris Caron \fIlead2gold@gmail\.com\fR

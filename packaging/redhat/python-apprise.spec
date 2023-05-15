@@ -56,7 +56,7 @@ SparkPost, Super Toasty, Streamlabs, Stride, Syslog, Techulus Push, Telegram,
 Twilio, Twitter, Twist, XBMC, Voipms, Vonage, Webex Teams}
 
 Name:           python-%{pypi_name}
-Version:        1.3.0
+Version:        1.4.0
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        BSD
@@ -186,6 +186,9 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 %{python3_sitelib}/%{pypi_name}/cli.*
 
 %changelog
+* Mon May 15 2023 Chris Caron <lead2gold@gmail.com> - 1.4.0
+- Updated to v1.4.0
+
 * Wed Feb 22 2023 Chris Caron <lead2gold@gmail.com> - 1.3.0
 - Updated to v1.3.0
 
