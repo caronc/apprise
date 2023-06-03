@@ -121,7 +121,23 @@ apprise_url_tests = (
         # Invalid client secret
         'instance': TypeError,
     }),
-    ('ringc://18005554321:jwt{}@client_id/secret/1555123456'.format(
+    ('ringc://18005554321:password@client_id/secret?mode=invalid', {
+        # Invalid auth mode
+        'instance': TypeError,
+    }),
+    ('ringc://18005554321:password@client_id/secret?ext=invalid', {
+        # Invalid extension
+        'instance': TypeError,
+    }),
+    ('ringc://18005554321:password@client_id/secret?env=invalid', {
+        # Invalid Environment
+        'instance': TypeError,
+    }),
+    ('ringc://18005554321:jwt=@client_id/secret/1555123456?mode=jwt', {
+        # Invalid jwt token
+        'instance': TypeError,
+    }),
+    ('ringc://18005554321:jwt{}@client_id/secret/1555123456?mode=jwt'.format(
         'c' * 60), {
             # Valid everything
             'instance': NotifyRingCentral,
@@ -132,14 +148,30 @@ apprise_url_tests = (
             # Our expected url(privacy=True) startswith() response:
             'privacy_url': 'ringc://18005554321:j...c@c...d/****/',
     }),
-    ('ringc://18005554321:jwt{}@client_id/secret'.format('c' * 60), {
-        # using phone no with no target - we text ourselves in
-        # this case
+    ('ringc://18005554321:jwt{}@client_id/secret/245/?ext=sms&env=dev'.format(
+        'c' * 60), {
+            # using phone no with no target - we text ourselves in
+            # this case
+            # Invalid pone number 245 is parsed out
+            'instance': NotifyRingCentral,
+            # Return a good response
+            'requests_response_text': GOOD_RESPONSE,
+    }),
+    ('ringc://18005554321:password@client_id/secret', {
+        # Basic auth mode
         'instance': NotifyRingCentral,
         # Return a good response
         'requests_response_text': GOOD_RESPONSE,
     }),
     ('ringc://_?token={}&secret={}&from={}'.format(
+        'a' * 8, 'b' * 16, '5' * 11), {
+        # Return a good response
+        'requests_response_text': GOOD_RESPONSE,
+        # use get args to acomplish the same thing
+        'instance': NotifyRingCentral,
+    }),
+    # Test 'id' argument
+    ('ringc://_?id={}&secret={}&from={}'.format(
         'a' * 8, 'b' * 16, '5' * 11), {
         # Return a good response
         'requests_response_text': GOOD_RESPONSE,
@@ -226,17 +258,45 @@ def test_plugin_ringc_edge_cases(mock_post):
         NotifyRingCentral(
             client_id=client_id, client_secret="  ", source=source)
 
-    # a error response
-    response.status_code = 400
-    response.content = dumps({
-        'code': 21211,
-        'message': "The 'To' number +1234567 is not a valid phone number.",
-    })
-    mock_post.return_value = response
+    with mock.patch(
+            'apprise.plugins.NotifyRingCentral.NotifyRingCentral.logout',
+            side_effect=OSError()):
+        # Handle edge case where a logout fails during our objects destruction
+        # We silently fail without any error
+
+        obj = NotifyRingCentral(
+            client_id=client_id, client_secret="valid", source=source)
+
+        # force __del__ to get called
+        del obj
+
+    # Prepare a good response
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = dumps(GOOD_RESPONSE)
+
+    # Prepare a bad response
+    bad_response = mock.Mock()
+    bad_response.status_code = requests.codes.internal_server_error
+    bad_response.content = dumps(GOOD_RESPONSE)
 
     # Initialize our object
     obj = NotifyRingCentral(
         client_id=client_id, client_secret=client_secret, source=source)
 
+    # a error response
+    mock_post.return_value = bad_response
+
     # We will fail with the above error code
+    assert obj.notify('title', 'body', 'info') is False
+
+    # A good response
+    mock_post.return_value = response
+    assert obj.notify('title', 'body', 'info') is True
+
+    # this extra check skips the login step (it already happened above when we
+    # fixed the response code). The below goes straight to the notification
+    # which fails.  Hence this test checks our failure in a different part of
+    # the code
+    mock_post.return_value = bad_response
     assert obj.notify('title', 'body', 'info') is False

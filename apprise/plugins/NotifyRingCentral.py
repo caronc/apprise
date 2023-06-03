@@ -278,7 +278,7 @@ class NotifyRingCentral(NotifyBase):
             self.token = validate_regex(
                 token, *self.template_tokens['token']['regex'])
             if not self.token:
-                msg = 'An invalid RingCentral JWT Toen ' \
+                msg = 'An invalid RingCentral JWT Token ' \
                       '({}) was specified.'.format(token)
                 self.logger.warning(msg)
                 raise TypeError(msg)
