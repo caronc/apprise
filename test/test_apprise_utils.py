@@ -723,11 +723,14 @@ def test_parse_url_general():
 
     # A Very invalid URL
     result = utils.parse_url(
-        'json://3)Ww[+oMD69[,?n\[S%40kjBDj\@+15552571986?auth=pass', verify_host=True)
+        'json://3)Ww[+oMD69[,?n\[S%40kjBDj\@+15552571986?auth=pass',
+        verify_host=True)
     assert result is None
     result = utils.parse_url(
-        'json://3)Ww[+oMD69[,?n\[S%40kjBDj\@+15552571986?auth=pass', verify_host=False)
+        'json://3)Ww[+oMD69[,?n\[S%40kjBDj\@+15552571986?auth=pass',
+        verify_host=False)
     assert result is None
+
 
 def test_parse_url_simple():
     "utils: parse_url() testing """
