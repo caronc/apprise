@@ -134,9 +134,14 @@ class NotifyRingCentral(NotifyBase):
     # Define object templates
     templates = (
         # Auth
+        '{schema}://{from_phone}:{password}@{client_id}/{secret}/',
+        '{schema}://{from_phone}:{password}@{client_id}/{secret}/{targets}',
         '{schema}://{password}@{client_id}/{secret}/{from_phone}',
         '{schema}://{password}@{client_id}/{secret}/{from_phone}/{targets}',
+
         # JWT
+        '{schema}://{from_phone}:{token}@{client_id}/{secret}/',
+        '{schema}://{from_phone}:{token}@{client_id}/{secret}/{targets}',
         '{schema}://{token}@{client_id}/{secret}/{from_phone}',
         '{schema}://{token}@{client_id}/{secret}/{from_phone}/{targets}',
     )
@@ -148,6 +153,12 @@ class NotifyRingCentral(NotifyBase):
             'type': 'string',
             'required': True,
             'regex': (r'^[a-z0-9._-]+$', 'i'),
+            'private': True,
+        },
+        'password': {
+            'name': _('Password'),
+            'type': 'string',
+            'required': True,
             'private': True,
         },
         'client_id': {
@@ -214,7 +225,7 @@ class NotifyRingCentral(NotifyBase):
             'alias_of': 'token',
         },
         'secret': {
-            'alias_of': 'client_secret',
+            'alias_of': 'secret',
         },
         'mode': {
             # This is automatically detected

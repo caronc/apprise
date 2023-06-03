@@ -14,6 +14,13 @@ services:
     volumes:
       - ./:/apprise
 
+  test.py311:
+    build:
+      context: .
+      dockerfile: Dockerfile.py311
+    volumes:
+      - ./:/apprise
+
   rpmbuild.el8:
     build:
       context: .

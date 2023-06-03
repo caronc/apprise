@@ -44,5 +44,9 @@ COPY dev-requirements.txt /
 ENV PYTHONPATH /apprise
 ENV PYTHONPYCACHEPREFIX /apprise/__pycache__/py310
 
-
 RUN pip install -r /requirements.txt -r /dev-requirements.txt
+
+RUN addgroup --gid ${USER_GID:-1000} apprise
+RUN adduser --system --uid ${USER_UID:-1000} --ingroup apprise --home /apprise --no-create-home --disabled-password apprise
+
+USER apprise
