@@ -106,6 +106,10 @@ apprise_url_tests = (
     ('tgram://bottest@123456789:abcdefg_hijklmnop/id1/?topic=invalid', {
         'instance': TypeError,
     }),
+    # content must be 'before' or 'after'
+    ('tgram://bottest@123456789:abcdefg_hijklmnop/id1/?content=invalid', {
+        'instance': TypeError,
+    }),
     # Testing image
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?image=Yes', {
         'instance': NotifyTelegram,
@@ -413,18 +417,26 @@ def test_plugin_telegram_general(mock_post):
     assert payload['text'] == \
         '<b>special characters</b>\r\n\'"This can\'t\t\r\nfail us"\'\r\n'
 
-    # Test sending attachments
-    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
-    assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO,
-        attach=attach) is True
+    for content in ('before', 'after'):
+        # Test our content settings
+        obj = NotifyTelegram(
+            bot_token=bot_token, targets='12345', content=content)
+        # Reset our mock
+        mock_post.reset_mock()
+        # Test sending attachments
+        attach = AppriseAttachment(
+            os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
+        assert obj.notify(
+            body='body', title='title', notify_type=NotifyType.INFO,
+            attach=attach) is True
 
-    # An invalid attachment will cause a failure
-    path = os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
-    attach = AppriseAttachment(path)
-    assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO,
-        attach=path) is False
+        # An invalid attachment will cause a failure
+        path = os.path.join(
+            TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
+        attach = AppriseAttachment(path)
+        assert obj.notify(
+            body='body', title='title', notify_type=NotifyType.INFO,
+            attach=path) is False
 
     obj = NotifyTelegram(bot_token=bot_token, targets=None)
     # No user detected; this happens after our firsst notification
