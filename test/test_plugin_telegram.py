@@ -106,6 +106,10 @@ apprise_url_tests = (
     ('tgram://bottest@123456789:abcdefg_hijklmnop/id1/?topic=invalid', {
         'instance': TypeError,
     }),
+    # content must be 'before' or 'after'
+    ('tgram://bottest@123456789:abcdefg_hijklmnop/id1/?content=invalid', {
+        'instance': TypeError,
+    }),
     # Testing image
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?image=Yes', {
         'instance': NotifyTelegram,

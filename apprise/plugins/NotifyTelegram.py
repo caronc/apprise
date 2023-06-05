@@ -745,10 +745,14 @@ class NotifyTelegram(NotifyBase):
                         'Failed to send Telegram type image to {}.',
                         payload['chat_id'])
 
-            if attach and self.content == TelegramContentPlacement.BEFORE and not has_error:
+            if attach and self.content == TelegramContentPlacement.AFTER:
                 # Send our attachments now (if specified and if it exists)
-                has_error = self._send_attachments(
-                    chat_id=payload['chat_id'], notify_type=notify_type, attach=attach):
+                if not self._send_attachments(
+                        chat_id=payload['chat_id'], notify_type=notify_type,
+                        attach=attach):
+
+                    has_error = True
+                    continue
 
             # Always call throttle before any remote server i/o is made;
             # Telegram throttles to occur before sending the image so that
@@ -812,10 +816,17 @@ class NotifyTelegram(NotifyBase):
 
             self.logger.info('Sent Telegram notification.')
 
-            if attach and self.content == TelegramContentPlacement.AFTER and not has_error:
-                # Send our attachments now (if specified and if it exists)
-                has_error = self._send_attachments(
-                    chat_id=payload['chat_id'], notify_type=notify_type, attach=attach):
+            if attach and self.content == TelegramContentPlacement.BEFORE:
+                # Send our attachments now (if specified and if it exists) as
+                # it was identified to send the content before the attachments
+                # which is now done.
+                if not self._send_attachments(
+                        chat_id=payload['chat_id'],
+                        notify_type=notify_type,
+                        attach=attach):
+
+                    has_error = True
+                    continue
 
         return not has_error
 
@@ -933,8 +944,8 @@ class NotifyTelegram(NotifyBase):
         results['targets'] = entries
 
         # content to be displayed 'before' or 'after' attachments
-        if 'content' in results['qsd'] and len(results['qsd']['to']):
-            results['content'] = NotifyTelegram.results['qsd']['content']
+        if 'content' in results['qsd'] and len(results['qsd']['content']):
+            results['content'] = results['qsd']['content']
 
         # Support the 'to' variable so that we can support rooms this way too
         # The 'to' makes it easier to use yaml configuration
