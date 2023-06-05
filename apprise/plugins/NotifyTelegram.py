@@ -340,7 +340,7 @@ class NotifyTelegram(NotifyBase):
             'name': _('Content Placement'),
             'type': 'choice:string',
             'values': TELEGRAM_CONTENT_PLACEMENT,
-            'default': TelegramContentPlacement.AFTER,
+            'default': TelegramContentPlacement.BEFORE,
         },
     })
 
