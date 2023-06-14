@@ -163,7 +163,8 @@ def test_plugin_gitter_general(mock_post, mock_get):
     request.content = dumps(response_obj)
     request.status_code = requests.codes.ok
     request.headers = {
-        'X-RateLimit-Reset': (datetime.now(timezone.utc) - epoch).total_seconds(),
+        'X-RateLimit-Reset': (
+            datetime.now(timezone.utc) - epoch).total_seconds(),
         'X-RateLimit-Remaining': 1,
     }
 

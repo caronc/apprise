@@ -268,7 +268,8 @@ def test_plugin_reddit_general(mock_post):
     })
     good_response.status_code = requests.codes.ok
     good_response.headers = {
-        'X-RateLimit-Reset': (datetime.now(timezone.utc) - epoch).total_seconds(),
+        'X-RateLimit-Reset': (
+            datetime.now(timezone.utc) - epoch).total_seconds(),
         'X-RateLimit-Remaining': 1,
     }
 
@@ -297,7 +298,8 @@ def test_plugin_reddit_general(mock_post):
 
     # Force a case where there are no more remaining posts allowed
     good_response.headers = {
-        'X-RateLimit-Reset': (datetime.now(timezone.utc) - epoch).total_seconds(),
+        'X-RateLimit-Reset': (
+            datetime.now(timezone.utc) - epoch).total_seconds(),
         'X-RateLimit-Remaining': 0,
     }
     # behind the scenes, it should cause us to update our rate limit
@@ -306,7 +308,8 @@ def test_plugin_reddit_general(mock_post):
 
     # This should cause us to block
     good_response.headers = {
-        'X-RateLimit-Reset': (datetime.now(timezone.utc) - epoch).total_seconds(),
+        'X-RateLimit-Reset': (
+            datetime.now(timezone.utc) - epoch).total_seconds(),
         'X-RateLimit-Remaining': 10,
     }
     assert obj.send(body="test") is True
@@ -320,7 +323,8 @@ def test_plugin_reddit_general(mock_post):
 
     # Reset our variable back to 1
     good_response.headers = {
-        'X-RateLimit-Reset': (datetime.now(timezone.utc) - epoch).total_seconds(),
+        'X-RateLimit-Reset': (
+            datetime.now(timezone.utc) - epoch).total_seconds(),
         'X-RateLimit-Remaining': 1,
     }
     # Handle cases where our epoch time is wrong
@@ -329,7 +333,8 @@ def test_plugin_reddit_general(mock_post):
 
     # Return our object, but place it in the future forcing us to block
     good_response.headers = {
-        'X-RateLimit-Reset': (datetime.now(timezone.utc) - epoch).total_seconds() + 1,
+        'X-RateLimit-Reset': (
+            datetime.now(timezone.utc) - epoch).total_seconds() + 1,
         'X-RateLimit-Remaining': 0,
     }
 
@@ -338,7 +343,8 @@ def test_plugin_reddit_general(mock_post):
 
     # Return our object, but place it in the future forcing us to block
     good_response.headers = {
-        'X-RateLimit-Reset': (datetime.now(timezone.utc) - epoch).total_seconds() - 1,
+        'X-RateLimit-Reset': (
+            datetime.now(timezone.utc) - epoch).total_seconds() - 1,
         'X-RateLimit-Remaining': 0,
     }
     assert obj.send(body="test") is True
@@ -349,7 +355,8 @@ def test_plugin_reddit_general(mock_post):
     # Invalid JSON
     response = mock.Mock()
     response.headers = {
-        'X-RateLimit-Reset': (datetime.now(timezone.utc) - epoch).total_seconds(),
+        'X-RateLimit-Reset': (
+            datetime.now(timezone.utc) - epoch).total_seconds(),
         'X-RateLimit-Remaining': 1,
     }
     response.content = '{'
@@ -394,7 +401,8 @@ def test_plugin_reddit_general(mock_post):
     })
     good_response.status_code = requests.codes.ok
     good_response.headers = {
-        'X-RateLimit-Reset': (datetime.now(timezone.utc) - epoch).total_seconds(),
+        'X-RateLimit-Reset': (
+            datetime.now(timezone.utc) - epoch).total_seconds(),
         'X-RateLimit-Remaining': 1,
     }
 

@@ -437,7 +437,8 @@ class NotifySES(NotifyBase):
                 base['Reply-To'] = formataddr(reply_to, charset='utf-8')
             base['Cc'] = ','.join(cc)
             base['Date'] = \
-                datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S +0000")
+                datetime.now(
+                    timezone.utc).strftime("%a, %d %b %Y %H:%M:%S +0000")
             base['X-Application'] = self.app_id
 
             if attach:

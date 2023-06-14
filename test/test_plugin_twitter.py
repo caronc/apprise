@@ -348,7 +348,8 @@ def test_plugin_twitter_general(mocker):
     request.content = json.dumps(response_obj)
     request.status_code = requests.codes.ok
     request.headers = {
-        'x-rate-limit-reset': (datetime.now(timezone.utc) - epoch).total_seconds(),
+        'x-rate-limit-reset': (
+            datetime.now(timezone.utc) - epoch).total_seconds(),
         'x-rate-limit-remaining': 1,
     }
 
@@ -599,7 +600,8 @@ def test_plugin_twitter_dm_attachments_basic(
     epoch = datetime.fromtimestamp(0, timezone.utc)
     mock_get.return_value = good_message_response
     mock_post.return_value.headers = {
-        'x-rate-limit-reset': (datetime.now(timezone.utc) - epoch).total_seconds(),
+        'x-rate-limit-reset': (
+            datetime.now(timezone.utc) - epoch).total_seconds(),
         'x-rate-limit-remaining': 1,
     }
 

@@ -806,7 +806,8 @@ class NotifyEmail(NotifyBase):
             base['To'] = formataddr((to_name, to_addr), charset='utf-8')
             base['Message-ID'] = make_msgid(domain=self.smtp_host)
             base['Date'] = \
-                datetime.now(timezone.utc).strftime("%a, %d %b %Y %H:%M:%S +0000")
+                datetime.now(timezone.utc)\
+                .strftime("%a, %d %b %Y %H:%M:%S +0000")
             base['X-Application'] = self.app_id
 
             if cc:
