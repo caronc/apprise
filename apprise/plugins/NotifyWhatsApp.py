@@ -66,7 +66,8 @@ class NotifyWhatsApp(NotifyBase):
     service_name = 'WhatsApp'
 
     # The services URL
-    service_url = 'https://developer.facebook.com/'
+    service_url = \
+        'https://developers.facebook.com/docs/whatsapp/cloud-api/get-started'
 
     # All notification requests are secure
     secure_protocol = 'whatsapp'
@@ -117,7 +118,6 @@ class NotifyWhatsApp(NotifyBase):
             'type': 'string',
             'required': True,
             'regex': (r'^[0-9]{14,}$', 'i'),
-            'map_to': 'source',
         },
         'target_phone': {
             'name': _('Target Phone No'),
@@ -147,7 +147,7 @@ class NotifyWhatsApp(NotifyBase):
             'alias_of': 'from_phone_id',
         },
         'token': {
-            'alias_of': 'auth_token',
+            'alias_of': 'token',
         },
         'template': {
             'alias_of': 'template',
@@ -367,10 +367,6 @@ class NotifyWhatsApp(NotifyBase):
         # Create a copy of the targets list
         targets = list(self.targets)
 
-        if len(targets) == 0:
-            # No sources specified, use our own phone no
-            targets.append(self.source)
-
         while len(targets):
             # Get our target to notify
             target = targets.pop(0)
@@ -544,11 +540,12 @@ class NotifyWhatsApp(NotifyBase):
         # targets this way too.
         # The 'from' makes it easier to use yaml configuration
         if 'from' in results['qsd'] and len(results['qsd']['from']):
-            results['source'] = \
+            results['from_phone_id'] = \
                 NotifyWhatsApp.unquote(results['qsd']['from'])
-        if 'source' in results['qsd'] and len(results['qsd']['source']):
-            results['source'] = \
-                NotifyWhatsApp.unquote(results['qsd']['source'])
+        if 'from_phone_id' in results['qsd'] and \
+                len(results['qsd']['from_phone_id']):
+            results['from_phone_id'] = \
+                NotifyWhatsApp.unquote(results['qsd']['from_phone_id'])
 
         # Support the 'to' variable so that we can support targets this way too
         # The 'to' makes it easier to use yaml configuration
