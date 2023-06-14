@@ -56,6 +56,7 @@ import requests
 from json import loads
 from datetime import timedelta
 from datetime import datetime
+from datetime import timezone
 
 from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
@@ -134,7 +135,7 @@ class NotifyReddit(NotifyBase):
     request_rate_per_sec = 0
 
     # For Tracking Purposes
-    ratelimit_reset = datetime.utcnow()
+    ratelimit_reset = datetime.now(timezone.utc).replace(tzinfo=None)
 
     # Default to 1.0
     ratelimit_remaining = 1.0
@@ -275,7 +276,7 @@ class NotifyReddit(NotifyBase):
         # Our keys we build using the provided content
         self.__refresh_token = None
         self.__access_token = None
-        self.__access_token_expiry = datetime.utcnow()
+        self.__access_token_expiry = datetime.now(timezone.utc)
 
         self.kind = kind.strip().lower() \
             if isinstance(kind, str) \
@@ -417,10 +418,10 @@ class NotifyReddit(NotifyBase):
         if 'expires_in' in response:
             delta = timedelta(seconds=int(response['expires_in']))
             self.__access_token_expiry = \
-                delta + datetime.utcnow() - self.clock_skew
+                delta + datetime.now(timezone.utc) - self.clock_skew
         else:
             self.__access_token_expiry = self.access_token_lifetime_sec + \
-                datetime.utcnow() - self.clock_skew
+                datetime.now(timezone.utc) - self.clock_skew
 
         # The Refresh Token
         self.__refresh_token = response.get(
@@ -547,7 +548,7 @@ class NotifyReddit(NotifyBase):
             # Gitter server.  One would hope we're on NTP and our clocks are
             # the same allowing this to role smoothly:
 
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
             if now < self.ratelimit_reset:
                 # We need to throttle for the difference in seconds
                 wait = abs(
@@ -671,8 +672,9 @@ class NotifyReddit(NotifyBase):
                 self.ratelimit_remaining = \
                     float(r.headers.get(
                         'X-RateLimit-Remaining'))
-                self.ratelimit_reset = datetime.utcfromtimestamp(
-                    int(r.headers.get('X-RateLimit-Reset')))
+                self.ratelimit_reset = datetime.fromtimestamp(
+                    int(r.headers.get('X-RateLimit-Reset')), timezone.utc
+                ).replace(tzinfo=None)
 
             except (TypeError, ValueError):
                 # This is returned if we could not retrieve this information

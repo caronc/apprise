@@ -89,6 +89,7 @@ import base64
 import requests
 from hashlib import sha256
 from datetime import datetime
+from datetime import timezone
 from collections import OrderedDict
 from xml.etree import ElementTree
 from email.mime.text import MIMEText
@@ -436,7 +437,8 @@ class NotifySES(NotifyBase):
                 base['Reply-To'] = formataddr(reply_to, charset='utf-8')
             base['Cc'] = ','.join(cc)
             base['Date'] = \
-                datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S +0000")
+                datetime.now(
+                    timezone.utc).strftime("%a, %d %b %Y %H:%M:%S +0000")
             base['X-Application'] = self.app_id
 
             if attach:
@@ -585,7 +587,7 @@ class NotifySES(NotifyBase):
         }
 
         # Get a reference time (used for header construction)
-        reference = datetime.utcnow()
+        reference = datetime.now(timezone.utc)
 
         # Provide Content-Length
         headers['Content-Length'] = str(len(payload))

@@ -35,6 +35,7 @@ import requests
 from copy import deepcopy
 from json import dumps, loads
 from datetime import datetime
+from datetime import timezone
 
 from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
@@ -150,7 +151,7 @@ class NotifyMastodon(NotifyBase):
     request_rate_per_sec = 0
 
     # For Tracking Purposes
-    ratelimit_reset = datetime.utcnow()
+    ratelimit_reset = datetime.now(timezone.utc).replace(tzinfo=None)
 
     # Default to 1000; users can send up to 1000 DM's and 2400 toot a day
     # This value only get's adjusted if the server sets it that way
@@ -834,7 +835,7 @@ class NotifyMastodon(NotifyBase):
             # Mastodon server.  One would hope we're on NTP and our clocks are
             # the same allowing this to role smoothly:
 
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
             if now < self.ratelimit_reset:
                 # We need to throttle for the difference in seconds
                 # We add 0.5 seconds to the end just to allow a grace
@@ -892,8 +893,9 @@ class NotifyMastodon(NotifyBase):
                 # Capture rate limiting if possible
                 self.ratelimit_remaining = \
                     int(r.headers.get('X-RateLimit-Remaining'))
-                self.ratelimit_reset = datetime.utcfromtimestamp(
-                    int(r.headers.get('X-RateLimit-Limit')))
+                self.ratelimit_reset = datetime.fromtimestamp(
+                    int(r.headers.get('X-RateLimit-Limit')), timezone.utc
+                ).replace(tzinfo=None)
 
             except (TypeError, ValueError):
                 # This is returned if we could not retrieve this information

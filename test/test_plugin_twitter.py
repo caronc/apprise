@@ -34,6 +34,7 @@ import json
 import logging
 import os
 from datetime import datetime
+from datetime import timezone
 from unittest.mock import Mock, patch
 
 import pytest
@@ -341,13 +342,14 @@ def test_plugin_twitter_general(mocker):
     }]
 
     # Epoch time:
-    epoch = datetime.utcfromtimestamp(0)
+    epoch = datetime.fromtimestamp(0, timezone.utc)
 
     request = Mock()
     request.content = json.dumps(response_obj)
     request.status_code = requests.codes.ok
     request.headers = {
-        'x-rate-limit-reset': (datetime.utcnow() - epoch).total_seconds(),
+        'x-rate-limit-reset': (
+            datetime.now(timezone.utc) - epoch).total_seconds(),
         'x-rate-limit-remaining': 1,
     }
 
@@ -402,21 +404,21 @@ def test_plugin_twitter_general(mocker):
 
     # Return our object, but place it in the future forcing us to block
     request.headers['x-rate-limit-reset'] = \
-        (datetime.utcnow() - epoch).total_seconds() + 1
+        (datetime.now(timezone.utc) - epoch).total_seconds() + 1
     request.headers['x-rate-limit-remaining'] = 0
     obj.ratelimit_remaining = 0
     assert obj.send(body="test") is True
 
     # Return our object, but place it in the future forcing us to block
     request.headers['x-rate-limit-reset'] = \
-        (datetime.utcnow() - epoch).total_seconds() - 1
+        (datetime.now(timezone.utc) - epoch).total_seconds() - 1
     request.headers['x-rate-limit-remaining'] = 0
     obj.ratelimit_remaining = 0
     assert obj.send(body="test") is True
 
     # Return our limits to always work
     request.headers['x-rate-limit-reset'] = \
-        (datetime.utcnow() - epoch).total_seconds()
+        (datetime.now(timezone.utc) - epoch).total_seconds()
     request.headers['x-rate-limit-remaining'] = 1
     obj.ratelimit_remaining = 1
 
@@ -595,10 +597,11 @@ def test_plugin_twitter_dm_attachments_basic(
     mock_post = mocker.patch("requests.post")
 
     # Epoch time:
-    epoch = datetime.utcfromtimestamp(0)
+    epoch = datetime.fromtimestamp(0, timezone.utc)
     mock_get.return_value = good_message_response
     mock_post.return_value.headers = {
-        'x-rate-limit-reset': (datetime.utcnow() - epoch).total_seconds(),
+        'x-rate-limit-reset': (
+            datetime.now(timezone.utc) - epoch).total_seconds(),
         'x-rate-limit-remaining': 1,
     }
 
