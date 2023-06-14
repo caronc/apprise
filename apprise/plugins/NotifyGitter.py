@@ -50,6 +50,7 @@ import requests
 from json import loads
 from json import dumps
 from datetime import datetime
+from datetime import timezone
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
@@ -99,7 +100,7 @@ class NotifyGitter(NotifyBase):
     request_rate_per_sec = 0
 
     # For Tracking Purposes
-    ratelimit_reset = datetime.utcnow()
+    ratelimit_reset = datetime.now(timezone.utc).replace(tzinfo=None)
 
     # Default to 1
     ratelimit_remaining = 1
@@ -298,7 +299,7 @@ class NotifyGitter(NotifyBase):
             # Gitter server.  One would hope we're on NTP and our clocks are
             # the same allowing this to role smoothly:
 
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
             if now < self.ratelimit_reset:
                 # We need to throttle for the difference in seconds
                 # We add 0.5 seconds to the end just to allow a grace
@@ -350,8 +351,9 @@ class NotifyGitter(NotifyBase):
             try:
                 self.ratelimit_remaining = \
                     int(r.headers.get('X-RateLimit-Remaining'))
-                self.ratelimit_reset = datetime.utcfromtimestamp(
-                    int(r.headers.get('X-RateLimit-Reset')))
+                self.ratelimit_reset = datetime.fromtimestamp(
+                    int(r.headers.get('X-RateLimit-Reset')), timezone.utc
+                ).replace(tzinfo=None)
 
             except (TypeError, ValueError):
                 # This is returned if we could not retrieve this information

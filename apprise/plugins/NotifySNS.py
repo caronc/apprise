@@ -35,6 +35,7 @@ import hmac
 import requests
 from hashlib import sha256
 from datetime import datetime
+from datetime import timezone
 from collections import OrderedDict
 from xml.etree import ElementTree
 from itertools import chain
@@ -396,7 +397,7 @@ class NotifySNS(NotifyBase):
         }
 
         # Get a reference time (used for header construction)
-        reference = datetime.utcnow()
+        reference = datetime.now(timezone.utc)
 
         # Provide Content-Length
         headers['Content-Length'] = str(len(payload))

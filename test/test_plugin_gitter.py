@@ -40,6 +40,7 @@ from helpers import AppriseURLTester
 
 from json import dumps
 from datetime import datetime
+from datetime import timezone
 
 # Disable logging for a cleaner testing output
 import logging
@@ -156,13 +157,13 @@ def test_plugin_gitter_general(mock_post, mock_get):
     ]
 
     # Epoch time:
-    epoch = datetime.utcfromtimestamp(0)
+    epoch = datetime.fromtimestamp(0, timezone.utc)
 
     request = mock.Mock()
     request.content = dumps(response_obj)
     request.status_code = requests.codes.ok
     request.headers = {
-        'X-RateLimit-Reset': (datetime.utcnow() - epoch).total_seconds(),
+        'X-RateLimit-Reset': (datetime.now(timezone.utc) - epoch).total_seconds(),
         'X-RateLimit-Remaining': 1,
     }
 
@@ -211,21 +212,21 @@ def test_plugin_gitter_general(mock_post, mock_get):
 
     # Return our object, but place it in the future forcing us to block
     request.headers['X-RateLimit-Reset'] = \
-        (datetime.utcnow() - epoch).total_seconds() + 1
+        (datetime.now(timezone.utc) - epoch).total_seconds() + 1
     request.headers['X-RateLimit-Remaining'] = 0
     obj.ratelimit_remaining = 0
     assert obj.send(body="test") is True
 
     # Return our object, but place it in the future forcing us to block
     request.headers['X-RateLimit-Reset'] = \
-        (datetime.utcnow() - epoch).total_seconds() - 1
+        (datetime.now(timezone.utc) - epoch).total_seconds() - 1
     request.headers['X-RateLimit-Remaining'] = 0
     obj.ratelimit_remaining = 0
     assert obj.send(body="test") is True
 
     # Return our limits to always work
     request.headers['X-RateLimit-Reset'] = \
-        (datetime.utcnow() - epoch).total_seconds()
+        (datetime.now(timezone.utc) - epoch).total_seconds()
     request.headers['X-RateLimit-Remaining'] = 1
     obj.ratelimit_remaining = 1
 
