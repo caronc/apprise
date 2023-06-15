@@ -49,7 +49,6 @@ import re
 import requests
 from json import loads, dumps
 from .NotifyBase import NotifyBase
-from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..utils import is_phone_no
 from ..utils import parse_phone_no
@@ -116,8 +115,9 @@ class NotifyWhatsApp(NotifyBase):
         'from_phone_id': {
             'name': _('From Phone ID'),
             'type': 'string',
+            'private': True,
             'required': True,
-            'regex': (r'^[0-9]{14,}$', 'i'),
+            'regex': (r'^[0-9]+$', 'i'),
         },
         'target_phone': {
             'name': _('Target Phone No'),
@@ -407,7 +407,9 @@ class NotifyWhatsApp(NotifyBase):
                         status_str = \
                             json_response['error'].get('message', status_str)
 
-                    except (AttributeError, TypeError, ValueError):
+                    except (AttributeError, TypeError, ValueError, KeyError):
+                        # KeyError = r.content is parseable but does not
+                        #            contain 'error'
                         # ValueError = r.content is Unparsable
                         # TypeError = r.content is None
                         # AttributeError = r is None
@@ -471,12 +473,11 @@ class NotifyWhatsApp(NotifyBase):
             .format(
                 schema=self.secure_protocol,
                 from_id=self.pprint(
-                    self.from_phone_id, privacy, mode=PrivacyMode.Tail,
-                    safe=''),
+                    self.from_phone_id, privacy, safe=''),
                 token=self.pprint(self.token, privacy, safe=''),
                 template='' if not self.template
-                else '{}:'.format(self.pprint(
-                    self.template, privacy, safe='')),
+                else '{}:'.format(
+                    NotifyWhatsApp.quote(self.template, safe='')),
                 targets='/'.join(
                     [NotifyWhatsApp.quote(x, safe='') for x in self.targets]),
                 params=NotifyWhatsApp.urlencode(params))
@@ -542,10 +543,10 @@ class NotifyWhatsApp(NotifyBase):
         if 'from' in results['qsd'] and len(results['qsd']['from']):
             results['from_phone_id'] = \
                 NotifyWhatsApp.unquote(results['qsd']['from'])
-        if 'from_phone_id' in results['qsd'] and \
-                len(results['qsd']['from_phone_id']):
+        if 'source' in results['qsd'] and \
+                len(results['qsd']['source']):
             results['from_phone_id'] = \
-                NotifyWhatsApp.unquote(results['qsd']['from_phone_id'])
+                NotifyWhatsApp.unquote(results['qsd']['source'])
 
         # Support the 'to' variable so that we can support targets this way too
         # The 'to' makes it easier to use yaml configuration
