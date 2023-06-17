@@ -27,6 +27,9 @@ sdist/
 .installed.cfg
 *.egg
 
+# Generated from Docker Instance
+.bash_history
+
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt

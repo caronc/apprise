@@ -96,6 +96,11 @@ class NotifyNextcloudTalk(NotifyBase):
             'private': True,
             'required': True,
         },
+        'target_room_id': {
+            'name': _('Room ID'),
+            'type': 'string',
+            'map_to': 'targets',
+        },
         'targets': {
             'name': _('Targets'),
             'type': 'list:string',

@@ -175,7 +175,6 @@ class NotifyMatrix(NotifyBase):
         'host': {
             'name': _('Hostname'),
             'type': 'string',
-            'required': True,
         },
         'port': {
             'name': _('Port'),
@@ -194,6 +193,7 @@ class NotifyMatrix(NotifyBase):
         },
         'token': {
             'name': _('Access Token'),
+            'private': True,
             'map_to': 'password',
         },
         'target_user': {

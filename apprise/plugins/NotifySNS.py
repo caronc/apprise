@@ -103,7 +103,7 @@ class NotifySNS(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{access_key_id}/{secret_access_key}{region}/{targets}',
+        '{schema}://{access_key_id}/{secret_access_key}/{region}/{targets}',
     )
 
     # Define our template tokens
@@ -125,6 +125,7 @@ class NotifySNS(NotifyBase):
             'type': 'string',
             'required': True,
             'regex': (r'^[a-z]{2}-[a-z-]+?-[0-9]+$', 'i'),
+            'required': True,
             'map_to': 'region_name',
         },
         'target_phone_no': {

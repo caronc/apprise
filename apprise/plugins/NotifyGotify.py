@@ -134,7 +134,6 @@ class NotifyGotify(NotifyBase):
             'type': 'string',
             'map_to': 'fullpath',
             'default': '/',
-            'required': True,
         },
         'port': {
             'name': _('Port'),

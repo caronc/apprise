@@ -157,7 +157,6 @@ class NotifyFCM(NotifyBase):
         'project': {
             'name': _('Project ID'),
             'type': 'string',
-            'required': True,
         },
         'target_device': {
             'name': _('Target Device'),
@@ -173,6 +172,7 @@ class NotifyFCM(NotifyBase):
         'targets': {
             'name': _('Targets'),
             'type': 'list:string',
+            'required': True,
         },
     })
 

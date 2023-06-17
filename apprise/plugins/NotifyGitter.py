@@ -122,9 +122,15 @@ class NotifyGitter(NotifyBase):
             'required': True,
             'regex': (r'^[a-z0-9]{40}$', 'i'),
         },
+        'target_room': {
+            'name': _('Target Room'),
+            'type': 'string',
+            'map_to': 'targets',
+        },
         'targets': {
-            'name': _('Rooms'),
+            'name': _('Targets'),
             'type': 'list:string',
+            'required': True,
         },
     })
 

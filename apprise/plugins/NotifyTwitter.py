@@ -132,6 +132,7 @@ class NotifyTwitter(NotifyBase):
     ratelimit_remaining = 1
 
     templates = (
+        '{schema}://{ckey}/{csecret}/{akey}/{asecret}',
         '{schema}://{ckey}/{csecret}/{akey}/{asecret}/{targets}',
     )
 

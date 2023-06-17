@@ -151,6 +151,12 @@ class NotifyBoxcar(NotifyBase):
         'to': {
             'alias_of': 'targets',
         },
+        'access': {
+            'alias_of': 'access_key',
+        },
+        'secret': {
+            'alias_of': 'secret_key',
+        },
     })
 
     def __init__(self, access, secret, targets=None, include_image=True,
@@ -380,6 +386,16 @@ class NotifyBoxcar(NotifyBase):
         if 'to' in results['qsd'] and len(results['qsd']['to']):
             results['targets'] += \
                 NotifyBoxcar.parse_list(results['qsd'].get('to'))
+
+        # Access
+        if 'access' in results['qsd'] and results['qsd']['access']:
+            results['access'] = NotifyBoxcar.unquote(
+                results['qsd']['access'].strip())
+
+        # Secret
+        if 'secret' in results['qsd'] and results['qsd']['secret']:
+            results['secret'] = NotifyBoxcar.unquote(
+                results['qsd']['secret'].strip())
 
         # Include images with our message
         results['include_image'] = \

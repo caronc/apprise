@@ -91,7 +91,7 @@ class NotifyRyver(NotifyBase):
     # Define object templates
     templates = (
         '{schema}://{organization}/{token}',
-        '{schema}://{user}@{organization}/{token}',
+        '{schema}://{botname}@{organization}/{token}',
     )
 
     # Define our template tokens
@@ -109,9 +109,10 @@ class NotifyRyver(NotifyBase):
             'private': True,
             'regex': (r'^[A-Z0-9]{15}$', 'i'),
         },
-        'user': {
+        'botname': {
             'name': _('Bot Name'),
             'type': 'string',
+            'map_to': 'user',
         },
     })
 

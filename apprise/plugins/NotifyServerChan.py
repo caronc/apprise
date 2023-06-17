@@ -68,7 +68,7 @@ class NotifyServerChan(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{token}/',
+        '{schema}://{token}',
     )
 
     # Define our template tokens

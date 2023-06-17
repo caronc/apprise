@@ -174,6 +174,7 @@ class NotifySES(NotifyBase):
             'name': _('Region'),
             'type': 'string',
             'regex': (r'^[a-z]{2}-[a-z-]+?-[0-9]+$', 'i'),
+            'required': True,
             'map_to': 'region_name',
         },
         'targets': {

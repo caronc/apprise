@@ -97,8 +97,8 @@ class NotifyFlock(NotifyBase):
     # Define object templates
     templates = (
         '{schema}://{token}',
-        '{schema}://{user}@{token}',
-        '{schema}://{user}@{token}/{targets}',
+        '{schema}://{botname}@{token}',
+        '{schema}://{botname}@{token}/{targets}',
         '{schema}://{token}/{targets}',
     )
 
@@ -111,9 +111,10 @@ class NotifyFlock(NotifyBase):
             'private': True,
             'required': True,
         },
-        'user': {
+        'botname': {
             'name': _('Bot Name'),
             'type': 'string',
+            'map_to': 'user',
         },
         'to_user': {
             'name': _('To User ID'),

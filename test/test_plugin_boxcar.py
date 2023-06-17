@@ -89,6 +89,12 @@ apprise_url_tests = (
         'instance': NotifyBoxcar,
         'requests_response_code': requests.codes.created,
     }),
+    ('boxcar://?access=%s&secret=%s&to=tag5' % ('d' * 64, 'b' * 64), {
+        # Test access and secret kwargs
+        'privacy_url': 'boxcar://d...d/****/',
+        'instance': NotifyBoxcar,
+        'requests_response_code': requests.codes.created,
+    }),
     # An invalid tag
     ('boxcar://%s/%s/@%s' % ('a' * 64, 'b' * 64, 't' * 64), {
         'instance': NotifyBoxcar,

@@ -149,7 +149,11 @@ class NotifyOffice365(NotifyBase):
             'required': True,
         },
         'targets': {
-            'name': _('Target Emails'),
+            'name': _('Target Email'),
+            'type': 'string',
+        },
+        'targets': {
+            'name': _('Targets'),
             'type': 'list:string',
         },
     })

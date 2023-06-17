@@ -112,12 +112,12 @@ class NotifyNotica(NotifyBase):
         '{schema}://{user}:{password}@{host}:{port}/{token}',
 
         # Self-hosted notica servers (with custom path)
-        '{schema}://{host}{path}{token}',
-        '{schema}://{host}:{port}{path}{token}',
-        '{schema}://{user}@{host}{path}{token}',
-        '{schema}://{user}@{host}:{port}{path}{token}',
-        '{schema}://{user}:{password}@{host}{path}{token}',
-        '{schema}://{user}:{password}@{host}:{port}{path}{token}',
+        '{schema}://{host}{path}/{token}',
+        '{schema}://{host}:{port}/{path}/{token}',
+        '{schema}://{user}@{host}/{path}/{token}',
+        '{schema}://{user}@{host}:{port}{path}/{token}',
+        '{schema}://{user}:{password}@{host}{path}/{token}',
+        '{schema}://{user}:{password}@{host}:{port}/{path}/{token}',
     )
 
     # Define our template tokens

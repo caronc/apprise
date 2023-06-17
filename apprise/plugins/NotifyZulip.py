@@ -131,6 +131,7 @@ class NotifyZulip(NotifyBase):
             'name': _('Bot Name'),
             'type': 'string',
             'regex': (r'^[A-Z0-9_-]{1,32}$', 'i'),
+            'required': True,
         },
         'organization': {
             'name': _('Organization'),

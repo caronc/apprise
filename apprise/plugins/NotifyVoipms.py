@@ -78,7 +78,6 @@ class NotifyVoipms(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{password}:{email}',
         '{schema}://{password}:{email}/{from_phone}/{targets}',
     )
 
@@ -111,6 +110,7 @@ class NotifyVoipms(NotifyBase):
         'targets': {
             'name': _('Targets'),
             'type': 'list:string',
+            'required': True,
         },
     })
 

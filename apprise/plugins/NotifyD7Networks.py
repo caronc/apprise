@@ -114,6 +114,7 @@ class NotifyD7Networks(NotifyBase):
         'targets': {
             'name': _('Targets'),
             'type': 'list:string',
+            'required': True,
         },
     })
 

@@ -145,6 +145,7 @@ class NotifySMSEagle(NotifyBase):
         'token': {
             'name': _('Access Token'),
             'type': 'string',
+            'required': True,
         },
         'target_phone': {
             'name': _('Target Phone No'),
@@ -170,6 +171,7 @@ class NotifySMSEagle(NotifyBase):
         'targets': {
             'name': _('Targets'),
             'type': 'list:string',
+            'required': True,
         }
     })
 

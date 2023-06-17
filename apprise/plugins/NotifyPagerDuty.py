@@ -142,7 +142,7 @@ class NotifyPagerDuty(NotifyBase):
         },
         # Optional but triggers V2 API
         'integrationkey': {
-            'name': _('Routing Key'),
+            'name': _('Integration Key'),
             'type': 'string',
             'private': True,
             'required': True
