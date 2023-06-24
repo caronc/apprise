@@ -165,6 +165,9 @@ def _sanitize_token(tokens, default_delimiter):
 
     """
 
+    # Used for tracking groups
+    group_map = {}
+
     # Iterate over our tokens
     for key in tokens.keys():
 
@@ -181,14 +184,26 @@ def _sanitize_token(tokens, default_delimiter):
             # Default type to key
             tokens[key]['map_to'] = key
 
+        # Track our map_to objects
+        if tokens[key]['map_to'] not in group_map:
+            group_map[tokens[key]['map_to']] = set()
+        group_map[tokens[key]['map_to']].add(key)
+
         if 'type' not in tokens[key]:
             # Default type to string
             tokens[key]['type'] = 'string'
 
-        elif tokens[key]['type'].startswith('list') \
-                and 'delim' not in tokens[key]:
-            # Default list delimiter (if not otherwise specified)
-            tokens[key]['delim'] = default_delimiter
+        elif tokens[key]['type'].startswith('list'):
+            if 'delim' not in tokens[key]:
+                # Default list delimiter (if not otherwise specified)
+                tokens[key]['delim'] = default_delimiter
+
+            if key in group_map[tokens[key]['map_to']]:
+                # Remove ourselves from the list
+                group_map[tokens[key]['map_to']].remove(key)
+
+            # Pointing to the set directly so we can dynamically update ourselves
+            tokens[key]['group'] = group_map[tokens[key]['map_to']]
 
         elif tokens[key]['type'].startswith('choice') \
                 and 'default' not in tokens[key] \
@@ -265,6 +280,11 @@ def details(plugin):
     #
     #            # Identifies if the entry specified is required or not
     #            'required': True,
+    #
+    #            # Identifies all tokens detected to be associated with the list:string
+    #            # This is ony present in list:string objects and is only set if there
+    #            # are groups defined
+    #            'group': [],
     #
     #            # Identify a default value
     #            'default': 'http',
