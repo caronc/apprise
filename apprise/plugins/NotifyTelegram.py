@@ -471,11 +471,14 @@ class NotifyTelegram(NotifyBase):
         # content can arrive together.
         self.throttle()
 
+        payload = {'chat_id': chat_id}
+        if self.topic:
+            payload['message_thread_id'] = self.topic
+
         try:
             with open(path, 'rb') as f:
                 # Configure file payload (for upload)
                 files = {key: (file_name, f)}
-                payload = {'chat_id': chat_id}
 
                 self.logger.debug(
                     'Telegram attachment POST URL: %s (cert_verify=%r)' % (
