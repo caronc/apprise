@@ -198,11 +198,12 @@ def _sanitize_token(tokens, default_delimiter):
                 # Default list delimiter (if not otherwise specified)
                 tokens[key]['delim'] = default_delimiter
 
-            if key in group_map[tokens[key]['map_to']]:
+            if key in group_map[tokens[key]['map_to']]:  # pragma: no branch
                 # Remove ourselves from the list
                 group_map[tokens[key]['map_to']].remove(key)
 
-            # Pointing to the set directly so we can dynamically update ourselves
+            # Pointing to the set directly so we can dynamically update
+            # ourselves
             tokens[key]['group'] = group_map[tokens[key]['map_to']]
 
         elif tokens[key]['type'].startswith('choice') \
@@ -281,9 +282,11 @@ def details(plugin):
     #            # Identifies if the entry specified is required or not
     #            'required': True,
     #
-    #            # Identifies all tokens detected to be associated with the list:string
-    #            # This is ony present in list:string objects and is only set if there
-    #            # are groups defined
+    #            # Identifies all tokens detected to be associated with the
+    #            # list:string
+    #            # This is ony present in list:string objects and is only set
+    #            # if this element acts as an alias for several other
+    #            # kwargs/fields.
     #            'group': [],
     #
     #            # Identify a default value

@@ -148,9 +148,10 @@ class NotifyOffice365(NotifyBase):
             'private': True,
             'required': True,
         },
-        'targets': {
+        'target_email': {
             'name': _('Target Email'),
             'type': 'string',
+            'map_to': 'targets',
         },
         'targets': {
             'name': _('Targets'),
