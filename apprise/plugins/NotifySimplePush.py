@@ -109,12 +109,12 @@ class NotifySimplePush(NotifyBase):
 
         # Used for encrypted logins
         'password': {
-            'name': _('Encrypted Password'),
+            'name': _('Password'),
             'type': 'string',
             'private': True,
         },
         'salt': {
-            'name': _('Encrypted Salt'),
+            'name': _('Salt'),
             'type': 'string',
             'private': True,
             'map_to': 'user',

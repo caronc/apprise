@@ -127,10 +127,10 @@ class NotifyBark(NotifyBase):
 
     # Define object templates
     templates = (
+        '{schema}://{host}/{targets}',
         '{schema}://{host}:{port}/{targets}',
         '{schema}://{user}:{password}@{host}/{targets}',
         '{schema}://{user}:{password}@{host}:{port}/{targets}',
-        '{schema}://{user}:{password}@{host}/{targets}',
     )
 
     # Define our template arguments
@@ -163,6 +163,7 @@ class NotifyBark(NotifyBase):
         'targets': {
             'name': _('Targets'),
             'type': 'list:string',
+            'required': True,
         },
     })
 

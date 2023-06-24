@@ -165,10 +165,10 @@ class NotifySlack(NotifyBase):
     # Define object templates
     templates = (
         # Webhook
-        '{schema}://{token_a}/{token_b}{token_c}',
+        '{schema}://{token_a}/{token_b}/{token_c}',
         '{schema}://{botname}@{token_a}/{token_b}{token_c}',
-        '{schema}://{token_a}/{token_b}{token_c}/{targets}',
-        '{schema}://{botname}@{token_a}/{token_b}{token_c}/{targets}',
+        '{schema}://{token_a}/{token_b}/{token_c}/{targets}',
+        '{schema}://{botname}@{token_a}/{token_b}/{token_c}/{targets}',
 
         # Bot
         '{schema}://{access_token}/',
@@ -198,7 +198,6 @@ class NotifySlack(NotifyBase):
             'name': _('Token A'),
             'type': 'string',
             'private': True,
-            'required': True,
             'regex': (r'^[A-Z0-9]+$', 'i'),
         },
         # Token required as part of the Webhook request
@@ -207,7 +206,6 @@ class NotifySlack(NotifyBase):
             'name': _('Token B'),
             'type': 'string',
             'private': True,
-            'required': True,
             'regex': (r'^[A-Z0-9]+$', 'i'),
         },
         # Token required as part of the Webhook request
@@ -216,7 +214,6 @@ class NotifySlack(NotifyBase):
             'name': _('Token C'),
             'type': 'string',
             'private': True,
-            'required': True,
             'regex': (r'^[A-Za-z0-9]+$', 'i'),
         },
         'target_encoded_id': {

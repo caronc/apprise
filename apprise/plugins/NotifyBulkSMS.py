@@ -121,11 +121,13 @@ class NotifyBulkSMS(NotifyBase):
         'user': {
             'name': _('User Name'),
             'type': 'string',
+            'required': True,
         },
         'password': {
             'name': _('Password'),
             'type': 'string',
             'private': True,
+            'required': True,
         },
         'target_phone': {
             'name': _('Target Phone No'),
@@ -144,6 +146,7 @@ class NotifyBulkSMS(NotifyBase):
         'targets': {
             'name': _('Targets'),
             'type': 'list:string',
+            'required': True,
         },
     })
 

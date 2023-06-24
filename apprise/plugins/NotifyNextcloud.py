@@ -67,6 +67,8 @@ class NotifyNextcloud(NotifyBase):
 
     # Define object templates
     templates = (
+        '{schema}://{host}/{targets}',
+        '{schema}://{host}:{port}/{targets}',
         '{schema}://{user}:{password}@{host}/{targets}',
         '{schema}://{user}:{password}@{host}:{port}/{targets}',
     )

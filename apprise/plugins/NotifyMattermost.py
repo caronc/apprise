@@ -91,11 +91,11 @@ class NotifyMattermost(NotifyBase):
     # Define object templates
     templates = (
         '{schema}://{host}/{token}',
-        '{schema}://{host}/{token}:{port}',
+        '{schema}://{host}:{port}/{token}',
+        '{schema}://{host}/{fullpath}/{token}',
+        '{schema}://{host}:{port}/{fullpath}/{token}',
         '{schema}://{botname}@{host}/{token}',
         '{schema}://{botname}@{host}:{port}/{token}',
-        '{schema}://{host}/{fullpath}/{token}',
-        '{schema}://{host}/{fullpath}{token}:{port}',
         '{schema}://{botname}@{host}/{fullpath}/{token}',
         '{schema}://{botname}@{host}:{port}/{fullpath}/{token}',
     )

@@ -152,8 +152,13 @@ class NotifyMailgun(NotifyBase):
             'private': True,
             'required': True,
         },
+        'target_email': {
+            'name': _('Target Email'),
+            'type': 'string',
+            'map_to': 'targets',
+        },
         'targets': {
-            'name': _('Target Emails'),
+            'name': _('Targets'),
             'type': 'list:string',
         },
     })

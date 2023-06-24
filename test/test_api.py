@@ -1486,6 +1486,7 @@ def test_apprise_details_plugin_verification():
     valid_schema_keys = (
         'name', 'private', 'required', 'type', 'values', 'min', 'max',
         'regex', 'default', 'list', 'delim', 'prefix', 'map_to', 'alias_of',
+        'group',
     )
     for entry in details['schemas']:
 

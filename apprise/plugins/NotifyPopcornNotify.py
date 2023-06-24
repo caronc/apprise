@@ -93,6 +93,7 @@ class NotifyPopcornNotify(NotifyBase):
         'targets': {
             'name': _('Targets'),
             'type': 'list:string',
+            'required': True,
         }
     })
 

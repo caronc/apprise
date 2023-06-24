@@ -103,13 +103,18 @@ class NotifyDingTalk(NotifyBase):
             'regex': (r'^[a-z0-9]+$', 'i'),
         },
         'secret': {
-            'name': _('Token'),
+            'name': _('Secret'),
             'type': 'string',
             'private': True,
             'regex': (r'^[a-z0-9]+$', 'i'),
         },
-        'targets': {
+        'target_phone_no': {
             'name': _('Target Phone No'),
+            'type': 'string',
+            'map_to': 'targets',
+        },
+        'targets': {
+            'name': _('Targets'),
             'type': 'list:string',
         },
     })

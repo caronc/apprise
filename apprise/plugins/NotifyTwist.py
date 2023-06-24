@@ -106,10 +106,12 @@ class NotifyTwist(NotifyBase):
             'name': _('Password'),
             'type': 'string',
             'private': True,
+            'required': True,
         },
         'email': {
             'name': _('Email'),
             'type': 'string',
+            'required': True,
         },
         'target_channel': {
             'name': _('Target Channel'),

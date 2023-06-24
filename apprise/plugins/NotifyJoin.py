@@ -174,7 +174,6 @@ class NotifyJoin(NotifyBase):
         'targets': {
             'name': _('Targets'),
             'type': 'list:string',
-            'required': True,
         },
     })
 

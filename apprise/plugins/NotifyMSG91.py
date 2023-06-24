@@ -133,6 +133,7 @@ class NotifyMSG91(NotifyBase):
         'targets': {
             'name': _('Targets'),
             'type': 'list:string',
+            'required': True,
         },
         'sender': {
             'name': _('Sender ID'),

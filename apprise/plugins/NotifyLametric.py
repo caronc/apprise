@@ -370,6 +370,7 @@ class NotifyLametric(NotifyBase):
 
         # Device Mode
         '{schema}://{apikey}@{host}',
+        '{schema}://{user}:{apikey}@{host}',
         '{schema}://{apikey}@{host}:{port}',
         '{schema}://{user}:{apikey}@{host}:{port}',
     )
@@ -404,7 +405,6 @@ class NotifyLametric(NotifyBase):
         'host': {
             'name': _('Hostname'),
             'type': 'string',
-            'required': True,
         },
         'port': {
             'name': _('Port'),
