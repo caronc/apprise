@@ -991,11 +991,11 @@ class NotifyMatrix(NotifyBase):
         default_port = 443 if self.secure else 80
 
         url = \
-            '{schema}://{hostname}:{port}{matrix_api}{path}'.format(
+            '{schema}://{hostname}{port}{matrix_api}{path}'.format(
                 schema='https' if self.secure else 'http',
                 hostname=self.host,
                 port='' if self.port is None
-                or self.port == default_port else self.port,
+                or self.port == default_port else f':{self.port}',
                 matrix_api=MATRIX_V2_API_PATH,
                 path=path)
 
@@ -1031,6 +1031,7 @@ class NotifyMatrix(NotifyBase):
                     timeout=self.request_timeout,
                 )
 
+                self.logger.debug('Matrix Response: %s' % str(r.content))
                 response = loads(r.content)
 
                 if r.status_code == 429:
