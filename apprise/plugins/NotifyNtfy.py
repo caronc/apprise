@@ -528,7 +528,8 @@ class NotifyNtfy(NotifyBase):
             params['filename'] = attach.name
 
             # prepare our files object
-            files = {'file': (attach.name, open(attach.path, 'rb'))}
+            files = {'file': (
+                attach.name, open(attach.path, 'rb'), attach.mimetype)}
 
         elif self.attach is not None:
             data['attach'] = self.attach
