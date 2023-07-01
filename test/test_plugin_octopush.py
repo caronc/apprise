@@ -57,25 +57,25 @@ apprise_url_tests = (
     }),
     ('octopush://user@myaccount.com/apikey', {
         # All valid entries, but no target phone numbers defined
-        'instance': plugins.NotifyOctopush,
+        'instance': plugins.NotifyOctopush.NotifyOctopush,
         'response': False,
     }),
     ('octopush://user@myaccount.com/apikey/+0987654321', {
         # A valid url
-        'instance': plugins.NotifyOctopush,
+        'instance': plugins.NotifyOctopush.NotifyOctopush,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'octopush://u...m/****/+0987654321',
     }),
     ('octopush://sender:user@myaccount.com/apikey/+1111111111', {
         # A valid url with sender
-        'instance': plugins.NotifyOctopush,
+        'instance': plugins.NotifyOctopush.NotifyOctopush,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'octopush://sender:u...m/****/+1111111111',
     }),
     ('octopush://?login=user@myaccount.com&key=key&to=9999999999'
         '&purpose=wholesale', {
             # Testing valid purpose change
-            'instance': plugins.NotifyOctopush}),
+            'instance': plugins.NotifyOctopush.NotifyOctopush}),
     ('octopush://?login=user@myaccount.com&key=key&to=9999999999'
         '&purpose=invalid', {
             # Testing invalid purpose change
@@ -83,33 +83,33 @@ apprise_url_tests = (
     ('octopush://?login=user@myaccount.com&key=key&to=9999999999'
         '&type=premium', {
             # Testing valid type change
-            'instance': plugins.NotifyOctopush}),
+            'instance': plugins.NotifyOctopush.NotifyOctopush}),
     ('octopush://?login=user@myaccount.com&key=key&to=9999999999'
         '&type=invalid', {
             # Testing invalid type change
             'instance': TypeError}),
     ('octopush://user@myaccount.com/apikey/+3333333333?replies=yes', {
         # Test replies
-        'instance': plugins.NotifyOctopush,
+        'instance': plugins.NotifyOctopush.NotifyOctopush,
     }),
     ('octopush://sender:user@myaccount.com/apikey/{}/{}/{}/?batch=yes'.format(
         '1' * 10, '2' * 3, '3' * 11), {
             # batch mode, 2 valid targets (1 is invalid and skipped)
-            'instance': plugins.NotifyOctopush}),
+            'instance': plugins.NotifyOctopush.NotifyOctopush}),
     ('octopush://_?key=abc123&login=user@myaccount&sender=abc&to=2222222222', {
         # use get args to acomplish the same thing
-        'instance': plugins.NotifyOctopush,
+        'instance': plugins.NotifyOctopush.NotifyOctopush,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'octopush://abc:u...t/****/+2222222222',
     }),
     ('octopush://user@myaccount.com/apikey/1234567890', {
-        'instance': plugins.NotifyOctopush,
+        'instance': plugins.NotifyOctopush.NotifyOctopush,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('octopush://user@myaccount.com/apikey/1234567890', {
-        'instance': plugins.NotifyOctopush,
+        'instance': plugins.NotifyOctopush.NotifyOctopush,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,

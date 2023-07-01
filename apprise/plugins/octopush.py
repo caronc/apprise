@@ -141,6 +141,7 @@ class NotifyOctopush(NotifyBase):
         'targets': {
             'name': _('Targets'),
             'type': 'list:string',
+            'required': True,
         },
     })
 
@@ -408,6 +409,12 @@ class NotifyOctopush(NotifyBase):
                     [NotifyOctopush.quote(x, safe='+') for x in self.targets]),
                 params=NotifyOctopush.urlencode(params),
             )
+
+    def __len__(self):
+        """
+        Returns the number of targets associated with this notification
+        """
+        return len(self.targets)
 
     @staticmethod
     def parse_url(url):
