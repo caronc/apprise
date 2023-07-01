@@ -53,7 +53,7 @@ Opsgenie, PagerDuty, PagerTree, ParsePlatform, PopcornNotify, Prowl, Pushalot,
 PushBullet, Pushjet, Pushover, PushSafer, Reddit, Rocket.Chat, SendGrid,
 ServerChan, Signal, SimplePush, Sinch, Slack, SMSEagle, SMTP2Go, Spontit,
 SparkPost, Super Toasty, Streamlabs, Stride, Syslog, Techulus Push, Telegram,
-Twilio, Twitter, Twist, XBMC, Voipms, Vonage, Webex Teams}
+Twilio, Twitter, Twist, XBMC, Voipms, Vonage, WhatsApp, Webex Teams}
 
 Name:           python-%{pypi_name}
 Version:        1.4.0
