@@ -745,7 +745,12 @@ def parse_url(url, default_schema='http', verify_host=True, strict_port=False,
     # Now do a proper extraction of data; http:// is just substitued in place
     # to allow urlparse() to function as expected, we'll swap this back to the
     # expected schema after.
-    parsed = urlparse('http://%s' % host)
+    try:
+        parsed = urlparse('http://%s' % host)
+
+    except ValueError:
+        # a really malformed URL
+        return None
 
     # Parse results
     result['host'] = parsed[1].strip()

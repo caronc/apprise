@@ -31,7 +31,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Base
-FROM python:3.6-buster
+FROM python:3.11-buster
 RUN apt-get update && \
     apt-get install -y libdbus-1-dev libgirepository1.0-dev build-essential musl-dev bash
 RUN pip install dbus-python PyGObject
@@ -42,7 +42,7 @@ WORKDIR /apprise
 COPY requirements.txt /
 COPY dev-requirements.txt /
 ENV PYTHONPATH /apprise
-ENV PYTHONPYCACHEPREFIX /apprise/__pycache__/py36
+ENV PYTHONPYCACHEPREFIX /apprise/__pycache__/py311
 
 RUN pip install -r /requirements.txt -r /dev-requirements.txt
 
