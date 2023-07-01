@@ -60,9 +60,9 @@ apprise_url_tests = (
     ('pover://%s' % ('a' * 30), {
         'instance': TypeError,
     }),
-    # API Key + invalid sound setting
-    ('pover://%s@%s?sound=invalid' % ('u' * 30, 'a' * 30), {
-        'instance': TypeError,
+    # API Key + custom sound setting
+    ('pover://%s@%s?sound=mysound' % ('u' * 30, 'a' * 30), {
+        'instance': NotifyPushover,
     }),
     # API Key + valid alternate sound picked
     ('pover://%s@%s?sound=spacealarm' % ('u' * 30, 'a' * 30), {
