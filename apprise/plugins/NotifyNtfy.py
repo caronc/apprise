@@ -490,7 +490,7 @@ class NotifyNtfy(NotifyBase):
             data['topic'] = topic
             virt_payload = data
 
-            if not self.attach:
+            if self.attach:
                 virt_payload['attach'] = self.attach
 
                 if self.filename:
