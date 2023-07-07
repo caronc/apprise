@@ -225,7 +225,7 @@ class NotifySparkPost(NotifyBase):
     }
 
     def __init__(self, apikey, targets, cc=None, bcc=None, from_name=None,
-                 region_name=None, headers=None, tokens=None, batch=False,
+                 region_name=None, headers=None, tokens=None, batch=None,
                  **kwargs):
         """
         Initialize SparkPost Object
@@ -296,7 +296,8 @@ class NotifySparkPost(NotifyBase):
             self.tokens.update(tokens)
 
         # Prepare Batch Mode Flag
-        self.batch = batch
+        self.batch = self.template_args['batch']['default'] \
+            if batch is None else batch
 
         if targets:
             # Validate recipients (to:) and drop bad ones:

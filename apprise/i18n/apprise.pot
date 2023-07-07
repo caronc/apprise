@@ -6,16 +6,16 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: apprise 1.4.0\n"
+"Project-Id-Version: apprise 1.4.5\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2023-05-15 16:33-0400\n"
+"POT-Creation-Date: 2023-07-06 20:30-0400\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.9.1\n"
+"Generated-By: Babel 2.11.0\n"
 
 msgid "A local Gnome environment is required."
 msgstr ""
@@ -164,6 +164,9 @@ msgstr ""
 msgid "Consumer Secret"
 msgstr ""
 
+msgid "Content Placement"
+msgstr ""
+
 msgid "Country"
 msgstr ""
 
@@ -224,12 +227,6 @@ msgstr ""
 msgid "Email Header"
 msgstr ""
 
-msgid "Encrypted Password"
-msgstr ""
-
-msgid "Encrypted Salt"
-msgstr ""
-
 msgid "Entity"
 msgstr ""
 
@@ -270,6 +267,9 @@ msgid "From Email"
 msgstr ""
 
 msgid "From Name"
+msgstr ""
+
+msgid "From Phone ID"
 msgstr ""
 
 msgid "From Phone No"
@@ -315,6 +315,9 @@ msgid "Include Segment"
 msgstr ""
 
 msgid "Integration ID"
+msgstr ""
+
+msgid "Integration Key"
 msgstr ""
 
 msgid "Is Ad?"
@@ -478,7 +481,7 @@ msgstr ""
 msgid "Retry"
 msgstr ""
 
-msgid "Rooms"
+msgid "Room ID"
 msgstr ""
 
 msgid "Route"
@@ -487,13 +490,16 @@ msgstr ""
 msgid "Route Group"
 msgstr ""
 
-msgid "Routing Key"
-msgstr ""
-
 msgid "SMTP Server"
 msgstr ""
 
+msgid "Salt"
+msgstr ""
+
 msgid "Schema"
+msgstr ""
+
+msgid "Secret"
 msgstr ""
 
 msgid "Secret Access Key"
@@ -616,6 +622,9 @@ msgstr ""
 msgid "Target Queue"
 msgstr ""
 
+msgid "Target Room"
+msgstr ""
+
 msgid "Target Room Alias"
 msgstr ""
 
@@ -659,6 +668,12 @@ msgid "Template"
 msgstr ""
 
 msgid "Template Data"
+msgstr ""
+
+msgid "Template Mapping"
+msgstr ""
+
+msgid "Template Name"
 msgstr ""
 
 msgid "Template Path"
@@ -800,5 +815,8 @@ msgid "libdbus-1.so.x must be installed."
 msgstr ""
 
 msgid "ttl"
+msgstr ""
+
+msgid "validity"
 msgstr ""
 
