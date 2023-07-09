@@ -1,5 +1,5 @@
 Alerts
-API
+Apprise API
 AWS
 Boxcar
 BulkSMS
@@ -7,32 +7,36 @@ Burst SMS
 Chat
 CLI
 ClickSend
-DAPNET
-Dbus
-Dingtalk
+D7Networks
+Dapnet
+DBus
+DingTalk
 Discord
 Email
 Emby
+Enigma2
 Faast
 FCM
 Flock
+Form
 Gitter
 Gnome
-Google
+Google Chat
 Gotify
 Growl
 Guilded
 Home Assistant
 IFTTT
 Join
+JSON
 Kavenegar
 KODI
 Kumulos
 LaMetric
 Line
-Mastodon
-MacOS
+MacOSX
 Mailgun
+Mastodon
 Matrix
 Mattermost
 MessageBird
@@ -41,7 +45,6 @@ Misskey
 MQTT
 MSG91
 MSTeams
-Nexmo
 Nextcloud
 NextcloudTalk
 Notica
@@ -61,6 +64,7 @@ Pushjet
 Push Notifications
 Pushover
 PushSafer
+Pushy
 Reddit
 Rocket.Chat
 Ryver
@@ -84,9 +88,11 @@ Telegram
 Twilio
 Twist
 Twitter
+Voipms
 Vonage
 Webex
 WhatsApp
 Windows
-Voipms
 XBMC
+XML
+Zulip
