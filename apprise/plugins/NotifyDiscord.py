@@ -50,6 +50,9 @@
 import re
 import requests
 from json import dumps
+from datetime import timedelta
+from datetime import datetime
+from datetime import timezone
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
@@ -83,6 +86,17 @@ class NotifyDiscord(NotifyBase):
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_256
+
+    # Discord is kind enough to return how many more requests we're allowed to
+    # continue to make within it's header response as:
+    # X-RateLimit-Reset: The epoc time (in seconds) we can expect our
+    #                    rate-limit to be reset.
+    # X-RateLimit-Remaining: an integer identifying how many requests we're
+    #                        still allow to make.
+    request_rate_per_sec = 0
+
+    # Taken right from google.auth.helpers:
+    clock_skew = timedelta(seconds=10)
 
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 2000
@@ -215,6 +229,12 @@ class NotifyDiscord(NotifyBase):
         # dynamically generated avatar url images
         self.avatar_url = avatar_url
 
+        # For Tracking Purposes
+        self.ratelimit_reset = datetime.now(timezone.utc).replace(tzinfo=None)
+
+        # Default to 1.0
+        self.ratelimit_remaining = 1.0
+
         return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
@@ -343,7 +363,8 @@ class NotifyDiscord(NotifyBase):
         # Otherwise return
         return True
 
-    def _send(self, payload, attach=None, params=None, **kwargs):
+    def _send(self, payload, attach=None, params=None, rate_limit=1,
+              **kwargs):
         """
         Wrapper to the requests (post) object
         """
@@ -365,8 +386,25 @@ class NotifyDiscord(NotifyBase):
         ))
         self.logger.debug('Discord Payload: %s' % str(payload))
 
-        # Always call throttle before any remote server i/o is made
-        self.throttle()
+        # By default set wait to None
+        wait = None
+
+        if self.ratelimit_remaining <= 0.0:
+            # Determine how long we should wait for or if we should wait at
+            # all. This isn't fool-proof because we can't be sure the client
+            # time (calling this script) is completely synced up with the
+            # Gitter server.  One would hope we're on NTP and our clocks are
+            # the same allowing this to role smoothly:
+
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
+            if now < self.ratelimit_reset:
+                # We need to throttle for the difference in seconds
+                wait = abs(
+                    (self.ratelimit_reset - now + self.clock_skew)
+                    .total_seconds())
+
+        # Always call throttle before any remote server i/o is made;
+        self.throttle(wait=wait)
 
         # Perform some simple error checking
         if isinstance(attach, AttachBase):
@@ -401,12 +439,42 @@ class NotifyDiscord(NotifyBase):
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
             )
+
+            # Handle rate limiting (if specified)
+            try:
+                # Store our rate limiting (if provided)
+                self.ratelimit_remaining = \
+                    float(r.headers.get(
+                        'X-RateLimit-Remaining'))
+                self.ratelimit_reset = datetime.fromtimestamp(
+                    int(r.headers.get('X-RateLimit-Reset')),
+                    timezone.utc).replace(tzinfo=None)
+
+            except (TypeError, ValueError):
+                # This is returned if we could not retrieve this
+                # information gracefully accept this state and move on
+                pass
+
             if r.status_code not in (
                     requests.codes.ok, requests.codes.no_content):
 
                 # We had a problem
                 status_str = \
                     NotifyBase.http_response_code_lookup(r.status_code)
+
+                if r.status_code == requests.codes.too_many_requests \
+                        and rate_limit > 0:
+
+                    # handle rate limiting
+                    self.logger.warning(
+                        'Discord rate limiting in effect; '
+                        'blocking for %.2f second(s)',
+                        self.ratelimit_remaining)
+
+                    # Try one more time before failing
+                    return self._send(
+                        payload=payload, attach=attach, params=params,
+                        rate_limit=rate_limit - 1, **kwargs)
 
                 self.logger.warning(
                     'Failed to send {}to Discord notification: '
