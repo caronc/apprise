@@ -439,6 +439,22 @@ class NotifyDiscord(NotifyBase):
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
             )
+
+            # Handle rate limiting (if specified)
+            try:
+                # Store our rate limiting (if provided)
+                self.ratelimit_remaining = \
+                    float(r.headers.get(
+                        'X-RateLimit-Remaining'))
+                self.ratelimit_reset = datetime.fromtimestamp(
+                    int(r.headers.get('X-RateLimit-Reset')),
+                    timezone.utc).replace(tzinfo=None)
+
+            except (TypeError, ValueError):
+                # This is returned if we could not retrieve this
+                # information gracefully accept this state and move on
+                pass
+
             if r.status_code not in (
                     requests.codes.ok, requests.codes.no_content):
 
@@ -446,32 +462,19 @@ class NotifyDiscord(NotifyBase):
                 status_str = \
                     NotifyBase.http_response_code_lookup(r.status_code)
 
-                if r.status_code == requests.codes.too_many_requests:
+                if r.status_code == requests.codes.too_many_requests \
+                        and rate_limit > 0:
+
                     # handle rate limiting
-                    try:
-                        # Store our rate limiting (if provided)
-                        self.ratelimit_remaining = \
-                            float(r.headers.get(
-                                'X-RateLimit-Remaining'))
-                        self.ratelimit_reset = datetime.fromtimestamp(
-                            int(r.headers.get('X-RateLimit-Reset')),
-                            timezone.utc).replace(tzinfo=None)
+                    self.logger.warning(
+                        'Discord rate limiting in effect; '
+                        'blocking for %.2f second(s)',
+                        self.ratelimit_remaining)
 
-                        if rate_limit > 0:
-                            self.logger.warning(
-                                'Discord rate limiting in effect; '
-                                'blocking for %.2f second(s)',
-                                self.ratelimit_remaining)
-
-                            # Try one more time before failing
-                            return self._send(
-                                payload=payload, attach=attach, params=params,
-                                rate_limit=rate_limit - 1, **kwargs)
-
-                    except (TypeError, ValueError):
-                        # This is returned if we could not retrieve this
-                        # information gracefully accept this state and move on
-                        pass
+                    # Try one more time before failing
+                    return self._send(
+                        payload=payload, attach=attach, params=params,
+                        rate_limit=rate_limit - 1, **kwargs)
 
                 self.logger.warning(
                     'Failed to send {}to Discord notification: '

@@ -32,7 +32,8 @@
 
 import os
 from unittest import mock
-
+from datetime import datetime, timedelta
+from datetime import timezone
 import pytest
 import requests
 
@@ -182,6 +183,11 @@ def test_plugin_discord_general(mock_post):
 
     """
 
+    # Turn off clock skew for local testing
+    NotifyDiscord.clock_skew = timedelta(seconds=0)
+    # Epoch time:
+    epoch = datetime.fromtimestamp(0, timezone.utc)
+
     # Initialize some generic (but valid) tokens
     webhook_id = 'A' * 24
     webhook_token = 'B' * 64
@@ -189,6 +195,12 @@ def test_plugin_discord_general(mock_post):
     # Prepare Mock
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = ''
+    mock_post.return_value.headers = {
+        'X-RateLimit-Reset': (
+            datetime.now(timezone.utc) - epoch).total_seconds(),
+        'X-RateLimit-Remaining': 1,
+    }
 
     # Invalid webhook id
     with pytest.raises(TypeError):
@@ -208,9 +220,84 @@ def test_plugin_discord_general(mock_post):
         webhook_id=webhook_id,
         webhook_token=webhook_token,
         footer=True, thumbnail=False)
+    assert obj.ratelimit_remaining == 1
 
     # Test that we get a string response
     assert isinstance(obj.url(), str) is True
+
+    # This call includes an image with it's payload:
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
+
+    # Force a case where there are no more remaining posts allowed
+    mock_post.return_value.headers = {
+        'X-RateLimit-Reset': (
+            datetime.now(timezone.utc) - epoch).total_seconds(),
+        'X-RateLimit-Remaining': 0,
+    }
+
+    # This call includes an image with it's payload:
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
+
+    # behind the scenes, it should cause us to update our rate limit
+    assert obj.send(body="test") is True
+    assert obj.ratelimit_remaining == 0
+
+    # This should cause us to block
+    mock_post.return_value.headers = {
+        'X-RateLimit-Reset': (
+            datetime.now(timezone.utc) - epoch).total_seconds(),
+        'X-RateLimit-Remaining': 10,
+    }
+    assert obj.send(body="test") is True
+    assert obj.ratelimit_remaining == 10
+
+    # Reset our variable back to 1
+    mock_post.return_value.headers = {
+        'X-RateLimit-Reset': (
+            datetime.now(timezone.utc) - epoch).total_seconds(),
+        'X-RateLimit-Remaining': 1,
+    }
+    # Handle cases where our epoch time is wrong
+    del mock_post.return_value.headers['X-RateLimit-Reset']
+    assert obj.send(body="test") is True
+
+    # Return our object, but place it in the future forcing us to block
+    mock_post.return_value.headers = {
+        'X-RateLimit-Reset': (
+            datetime.now(timezone.utc) - epoch).total_seconds() + 1,
+        'X-RateLimit-Remaining': 0,
+    }
+
+    obj.ratelimit_remaining = 0
+    assert obj.send(body="test") is True
+
+    # Test 429 error response
+    mock_post.return_value.status_code = requests.codes.too_many_requests
+
+    # The below will attempt a second transmission and fail (because we didn't
+    # set up a second post request to pass) :)
+    assert obj.send(body="test") is False
+
+    # Return our object, but place it in the future forcing us to block
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.headers = {
+        'X-RateLimit-Reset': (
+            datetime.now(timezone.utc) - epoch).total_seconds() - 1,
+        'X-RateLimit-Remaining': 0,
+    }
+    assert obj.send(body="test") is True
+
+    # Return our limits to always work
+    obj.ratelimit_remaining = 1
+
+    # Return our headers to normal
+    mock_post.return_value.headers = {
+        'X-RateLimit-Reset': (
+            datetime.now(timezone.utc) - epoch).total_seconds(),
+        'X-RateLimit-Remaining': 1,
+    }
 
     # This call includes an image with it's payload:
     assert obj.notify(
