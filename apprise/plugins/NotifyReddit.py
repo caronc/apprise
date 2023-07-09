@@ -134,12 +134,6 @@ class NotifyReddit(NotifyBase):
     #                        still allow to make.
     request_rate_per_sec = 0
 
-    # For Tracking Purposes
-    ratelimit_reset = datetime.now(timezone.utc).replace(tzinfo=None)
-
-    # Default to 1.0
-    ratelimit_remaining = 1.0
-
     # Taken right from google.auth.helpers:
     clock_skew = timedelta(seconds=10)
 
@@ -326,6 +320,13 @@ class NotifyReddit(NotifyBase):
         if not self.subreddits:
             self.logger.warning(
                 'No subreddits were identified to be notified')
+
+        # For Rate Limit Tracking Purposes
+        self.ratelimit_reset = datetime.now(timezone.utc).replace(tzinfo=None)
+
+        # Default to 1.0
+        self.ratelimit_remaining = 1.0
+
         return
 
     def url(self, privacy=False, *args, **kwargs):
