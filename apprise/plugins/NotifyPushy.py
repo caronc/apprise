@@ -43,8 +43,8 @@ from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
 # Used to detect a Device and Topic
-VALIDATE_DEVICE = re.compile(r'^[@]?(?P<device>[a-z0-9]+)$', re.I)
-VALIDATE_TOPIC = re.compile(r'^#(?P<topic>[a-z0-9]+)$', re.I)
+VALIDATE_DEVICE = re.compile(r'^@(?P<device>[a-z0-9]+)$', re.I)
+VALIDATE_TOPIC = re.compile(r'^[#]?(?P<topic>[a-z0-9]+)$', re.I)
 
 # Extend HTTP Error Messages
 PUSHY_HTTP_ERROR_MAP = {
@@ -146,14 +146,14 @@ class NotifyPushy(NotifyBase):
         self.topics = []
 
         for target in parse_list(targets):
-            result = VALIDATE_DEVICE.match(target)
-            if result:
-                self.devices.append(result.group('device'))
-                continue
-
             result = VALIDATE_TOPIC.match(target)
             if result:
                 self.topics.append(result.group('topic'))
+                continue
+
+            result = VALIDATE_DEVICE.match(target)
+            if result:
+                self.devices.append(result.group('device'))
                 continue
 
             self.logger.warning(

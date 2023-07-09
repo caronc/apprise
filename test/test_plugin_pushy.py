@@ -60,15 +60,37 @@ apprise_url_tests = (
         # to actually notify anything if no device_key was specified
         'notify_response': False,
         'requests_response_text': GOOD_RESPONSE,
-
     }),
-    ('pushy://apikey/device', {
+    ('pushy://apikey/topic', {
+        # No Device/Topic specified
+        'instance': NotifyPushy,
+        # Expected notify() response False because the success flag
+        # was set to false
+        'notify_response': False,
+        'requests_response_text': {'success': False}
+    }),
+    ('pushy://apikey/%20(', {
+        # Invalid topic specified
+        'instance': NotifyPushy,
+        # Expected notify() response False because there is no one to notify
+        'notify_response': False,
+        'requests_response_text': GOOD_RESPONSE,
+    }),
+    ('pushy://apikey/@device', {
         # Everything is okay
         'instance': NotifyPushy,
         'requests_response_text': GOOD_RESPONSE,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'pushy://a...y/@device/',
+    }),
+    ('pushy://apikey/topic', {
+        # Everything is okay; no prefix means it's a topic
+        'instance': NotifyPushy,
+        'requests_response_text': GOOD_RESPONSE,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'pushy://a...y/#topic/',
     }),
     ('pushy://apikey/device/?sound=alarm.aiff', {
         # alarm.aiff sound loaded
@@ -95,7 +117,7 @@ apprise_url_tests = (
         'instance': NotifyPushy,
         'requests_response_text': GOOD_RESPONSE,
     }),
-    ('pushy://apikey/?to=device', {
+    ('pushy://apikey/?to=@device', {
         # test use of to= argument
         'instance': NotifyPushy,
         'requests_response_text': GOOD_RESPONSE,
