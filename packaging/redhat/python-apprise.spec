@@ -50,7 +50,7 @@ LaMetric, Line, MacOSX, Mailgun, Mastodon, Mattermost, Matrix, MessageBird,
 Microsoft Windows, Microsoft Teams, Misskey, MQTT, MSG91, MyAndroid, Nexmo,
 Nextcloud, NextcloudTalk, Notica, Notifico, ntfy, Office365, OneSignal,
 Opsgenie, PagerDuty, PagerTree, ParsePlatform, PopcornNotify, Prowl, Pushalot,
-PushBullet, Pushjet, Pushover, PushSafer, Reddit, Rocket.Chat, SendGrid,
+PushBullet, Pushjet, Pushover, PushSafer, Pushy, Reddit, Rocket.Chat, SendGrid,
 ServerChan, Signal, SimplePush, Sinch, Slack, SMSEagle, SMTP2Go, Spontit,
 SparkPost, Super Toasty, Streamlabs, Stride, Syslog, Techulus Push, Telegram,
 Twilio, Twitter, Twist, XBMC, Voipms, Vonage, WhatsApp, Webex Teams}

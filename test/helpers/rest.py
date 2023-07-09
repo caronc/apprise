@@ -332,9 +332,14 @@ class AppriseURLTester:
             requests_response_text = dumps(requests_response_text)
             requests_response_content = requests_response_text.encode('utf-8')
 
+        else:
+            requests_response_content = u''
+            requests_response_text = ''
+
         # A request
         robj = mock.Mock()
         robj.content = u''
+        robj.text = ''
         mock_get.return_value = robj
         mock_post.return_value = robj
         mock_head.return_value = robj
