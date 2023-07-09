@@ -69,6 +69,15 @@ apprise_url_tests = (
         'notify_response': False,
         'requests_response_text': {'success': False}
     }),
+    ('pushy://apikey/topic', {
+        # No Device/Topic specified
+        'instance': NotifyPushy,
+        # Expected notify() response False because the success flag
+        # was set to false
+        'notify_response': False,
+        # Invalid JSON data
+        'requests_response_text': '}'
+    }),
     ('pushy://apikey/%20(', {
         # Invalid topic specified
         'instance': NotifyPushy,
