@@ -33,6 +33,7 @@
 # API reference: https://pushy.me/docs/api/send-notifications
 import re
 import requests
+from itertools import chain
 
 from json import dumps, loads
 from .NotifyBase import NotifyBase
@@ -41,8 +42,9 @@ from ..utils import parse_list
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 
-# Used to detect a Device
-VALIDATE_DEVICE = re.compile(r'^[a-z0-9_]{1,25}$', re.I)
+# Used to detect a Device and Topic
+VALIDATE_DEVICE = re.compile(r'^[@]?(?P<device>[a-z0-9]+)$', re.I)
+VALIDATE_TOPIC = re.compile(r'^#(?P<topic>[a-z0-9]+)$', re.I)
 
 # Extend HTTP Error Messages
 PUSHY_HTTP_ERROR_MAP = {
@@ -89,11 +91,13 @@ class NotifyPushy(NotifyBase):
         'target_device': {
             'name': _('Target Device'),
             'type': 'string',
+            'prefix': '@',
             'map_to': 'targets',
         },
         'target_topic': {
             'name': _('Target Topic'),
             'type': 'string',
+            'prefix': '#',
             'map_to': 'targets',
         },
         'targets': {
@@ -137,7 +141,25 @@ class NotifyPushy(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        self.targets = parse_list(targets)
+        # Get our targets
+        self.devices = []
+        self.topics = []
+
+        for target in parse_list(targets):
+            result = VALIDATE_DEVICE.match(target)
+            if result:
+                self.devices.append(result.group('device'))
+                continue
+
+            result = VALIDATE_TOPIC.match(target)
+            if result:
+                self.topics.append(result.group('topic'))
+                continue
+
+            self.logger.warning(
+                'Dropped invalid topic/device  '
+                '({}) specified.'.format(target),
+            )
 
         # Setup our sound
         self.sound = sound
@@ -167,7 +189,7 @@ class NotifyPushy(NotifyBase):
         Perform Pushy Notification
         """
 
-        if len(self.targets) == 0:
+        if len(self.topics) + len(self.devices) == 0:
             # There were no services to notify
             self.logger.warning('There were no Pushy targets to notify.')
             return False
@@ -189,7 +211,7 @@ class NotifyPushy(NotifyBase):
         content = {}
 
         # Create a copy of targets (topics and devices)
-        targets = list(self.targets)
+        targets = list(self.topics) + list(self.devices)
         while len(targets):
             target = targets.pop(0)
 
@@ -308,21 +330,23 @@ class NotifyPushy(NotifyBase):
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        # Escape our targets
-        targets = '/'.join([NotifyPushy.quote(x, safe='')
-                            for x in self.targets])
-
         return '{schema}://{apikey}/{targets}/?{params}'.format(
             schema=self.secure_protocol,
             apikey=self.pprint(self.apikey, privacy, safe=''),
-            targets=targets,
+            targets='/'.join(
+                [NotifyPushy.quote(x, safe='@#') for x in chain(
+                    # Topics are prefixed with a pound/hashtag symbol
+                    ['#{}'.format(x) for x in self.topics],
+                    # Devices
+                    ['@{}'.format(x) for x in self.devices],
+                )]),
             params=NotifyPushy.urlencode(params))
 
     def __len__(self):
         """
         Returns the number of targets associated with this notification
         """
-        return len(self.targets)
+        return len(self.topics) + len(self.devices)
 
     @staticmethod
     def parse_url(url):
