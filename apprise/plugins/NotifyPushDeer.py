@@ -30,7 +30,6 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import re
 import requests
 
 from ..common import NotifyType
@@ -137,7 +136,8 @@ class NotifyPushDeer(NotifyBase):
             port = self.port
 
         # Our Notification URL
-        notify_url = self.notify_url.format(schema=schema, host=host, port=port, pushKey=self.push_key)
+        notify_url = self.notify_url.format(
+            schema=schema, host=host, port=port, pushKey=self.push_key)
 
         # Some Debug Logging
         self.logger.debug('PushDeer URL: {} (cert_verify={})'.format(
@@ -193,7 +193,7 @@ class NotifyPushDeer(NotifyBase):
             url = '{schema}://{host}{port}/{pushkey}'
         else:
             url = '{schema}://{pushkey}'
-        
+
         return url.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             host=self.host,
@@ -210,7 +210,7 @@ class NotifyPushDeer(NotifyBase):
         if not results:
             # We're done early as we couldn't parse the URL
             return results
-        
+
         fullpaths = NotifyPushDeer.split_path(results['fullpath'])
 
         if len(fullpaths) == 0:
