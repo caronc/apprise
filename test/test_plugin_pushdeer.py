@@ -46,9 +46,6 @@ apprise_url_tests = (
     ('pushdeers://', {
         'instance': TypeError,
     }),
-    ('pushdeer://localhost/', {
-        'instance': TypeError,
-    }),
     ('pushdeer://localhost/{}'.format('a' * 8), {
         'instance': NotifyPushDeer,
         # throw a bizzare code forcing us to fail to look it up
@@ -56,6 +53,18 @@ apprise_url_tests = (
         'requests_response_code': 999,
     }),
     ('pushdeer://localhost/{}'.format('a' * 8), {
+        'instance': NotifyPushDeer,
+        # Throws a series of connection and transfer exceptions when this flag
+        # is set and tests that we gracfully handle them
+        'test_requests_exceptions': True,
+    }),
+    ('pushdeer://localhost:80/{}'.format('a' * 8), {
+        'instance': NotifyPushDeer,
+        # throw a bizzare code forcing us to fail to look it up
+        'response': False,
+        'requests_response_code': 999,
+    }),
+    ('pushdeer://localhost:80/{}'.format('a' * 8), {
         'instance': NotifyPushDeer,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
