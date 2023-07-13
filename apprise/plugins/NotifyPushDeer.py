@@ -118,9 +118,9 @@ class NotifyPushDeer(NotifyBase):
 
         # Prepare our persistent_notification.create payload
         payload = {
-            'text': title,
+            'text': title if title else body,
             'type': 'text',
-            'desp': body,
+            'desp': body if title else '',
         }
 
         # Set our schema
