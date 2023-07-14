@@ -30,7 +30,10 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from unittest import mock
+
 import requests
+from apprise import Apprise
 from apprise.plugins.NotifyPushDeer import NotifyPushDeer
 from helpers import AppriseURLTester
 
@@ -85,7 +88,7 @@ apprise_url_tests = (
 )
 
 
-def test_plugin_PushDeer_urls():
+def test_plugin_pushdeer_urls():
     """
     NotifyPushDeer() Apprise URLs
 
@@ -93,3 +96,30 @@ def test_plugin_PushDeer_urls():
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+@mock.patch('requests.post')
+def test_plugin_pushdeer_general(mock_post):
+    """
+    NotifyPushDeer() General Checks
+
+    """
+
+    response = mock.Mock()
+    response.content = ''
+    response.status_code = requests.codes.ok
+
+    # Prepare Mock
+    mock_post.return_value = response
+
+    # Variation Initializations
+    obj = Apprise.instantiate('pushdeer://localhost/pushKey')
+    assert isinstance(obj, NotifyPushDeer) is True
+    assert isinstance(obj.url(), str) is True
+
+    # Send Notification
+    assert obj.send(body="test") is True
+
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'http://localhost:80/message/push?pushkey=pushKey'
