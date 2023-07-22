@@ -103,3 +103,48 @@ def test_plugin_title_maxlen(request_mock):
     payload = loads(details[1]['data'])
     # HTML in Title is escaped
     assert payload['text'] == "<b>Hello World</b>\r\nFoo Bar"
+
+    # Reset our mock object
+    request_mock.reset_mock()
+    #
+    # Reverse the configuration file and expect the same results
+    #
+    result, config = ConfigBase.config_parse_yaml(cleandoc("""
+    urls:
+
+      # Telegram has a title_maxlen of 0
+      - tgram://123456789:AABCeFGhIJKLmnOPqrStUvWxYZ12345678U/987654321
+      # Our JSON plugin allows for a title definition; we enforce a html format
+      - json://user:pass@example.ca?format=html
+    """))
+
+    # Verify we loaded correctly
+    assert isinstance(result, list)
+    assert len(result) == 2
+    assert len(result[0].tags) == 0
+
+    aobj = Apprise()
+    aobj.add(result)
+    assert len(aobj) == 2
+
+    title = "Hello World"
+    body = "Foo Bar"
+    assert aobj.notify(title=title, body=body)
+
+    # If a batch, there is only 1 post
+    assert request_mock.call_count == 2
+
+    details = request_mock.call_args_list[0]
+    assert details[0][0] == \
+        'https://api.telegram.org/bot123456789:' \
+        'AABCeFGhIJKLmnOPqrStUvWxYZ12345678U/sendMessage'
+    payload = loads(details[1]['data'])
+
+    # HTML in Title is escaped
+    assert payload['text'] == "<b>Hello World</b>\r\nFoo Bar"
+
+    details = request_mock.call_args_list[1]
+    assert details[0][0] == 'http://example.ca'
+    payload = loads(details[1]['data'])
+    assert payload['message'] == body
+    assert payload['title'] == "Hello World"
