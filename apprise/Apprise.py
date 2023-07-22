@@ -498,25 +498,29 @@ class Apprise:
             # If our code reaches here, we either did not define a tag (it
             # was set to None), or we did define a tag and the logic above
             # determined we need to notify the service it's associated with
-            if server.notify_format not in conversion_body_map:
-                # Perform Conversion
-                conversion_body_map[server.notify_format] = \
-                    convert_between(
-                        body_format, server.notify_format, content=body)
+
+            # First we need to generate a key we will use to determine if we
+            # need to build our data out.  Entries without are merged with
+            # the body at this stage.
+            key = server.notify_format if server.title_maxlen > 0\
+                else f'_{server.notify_format}'
+
+            if key not in conversion_title_map:
 
                 # Prepare our title
-                conversion_title_map[server.notify_format] = \
-                    '' if not title else title
+                conversion_title_map[key] = '' if not title else title
 
-                # Tidy Title IF required (hence it will become part of the
-                # body)
-                if server.title_maxlen <= 0 and \
-                        conversion_title_map[server.notify_format]:
+                # Conversion of title only occurs for services where the title
+                # is blended with the body (title_maxlen <= 0)
+                if conversion_title_map[key] and server.title_maxlen <= 0:
+                    conversion_title_map[key] = convert_between(
+                        body_format, server.notify_format,
+                        content=conversion_title_map[key])
 
-                    conversion_title_map[server.notify_format] = \
-                        convert_between(
-                            body_format, server.notify_format,
-                            content=conversion_title_map[server.notify_format])
+                # Our body is always converted no matter what
+                conversion_body_map[key] = \
+                    convert_between(
+                        body_format, server.notify_format, content=body)
 
                 if interpret_escapes:
                     #
@@ -526,13 +530,13 @@ class Apprise:
                     try:
                         # Added overhead required due to Python 3 Encoding Bug
                         # identified here: https://bugs.python.org/issue21331
-                        conversion_body_map[server.notify_format] = \
-                            conversion_body_map[server.notify_format]\
+                        conversion_body_map[key] = \
+                            conversion_body_map[key]\
                             .encode('ascii', 'backslashreplace')\
                             .decode('unicode-escape')
 
-                        conversion_title_map[server.notify_format] = \
-                            conversion_title_map[server.notify_format]\
+                        conversion_title_map[key] = \
+                            conversion_title_map[key]\
                             .encode('ascii', 'backslashreplace')\
                             .decode('unicode-escape')
 
@@ -543,8 +547,8 @@ class Apprise:
                         raise TypeError(msg)
 
             kwargs = dict(
-                body=conversion_body_map[server.notify_format],
-                title=conversion_title_map[server.notify_format],
+                body=conversion_body_map[key],
+                title=conversion_title_map[key],
                 notify_type=notify_type,
                 attach=attach,
                 body_format=body_format
