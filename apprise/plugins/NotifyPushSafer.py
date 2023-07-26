@@ -336,6 +336,9 @@ class NotifyPushSafer(NotifyBase):
     # The default secure protocol
     secure_protocol = 'psafers'
 
+    # Support attachments
+    attachment_support = True
+
     # Number of requests to a allow per second
     request_rate_per_sec = 1.2
 

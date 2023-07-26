@@ -136,6 +136,9 @@ class NotifySES(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_ses'
 
+    # Support attachments
+    attachment_support = True
+
     # AWS is pretty good for handling data load so request limits
     # can occur in much shorter bursts
     request_rate_per_sec = 2.5

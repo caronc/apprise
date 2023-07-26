@@ -118,6 +118,9 @@ class NotifySparkPost(NotifyBase):
     # The services URL
     service_url = 'https://sparkpost.com/'
 
+    # Support attachments
+    attachment_support = True
+
     # All notification requests are secure
     secure_protocol = 'sparkpost'
 

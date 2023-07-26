@@ -257,9 +257,11 @@ def apprise_test(do_notify):
     assert do_notify(a, title=object(), body=b'bytes') is False
     assert do_notify(a, title=b"bytes", body=object()) is False
 
-    # As long as one is present, we're good
+    # A Body must be present
+    assert do_notify(a, title='present', body=None) is False
+
+    # Other combinations work fine
     assert do_notify(a, title=None, body='present') is True
-    assert do_notify(a, title='present', body=None) is True
     assert do_notify(a, title="present", body="present") is True
 
     # Send Attachment with success

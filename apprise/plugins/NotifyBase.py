@@ -139,6 +139,18 @@ class NotifyBase(URLBase):
     # Default Overflow Mode
     overflow_mode = OverflowMode.UPSTREAM
 
+    # Support Attachments; this defaults to being disabled.
+    # Since apprise allows you to send attachments without a body or title
+    # defined, by letting Apprise know the plugin won't support attachments
+    # up front, it can quickly pass over and ignore calls to these end points.
+
+    # You must set this to true if your application can handle attachments.
+    # You must also consider a flow change to your notification if this is set
+    # to True as well as now there will be cases where both the body and title
+    # may not be set.  There will never be a case where a body, or attachment
+    # isn't set in the same call to your notify() function.
+    attachment_support = False
+
     # Default Title HTML Tagging
     # When a title is specified for a notification service that doesn't accept
     # titles, by default apprise tries to give a plesant view and convert the
@@ -316,7 +328,7 @@ class NotifyBase(URLBase):
             the_cors = (do_send(**kwargs2) for kwargs2 in send_calls)
             return all(await asyncio.gather(*the_cors))
 
-    def _build_send_calls(self, body, title=None,
+    def _build_send_calls(self, body=None, title=None,
                           notify_type=NotifyType.INFO, overflow=None,
                           attach=None, body_format=None, **kwargs):
         """
@@ -339,6 +351,16 @@ class NotifyBase(URLBase):
                 # bad attachments
                 raise
 
+            # Handle situations where the body is None
+            body = '' if not body else body
+
+        elif not (body or attach):
+            # If there is not an attachment at the very least, a body must be
+            # present
+            msg = "No message body or attachment was specified."
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
         # Handle situations where the title is None
         title = '' if not title else title
 
@@ -346,6 +368,18 @@ class NotifyBase(URLBase):
         for chunk in self._apply_overflow(
                 body=body, title=title, overflow=overflow,
                 body_format=body_format):
+
+            if not body and not self.attachment_support:
+                # If no body was specified, then we know that an attachment
+                # was.  This is logic checked earlier in the code.
+                #
+                # Knowing this, if the plugin itself doesn't support sending
+                # attachments, there is nothing further to do here, just move
+                # along.
+                self.logger.warning(
+                    f"{self.service_name} does not support attachments; "
+                    " service skipped")
+                continue
 
             # Send notification
             yield dict(

@@ -88,6 +88,9 @@ class NotifyTwitter(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_twitter'
 
+    # Support attachments
+    attachment_support = True
+
     # Do not set body_maxlen as it is set in a property value below
     # since the length varies depending if we are doing a direct message
     # or a tweet
@@ -414,7 +417,7 @@ class NotifyTwitter(NotifyBase):
                 _payload = deepcopy(payload)
                 _payload['media_ids'] = media_ids
 
-                if no:
+                if no or not body:
                     # strip text and replace it with the image representation
                     _payload['status'] = \
                         '{:02d}/{:02d}'.format(no + 1, len(batches))
@@ -514,7 +517,7 @@ class NotifyTwitter(NotifyBase):
                     'additional_owners':
                     ','.join([str(x) for x in targets.values()])
                 }
-                if no:
+                if no or not body:
                     # strip text and replace it with the image representation
                     _data['text'] = \
                         '{:02d}/{:02d}'.format(no + 1, len(attachments))

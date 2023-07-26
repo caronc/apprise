@@ -277,8 +277,7 @@ class NotifyStreamlabs(NotifyBase):
 
         return
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
-             **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Streamlabs notification call (either donation or alert)
         """

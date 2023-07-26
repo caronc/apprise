@@ -458,7 +458,7 @@ class Apprise:
             logger.error(msg)
             raise TypeError(msg)
 
-        if not (title or body):
+        if not (title or body or attach):
             msg = "No message content specified to deliver"
             logger.error(msg)
             raise TypeError(msg)
@@ -688,6 +688,11 @@ class Apprise:
                 'setup_url': getattr(plugin, 'setup_url', None),
                 # Placeholder - populated below
                 'details': None,
+
+                # Let upstream service know of the plugins that support
+                # attachments
+                'attachment_support': getattr(
+                    plugin, 'attachment_support', False),
 
                 # Differentiat between what is a custom loaded plugin and
                 # which is native.

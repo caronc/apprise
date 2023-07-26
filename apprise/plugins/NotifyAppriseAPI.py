@@ -77,6 +77,9 @@ class NotifyAppriseAPI(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_apprise_api'
 
+    # Support attachments
+    attachment_support = True
+
     # Depending on the number of transactions/notifications taking place, this
     # could take a while. 30 seconds should be enough to perform the task
     socket_read_timeout = 30.0

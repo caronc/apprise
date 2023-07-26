@@ -341,6 +341,9 @@ class NotifyEmail(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_email'
 
+    # Support attachments
+    attachment_support = True
+
     # Default Notify Format
     notify_format = NotifyFormat.HTML
 

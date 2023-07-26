@@ -143,6 +143,10 @@ class NotifySlack(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_slack'
 
+    # Support attachments
+    attachment_support = True
+
+    # The maximum targets to include when doing batch transfers
     # Slack Webhook URL
     webhook_url = 'https://hooks.slack.com/services'
 

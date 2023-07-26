@@ -112,6 +112,9 @@ class NotifySMSEagle(NotifyBase):
     # The path we send our notification to
     notify_path = '/jsonrpc/sms'
 
+    # Support attachments
+    attachment_support = True
+
     # The maxumum length of the text message
     # The actual limit is 160 but SMSEagle looks after the handling
     # of large messages in it's upstream service
