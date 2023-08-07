@@ -64,12 +64,6 @@ jobs:
           - os: "ubuntu-latest"
             python-version: "3.11"
 
-          # Test more available versions of PyPy on Linux.
-          - os: "ubuntu-latest"
-            python-version: "pypy3.8"
-          - os: "ubuntu-latest"
-            python-version: "pypy3.9"
-
     defaults:
       run:
         shell: bash
@@ -114,13 +108,10 @@ jobs:
       run: |
         pip install -r all-plugin-requirements.txt
         
-        # Installing `dbus-python` will only work on Linux/CPython.
-        [[ $RUNNER_OS = "Linux" && $PYTHON != 'pypy'* ]] && pip install dbus-python || true
-
     - name: Install project dependencies (Windows)
       if: runner.os == 'Windows'
       run: |
-        [[ $PYTHON != 'pypy'* ]] && pip install -r win-requirements.txt || true
+        pip install -r win-requirements.txt || true
 
     # Install package in editable mode,
     # and run project-specific tasks.
