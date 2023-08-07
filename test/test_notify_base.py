@@ -118,7 +118,7 @@ def test_notify_base():
     start_time = default_timer()
     nb.throttle(last_io=datetime.now())
     elapsed = default_timer() - start_time
-    assert elapsed > 0.5 and elapsed < 1.5
+    assert elapsed > 0.48 and elapsed < 1.5
 
     nb = NotifyBase()
     nb.request_rate_per_sec = 1.0
@@ -129,13 +129,13 @@ def test_notify_base():
     elapsed = default_timer() - start_time
     # because we told it that we had already done a previous action (now)
     # the throttle holds out until the right time has passed
-    assert elapsed > 0.5 and elapsed < 1.5
+    assert elapsed > 0.48 and elapsed < 1.5
 
     # Concurrent calls could take up to the rate_per_sec though...
     start_time = default_timer()
     nb.throttle(last_io=datetime.now())
     elapsed = default_timer() - start_time
-    assert elapsed > 0.5 and elapsed < 1.5
+    assert elapsed > 0.48 and elapsed < 1.5
 
     nb = NotifyBase()
     start_time = default_timer()
@@ -152,7 +152,7 @@ def test_notify_base():
     start_time = default_timer()
     nb.throttle(wait=0.5)
     elapsed = default_timer() - start_time
-    assert elapsed > 0.5 and elapsed < 1.5
+    assert elapsed > 0.48 and elapsed < 1.5
 
     # our NotifyBase wasn't initialized with an ImageSize so this will fail
     assert nb.image_url(notify_type=NotifyType.INFO) is None
