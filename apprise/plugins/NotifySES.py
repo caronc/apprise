@@ -429,7 +429,8 @@ class NotifySES(NotifyBase):
                 content = MIMEText(body, 'plain', 'utf-8')
 
             # Create a Multipart container if there is an attachment
-            base = MIMEMultipart() if attach and self.attachment_support else content
+            base = MIMEMultipart() \
+                if attach and self.attachment_support else content
 
             # TODO: Deduplicate with `NotifyEmail`?
             base['Subject'] = Header(title, 'utf-8')
