@@ -348,7 +348,7 @@ class NotifyForm(NotifyBase):
 
         # Track our potential attachments
         files = []
-        if attach:
+        if attach and self.attachment_support:
             for no, attachment in enumerate(attach, start=1):
                 # Perform some simple error checking
                 if not attachment:

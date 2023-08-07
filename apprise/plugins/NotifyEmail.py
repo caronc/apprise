@@ -773,7 +773,7 @@ class NotifyEmail(NotifyBase):
             else:
                 base = MIMEText(body, 'plain', 'utf-8')
 
-            if attach:
+            if attach and self.attachment_support:
                 mixed = MIMEMultipart("mixed")
                 mixed.attach(base)
                 # Now store our attachments

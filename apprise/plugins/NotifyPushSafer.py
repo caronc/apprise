@@ -549,7 +549,7 @@ class NotifyPushSafer(NotifyBase):
         # Initialize our list of attachments
         attachments = []
 
-        if attach:
+        if attach and self.attachment_support:
             # We need to upload our payload first so that we can source it
             # in remaining messages
             for attachment in attach:

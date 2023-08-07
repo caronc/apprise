@@ -343,7 +343,7 @@ class NotifyXML(NotifyBase):
             ['<{}>{}</{}>'.format(k, v, k) for k, v in payload_base.items()])
 
         attachments = []
-        if attach:
+        if attach and self.attachment_support:
             for attachment in attach:
                 # Perform some simple error checking
                 if not attachment:

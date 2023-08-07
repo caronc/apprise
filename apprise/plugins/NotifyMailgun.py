@@ -374,7 +374,7 @@ class NotifyMailgun(NotifyBase):
         # Track our potential files
         files = {}
 
-        if attach:
+        if attach and self.attachment_support:
             for idx, attachment in enumerate(attach):
                 # Perform some simple error checking
                 if not attachment:

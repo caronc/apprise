@@ -408,7 +408,7 @@ class NotifyNtfy(NotifyBase):
             # Retrieve our topic
             topic = topics.pop()
 
-            if attach:
+            if attach and self.attachment_support:
                 # We need to upload our payload first so that we can source it
                 # in remaining messages
                 for no, attachment in enumerate(attach):

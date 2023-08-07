@@ -546,7 +546,7 @@ class NotifySparkPost(NotifyBase):
         else:
             payload['content']['text'] = body
 
-        if attach:
+        if attach and self.attachment_support:
             # Prepare ourselves an attachment object
             payload['content']['attachments'] = []
 

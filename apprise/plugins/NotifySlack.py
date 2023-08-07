@@ -526,7 +526,8 @@ class NotifySlack(NotifyBase):
                 # Include the footer only if specified to do so
                 payload['attachments'][0]['footer'] = self.app_id
 
-        if attach and self.mode is SlackMode.WEBHOOK:
+        if attach and self.attachment_support \
+                and self.mode is SlackMode.WEBHOOK:
             # Be friendly; let the user know why they can't send their
             # attachments if using the Webhook mode
             self.logger.warning(
@@ -604,7 +605,8 @@ class NotifySlack(NotifyBase):
                     ' to {}'.format(channel)
                     if channel is not None else ''))
 
-        if attach and self.mode is SlackMode.BOT and attach_channel_list:
+        if attach and self.attachment_support and \
+                self.mode is SlackMode.BOT and attach_channel_list:
             # Send our attachments (can only be done in bot mode)
             for attachment in attach:
 

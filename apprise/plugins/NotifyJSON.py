@@ -292,7 +292,7 @@ class NotifyJSON(NotifyBase):
 
         # Track our potential attachments
         attachments = []
-        if attach:
+        if attach and self.attachment_support:
             for attachment in attach:
                 # Perform some simple error checking
                 if not attachment:

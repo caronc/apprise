@@ -340,7 +340,7 @@ class NotifyDiscord(NotifyBase):
                         # We failed to post our message
                         return False
 
-        if attach:
+        if attach and self.attachment_support:
             # Update our payload; the idea is to preserve it's other detected
             # and assigned values for re-use here too
             payload.update({

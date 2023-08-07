@@ -755,7 +755,8 @@ class NotifyTelegram(NotifyBase):
                         'Failed to send Telegram type image to {}.',
                         payload['chat_id'])
 
-            if attach and attach_content == TelegramContentPlacement.AFTER:
+            if attach and self.attachment_support and \
+                    attach_content == TelegramContentPlacement.AFTER:
                 # Send our attachments now (if specified and if it exists)
                 if not self._send_attachments(
                         chat_id=payload['chat_id'], notify_type=notify_type,
@@ -830,7 +831,8 @@ class NotifyTelegram(NotifyBase):
 
             self.logger.info('Sent Telegram notification.')
 
-            if attach and attach_content == TelegramContentPlacement.BEFORE:
+            if attach and self.attachment_support \
+                    and attach_content == TelegramContentPlacement.BEFORE:
                 # Send our attachments now (if specified and if it exists) as
                 # it was identified to send the content before the attachments
                 # which is now done.

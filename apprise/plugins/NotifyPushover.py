@@ -384,7 +384,7 @@ class NotifyPushover(NotifyBase):
             if self.priority == PushoverPriority.EMERGENCY:
                 payload.update({'retry': self.retry, 'expire': self.expire})
 
-            if attach:
+            if attach and self.attachment_support:
                 # Create a copy of our payload
                 _payload = payload.copy()
 

@@ -343,7 +343,7 @@ class NotifySMSEagle(NotifyBase):
         has_error = False
 
         attachments = []
-        if attach:
+        if attach and self.attachment_support:
             for attachment in attach:
                 # Perform some simple error checking
                 if not attachment:

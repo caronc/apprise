@@ -418,11 +418,10 @@ class NotifyMastodon(NotifyBase):
             else:
                 targets.add(myself)
 
-        if attach:
+        if attach and self.attachment_support:
             # We need to upload our payload first so that we can source it
             # in remaining messages
             for attachment in attach:
-
                 # Perform some simple error checking
                 if not attachment:
                     # We could not access the attachment
