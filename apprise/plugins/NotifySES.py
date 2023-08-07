@@ -157,6 +157,7 @@ class NotifySES(NotifyBase):
             'name': _('From Email'),
             'type': 'string',
             'map_to': 'from_addr',
+            'required': True,
         },
         'access_key_id': {
             'name': _('Access Key ID'),
