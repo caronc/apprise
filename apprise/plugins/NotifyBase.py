@@ -361,6 +361,18 @@ class NotifyBase(URLBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
+        if not body and not self.attachment_support:
+            # If no body was specified, then we know that an attachment
+            # was.  This is logic checked earlier in the code.
+            #
+            # Knowing this, if the plugin itself doesn't support sending
+            # attachments, there is nothing further to do here, just move
+            # along.
+            msg = f"{self.service_name} does not support attachments; " \
+                " service skipped"
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
         # Handle situations where the title is None
         title = '' if not title else title
 
@@ -368,18 +380,6 @@ class NotifyBase(URLBase):
         for chunk in self._apply_overflow(
                 body=body, title=title, overflow=overflow,
                 body_format=body_format):
-
-            if not body and not self.attachment_support:
-                # If no body was specified, then we know that an attachment
-                # was.  This is logic checked earlier in the code.
-                #
-                # Knowing this, if the plugin itself doesn't support sending
-                # attachments, there is nothing further to do here, just move
-                # along.
-                self.logger.warning(
-                    f"{self.service_name} does not support attachments; "
-                    " service skipped")
-                continue
 
             # Send notification
             yield dict(

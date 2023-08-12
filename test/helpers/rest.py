@@ -493,13 +493,36 @@ class AppriseURLTester:
                         # have ot test against this flag is ran
                         obj.attachment_support = False
 
+                        #
+                        # Notifications should still transmit as normal if
+                        # Attachment support is flipped off
+                        #
                         assert obj.notify(
                             body=self.body, title=self.title,
                             notify_type=notify_type,
                             attach=attach) == notify_response
 
+                        #
+                        # We should not be able to send a message without a
+                        # body or title in this circumstance
+                        #
+                        assert obj.notify(
+                            body=None, title=None,
+                            notify_type=notify_type,
+                            attach=attach) is False
+
                         # Toggle Back
                         obj.attachment_support = True
+
+                    else:  # No Attachment support
+                        #
+                        # We should not be able to send a message without a
+                        # body or title in this circumstance
+                        #
+                        assert obj.notify(
+                            body=None, title=None,
+                            notify_type=notify_type,
+                            attach=attach) is False
             else:
 
                 for _exception in self.req_exceptions:
