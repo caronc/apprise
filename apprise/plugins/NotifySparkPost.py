@@ -118,6 +118,9 @@ class NotifySparkPost(NotifyBase):
     # The services URL
     service_url = 'https://sparkpost.com/'
 
+    # Support attachments
+    attachment_support = True
+
     # All notification requests are secure
     secure_protocol = 'sparkpost'
 
@@ -543,7 +546,7 @@ class NotifySparkPost(NotifyBase):
         else:
             payload['content']['text'] = body
 
-        if attach:
+        if attach and self.attachment_support:
             # Prepare ourselves an attachment object
             payload['content']['attachments'] = []
 

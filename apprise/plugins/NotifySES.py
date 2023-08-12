@@ -136,6 +136,9 @@ class NotifySES(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_ses'
 
+    # Support attachments
+    attachment_support = True
+
     # AWS is pretty good for handling data load so request limits
     # can occur in much shorter bursts
     request_rate_per_sec = 2.5
@@ -427,7 +430,8 @@ class NotifySES(NotifyBase):
                 content = MIMEText(body, 'plain', 'utf-8')
 
             # Create a Multipart container if there is an attachment
-            base = MIMEMultipart() if attach else content
+            base = MIMEMultipart() \
+                if attach and self.attachment_support else content
 
             # TODO: Deduplicate with `NotifyEmail`?
             base['Subject'] = Header(title, 'utf-8')
@@ -443,7 +447,7 @@ class NotifySES(NotifyBase):
                     timezone.utc).strftime("%a, %d %b %Y %H:%M:%S +0000")
             base['X-Application'] = self.app_id
 
-            if attach:
+            if attach and self.attachment_support:
                 # First attach our body to our content as the first element
                 base.attach(content)
 

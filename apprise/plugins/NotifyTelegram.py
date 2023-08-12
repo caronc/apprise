@@ -123,6 +123,9 @@ class NotifyTelegram(NotifyBase):
     # Telegram uses the http protocol with JSON requests
     notify_url = 'https://api.telegram.org/bot'
 
+    # Support attachments
+    attachment_support = True
+
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_256
 
@@ -715,6 +718,10 @@ class NotifyTelegram(NotifyBase):
             # Prepare our payload based on HTML or TEXT
             payload['text'] = body
 
+        # Handle payloads without a body specified (but an attachment present)
+        attach_content = \
+            TelegramContentPlacement.AFTER if not body else self.content
+
         # Create a copy of the chat_ids list
         targets = list(self.targets)
         while len(targets):
@@ -748,13 +755,18 @@ class NotifyTelegram(NotifyBase):
                         'Failed to send Telegram type image to {}.',
                         payload['chat_id'])
 
-            if attach and self.content == TelegramContentPlacement.AFTER:
+            if attach and self.attachment_support and \
+                    attach_content == TelegramContentPlacement.AFTER:
                 # Send our attachments now (if specified and if it exists)
                 if not self._send_attachments(
                         chat_id=payload['chat_id'], notify_type=notify_type,
                         attach=attach):
 
                     has_error = True
+                    continue
+
+                if not body:
+                    # Nothing more to do; move along to the next attachment
                     continue
 
             # Always call throttle before any remote server i/o is made;
@@ -819,7 +831,8 @@ class NotifyTelegram(NotifyBase):
 
             self.logger.info('Sent Telegram notification.')
 
-            if attach and self.content == TelegramContentPlacement.BEFORE:
+            if attach and self.attachment_support \
+                    and attach_content == TelegramContentPlacement.BEFORE:
                 # Send our attachments now (if specified and if it exists) as
                 # it was identified to send the content before the attachments
                 # which is now done.

@@ -164,6 +164,9 @@ class NotifyPushover(NotifyBase):
     # Pushover uses the http protocol with JSON requests
     notify_url = 'https://api.pushover.net/1/messages.json'
 
+    # Support attachments
+    attachment_support = True
+
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 1024
 
@@ -381,22 +384,25 @@ class NotifyPushover(NotifyBase):
             if self.priority == PushoverPriority.EMERGENCY:
                 payload.update({'retry': self.retry, 'expire': self.expire})
 
-            if attach:
+            if attach and self.attachment_support:
                 # Create a copy of our payload
                 _payload = payload.copy()
 
                 # Send with attachments
-                for attachment in attach:
-                    # Simple send
+                for no, attachment in enumerate(attach):
+                    if no or not body:
+                        # To handle multiple attachments, clean up our message
+                        _payload['message'] = attachment.name
+
                     if not self._send(_payload, attachment):
                         # Mark our failure
                         has_error = True
                         # clean exit from our attachment loop
                         break
 
-                    # To handle multiple attachments, clean up our message
-                    _payload['title'] = '...'
-                    _payload['message'] = attachment.name
+                    # Clear our title if previously set
+                    _payload['title'] = ''
+
                     # No need to alarm for each consecutive attachment uploaded
                     # afterwards
                     _payload['sound'] = PushoverSound.NONE

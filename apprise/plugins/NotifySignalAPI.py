@@ -68,6 +68,9 @@ class NotifySignalAPI(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_signal'
 
+    # Support attachments
+    attachment_support = True
+
     # The maximum targets to include when doing batch transfers
     default_batch_size = 10
 
@@ -234,7 +237,7 @@ class NotifySignalAPI(NotifyBase):
         has_error = False
 
         attachments = []
-        if attach:
+        if attach and self.attachment_support:
             for attachment in attach:
                 # Perform some simple error checking
                 if not attachment:
@@ -281,7 +284,7 @@ class NotifySignalAPI(NotifyBase):
         payload = {
             'message': "{}{}".format(
                 '' if not self.status else '{} '.format(
-                    self.asset.ascii(notify_type)), body),
+                    self.asset.ascii(notify_type)), body).rstrip(),
             "number": self.source,
             "recipients": []
         }

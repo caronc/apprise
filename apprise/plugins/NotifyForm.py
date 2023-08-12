@@ -99,6 +99,9 @@ class NotifyForm(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_Custom_Form'
 
+    # Support attachments
+    attachment_support = True
+
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_128
 
@@ -345,7 +348,7 @@ class NotifyForm(NotifyBase):
 
         # Track our potential attachments
         files = []
-        if attach:
+        if attach and self.attachment_support:
             for no, attachment in enumerate(attach, start=1):
                 # Perform some simple error checking
                 if not attachment:

@@ -172,6 +172,9 @@ class NotifyNtfy(NotifyBase):
     # Default upstream/cloud host if none is defined
     cloud_notify_url = 'https://ntfy.sh'
 
+    # Support attachments
+    attachment_support = True
+
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_256
 
@@ -405,14 +408,14 @@ class NotifyNtfy(NotifyBase):
             # Retrieve our topic
             topic = topics.pop()
 
-            if attach:
+            if attach and self.attachment_support:
                 # We need to upload our payload first so that we can source it
                 # in remaining messages
                 for no, attachment in enumerate(attach):
 
-                    # First message only includes the text
-                    _body = body if not no else None
-                    _title = title if not no else None
+                    # First message only includes the text (if defined)
+                    _body = body if not no and body else None
+                    _title = title if not no and title else None
 
                     # Perform some simple error checking
                     if not attachment:
@@ -543,11 +546,8 @@ class NotifyNtfy(NotifyBase):
         # Default response type
         response = None
 
-        if data:
-            data = data if attach else dumps(data)
-
-        else:  # not data:
-            data = None
+        if not attach:
+            data = dumps(data)
 
         try:
             r = requests.post(

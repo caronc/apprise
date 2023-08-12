@@ -111,6 +111,10 @@ class NotifyMastodon(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_mastodon'
 
+    # Support attachments
+    attachment_support = True
+
+    # Allows the user to specify the NotifyImageSize object
     # Allows the user to specify the NotifyImageSize object; this is supported
     # through the webhook
     image_size = NotifyImageSize.XY_128
@@ -414,11 +418,10 @@ class NotifyMastodon(NotifyBase):
             else:
                 targets.add(myself)
 
-        if attach:
+        if attach and self.attachment_support:
             # We need to upload our payload first so that we can source it
             # in remaining messages
             for attachment in attach:
-
                 # Perform some simple error checking
                 if not attachment:
                     # We could not access the attachment
@@ -578,7 +581,7 @@ class NotifyMastodon(NotifyBase):
                 _payload = deepcopy(payload)
                 _payload['media_ids'] = media_ids
 
-                if no:
+                if no or not body:
                     # strip text and replace it with the image representation
                     _payload['status'] = \
                         '{:02d}/{:02d}'.format(no + 1, len(batches))

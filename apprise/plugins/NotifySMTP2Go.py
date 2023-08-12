@@ -91,6 +91,9 @@ class NotifySMTP2Go(NotifyBase):
     # Notify URL
     notify_url = 'https://api.smtp2go.com/v3/email/send'
 
+    # Support attachments
+    attachment_support = True
+
     # Default Notify Format
     notify_format = NotifyFormat.HTML
 
@@ -294,8 +297,8 @@ class NotifySMTP2Go(NotifyBase):
         # Track our potential attachments
         attachments = []
 
-        if attach:
-            for idx, attachment in enumerate(attach):
+        if attach and self.attachment_support:
+            for attachment in attach:
                 # Perform some simple error checking
                 if not attachment:
                     # We could not access the attachment

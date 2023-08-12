@@ -84,6 +84,9 @@ class NotifyDiscord(NotifyBase):
     # Discord Webhook
     notify_url = 'https://discord.com/api/webhooks'
 
+    # Support attachments
+    attachment_support = True
+
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_256
 
@@ -255,61 +258,6 @@ class NotifyDiscord(NotifyBase):
         # Acquire image_url
         image_url = self.image_url(notify_type)
 
-        # our fields variable
-        fields = []
-
-        if self.notify_format == NotifyFormat.MARKDOWN:
-            # Use embeds for payload
-            payload['embeds'] = [{
-                'author': {
-                    'name': self.app_id,
-                    'url': self.app_url,
-                },
-                'title': title,
-                'description': body,
-
-                # Our color associated with our notification
-                'color': self.color(notify_type, int),
-            }]
-
-            if self.footer:
-                # Acquire logo URL
-                logo_url = self.image_url(notify_type, logo=True)
-
-                # Set Footer text to our app description
-                payload['embeds'][0]['footer'] = {
-                    'text': self.app_desc,
-                }
-
-                if self.footer_logo and logo_url:
-                    payload['embeds'][0]['footer']['icon_url'] = logo_url
-
-            if self.include_image and image_url:
-                payload['embeds'][0]['thumbnail'] = {
-                    'url': image_url,
-                    'height': 256,
-                    'width': 256,
-                }
-
-            if self.fields:
-                # Break titles out so that we can sort them in embeds
-                description, fields = self.extract_markdown_sections(body)
-
-                # Swap first entry for description
-                payload['embeds'][0]['description'] = description
-                if fields:
-                    # Apply our additional parsing for a better presentation
-                    payload['embeds'][0]['fields'] = \
-                        fields[:self.discord_max_fields]
-
-                    # Remove entry from head of fields
-                    fields = fields[self.discord_max_fields:]
-
-        else:
-            # not markdown
-            payload['content'] = \
-                body if not title else "{}\r\n{}".format(title, body)
-
         if self.avatar and (image_url or self.avatar_url):
             payload['avatar_url'] = \
                 self.avatar_url if self.avatar_url else image_url
@@ -318,22 +266,81 @@ class NotifyDiscord(NotifyBase):
             # Optionally override the default username of the webhook
             payload['username'] = self.user
 
+        # Associate our thread_id with our message
         params = {'thread_id': self.thread_id} if self.thread_id else None
-        if not self._send(payload, params=params):
-            # We failed to post our message
-            return False
 
-        # Process any remaining fields IF set
-        if fields:
-            payload['embeds'][0]['description'] = ''
-            for i in range(0, len(fields), self.discord_max_fields):
-                payload['embeds'][0]['fields'] = \
-                    fields[i:i + self.discord_max_fields]
-                if not self._send(payload):
-                    # We failed to post our message
-                    return False
+        if body:
+            # our fields variable
+            fields = []
 
-        if attach:
+            if self.notify_format == NotifyFormat.MARKDOWN:
+                # Use embeds for payload
+                payload['embeds'] = [{
+                    'author': {
+                        'name': self.app_id,
+                        'url': self.app_url,
+                    },
+                    'title': title,
+                    'description': body,
+
+                    # Our color associated with our notification
+                    'color': self.color(notify_type, int),
+                }]
+
+                if self.footer:
+                    # Acquire logo URL
+                    logo_url = self.image_url(notify_type, logo=True)
+
+                    # Set Footer text to our app description
+                    payload['embeds'][0]['footer'] = {
+                        'text': self.app_desc,
+                    }
+
+                    if self.footer_logo and logo_url:
+                        payload['embeds'][0]['footer']['icon_url'] = logo_url
+
+                if self.include_image and image_url:
+                    payload['embeds'][0]['thumbnail'] = {
+                        'url': image_url,
+                        'height': 256,
+                        'width': 256,
+                    }
+
+                if self.fields:
+                    # Break titles out so that we can sort them in embeds
+                    description, fields = self.extract_markdown_sections(body)
+
+                    # Swap first entry for description
+                    payload['embeds'][0]['description'] = description
+                    if fields:
+                        # Apply our additional parsing for a better
+                        # presentation
+                        payload['embeds'][0]['fields'] = \
+                            fields[:self.discord_max_fields]
+
+                        # Remove entry from head of fields
+                        fields = fields[self.discord_max_fields:]
+
+            else:
+                # not markdown
+                payload['content'] = \
+                    body if not title else "{}\r\n{}".format(title, body)
+
+            if not self._send(payload, params=params):
+                # We failed to post our message
+                return False
+
+            # Process any remaining fields IF set
+            if fields:
+                payload['embeds'][0]['description'] = ''
+                for i in range(0, len(fields), self.discord_max_fields):
+                    payload['embeds'][0]['fields'] = \
+                        fields[i:i + self.discord_max_fields]
+                    if not self._send(payload):
+                        # We failed to post our message
+                        return False
+
+        if attach and self.attachment_support:
             # Update our payload; the idea is to preserve it's other detected
             # and assigned values for re-use here too
             payload.update({
@@ -356,7 +363,7 @@ class NotifyDiscord(NotifyBase):
             for attachment in attach:
                 self.logger.info(
                     'Posting Discord Attachment {}'.format(attachment.name))
-                if not self._send(payload, attach=attachment):
+                if not self._send(payload, params=params, attach=attachment):
                     # We failed to post our message
                     return False
 

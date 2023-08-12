@@ -341,6 +341,9 @@ class NotifyEmail(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_email'
 
+    # Support attachments
+    attachment_support = True
+
     # Default Notify Format
     notify_format = NotifyFormat.HTML
 
@@ -770,7 +773,7 @@ class NotifyEmail(NotifyBase):
             else:
                 base = MIMEText(body, 'plain', 'utf-8')
 
-            if attach:
+            if attach and self.attachment_support:
                 mixed = MIMEMultipart("mixed")
                 mixed.attach(base)
                 # Now store our attachments

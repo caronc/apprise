@@ -14,6 +14,13 @@ services:
     volumes:
       - ./:/apprise
 
+  test.py311:
+    build:
+      context: .
+      dockerfile: Dockerfile.py311
+    volumes:
+      - ./:/apprise
+
   rpmbuild.el8:
     build:
       context: .
@@ -36,6 +43,17 @@ services:
       - ./:/apprise
 
 
+#
+# Every Day testing
+#
+# Connect to web and create a new project using the manage script
+# -> docker-compose run --rm test.py311 bash
+# bin/apprise -
+# bin/checkdone.sh
+
+#
+# Other Testing
+#
 # Connect to web and create a new project using the manage script
 # -> docker-compose run --rm test.py36 bash
 # bin/apprise -

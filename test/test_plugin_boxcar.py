@@ -170,7 +170,13 @@ def test_plugin_boxcar_edge_cases(mock_post, mock_get):
     # Test notifications without a body or a title
     p = NotifyBoxcar(access=access, secret=secret, targets=None)
 
-    assert p.notify(body=None, title=None, notify_type=NotifyType.INFO) is True
+    # Neither a title or body was specified
+    assert p.notify(
+        body=None, title=None, notify_type=NotifyType.INFO) is False
+
+    # Acceptable when data is provided:
+    assert p.notify(
+        body="Test", title=None, notify_type=NotifyType.INFO) is True
 
     # Test comma, separate values
     device = 'a' * 64

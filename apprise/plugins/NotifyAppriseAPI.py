@@ -77,6 +77,9 @@ class NotifyAppriseAPI(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_apprise_api'
 
+    # Support attachments
+    attachment_support = True
+
     # Depending on the number of transactions/notifications taking place, this
     # could take a while. 30 seconds should be enough to perform the task
     socket_read_timeout = 30.0
@@ -260,7 +263,7 @@ class NotifyAppriseAPI(NotifyBase):
 
         attachments = []
         files = []
-        if attach:
+        if attach and self.attachment_support:
             for no, attachment in enumerate(attach, start=1):
                 # Perform some simple error checking
                 if not attachment:
@@ -310,7 +313,10 @@ class NotifyAppriseAPI(NotifyBase):
 
         if self.method == AppriseAPIMethod.JSON:
             headers['Content-Type'] = 'application/json'
-            payload['attachments'] = attachments
+
+            if attachments:
+                payload['attachments'] = attachments
+
             payload = dumps(payload)
 
         if self.__tags:
