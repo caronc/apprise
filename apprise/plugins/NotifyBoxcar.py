@@ -240,8 +240,7 @@ class NotifyBoxcar(NotifyBase):
         if title:
             payload['aps']['@title'] = title
 
-        if body:
-            payload['aps']['alert'] = body
+        payload['aps']['alert'] = body
 
         if self._tags:
             payload['tags'] = {'or': self._tags}
