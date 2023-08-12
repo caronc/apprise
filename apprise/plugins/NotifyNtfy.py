@@ -546,11 +546,8 @@ class NotifyNtfy(NotifyBase):
         # Default response type
         response = None
 
-        if data:
-            data = data if attach else dumps(data)
-
-        else:  # not data:
-            data = None
+        if not attach:
+            data = dumps(data)
 
         try:
             r = requests.post(

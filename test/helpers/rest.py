@@ -477,6 +477,29 @@ class AppriseURLTester:
                         notify_type=notify_type,
                         attach=attach) == attach_response
 
+                    if obj.attachment_support:
+                        #
+                        # Services that support attachments should support
+                        # sending a attachment (or more) without a body or
+                        # title specified:
+                        #
+                        assert obj.notify(
+                            body=None, title=None,
+                            notify_type=notify_type,
+                            attach=attach) == attach_response
+
+                        # Turn off attachment support on the notifications
+                        # that support it so we can test that any logic we
+                        # have ot test against this flag is ran
+                        obj.attachment_support = False
+
+                        assert obj.notify(
+                            body=self.body, title=self.title,
+                            notify_type=notify_type,
+                            attach=attach) == notify_response
+
+                        # Toggle Back
+                        obj.attachment_support = True
             else:
 
                 for _exception in self.req_exceptions:
