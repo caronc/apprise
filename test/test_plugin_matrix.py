@@ -44,6 +44,14 @@ from helpers import AppriseURLTester
 import logging
 logging.disable(logging.CRITICAL)
 
+MATRIX_GOOD_RESPONSE = dumps({
+    'room_id': '!abc123:localhost',
+    'room_alias': '#abc123:localhost',
+    'joined_rooms': ['!abc123:localhost', '!def456:localhost'],
+    'access_token': 'abcd1234',
+    'home_server': 'localhost',
+})
+
 # Our Testing URLs
 apprise_url_tests = (
     ##################################
@@ -96,6 +104,24 @@ apprise_url_tests = (
     ('matrix://user:token@localhost?mode=matrix&format=html', {
         # user and token correctly specified with webhook
         'instance': NotifyMatrix,
+    }),
+    ('matrix://user:token@localhost:123/#general/?version=3', {
+        # Provide version over-ride (using version=)
+        'instance': NotifyMatrix,
+        # Our response expected server response
+        'requests_response_text': MATRIX_GOOD_RESPONSE,
+        'privacy_url': 'matrix://user:****@localhost:123',
+    }),
+    ('matrixs://user:token@localhost/#general?v=2', {
+        # Provide version over-ride (using v=)
+        'instance': NotifyMatrix,
+        # Our response expected server response
+        'requests_response_text': MATRIX_GOOD_RESPONSE,
+        'privacy_url': 'matrixs://user:****@localhost',
+    }),
+    ('matrix://user:token@localhost:123/#general/?v=invalid', {
+        # Invalid version specified
+        'instance': TypeError
     }),
     ('matrix://user:token@localhost?mode=slack&format=text', {
         # user and token correctly specified with webhook

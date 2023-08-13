@@ -146,6 +146,9 @@ class NotifyMatrix(NotifyBase):
     # The default secure protocol
     secure_protocol = 'matrixs'
 
+    # Support Attachments
+    attachment_support = True
+
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_matrix'
 
@@ -311,8 +314,8 @@ class NotifyMatrix(NotifyBase):
 
         # Setup our version
         self.version = self.template_args['version']['default'] \
-            if not isinstance(version, str) else version.lower()
-        if self.version and self.version not in MATRIX_VERSIONS:
+            if not isinstance(version, str) else version
+        if self.version not in MATRIX_VERSIONS:
             msg = 'The version specified ({}) is invalid.'.format(version)
             self.logger.warning(msg)
             raise TypeError(msg)
@@ -585,7 +588,7 @@ class NotifyMatrix(NotifyBase):
         has_error = False
 
         attachments = None
-        if attach:
+        if attach and self.attachment_support:
             attachments = self._send_attachments(attach)
 
         while len(rooms) > 0:
