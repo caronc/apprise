@@ -590,6 +590,9 @@ class NotifyMatrix(NotifyBase):
         attachments = None
         if attach and self.attachment_support:
             attachments = self._send_attachments(attach)
+            if not attachments:
+                # take an early exit
+                return False
 
         while len(rooms) > 0:
 
@@ -687,6 +690,10 @@ class NotifyMatrix(NotifyBase):
 
         payloads = []
         for attachment in attach:
+            if not attachment:
+                # invalid attachment (bad file)
+                return False
+
             if not re.match(r'^image/', attachment.mimetype, re.I):
                 # unsuppored at this time
                 continue
@@ -1197,6 +1204,13 @@ class NotifyMatrix(NotifyBase):
                 self.logger.debug('Socket Exception: %s' % str(e))
                 # Return; we're done
                 return (False, response)
+
+            except (OSError, IOError) as e:
+                self.logger.warning(
+                    'An I/O error occurred while reading {}.'.format(
+                        attachment.name if attachment else 'unknown file'))
+                self.logger.debug('I/O Exception: %s' % str(e))
+                return (False, {})
 
             return (True, response)
 
