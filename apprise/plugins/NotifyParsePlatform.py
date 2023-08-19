@@ -30,8 +30,6 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-# Official API reference: https://developer.gitter.im/docs/user-resource
-
 import re
 import requests
 from json import dumps

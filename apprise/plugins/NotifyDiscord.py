@@ -414,7 +414,7 @@ class NotifyDiscord(NotifyBase):
             # Determine how long we should wait for or if we should wait at
             # all. This isn't fool-proof because we can't be sure the client
             # time (calling this script) is completely synced up with the
-            # Gitter server.  One would hope we're on NTP and our clocks are
+            # Discord server.  One would hope we're on NTP and our clocks are
             # the same allowing this to role smoothly:
 
             now = datetime.now(timezone.utc).replace(tzinfo=None)

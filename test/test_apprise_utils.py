@@ -2705,15 +2705,6 @@ def test_cwe312_url():
         'http://user@localhost?secret=secret-.12345') == \
         'http://user@localhost?secret=s...5'
 
-    # Now test other:// private data
-    assert utils.cwe312_url(
-        'gitter://b5637831f563aa846bb5b2c27d8fe8f633b8f026/apprise') == \
-        'gitter://b...6/apprise'
-    assert utils.cwe312_url(
-        'gitter://b5637831f563aa846bb5b2c27d8fe8f633b8f026'
-        '/apprise/?pass=abc123') == \
-        'gitter://b...6/apprise/?pass=a...3'
-
     assert utils.cwe312_url(
         'slack://mybot@xoxb-43598234231-3248932482278-BZK5Wj15B9mPh1RkShJoCZ44'
         '/lead2gold@gmail.com') == 'slack://mybot@x...4/l...m'
