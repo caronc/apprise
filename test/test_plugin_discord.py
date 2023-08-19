@@ -132,6 +132,18 @@ apprise_url_tests = (
         'instance': NotifyDiscord,
         'requests_response_code': requests.codes.no_content,
     }),
+    # Test with href (title link)
+    ('discord://%s/%s?hmarkdown=true&ref=http://localhost' % (
+        'i' * 24, 't' * 64), {
+            'instance': NotifyDiscord,
+            'requests_response_code': requests.codes.no_content,
+    }),
+    # Test with url (title link) - Alias of href
+    ('discord://%s/%s?markdown=true&url=http://localhost' % (
+        'i' * 24, 't' * 64), {
+            'instance': NotifyDiscord,
+            'requests_response_code': requests.codes.no_content,
+    }),
     # Test with avatar URL
     ('discord://%s/%s?avatar_url=http://localhost/test.jpg' % (
         'i' * 24, 't' * 64), {

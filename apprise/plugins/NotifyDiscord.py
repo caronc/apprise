@@ -152,6 +152,13 @@ class NotifyDiscord(NotifyBase):
             'name': _('Avatar URL'),
             'type': 'string',
         },
+        'href': {
+            'name': _('URL'),
+            'type': 'string',
+        },
+        'url': {
+            'alias_of': 'href',
+        },
         # Send a message to the specified thread within a webhook's channel.
         # The thread will automatically be unarchived.
         'thread': {
@@ -183,7 +190,8 @@ class NotifyDiscord(NotifyBase):
 
     def __init__(self, webhook_id, webhook_token, tts=False, avatar=True,
                  footer=False, footer_logo=True, include_image=False,
-                 fields=True, avatar_url=None, thread=None, **kwargs):
+                 fields=True, avatar_url=None, href=None, thread=None,
+                 **kwargs):
         """
         Initialize Discord Object
 
@@ -231,6 +239,9 @@ class NotifyDiscord(NotifyBase):
         # This allows a user to provide an over-ride to the otherwise
         # dynamically generated avatar url images
         self.avatar_url = avatar_url
+
+        # A URL to have the title link to
+        self.href = href
 
         # For Tracking Purposes
         self.ratelimit_reset = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -286,6 +297,9 @@ class NotifyDiscord(NotifyBase):
                     # Our color associated with our notification
                     'color': self.color(notify_type, int),
                 }]
+
+                if self.href:
+                    payload['embeds'][0]['url'] = self.href
 
                 if self.footer:
                     # Acquire logo URL
@@ -540,6 +554,9 @@ class NotifyDiscord(NotifyBase):
         if self.avatar_url:
             params['avatar_url'] = self.avatar_url
 
+        if self.href:
+            params['href'] = self.href
+
         if self.thread_id:
             params['thread'] = self.thread_id
 
@@ -611,10 +628,23 @@ class NotifyDiscord(NotifyBase):
             results['avatar_url'] = \
                 NotifyDiscord.unquote(results['qsd']['avatar_url'])
 
+        # Extract url if it was specified
+        if 'href' in results['qsd']:
+            results['href'] = \
+                NotifyDiscord.unquote(results['qsd']['href'])
+
+        elif 'url' in results['qsd']:
+            results['href'] = \
+                NotifyDiscord.unquote(results['qsd']['url'])
+            # Markdown is implied
+            results['format'] = NotifyFormat.MARKDOWN
+
         # Extract thread id if it was specified
         if 'thread' in results['qsd']:
             results['thread'] = \
                 NotifyDiscord.unquote(results['qsd']['thread'])
+            # Markdown is implied
+            results['format'] = NotifyFormat.MARKDOWN
 
         return results
 
