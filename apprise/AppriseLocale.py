@@ -223,3 +223,19 @@ class AppriseLocale:
                 return None
 
         return None if not lang else lang[0:2].lower()
+
+    def __getstate__(self):
+        """
+        Pickle Support dumps()
+        """
+        state = self.__dict__.copy()
+        # Remove the unpicklable entries.
+        del state['_gtobjs']
+        return state
+
+    def __setstate__(self, state):
+        """
+        Pickle Support loads()
+        """
+        self.__dict__.update(state)
+        self._gtobjs = {}

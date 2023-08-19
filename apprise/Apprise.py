@@ -819,6 +819,30 @@ class Apprise:
         # If we reach here, then we indexed out of range
         raise IndexError('list index out of range')
 
+    def __getstate__(self):
+        """
+        Pickle Support dumps()
+        """
+        attributes = {
+            'asset': self.asset,
+            'urls': self.urls(),
+            'locale': self.locale,
+            'debug': self.debug,
+            'location': self.location,
+        }
+
+        return attributes
+
+    def __setstate__(self, state):
+        """
+        Pickle Support loads()
+        """
+        self.servers = list()
+        self.asset = state['asset']
+        self.locale = state['locale']
+        self.location = state['location']
+        self.add(state['urls'])
+
     def __bool__(self):
         """
         Allows the Apprise object to be wrapped in an 'if statement'.
