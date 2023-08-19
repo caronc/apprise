@@ -825,7 +825,12 @@ class Apprise:
         """
         attributes = {
             'asset': self.asset,
-            'urls': self.urls(),
+            # Prepare our URL list as we need to extract the associated tags
+            # and asset details associated with it
+            'urls': [{
+                'url': server.url(privacy=False),
+                'tag': server.tags if server.tags else None,
+                'asset': server.asset} for server in self.servers],
             'locale': self.locale,
             'debug': self.debug,
             'location': self.location,
@@ -841,7 +846,8 @@ class Apprise:
         self.asset = state['asset']
         self.locale = state['locale']
         self.location = state['location']
-        self.add(state['urls'])
+        for entry in state['urls']:
+            self.add(entry['url'], asset=entry['asset'], tag=entry['tag'])
 
     def __bool__(self):
         """

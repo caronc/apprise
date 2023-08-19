@@ -47,8 +47,8 @@ def test_apprise_pickle_asset(tmpdir):
     """pickle: AppriseAsset
     """
     asset = AppriseAsset()
-    encoded = pickle.dumps(asset)
-    new_asset = pickle.loads(encoded)
+    serialized = pickle.dumps(asset)
+    new_asset = pickle.loads(serialized)
 
     # iterate over some keys to verify they're still the same:
     keys = (
@@ -67,8 +67,8 @@ def test_apprise_pickle_locale(tmpdir):
     """pickle: AppriseLocale
     """
     _locale = AppriseLocale.AppriseLocale()
-    encoded = pickle.dumps(_locale)
-    new_locale = pickle.loads(encoded)
+    serialized = pickle.dumps(_locale)
+    new_locale = pickle.loads(serialized)
 
     assert _locale.lang == new_locale.lang
 
@@ -79,13 +79,30 @@ def test_apprise_pickle_locale(tmpdir):
 def test_apprise_pickle_core(tmpdir):
     """pickle: Apprise
     """
-    apobj = Apprise()
+    asset = AppriseAsset(app_id="default")
+    apobj = Apprise(asset=asset)
 
+    # Create a custom asset so we can verify it gets correctly serialized
+    xml_asset = AppriseAsset(app_id="xml")
+
+    # Store our Entries
     apobj.add("json://localhost")
-    apobj.add("xml://localhost")
+    apobj.add("xml://localhost", asset=xml_asset)
     apobj.add("form://localhost")
     apobj.add("mailto://user:pass@localhost", tag="email")
-    encoded = pickle.dumps(apobj)
+    serialized = pickle.dumps(apobj)
 
-    new_apobj = pickle.loads(encoded)
+    # Unserialize our object
+    new_apobj = pickle.loads(serialized)
+
+    # Verify that it loaded our URLs back
     assert len(new_apobj) == 4
+
+    # Our assets were kept (note the XML altered entry)
+    assert apobj[0].app_id == "default"
+    assert apobj[1].app_id == "xml"
+    assert apobj[2].app_id == "default"
+    assert apobj[3].app_id == "default"
+
+    # Our tag was kept
+    assert "email" in apobj[3].tags
