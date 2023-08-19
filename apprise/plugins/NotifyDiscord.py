@@ -633,7 +633,6 @@ class NotifyDiscord(NotifyBase):
             results['href'] = \
                 NotifyDiscord.unquote(results['qsd']['href'])
 
-
         elif 'url' in results['qsd']:
             results['href'] = \
                 NotifyDiscord.unquote(results['qsd']['url'])
