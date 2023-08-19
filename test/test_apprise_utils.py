@@ -2016,7 +2016,7 @@ def test_parse_list():
 
 
 def test_import_module(tmpdir):
-    """utils: imort_module testing
+    """utils: import_module testing
     """
     # Prepare ourselves a file to work with
     bad_file_base = tmpdir.mkdir('a')
