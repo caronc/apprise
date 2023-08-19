@@ -54,6 +54,20 @@ apprise_url_tests = (
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'pushme://a...a/',
     }),
+    # Token specified
+    ('pushme://?token=%s' % ('b' * 6), {
+        'instance': NotifyPushMe,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'pushme://b...b/',
+    }),
+    # Token specified
+    ('pushme://?push_key=%s' % ('p' * 6), {
+        'instance': NotifyPushMe,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'pushme://p...p/',
+    }),
     ('pushme://%s' % ('c' * 6), {
         'instance': NotifyPushMe,
         # force a failure

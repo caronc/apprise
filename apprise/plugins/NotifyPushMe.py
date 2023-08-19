@@ -74,6 +74,16 @@ class NotifyPushMe(NotifyBase):
         },
     })
 
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'token': {
+            'alias_of': 'token',
+        },
+        'push_key': {
+            'alias_of': 'token',
+        },
+    })
+
     def __init__(self, token, **kwargs):
         """
         Initialize PushMe Object
@@ -184,5 +194,13 @@ class NotifyPushMe(NotifyBase):
 
         # Store our token using the host
         results['token'] = NotifyPushMe.unquote(results['host'])
+
+        # The 'token' makes it easier to use yaml configuration
+        if 'token' in results['qsd'] and len(results['qsd']['token']):
+            results['token'] = NotifyPushMe.unquote(results['qsd']['token'])
+
+        elif 'push_key' in results['qsd'] and len(results['qsd']['push_key']):
+            # Support 'push_key' if specified
+            results['token'] = NotifyPushMe.unquote(results['qsd']['push_key'])
 
         return results
