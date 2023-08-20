@@ -30,12 +30,45 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import syslog
+import os
+import socket
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
 from ..utils import parse_bool
 from ..AppriseLocale import gettext_lazy as _
+
+
+class syslog:
+    """
+    Extrapoloated information from the syslog library so that this plugin
+    would not be dependent on it.
+    """
+    # Notification Categories
+    LOG_KERN = 0
+    LOG_USER = 8
+    LOG_MAIL = 16
+    LOG_DAEMON = 24
+    LOG_AUTH = 32
+    LOG_SYSLOG = 40
+    LOG_LPR = 48
+    LOG_NEWS = 56
+    LOG_UUCP = 64
+    LOG_CRON = 72
+    LOG_LOCAL0 = 128
+    LOG_LOCAL1 = 136
+    LOG_LOCAL2 = 144
+    LOG_LOCAL3 = 152
+    LOG_LOCAL4 = 160
+    LOG_LOCAL5 = 168
+    LOG_LOCAL6 = 176
+    LOG_LOCAL7 = 184
+
+    # Notification Types
+    LOG_INFO = 6
+    LOG_NOTICE = 5
+    LOG_WARNING = 4
+    LOG_CRIT = 2
 
 
 class SyslogFacility:
@@ -113,31 +146,32 @@ SYSLOG_PUBLISH_MAP = {
 }
 
 
-class NotifySyslog(NotifyBase):
+class NotifyRSyslog(NotifyBase):
     """
-    A wrapper for Syslog Notifications
+    A wrapper for Remote Syslog Notifications
     """
 
     # The default descriptive name associated with the Notification
-    service_name = 'Syslog'
+    service_name = 'Remote Syslog'
 
     # The services URL
     service_url = 'https://tools.ietf.org/html/rfc5424'
 
     # The default protocol
-    protocol = 'syslog'
+    protocol = 'rsyslog'
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_syslog'
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_rsyslog'
 
-    # Disable throttle rate for Syslog requests since they are normally
-    # local anyway
+    # Disable throttle rate for RSyslog requests
     request_rate_per_sec = 0
 
     # Define object templates
     templates = (
-        '{schema}://',
-        '{schema}://{facility}',
+        '{schema}://{host}',
+        '{schema}://{host}:{port}',
+        '{schema}://{host}/{facility}',
+        '{schema}://{host}:{port}/{facility}',
     )
 
     # Define our template tokens
@@ -147,6 +181,19 @@ class NotifySyslog(NotifyBase):
             'type': 'choice:string',
             'values': [k for k in SYSLOG_FACILITY_MAP.keys()],
             'default': SyslogFacility.USER,
+            'required': True,
+        },
+        'host': {
+            'name': _('Hostname'),
+            'type': 'string',
+            'required': True,
+        },
+        'port': {
+            'name': _('Port'),
+            'type': 'int',
+            'min': 1,
+            'max': 65535,
+            'default': 514,
         },
     })
 
@@ -162,18 +209,11 @@ class NotifySyslog(NotifyBase):
             'default': True,
             'map_to': 'log_pid',
         },
-        'logperror': {
-            'name': _('Log to STDERR'),
-            'type': 'bool',
-            'default': False,
-            'map_to': 'log_perror',
-        },
     })
 
-    def __init__(self, facility=None, log_pid=True, log_perror=False,
-                 **kwargs):
+    def __init__(self, facility=None, log_pid=True, **kwargs):
         """
-        Initialize Syslog Object
+        Initialize RSyslog Object
         """
         super().__init__(**kwargs)
 
@@ -186,45 +226,21 @@ class NotifySyslog(NotifyBase):
                       '({}) was specified.'.format(facility)
                 self.logger.warning(msg)
                 raise TypeError(msg)
+
         else:
             self.facility = \
                 SYSLOG_FACILITY_MAP[
                     self.template_tokens['facility']['default']]
 
-        # Logging Options
-        self.logoptions = 0
-
         # Include PID with each message.
-        # This may not appear evident if using journalctl since the pid
-        # will always display itself; however it will appear visible
-        # for log_perror combinations
         self.log_pid = log_pid
 
-        # Print to stderr as well.
-        self.log_perror = log_perror
-
-        if log_pid:
-            self.logoptions |= syslog.LOG_PID
-
-        if log_perror:
-            self.logoptions |= syslog.LOG_PERROR
-
-        # Initialize our logging
-        syslog.openlog(
-            self.app_id, logoption=self.logoptions, facility=self.facility)
         return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
-        Perform Syslog Notification
+        Perform RSyslog Notification
         """
-
-        SYSLOG_PUBLISH_MAP = {
-            NotifyType.INFO: syslog.LOG_INFO,
-            NotifyType.SUCCESS: syslog.LOG_NOTICE,
-            NotifyType.FAILURE: syslog.LOG_CRIT,
-            NotifyType.WARNING: syslog.LOG_WARNING,
-        }
 
         if title:
             # Format title
@@ -232,17 +248,59 @@ class NotifySyslog(NotifyBase):
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
-        try:
-            syslog.syslog(SYSLOG_PUBLISH_MAP[notify_type], body)
+        host = self.host
+        port = self.port if self.port \
+            else self.template_tokens['port']['default']
 
-        except KeyError:
-            # An invalid notification type was specified
+        if self.log_pid:
+            payload = '<%d>- %d - %s' % (
+                SYSLOG_PUBLISH_MAP[notify_type] + self.facility * 8,
+                os.getpid(), body)
+
+        else:
+            payload = '<%d>- %s' % (
+                SYSLOG_PUBLISH_MAP[notify_type] + self.facility * 8, body)
+
+        # send UDP packet to upstream server
+        self.logger.debug(
+            'RSyslog Host: %s:%d/%s',
+            host, port, SYSLOG_FACILITY_RMAP[self.facility])
+        self.logger.debug('RSyslog Payload: %s' % str(payload))
+
+        # our sent bytes
+        sent = 0
+
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.settimeout(self.socket_connect_timeout)
+            sent = sock.sendto(payload.encode('utf-8'), (host, port))
+            sock.close()
+
+        except socket.gaierror as e:
             self.logger.warning(
-                'An invalid notification type '
-                '({}) was specified.'.format(notify_type))
+                'A connection error occurred sending RSyslog '
+                'notification to %s:%d/%s', host, port,
+                SYSLOG_FACILITY_RMAP[self.facility]
+            )
+            self.logger.debug('Socket Exception: %s' % str(e))
             return False
 
-        self.logger.info('Sent Syslog notification.')
+        except socket.timeout as e:
+            self.logger.warning(
+                'A connection timeout occurred sending RSyslog '
+                'notification to %s:%d/%s', host, port,
+                SYSLOG_FACILITY_RMAP[self.facility]
+            )
+            self.logger.debug('Socket Exception: %s' % str(e))
+            return False
+
+        if sent < len(payload):
+            self.logger.warning(
+                'RSyslog sent %d byte(s) but intended to send %d byte(s)',
+                sent, len(payload))
+            return False
+
+        self.logger.info('Sent RSyslog notification.')
 
         return True
 
@@ -253,19 +311,22 @@ class NotifySyslog(NotifyBase):
 
         # Define any URL parameters
         params = {
-            'logperror': 'yes' if self.log_perror else 'no',
             'logpid': 'yes' if self.log_pid else 'no',
         }
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        return '{schema}://{facility}/?{params}'.format(
+        return '{schema}://{hostname}{port}/{facility}/?{params}'.format(
+            schema=self.protocol,
+            hostname=NotifyRSyslog.quote(self.host, safe=''),
+            port='' if self.port is None
+            or self.port == self.template_tokens['port']['default']
+            else ':{}'.format(self.port),
             facility=self.template_tokens['facility']['default']
             if self.facility not in SYSLOG_FACILITY_RMAP
             else SYSLOG_FACILITY_RMAP[self.facility],
-            schema=self.protocol,
-            params=NotifySyslog.urlencode(params),
+            params=NotifyRSyslog.urlencode(params),
         )
 
     @staticmethod
@@ -281,11 +342,9 @@ class NotifySyslog(NotifyBase):
             return results
 
         tokens = []
-        if results['host']:
-            tokens.append(NotifySyslog.unquote(results['host']))
 
         # Get our path values
-        tokens.extend(NotifySyslog.split_path(results['fullpath']))
+        tokens.extend(NotifyRSyslog.split_path(results['fullpath']))
 
         # Initialization
         facility = None
@@ -316,12 +375,6 @@ class NotifySyslog(NotifyBase):
         results['log_pid'] = parse_bool(
             results['qsd'].get(
                 'logpid',
-                NotifySyslog.template_args['logpid']['default']))
-
-        # Print to stderr as well.
-        results['log_perror'] = parse_bool(
-            results['qsd'].get(
-                'logperror',
-                NotifySyslog.template_args['logperror']['default']))
+                NotifyRSyslog.template_args['logpid']['default']))
 
         return results
