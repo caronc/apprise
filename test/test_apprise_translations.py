@@ -46,7 +46,7 @@ import logging
 logging.disable(logging.CRITICAL)
 
 
-def test_apprise_locale():
+def test_apprise_trans():
     """
     API: Test apprise locale object
     """
@@ -56,7 +56,7 @@ def test_apprise_locale():
 
 @pytest.mark.skipif(
     'gettext' not in sys.modules, reason="Requires gettext")
-def test_apprise_locale_gettext_init():
+def test_apprise_trans_gettext_init():
     """
     API: Handle gettext
     """
@@ -78,7 +78,7 @@ def test_apprise_locale_gettext_init():
     'gettext' not in sys.modules, reason="Requires gettext")
 @mock.patch('gettext.translation')
 @mock.patch('locale.getlocale')
-def test_apprise_locale_gettext_translations(
+def test_apprise_trans_gettext_translations(
         mock_getlocale, mock_gettext_trans):
     """
     API: Apprise() Gettext translations
@@ -104,7 +104,7 @@ def test_apprise_locale_gettext_translations(
 @pytest.mark.skipif(
     'gettext' not in sys.modules, reason="Requires gettext")
 @mock.patch('locale.getlocale')
-def test_apprise_locale_gettext_lang_at(mock_getlocale):
+def test_apprise_trans_gettext_lang_at(mock_getlocale):
     """
     API: Apprise() Gettext lang_at
 
@@ -184,7 +184,7 @@ def test_apprise_locale_gettext_lang_at(mock_getlocale):
 
 @pytest.mark.skipif(
     'gettext' not in sys.modules, reason="Requires gettext")
-def test_apprise_locale_add():
+def test_apprise_trans_add():
     """
     API: Apprise() Gettext add
 
@@ -204,7 +204,7 @@ def test_apprise_locale_add():
 
 @pytest.mark.skipif(
     'gettext' not in sys.modules, reason="Requires gettext")
-def test_apprise_locale_detect_language_windows_users():
+def test_apprise_trans_detect_language_windows_users():
     """
     API: Apprise() Detect language
 
@@ -268,7 +268,7 @@ def test_detect_language_using_env(mock_getlocale):
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Does not work on Windows")
 @mock.patch('locale.getlocale')
-def test_detect_language_locale(mock_getlocale):
+def test_detect_language_trans(mock_getlocale):
     """
     API: Apprise() Default locale detection
 
@@ -289,7 +289,7 @@ def test_detect_language_locale(mock_getlocale):
 
 @pytest.mark.skipif(
     'gettext' not in sys.modules, reason="Requires gettext")
-def test_apprise_locale_gettext_missing(tmpdir):
+def test_apprise_trans_gettext_missing(tmpdir):
     """
     Verify we can still operate without the gettext library
     """
