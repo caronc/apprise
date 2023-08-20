@@ -1060,8 +1060,8 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get):
 
     # Throw an exception on the second call to requests.post()
     for side_effect in (requests.RequestException(), OSError(), bad_response):
-        mock_post.side_effect = [response, side_effect]
-        mock_get.side_effect = [side_effect]
+        mock_post.side_effect = [response, side_effect, side_effect]
+        mock_get.side_effect = [side_effect, side_effect]
 
         # We'll fail now because of our error handling
         assert obj.send(body="test", attach=attach) is False
@@ -1069,8 +1069,10 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get):
     # handle a bad response
     bad_response = mock.Mock()
     bad_response.status_code = requests.codes.internal_server_error
-    mock_post.side_effect = [response, bad_response]
-    mock_get.side_effect = [response, bad_response]
+    mock_post.side_effect = \
+        [response, bad_response, response, response, response]
+    mock_get.side_effect = \
+        [response, bad_response, response, response, response]
 
     # We'll fail now because of an internal exception
     assert obj.send(body="test", attach=attach) is False
