@@ -36,6 +36,7 @@ from .NotifyBase import NotifyBase
 from ..common import NotifyType
 from ..common import NotifyFormat
 from ..utils import validate_regex
+from ..utils import parse_bool
 from ..AppriseLocale import gettext_lazy as _
 
 
@@ -82,9 +83,14 @@ class NotifyPushMe(NotifyBase):
         'push_key': {
             'alias_of': 'token',
         },
+        'status': {
+            'name': _('Show Status'),
+            'type': 'bool',
+            'default': True,
+        },
     })
 
-    def __init__(self, token, **kwargs):
+    def __init__(self, token, status=None, **kwargs):
         """
         Initialize PushMe Object
         """
@@ -97,6 +103,9 @@ class NotifyPushMe(NotifyBase):
                   '({}) was specified.'.format(token)
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        # Set Status type
+        self.status = status
 
         return
 
@@ -112,7 +121,8 @@ class NotifyPushMe(NotifyBase):
         # Prepare our payload
         params = {
             'push_key': self.token,
-            'title': title,
+            'title': title if not self.status else '{} {}'.format(
+                self.asset.ascii(notify_type), title),
             'content': body,
             'type': 'markdown'
             if self.notify_format == NotifyFormat.MARKDOWN else 'text'
@@ -170,8 +180,13 @@ class NotifyPushMe(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Our URL parameters
-        params = self.url_parameters(privacy=privacy, *args, **kwargs)
+        # Define any URL parameters
+        params = {
+            'status': 'yes' if self.status else 'no',
+        }
+
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Official URLs are easy to assemble
         return '{schema}://{token}/?{params}'.format(
@@ -191,6 +206,10 @@ class NotifyPushMe(NotifyBase):
         if not results:
             # We're done early as we couldn't load the results
             return results
+
+        # Get status switch
+        results['status'] = \
+            parse_bool(results['qsd'].get('status', True))
 
         # Store our token using the host
         results['token'] = NotifyPushMe.unquote(results['host'])
