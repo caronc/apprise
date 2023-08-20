@@ -34,6 +34,7 @@ import ctypes
 import locale
 import contextlib
 import os
+import re
 from os.path import join
 from os.path import dirname
 from os.path import abspath
@@ -95,6 +96,17 @@ class AppriseLocale:
     on the fly if required.
 
     """
+
+    # Locale regular expression
+    _local_re = re.compile(
+        r'^\s*(?P<lang>[a-z]{2})([_:]((?P<country>[a-z]{2}))?'
+        r'(\.(?P<enc>[a-z0-9]+))?|.+)?', re.IGNORECASE)
+
+    # Define our default encoding
+    _default_encoding = 'utf-8'
+
+    # Define our default language
+    _default_language = 'en'
 
     def __init__(self, language=None):
         """
@@ -210,19 +222,9 @@ class AppriseLocale:
             for variable in ('LC_ALL', 'LC_CTYPE', 'LANG', 'LANGUAGE'):
                 localename = lookup(variable, None)
                 if localename:
-                    if variable == 'LANGUAGE':
-                        localename = localename.split(':')[0]
-
-                    try:
-                        locale.setlocale(locale.LC_ALL, localename)
-
-                    except locale.Error:
-                        logger.warning(
-                            'Invalid language define %s=%s',
-                            variable,
-                            lookup(variable, None))
-                        continue
-                    break
+                    result = AppriseLocale._local_re.match(localename)
+                    if result and result.group('lang'):
+                        return result.group('lang').lower()
 
             try:
                 # Acquire our locale

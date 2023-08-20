@@ -164,8 +164,7 @@ def test_detect_language_windows_users():
         assert AppriseLocale.AppriseLocale.detect_language() == 'en'
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="Does not work on Windows")
-def test_detect_language_windows_users_croaks_please_review():
+def test_detect_language_using_env():
     """
     When enabling CI testing on Windows, those tests did not produce the
     correct results. They may want to be reviewed.
