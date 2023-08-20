@@ -50,8 +50,7 @@ def convert_between(from_format, to_format, content):
         (NotifyFormat.MARKDOWN, NotifyFormat.HTML): markdown_to_html,
         (NotifyFormat.TEXT, NotifyFormat.HTML): text_to_html,
         (NotifyFormat.HTML, NotifyFormat.TEXT): html_to_text,
-        # For now; use same converter for Markdown support
-        (NotifyFormat.HTML, NotifyFormat.MARKDOWN): html_to_text,
+        (NotifyFormat.HTML, NotifyFormat.MARKDOWN): html_to_markdown,
     }
 
     convert = converters.get((from_format, to_format))
@@ -81,6 +80,17 @@ def html_to_text(content):
     """
 
     parser = HTMLConverter()
+    parser.feed(content)
+    parser.close()
+    return parser.converted
+
+
+def html_to_markdown(content):
+    """
+    Converts a content from HTML to markdown.
+    """
+
+    parser = HTMLMarkDownConverter()
     parser.feed(content)
     parser.close()
     return parser.converted
@@ -200,3 +210,112 @@ class HTMLConverter(HTMLParser, object):
 
         if tag in self.BLOCK_TAGS:
             self._result.append(self.BLOCK_END)
+
+
+class HTMLMarkDownConverter(HTMLConverter):
+    """An HTML to markdown converter tuned for email messages."""
+
+    # Escape markdown characters
+    MARKDOWN_ESCAPE = re.compile(r'([\\`*_{}[\]<>()#+\-.!|])',
+                                 re.DOTALL | re.MULTILINE)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        # Store href value
+        self._link = ""
+
+    def handle_data(self, data, *args, **kwargs):
+        """
+        Store our data if it is not on the ignore list
+        """
+
+        # initialize our previous flag
+        if self._do_store:
+
+            # Tidy our whitespace
+            content = self.WS_TRIM.sub(' ', data)
+            content = self.MARKDOWN_ESCAPE.sub(r'\\\1', content)
+
+            # Add hyperlink
+            if self._link == "":
+                self._result.append(content)
+            else:
+                self._result.append("[" + content + "]" + self._link)
+
+    def handle_starttag(self, tag, attrs):
+        """
+        Process our starting HTML Tag
+        """
+        # Toggle initial states
+        self._do_store = tag not in self.IGNORE_TAGS
+        self._link = ""
+
+        if tag in self.BLOCK_TAGS:
+            self._result.append(self.BLOCK_END)
+
+        if tag == 'li':
+            self._result.append('- ')
+
+        elif tag == 'br':
+            self._result.append('\n')
+
+        elif tag == 'hr':
+            if self._result:
+                self._result[-1] = self._result[-1].rstrip(' ')
+
+            self._result.append('\n---\n')
+
+        elif tag == 'blockquote':
+            self._result.append('> ')
+
+        elif tag == 'h1':
+            self._result.append('# ')
+
+        elif tag == 'h2':
+            self._result.append('## ')
+
+        elif tag == 'h3':
+            self._result.append('### ')
+
+        elif tag == 'h4':
+            self._result.append('#### ')
+
+        elif tag == 'h5':
+            self._result.append('##### ')
+
+        elif tag == 'h6':
+            self._result.append('###### ')
+
+        elif tag in ['strong', 'b']:
+            self._result.append('**')
+
+        elif tag in ['em', 'i']:
+            self._result.append('*')
+
+        elif tag == 'code':
+            self._result.append('`')
+
+        elif tag == 'a':
+            for name, link in attrs:
+                if name == 'href':
+                    self._link = '(' + link + ')'
+
+    def handle_endtag(self, tag):
+        """
+        Edge case handling of open/close tags
+        """
+        self._do_store = True
+        self._link = ""
+
+        if tag in self.BLOCK_TAGS:
+            self._result.append(self.BLOCK_END)
+
+        if tag in ['strong', 'b']:
+            self._result.append('**')
+
+        elif tag in ['em', 'i']:
+            self._result.append('*')
+
+        elif tag == 'code':
+            self._result.append('`')
