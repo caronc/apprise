@@ -166,14 +166,8 @@ class AppriseLocale:
         # Tidy the language
         lang = AppriseLocale.detect_language(lang, detect_fallback=False)
         if lang not in self._gtobjs and not self.add(lang, set_default=False):
-            if self._default_language not in self._gtobjs \
-                    and not self.add(self._default_language,
-                                     set_default=False):
-                # Do Nothing
-                yield None
-
-            else:
-                yield getattr(self._gtobjs[self._default_language], mapto)
+            # Do Nothing
+            yield getattr(self._gtobjs[self.lang], mapto)
         else:
             # Yield
             yield getattr(self._gtobjs[lang], mapto)

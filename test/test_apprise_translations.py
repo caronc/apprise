@@ -158,6 +158,22 @@ def test_apprise_trans_gettext_lang_at(mock_getlocale):
         # No Language could be set becuause no locale directory exists for this
         assert al.lang is None
 
+        with al.lang_at(None) as _:
+            # functions still behave as normal
+            assert callable(_)
+
+        with al.lang_at('en') as _:
+            # functions still behave as normal
+            assert callable(_)
+
+        with al.lang_at('es') as _:
+            # functions still behave as normal
+            assert callable(_)
+
+        with al.lang_at('fr') as _:
+            # functions still behave as normal
+            assert callable(_)
+
         # We can still perform simple lookups; they access a dummy wrapper:
         assert al.gettext('test') == 'test'
 
