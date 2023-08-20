@@ -36,6 +36,7 @@ import json
 import contextlib
 import os
 import hashlib
+import locale
 from itertools import chain
 from os.path import expanduser
 from functools import reduce
@@ -1488,7 +1489,7 @@ def environ(*remove, **update):
 
     # Create a backup of our environment for restoration purposes
     env_orig = os.environ.copy()
-
+    loc_orig = locale.getlocale()
     try:
         os.environ.update(update)
         [os.environ.pop(k, None) for k in remove]
@@ -1497,6 +1498,13 @@ def environ(*remove, **update):
     finally:
         # Restore our snapshot
         os.environ = env_orig.copy()
+        try:
+            # Restore locale
+            locale.setlocale(locale.LC_ALL, loc_orig)
+
+        except locale.Error:
+            # Thrown in py3.6
+            pass
 
 
 def apply_template(template, app_mode=TemplateType.RAW, **kwargs):

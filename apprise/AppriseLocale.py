@@ -33,6 +33,8 @@
 import ctypes
 import locale
 import contextlib
+import os
+import re
 from os.path import join
 from os.path import dirname
 from os.path import abspath
@@ -94,6 +96,17 @@ class AppriseLocale:
     on the fly if required.
 
     """
+
+    # Locale regular expression
+    _local_re = re.compile(
+        r'^\s*(?P<lang>[a-z]{2})([_:]((?P<country>[a-z]{2}))?'
+        r'(\.(?P<enc>[a-z0-9]+))?|.+)?', re.IGNORECASE)
+
+    # Define our default encoding
+    _default_encoding = 'utf-8'
+
+    # Define our default language
+    _default_language = 'en'
 
     def __init__(self, language=None):
         """
@@ -181,7 +194,7 @@ class AppriseLocale:
     @staticmethod
     def detect_language(lang=None, detect_fallback=True):
         """
-        returns the language (if it's retrievable)
+        Returns the language (if it's retrievable)
         """
         # We want to only use the 2 character version of this language
         # hence en_CA becomes en, en_US becomes en.
@@ -190,6 +203,17 @@ class AppriseLocale:
                 # no detection enabled; we're done
                 return None
 
+            # Posix lookup
+            lookup = os.environ.get
+            localename = None
+            for variable in ('LC_ALL', 'LC_CTYPE', 'LANG', 'LANGUAGE'):
+                localename = lookup(variable, None)
+                if localename:
+                    result = AppriseLocale._local_re.match(localename)
+                    if result and result.group('lang'):
+                        return result.group('lang').lower()
+
+            # Windows handling
             if hasattr(ctypes, 'windll'):
                 windll = ctypes.windll.kernel32
                 try:
@@ -203,11 +227,12 @@ class AppriseLocale:
                     # Fallback to posix detection
                     pass
 
+            # Linux Handling
             try:
-                # Detect language
-                lang = locale.getdefaultlocale()[0]
+                # Acquire our locale
+                lang = locale.getlocale()[0]
 
-            except ValueError as e:
+            except TypeError as e:
                 # This occurs when an invalid locale was parsed from the
                 # environment variable. While we still return None in this
                 # case, we want to better notify the end user of this. Users
@@ -215,11 +240,6 @@ class AppriseLocale:
                 # variables.
                 logger.warning(
                     'Language detection failure / {}'.format(str(e)))
-                return None
-
-            except TypeError:
-                # None is returned if the default can't be determined
-                # we're done in this case
                 return None
 
         return None if not lang else lang[0:2].lower()
