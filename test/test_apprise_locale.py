@@ -77,11 +77,16 @@ def test_apprise_locale_gettext_init():
 @pytest.mark.skipif(
     'gettext' not in sys.modules, reason="Requires gettext")
 @mock.patch('gettext.translation')
-def test_apprise_locale_gettext_translations(mock_gettext_trans):
+@mock.patch('locale.getlocale')
+def test_apprise_locale_gettext_translations(
+        mock_getlocale, mock_gettext_trans):
     """
     API: Apprise() Gettext translations
 
     """
+
+    # Set- our gettext.locale() return value
+    mock_getlocale.return_value = ('en_US', 'UTF-8')
 
     mock_gettext_trans.side_effect = FileNotFoundError()
 
@@ -98,11 +103,15 @@ def test_apprise_locale_gettext_translations(mock_gettext_trans):
 
 @pytest.mark.skipif(
     'gettext' not in sys.modules, reason="Requires gettext")
-def test_apprise_locale_gettext_lang_at():
+@mock.patch('locale.getlocale')
+def test_apprise_locale_gettext_lang_at(mock_getlocale):
     """
     API: Apprise() Gettext lang_at
 
     """
+
+    # Set- our gettext.locale() return value
+    mock_getlocale.return_value = ('en_CA', 'UTF-8')
 
     # This throws internally but we handle it gracefully
     al = AppriseLocale.AppriseLocale()
@@ -135,12 +144,34 @@ def test_apprise_locale_gettext_lang_at():
     # reason the person who set up apprise does not have the languages
     # installed.
     fallback = AppriseLocale.AppriseLocale._default_language
-    with environ('LANG', 'LANGUAGE', 'LC_ALL', 'LC_CTYPE', LANG="en_CA"):
+    mock_getlocale.return_value = None
+
+    with environ('LANGUAGE', 'LC_ALL', 'LC_CTYPE', 'LANG'):
+        # Our default language
         AppriseLocale.AppriseLocale._default_language = 'zz'
+
+        # We will detect the zz since there were no environment variables to
+        # help us otherwise
+        assert AppriseLocale.AppriseLocale.detect_language() is None
         al = AppriseLocale.AppriseLocale()
+
+        # No Language could be set becuause no locale directory exists for this
+        assert al.lang is None
+
+        # We can still perform simple lookups; they access a dummy wrapper:
         assert al.gettext('test') == 'test'
 
-        # Test case with set_default set to False (so we're still set to 'zz')
+    with environ('LANGUAGE', 'LC_ALL', 'LC_CTYPE', LANG="en_CA"):
+        AppriseLocale.AppriseLocale._default_language = 'fr'
+
+        # We will detect the english language (found in the LANG= environment
+        # variable which over-rides the _default
+        assert AppriseLocale.AppriseLocale.detect_language() == "en"
+        al = AppriseLocale.AppriseLocale()
+        assert al.lang == "en"
+        assert al.gettext('test') == 'test'
+
+        # Test case with set_default set to False (so we're still set to 'fr')
         assert al.add('zy', set_default=False) is False
         assert al.gettext('test') == 'test'
 
@@ -202,10 +233,14 @@ def test_apprise_locale_detect_language_windows_users():
         assert AppriseLocale.AppriseLocale.detect_language() == 'en'
 
 
-def test_detect_language_using_env():
+@mock.patch('locale.getlocale')
+def test_detect_language_using_env(mock_getlocale):
     """
     Test the reading of information from an environment variable
     """
+
+    # Set- our gettext.locale() return value
+    mock_getlocale.return_value = ('en_CA', 'UTF-8')
 
     # The below accesses the windows fallback code and fail
     # then it will resort to the environment variables.

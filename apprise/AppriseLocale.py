@@ -107,14 +107,13 @@ class AppriseLocale:
             return
 
         # Add language
-        if not (self.lang and self.add(self.lang)):
-            # Fall back to our default
-            self.add(self._default_language)
+        self.add(self.lang)
 
-    def add(self, lang, set_default=True):
+    def add(self, lang=None, set_default=True):
         """
         Add a language to our list
         """
+        lang = lang if lang else self._default_language
         if lang not in self._gtobjs:
             # Load our gettext object and install our language
             try:
@@ -132,19 +131,18 @@ class AppriseLocale:
                     'Could not load translation path: %s',
                     join(self._locale_dir, lang))
 
-                # Fallback
-                if None not in self._gtobjs:
-                    self._gtobjs[None] = gettext
-                    self.__fn_map = getattr(self._gtobjs[None], self._fn)
-                if set_default:
-                    self.lang = None
+                # Fallback (handle case where self.lang does not exist)
+                if self.lang not in self._gtobjs:
+                    self._gtobjs[self.lang] = gettext
+                    self.__fn_map = getattr(self._gtobjs[self.lang], self._fn)
+
                 return False
 
             logger.trace('Loaded language %s', lang)
 
         if set_default:
-            logger.debug('Language set to %s', self.lang)
-            self.lang = self._default_language
+            logger.debug('Language set to %s', lang)
+            self.lang = lang
 
         return True
 
@@ -249,8 +247,10 @@ class AppriseLocale:
         Pickle Support dumps()
         """
         state = self.__dict__.copy()
+
         # Remove the unpicklable entries.
         del state['_gtobjs']
+        del state['_AppriseLocale__fn_map']
         return state
 
     def __setstate__(self, state):
@@ -258,7 +258,10 @@ class AppriseLocale:
         Pickle Support loads()
         """
         self.__dict__.update(state)
+        # Our mapping to our _fn
+        self.__fn_map = None
         self._gtobjs = {}
+        self.add(state['lang'], set_default=True)
 
 
 #

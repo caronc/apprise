@@ -3,9 +3,10 @@
 # This file is distributed under the same license as the apprise project.
 # Chris Caron <lead2gold@gmail.com>, 2019.
 #
-msgid ""
+msgid  ""
 msgstr ""
-"Project-Id-Version: apprise 0.7.6\n"
+
+"Project-Id-Version: apprise 1.4.5\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
 "POT-Creation-Date: 2019-05-28 16:56-0400\n"
 "PO-Revision-Date: 2019-05-24 20:00-0400\n"
@@ -18,276 +19,272 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.6.0\n"
 
-msgid "API Key"
-msgstr ""
+msgid  "API Key"
+msgstr "API Key"
 
-msgid "Access Key"
-msgstr ""
+msgid  "Access Key"
+msgstr "Access Key"
 
-msgid "Access Key ID"
-msgstr ""
+msgid  "Access Key ID"
+msgstr "Access Key ID"
 
-msgid "Access Secret"
-msgstr ""
+msgid  "Access Secret"
+msgstr "Access Secret"
 
-msgid "Access Token"
-msgstr ""
+msgid  "Access Token"
+msgstr "Access Token"
 
-msgid "Account SID"
-msgstr ""
+msgid  "Account SID"
+msgstr "Account SID"
 
-msgid "Add Tokens"
-msgstr ""
+msgid  "Add Tokens"
+msgstr "Add Tokens"
 
-msgid "Application Key"
-msgstr ""
+msgid  "Application Key"
+msgstr "Application Key"
 
-msgid "Application Secret"
-msgstr ""
+msgid  "Application Secret"
+msgstr "Application Secret"
 
-msgid "Auth Token"
-msgstr ""
+msgid  "Auth Token"
+msgstr "Auth Token"
 
-msgid "Authorization Token"
-msgstr ""
+msgid  "Authorization Token"
+msgstr "Authorization Token"
 
-msgid "Avatar Image"
-msgstr ""
+msgid  "Avatar Image"
+msgstr "Avatar Image"
 
-msgid "Bot Name"
-msgstr ""
+msgid  "Bot Name"
+msgstr "Bot Name"
 
-msgid "Bot Token"
-msgstr ""
+msgid  "Bot Token"
+msgstr "Bot Token"
 
-msgid "Channels"
-msgstr ""
+msgid  "Channels"
+msgstr "Channels"
 
-msgid "Consumer Key"
-msgstr ""
+msgid  "Consumer Key"
+msgstr "Consumer Key"
 
-msgid "Consumer Secret"
-msgstr ""
+msgid  "Consumer Secret"
+msgstr "Consumer Secret"
 
-msgid "Detect Bot Owner"
-msgstr ""
+msgid  "Detect Bot Owner"
+msgstr "Detect Bot Owner"
 
-msgid "Device ID"
-msgstr ""
+msgid  "Device ID"
+msgstr "Device ID"
 
-msgid "Display Footer"
-msgstr ""
+msgid  "Display Footer"
+msgstr "Display Footer"
 
-msgid "Domain"
-msgstr ""
+msgid  "Domain"
+msgstr "Domain"
 
-msgid "Duration"
-msgstr ""
+msgid  "Duration"
+msgstr "Duration"
 
-msgid "Events"
-msgstr ""
+msgid  "Events"
+msgstr "Events"
 
-msgid "Footer Logo"
-msgstr ""
+msgid  "Footer Logo"
+msgstr "Footer Logo"
 
-msgid "From Email"
-msgstr ""
+msgid  "From Email"
+msgstr "From Email"
 
-msgid "From Name"
-msgstr ""
+msgid  "From Name"
+msgstr "From Name"
 
-msgid "From Phone No"
-msgstr ""
+msgid  "From Phone No"
+msgstr "From Phone No"
 
-msgid "Group"
-msgstr ""
+msgid  "Group"
+msgstr "Group"
 
-msgid "HTTP Header"
-msgstr ""
+msgid  "HTTP Header"
+msgstr "HTTP Header"
 
-msgid "Hostname"
-msgstr ""
+msgid  "Hostname"
+msgstr "Hostname"
 
-msgid "Include Image"
-msgstr ""
+msgid  "Include Image"
+msgstr "Include Image"
 
-msgid "Modal"
-msgstr ""
+msgid  "Modal"
+msgstr "Modal"
 
-msgid "Notify Format"
-msgstr ""
+msgid  "Notify Format"
+msgstr "Notify Format"
 
-msgid "Organization"
-msgstr ""
+msgid  "Organization"
+msgstr "Organization"
 
-msgid "Overflow Mode"
-msgstr ""
+msgid  "Overflow Mode"
+msgstr "Overflow Mode"
 
-msgid "Password"
-msgstr ""
+msgid  "Password"
+msgstr "Password"
 
-msgid "Port"
-msgstr ""
+msgid  "Port"
+msgstr "Port"
 
-msgid "Priority"
-msgstr ""
+msgid  "Priority"
+msgstr "Priority"
 
-msgid "Provider Key"
-msgstr ""
+msgid  "Provider Key"
+msgstr "Provider Key"
 
-msgid "Region"
-msgstr ""
+msgid  "Region"
+msgstr "Region"
 
-msgid "Region Name"
-msgstr ""
+msgid  "Region Name"
+msgstr "Region Name"
 
-msgid "Remove Tokens"
-msgstr ""
+msgid  "Remove Tokens"
+msgstr "Remove Tokens"
 
-msgid "Rooms"
-msgstr ""
+msgid  "Rooms"
+msgstr "Rooms"
 
-msgid "SMTP Server"
-msgstr ""
+msgid  "SMTP Server"
+msgstr "SMTP Server"
 
-msgid "Schema"
-msgstr ""
+msgid  "Schema"
+msgstr "Schema"
 
-msgid "Secret Access Key"
-msgstr ""
+msgid  "Secret Access Key"
+msgstr "Secret Access Key"
 
-msgid "Secret Key"
-msgstr ""
+msgid  "Secret Key"
+msgstr "Secret Key"
 
-msgid "Secure Mode"
-msgstr ""
+msgid  "Secure Mode"
+msgstr "Secure Mode"
 
-msgid "Server Timeout"
-msgstr ""
+msgid  "Server Timeout"
+msgstr "Server Timeout"
 
-msgid "Sound"
-msgstr ""
+msgid  "Sound"
+msgstr "Sound"
 
-msgid "Source JID"
-msgstr ""
+msgid  "Source JID"
+msgstr "Source JID"
 
-msgid "Target Channel"
-msgstr ""
+msgid  "Target Channel"
+msgstr "Target Channel"
 
-msgid "Target Chat ID"
-msgstr ""
+msgid  "Target Chat ID"
+msgstr "Target Chat ID"
 
-msgid "Target Device"
-msgstr ""
+msgid  "Target Device"
+msgstr "Target Device"
 
-msgid "Target Device ID"
-msgstr ""
+msgid  "Target Device ID"
+msgstr "Target Device ID"
 
-msgid "Target Email"
-msgstr ""
+msgid  "Target Email"
+msgstr "Target Email"
 
-msgid "Target Emails"
-msgstr ""
+msgid  "Target Emails"
+msgstr "Target Emails"
 
-msgid "Target Encoded ID"
-msgstr ""
+msgid  "Target Encoded ID"
+msgstr "Target Encoded ID"
 
-msgid "Target JID"
-msgstr ""
+msgid  "Target JID"
+msgstr "Target JID"
 
-msgid "Target Phone No"
-msgstr ""
+msgid  "Target Phone No"
+msgstr "Target Phone No"
 
-msgid "Target Room Alias"
-msgstr ""
+msgid  "Target Room Alias"
+msgstr "Target Room Alias"
 
-msgid "Target Room ID"
-msgstr ""
+msgid  "Target Room ID"
+msgstr "Target Room ID"
 
-msgid "Target Short Code"
-msgstr ""
+msgid  "Target Short Code"
+msgstr "Target Short Code"
 
-msgid "Target Tag ID"
-msgstr ""
+msgid  "Target Tag ID"
+msgstr "Target Tag ID"
 
-msgid "Target Topic"
-msgstr ""
+msgid  "Target Topic"
+msgstr "Target Topic"
 
-msgid "Target User"
-msgstr ""
+msgid  "Target User"
+msgstr "Target User"
 
-msgid "Targets"
-msgstr ""
+msgid  "Targets"
+msgstr "Targets"
 
-msgid "Text To Speech"
-msgstr ""
+msgid  "Text To Speech"
+msgstr "Text To Speech"
 
-msgid "To Channel ID"
-msgstr ""
+msgid  "To Channel ID"
+msgstr "To Channel ID"
 
-msgid "To Email"
-msgstr ""
+msgid  "To Email"
+msgstr "To Email"
 
-msgid "To User ID"
-msgstr ""
+msgid  "To User ID"
+msgstr "To User ID"
 
-msgid "Token"
-msgstr ""
+msgid  "Token"
+msgstr "Token"
 
-msgid "Token A"
-msgstr ""
+msgid  "Token A"
+msgstr "Token A"
 
-msgid "Token B"
-msgstr ""
+msgid  "Token B"
+msgstr "Token B"
 
-msgid "Token C"
-msgstr ""
+msgid  "Token C"
+msgstr "Token C"
 
-msgid "Urgency"
-msgstr ""
+msgid  "Urgency"
+msgstr "Urgency"
 
-msgid "Use Avatar"
-msgstr ""
+msgid  "Use Avatar"
+msgstr "Use Avatar"
 
-msgid "User"
-msgstr ""
+msgid  "User"
+msgstr "User"
 
-msgid "User Key"
-msgstr ""
+msgid  "User Key"
+msgstr "User Key"
 
-msgid "User Name"
-msgstr ""
+msgid  "User Name"
+msgstr "User Name"
 
-msgid "Username"
-msgstr ""
+msgid  "Username"
+msgstr "Username"
 
-msgid "Verify SSL"
-msgstr ""
+msgid  "Verify SSL"
+msgstr "Verify SSL"
 
-msgid "Version"
-msgstr ""
+msgid  "Version"
+msgstr "Version"
 
-msgid "Webhook"
-msgstr ""
+msgid  "Webhook"
+msgstr "Webhook"
 
-msgid "Webhook ID"
-msgstr ""
+msgid  "Webhook ID"
+msgstr "Webhook ID"
 
-msgid "Webhook Mode"
-msgstr ""
+msgid  "Webhook Mode"
+msgstr "Webhook Mode"
 
-msgid "Webhook Token"
-msgstr ""
+msgid  "Webhook Token"
+msgstr "Webhook Token"
 
-msgid "X-Axis"
-msgstr ""
+msgid  "X-Axis"
+msgstr "X-Axis"
 
-msgid "XEP"
-msgstr ""
+msgid  "XEP"
+msgstr "XEP"
 
-msgid "Y-Axis"
-msgstr ""
-
-#~ msgid "Access Key Secret"
-#~ msgstr ""
-
+msgid  "Y-Axis"
+msgstr "Y-Axis"
