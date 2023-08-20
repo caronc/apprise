@@ -203,6 +203,17 @@ class AppriseLocale:
                 # no detection enabled; we're done
                 return None
 
+            # Posix lookup
+            lookup = os.environ.get
+            localename = None
+            for variable in ('LC_ALL', 'LC_CTYPE', 'LANG', 'LANGUAGE'):
+                localename = lookup(variable, None)
+                if localename:
+                    result = AppriseLocale._local_re.match(localename)
+                    if result and result.group('lang'):
+                        return result.group('lang').lower()
+
+            # Windows handling
             if hasattr(ctypes, 'windll'):
                 windll = ctypes.windll.kernel32
                 try:
@@ -216,16 +227,7 @@ class AppriseLocale:
                     # Fallback to posix detection
                     pass
 
-            # Posix lookup
-            lookup = os.environ.get
-            localename = None
-            for variable in ('LC_ALL', 'LC_CTYPE', 'LANG', 'LANGUAGE'):
-                localename = lookup(variable, None)
-                if localename:
-                    result = AppriseLocale._local_re.match(localename)
-                    if result and result.group('lang'):
-                        return result.group('lang').lower()
-
+            # Linux Handling
             try:
                 # Acquire our locale
                 lang = locale.getlocale()[0]

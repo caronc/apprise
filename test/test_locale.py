@@ -144,6 +144,7 @@ def test_detect_language_windows_users():
 
     if hasattr(ctypes, 'windll'):
         from ctypes import windll
+
     else:
         windll = mock.Mock()
         # 4105 = en_CA
@@ -166,8 +167,7 @@ def test_detect_language_windows_users():
 
 def test_detect_language_using_env():
     """
-    When enabling CI testing on Windows, those tests did not produce the
-    correct results. They may want to be reviewed.
+    Test the reading of information from an environment variable
     """
 
     # The below accesses the windows fallback code and fail
@@ -203,7 +203,12 @@ def test_detect_language_locale(mock_getlocale):
     """
     # Handle case where getlocale() can't be detected
     mock_getlocale.return_value = None
-    assert AppriseLocale.AppriseLocale.detect_language() is None
+    with environ('LC_ALL', 'LC_CTYPE', 'LANG', 'LANGUAGE'):
+        assert AppriseLocale.AppriseLocale.detect_language() is None
+
+    mock_getlocale.return_value = (None, None)
+    with environ('LC_ALL', 'LC_CTYPE', 'LANG', 'LANGUAGE'):
+        assert AppriseLocale.AppriseLocale.detect_language() is None
 
     # if detect_language and windows env fail us, then we don't
     # set up a default language on first load
