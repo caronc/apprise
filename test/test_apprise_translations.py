@@ -177,7 +177,8 @@ def test_apprise_trans_gettext_lang_at(mock_getlocale):
         # We can still perform simple lookups; they access a dummy wrapper:
         assert al.gettext('test') == 'test'
 
-    with environ('LANGUAGE', 'LC_ALL', 'LC_CTYPE', LANG="en_CA"):
+    with environ('LANGUAGE', 'LC_CTYPE', LC_ALL='C.UTF-8', LANG="en_CA"):
+        # the UTF-8 entry is skipped over
         AppriseLocale.AppriseLocale._default_language = 'fr'
 
         # We will detect the english language (found in the LANG= environment
@@ -266,7 +267,7 @@ def test_detect_language_using_env(mock_getlocale):
             AppriseLocale.AppriseLocale.detect_language(), str)
 
     # Detect French language.
-    with environ('LANGUAGE', 'LC_ALL', 'LC_CTYPE', LANG="fr_CA"):
+    with environ('LANGUAGE', 'LC_ALL', LC_CTYPE="garbage", LANG="fr_CA"):
         assert AppriseLocale.AppriseLocale.detect_language() == 'fr'
 
     # The following unsets all environment variables and sets LC_CTYPE

@@ -72,8 +72,8 @@ class AppriseLocale:
 
     # Locale regular expression
     _local_re = re.compile(
-        r'^\s*(?P<lang>[a-z]{2})([_:]((?P<country>[a-z]{2}))?'
-        r'(\.(?P<enc>[a-z0-9]+))?|.+)?', re.IGNORECASE)
+        r'^((?P<ansii>C)|(?P<lang>([a-z]{2}))([_:](?P<country>[a-z]{2}))?)'
+        r'(\.(?P<enc>[a-z0-9-]+))?$', re.IGNORECASE)
 
     # Define our default encoding
     _default_encoding = 'utf-8'
