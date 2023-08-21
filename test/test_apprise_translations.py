@@ -220,11 +220,60 @@ def test_apprise_trans_add():
 
 
 @pytest.mark.skipif(
+    not hasattr(ctypes, 'windll'), reason="Unique Windows test cases")
+@pytest.mark.skipif(
     'gettext' not in sys.modules, reason="Requires gettext")
 @mock.patch('locale.getlocale')
-def test_apprise_trans_windows_users(mock_getlocale):
+def test_apprise_trans_windows_users_win(mock_getlocale):
     """
-    API: Apprise() Detect language
+    API: Apprise() Windows Locale Testing (Win version)
+
+    """
+
+    # Set- our gettext.locale() return value
+    mock_getlocale.return_value = ('fr_CA', 'UTF-8')
+
+    with mock.patch(
+            'ctypes.windll.kernel32.GetUserDefaultUILanguage') as ui_lang:
+
+        # 4105 = en_CA
+        ui_lang.return_value = 4105
+
+        with environ('LANGUAGE', 'LC_ALL', 'LC_CTYPE', 'LANG'):
+            # Our default language
+            AppriseLocale.AppriseLocale._default_language = 'zz'
+
+            # We will pick up the windll module and detect english
+            assert AppriseLocale.AppriseLocale.detect_language() == 'en'
+
+        # The below accesses the windows fallback code
+        with environ('LANGUAGE', 'LC_ALL', 'LC_CTYPE', LANG="es_AR"):
+            # Environment Variable Trumps
+            assert AppriseLocale.AppriseLocale.detect_language() == 'es'
+
+        # No environment variable, then the Windows environment is used
+        with environ('LANGUAGE', 'LC_ALL', 'LC_CTYPE', 'LANG'):
+            # Windows Environment
+            assert AppriseLocale.AppriseLocale.detect_language() == 'en'
+
+        assert AppriseLocale.AppriseLocale\
+            .detect_language(detect_fallback=False) is None
+
+        # 0 = IndexError
+        ui_lang.return_value = 0
+        with environ('LANGUAGE', 'LANG', 'LC_ALL', 'LC_CTYPE'):
+            # We fall back to posix locale
+            assert AppriseLocale.AppriseLocale.detect_language() == 'fr'
+
+
+@pytest.mark.skipif(
+    hasattr(ctypes, 'windll'), reason="Unique Nux test cases")
+@pytest.mark.skipif(
+    'gettext' not in sys.modules, reason="Requires gettext")
+@mock.patch('locale.getlocale')
+def test_apprise_trans_windows_users_nux(mock_getlocale):
+    """
+    API: Apprise() Windows Locale Testing (Nux version)
 
     """
 
@@ -232,14 +281,8 @@ def test_apprise_trans_windows_users(mock_getlocale):
     mock_getlocale.return_value = ('fr_CA', 'UTF-8')
 
     # Emulate a windows environment
-    if hasattr(ctypes, 'windll'):
-        # Windows Distribution
-        from ctypes import windll
-
-    else:
-        # Linux Distribution
-        windll = mock.Mock()
-        setattr(ctypes, 'windll', windll)
+    windll = mock.Mock()
+    setattr(ctypes, 'windll', windll)
 
     # 4105 = en_CA
     windll.kernel32.GetUserDefaultUILanguage.return_value = 4105
@@ -269,6 +312,8 @@ def test_apprise_trans_windows_users(mock_getlocale):
     with environ('LANGUAGE', 'LANG', 'LC_ALL', 'LC_CTYPE'):
         # We fall back to posix locale
         assert AppriseLocale.AppriseLocale.detect_language() == 'fr'
+
+    delattr(ctypes, 'windll')
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Unique Nux test cases")
@@ -316,12 +361,6 @@ def test_detect_language_using_env(mock_getlocale):
     # if detect_language and windows env fail us, then we don't
     # set up a default language on first load
     AppriseLocale.AppriseLocale()
-
-    with mock.patch('ctypes') as mock_ctypes:
-
-        # 4105 = en_CA
-        mock_ctypes.windll.kernel32.GetUserDefaultUILanguage\
-            .return_value = 4105
 
 
 @pytest.mark.skipif(
