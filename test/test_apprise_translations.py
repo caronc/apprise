@@ -220,6 +220,8 @@ def test_apprise_trans_add():
 
 
 @pytest.mark.skipif(
+    sys.platform != "win32", reason="Unique Windows test cases")
+@pytest.mark.skipif(
     'gettext' not in sys.modules, reason="Requires gettext")
 def test_apprise_trans_detect_language_windows_users():
     """
@@ -236,9 +238,16 @@ def test_apprise_trans_detect_language_windows_users():
         windll.kernel32.GetUserDefaultUILanguage.return_value = 4105
         setattr(ctypes, 'windll', windll)
 
-    # The below accesses the windows fallback code
-    with environ('LANG', 'LANGUAGE', 'LC_ALL', 'LC_CTYPE', LANG="en_CA"):
+    with environ('LANGUAGE', 'LC_ALL', 'LC_CTYPE', 'LANG'):
+        # Our default language
+        AppriseLocale.AppriseLocale._default_language = 'zz'
+
+        # We will pick up the windll module
         assert AppriseLocale.AppriseLocale.detect_language() == 'en'
+
+    # The below accesses the windows fallback code
+    with environ('LANG', 'LANGUAGE', 'LC_ALL', 'LC_CTYPE', LANG="fr_CA"):
+        assert AppriseLocale.AppriseLocale.detect_language() == 'fr'
 
     assert AppriseLocale.AppriseLocale\
         .detect_language(detect_fallback=False) is None
@@ -250,6 +259,7 @@ def test_apprise_trans_detect_language_windows_users():
         assert AppriseLocale.AppriseLocale.detect_language() == 'en'
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Unique Nux test cases")
 @mock.patch('locale.getlocale')
 def test_detect_language_using_env(mock_getlocale):
     """
@@ -282,14 +292,6 @@ def test_detect_language_using_env(mock_getlocale):
     with environ(*list(os.environ.keys())):
         assert isinstance(AppriseLocale.AppriseLocale.detect_language(), str)
 
-
-@pytest.mark.skipif(sys.platform == "win32", reason="Does not work on Windows")
-@mock.patch('locale.getlocale')
-def test_detect_language_trans(mock_getlocale):
-    """
-    API: Apprise() Default locale detection
-
-    """
     # Handle case where getlocale() can't be detected
     mock_getlocale.return_value = None
     with environ('LC_ALL', 'LC_CTYPE', 'LANG', 'LANGUAGE'):
