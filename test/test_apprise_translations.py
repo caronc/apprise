@@ -102,6 +102,8 @@ def test_apprise_trans_gettext_translations(
 
 
 @pytest.mark.skipif(
+    hasattr(ctypes, 'windll'), reason="Unique Nux test cases")
+@pytest.mark.skipif(
     'gettext' not in sys.modules, reason="Requires gettext")
 @mock.patch('locale.getlocale')
 def test_apprise_trans_gettext_lang_at(mock_getlocale):
