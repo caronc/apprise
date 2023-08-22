@@ -40,9 +40,6 @@ from os.path import dirname
 from os.path import abspath
 from .logger import logger
 
-# Define our translation domain
-DOMAIN = 'apprise'
-LOCALE_DIR = abspath(join(dirname(__file__), 'i18n'))
 
 # This gets toggled to True if we succeed
 GETTEXT_LOADED = False
@@ -51,43 +48,13 @@ try:
     # Initialize gettext
     import gettext
 
-    # install() creates a _() in our builtins
-    gettext.install(DOMAIN, localedir=LOCALE_DIR)
-
     # Toggle our flag
     GETTEXT_LOADED = True
 
 except ImportError:
-    # gettext isn't available; no problem, just fall back to using
-    # the library features without multi-language support.
-    import builtins
-    builtins.__dict__['_'] = lambda x: x  # pragma: no branch
-
-
-class LazyTranslation:
-    """
-    Doesn't translate anything until str() or unicode() references
-    are made.
-
-    """
-    def __init__(self, text, *args, **kwargs):
-        """
-        Store our text
-        """
-        self.text = text
-
-        super().__init__(*args, **kwargs)
-
-    def __str__(self):
-        return gettext.gettext(self.text)
-
-
-# Lazy translation handling
-def gettext_lazy(text):
-    """
-    A dummy function that can be referenced
-    """
-    return LazyTranslation(text=text)
+    # gettext isn't available; no problem; Use the library features without
+    # multi-language support.
+    pass
 
 
 class AppriseLocale:
@@ -97,15 +64,24 @@ class AppriseLocale:
 
     """
 
+    # Define our translation domain
+    _domain = 'apprise'
+
+    # The path to our translations
+    _locale_dir = abspath(join(dirname(__file__), 'i18n'))
+
     # Locale regular expression
     _local_re = re.compile(
-        r'^\s*(?P<lang>[a-z]{2})([_:]((?P<country>[a-z]{2}))?'
-        r'(\.(?P<enc>[a-z0-9]+))?|.+)?', re.IGNORECASE)
+        r'^((?P<ansii>C)|(?P<lang>([a-z]{2}))([_:](?P<country>[a-z]{2}))?)'
+        r'(\.(?P<enc>[a-z0-9-]+))?$', re.IGNORECASE)
 
     # Define our default encoding
     _default_encoding = 'utf-8'
 
-    # Define our default language
+    # The function to assign `_` by default
+    _fn = 'gettext'
+
+    # The language we should fall back to if all else fails
     _default_language = 'en'
 
     def __init__(self, language=None):
@@ -123,25 +99,55 @@ class AppriseLocale:
         # Get our language
         self.lang = AppriseLocale.detect_language(language)
 
+        # Our mapping to our _fn
+        self.__fn_map = None
+
         if GETTEXT_LOADED is False:
             # We're done
             return
 
-        if self.lang:
+        # Add language
+        self.add(self.lang)
+
+    def add(self, lang=None, set_default=True):
+        """
+        Add a language to our list
+        """
+        lang = lang if lang else self._default_language
+        if lang not in self._gtobjs:
             # Load our gettext object and install our language
             try:
-                self._gtobjs[self.lang] = gettext.translation(
-                    DOMAIN, localedir=LOCALE_DIR, languages=[self.lang])
+                self._gtobjs[lang] = gettext.translation(
+                    self._domain, localedir=self._locale_dir, languages=[lang],
+                    fallback=False)
 
-                # Install our language
-                self._gtobjs[self.lang].install()
+                # The non-intrusive method of applying the gettext change to
+                # the global namespace only
+                self.__fn_map = getattr(self._gtobjs[lang], self._fn)
 
-            except IOError:
-                # This occurs if we can't access/load our translations
-                pass
+            except FileNotFoundError:
+                # The translation directory does not exist
+                logger.debug(
+                    'Could not load translation path: %s',
+                    join(self._locale_dir, lang))
+
+                # Fallback (handle case where self.lang does not exist)
+                if self.lang not in self._gtobjs:
+                    self._gtobjs[self.lang] = gettext
+                    self.__fn_map = getattr(self._gtobjs[self.lang], self._fn)
+
+                return False
+
+            logger.trace('Loaded language %s', lang)
+
+        if set_default:
+            logger.debug('Language set to %s', lang)
+            self.lang = lang
+
+        return True
 
     @contextlib.contextmanager
-    def lang_at(self, lang):
+    def lang_at(self, lang, mapto=_fn):
         """
         The syntax works as:
             with at.lang_at('fr'):
@@ -151,45 +157,31 @@ class AppriseLocale:
         """
 
         if GETTEXT_LOADED is False:
-            # yield
-            yield
+            # Do nothing
+            yield None
 
             # we're done
             return
 
         # Tidy the language
         lang = AppriseLocale.detect_language(lang, detect_fallback=False)
-
-        # Now attempt to load it
-        try:
-            if lang in self._gtobjs:
-                if lang != self.lang:
-                    # Install our language only if we aren't using it
-                    # already
-                    self._gtobjs[lang].install()
-
-            else:
-                self._gtobjs[lang] = gettext.translation(
-                    DOMAIN, localedir=LOCALE_DIR, languages=[self.lang])
-
-                # Install our language
-                self._gtobjs[lang].install()
-
+        if lang not in self._gtobjs and not self.add(lang, set_default=False):
+            # Do Nothing
+            yield getattr(self._gtobjs[self.lang], mapto)
+        else:
             # Yield
-            yield
-
-        except (IOError, KeyError):
-            # This occurs if we can't access/load our translations
-            # Yield reguardless
-            yield
-
-        finally:
-            # Fall back to our previous language
-            if lang != self.lang and lang in self._gtobjs:
-                # Install our language
-                self._gtobjs[self.lang].install()
+            yield getattr(self._gtobjs[lang], mapto)
 
         return
+
+    @property
+    def gettext(self):
+        """
+        Return the current language gettext() function
+
+        Useful for assigning to `_`
+        """
+        return self._gtobjs[self.lang].gettext
 
     @staticmethod
     def detect_language(lang=None, detect_fallback=True):
@@ -227,12 +219,12 @@ class AppriseLocale:
                     # Fallback to posix detection
                     pass
 
-            # Linux Handling
+            # Built in locale library check
             try:
                 # Acquire our locale
                 lang = locale.getlocale()[0]
 
-            except TypeError as e:
+            except (ValueError, TypeError) as e:
                 # This occurs when an invalid locale was parsed from the
                 # environment variable. While we still return None in this
                 # case, we want to better notify the end user of this. Users
@@ -249,8 +241,10 @@ class AppriseLocale:
         Pickle Support dumps()
         """
         state = self.__dict__.copy()
+
         # Remove the unpicklable entries.
         del state['_gtobjs']
+        del state['_AppriseLocale__fn_map']
         return state
 
     def __setstate__(self, state):
@@ -258,4 +252,39 @@ class AppriseLocale:
         Pickle Support loads()
         """
         self.__dict__.update(state)
+        # Our mapping to our _fn
+        self.__fn_map = None
         self._gtobjs = {}
+        self.add(state['lang'], set_default=True)
+
+
+#
+# Prepare our default LOCALE Singleton
+#
+LOCALE = AppriseLocale()
+
+
+class LazyTranslation:
+    """
+    Doesn't translate anything until str() or unicode() references
+    are made.
+
+    """
+    def __init__(self, text, *args, **kwargs):
+        """
+        Store our text
+        """
+        self.text = text
+
+        super().__init__(*args, **kwargs)
+
+    def __str__(self):
+        return LOCALE.gettext(self.text) if GETTEXT_LOADED else self.text
+
+
+# Lazy translation handling
+def gettext_lazy(text):
+    """
+    A dummy function that can be referenced
+    """
+    return LazyTranslation(text=text)

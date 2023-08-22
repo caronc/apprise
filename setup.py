@@ -90,7 +90,7 @@ setup(
         ],
     },
     install_requires=install_requires,
-    classifiers=(
+    classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
         'Intended Audience :: System Administrators',
@@ -109,7 +109,7 @@ setup(
         'License :: OSI Approved :: BSD License',
         'Topic :: Software Development :: Libraries :: Python Modules',
         'Topic :: Software Development :: Libraries :: Application Frameworks',
-    ),
+    ],
     entry_points={'console_scripts': console_scripts},
     python_requires='>=3.6',
     setup_requires=['babel', ],

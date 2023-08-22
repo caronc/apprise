@@ -53,6 +53,7 @@ from apprise import __version__
 from apprise import URLBase
 from apprise import PrivacyMode
 from apprise.AppriseLocale import LazyTranslation
+from apprise.AppriseLocale import gettext_lazy as _
 
 from apprise import common
 from apprise.plugins import __load_matrix
@@ -1379,7 +1380,8 @@ def test_apprise_details():
         assert 'details' in entry['requirements']
         assert 'packages_required' in entry['requirements']
         assert 'packages_recommended' in entry['requirements']
-        assert isinstance(entry['requirements']['details'], str)
+        assert isinstance(entry['requirements']['details'], (
+            str, LazyTranslation))
         assert isinstance(entry['requirements']['packages_required'], list)
         assert isinstance(entry['requirements']['packages_recommended'], list)
 
@@ -1406,7 +1408,8 @@ def test_apprise_details():
         assert 'details' in entry['requirements']
         assert 'packages_required' in entry['requirements']
         assert 'packages_recommended' in entry['requirements']
-        assert isinstance(entry['requirements']['details'], str)
+        assert isinstance(entry['requirements']['details'], (
+            str, LazyTranslation))
         assert isinstance(entry['requirements']['packages_required'], list)
         assert isinstance(entry['requirements']['packages_recommended'], list)
 

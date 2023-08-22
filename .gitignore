@@ -26,6 +26,7 @@ sdist/
 *.egg-info/
 .installed.cfg
 *.egg
+.local
 
 # Generated from Docker Instance
 .bash_history

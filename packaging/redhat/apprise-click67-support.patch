@@ -1,7 +1,7 @@
-diff -Naur apprise-1.0.0/test/test_cli.py apprise-1.0.0.patched/test/test_cli.py
---- apprise-1.0.0/test/test_cli.py	2022-07-15 14:52:13.000000000 -0400
-+++ apprise-1.0.0.patched/test/test_cli.py	2022-08-06 13:32:50.796935607 -0400
-@@ -1022,9 +1022,6 @@
+diff -Naur apprise-1.4.5/test/test_apprise_cli.py apprise-1.4.5-patched/test/test_apprise_cli.py
+--- apprise-1.4.5/test/test_apprise_cli.py	2023-08-20 11:26:43.000000000 -0400
++++ apprise-1.4.5-patched/test/test_apprise_cli.py	2023-08-20 16:37:42.922342103 -0400
+@@ -1027,9 +1027,6 @@
      # Absolute path to __init__.py is okay
      assert result.exit_code == 0
  
@@ -11,7 +11,7 @@ diff -Naur apprise-1.0.0/test/test_cli.py apprise-1.0.0.patched/test/test_cli.py
      # Clear our working variables so they don't obstruct the next test
      # This simulates an actual call from the CLI.  Unfortunately through
      # testing were occupying the same memory space so our singleton's
-@@ -1044,9 +1041,6 @@
+@@ -1049,9 +1046,6 @@
      # an __init__.py is found on the inside of it
      assert result.exit_code == 0
  
@@ -21,7 +21,7 @@ diff -Naur apprise-1.0.0/test/test_cli.py apprise-1.0.0.patched/test/test_cli.py
      # Test double paths that are the same; this ensures we only
      # load the plugin once
      result = runner.invoke(cli.main, [
-@@ -1179,15 +1173,6 @@
+@@ -1183,15 +1177,6 @@
          # Print our custom details to the screen
          '--details',
      ])
