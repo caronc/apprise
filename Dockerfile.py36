@@ -34,7 +34,7 @@
 FROM python:3.6-buster
 RUN apt-get update && \
     apt-get install -y libdbus-1-dev libgirepository1.0-dev build-essential musl-dev bash
-RUN pip install dbus-python PyGObject
+RUN pip install --no-cache-dir dbus-python PyGObject
 
 # Apprise Setup
 VOLUME ["/apprise"]
@@ -45,4 +45,4 @@ ENV PYTHONPATH /apprise
 ENV PYTHONPYCACHEPREFIX /apprise/__pycache__/py36
 
 
-RUN pip install -r /requirements.txt -r /dev-requirements.txt
+RUN pip install --no-cache-dir -r /requirements.txt -r /dev-requirements.txt

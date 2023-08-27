@@ -34,7 +34,7 @@
 FROM python:3.10-buster
 RUN apt-get update && \
     apt-get install -y libdbus-1-dev libgirepository1.0-dev build-essential musl-dev bash
-RUN pip install dbus-python PyGObject
+RUN pip install --no-cache-dir dbus-python PyGObject
 
 # Apprise Setup
 VOLUME ["/apprise"]
@@ -44,7 +44,7 @@ COPY dev-requirements.txt /
 ENV PYTHONPATH /apprise
 ENV PYTHONPYCACHEPREFIX /apprise/__pycache__/py310
 
-RUN pip install -r /requirements.txt -r /dev-requirements.txt
+RUN pip install --no-cache-dir -r /requirements.txt -r /dev-requirements.txt
 
 RUN addgroup --gid ${USER_GID:-1000} apprise
 RUN adduser --system --uid ${USER_UID:-1000} --ingroup apprise --home /apprise --no-create-home --disabled-password apprise
