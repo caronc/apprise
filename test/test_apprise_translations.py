@@ -225,7 +225,8 @@ def test_apprise_trans_add():
         # Test English Environment
         assert al.add('en') is True
 
-        # Double add (copy of above) to access logic that prevents adding it again
+        # Double add (copy of above) to access logic that prevents adding it
+        # again
         assert al.add('en') is True
 
     # Invalid Language
