@@ -211,11 +211,22 @@ def test_apprise_trans_add():
 
     # This throws internally but we handle it gracefully
     al = AppriseLocale.AppriseLocale()
+    with environ('LANGUAGE', 'LC_ALL', 'LC_CTYPE', 'LANG'):
+        # English is the default/fallback type
+        assert al.add('en') is True
 
-    assert al.add('en') is True
+    al = AppriseLocale.AppriseLocale()
+    with environ('LANGUAGE', 'LC_ALL', 'LC_CTYPE', LANG='C.UTF-8'):
+        # Test English Environment
+        assert al.add('en') is True
 
-    # Double add (copy of above) to access logic that prevents adding it again
-    assert al.add('en') is True
+    al = AppriseLocale.AppriseLocale()
+    with environ('LANGUAGE', 'LC_ALL', 'LC_CTYPE', LANG='en_CA.UTF-8'):
+        # Test English Environment
+        assert al.add('en') is True
+
+        # Double add (copy of above) to access logic that prevents adding it again
+        assert al.add('en') is True
 
     # Invalid Language
     assert al.add('bad') is False
