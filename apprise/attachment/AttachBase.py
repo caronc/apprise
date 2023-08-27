@@ -68,7 +68,8 @@ class AttachBase(URLBase):
     # set to zero (0), then no check is performed
     # 1 MB = 1048576 bytes
     # 5 MB = 5242880 bytes
-    max_file_size = 5242880
+    # 1 GB = 1048576000 bytes
+    max_file_size = 1048576000
 
     # By default all attachments types are inaccessible.
     # Developers of items identified in the attachment plugin directory
