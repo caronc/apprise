@@ -6,9 +6,9 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: apprise 1.4.5\n"
+"Project-Id-Version: apprise 1.5.0\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2023-07-06 20:30-0400\n"
+"POT-Creation-Date: 2023-08-27 13:09-0400\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -356,6 +356,9 @@ msgstr ""
 msgid "Master Key"
 msgstr ""
 
+msgid "Matrix API Verion"
+msgstr ""
+
 msgid "Memory"
 msgstr ""
 
@@ -454,6 +457,9 @@ msgstr ""
 msgid "Provider Key"
 msgstr ""
 
+msgid "Pushkey"
+msgstr ""
+
 msgid "QOS"
 msgstr ""
 
@@ -500,6 +506,9 @@ msgid "Schema"
 msgstr ""
 
 msgid "Secret"
+msgstr ""
+
+msgid "Secret API Key"
 msgstr ""
 
 msgid "Secret Access Key"
@@ -568,9 +577,6 @@ msgstr ""
 msgid "Subtitle"
 msgstr ""
 
-msgid "Syslog Mode"
-msgstr ""
-
 msgid "Tags"
 msgstr ""
 
@@ -620,9 +626,6 @@ msgid "Target Player ID"
 msgstr ""
 
 msgid "Target Queue"
-msgstr ""
-
-msgid "Target Room"
 msgstr ""
 
 msgid "Target Room Alias"
