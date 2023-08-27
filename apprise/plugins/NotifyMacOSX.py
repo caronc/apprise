@@ -197,8 +197,7 @@ class NotifyMacOSX(NotifyBase):
         self.logger.debug('MacOSX CMD: {}'.format(' '.join(cmd)))
 
         # Send our notification
-        output = subprocess.Popen(
-            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        output = subprocess.Popen(cmd)
 
         # Wait for process to complete
         output.wait()
