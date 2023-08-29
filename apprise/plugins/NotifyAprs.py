@@ -272,17 +272,17 @@ class NotifyAprs(NotifyBase):
         # check if we run on Python 3
         is_py3 = True if sys.version_info[0] >= 3 else False
 
-        login_str = "user {0} pass {1} vers aprslib {3}{2}\r\n".format(user,password, 1,0)
+        login_str = "user {0} pass {1} vers aprslib {3}{2}\r\n".format(self.user,self.password, 1,0)
         self.logger.info(
             'Sending login information to APRS-IS')
 
         try:
-            mysocket = socket.create_connection((host,port),timeout=15)
-            mysocket.setblocking(1)
+            sock = socket.socket(socket.AF_INET)
+            sock.settimeout(self.socket_connect_timeout)
+            sock.setblocking(1)
             if is_py3:
                 payload = payload.encode('utf-8')
-
-            mysocket.send(payload)
+            sent = sock.sendto(payload, (host, port))
 
             self.sock.settimeout(5)
             test = self.sock.recv(len(login_str) + 100)
@@ -296,38 +296,35 @@ class NotifyAprs(NotifyBase):
 
             # check if we were able to log in
             if callsign == "":
-                self.logger.debug('Socket Exception: %s' % str(e))
+                self.logger.debug('Did not receive call sign from APRS-IS')
+                if sock:
+                    sock.close()
                 return False
 
-            if callsign != user:
-                self.logger.debug('call signs differ: %s' % str(e))
+            if callsign != self.user:
+                self.logger.debug('call signs differ: %s' % callsign)
+                if sock:
+                    sock.close()
+                return False
 
-            if status != "verified," and passwd != "-1":
-                self.logger.debug('invalid password: %s' % str(e))
+            if status != "verified," and self.passwd != "-1":
+                self.logger.debug('invalid APRS-IS password for given call sign')
+                if sock:
+                    sock.close()
+                return False
 
+            sock.close()
 
-
-        except (ConnectionError):
+        except ConnectionError as e:
             self.logger.debug('Socket Exception: %s' % str(e))
-
-
+            return False
 
         except socket.gaierror as e:
-            self.logger.warning(
-                'A connection error occurred sending RSyslog '
-                'notification to %s:%d/%s', host, port,
-                SYSLOG_FACILITY_RMAP[self.facility]
-            )
             self.logger.debug('Socket Exception: %s' % str(e))
             return False
 
         except socket.timeout as e:
-            self.logger.warning(
-                'A connection timeout occurred sending RSyslog '
-                'notification to %s:%d/%s', host, port,
-                SYSLOG_FACILITY_RMAP[self.facility]
-            )
-            self.logger.debug('Socket Exception: %s' % str(e))
+            self.logger.debug('Socket Timeout Exception: %s' % str(e))
             return False
 
         if sent < len(payload):
@@ -336,7 +333,7 @@ class NotifyAprs(NotifyBase):
                 sent, len(payload))
             return False
 
-        self.logger.info('Sent RSyslog notification.')
+        self.logger.info('Sent APRS-IS notification.')
 
         return True
 
