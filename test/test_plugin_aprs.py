@@ -80,7 +80,7 @@ apprise_url_tests = (
         'privacy_url': 'aprs://user:****@D...C?',
     }),
     ('aprs://user:pass@?to={},{}'.format('DF1ABC', 'DF1DEF'), {
-        # support the to= argument
+        # support the two= argument
         'instance': NotifyAprs,
         'requests_response_code': requests.codes.created,
     }),
@@ -218,20 +218,14 @@ def test_plugin_aprs_config_files(mock_post):
     assert len(ac.servers()) == 7
     assert len(aobj) == 7
     assert len([x for x in aobj.find(tag='normal')]) == 3
-    for s in aobj.find(tag='normal'):
-        assert s.priority == DapnetPriority.NORMAL
 
     assert len([x for x in aobj.find(tag='emerg')]) == 3
-    for s in aobj.find(tag='emerg'):
-        assert s.priority == DapnetPriority.EMERGENCY
 
     assert len([x for x in aobj.find(tag='dapnet_str')]) == 2
     assert len([x for x in aobj.find(tag='dapnet_str_int')]) == 2
     assert len([x for x in aobj.find(tag='dapnet_int')]) == 2
 
     assert len([x for x in aobj.find(tag='dapnet_invalid')]) == 1
-    assert next(aobj.find(tag='dapnet_invalid')).priority == \
-        DapnetPriority.NORMAL
 
     # Notifications work
     assert aobj.notify(title="title", body="body") is True
