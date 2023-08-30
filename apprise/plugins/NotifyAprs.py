@@ -81,21 +81,6 @@ APRS_LOCALES = {
 }
 
 
-APRS_LOCALES_MAP = {
-    'n': AprsLocale.NOAM,
-    's': AprsLocale.SOAM,
-    'e': AprsLocale.EURO,
-    'a': AprsLocale.ASIA,
-    'z': AprsLocale.AUNZ,
-
-    '0': AprsLocale.NOAM,
-    '1': AprsLocale.SOAM,
-    '2': AprsLocale.SOAM,
-    '3': AprsLocale.ASIA,
-    '4': AprsLocale.AUNZ,
-}
-
-
 class NotifyAprs(NotifyBase):
     """
     A wrapper for APRS Notifications
@@ -175,15 +160,9 @@ class NotifyAprs(NotifyBase):
             },
             'locale': {
                 'name': _('Locale'),
-                'type': 'choice:int',
+                'type': 'choice:string',
                 'values': APRS_LOCALES,
                 'default': AprsLocale.EURO,
-            },
-            'txgroups': {
-                'name': _('Transmitter Groups'),
-                'type': 'string',
-                'default': 'dl-all',
-                'private': True,
             },
             'batch': {
                 'name': _('Batch Mode'),
@@ -196,26 +175,28 @@ class NotifyAprs(NotifyBase):
     def __init__(self, targets=None, priority=None, txgroups=None,
                  batch=False, **kwargs):
         """
-        Initialize Dapnet Object
+        Initialize APRS Object
         """
         super().__init__(**kwargs)
 
         # Parse our targets
         self.targets = list()
 
-        # The Priority of the message
-        self.priority = int(
-            NotifyAprs.template_args['priority']['default']
-            if priority is None else
-            next((
-                v for k, v in APRS_LOCALES_MAP.items()
-                if str(priority).lower().startswith(k)),
-                NotifyAprs.template_args['priority']['default']))
+        # Get the APRS-IS target server
+        self.locale = NotifyAprs.template_args['locale']['default']
 
         if not (self.user and self.password):
             msg = 'An APRS user/pass was not provided.'
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        if self.password == "-1":
+            msg = 'An APRS user/pass was not provided.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
+
+
 
         # Get the transmitter group
         self.txgroups = parse_list(
