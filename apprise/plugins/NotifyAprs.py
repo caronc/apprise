@@ -191,7 +191,7 @@ class NotifyAprs(NotifyBase):
             raise TypeError(msg)
 
         if self.password == "-1":
-            msg = 'An APRS user/pass was not provided.'
+            msg = 'APRS read-only passwords are not supported.'
             self.logger.warning(msg)
             raise TypeError(msg)
 
