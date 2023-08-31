@@ -172,7 +172,7 @@ class NotifyAprs(NotifyBase):
         }
     )
 
-    def __init__(self, targets=None, priority=None, txgroups=None,
+    def __init__(self, targets=None, locale=APRS_LOCALES.EURO,
                  batch=False, **kwargs):
         """
         Initialize APRS Object
@@ -199,9 +199,9 @@ class NotifyAprs(NotifyBase):
 
 
         # Get the transmitter group
-        self.txgroups = parse_list(
-            NotifyAprs.template_args['txgroups']['default']
-            if not txgroups else txgroups)
+        self.locale = parse_list(
+            NotifyAprs.template_args['locale']['default']
+            if not locale else locale)
 
         # Prepare Batch Mode Flag
         self.batch = batch
