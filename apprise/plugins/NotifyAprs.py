@@ -268,9 +268,9 @@ class NotifyAprs(NotifyBase):
             sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
             sock.settimeout(self.socket_connect_timeout)
             sock.setblocking(1)
-            sock.bind(host,port)
+            sock.connect((host,port))
             self.logger.debug(
-                'bind successful')
+                'connect successful')
             if is_py3:
                 payload = payload.encode('utf-8')
             sent = sock.sendto(payload)
