@@ -33,7 +33,8 @@
 # Base
 FROM python:3.6-buster
 RUN apt-get update && \
-    apt-get install -y libdbus-1-dev libgirepository1.0-dev build-essential musl-dev bash
+    apt-get install -y libdbus-1-dev libgirepository1.0-dev build-essential musl-dev bash && \
+    rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir dbus-python PyGObject
 
 # Apprise Setup
