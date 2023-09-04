@@ -251,9 +251,8 @@ class NotifyAprs(NotifyBase):
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
-        host = self.host
-        port = self.notify_port if self.notify_port \
-            else self.template_tokens['notify_port']['default']
+        host = APRS_LOCALES[self.locale]
+        port = self.notify_port
 
         # our sent bytes
         sent = 0
@@ -261,17 +260,20 @@ class NotifyAprs(NotifyBase):
         # check if we run on Python 3
         is_py3 = True if sys.version_info[0] >= 3 else False
 
-        login_str = "user {0} pass {1} vers aprslib {3}{2}\r\n".format(self.user,self.password, 1,0)
+        login_str = "user {0} pass {1} vers apprise {3}{2}\r\n".format(self.user,self.password, 1,0)
         self.logger.info(
             'Sending login information to APRS-IS')
 
         try:
-            sock = socket.socket(socket.AF_INET)
+            sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
             sock.settimeout(self.socket_connect_timeout)
             sock.setblocking(1)
+            sock.bind(host,port)
+            self.logger.debug(
+                'bind successful')
             if is_py3:
                 payload = payload.encode('utf-8')
-            sent = sock.sendto(payload, (host, port))
+            sent = sock.sendto(payload)
 
             self.sock.settimeout(5)
             test = self.sock.recv(len(login_str) + 100)
