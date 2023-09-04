@@ -62,6 +62,7 @@ from ..utils import is_call_sign
 from ..utils import parse_call_sign
 from ..utils import parse_list
 from ..utils import parse_bool
+import re
 
 
 # fixed APRS-IS server locales
@@ -260,28 +261,36 @@ class NotifyAprs(NotifyBase):
         # check if we run on Python 3
         is_py3 = True if sys.version_info[0] >= 3 else False
 
-        login_str = "user {0} pass {1} vers apprise {3}{2}\r\n".format(self.user,self.password, 1,0)
+        login_str = "user {0} pass {1} vers aprs {3}{2}\r\n".format(self.user,self.password, 1,0)
         self.logger.info(
-            'Sending login information to APRS-IS')
+            'Creating socket connection to APRS-IS')
 
         try:
-            sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-            sock.settimeout(self.socket_connect_timeout)
+            sock=socket.create_connection((host,port),15)
+            h, p = sock.getpeername()
+
+            self.logger.info(
+                'Connected to {}:{}'.format(h,p))
+
             sock.setblocking(1)
-            sock.connect((host,port))
-            self.logger.debug(
-                'connect successful')
+
+            self.logger.info(
+                'Sending login information to APRS-IS')
+
             if is_py3:
                 payload = payload.encode('utf-8')
-            sent = sock.sendto(payload)
+            sent = sock.sendall(login_str.encode())
 
-            self.sock.settimeout(5)
-            test = self.sock.recv(len(login_str) + 100)
+            test = sock.recv(len(login_str) + 100)
             if is_py3:
                 test = test.decode('latin-1')
             test = test.rstrip()
 
             self.logger.debug("Server: %s", test)
+
+            testlines = test.splitlines()
+            if len(testlines) > 1:
+                test=testlines[1]
 
             _, _, callsign, status, _ = test.split(' ', 4)
 
@@ -298,12 +307,13 @@ class NotifyAprs(NotifyBase):
                     sock.close()
                 return False
 
-            if status != "verified," and self.passwd != "-1":
+            if status == "unverified,":
                 self.logger.debug('invalid APRS-IS password for given call sign')
                 if sock:
                     sock.close()
                 return False
 
+            self.logger.info("Connection successful to {}:{}".format(host, port))
             sock.close()
 
         except ConnectionError as e:
@@ -318,10 +328,8 @@ class NotifyAprs(NotifyBase):
             self.logger.debug('Socket Timeout Exception: %s' % str(e))
             return False
 
-        if sent < len(payload):
-            self.logger.warning(
-                'RSyslog sent %d byte(s) but intended to send %d byte(s)',
-                sent, len(payload))
+        except Exception as e:
+            self.logger.debug('Socket Exception: %s' % str(e))
             return False
 
         self.logger.info('Sent APRS-IS notification.')
