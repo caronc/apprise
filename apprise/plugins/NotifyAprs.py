@@ -156,7 +156,7 @@ class NotifyAprs(NotifyBase):
                 'name': _('Locale'),
                 'type': 'choice:string',
                 'values': APRS_LOCALES,
-                'default': APRS_LOCALES["EURO"],
+                'default': 'EURO',
             },
             'batch': {
                 'name': _('Batch Mode'),
