@@ -64,20 +64,14 @@ from ..utils import parse_list
 from ..utils import parse_bool
 
 
-class AprsLocale:
-    NOAM = 0
-    SOAM = 1
-    EURO = 2
-    ASIA = 3
-    AUNZ = 4
-
-
+# fixed APRS-IS server locales
+# default is "EURO"
 APRS_LOCALES = {
-    AprsLocale.NOAM: 'noam.aprs2.net',
-    AprsLocale.SOAM: 'soam.aprs2.net',
-    AprsLocale.EURO: 'euro.aprs2.net',
-    AprsLocale.ASIA: 'asia.aprs2.net',
-    AprsLocale.AUNZ: 'aunz.aprs2.net',
+    "NOAM": 'noam.aprs2.net',
+    "SOAM": 'soam.aprs2.net',
+    "EURO": 'euro.aprs2.net',
+    "ASIA": 'asia.aprs2.net',
+    "AUNZ": 'aunz.aprs2.net',
 }
 
 
@@ -162,7 +156,7 @@ class NotifyAprs(NotifyBase):
                 'name': _('Locale'),
                 'type': 'choice:string',
                 'values': APRS_LOCALES,
-                'default': AprsLocale.EURO,
+                'default': APRS_LOCALES["EURO"],
             },
             'batch': {
                 'name': _('Batch Mode'),
@@ -172,7 +166,7 @@ class NotifyAprs(NotifyBase):
         }
     )
 
-    def __init__(self, targets=None, locale=APRS_LOCALES.EURO,
+    def __init__(self, targets=None, locale=None,
                  batch=False, **kwargs):
         """
         Initialize APRS Object
@@ -182,29 +176,43 @@ class NotifyAprs(NotifyBase):
         # Parse our targets
         self.targets = list()
 
-        # Get the APRS-IS target server
-        self.locale = NotifyAprs.template_args['locale']['default']
-
+        """
+        Check if the user has provided credentials
+        """
         if not (self.user and self.password):
             msg = 'An APRS user/pass was not provided.'
             self.logger.warning(msg)
             raise TypeError(msg)
 
+        """
+        Check if the user tries to use a read-only access
+        to APRS-IS. We need to send content, meaning that
+        read-only access will not work
+        """
         if self.password == "-1":
             msg = 'APRS read-only passwords are not supported.'
             self.logger.warning(msg)
             raise TypeError(msg)
 
+        """
+        Check if the user has provided a locale for the 
+        APRS-IS-server and validate it, if necessary
+        """
+        if locale:
+            locale = locale.upper()
+            if locale not in APRS_LOCALES:
+                msg = 'Unsupported APRS-IS locale. Valid:({}).'.format(APRS_LOCALES.keys())
+                self.logger.warning(msg)
+                raise TypeError(msg)
 
-
-
-        # Get the transmitter group
-        self.locale = parse_list(
-            NotifyAprs.template_args['locale']['default']
-            if not locale else locale)
+        # Set the transmitter group
+        self.locale = NotifyAprs.template_args['locale']['default'] if not locale else locale
 
         # Prepare Batch Mode Flag
         self.batch = batch
+
+        # Set fixed port number
+        self.notify_port = 10152
 
         for target in parse_call_sign(targets):
             # Validate targets and drop bad ones:
