@@ -252,8 +252,8 @@ class NotifyAprs(NotifyBase):
         # Always call throttle before any remote server i/o is made
         self.throttle()
         host = self.host
-        port = self.port if self.port \
-            else self.template_tokens['port']['default']
+        port = self.notify_port if self.notify_port \
+            else self.template_tokens['notify_port']['default']
 
         # our sent bytes
         sent = 0
