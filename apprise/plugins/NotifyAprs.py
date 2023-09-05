@@ -96,12 +96,18 @@ class NotifyAprs(NotifyBase):
     # APRS default server
     notify_url = 'euro.aprs2.net'
 
+    # Our (future) socket sobject
+    sock = None
+
     # APRS default port, supported by all core servers
     # Details: https://www.aprs-is.net/Connecting.aspx
     notify_port = 10152
 
     # The maximum length of the body
     body_maxlen = 67
+
+    # socket timeout in seconds
+    socket_timeout = 15
 
     # A title can not be used for APRS Messages.  Setting this to zero will
     # cause any title (if defined) to get placed into the message body.
@@ -196,6 +202,14 @@ class NotifyAprs(NotifyBase):
             raise TypeError(msg)
 
         """
+        Check if the password is numeric
+        """
+        if not self.password.isnumeric():
+            msg = 'Invalid APRS-IS password'
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
+        """
         Check if the user has provided a locale for the 
         APRS-IS-server and validate it, if necessary
         """
@@ -212,11 +226,10 @@ class NotifyAprs(NotifyBase):
         # Prepare Batch Mode Flag
         self.batch = batch
 
-        # Set fixed port number
-        self.notify_port = 10152
-
         for target in parse_call_sign(targets):
-            # Validate targets and drop bad ones:
+            # Validate targets and drop bad ones
+            # We just need to know if the call sign (including SSID, if
+            # provided) is valid and can then process the input as is
             result = is_call_sign(target)
             if not result:
                 self.logger.warning(
@@ -225,11 +238,225 @@ class NotifyAprs(NotifyBase):
                 )
                 continue
 
-            # Store callsign without SSID and ignore duplicates
-            if result['callsign'] not in self.targets:
-                self.targets.append(result['callsign'])
+            # Convert the call sign to upper case and
+            # try to add it to our list of targets
+            target_upper = target.upper()
+
+            # Store call sign as is and ignore duplicates
+            if target_upper not in self.targets:
+                self.targets.append(target_upper)
 
         return
+
+    def socket_close(self):
+        """
+        Closes the socket connection whereas present
+        """
+        if self.sock:
+            try:
+                self.sock.close()
+
+            except socket.gaierror as e:
+                self.logger.debug('Socket Exception: %s' % str(e))
+                self.sock = None
+                return False
+
+            except socket.timeout as e:
+                self.logger.debug('Socket Timeout Exception: %s' % str(e))
+                self.sock = None
+                return False
+
+            except Exception as e:
+                self.logger.debug('General Exception: %s' % str(e))
+                self.sock = None
+                return False
+
+        self.sock = None
+
+    def socket_open(self):
+        """
+        Establishes the connection to the APRS-IS
+        socket server
+        """
+        self.logger.info(
+            'Creating socket connection with APRS-IS')
+
+        try:
+            self.sock=socket.create_connection((APRS_LOCALES[self.locale],self.notify_port),self.socket_timeout)
+
+        except ConnectionError as e:
+            self.logger.debug('Socket Exception: %s' % str(e))
+            self.sock = None
+            return False
+
+        except socket.gaierror as e:
+            self.logger.debug('Socket Exception: %s' % str(e))
+            self.sock = None
+            return False
+
+        except socket.timeout as e:
+            self.logger.debug('Socket Timeout Exception: %s' % str(e))
+            self.sock = None
+            return False
+
+        except Exception as e:
+            self.logger.debug('General Exception: %s' % str(e))
+            self.sock = None
+            return False
+
+        # We are connected.
+        # Get the physical host/port of the server
+        host, port = self.sock.getpeername()
+
+        # and create debug info
+        self.logger.info(
+                'Connected to {}:{}'.format(host, port))
+
+        # Return success
+        return True
+
+    def aprsis_login(self):
+        """
+        Generate the APRS-IS login string, send it to the server
+        and parse the response
+
+        Returns True/False wrt whether the login was successful
+        """
+
+        # Check if we are connected
+        if not self.sock:
+            self.logger.info(
+                'Not connected to APRS-IS')
+            return False
+
+        # APRS-IS login string
+        login_str = "user {0} pass {1} vers aprs {3}{2}\r\n".format(self.user,self.password, 1,0)
+
+        self.logger.info(
+            'Sending login information to APRS-IS')
+
+        # Send the data & abort in case of error
+        if not self.socket_send(login_str):
+            self.logger.debug(
+                'Login to APRS-IS unsuccessful, exception occurred')
+            self.socket_close()
+            return False
+
+        rx_buf = self.socket_receive(len(login_str)+100)
+        # Abort the remaining process in case an error has occurred
+        if not rx_buf:
+            self.logger.debug(
+                'Login to APRS-IS unsuccessful, exception occurred')
+            self.socket_close()
+            return False
+
+            rx_lines = rb_buf.splitlines()
+            if len(rx_lines) < 1:
+                self.logger.debug(
+                    'Incorrect APRS-IS rx header?')
+                self.socket_close()
+                return False
+
+            # We need the content from the 2nd line
+            # of the server's response
+            _, _, callsign, status, _ = rx_lines[1].split(' ', 4)
+
+            # check if we were able to log in
+            if callsign == "":
+                self.logger.debug('Did not receive call sign from APRS-IS')
+                self.socket_close()
+                return False
+
+            if callsign != self.user:
+                self.logger.debug('call signs differ: %s' % callsign)
+                self.socket_close()
+                return False
+
+            if status == "unverified,":
+                self.logger.debug('invalid APRS-IS password for given call sign')
+                self.socket_close()
+                return False
+
+            # all validations are successful; we are connected
+            return True
+
+    def socket_send(self, tx_data):
+        """
+        Generic "Send data to a socket"
+        """
+
+        # Check if we are connected
+        if not self.sock:
+            self.logger.info(
+                'Not connected to APRS-IS')
+            return False
+
+        self.logger.debug(
+            'Sending data to APRS-IS')
+
+        payload = tx_data.encode('utf-8') if sys.version_info[0] >= 3 else tx_data
+
+        try:
+            self.sock.sendall(payload)
+
+        except socket.gaierror as e:
+            self.logger.debug('Socket Exception: %s' % str(e))
+            self.sock = None
+            return False
+
+        except socket.timeout as e:
+            self.logger.debug('Socket Timeout Exception: %s' % str(e))
+            self.sock = None
+            return False
+
+        except Exception as e:
+            self.logger.debug('General Exception: %s' % str(e))
+            self.sock = None
+            return False
+
+        return True
+
+    def socket_receive(self, rx_len):
+        """
+        Generic "Receive data from a socket"
+        """
+
+        # Check if we are connected
+        if not self.sock:
+            self.logger.info(
+                'Not connected to APRS-IS')
+            return False
+
+        self.logger.debug(
+            'Receiving data from APRS-IS')
+
+        # Receive content from the socket
+        try:
+            rx_buf = self.sock.recv(rx_len)
+
+        except ConnectionError as e:
+            self.logger.debug('Socket Exception: %s' % str(e))
+            self.sock = None
+            return None
+
+        except socket.gaierror as e:
+            self.logger.debug('Socket Exception: %s' % str(e))
+            self.sock = None
+            return None
+
+        except socket.timeout as e:
+            self.logger.debug('Socket Timeout Exception: %s' % str(e))
+            self.sock = None
+            return None
+
+        except Exception as e:
+            self.logger.debug('General Exception: %s' % str(e))
+            self.sock = None
+            return None
+
+        rx_buf = rx_buf.decode('latin-1') if sys.version_info[0] >= 3 else rx_buf
+
+        return rx_buf.rstrip()
 
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
@@ -240,7 +467,7 @@ class NotifyAprs(NotifyBase):
         if not self.targets:
             # There is no one to notify; we're done
             self.logger.warning(
-                'There are no amateur radio callsigns to notify')
+                'There are no amateur radio call signs to notify')
             return False
 
         # prepare payload
@@ -252,86 +479,29 @@ class NotifyAprs(NotifyBase):
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
-        host = APRS_LOCALES[self.locale]
-        port = self.notify_port
 
-        # our sent bytes
-        sent = 0
-
-        # check if we run on Python 3
-        is_py3 = True if sys.version_info[0] >= 3 else False
-
-        login_str = "user {0} pass {1} vers aprs {3}{2}\r\n".format(self.user,self.password, 1,0)
+        # Create the connection
         self.logger.info(
-            'Creating socket connection to APRS-IS')
+            'Connecting to APRS-IS')
 
-        try:
-            sock=socket.create_connection((host,port),15)
-            h, p = sock.getpeername()
-
-            self.logger.info(
-                'Connected to {}:{}'.format(h,p))
-
-            sock.setblocking(1)
-
-            self.logger.info(
-                'Sending login information to APRS-IS')
-
-            if is_py3:
-                payload = payload.encode('utf-8')
-            sent = sock.sendall(login_str.encode())
-
-            test = sock.recv(len(login_str) + 100)
-            if is_py3:
-                test = test.decode('latin-1')
-            test = test.rstrip()
-
-            self.logger.debug("Server: %s", test)
-
-            testlines = test.splitlines()
-            if len(testlines) > 1:
-                test=testlines[1]
-
-            _, _, callsign, status, _ = test.split(' ', 4)
-
-            # check if we were able to log in
-            if callsign == "":
-                self.logger.debug('Did not receive call sign from APRS-IS')
-                if sock:
-                    sock.close()
-                return False
-
-            if callsign != self.user:
-                self.logger.debug('call signs differ: %s' % callsign)
-                if sock:
-                    sock.close()
-                return False
-
-            if status == "unverified,":
-                self.logger.debug('invalid APRS-IS password for given call sign')
-                if sock:
-                    sock.close()
-                return False
-
-            self.logger.info("Connection successful to {}:{}".format(host, port))
-            sock.close()
-
-        except ConnectionError as e:
-            self.logger.debug('Socket Exception: %s' % str(e))
+        # Try to open the socket
+        # sock object is "None" if we were unable to establish a connection
+        # In case of errors, the error message has already been sent
+        # to the logger object
+        if not self.socket_open():
             return False
 
-        except socket.gaierror as e:
-            self.logger.debug('Socket Exception: %s' % str(e))
+        # test
+        self.sock.setblocking(1)
+
+        # We have established a successful connection
+        # to the socket server. Now send the login information
+        if not self.aprsis_login():
             return False
 
-        except socket.timeout as e:
-            self.logger.debug('Socket Timeout Exception: %s' % str(e))
-            return False
+        # Login & authorization confirmed
 
-        except Exception as e:
-            self.logger.debug('Socket Exception: %s' % str(e))
-            return False
-
+        self.socket_close()
         self.logger.info('Sent APRS-IS notification.')
 
         return True
