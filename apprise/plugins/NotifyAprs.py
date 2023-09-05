@@ -278,7 +278,9 @@ class NotifyAprs(NotifyBase):
         socket server
         """
         self.logger.info(
-            'Creating socket connection with APRS-IS')
+            'Creating socket connection with APRS-IS {}:{}'
+            .format(APRS_LOCALES[self.locale],
+                    self.notify_port))
 
         try:
             self.sock = socket.create_connection((APRS_LOCALES[self.locale],
@@ -339,48 +341,55 @@ class NotifyAprs(NotifyBase):
 
         # Send the data & abort in case of error
         if not self.socket_send(login_str):
-            self.logger.debug(
+            self.logger.info(
                 'Login to APRS-IS unsuccessful, exception occurred')
             self.socket_close()
             return False
 
         rx_buf = self.socket_receive(len(login_str)+100)
         # Abort the remaining process in case an error has occurred
-        if not rx_buf:
-            self.logger.debug(
-                'Login to APRS-IS unsuccessful, exception occurred')
+        if rx_buf == "":
+            self.logger.debug('Login to APRS-IS unsuccessful, exception occurred')
             self.socket_close()
             return False
 
-            rx_lines = rb_buf.splitlines()
-            if len(rx_lines) < 1:
-                self.logger.debug(
-                    'Incorrect APRS-IS rx header?')
-                self.socket_close()
-                return False
+        # APRS-IS sends at least two lines of data
+        # The data that we need is in line #2 so
+        # let's split the  content and see what we have
+        rx_lines = rx_buf.splitlines()
+        if len(rx_lines) < 2:
+            self.logger.info(
+                'Incorrect APRS-IS rx header - need > 1 lines')
+            self.socket_close()
+            return False
 
-            # We need the content from the 2nd line
-            # of the server's response
+        # Now split the 2nd line's content and extract
+        # both call sign and login status
+        try:
             _, _, callsign, status, _ = rx_lines[1].split(' ', 4)
+        except IndexError:
+            self.logger.debug('Received invalid response from APRS-IS')
+            self.socket_close()
+            return False
 
-            # check if we were able to log in
-            if callsign == "":
-                self.logger.debug('Did not receive call sign from APRS-IS')
-                self.socket_close()
-                return False
+        # check if we were able to log in
+        if callsign == "":
+            self.logger.debug('Did not receive call sign from APRS-IS')
+            self.socket_close()
+            return False
 
-            if callsign != self.user:
-                self.logger.debug('call signs differ: %s' % callsign)
-                self.socket_close()
-                return False
+        if callsign != self.user:
+            self.logger.debug('call signs differ: %s' % callsign)
+            self.socket_close()
+            return False
 
-            if status == "unverified,":
-                self.logger.debug('invalid APRS-IS password for given call sign')
-                self.socket_close()
-                return False
+        if status == "unverified,":
+            self.logger.debug('invalid APRS-IS password for given call sign')
+            self.socket_close()
+            return False
 
-            # all validations are successful; we are connected
-            return True
+        # all validations are successful; we are connected
+        return True
 
     def socket_send(self, tx_data):
         """
@@ -393,7 +402,7 @@ class NotifyAprs(NotifyBase):
                 'Not connected to APRS-IS')
             return False
 
-        self.logger.debug(
+        self.logger.info(
             'Sending data to APRS-IS')
 
         payload = tx_data.encode('utf-8') if sys.version_info[0] >= 3 else tx_data
@@ -402,20 +411,21 @@ class NotifyAprs(NotifyBase):
             self.sock.sendall(payload)
 
         except socket.gaierror as e:
-            self.logger.debug('Socket Exception: %s' % str(e))
+            self.logger.info('Socket Exception: %s' % str(e))
             self.sock = None
             return False
 
         except socket.timeout as e:
-            self.logger.debug('Socket Timeout Exception: %s' % str(e))
+            self.logger.info('Socket Timeout Exception: %s' % str(e))
             self.sock = None
             return False
 
         except Exception as e:
-            self.logger.debug('General Exception: %s' % str(e))
+            self.logger.info('General Exception: %s' % str(e))
             self.sock = None
             return False
 
+        self.logger.info('Send successful')
         return True
 
     def socket_receive(self, rx_len):
@@ -429,7 +439,7 @@ class NotifyAprs(NotifyBase):
                 'Not connected to APRS-IS')
             return False
 
-        self.logger.debug(
+        self.logger.info(
             'Receiving data from APRS-IS')
 
         # Receive content from the socket
@@ -437,27 +447,27 @@ class NotifyAprs(NotifyBase):
             rx_buf = self.sock.recv(rx_len)
 
         except ConnectionError as e:
-            self.logger.debug('Socket Exception: %s' % str(e))
+            self.logger.info('Socket Exception: %s' % str(e))
             self.sock = None
-            return None
+            rx_buf = ""
 
         except socket.gaierror as e:
-            self.logger.debug('Socket Exception: %s' % str(e))
+            self.logger.info('Socket Exception: %s' % str(e))
             self.sock = None
-            return None
+            rx_buf = ""
 
         except socket.timeout as e:
-            self.logger.debug('Socket Timeout Exception: %s' % str(e))
+            self.logger.info('Socket Timeout Exception: %s' % str(e))
             self.sock = None
-            return None
+            rx_buf = ""
 
         except Exception as e:
-            self.logger.debug('General Exception: %s' % str(e))
+            self.logger.info('General Exception: %s' % str(e))
             self.sock = None
-            return None
+            rx_buf= ""
 
         rx_buf = rx_buf.decode('latin-1') if sys.version_info[0] >= 3 else rx_buf
-
+        self.logger.info('Received content: {}'.format(rx_buf))
         return rx_buf.rstrip()
 
 
@@ -481,10 +491,6 @@ class NotifyAprs(NotifyBase):
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
-
-        # Create the connection
-        self.logger.info(
-            'Connecting to APRS-IS')
 
         # Try to open the socket
         # sock object is "None" if we were unable to establish a connection
