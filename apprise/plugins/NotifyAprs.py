@@ -63,6 +63,8 @@ from ..utils import parse_call_sign
 from ..utils import parse_list
 from ..utils import parse_bool
 from .. import __version__
+import re
+from unidecode import unidecode
 
 # fixed APRS-IS server locales
 # default is "EURO"
@@ -162,7 +164,7 @@ class NotifyAprs(NotifyBase):
                 'name': _('Locale'),
                 'type': 'choice:string',
                 'values': APRS_LOCALES,
-                'default': 'EURO',
+                'default': 'AUNZ',
             },
             'batch': {
                 'name': _('Batch Mode'),
@@ -256,17 +258,17 @@ class NotifyAprs(NotifyBase):
                 self.sock.close()
 
             except socket.gaierror as e:
-                self.logger.debug('Socket Exception: %s' % str(e))
+                self.logger.debug('Socket Exception socket_close: %s' % str(e))
                 self.sock = None
                 return False
 
             except socket.timeout as e:
-                self.logger.debug('Socket Timeout Exception: %s' % str(e))
+                self.logger.debug('Socket Timeout Exception socket_close: %s' % str(e))
                 self.sock = None
                 return False
 
             except Exception as e:
-                self.logger.debug('General Exception: %s' % str(e))
+                self.logger.debug('General Exception socket_close: %s' % str(e))
                 self.sock = None
                 return False
 
@@ -288,22 +290,22 @@ class NotifyAprs(NotifyBase):
                                                  self.socket_timeout)
 
         except ConnectionError as e:
-            self.logger.debug('Socket Exception: %s' % str(e))
+            self.logger.debug('Socket Exception socket_open: %s' % str(e))
             self.sock = None
             return False
 
         except socket.gaierror as e:
-            self.logger.debug('Socket Exception: %s' % str(e))
+            self.logger.debug('Socket Exception socket_open: %s' % str(e))
             self.sock = None
             return False
 
         except socket.timeout as e:
-            self.logger.debug('Socket Timeout Exception: %s' % str(e))
+            self.logger.debug('Socket Timeout Exception socket_open: %s' % str(e))
             self.sock = None
             return False
 
         except Exception as e:
-            self.logger.debug('General Exception: %s' % str(e))
+            self.logger.debug('General Exception socket_open: %s' % str(e))
             self.sock = None
             return False
 
@@ -348,7 +350,7 @@ class NotifyAprs(NotifyBase):
 
         rx_buf = self.socket_receive(len(login_str)+100)
         # Abort the remaining process in case an error has occurred
-        if rx_buf == "":
+        if not rx_buf:
             self.logger.debug('Login to APRS-IS unsuccessful, exception occurred')
             self.socket_close()
             return False
@@ -359,7 +361,7 @@ class NotifyAprs(NotifyBase):
         rx_lines = rx_buf.splitlines()
         if len(rx_lines) < 2:
             self.logger.info(
-                'Incorrect APRS-IS rx header - need > 1 lines')
+                'Incorrect APRS-IS rx header - needs to have at least 2 lines')
             self.socket_close()
             return False
 
@@ -373,7 +375,7 @@ class NotifyAprs(NotifyBase):
             return False
 
         # check if we were able to log in
-        if callsign == "":
+        if not callsign:
             self.logger.debug('Did not receive call sign from APRS-IS')
             self.socket_close()
             return False
@@ -405,23 +407,31 @@ class NotifyAprs(NotifyBase):
         self.logger.info(
             'Sending data to APRS-IS')
 
+        # remove all characters that would break APRS
+        # see https://www.aprs.org/doc/APRS101.PDF pg. 71
+        tx_data = re.sub("[{}|~]+", "", tx_data)
+
+        # Unidecode removes e.g. Umlauts and replaces them with
+        # the next best character - APRS only support ASCII 7-bit
+        tx_data = unidecode(tx_data)
+
         payload = tx_data.encode('utf-8') if sys.version_info[0] >= 3 else tx_data
 
         try:
             self.sock.sendall(payload)
 
         except socket.gaierror as e:
-            self.logger.info('Socket Exception: %s' % str(e))
+            self.logger.info('Socket Exception socket_send: %s' % str(e))
             self.sock = None
             return False
 
         except socket.timeout as e:
-            self.logger.info('Socket Timeout Exception: %s' % str(e))
+            self.logger.info('Socket Timeout Exception socket_send: %s' % str(e))
             self.sock = None
             return False
 
         except Exception as e:
-            self.logger.info('General Exception: %s' % str(e))
+            self.logger.info('General Exception socket_send: %s' % str(e))
             self.sock = None
             return False
 
@@ -447,22 +457,22 @@ class NotifyAprs(NotifyBase):
             rx_buf = self.sock.recv(rx_len)
 
         except ConnectionError as e:
-            self.logger.info('Socket Exception: %s' % str(e))
+            self.logger.info('Socket Exception socket_receive: %s' % str(e))
             self.sock = None
             rx_buf = ""
 
         except socket.gaierror as e:
-            self.logger.info('Socket Exception: %s' % str(e))
+            self.logger.info('Socket Exception socket_receive: %s' % str(e))
             self.sock = None
             rx_buf = ""
 
         except socket.timeout as e:
-            self.logger.info('Socket Timeout Exception: %s' % str(e))
+            self.logger.info('Socket Timeout Exception socket_receive: %s' % str(e))
             self.sock = None
             rx_buf = ""
 
         except Exception as e:
-            self.logger.info('General Exception: %s' % str(e))
+            self.logger.info('General Exception socket_receive: %s' % str(e))
             self.sock = None
             rx_buf= ""
 
