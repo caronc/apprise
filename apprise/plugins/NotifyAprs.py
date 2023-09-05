@@ -445,6 +445,13 @@ class NotifyAprs(NotifyBase):
         self.logger.info('Send successful')
         return True
 
+    def socket_reset(self):
+        """
+        Resets the socket's buffer
+        """
+        _ = self.socket_receive(0)
+        return True
+
     def socket_receive(self, rx_len):
         """
         Generic "Receive data from a socket"
@@ -525,6 +532,8 @@ class NotifyAprs(NotifyBase):
             return False
 
         # Login & authorization confirmed
+        # reset what is in our buffer
+        self.socket_reset()
 
         self.socket_close()
         self.logger.info('Sent APRS-IS notification.')
