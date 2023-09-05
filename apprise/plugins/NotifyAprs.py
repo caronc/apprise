@@ -164,7 +164,7 @@ class NotifyAprs(NotifyBase):
                 'name': _('Locale'),
                 'type': 'choice:string',
                 'values': APRS_LOCALES,
-                'default': 'AUNZ',
+                'default': 'EURO',
             },
             'batch': {
                 'name': _('Batch Mode'),
@@ -310,12 +310,17 @@ class NotifyAprs(NotifyBase):
             return False
 
         # We are connected.
-        # Get the physical host/port of the server
-        host, port = self.sock.getpeername()
+        # getpeername is not supported for every OS
 
-        # and create debug info
-        self.logger.info(
-                'Connected to {}:{}'.format(host, port))
+        try:
+            # Get the physical host/port of the server
+            host, port = self.sock.getpeername()
+            # and create debug info
+            self.logger.info(
+                    'Connected to {}:{}'.format(host, port))
+        except ValueError:
+            # Create a minimal log file entry
+            self.logger.info('Connected to APRS-IS')
 
         # Return success
         return True
@@ -336,7 +341,9 @@ class NotifyAprs(NotifyBase):
 
         # APRS-IS login string, see https://www.aprs-is.net/Connecting.aspx
         login_str = "user {0} pass {1} vers apprise {2}\r\n"\
-            .format(self.user,self.password, __version__)
+            .format(self.user,self.password,__version__)
+
+       # login_str = "user {0} pass {1} vers aprs {3}{2}\r\n".format(self.user, self.password, 1, 0)
 
         self.logger.info(
             'Sending login information to APRS-IS')
@@ -409,11 +416,11 @@ class NotifyAprs(NotifyBase):
 
         # remove all characters that would break APRS
         # see https://www.aprs.org/doc/APRS101.PDF pg. 71
-        tx_data = re.sub("[{}|~]+", "", tx_data)
+        #tx_data = re.sub("[{}|~]+", "", tx_data)
 
         # Unidecode removes e.g. Umlauts and replaces them with
         # the next best character - APRS only support ASCII 7-bit
-        tx_data = unidecode(tx_data)
+        #tx_data = unidecode(tx_data)
 
         payload = tx_data.encode('utf-8') if sys.version_info[0] >= 3 else tx_data
 
