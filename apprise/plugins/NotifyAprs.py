@@ -62,8 +62,7 @@ from ..utils import is_call_sign
 from ..utils import parse_call_sign
 from ..utils import parse_list
 from ..utils import parse_bool
-import re
-
+from .. import __version__
 
 # fixed APRS-IS server locales
 # default is "EURO"
@@ -282,7 +281,9 @@ class NotifyAprs(NotifyBase):
             'Creating socket connection with APRS-IS')
 
         try:
-            self.sock=socket.create_connection((APRS_LOCALES[self.locale],self.notify_port),self.socket_timeout)
+            self.sock = socket.create_connection((APRS_LOCALES[self.locale],
+                                                  self.notify_port),
+                                                 self.socket_timeout)
 
         except ConnectionError as e:
             self.logger.debug('Socket Exception: %s' % str(e))
@@ -329,8 +330,9 @@ class NotifyAprs(NotifyBase):
                 'Not connected to APRS-IS')
             return False
 
-        # APRS-IS login string
-        login_str = "user {0} pass {1} vers aprs {3}{2}\r\n".format(self.user,self.password, 1,0)
+        # APRS-IS login string, see https://www.aprs-is.net/Connecting.aspx
+        login_str = "user {0} pass {1} vers apprise {2}\r\n"\
+            .format(self.user,self.password, __version__)
 
         self.logger.info(
             'Sending login information to APRS-IS')
