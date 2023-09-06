@@ -32,6 +32,21 @@
 
 # To use this plugin, you need to be a licensed ham radio operator
 
+# Plugin constraints:
+#
+# - message length = 67 chars max.
+# - message content = ASCII 7 bit
+# - APRS messages will be sent without msg ID, meaning that
+#   ham radio operators cannot acknowledge them
+# - Bring your own APRS-IS passcode. If you don't know what
+#   this is or how to get it, then this plugin is not for you
+# - Do NOT change the Device/ToCall ID setting UNLESS this
+#   module is used outside of Apprise. This identifier helps
+#   the ham radio community with determining the software behind
+#   a given APRS message.
+# - With great (ham radio) power comes great responsibility; do
+#   not use this plugin for spamming other ham radio operators
+
 #
 # You're done at this point, you only need to know your user/pass that
 # you signed up with.
@@ -41,8 +56,8 @@
 #   - aprs://{user}:{password}@{callsign1}/{callsign2}
 
 # Optional parameters:
-#   - server --> APRS-IS target server to connect with
-#                Default: 'euro.aprs2.net'
+#   - locale --> APRS-IS target server to connect with
+#                Default: EURO --> 'euro.aprs2.net'
 #                Details: https://www.aprs2.net/
 
 #
@@ -65,6 +80,7 @@ from ..utils import parse_bool
 from .. import __version__
 import re
 from unidecode import unidecode
+import time
 
 # fixed APRS-IS server locales
 # default is "EURO"
@@ -120,14 +136,23 @@ class NotifyAprs(NotifyBase):
     #
     #device_id = 'APPRS'
     device_id = 'APRS'
+
+    # This is the APRS call sign which will send
+    # our message
     call_sign = "APPRS"
 
     # A title can not be used for APRS Messages.  Setting this to zero will
     # cause any title (if defined) to get placed into the message body.
     title_maxlen = 0
 
+    # helps to reduce the number of errors where the
+    # APRS-IS server "isn't ready yet" after receiving the
+    # login information and then only returns an abbreviated
+    # login message
+    sleep_after_send = 0.5
+
     # The maximum amount of emails that can reside within a single transmission
-    default_batch_size = 50
+    default_batch_size = 0
 
     # Define object templates
     templates = ('{schema}://{user}:{password}@{targets}',)
@@ -377,10 +402,15 @@ class NotifyAprs(NotifyBase):
         # APRS-IS sends at least two lines of data
         # The data that we need is in line #2 so
         # let's split the  content and see what we have
+        #
+        # note: if you see this error too often,
+        # increase the value for sleep_after_send
+        # in this module
+        #
         rx_lines = rx_buf.splitlines()
         if len(rx_lines) < 2:
             self.logger.info(
-                'Incorrect APRS-IS rx header - needs to have at least 2 lines')
+                'Rx: APRS-IS msg is too short - needs to have at least two lines')
             self.socket_close()
             return False
 
@@ -447,13 +477,20 @@ class NotifyAprs(NotifyBase):
             return False
 
         self.logger.info('Send successful')
+
+        # mandatory on several APRS-IS servers
+        # helps to reduce the number of errors where
+        # the server only returns an abbreviated message
+        time.sleep(self.sleep_after_send)
         return True
 
     def socket_reset(self):
         """
         Resets the socket's buffer
         """
+        self.logger.info('Resetting socket')
         _ = self.socket_receive(0)
+        self.logger.info('reset successful')
         return True
 
     def socket_receive(self, rx_len):
@@ -467,17 +504,15 @@ class NotifyAprs(NotifyBase):
                 'Not connected to APRS-IS')
             return False
 
-        self.logger.info(
-            'Receiving data from APRS-IS')
+        # len is zero in case we intend to
+        # reset the socket
+        if rx_len > 0:
+            self.logger.info(
+                'Receiving data from APRS-IS')
 
         # Receive content from the socket
         try:
             rx_buf = self.sock.recv(rx_len)
-
-        except ConnectionError as e:
-            self.logger.info('Socket Exception socket_receive: %s' % str(e))
-            self.sock = None
-            rx_buf = ""
 
         except socket.gaierror as e:
             self.logger.info('Socket Exception socket_receive: %s' % str(e))
@@ -492,10 +527,14 @@ class NotifyAprs(NotifyBase):
         except Exception as e:
             self.logger.info('General Exception socket_receive: %s' % str(e))
             self.sock = None
-            rx_buf= ""
+            rx_buf = ""
 
         rx_buf = rx_buf.decode('latin-1') if sys.version_info[0] >= 3 else rx_buf
-        self.logger.info('Received content: {}'.format(rx_buf))
+
+        # There will be no data in case we reset the socket
+        if rx_len > 0:
+            self.logger.info('Received content: {}'.format(rx_buf))
+
         return rx_buf.rstrip()
 
 
@@ -517,10 +556,6 @@ class NotifyAprs(NotifyBase):
         else:
             payload = body
 
-        # Send in batches if identified to do so
-
-        batch_size = 1 if not self.batch else self.default_batch_size
-
         # Always call throttle before any remote server i/o is made
         self.throttle()
 
@@ -530,9 +565,6 @@ class NotifyAprs(NotifyBase):
         # to the logger object
         if not self.socket_open():
             return False
-
-        # test
-#        self.sock.setblocking(1)
 
         # We have established a successful connection
         # to the socket server. Now send the login information
@@ -551,39 +583,40 @@ class NotifyAprs(NotifyBase):
 
         # Prepare the outgoing message
         #
-        # First. remove all characters from the
+        # First remove all characters from the
         # payload that would break APRS
         # see https://www.aprs.org/doc/APRS101.PDF pg. 71
         payload = re.sub("[{}|~]+", "", payload)
         #
-        # Finally, convert to ASCII 7bit while trying to keep
+        # Then convert to ASCII 7bit while trying to keep
         # the integrity of the message intact
         # Unidecode removes e.g. Umlauts and replaces them with
         # the next best character(s)
         payload = unidecode(payload)
         #
         # Finally, constrain output string to 67 characters as
-        # APRS messages are limited in content
+        # APRS messages are limited in length
         payload = payload[:67]
 
-        for index in range(0, len(targets), batch_size):
+        for index in range(0, len(targets)):
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
 
+            # Define the pattern for the APRS body
+            # Format: Device ID/TOCALL - our call sign - target call sign - body
+            aprs_body = '{}>{}::{:9}:{}'
+
             # prepare the output string
-            stringtosend = format("{}>{}::{:9}:{}",
-                                  self.device_id,
-                                  self.call_sign,
-                                  targets[index:index + batch_size],
-                                  payload
-            )
+            payload = '{}>{}::{:9}:{}'.format(self.device_id, self.call_sign, targets[index], payload)
 
             # and send the content to the socket
             # Note that there will be no response from APRS and
             # that all exceptions are handled within this method
-            if not self.socket_send(stringtosend):
-                has_error = True
+            self.logger.info('APRS Payload: {}'.format(payload))
+
+#            if not self.socket_send(payload):
+#                has_error = True
 
         self.socket_close()
         self.logger.info('Sent APRS-IS notification.')
