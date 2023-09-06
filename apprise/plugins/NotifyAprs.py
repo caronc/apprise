@@ -110,6 +110,18 @@ class NotifyAprs(NotifyBase):
     # socket timeout in seconds
     socket_timeout = 15
 
+    # Apprise APRS Device ID / TOCALL ID
+    # This is a fixed value which is associated with this software
+    # This value must not be changed. If you use this APRS plugin
+    # outside of Apprise, please request your own TOCALL ID.
+    # Details: see https://github.com/aprsorg/aprs-deviceid
+    #
+    # DO NOT use the generic "APRS" TOCALL ID !!!!!
+    #
+    #device_id = 'APPRS'
+    device_id = 'APRS'
+    call_sign = "APPRS"
+
     # A title can not be used for APRS Messages.  Setting this to zero will
     # cause any title (if defined) to get placed into the message body.
     title_maxlen = 0
@@ -341,9 +353,9 @@ class NotifyAprs(NotifyBase):
 
         # APRS-IS login string, see https://www.aprs-is.net/Connecting.aspx
         login_str = "user {0} pass {1} vers apprise {2}\r\n"\
-            .format(self.user,self.password,__version__)
-
-       # login_str = "user {0} pass {1} vers aprs {3}{2}\r\n".format(self.user, self.password, 1, 0)
+            .format(self.user,
+                    self.password,
+                    __version__)
 
         self.logger.info(
             'Sending login information to APRS-IS')
@@ -413,14 +425,6 @@ class NotifyAprs(NotifyBase):
 
         self.logger.info(
             'Sending data to APRS-IS')
-
-        # remove all characters that would break APRS
-        # see https://www.aprs.org/doc/APRS101.PDF pg. 71
-        #tx_data = re.sub("[{}|~]+", "", tx_data)
-
-        # Unidecode removes e.g. Umlauts and replaces them with
-        # the next best character - APRS only support ASCII 7-bit
-        #tx_data = unidecode(tx_data)
 
         payload = tx_data.encode('utf-8') if sys.version_info[0] >= 3 else tx_data
 
@@ -513,6 +517,10 @@ class NotifyAprs(NotifyBase):
         else:
             payload = body
 
+        # Send in batches if identified to do so
+
+        batch_size = 1 if not self.batch else self.default_batch_size
+
         # Always call throttle before any remote server i/o is made
         self.throttle()
 
@@ -524,7 +532,7 @@ class NotifyAprs(NotifyBase):
             return False
 
         # test
-        self.sock.setblocking(1)
+#        self.sock.setblocking(1)
 
         # We have established a successful connection
         # to the socket server. Now send the login information
@@ -535,10 +543,52 @@ class NotifyAprs(NotifyBase):
         # reset what is in our buffer
         self.socket_reset()
 
+        # error tracking (used for function return)
+        has_error = False
+
+        # Create a copy of the targets list
+        targets = list(self.targets)
+
+        # Prepare the outgoing message
+        #
+        # First. remove all characters from the
+        # payload that would break APRS
+        # see https://www.aprs.org/doc/APRS101.PDF pg. 71
+        payload = re.sub("[{}|~]+", "", payload)
+        #
+        # Finally, convert to ASCII 7bit while trying to keep
+        # the integrity of the message intact
+        # Unidecode removes e.g. Umlauts and replaces them with
+        # the next best character(s)
+        payload = unidecode(payload)
+        #
+        # Finally, constrain output string to 67 characters as
+        # APRS messages are limited in content
+        payload = payload[:67]
+
+        for index in range(0, len(targets), batch_size):
+
+            # Always call throttle before any remote server i/o is made
+            self.throttle()
+
+            # prepare the output string
+            stringtosend = format("{}>{}::{:9}:{}",
+                                  self.device_id,
+                                  self.call_sign,
+                                  targets[index:index + batch_size],
+                                  payload
+            )
+
+            # and send the content to the socket
+            # Note that there will be no response from APRS and
+            # that all exceptions are handled within this method
+            if not self.socket_send(stringtosend):
+                has_error = True
+
         self.socket_close()
         self.logger.info('Sent APRS-IS notification.')
 
-        return True
+        return not has_error
 
 
     def url(self, privacy=False, *args, **kwargs):
