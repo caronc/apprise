@@ -83,19 +83,19 @@ from unidecode import unidecode
 import time
 
 # fixed APRS-IS server locales
-# default is "EURO"
+# default is 'EURO'
 APRS_LOCALES = {
-    "NOAM": 'noam.aprs2.net',
-    "SOAM": 'soam.aprs2.net',
-    "EURO": 'euro.aprs2.net',
-    "ASIA": 'asia.aprs2.net',
-    "AUNZ": 'aunz.aprs2.net',
+    'NOAM': 'noam.aprs2.net',
+    'SOAM': 'soam.aprs2.net',
+    'EURO': 'euro.aprs2.net',
+    'ASIA': 'asia.aprs2.net',
+    'AUNZ': 'aunz.aprs2.net',
 }
 
 
 class NotifyAprs(NotifyBase):
     """
-    A wrapper for APRS Notifications
+    A wrapper for APRS Notifications via APRS-IS
     """
 
     # The default descriptive name associated with the Notification
@@ -145,11 +145,17 @@ class NotifyAprs(NotifyBase):
     # cause any title (if defined) to get placed into the message body.
     title_maxlen = 0
 
-    # helps to reduce the number of errors where the
-    # APRS-IS server "isn't ready yet" after receiving the
-    # login information and then only returns an abbreviated
-    # login message
-    sleep_after_send = 0.5
+    # Helps to reduce the number of login-related errors where the
+    # APRS-IS server "isn't ready yet". If we try to receive the rx buffer
+    # without this grace perid in place, we may receive "incomplete" responsese
+    # where the login response lacks information. In case you receive too many
+    # "Rx: APRS-IS msg is too short - needs to have at least two lines" error
+    # messages, you might want to increase this value to a larger time span
+    sleep_after_socket_send = 0.5
+
+    # Once we have sent a packet to APRS-IS, these are the number seconds
+    # that we will wait before we will continue with the next package
+    sleep_after_package = 5.0
 
     # The maximum amount of emails that can reside within a single transmission
     default_batch_size = 0
@@ -404,7 +410,7 @@ class NotifyAprs(NotifyBase):
         # let's split the  content and see what we have
         #
         # note: if you see this error too often,
-        # increase the value for sleep_after_send
+        # increase the value for sleep_after_socket_send
         # in this module
         #
         rx_lines = rx_buf.splitlines()
@@ -481,7 +487,7 @@ class NotifyAprs(NotifyBase):
         # mandatory on several APRS-IS servers
         # helps to reduce the number of errors where
         # the server only returns an abbreviated message
-        time.sleep(self.sleep_after_send)
+        time.sleep(self.sleep_after_socket_send)
         return True
 
     def socket_reset(self):
@@ -598,6 +604,7 @@ class NotifyAprs(NotifyBase):
         # APRS messages are limited in length
         payload = payload[:67]
 
+        # send the message to our target call sign(s)
         for index in range(0, len(targets)):
 
             # Always call throttle before any remote server i/o is made
@@ -618,11 +625,16 @@ class NotifyAprs(NotifyBase):
 #            if not self.socket_send(payload):
 #                has_error = True
 
+            # apply grace sleep period in case we need to send
+            # another package to APRS-IS - otherwise, APRS-IS
+            # will choke on the incoming data
+            if (index + 1) < len(targets):
+                time.sleep(self.sleep_after_package)
+
         self.socket_close()
         self.logger.info('Sent APRS-IS notification.')
 
         return not has_error
-
 
     def url(self, privacy=False, *args, **kwargs):
         """
