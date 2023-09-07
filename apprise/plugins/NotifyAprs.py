@@ -139,7 +139,7 @@ class NotifyAprs(NotifyBase):
 
     # This is the APRS call sign which will send
     # our message
-    call_sign = "APPRS"
+    call_sign = 'APPRS'
 
     # A title can not be used for APRS Messages.  Setting this to zero will
     # cause any title (if defined) to get placed into the message body.
@@ -543,7 +543,6 @@ class NotifyAprs(NotifyBase):
 
         return rx_buf.rstrip()
 
-
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform APRS Notification
@@ -592,7 +591,7 @@ class NotifyAprs(NotifyBase):
         # First remove all characters from the
         # payload that would break APRS
         # see https://www.aprs.org/doc/APRS101.PDF pg. 71
-        payload = re.sub("[{}|~]+", "", payload)
+        payload = re.sub('[{}|~]+', '', payload)
         #
         # Then convert to ASCII 7bit while trying to keep
         # the integrity of the message intact
@@ -610,11 +609,8 @@ class NotifyAprs(NotifyBase):
             # Always call throttle before any remote server i/o is made
             self.throttle()
 
-            # Define the pattern for the APRS body
-            # Format: Device ID/TOCALL - our call sign - target call sign - body
-            aprs_body = '{}>{}::{:9}:{}'
-
             # prepare the output string
+            # Format: Device ID/TOCALL - our call sign - target call sign - body
             payload = '{}>{}::{:9}:{}'.format(self.device_id, self.call_sign, targets[index], payload)
 
             # and send the content to the socket
@@ -631,6 +627,7 @@ class NotifyAprs(NotifyBase):
             if (index + 1) < len(targets):
                 time.sleep(self.sleep_after_package)
 
+        self.logger.debug('Closing socket.')
         self.socket_close()
         self.logger.info('Sent APRS-IS notification.')
 
@@ -708,17 +705,10 @@ class NotifyAprs(NotifyBase):
             results['targets'] += \
                 NotifyAprs.parse_list(results['qsd']['to'])
 
-        # Set our priority
-        if 'priority' in results['qsd'] and len(results['qsd']['priority']):
-            results['priority'] = \
-                NotifyAprs.unquote(results['qsd']['priority'])
-
-        # Check for one or multiple transmitter groups (comma separated)
-        # and split them up, when necessary
-        if 'txgroups' in results['qsd']:
-            results['txgroups'] = \
-                [x.lower() for x in
-                 NotifyAprs.parse_list(results['qsd']['txgroups'])]
+        # Set our APRS-IS server locale
+        if 'locale' in results['qsd'] and len(results['qsd']['locale']):
+            results['locale'] = \
+                NotifyAprs.unquote(results['qsd']['locale'])
 
         # Get Batch Mode Flag
         results['batch'] = \
