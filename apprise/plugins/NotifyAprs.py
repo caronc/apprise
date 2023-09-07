@@ -375,7 +375,7 @@ class NotifyAprs(NotifyBase):
 
         # APRS-IS login string, see https://www.aprs-is.net/Connecting.aspx
         login_str = "user {0} pass {1} vers apprise {2}\r\n"\
-            .format(self.user,
+            .format(self.user.upper(),
                     self.password,
                     __version__)
 
@@ -617,7 +617,7 @@ class NotifyAprs(NotifyBase):
 
             # prepare the output string
             # Format: Device ID/TOCALL - our call sign - target call sign - body
-            payload = '{}>{}::{:9}:{}'.format(self.device_id, self.user, targets[index], payload)
+            payload = '{}>{}::{:9}:{}'.format(self.device_id.upper(), self.user.upper(), targets[index], payload)
 
             # and send the content to the socket
             # Note that there will be no response from APRS and
