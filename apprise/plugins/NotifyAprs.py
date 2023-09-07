@@ -84,6 +84,8 @@ import time
 
 # fixed APRS-IS server locales
 # default is 'EURO'
+# see https://www.aprs2.net/
+# for details
 APRS_LOCALES = {
     'NOAM': 'noam.aprs2.net',
     'SOAM': 'soam.aprs2.net',
@@ -157,9 +159,6 @@ class NotifyAprs(NotifyBase):
     # that we will wait before we will continue with the next package
     sleep_after_package = 5.0
 
-    # The maximum amount of emails that can reside within a single transmission
-    default_batch_size = 0
-
     # Define object templates
     templates = ('{schema}://{user}:{password}@{targets}',)
 
@@ -208,11 +207,6 @@ class NotifyAprs(NotifyBase):
                 'type': 'choice:string',
                 'values': APRS_LOCALES,
                 'default': 'EURO',
-            },
-            'batch': {
-                'name': _('Batch Mode'),
-                'type': 'bool',
-                'default': False,
             },
         }
     )
@@ -266,9 +260,6 @@ class NotifyAprs(NotifyBase):
 
         # Set the transmitter group
         self.locale = NotifyAprs.template_args['locale']['default'] if not locale else locale
-
-        # Prepare Batch Mode Flag
-        self.batch = batch
 
         for target in parse_call_sign(targets):
             # Validate targets and drop bad ones
@@ -587,11 +578,26 @@ class NotifyAprs(NotifyBase):
         targets = list(self.targets)
 
         # Prepare the outgoing message
+        # Due to APRS's contraints, we need to do
+        # a lot of filtering before we can send
+        # the message
         #
         # First remove all characters from the
         # payload that would break APRS
         # see https://www.aprs.org/doc/APRS101.PDF pg. 71
         payload = re.sub('[{}|~]+', '', payload)
+        #
+        # Now, replace German umlauts as these are not
+        # handled by unidecode - see https://pypi.org/project/Unidecode/
+        payload = (
+            payload.replace("Ä", "Ae")
+            .replace("Ö", "Oe")
+            .replace("Ü", "Ue")
+            .replace("ä", "ae")
+            .replace("ö", "oe")
+            .replace("ü", "ue")
+            .replace("ß", "ss")
+        )
         #
         # Then convert to ASCII 7bit while trying to keep
         # the integrity of the message intact
@@ -611,7 +617,7 @@ class NotifyAprs(NotifyBase):
 
             # prepare the output string
             # Format: Device ID/TOCALL - our call sign - target call sign - body
-            payload = '{}>{}::{:9}:{}'.format(self.device_id, self.call_sign, targets[index], payload)
+            payload = '{}>{}::{:9}:{}'.format(self.device_id, self.user, targets[index], payload)
 
             # and send the content to the socket
             # Note that there will be no response from APRS and
@@ -644,7 +650,6 @@ class NotifyAprs(NotifyBase):
                 APRS_LOCALES[self.template_args['locale']['default']]
                 if self.locale not in APRS_LOCALES
                 else APRS_LOCALES[self.locale],
-            'batch': 'yes' if self.batch else 'no',
         }
 
         # Extend our parameters
@@ -665,21 +670,6 @@ class NotifyAprs(NotifyBase):
                               for x in self.targets]),
             params=NotifyAprs.urlencode(params),
         )
-
-    def __len__(self):
-        """
-        Returns the number of targets associated with this notification
-        """
-        #
-        # Factor batch into calculation
-        #
-        batch_size = 1 if not self.batch else self.default_batch_size
-        targets = len(self.targets)
-        if batch_size > 1:
-            targets = int(targets / batch_size) + \
-                (1 if targets % batch_size else 0)
-
-        return targets
 
     @staticmethod
     def parse_url(url):
@@ -709,10 +699,5 @@ class NotifyAprs(NotifyBase):
         if 'locale' in results['qsd'] and len(results['qsd']['locale']):
             results['locale'] = \
                 NotifyAprs.unquote(results['qsd']['locale'])
-
-        # Get Batch Mode Flag
-        results['batch'] = \
-            parse_bool(results['qsd'].get(
-                'batch', NotifyAprs.template_args['batch']['default']))
 
         return results
