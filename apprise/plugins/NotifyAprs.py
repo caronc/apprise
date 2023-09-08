@@ -586,6 +586,8 @@ class NotifyAprs(NotifyBase):
         # Create a copy of the targets list
         targets = list(self.targets)
 
+        self.logger.info('Starting Payload setup')
+
         # Prepare the outgoing message
         # Due to APRS's contraints, we need to do
         # a lot of filtering before we can send
@@ -618,8 +620,11 @@ class NotifyAprs(NotifyBase):
         # APRS messages are limited in length
         payload = payload[:67]
 
-        self.logger.info("Payload setup complete")
-        self.logger.info(payload)
+        # Our outgoing message MUST end with CRLF so
+        # let's amend our payload respectively
+        payload = payload.rstrip('\r\n') + '\r\n'
+
+        self.logger.info('Payload setup complete: {}'.format(payload))
 
         # send the message to our target call sign(s)
         for index in range(0, len(targets)):
@@ -631,7 +636,7 @@ class NotifyAprs(NotifyBase):
             # Format: Device ID/TOCALL - our call sign - target call sign - body
             buffer = ('{}>{}::{:9}:{}'
                        .format(self.user,
-                                self.device_id.upper(),
+                                self.device_id,
                                targets[index],
                                payload))
 
