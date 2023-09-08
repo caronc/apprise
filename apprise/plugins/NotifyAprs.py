@@ -461,8 +461,8 @@ class NotifyAprs(NotifyBase):
             else tx_data
 
         try:
-            self.sock.setblocking(1)
-            self.sock.settimeout(5)
+            self.sock.setblocking(True)
+            self.sock.settimeout(self.socket_timeout)
             self.sock.sendall(payload)
 
         except socket.gaierror as e:
@@ -516,8 +516,8 @@ class NotifyAprs(NotifyBase):
 
         # Receive content from the socket
         try:
-            self.sock.setblocking(0)
-            self.sock.settimeout(5)
+            self.sock.setblocking(False)
+            self.sock.settimeout(self.socket_timeout)
             rx_buf = self.sock.recv(rx_len)
 
         except socket.gaierror as e:
