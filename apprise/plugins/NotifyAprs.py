@@ -255,9 +255,10 @@ class NotifyAprs(NotifyBase):
         APRS-IS-server and validate it, if necessary
         """
         if locale:
-            locale = locale.upper()
             if locale not in APRS_LOCALES:
-                msg = 'Unsupported APRS-IS locale. Valid:({}).'.format(APRS_LOCALES.keys())
+                msg = ('Unsupported APRS-IS server locale. Received: {}. Valid: {}'.
+                       format(locale,
+                              ', '.join(str(x) for x in APRS_LOCALES.keys())))
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
@@ -726,6 +727,6 @@ class NotifyAprs(NotifyBase):
         # Set our APRS-IS server locale
         if 'locale' in results['qsd'] and len(results['qsd']['locale']):
             results['locale'] = \
-                NotifyAprs.unquote(results['qsd']['locale'])
+                NotifyAprs.unquote(results['qsd']['locale']).upper()
 
         return results
