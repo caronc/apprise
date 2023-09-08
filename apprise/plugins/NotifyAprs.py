@@ -230,7 +230,7 @@ class NotifyAprs(NotifyBase):
         to APRS-IS. We need to send content, meaning that
         read-only access will not work
         """
-        if self.password == "-1":
+        if self.password == '-1':
             msg = 'APRS read-only passwords are not supported.'
             self.logger.warning(msg)
             raise TypeError(msg)
