@@ -120,7 +120,7 @@ class NotifyAprs(NotifyBase):
 
     # APRS default port, supported by all core servers
     # Details: https://www.aprs-is.net/Connecting.aspx
-    notify_port = 14580
+    notify_port = 10152
 
     # The maximum length of the body
     body_maxlen = 67
