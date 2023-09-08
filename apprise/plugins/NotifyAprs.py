@@ -120,7 +120,7 @@ class NotifyAprs(NotifyBase):
 
     # APRS default port, supported by all core servers
     # Details: https://www.aprs-is.net/Connecting.aspx
-    notify_port = 10152
+    notify_port = 14580
 
     # The maximum length of the body
     body_maxlen = 67
@@ -137,11 +137,7 @@ class NotifyAprs(NotifyBase):
     # DO NOT use the generic "APRS" TOCALL ID !!!!!
     #
     #device_id = 'APPRS'
-    device_id = 'APRS'
-
-    # This is the APRS call sign which will send
-    # our message
-    call_sign = 'APPRS'
+    device_id = 'APZ244'
 
     # A title can not be used for APRS Messages.  Setting this to zero will
     # cause any title (if defined) to get placed into the message body.
@@ -248,6 +244,13 @@ class NotifyAprs(NotifyBase):
             raise TypeError(msg)
 
         """
+        Convert given user name (FROM callsign) and
+        device ID to to uppercase
+        """
+        self.user = self.user.upper()
+        self.device_id = self.device_id.upper()
+
+        """
         Check if the user has provided a locale for the 
         APRS-IS-server and validate it, if necessary
         """
@@ -275,11 +278,11 @@ class NotifyAprs(NotifyBase):
 
             # Convert the call sign to upper case and
             # try to add it to our list of targets
-            target_upper = target.upper()
+            _target_upper = target.upper()
 
             # Store call sign as is and ignore duplicates
-            if target_upper not in self.targets:
-                self.targets.append(target_upper)
+            if _target_upper not in self.targets:
+                self.targets.append(_target_upper)
 
         return
 
@@ -375,7 +378,7 @@ class NotifyAprs(NotifyBase):
 
         # APRS-IS login string, see https://www.aprs-is.net/Connecting.aspx
         login_str = "user {0} pass {1} vers apprise {2}\r\n"\
-            .format(self.user.upper(),
+            .format(self.user,
                     self.password,
                     __version__)
 
@@ -392,7 +395,7 @@ class NotifyAprs(NotifyBase):
         rx_buf = self.socket_receive(len(login_str)+100)
         # Abort the remaining process in case an error has occurred
         if not rx_buf:
-            self.logger.debug('Login to APRS-IS unsuccessful, exception occurred')
+            self.logger.info('Login to APRS-IS unsuccessful, exception occurred')
             self.socket_close()
             return False
 
@@ -416,23 +419,23 @@ class NotifyAprs(NotifyBase):
         try:
             _, _, callsign, status, _ = rx_lines[1].split(' ', 4)
         except IndexError:
-            self.logger.debug('Received invalid response from APRS-IS')
+            self.logger.info('Received invalid response from APRS-IS')
             self.socket_close()
             return False
 
         # check if we were able to log in
         if not callsign:
-            self.logger.debug('Did not receive call sign from APRS-IS')
+            self.logger.info('Did not receive call sign from APRS-IS')
             self.socket_close()
             return False
 
         if callsign != self.user:
-            self.logger.debug('call signs differ: %s' % callsign)
+            self.logger.info('call signs differ: %s' % callsign)
             self.socket_close()
             return False
 
         if status == "unverified,":
-            self.logger.debug('invalid APRS-IS password for given call sign')
+            self.logger.info('invalid APRS-IS password for given call sign')
             self.socket_close()
             return False
 
@@ -453,9 +456,13 @@ class NotifyAprs(NotifyBase):
         self.logger.info(
             'Sending data to APRS-IS')
 
-        payload = tx_data.encode('utf-8') if sys.version_info[0] >= 3 else tx_data
+        payload = tx_data.encode('utf-8') \
+            if sys.version_info[0] >= 3 \
+            else tx_data
 
         try:
+            self.sock.setblocking(1)
+            self.sock.settimeout(5)
             self.sock.sendall(payload)
 
         except socket.gaierror as e:
@@ -509,6 +516,8 @@ class NotifyAprs(NotifyBase):
 
         # Receive content from the socket
         try:
+            self.sock.setblocking(0)
+            self.sock.settimeout(5)
             rx_buf = self.sock.recv(rx_len)
 
         except socket.gaierror as e:
@@ -580,7 +589,7 @@ class NotifyAprs(NotifyBase):
         # Prepare the outgoing message
         # Due to APRS's contraints, we need to do
         # a lot of filtering before we can send
-        # the message
+        # the actual message
         #
         # First remove all characters from the
         # payload that would break APRS
@@ -609,6 +618,9 @@ class NotifyAprs(NotifyBase):
         # APRS messages are limited in length
         payload = payload[:67]
 
+        self.logger.info("Payload setup complete")
+        self.logger.info(payload)
+
         # send the message to our target call sign(s)
         for index in range(0, len(targets)):
 
@@ -617,21 +629,32 @@ class NotifyAprs(NotifyBase):
 
             # prepare the output string
             # Format: Device ID/TOCALL - our call sign - target call sign - body
-            payload = '{}>{}::{:9}:{}'.format(self.device_id.upper(), self.user.upper(), targets[index], payload)
+            buffer = ('{}>{}::{:9}:{}'
+                       .format(self.user,
+                                self.device_id.upper(),
+                               targets[index],
+                               payload))
 
             # and send the content to the socket
             # Note that there will be no response from APRS and
-            # that all exceptions are handled within this method
-            self.logger.info('APRS Payload: {}'.format(payload))
+            # that all exceptions are handled within the 'send' method
+            self.logger.info('Sending APRS message: {}'.format(buffer))
 
-#            if not self.socket_send(payload):
-#                has_error = True
+            # send the content
+            if not self.socket_send(buffer):
+                has_error = True
 
             # apply grace sleep period in case we need to send
             # another package to APRS-IS - otherwise, APRS-IS
             # will choke on the incoming data
             if (index + 1) < len(targets):
+                self.logger.info("Initiating sleep between separateAPRS messages")
                 time.sleep(self.sleep_after_package)
+
+            # Finally, reset our socket buffer
+            # we DO NOT read from the socket as we
+            # would simply listen to the default APRS-IS stream
+            self.socket_reset()
 
         self.logger.debug('Closing socket.')
         self.socket_close()
