@@ -42,6 +42,19 @@ services:
     volumes:
       - ./:/apprise
 
+  rpmbuild.f39:
+    build:
+      context: .
+      dockerfile: Dockerfile.f39
+    volumes:
+      - ./:/apprise
+
+  rpmbuild.rawhide:
+    build:
+      context: .
+      dockerfile: Dockerfile.rawhide
+    volumes:
+      - ./:/apprise
 
 #
 # Every Day testing
@@ -82,5 +95,5 @@ services:
 #  - docker-compose run --rm rpmbuild.el8 build-rpm.sh
 # el9
 #  - docker-compose run --rm rpmbuild.el9 build-rpm.sh
-# f37 (Fedora)
-#  - docker-compose run --rm rpmbuild.f37 build-rpm.sh
+# f39 (Fedora)
+#  - docker-compose run --rm rpmbuild.f39 build-rpm.sh

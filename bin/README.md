@@ -58,6 +58,6 @@ Apprise is also packaged for Redhat/Fedora as an RPM. To verify this processs wo
    # To test with el9; do the following:
    docker-compose run --rm rpmbuild.el9 build-rpm.sh
 
-   # To test with f37; do the following:
-   docker-compose run --rm rpmbuild.f37 build-rpm.sh
+   # To test with f39; do the following:
+   docker-compose run --rm rpmbuild.f39 build-rpm.sh
    ```
