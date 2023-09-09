@@ -295,3 +295,71 @@ def test_notify_json_plugin_attachments(mock_post):
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=attach) is True
     assert mock_post.call_count == 1
+
+
+# Based on incomming webhook details defined here:
+# https://kb.synology.com/en-au/DSM/help/Chat/chat_integration
+@mock.patch('requests.post')
+def test_plugin_custom_form_for_synology(mock_post):
+    """
+    NotifyJSON() Synology Chat Test Case
+
+    """
+
+    # Prepare our response
+    response = requests.Request()
+    response.status_code = requests.codes.ok
+
+    # Prepare Mock
+    mock_post.return_value = response
+
+    # This is rather confusing, it may be easier to leverage the
+    # synology:// and synologys:// plugins instead, but this is just to prove
+    # that the same message can be sent using the json:// plugin.
+
+    results = NotifyJSON.parse_url(
+        'jsons://localhost:8081/webapi/entry.cgi?'
+        '-api=SYNO.Chat.External&-method=incoming&-version=2&-token=abc123'
+        '&:message=text&:version=&:type=&:title=&:attachments'
+        '&:file_url=https://i.redd.it/my2t4d2fx0u31.jpg')
+
+    assert isinstance(results, dict)
+    assert results['user'] is None
+    assert results['password'] is None
+    assert results['port'] == 8081
+    assert results['host'] == 'localhost'
+    assert results['fullpath'] == '/webapi/entry.cgi'
+    assert results['path'] == '/webapi/'
+    assert results['query'] == 'entry.cgi'
+    assert results['schema'] == 'jsons'
+    assert results['url'] == 'jsons://localhost:8081/webapi/entry.cgi'
+    assert isinstance(results['qsd:'], dict) is True
+    # Header Entries
+    assert results['qsd-']['api'] == 'SYNO.Chat.External'
+    assert results['qsd-']['method'] == 'incoming'
+    assert results['qsd-']['version'] == '2'
+    assert results['qsd-']['token'] == 'abc123'
+
+    instance = NotifyJSON(**results)
+    assert isinstance(instance, NotifyJSON)
+
+    response = instance.send(title='title', body='body')
+    assert response is True
+    assert mock_post.call_count == 1
+
+    details = mock_post.call_args_list[0]
+    assert details[0][0] == 'https://localhost:8081/webapi/entry.cgi'
+
+    params = details[1]['params']
+    assert params.get('api') == 'SYNO.Chat.External'
+    assert params.get('method') == 'incoming'
+    assert params.get('version') == '2'
+    assert params.get('token') == 'abc123'
+
+    payload = json.loads(details[1]['data'])
+    assert 'version' not in payload
+    assert 'title' not in payload
+    assert 'message' not in payload
+    assert 'type' not in payload
+    assert payload.get('text') == 'body'
+    assert payload.get('file_url') == 'https://i.redd.it/my2t4d2fx0u31.jpg'
