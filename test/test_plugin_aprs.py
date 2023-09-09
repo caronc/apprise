@@ -71,8 +71,8 @@ apprise_url_tests = (
         'requests_response_code': requests.codes.created,
     }),
     ('aprs://user:pass@DF1ABC-1/DF1ABC/DF1ABC-15', {
-        # valid call signs; but a few are duplicates;
-        # at the end there will only be 1 entry
+        # valid call signs - not treated as duplicates
+        # as SSID's will be honored
         'instance': NotifyAprs,
         'requests_response_code': requests.codes.created,
         # Our expected url(privacy=True) startswith() response:
@@ -84,30 +84,38 @@ apprise_url_tests = (
         'instance': NotifyAprs,
         'requests_response_code': requests.codes.created,
     }),
-    ('aprs://user:pass@{}?priority=normal'.format('DF1ABC'), {
-        # valid call sign with priority
+    ('aprs://user:pass@{}?locale="EURO'.format('DF1ABC'), {
+        # valid call sign with locale setting
         'instance': NotifyAprs,
         'requests_response_code': requests.codes.created,
     }),
-    ('aprs://user:pass@{}?priority=em&batch=false'.format(
-        '/'.join(['DF1ABC', '0A1DEF'])), {
-            # valid call sign with priority (emergency) + no batch
-            # transmissions
-            'instance': NotifyAprs,
-            'requests_response_code': requests.codes.created,
+    ('aprs://user:pass@{}?locale="NOAM'.format('DF1ABC'), {
+        # valid call sign with locale setting
+        'instance': NotifyAprs,
+        'requests_response_code': requests.codes.created,
+    }),
+    ('aprs://user:pass@{}?locale="SOAM'.format('DF1ABC'), {
+        # valid call sign with locale setting
+        'instance': NotifyAprs,
+        'requests_response_code': requests.codes.created,
+    }),
+    ('aprs://user:pass@{}?locale="AUNZ'.format('DF1ABC'), {
+        # valid call sign with locale setting
+        'instance': NotifyAprs,
+        'requests_response_code': requests.codes.created,
+    }),
+    ('aprs://user:pass@{}?locale="ASIA'.format('DF1ABC'), {
+        # valid call sign with locale setting
+        'instance': NotifyAprs,
+        'requests_response_code': requests.codes.created,
+    }),
+    ('aprs://user:pass@{}?locale="ABCD'.format('DF1ABC'), {
+        # valid call sign with invalid locale setting
+        'instance': NotifyAprs,
+        'requests_response_code': requests.codes.created,
     }),
     ('aprs://user:pass@{}?priority=invalid'.format('DF1ABC'), {
         # invalid priority
-        'instance': NotifyAprs,
-        'requests_response_code': requests.codes.created,
-    }),
-    ('aprs://user:pass@{}?txgroups=dl-all,all'.format('DF1ABC'), {
-        # valid call sign with two transmitter groups
-        'instance': NotifyAprs,
-        'requests_response_code': requests.codes.created,
-    }),
-    ('aprs://user:pass@{}?txgroups=invalid'.format('DF1ABC'), {
-        # valid call sign with invalid transmitter group
         'instance': NotifyAprs,
         'requests_response_code': requests.codes.created,
     }),
