@@ -427,6 +427,10 @@ class NotifyMQTT(NotifyBase):
             self.logger.debug('Socket Exception: %s' % str(e))
             return False
 
+        if not has_error:
+            # Verbal notice
+            self.logger.info('Sent MQTT notification')
+
         return not has_error
 
     def url(self, privacy=False, *args, **kwargs):
