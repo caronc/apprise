@@ -216,9 +216,6 @@ class NotifyXML(NotifyBase):
             # Store our extra headers
             self.headers.update(headers)
 
-        # Set our xsd url
-        self.xsd_url = self.xsd_default_url.format(version=self.xsd_ver)
-
         self.payload_overrides = {}
         self.payload_extras = {}
         if payload:
@@ -240,11 +237,13 @@ class NotifyXML(NotifyBase):
                     self.payload_map[key] = v
                     self.payload_overrides[key] = v
 
-                    # Over-ride XSD URL as data is no longer known
-                    self.xsd_url = None
-
                 else:
                     self.payload_extras[key] = v
+
+        # Set our xsd url
+        self.xsd_url = None if self.payload_overrides or self.payload_extras \
+            else self.xsd_default_url.format(version=self.xsd_ver)
+
         return
 
     def url(self, privacy=False, *args, **kwargs):

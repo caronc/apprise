@@ -327,7 +327,7 @@ def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
     assert isinstance(instance, NotifyXML)
 
     # XSD URL is disabled due to custom formatting
-    assert instance.xsd_url is not None
+    assert instance.xsd_url is None
 
     response = instance.send(title='title', body='body')
     assert response is True
@@ -351,5 +351,57 @@ def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
     assert re.search(r'<Subject>title</Subject>', details[1]['data'])
     # No over-ride
     assert re.search(r'<Message>body</Message>', details[1]['data'])
-    # since there is no over-ride, an xmlns:xsi is provided
-    assert re.search(r'<Notification xmlns:xsi=', details[1]['data'])
+
+    mock_post.reset_mock()
+    mock_get.reset_mock()
+
+    results = NotifyXML.parse_url(
+        'xmls://localhost?method=POST&:Message=Body&:Subject=Title&:Version')
+
+    assert isinstance(results, dict)
+    assert results['user'] is None
+    assert results['password'] is None
+    assert results['port'] is None
+    assert results['host'] == 'localhost'
+    assert results['fullpath'] is None
+    assert results['path'] is None
+    assert results['query'] is None
+    assert results['schema'] == 'xmls'
+    assert results['url'] == 'xmls://localhost'
+    assert isinstance(results['qsd:'], dict) is True
+    assert results['qsd:']['Version'] == ''
+    assert results['qsd:']['Message'] == 'Body'
+    assert results['qsd:']['Subject'] == 'Title'
+
+    instance = NotifyXML(**results)
+    assert isinstance(instance, NotifyXML)
+
+    # XSD URL is disabled due to custom formatting
+    assert instance.xsd_url is None
+
+    response = instance.send(title='title', body='body')
+    assert response is True
+    assert mock_post.call_count == 1
+    assert mock_get.call_count == 0
+
+    details = mock_post.call_args_list[0]
+    assert details[0][0] == 'https://localhost'
+    assert instance.url(privacy=False).startswith('xmls://localhost')
+
+    # Generate a new URL based on our last and verify key values are the same
+    new_results = NotifyXML.parse_url(instance.url(safe=False))
+
+    # Test that the Version has been dropped
+    assert re.search(
+        r'<Version>[1-9]+\.[0-9]+</Version>', details[1]['data']) is None
+
+    # Test our data set for our key/value pair
+    assert re.search(r'<MessageType>info</MessageType>', details[1]['data'])
+
+    # Subject is swapped for Title
+    assert re.search(r'<Subject>title</Subject>', details[1]['data']) is None
+    assert re.search(r'<Title>title</Title>', details[1]['data'])
+
+    # Message is swapped for Body
+    assert re.search(r'<Message>body</Message>', details[1]['data']) is None
+    assert re.search(r'<Body>body</Body>', details[1]['data'])
