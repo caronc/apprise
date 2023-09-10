@@ -48,13 +48,15 @@ RUN ( \
    dnf install -y rpm-build rpmlint python3-pip python3-virtualenv rubygem-ronn \
                   dnf-plugins-core 'dnf-command(config-manager)' \
                  'dnf-command(builddep)' sudo rsync rpmdevtools; \
-   dnf config-manager --set-enabled powertools;
+   dnf config-manager --set-enabled powertools; \
+   dnf clean all;
 
 COPY packaging/redhat/python-apprise.spec /
 # Place our build file into the path
 COPY bin/build-rpm.sh /usr/bin
 RUN rpmspec -q --buildrequires /python-apprise.spec | cut -f1 -d' ' | \
-    xargs dnf install -y
+    xargs dnf install -y; \
+    dnf clean all;
 
 # RPM Build Structure Setup
 ENV FLAVOR=rpmbuild OS=centos DIST=el8
