@@ -1040,16 +1040,6 @@ class NotifyEmail(NotifyBase):
         # add one to ourselves
         results['targets'] = NotifyEmail.split_path(results['fullpath'])
 
-        if results['password'] is None and results['user']:
-            # Handle cases where the user provided
-            # mailtos://PASSWORD@hostname?user=admin@mail-domain.com
-            #  - the PASSWORD gets lost in the parse url() since a user=
-            #    over-ride is specified.
-            presults = NotifyBase.parse_url(results['url'])
-            if presults['password'] is None and presults['user']:
-                # Store our Password
-                results['password'] = presults['user']
-
         # Attempt to detect 'to' email address
         if 'to' in results['qsd'] and len(results['qsd']['to']):
             results['targets'].append(results['qsd']['to'])

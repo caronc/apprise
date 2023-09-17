@@ -124,6 +124,12 @@ TEST_URLS = (
     ('mailtos://user:pass@nuxref.com:567?to=l2g@nuxref.com', {
         'instance': NotifyEmail,
     }),
+    ('mailtos://user:pass@domain.com?user=admin@mail-domain.com', {
+        'instance': NotifyEmail,
+    }),
+    ('mailtos://%20@domain.com?user=admin@mail-domain.com', {
+        'instance': NotifyEmail,
+    }),
     ('mailtos://user:pass@nuxref.com:567/l2g@nuxref.com', {
         'instance': NotifyEmail,
     }),
