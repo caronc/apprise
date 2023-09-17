@@ -124,6 +124,12 @@ TEST_URLS = (
     ('mailtos://user:pass@nuxref.com:567?to=l2g@nuxref.com', {
         'instance': NotifyEmail,
     }),
+    ('mailtos://user:pass@domain.com?user=admin@mail-domain.com', {
+        'instance': NotifyEmail,
+    }),
+    ('mailtos://%20@domain.com?user=admin@mail-domain.com', {
+        'instance': NotifyEmail,
+    }),
     ('mailtos://user:pass@nuxref.com:567/l2g@nuxref.com', {
         'instance': NotifyEmail,
     }),
@@ -1386,6 +1392,61 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     user, pw = response.login.call_args[0]
     assert pw == 'abc123'
     assert user == 'joe@mydomain.nl'
+
+    mock_smtp.reset_mock()
+    mock_smtp_ssl.reset_mock()
+    response.reset_mock()
+
+    # Issue github.com/caronc/apprise/issue/941
+
+    # mail domain = mail-domain.com
+    # host domain = domain.subdomain.com
+    # PASSWORD needs to be fetched since a user= was provided
+    #  - this is an edge case that is tested here
+    results = NotifyEmail.parse_url(
+        'mailtos://PASSWORD@domain.subdomain.com:587?'
+        'user=admin@mail-domain.com&to=mail@mail-domain.com')
+    assert isinstance(results, dict)
+    # From_Addr could not be detected at this stage, but will be
+    # handled during instantiation
+    assert '' == results['from_addr']
+    assert 'admin@mail-domain.com' == results['user']
+    assert results['port'] == 587
+    assert 'domain.subdomain.com' == results['host']
+    assert 'PASSWORD' == results['password']
+    assert 'mail@mail-domain.com' in results['targets']
+
+    obj = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(obj, NotifyEmail) is True
+
+    # Not that our from_address takes on 'admin@domain.subdomain.com'
+    assert obj.from_addr == ['Apprise', 'admin@domain.subdomain.com']
+
+    assert mock_smtp.call_count == 0
+    assert mock_smtp_ssl.call_count == 0
+    assert response.starttls.call_count == 0
+    assert obj.notify("test") is True
+    assert mock_smtp.call_count == 1
+    assert response.starttls.call_count == 1
+    assert mock_smtp_ssl.call_count == 0
+    assert response.login.call_count == 1
+    assert response.sendmail.call_count == 1
+    # Store our Sent Arguments
+    # Syntax is:
+    #  sendmail(from_addr, to_addrs, msg, mail_options=(), rcpt_options=())
+    #             [0]        [1]     [2]
+    _from = response.sendmail.call_args[0][0]
+    _to = response.sendmail.call_args[0][1]
+    _msg = response.sendmail.call_args[0][2]
+    assert _from == 'admin@domain.subdomain.com'
+    assert isinstance(_to, list)
+    assert len(_to) == 1
+    assert _to[0] == 'mail@mail-domain.com'
+    assert _msg.split('\n')[-3] == 'test'
+
+    user, pw = response.login.call_args[0]
+    assert user == 'admin@mail-domain.com'
+    assert pw == 'PASSWORD'
 
 
 @mock.patch('smtplib.SMTP_SSL')

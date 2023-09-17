@@ -650,6 +650,21 @@ class URLBase:
         if 'user' in results['qsd']:
             results['user'] = results['qsd']['user']
 
+        # parse_url() always creates a 'password' and 'user' entry in the
+        # results returned.  Entries are set to None if they weren't specified
+        if results['password'] is None and 'user' in results['qsd']:
+            # Handle cases where the user= provided in 2 locations, we want
+            # the original to fall back as a being a password (if one wasn't
+            # otherwise defined)
+            # e.g.
+            # mailtos://PASSWORD@hostname?user=admin@mail-domain.com
+            #  - the PASSWORD gets lost in the parse url() since a user=
+            #    over-ride is specified.
+            presults = parse_url(results['url'])
+            if presults:
+                # Store our Password
+                results['password'] = presults['user']
+
         # Store our socket read timeout if specified
         if 'rto' in results['qsd']:
             results['rto'] = results['qsd']['rto']

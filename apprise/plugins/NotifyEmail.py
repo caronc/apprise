@@ -1040,6 +1040,10 @@ class NotifyEmail(NotifyBase):
         # add one to ourselves
         results['targets'] = NotifyEmail.split_path(results['fullpath'])
 
+        # Attempt to detect 'to' email address
+        if 'to' in results['qsd'] and len(results['qsd']['to']):
+            results['targets'].append(results['qsd']['to'])
+
         # Attempt to detect 'from' email address
         if 'from' in results['qsd'] and len(results['qsd']['from']):
             from_addr = NotifyEmail.unquote(results['qsd']['from'])
@@ -1057,10 +1061,6 @@ class NotifyEmail(NotifyBase):
         elif 'name' in results['qsd'] and len(results['qsd']['name']):
             # Extract from name to associate with from address
             from_addr = NotifyEmail.unquote(results['qsd']['name'])
-
-        # Attempt to detect 'to' email address
-        if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'].append(results['qsd']['to'])
 
         # Store SMTP Host if specified
         if 'smtp' in results['qsd'] and len(results['qsd']['smtp']):
