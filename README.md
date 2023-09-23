@@ -518,10 +518,6 @@ aobj.notify("test")
 
 You can read more about creating your own custom notifications and/or hooks [here](https://github.com/caronc/apprise/wiki/decorator_notify).
 
-# Notable Sponsors
-
-- 🚀 [Novu - Open-source notification infrastructure](https://github.novu.co/apprise)
-
 # Want To Learn More?
 
 If you're interested in reading more about this and other methods on how to customize your own notifications, please check out the following links:
