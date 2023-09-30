@@ -46,7 +46,7 @@ from ..utils import parse_list
 CHANNEL_LIST_DELIM = re.compile(r'[ \t\r\n,#\\/]+')
 
 CHANNEL_REGEX = re.compile(
-    r'^\s*(\#|\%35)?(?P<group>[a-z0-9_-]+)', re.I)
+    r'^\s*(\#|\%35)?(?P<channel>[a-z0-9_-]+)', re.I)
 
 USER_REGEX = re.compile(
     r'^\s*(\@|\%40)(?P<user>[a-z0-9_-]+)', re.I)
@@ -70,10 +70,10 @@ class NotifyNotifiarr(NotifyBase):
     service_url = 'https://notifiarr.com/'
 
     # The default protocol
-    protocol = 'nfiarr'
+    protocol = ('nfiarr', 'notifiarr')
 
     # The default secure protocol
-    secure_protocol = 'nfiarrs'
+    secure_protocol = ('nfiarrs', 'notifiarrs')
 
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_notifiarr'
@@ -155,11 +155,17 @@ class NotifyNotifiarr(NotifyBase):
         'key': {
             'alias_of': 'apikey',
         },
+        'apikey': {
+            'alias_of': 'apikey',
+        },
         'image': {
             'name': _('Include Image'),
             'type': 'bool',
             'default': False,
             'map_to': 'include_image',
+        },
+        'to': {
+            'alias_of': 'targets',
         },
     })
 
@@ -212,26 +218,26 @@ class NotifyNotifiarr(NotifyBase):
             result = USER_REGEX.match(target)
             if result:
                 # Store user information
-                self.target['users'].append(result.group('user'))
+                self.targets['users'].append(result.group('user'))
                 continue
 
             result = ROLE_REGEX.match(target)
             if result:
                 # Store role information
-                self.target['roles'].append(result.group('role'))
+                self.targets['roles'].append(result.group('role'))
                 continue
 
             result = CHANNEL_REGEX.match(target)
             if result:
                 # Store role information
-                self.target['channels'].append(result.group('channels'))
+                self.targets['channels'].append(result.group('channel'))
                 continue
 
             self.logger.warning(
                 'Dropped invalid phone/group/contact '
                 '({}) specified.'.format(target),
             )
-            self.target['invalid'].append(target)
+            self.targets['invalid'].append(target)
 
         return
 
@@ -268,7 +274,8 @@ class NotifyNotifiarr(NotifyBase):
 
         return '{schema}://{auth}{hostname}{port}/{apikey}' \
             '/{targets}?{params}'.format(
-                schema=self.secure_protocol if self.secure else self.protocol,
+                schema=self.secure_protocol[0]
+                if self.secure else self.protocol[0],
                 auth=auth,
                 # never encode hostname since we're expecting it to be a valid
                 # one
@@ -431,8 +438,13 @@ class NotifyNotifiarr(NotifyBase):
         entries = NotifyNotifiarr.split_path(results['fullpath'])
 
         # Set our apikey if found as an argument
-        if 'key' in results['qsd'] and len(results['qsd']['key']):
-            results['apikey'] = NotifyNotifiarr.unquote(results['qsd']['key'])
+        if 'apikey' in results['qsd'] and len(results['qsd']['apikey']):
+            results['apikey'] = \
+                NotifyNotifiarr.unquote(results['qsd']['apikey'])
+
+        elif 'key' in results['qsd'] and len(results['qsd']['key']):
+            results['apikey'] = \
+                NotifyNotifiarr.unquote(results['qsd']['key'])
 
         elif entries:
             # Pop the first element (this is the api key)

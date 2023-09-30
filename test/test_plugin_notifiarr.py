@@ -52,9 +52,24 @@ apprise_url_tests = (
     }),
     ('nfiarr://localhost/apikey', {
         'instance': NotifyNotifiarr,
+
+        # Response will fail due to no targets defined
+        'notify_response': False,
     }),
     ('nfiarr://user:pass@localhost/apikey', {
         'instance': NotifyNotifiarr,
+
+        # Response will fail due to no targets defined
+        'notify_response': False,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'nfiarr://user:****@localhost/a...y',
+    }),
+    ('nfiarr://user:pass@localhost/apikey/%%invalid%%', {
+        'instance': NotifyNotifiarr,
+
+        # Response will fail due to no targets defined
+        'notify_response': False,
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'nfiarr://user:****@localhost/a...y',
@@ -64,56 +79,86 @@ apprise_url_tests = (
         'instance': TypeError,
     }),
 
-    ('nfiarr://user@localhost/apikey', {
+    ('nfiarr://user@localhost/apikey/channel', {
         'instance': NotifyNotifiarr,
     }),
 
     # Continue testing other cases
-    ('nfiarr://localhost:8080/apikey', {
+    ('nfiarr://localhost:8080/apikey/channel', {
         'instance': NotifyNotifiarr,
     }),
-    ('nfiarr://user:pass@localhost:8080/apikey', {
+    ('nfiarr://user:pass@localhost:8080/apikey/#channel', {
+        'instance': NotifyNotifiarr,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'nfiarr://user:****@localhost:8080/a...y/#channel'
+    }),
+    ('nfiarr://user:pass@localhost:8080/apikey/+group', {
+        'instance': NotifyNotifiarr,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'nfiarr://user:****@localhost:8080/a...y/+group'
+    }),
+    ('nfiarr://user:pass@localhost:8080/apikey/@user', {
+        'instance': NotifyNotifiarr,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'nfiarr://user:****@localhost:8080/a...y/@user'
+    }),
+    ('nfiarrs://localhost/apikey/channel?image=No', {
         'instance': NotifyNotifiarr,
     }),
-    ('nfiarrs://localhost/apikey', {
-        'instance': NotifyNotifiarr,
-    }),
-    ('nfiarrs://localhost/?apikey=myapikey', {
+    ('notifiarr://localhost/apikey/channel?image=yes', {
         'instance': NotifyNotifiarr,
         # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'nfiarrs://localhost/m...y',
+        'privacy_url': 'nfiarr://localhost/a...y/#channel',
     }),
-    ('nfiarrs://user:pass@localhost/apikey', {
+    ('notifiarrs://localhost/apikey/?to=channel', {
+        'instance': NotifyNotifiarr,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'nfiarrs://localhost/a...y/#channel',
+    }),
+    ('nfiarrs://localhost/channel/?apikey=myapikey', {
+        'instance': NotifyNotifiarr,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'nfiarrs://localhost/m...y/#channel',
+    }),
+    ('nfiarrs://localhost/channel/?key=myapikey', {
+        'instance': NotifyNotifiarr,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'nfiarrs://localhost/m...y/#channel',
+    }),
+    ('nfiarrs://user:pass@localhost/apikey/channel/', {
         'instance': NotifyNotifiarr,
     }),
     ('nfiarrs://localhost:8080/apikey/#channel/', {
         'instance': NotifyNotifiarr,
         # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'nfiarrs://localhost:8080/a...y/#channel/',
+        'privacy_url': 'nfiarrs://localhost:8080/a...y/#channel?',
     }),
-    ('nfiarrs://user:password@localhost:8080/apikey', {
+    ('nfiarrs://user:password@localhost:8080/apikey/channel', {
         'instance': NotifyNotifiarr,
 
         # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'nfiarrs://user:****@localhost:8080/a...y',
+        'privacy_url': 'nfiarrs://user:****@localhost:8080/a...y/#channel?',
     }),
     # Test our Headers
-    ('nfiarr://localhost:8080/path?+HeaderKey=HeaderValue', {
+    ('nfiarr://localhost:8080/chan/path?+HeaderKey=HeaderValue', {
         'instance': NotifyNotifiarr,
     }),
-    ('nfiarr://user:pass@localhost:8081/apikey', {
+    ('nfiarr://user:pass@localhost:8081/apikey/chan', {
         'instance': NotifyNotifiarr,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
-    ('nfiarr://user:pass@localhost:8082/apikey', {
+    ('nfiarr://user:pass@localhost:8082/apikey/channel', {
         'instance': NotifyNotifiarr,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
-    ('nfiarr://user:pass@localhost:8083/apikey', {
+    ('nfiarr://user:pass@localhost:8083/apikey/channel', {
         'instance': NotifyNotifiarr,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
