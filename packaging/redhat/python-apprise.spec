@@ -48,13 +48,13 @@ DAPNET, DingTalk, Discord, E-Mail, Emby, Faast, FCM, Flock, Google Chat,
 Gotify, Growl, Guilded, Home Assistant, IFTTT, Join, Kavenegar, KODI, Kumulos,
 LaMetric, Line, MacOSX, Mailgun, Mastodon, Mattermost, Matrix, MessageBird,
 Microsoft Windows, Microsoft Teams, Misskey, MQTT, MSG91, MyAndroid, Nexmo,
-Nextcloud, NextcloudTalk, Notica, Notifico, ntfy, Office365, OneSignal,
-Opsgenie, PagerDuty, PagerTree, ParsePlatform, PopcornNotify, Prowl, Pushalot,
-PushBullet, Pushjet, PushMe, Pushover, PushSafer, Pushy, PushDeer, Reddit,
-Rocket.Chat, RSyslog, SendGrid, ServerChan, Signal, SimplePush, Sinch, Slack,
-SMSEagle, SMTP2Go, Spontit, SparkPost, Super Toasty, Streamlabs, Stride,
-Syslog, Techulus Push, Telegram, Twilio, Twitter, Twist, XBMC, Voipms, Vonage,
-WhatsApp, Webex Teams}
+Nextcloud, NextcloudTalk, Notica, Notifiarr, Notifico, ntfy, Office365,
+OneSignal, Opsgenie, PagerDuty, PagerTree, ParsePlatform, PopcornNotify,
+Prowl, Pushalot, PushBullet, Pushjet, PushMe, Pushover, PushSafer, Pushy,
+PushDeer, Reddit, Rocket.Chat, RSyslog, SendGrid, ServerChan, Signal,
+SimplePush, Sinch, Slack, SMSEagle, SMTP2Go, Spontit, SparkPost, Super Toasty,
+Streamlabs, Stride, Syslog, Techulus Push, Telegram, Twilio, Twitter, Twist,
+XBMC, Voipms, Vonage, WhatsApp, Webex Teams}
 
 Name:           python-%{pypi_name}
 Version:        1.5.0
