@@ -41,124 +41,105 @@ logging.disable(logging.CRITICAL)
 
 # Our Testing URLs
 apprise_url_tests = (
-    ('nfiarr://:@/', {
-        'instance': None,
-    }),
-    ('nfiarr://', {
-        'instance': None,
-    }),
-    ('nfiarrs://', {
-        'instance': None,
-    }),
-    ('nfiarr://localhost/apikey', {
-        'instance': NotifyNotifiarr,
-
-        # Response will fail due to no targets defined
-        'notify_response': False,
-    }),
-    ('nfiarr://user:pass@localhost/apikey', {
-        'instance': NotifyNotifiarr,
-
-        # Response will fail due to no targets defined
-        'notify_response': False,
-
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'nfiarr://user:****@localhost/a...y',
-    }),
-    ('nfiarr://user:pass@localhost/apikey/%%invalid%%', {
-        'instance': NotifyNotifiarr,
-
-        # Response will fail due to no targets defined
-        'notify_response': False,
-
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'nfiarr://user:****@localhost/a...y',
-    }),
-    # No apikey was specified
-    ('nfiarr://user@localhost', {
+    ('notifiarr://:@/', {
         'instance': TypeError,
     }),
-
-    ('nfiarr://user@localhost/apikey/channel', {
-        'instance': NotifyNotifiarr,
+    ('notifiarr://', {
+        'instance': TypeError,
     }),
-
-    # Continue testing other cases
-    ('nfiarr://localhost:8080/apikey/channel', {
-        'instance': NotifyNotifiarr,
-    }),
-    ('nfiarr://user:pass@localhost:8080/apikey/#channel', {
+    ('notifiarr://apikey', {
         'instance': NotifyNotifiarr,
 
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'nfiarr://user:****@localhost:8080/a...y/#channel'
-    }),
-    ('nfiarr://user:pass@localhost:8080/apikey/+group', {
-        'instance': NotifyNotifiarr,
+        # Response will fail due to no targets defined
+        'notify_response': False,
 
         # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'nfiarr://user:****@localhost:8080/a...y/+group'
+        'privacy_url': 'notifiarr://a...y',
     }),
-    ('nfiarr://user:pass@localhost:8080/apikey/@user', {
+    ('notifiarr://apikey/1234/?discord_user=invalid', {
+        'instance': TypeError,
+    }),
+    ('notifiarr://apikey/1234/?discord_role=invalid', {
+        'instance': TypeError,
+    }),
+    ('notifiarr://apikey/1234/?discord_event=invalid', {
+        'instance': TypeError,
+    }),
+    ('notifiarr://apikey/%%invalid%%', {
         'instance': NotifyNotifiarr,
 
+        # Response will fail due to no targets defined
+        'notify_response': False,
+
         # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'nfiarr://user:****@localhost:8080/a...y/@user'
+        'privacy_url': 'notifiarr://a...y',
     }),
-    ('nfiarrs://localhost/apikey/channel?image=No', {
-        'instance': NotifyNotifiarr,
-    }),
-    ('notifiarr://localhost/apikey/channel?image=yes', {
-        'instance': NotifyNotifiarr,
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'nfiarr://localhost/a...y/#channel',
-    }),
-    ('notifiarrs://localhost/apikey/?to=channel', {
-        'instance': NotifyNotifiarr,
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'nfiarrs://localhost/a...y/#channel',
-    }),
-    ('nfiarrs://localhost/channel/?apikey=myapikey', {
-        'instance': NotifyNotifiarr,
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'nfiarrs://localhost/m...y/#channel',
-    }),
-    ('nfiarrs://localhost/channel/?key=myapikey', {
-        'instance': NotifyNotifiarr,
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'nfiarrs://localhost/m...y/#channel',
-    }),
-    ('nfiarrs://user:pass@localhost/apikey/channel/', {
-        'instance': NotifyNotifiarr,
-    }),
-    ('nfiarrs://localhost:8080/apikey/#channel/', {
-        'instance': NotifyNotifiarr,
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'nfiarrs://localhost:8080/a...y/#channel?',
-    }),
-    ('nfiarrs://user:password@localhost:8080/apikey/channel', {
+    ('notifiarr://apikey/#123', {
         'instance': NotifyNotifiarr,
 
         # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'nfiarrs://user:****@localhost:8080/a...y/#channel?',
+        'privacy_url': 'notifiarr://a...y/#123'
     }),
-    # Test our Headers
-    ('nfiarr://localhost:8080/chan/path?+HeaderKey=HeaderValue', {
+    ('notifiarr://apikey/123?image=No', {
         'instance': NotifyNotifiarr,
     }),
-    ('nfiarr://user:pass@localhost:8081/apikey/chan', {
+    ('notifiarr://apikey/123?image=yes', {
+        'instance': NotifyNotifiarr,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'notifiarr://a...y/#123',
+    }),
+    ('notifiarr://apikey/?to=123,432', {
+        'instance': NotifyNotifiarr,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'notifiarr://a...y/#123/#432',
+    }),
+    ('notifiarr://123/?apikey=myapikey', {
+        'instance': NotifyNotifiarr,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'notifiarr://m...y/#123',
+    }),
+    ('notifiarr://?apikey=myapikey', {
+        # No Channel or host
+        'instance': NotifyNotifiarr,
+        # Response will fail due to no targets defined
+        'notify_response': False,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'notifiarr://m...y/',
+    }),
+    ('notifiarr://invalid?apikey=myapikey', {
+        # No Channel or host
+        'instance': NotifyNotifiarr,
+        # invalid channel
+        'notify_response': False,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'notifiarr://m...y/',
+    }),
+    ('notifiarr://123/325/?apikey=myapikey', {
+        'instance': NotifyNotifiarr,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'notifiarr://m...y/#123/#325',
+    }),
+    ('notifiarr://12/?key=myapikey&discord_user=23'
+     '&discord_role=12&discord_event=123', {
+         'instance': NotifyNotifiarr,
+         # Our expected url(privacy=True) startswith() response:
+         'privacy_url': 'notifiarr://m...y/#12'}),
+    ('notifiarr://apikey/123/', {
+        'instance': NotifyNotifiarr,
+    }),
+    ('notifiarr://apikey/123', {
         'instance': NotifyNotifiarr,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
-    ('nfiarr://user:pass@localhost:8082/apikey/channel', {
+    ('notifiarr://apikey/123', {
         'instance': NotifyNotifiarr,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
-    ('nfiarr://user:pass@localhost:8083/apikey/channel', {
+    ('notifiarr://apikey/123', {
         'instance': NotifyNotifiarr,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them

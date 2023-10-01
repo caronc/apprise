@@ -36,23 +36,16 @@ from json import dumps
 from itertools import chain
 
 from .NotifyBase import NotifyBase
-from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..AppriseLocale import gettext_lazy as _
 from ..common import NotifyImageSize
-from ..utils import parse_list
+from ..utils import parse_list, parse_bool
 
 # Used to break path apart into list of channels
 CHANNEL_LIST_DELIM = re.compile(r'[ \t\r\n,#\\/]+')
 
 CHANNEL_REGEX = re.compile(
-    r'^\s*(\#|\%35)?(?P<channel>[a-z0-9_-]+)', re.I)
-
-USER_REGEX = re.compile(
-    r'^\s*(\@|\%40)(?P<user>[a-z0-9_-]+)', re.I)
-
-ROLE_REGEX = re.compile(
-    r'^\s*(\+|\%2B)(?P<role>[a-z0-9_-]+)', re.I)
+    r'^\s*(\#|\%35)?(?P<channel>[0-9]+)', re.I)
 
 # For API Details see:
 # https://notifiarr.wiki/Client/Installation
@@ -69,75 +62,41 @@ class NotifyNotifiarr(NotifyBase):
     # The services URL
     service_url = 'https://notifiarr.com/'
 
-    # The default protocol
-    protocol = ('nfiarr', 'notifiarr')
-
     # The default secure protocol
-    secure_protocol = ('nfiarrs', 'notifiarrs')
+    secure_protocol = 'notifiarr'
 
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_notifiarr'
 
-    # Disable throttle rate for Notifiarr requests since they are normally
-    # local anyway
-    request_rate_per_sec = 0
+    # The Notification URL
+    notify_url = 'https://notifiarr.com/api/v1/notification/apprise'
+
+    # Notifiarr Throttling (knowing in advance reduces 429 responses)
+    # define('NOTIFICATION_LIMIT_SECOND_USER', 5);
+    # define('NOTIFICATION_LIMIT_SECOND_PATRON', 15);
+
+    # Throttle requests ever so slightly
+    request_rate_per_sec = 0.04
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_256
 
     # Define object templates
     templates = (
-        '{schema}://{host}/{apikey}/{targets}',
-        '{schema}://{host}:{port}/{apikey}/{targets}',
-        '{schema}://{user}@{host}/{apikey}/{targets}',
-        '{schema}://{user}@{host}:{port}/{apikey}/{targets}',
-        '{schema}://{user}:{password}@{host}/{apikey}/{targets}',
-        '{schema}://{user}:{password}@{host}:{port}/{apikey}/{targets}',
+        '{schema}://{apikey}/{targets}',
     )
 
     # Define our apikeys; these are the minimum apikeys required required to
     # be passed into this function (as arguments). The syntax appends any
     # previously defined in the base package and builds onto them
     template_tokens = dict(NotifyBase.template_tokens, **{
-        'host': {
-            'name': _('Hostname'),
-            'type': 'string',
-            'required': True,
-        },
-        'port': {
-            'name': _('Port'),
-            'type': 'int',
-            'min': 1,
-            'max': 65535,
-        },
-        'user': {
-            'name': _('Username'),
-            'type': 'string',
-        },
-        'password': {
-            'name': _('Password'),
-            'type': 'string',
-            'private': True,
-        },
         'apikey': {
             'name': _('Token'),
             'type': 'string',
             'required': True,
             'private': True,
         },
-        'target_role': {
-            'name': _('Target Role'),
-            'type': 'string',
-            'prefix': '+',
-            'map_to': 'targets',
-        },
-        'target_user': {
-            'name': _('Target User'),
-            'type': 'string',
-            'prefix': '@',
-            'map_to': 'targets',
-        },
-        'target_channels': {
+        'target_channel': {
             'name': _('Target Channel'),
             'type': 'string',
             'prefix': '#',
@@ -158,6 +117,18 @@ class NotifyNotifiarr(NotifyBase):
         'apikey': {
             'alias_of': 'apikey',
         },
+        'discord_user': {
+            'name': _('Ping Discord User'),
+            'type': 'int',
+        },
+        'discord_role': {
+            'name': _('Ping Discord Role'),
+            'type': 'int',
+        },
+        'discord_event': {
+            'name': _('Discord Event ID'),
+            'type': 'int',
+        },
         'image': {
             'name': _('Include Image'),
             'type': 'bool',
@@ -169,15 +140,8 @@ class NotifyNotifiarr(NotifyBase):
         },
     })
 
-    # Define any kwargs we're using
-    template_kwargs = {
-        'headers': {
-            'name': _('HTTP Header'),
-            'prefix': '+',
-        },
-    }
-
-    def __init__(self, apikey=None, headers=None, include_image=None,
+    def __init__(self, apikey=None, include_image=None,
+                 discord_user=None, discord_role=None, discord_event=None,
                  targets=None, **kwargs):
         """
         Initialize Notifiarr Object
@@ -200,41 +164,56 @@ class NotifyNotifiarr(NotifyBase):
             if isinstance(include_image, bool) \
             else self.template_args['image']['default']
 
-        self.headers = {}
-        if headers:
-            # Store our extra headers
-            self.headers.update(headers)
+        # Set up our user if specified
+        self.discord_user = 0
+        if discord_user:
+            try:
+                self.discord_user = int(discord_user)
+
+            except (ValueError, TypeError):
+                msg = 'An invalid Notifiarr User ID ' \
+                      '({}) was specified.'.format(discord_user)
+                self.logger.warning(msg)
+                raise TypeError(msg)
+
+        # Set up our role if specified
+        self.discord_role = 0
+        if discord_role:
+            try:
+                self.discord_role = int(discord_role)
+
+            except (ValueError, TypeError):
+                msg = 'An invalid Notifiarr Role ID ' \
+                      '({}) was specified.'.format(discord_role)
+                self.logger.warning(msg)
+                raise TypeError(msg)
+
+        self.discord_event = 0
+        if discord_event:
+            try:
+                self.discord_event = int(discord_event)
+
+            except (ValueError, TypeError):
+                msg = 'An invalid Notifiarr Discord Event ID ' \
+                      '({}) was specified.'.format(discord_event)
+                self.logger.warning(msg)
+                raise TypeError(msg)
 
         # Prepare our targets
         self.targets = {
             'channels': [],
-            'users': [],
-            'roles': [],
             'invalid': [],
         }
 
         for target in parse_list(targets):
-
-            result = USER_REGEX.match(target)
-            if result:
-                # Store user information
-                self.targets['users'].append(result.group('user'))
-                continue
-
-            result = ROLE_REGEX.match(target)
-            if result:
-                # Store role information
-                self.targets['roles'].append(result.group('role'))
-                continue
-
             result = CHANNEL_REGEX.match(target)
             if result:
                 # Store role information
-                self.targets['channels'].append(result.group('channel'))
+                self.targets['channels'].append(int(result.group('channel')))
                 continue
 
             self.logger.warning(
-                'Dropped invalid phone/group/contact '
+                'Dropped invalid channel '
                 '({}) specified.'.format(target),
             )
             self.targets['invalid'].append(target)
@@ -251,46 +230,26 @@ class NotifyNotifiarr(NotifyBase):
             'image': 'yes' if self.include_image else 'no'
         }
 
+        if self.discord_user:
+            params['discord_user'] = self.discord_user
+
+        if self.discord_role:
+            params['discord_role'] = self.discord_role
+
+        if self.discord_event:
+            params['discord_event'] = self.discord_event
+
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        # Append our headers into our parameters
-        params.update({'+{}'.format(k): v for k, v in self.headers.items()})
-
-        # Determine Authentication
-        auth = ''
-        if self.user and self.password:
-            auth = '{user}:{password}@'.format(
-                user=NotifyNotifiarr.quote(self.user, safe=''),
-                password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
-            )
-        elif self.user:
-            auth = '{user}@'.format(
-                user=NotifyNotifiarr.quote(self.user, safe=''),
-            )
-
-        default_port = 443 if self.secure else 80
-
-        return '{schema}://{auth}{hostname}{port}/{apikey}' \
+        return '{schema}://{apikey}' \
             '/{targets}?{params}'.format(
-                schema=self.secure_protocol[0]
-                if self.secure else self.protocol[0],
-                auth=auth,
-                # never encode hostname since we're expecting it to be a valid
-                # one
-                hostname=self.host,
-                port='' if self.port is None or self.port == default_port
-                     else ':{}'.format(self.port),
+                schema=self.secure_protocol,
                 apikey=self.pprint(self.apikey, privacy, safe=''),
                 targets='/'.join(
                     [NotifyNotifiarr.quote(x, safe='+#@') for x in chain(
                         # Channels
                         ['#{}'.format(x) for x in self.targets['channels']],
-                        # Users
-                        ['@{}'.format(x) for x in self.targets['users']],
-                        # Users
-                        ['+{}'.format(x) for x in self.targets['roles']],
                         # Pass along the same invalid entries as were provided
                         self.targets['invalid'],
                     )]),
@@ -302,86 +261,79 @@ class NotifyNotifiarr(NotifyBase):
         Perform Notifiarr Notification
         """
 
-        if not self.targets['channels'] and not self.targets['users'] \
-                and not self.targets['roles']:
+        if not self.targets['channels']:
             # There were no services to notify
             self.logger.warning(
-                'There were no Notifiarr targets to notify.')
+                'There were no Notifiarr channels to notify.')
             return False
+
+        # No error to start with
+        has_error = False
+
+        # Acquire image_url
+        image_url = self.image_url(notify_type)
+
+        for idx, channel in enumerate(self.targets['channels']):
+            # prepare Notifiarr Object
+            payload = {
+                'notification': {
+                    'update': True if self.discord_event else False,
+                    'name': self.app_id,
+                    'event': str(self.discord_event)
+                    if self.discord_event else "",
+                },
+                'discord': {
+                    'color': self.color(notify_type),
+                    'ping': {
+                        'pingUser': self.discord_user
+                        if not idx and self.discord_user else 0,
+                        'pingRole': self.discord_role
+                        if not idx and self.discord_role else 0,
+                    },
+                    'text': {
+                        'title': title,
+                        'content': '',
+                        'description': body,
+                    },
+                    'ids': {
+                        'channel': channel,
+                    }
+                }
+            }
+
+            if self.include_image and image_url:
+                payload['discord']['text']['icon'] = image_url
+
+            if not self._send(payload):
+                has_error = True
+
+        return not has_error
+
+    def _send(self, payload):
+        """
+        Send notification
+        """
+        self.logger.debug('Notifiarr POST URL: %s (cert_verify=%r)' % (
+            self.notify_url, self.verify_certificate,
+        ))
+        self.logger.debug('Notifiarr Payload: %s' % str(payload))
 
         # Prepare HTTP Headers
         headers = {
             'User-Agent': self.app_id,
             'Content-Type': 'application/json',
-            'Accept': 'text/plain'
+            'Accept': 'text/plain',
+            'X-api-Key': self.apikey,
         }
-
-        # Apply any/all header over-rides defined
-        headers.update(self.headers)
-
-        # Acquire image_url
-        image_url = self.image_url(notify_type)
-
-        # prepare Notifiarr Object
-        payload = {
-            'text': body,
-        }
-
-        # Prepare our parameters
-        payload = {
-            'notification': {
-                'update': False,
-                'name': self.app_id,
-                'event': 0
-            },
-            'discord': {
-                'color': self.color(notify_type),
-                'ping': {
-                    'pingUser': None,  # TODO
-                    'pingRole': None,  # TODO
-                },
-                'text': {
-                    'title': title,
-                    'content': '',
-                    'description': body,
-                },
-                'ids': {
-                    'channel': None,  # TODO
-                }
-            }
-        }
-
-        if self.include_image and image_url:
-            payload['text']['icon'] = image_url
-
-        auth = None
-        if self.user:
-            auth = (self.user, self.password)
-
-        # Set our schema
-        schema = 'https' if self.secure else 'http'
-
-        url = '%s://%s' % (schema, self.host)
-        if isinstance(self.port, int):
-            url += ':%d' % self.port
-
-        # append the passthrough URL
-        url += f'/api/v1/notification/passthrough/{self.apikey}'
-
-        self.logger.debug('Notifiarr POST URL: %s (cert_verify=%r)' % (
-            url, self.verify_certificate,
-        ))
-        self.logger.debug('Notifiarr Payload: %s' % str(payload))
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
 
         try:
             r = requests.post(
-                url,
+                self.notify_url,
                 data=dumps(payload),
                 headers=headers,
-                auth=auth,
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
             )
@@ -423,35 +375,57 @@ class NotifyNotifiarr(NotifyBase):
         us to re-instantiate this object.
 
         """
-        results = NotifyBase.parse_url(url)
+        results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
 
-        # Add our headers that the user can potentially over-ride if they wish
-        # to to our returned result set and tidy entries by unquoting them
-        results['headers'] = {
-            NotifyNotifiarr.unquote(x): NotifyNotifiarr.unquote(y)
-            for x, y in results['qsd+'].items()}
+        # Get channels
+        results['targets'] = NotifyNotifiarr.split_path(results['fullpath'])
 
-        # Get unquoted entries
-        entries = NotifyNotifiarr.split_path(results['fullpath'])
+        if 'discord_user' in results['qsd'] and \
+                len(results['qsd']['discord_user']):
+            results['discord_user'] = \
+                NotifyNotifiarr.unquote(
+                    results['qsd']['discord_user'])
+
+        if 'discord_role' in results['qsd'] and \
+                len(results['qsd']['discord_role']):
+            results['discord_role'] = \
+                NotifyNotifiarr.unquote(results['qsd']['discord_role'])
+
+        if 'discord_event' in results['qsd'] and \
+                len(results['qsd']['discord_event']):
+            results['discord_event'] = \
+                NotifyNotifiarr.unquote(results['qsd']['discord_event'])
+
+        # Include images with our message
+        results['include_image'] = \
+            parse_bool(results['qsd'].get('image', False))
+
+        # Track if we need to extract the hostname as a target
+        host_is_potential_target = False
 
         # Set our apikey if found as an argument
         if 'apikey' in results['qsd'] and len(results['qsd']['apikey']):
             results['apikey'] = \
                 NotifyNotifiarr.unquote(results['qsd']['apikey'])
 
+            host_is_potential_target = True
+
         elif 'key' in results['qsd'] and len(results['qsd']['key']):
             results['apikey'] = \
                 NotifyNotifiarr.unquote(results['qsd']['key'])
 
-        elif entries:
-            # Pop the first element (this is the api key)
-            results['apikey'] = entries.pop(0)
+            host_is_potential_target = True
 
-        # the remaining items are our targets
-        results['targets'] = entries
+        else:
+            # Pop the first element (this is the api key)
+            results['apikey'] = \
+                NotifyNotifiarr.unquote(results['host'])
+
+        if host_is_potential_target is True and results['host']:
+            results['targets'].append(NotifyNotifiarr.unquote(results['host']))
 
         # Support the 'to' variable so that we can support rooms this way too
         # The 'to' makes it easier to use yaml configuration
