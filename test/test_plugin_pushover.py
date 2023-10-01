@@ -87,7 +87,7 @@ apprise_url_tests = (
         'instance': NotifyPushover,
     }),
     # API Key + Valid User + 2 Devices
-    ('pover://%s@%s/DEVICE1/DEVICE2/' % ('u' * 30, 'a' * 30), {
+    ('pover://%s@%s/DEVICE1/Device-with-dash/' % ('u' * 30, 'a' * 30), {
         'instance': NotifyPushover,
 
         # Our expected url(privacy=True) startswith() response:
@@ -345,12 +345,13 @@ def test_plugin_pushover_edge_cases(mock_post):
     obj = NotifyPushover(
         user_key=user_key, token=token, targets=devices)
     assert isinstance(obj, NotifyPushover) is True
-    assert len(obj.targets) == 3
+    # Our invalid device is ignored
+    assert len(obj.targets) == 2
 
-    # This call fails because there is 1 invalid device
+    # We notify the 2 devices loaded
     assert obj.notify(
         body='body', title='title',
-        notify_type=apprise.NotifyType.INFO) is False
+        notify_type=apprise.NotifyType.INFO) is True
 
     obj = NotifyPushover(user_key=user_key, token=token)
     assert isinstance(obj, NotifyPushover) is True
@@ -446,4 +447,9 @@ def test_plugin_pushover_config_files(mock_post):
         PushoverPriority.NORMAL
 
     # Notifications work
+    # We test 'pushover_str_int' and 'low' which only matches 1 end point
+    assert aobj.notify(
+        title="title", body="body", tag=[('pushover_str_int', 'low')]) is True
+
+    # Notify everything loaded
     assert aobj.notify(title="title", body="body") is True
