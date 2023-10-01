@@ -203,7 +203,7 @@ class NotifyMSG91(NotifyBase):
             )
         # Prepare our payload
         payload = {
-            'template_id': self.template_id,
+            'template_id': self.template,
             'short_url': 1 if self.short_url else 0,
             # target phone numbers are sent with a comma delimiter
             'recipients': recipients,
@@ -305,6 +305,9 @@ class NotifyMSG91(NotifyBase):
 
         # The hostname is our authentication key
         results['authkey'] = NotifyMSG91.unquote(results['host'])
+
+        # The template id is kept in the user field
+        results['template'] = NotifyMSG91.unquote(results['user'])
 
         if 'short_url' in results['qsd'] and len(results['qsd']['short_url']):
             results['short_url'] = parse_bool(results['qsd']['short_url'])
