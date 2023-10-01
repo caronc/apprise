@@ -35,50 +35,18 @@
 # Get your (authkey) from the dashboard here:
 #   - https://world.msg91.com/user/index.php#api
 #
+# Note: You will need to define a template for this to work
+#
 # Get details on the API used in this plugin here:
-#   - https://world.msg91.com/apidoc/textsms/send-sms.php
-
+#   - https://docs.msg91.com/reference/send-sms
 import requests
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
 from ..utils import is_phone_no
-from ..utils import parse_phone_no
+from ..utils import parse_phone_no, parse_bool
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
-
-
-class MSG91Route:
-    """
-    Transactional SMS Routes
-    route=1 for promotional, route=4 for transactional SMS.
-    """
-    PROMOTIONAL = 1
-    TRANSACTIONAL = 4
-
-
-# Used for verification
-MSG91_ROUTES = (
-    MSG91Route.PROMOTIONAL,
-    MSG91Route.TRANSACTIONAL,
-)
-
-
-class MSG91Country:
-    """
-    Optional value that can be specified on the MSG91 api
-    """
-    INTERNATIONAL = 0
-    USA = 1
-    INDIA = 91
-
-
-# Used for verification
-MSG91_COUNTRIES = (
-    MSG91Country.INTERNATIONAL,
-    MSG91Country.USA,
-    MSG91Country.INDIA,
-)
 
 
 class NotifyMSG91(NotifyBase):
@@ -99,7 +67,7 @@ class NotifyMSG91(NotifyBase):
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_msg91'
 
     # MSG91 uses the http protocol with JSON requests
-    notify_url = 'https://world.msg91.com/api/sendhttp.php'
+    notify_url = 'https://control.msg91.com/api/v5/flow/'
 
     # The maximum length of the body
     body_maxlen = 160
@@ -110,12 +78,18 @@ class NotifyMSG91(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{authkey}/{targets}',
-        '{schema}://{sender}@{authkey}/{targets}',
+        '{schema}://{template}@{authkey}/{targets}',
     )
 
     # Define our template tokens
     template_tokens = dict(NotifyBase.template_tokens, **{
+        'template': {
+            'name': _('Template ID'),
+            'type': 'string',
+            'required': True,
+            'private': True,
+            'regex': (r'^[a-z0-9]+$', 'i'),
+        },
         'authkey': {
             'name': _('Authentication Key'),
             'type': 'string',
@@ -135,10 +109,6 @@ class NotifyMSG91(NotifyBase):
             'type': 'list:string',
             'required': True,
         },
-        'sender': {
-            'name': _('Sender ID'),
-            'type': 'string',
-        },
     })
 
     # Define our template arguments
@@ -146,21 +116,15 @@ class NotifyMSG91(NotifyBase):
         'to': {
             'alias_of': 'targets',
         },
-        'route': {
-            'name': _('Route'),
-            'type': 'choice:int',
-            'values': MSG91_ROUTES,
-            'default': MSG91Route.TRANSACTIONAL,
-        },
-        'country': {
-            'name': _('Country'),
-            'type': 'choice:int',
-            'values': MSG91_COUNTRIES,
+        'short_url': {
+            'name': _('Short URL'),
+            'type': 'bool',
+            'default': False,
         },
     })
 
-    def __init__(self, authkey, targets=None, sender=None, route=None,
-                 country=None, **kwargs):
+    def __init__(self, template, authkey, targets=None, short_url=None,
+                 **kwargs):
         """
         Initialize MSG91 Object
         """
@@ -175,39 +139,20 @@ class NotifyMSG91(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        if route is None:
-            self.route = self.template_args['route']['default']
+        # Template ID
+        self.template = validate_regex(
+            template, *self.template_tokens['template']['regex'])
+        if not self.template:
+            msg = 'An invalid MSG91 Template ID ' \
+                  '({}) was specified.'.format(template)
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
+        if short_url is None:
+            self.short_url = self.template_args['short_url']['default']
 
         else:
-            try:
-                self.route = int(route)
-                if self.route not in MSG91_ROUTES:
-                    # Let outer except catch thi
-                    raise ValueError()
-
-            except (ValueError, TypeError):
-                msg = 'The MSG91 route specified ({}) is invalid.'\
-                    .format(route)
-                self.logger.warning(msg)
-                raise TypeError(msg)
-
-        if country:
-            try:
-                self.country = int(country)
-                if self.country not in MSG91_COUNTRIES:
-                    # Let outer except catch thi
-                    raise ValueError()
-
-            except (ValueError, TypeError):
-                msg = 'The MSG91 country specified ({}) is invalid.'\
-                    .format(country)
-                self.logger.warning(msg)
-                raise TypeError(msg)
-        else:
-            self.country = country
-
-        # Store our sender
-        self.sender = sender
+            self.short_url = parse_bool(short_url)
 
         # Parse our targets
         self.targets = list()
@@ -240,22 +185,29 @@ class NotifyMSG91(NotifyBase):
         # Prepare our headers
         headers = {
             'User-Agent': self.app_id,
-            'Content-Type': 'application/x-www-form-urlencoded',
+            'Content-Type': 'application/json',
+            'authkey': self.authkey,
         }
 
+        # Prepare our recipients
+        recipients = []
+        for target in self.targets:
+            recipients.append(
+                {
+                    'mobiles': target,
+                    # Keyword Tokens
+                    'title': title,
+                    'body': body,
+                    'type': notify_type,
+                }
+            )
         # Prepare our payload
         payload = {
-            'sender': self.sender if self.sender else self.app_id,
-            'authkey': self.authkey,
-            'message': body,
-            'response': 'json',
+            'template_id': self.template_id,
+            'short_url': 1 if self.short_url else 0,
             # target phone numbers are sent with a comma delimiter
-            'mobiles': ','.join(self.targets),
-            'route': str(self.route),
+            'recipients': recipients,
         }
-
-        if self.country:
-            payload['country'] = str(self.country)
 
         # Some Debug Logging
         self.logger.debug('MSG91 POST URL: {} (cert_verify={})'.format(
@@ -314,17 +266,15 @@ class NotifyMSG91(NotifyBase):
 
         # Define any URL parameters
         params = {
-            'route': str(self.route),
+            'short_url': str(self.short_url),
         }
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        if self.country:
-            params['country'] = str(self.country)
-
-        return '{schema}://{authkey}/{targets}/?{params}'.format(
+        return '{schema}://{template}@{authkey}/{targets}/?{params}'.format(
             schema=self.secure_protocol,
+            template=self.pprint(self.template, privacy, safe=''),
             authkey=self.pprint(self.authkey, privacy, safe=''),
             targets='/'.join(
                 [NotifyMSG91.quote(x, safe='') for x in self.targets]),
@@ -356,11 +306,8 @@ class NotifyMSG91(NotifyBase):
         # The hostname is our authentication key
         results['authkey'] = NotifyMSG91.unquote(results['host'])
 
-        if 'route' in results['qsd'] and len(results['qsd']['route']):
-            results['route'] = results['qsd']['route']
-
-        if 'country' in results['qsd'] and len(results['qsd']['country']):
-            results['country'] = results['qsd']['country']
+        if 'short_url' in results['qsd'] and len(results['qsd']['short_url']):
+            results['short_url'] = parse_bool(results['qsd']['short_url'])
 
         # Support the 'to' variable so that we can support targets this way too
         # The 'to' makes it easier to use yaml configuration
