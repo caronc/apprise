@@ -372,6 +372,13 @@ class NotifyNotifiarr(NotifyBase):
 
         return True
 
+    def __len__(self):
+        """
+        Returns the number of targets associated with this notification
+        """
+        targets = len(self.targets['channels']) + len(self.targets['invalid'])
+        return targets if targets > 0 else 1
+
     @staticmethod
     def parse_url(url):
         """
