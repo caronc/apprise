@@ -62,7 +62,7 @@ apprise_url_tests = (
     ('notifiarr://apikey/1234/?discord_role=invalid', {
         'instance': TypeError,
     }),
-    ('notifiarr://apikey/1234/?discord_event=invalid', {
+    ('notifiarr://apikey/1234/?event=invalid', {
         'instance': TypeError,
     }),
     ('notifiarr://apikey/%%invalid%%', {
@@ -120,7 +120,7 @@ apprise_url_tests = (
         'privacy_url': 'notifiarr://m...y/#123/#325',
     }),
     ('notifiarr://12/?key=myapikey&discord_user=23'
-     '&discord_role=12&discord_event=123', {
+     '&discord_role=12&event=123', {
          'instance': NotifyNotifiarr,
          # Our expected url(privacy=True) startswith() response:
          'privacy_url': 'notifiarr://m...y/#12'}),

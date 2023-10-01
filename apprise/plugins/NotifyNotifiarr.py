@@ -50,6 +50,10 @@ CHANNEL_REGEX = re.compile(
 # For API Details see:
 # https://notifiarr.wiki/Client/Installation
 
+# Another good example:
+# https://notifiarr.wiki/en/Website/ \
+#              Integrations/Passthrough#payload-example-1
+
 
 class NotifyNotifiarr(NotifyBase):
     """
@@ -125,7 +129,7 @@ class NotifyNotifiarr(NotifyBase):
             'name': _('Ping Discord Role'),
             'type': 'int',
         },
-        'discord_event': {
+        'event': {
             'name': _('Discord Event ID'),
             'type': 'int',
         },
@@ -141,7 +145,7 @@ class NotifyNotifiarr(NotifyBase):
     })
 
     def __init__(self, apikey=None, include_image=None,
-                 discord_user=None, discord_role=None, discord_event=None,
+                 discord_user=None, discord_role=None, event=None,
                  targets=None, **kwargs):
         """
         Initialize Notifiarr Object
@@ -188,14 +192,14 @@ class NotifyNotifiarr(NotifyBase):
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
-        self.discord_event = 0
-        if discord_event:
+        self.event = 0
+        if event:
             try:
-                self.discord_event = int(discord_event)
+                self.event = int(event)
 
             except (ValueError, TypeError):
                 msg = 'An invalid Notifiarr Discord Event ID ' \
-                      '({}) was specified.'.format(discord_event)
+                      '({}) was specified.'.format(event)
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
@@ -236,8 +240,8 @@ class NotifyNotifiarr(NotifyBase):
         if self.discord_role:
             params['discord_role'] = self.discord_role
 
-        if self.discord_event:
-            params['discord_event'] = self.discord_event
+        if self.event:
+            params['event'] = self.event
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
@@ -277,10 +281,10 @@ class NotifyNotifiarr(NotifyBase):
             # prepare Notifiarr Object
             payload = {
                 'notification': {
-                    'update': True if self.discord_event else False,
+                    'update': True if self.event else False,
                     'name': self.app_id,
-                    'event': str(self.discord_event)
-                    if self.discord_event else "",
+                    'event': str(self.event)
+                    if self.event else "",
                 },
                 'discord': {
                     'color': self.color(notify_type),
@@ -394,10 +398,10 @@ class NotifyNotifiarr(NotifyBase):
             results['discord_role'] = \
                 NotifyNotifiarr.unquote(results['qsd']['discord_role'])
 
-        if 'discord_event' in results['qsd'] and \
-                len(results['qsd']['discord_event']):
-            results['discord_event'] = \
-                NotifyNotifiarr.unquote(results['qsd']['discord_event'])
+        if 'event' in results['qsd'] and \
+                len(results['qsd']['event']):
+            results['event'] = \
+                NotifyNotifiarr.unquote(results['qsd']['event'])
 
         # Include images with our message
         results['include_image'] = \
