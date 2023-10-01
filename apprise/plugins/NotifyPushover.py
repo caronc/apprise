@@ -32,6 +32,7 @@
 
 import re
 import requests
+from itertools import chain
 
 from .NotifyBase import NotifyBase
 from ..common import NotifyType
@@ -46,7 +47,7 @@ from ..attachment.AttachBase import AttachBase
 PUSHOVER_SEND_TO_ALL = 'ALL_DEVICES'
 
 # Used to detect a Device
-VALIDATE_DEVICE = re.compile(r'^[a-z0-9_]{1,25}$', re.I)
+VALIDATE_DEVICE = re.compile(r'^\s*(?P<device>[a-z0-9_]{1,25})\s*$', re.I)
 
 
 # Priorities
@@ -204,7 +205,7 @@ class NotifyPushover(NotifyBase):
         'target_device': {
             'name': _('Target Device'),
             'type': 'string',
-            'regex': (r'^[a-z0-9_]{1,25}$', 'i'),
+            'regex': (r'^[a-z0-9_-]{1,25}$', 'i'),
             'map_to': 'targets',
         },
         'targets': {
@@ -279,9 +280,29 @@ class NotifyPushover(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        self.targets = parse_list(targets)
-        if len(self.targets) == 0:
+        # Track our valid devices
+        targets = parse_list(targets)
+
+        # Track any invalid entries
+        self.invalid_targets = list()
+
+        if len(targets) == 0:
             self.targets = (PUSHOVER_SEND_TO_ALL, )
+
+        else:
+            self.targets = []
+            for target in targets:
+                result = VALIDATE_DEVICE.match(target)
+                if result:
+                    # Store device information
+                    self.targets.append(result.group('device'))
+                    continue
+
+                self.logger.warning(
+                    'Dropped invalid Pushover device '
+                    '({}) specified.'.format(target),
+                )
+                self.invalid_targets.append(target)
 
         # Setup supplemental url
         self.supplemental_url = supplemental_url
@@ -340,80 +361,67 @@ class NotifyPushover(NotifyBase):
         Perform Pushover Notification
         """
 
-        # error tracking (used for function return)
-        has_error = False
+        if not self.targets:
+            # There were no services to notify
+            self.logger.warning(
+                'There were no Pushover targets to notify.')
+            return False
 
-        # Create a copy of the devices list
-        devices = list(self.targets)
-        while len(devices):
-            device = devices.pop(0)
+        # prepare JSON Object
+        payload = {
+            'token': self.token,
+            'user': self.user_key,
+            'priority': str(self.priority),
+            'title': title if title else self.app_desc,
+            'message': body,
+            'device': ','.join(self.targets),
+            'sound': self.sound,
+        }
 
-            if VALIDATE_DEVICE.match(device) is None:
-                self.logger.warning(
-                    'The device specified (%s) is invalid.' % device,
-                )
+        if self.supplemental_url:
+            payload['url'] = self.supplemental_url
 
-                # Mark our failure
-                has_error = True
-                continue
+        if self.supplemental_url_title:
+            payload['url_title'] = self.supplemental_url_title
 
-            # prepare JSON Object
-            payload = {
-                'token': self.token,
-                'user': self.user_key,
-                'priority': str(self.priority),
-                'title': title if title else self.app_desc,
-                'message': body,
-                'device': device,
-                'sound': self.sound,
-            }
+        if self.notify_format == NotifyFormat.HTML:
+            # https://pushover.net/api#html
+            payload['html'] = 1
 
-            if self.supplemental_url:
-                payload['url'] = self.supplemental_url
-            if self.supplemental_url_title:
-                payload['url_title'] = self.supplemental_url_title
+        elif self.notify_format == NotifyFormat.MARKDOWN:
+            payload['message'] = convert_between(
+                NotifyFormat.MARKDOWN, NotifyFormat.HTML, body)
+            payload['html'] = 1
 
-            if self.notify_format == NotifyFormat.HTML:
-                # https://pushover.net/api#html
-                payload['html'] = 1
-            elif self.notify_format == NotifyFormat.MARKDOWN:
-                payload['message'] = convert_between(
-                    NotifyFormat.MARKDOWN, NotifyFormat.HTML, body)
-                payload['html'] = 1
+        if self.priority == PushoverPriority.EMERGENCY:
+            payload.update({'retry': self.retry, 'expire': self.expire})
 
-            if self.priority == PushoverPriority.EMERGENCY:
-                payload.update({'retry': self.retry, 'expire': self.expire})
+        if attach and self.attachment_support:
+            # Create a copy of our payload
+            _payload = payload.copy()
 
-            if attach and self.attachment_support:
-                # Create a copy of our payload
-                _payload = payload.copy()
+            # Send with attachments
+            for no, attachment in enumerate(attach):
+                if no or not body:
+                    # To handle multiple attachments, clean up our message
+                    _payload['message'] = attachment.name
 
-                # Send with attachments
-                for no, attachment in enumerate(attach):
-                    if no or not body:
-                        # To handle multiple attachments, clean up our message
-                        _payload['message'] = attachment.name
-
-                    if not self._send(_payload, attachment):
-                        # Mark our failure
-                        has_error = True
-                        # clean exit from our attachment loop
-                        break
-
-                    # Clear our title if previously set
-                    _payload['title'] = ''
-
-                    # No need to alarm for each consecutive attachment uploaded
-                    # afterwards
-                    _payload['sound'] = PushoverSound.NONE
-
-            else:
-                # Simple send
-                if not self._send(payload):
+                if not self._send(_payload, attachment):
                     # Mark our failure
-                    has_error = True
+                    return False
 
-        return not has_error
+                # Clear our title if previously set
+                _payload['title'] = ''
+
+                # No need to alarm for each consecutive attachment uploaded
+                # afterwards
+                _payload['sound'] = PushoverSound.NONE
+
+        else:
+            # Simple send
+            return self._send(payload)
+
+        return True
 
     def _send(self, payload, attach=None):
         """
@@ -567,8 +575,9 @@ class NotifyPushover(NotifyBase):
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Escape our devices
-        devices = '/'.join([NotifyPushover.quote(x, safe='')
-                            for x in self.targets])
+        devices = '/'.join(
+            [NotifyPushover.quote(x, safe='')
+             for x in chain(self.targets, self.invalid_targets)])
 
         if devices == PUSHOVER_SEND_TO_ALL:
             # keyword is reserved for internal usage only; it's safe to remove
@@ -581,12 +590,6 @@ class NotifyPushover(NotifyBase):
             token=self.pprint(self.token, privacy, safe=''),
             devices=devices,
             params=NotifyPushover.urlencode(params))
-
-    def __len__(self):
-        """
-        Returns the number of targets associated with this notification
-        """
-        return len(self.targets)
 
     @staticmethod
     def parse_url(url):
