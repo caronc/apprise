@@ -47,7 +47,7 @@ from ..attachment.AttachBase import AttachBase
 PUSHOVER_SEND_TO_ALL = 'ALL_DEVICES'
 
 # Used to detect a Device
-VALIDATE_DEVICE = re.compile(r'^\s*(?P<device>[a-z0-9_]{1,25})\s*$', re.I)
+VALIDATE_DEVICE = re.compile(r'^\s*(?P<device>[a-z0-9_-]{1,25})\s*$', re.I)
 
 
 # Priorities

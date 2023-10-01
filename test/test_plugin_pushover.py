@@ -87,7 +87,7 @@ apprise_url_tests = (
         'instance': NotifyPushover,
     }),
     # API Key + Valid User + 2 Devices
-    ('pover://%s@%s/DEVICE1/DEVICE2/' % ('u' * 30, 'a' * 30), {
+    ('pover://%s@%s/DEVICE1/Device-with-dash/' % ('u' * 30, 'a' * 30), {
         'instance': NotifyPushover,
 
         # Our expected url(privacy=True) startswith() response:
