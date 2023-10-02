@@ -34,7 +34,8 @@ from unittest import mock
 
 import pytest
 import requests
-
+from json import loads
+from apprise import Apprise
 from apprise.plugins.NotifyMSG91 import NotifyMSG91
 from helpers import AppriseURLTester
 
@@ -140,3 +141,78 @@ def test_plugin_msg91_edge_cases(mock_post):
         NotifyMSG91(template="     ", authkey='a' * 23, targets=target)
     with pytest.raises(TypeError):
         NotifyMSG91(template=None, authkey='a' * 23, targets=target)
+
+
+@mock.patch('requests.post')
+def test_plugin_msg91_keywords(mock_post):
+    """
+    NotifyMSG91() Templating
+
+    """
+
+    response = mock.Mock()
+    response.content = ''
+    response.status_code = requests.codes.ok
+
+    # Prepare Mock
+    mock_post.return_value = response
+
+    target = '+1 (555) 123-3456'
+    template = '12345'
+    authkey = '{}'.format('b' * 32)
+
+    message_contents = "test"
+
+    # Variation of initialization without API key
+    obj = Apprise.instantiate(
+        'msg91://{}@{}/{}?:key=value&:mobiles=ignored'
+        .format(template, authkey, target))
+    assert isinstance(obj, NotifyMSG91) is True
+    assert isinstance(obj.url(), str) is True
+
+    # Send Notification
+    assert obj.send(body=message_contents) is True
+
+    # Validate expected call parameters
+    assert mock_post.call_count == 1
+    first_call = mock_post.call_args_list[0]
+
+    # URL and message parameters are the same for both calls
+    assert first_call[0][0] == 'https://control.msg91.com/api/v5/flow/'
+    response = loads(first_call[1]['data'])
+    assert response['template_id'] == template
+    assert response['short_url'] == 0
+    assert len(response['recipients']) == 1
+    # mobiles is not over-ridden as it is a special reserved token
+    assert response['recipients'][0]['mobiles'] == '15551233456'
+
+    # Our base tokens
+    assert response['recipients'][0]['body'] == message_contents
+    assert response['recipients'][0]['type'] == 'info'
+    assert response['recipients'][0]['key'] == 'value'
+
+    mock_post.reset_mock()
+
+    # Play with mapping
+    obj = Apprise.instantiate(
+        'msg91://{}@{}/{}?:body&:type=cat'.format(template, authkey, target))
+    assert isinstance(obj, NotifyMSG91) is True
+    assert isinstance(obj.url(), str) is True
+
+    # Send Notification
+    assert obj.send(body=message_contents) is True
+
+    # Validate expected call parameters
+    assert mock_post.call_count == 1
+    first_call = mock_post.call_args_list[0]
+
+    # URL and message parameters are the same for both calls
+    assert first_call[0][0] == 'https://control.msg91.com/api/v5/flow/'
+    response = loads(first_call[1]['data'])
+    assert response['template_id'] == template
+    assert response['short_url'] == 0
+    assert len(response['recipients']) == 1
+    assert response['recipients'][0]['mobiles'] == '15551233456'
+    assert 'body' not in response['recipients'][0]
+    assert 'type' not in response['recipients'][0]
+    assert response['recipients'][0]['cat'] == 'info'
