@@ -33,6 +33,7 @@
 import pytest
 from apprise.AppriseAsset import AppriseAsset
 from apprise.config.ConfigBase import ConfigBase
+from apprise import Apprise
 from apprise import ConfigFormat
 from inspect import cleandoc
 import yaml
@@ -355,6 +356,121 @@ def test_config_base_config_parse_text():
     assert 'tag1' in result[0].tags
     assert 'tag2' in result[0].tags
     assert 'tag3' in result[0].tags
+
+
+def test_config_base_config_tag_groups_text():
+    """
+    API: ConfigBase.config_tag_groups_text object
+
+    """
+
+    # Valid Configuration
+    result, config = ConfigBase.config_parse_text("""
+    # Tag assignments
+    groupA, groupB = tagB, tagC
+
+    # groupB doubles down as it takes the entries initialized above
+    # plus the added ones defined below
+    groupB = tagA, tagB, tagD
+    groupC = groupA, groupB, groupC, tagE
+
+    # Tag that recursively looks to more tags
+    groupD = groupC
+
+    # Set up a recursive loop
+    groupE = groupF
+    groupF = groupE
+
+    # Set up a larger recursive loop
+    groupG = groupH
+    groupH = groupI
+    groupI = groupJ
+    groupJ = groupK
+    groupK = groupG
+
+    # A comment line over top of a URL
+    groupB = mailto://userb:pass@gmail.com
+
+    # Tag Assignments
+    tagA,groupB=json://localhost
+
+    # More Tag Assignments
+    tagC,groupB=xml://localhost
+
+    # More Tag Assignments
+    groupD=form://localhost
+
+    """, asset=AppriseAsset())
+
+    # We expect to parse 3 entries from the above
+    assert isinstance(result, list)
+    assert isinstance(config, list)
+    assert len(result) == 4
+
+    # Our first element is our group tags
+    assert len(result[0].tags) == 1
+    assert 'groupB' in result[0].tags
+
+    # No additional configuration is loaded
+    assert len(config) == 0
+
+    apobj = Apprise()
+    assert apobj.add(result)
+    # We match against 1 entry
+    assert len([x for x in apobj.find('tagA')]) == 1
+    assert len([x for x in apobj.find('tagB')]) == 0
+    assert len([x for x in apobj.find('groupA')]) == 1
+    assert len([x for x in apobj.find('groupB')]) == 3
+    assert len([x for x in apobj.find('groupC')]) == 2
+    assert len([x for x in apobj.find('groupD')]) == 3
+
+    # Invalid Assignment
+    result, config = ConfigBase.config_parse_text("""
+    # Rundant assignment
+    group = group
+
+    # Our group assignment
+    group=windows://
+
+    """)
+
+    # the redundant assignment does us no harm; but it doesn't grant us any
+    # value either
+    assert isinstance(result, list)
+    assert len(result) == 1
+
+    # Our first element is our group tags
+    assert len(result[0].tags) == 1
+    assert 'group' in result[0].tags
+
+    # There were no include entries defined
+    assert len(config) == 0
+
+    # More invalid data
+    result, config = ConfigBase.config_parse_text("""
+    # A tag without a url or group assignment
+    taga=
+
+    """)
+
+    # We expect to parse 0 entries from the above
+    assert isinstance(result, list)
+    assert len(result) == 0
+
+    # There were no include entries defined
+    assert len(config) == 0
+
+    result, config = ConfigBase.config_parse_text("""
+    # A tag without a url or group assignment
+    taga= %%INVALID
+    """)
+
+    # We expect to parse 0 entries from the above
+    assert isinstance(result, list)
+    assert len(result) == 0
+
+    # There were no include entries defined
+    assert len(config) == 0
 
 
 def test_config_base_config_parse_text_with_url():
