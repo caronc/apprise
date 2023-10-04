@@ -616,8 +616,8 @@ class ConfigBase(URLBase):
             # as additional configuration entries when loaded.
             include <ConfigURL>
 
-            # Assign tag contents to existing tag contents
-            <Tags(s)>=<Tag(s)>
+            # Assign tag contents to a group identifier
+            <Group(s)>=<Tag(s)>
 
         """
         # A list of loaded Notification Services
@@ -821,6 +821,12 @@ class ConfigBase(URLBase):
         # the include keyword
         configs = list()
 
+        # Group Assignments
+        group_tags = {}
+
+        # Track our entries to preload
+        preloaded = []
+
         try:
             # Load our data (safely)
             result = yaml.load(content, Loader=yaml.SafeLoader)
@@ -903,6 +909,33 @@ class ConfigBase(URLBase):
         if tags and isinstance(tags, (list, tuple, str)):
             # Store any preset tags
             global_tags = set(parse_list(tags))
+
+        #
+        # groups root directive
+        #
+        groups = result.get('groups', None)
+        if not isinstance(groups, (list, tuple)):
+            # Not a problem; we simply have no group entry
+            groups = list()
+
+        # Iterate over each group defined and store it
+        for no, entry in enumerate(groups):
+            if not isinstance(entry, dict):
+                ConfigBase.logger.warning(
+                    'No assignment for group {}, entry #{}'.format(
+                        entry, no + 1))
+                continue
+
+            for group, tags in entry.items():
+
+                if isinstance(tags, dict):
+                    # Allow entries with comments
+                    tags = set(tags.keys())
+
+                else:  # isinstance(tags, (str, list, tuple)):
+                    tags = set(parse_list(tags))
+
+                group_tags[group] = tags
 
         #
         # include root directive
@@ -1121,29 +1154,59 @@ class ConfigBase(URLBase):
                 # Prepare our Asset Object
                 _results['asset'] = asset
 
-                # Now we generate our plugin
-                try:
-                    # Attempt to create an instance of our plugin using the
-                    # parsed URL information
-                    plugin = common.\
-                        NOTIFY_SCHEMA_MAP[_results['schema']](**_results)
+                # Store our preloaded entries
+                preloaded.append({
+                    'results': _results,
+                    'entry': no + 1,
+                    'item': entry,
+                })
 
-                    # Create log entry of loaded URL
-                    ConfigBase.logger.debug(
-                        'Loaded URL: {}'.format(
-                            plugin.url(privacy=asset.secure_logging)))
+        #
+        # Normalize Tag Groups
+        # - Expand Groups of Groups so that they don't exist
+        #
+        ConfigBase.__normalize_tag_groups(group_tags)
 
-                except Exception as e:
-                    # the arguments are invalid or can not be used.
-                    ConfigBase.logger.warning(
-                        'Could not load Apprise YAML configuration '
-                        'entry #{}, item #{}'
-                        .format(no + 1, entry))
-                    ConfigBase.logger.debug('Loading Exception: %s' % str(e))
-                    continue
+        #
+        # URL Processing
+        #
+        for entry in preloaded:
+            # Point to our results entry for easier reference below
+            results = entry['results']
 
-                # if we reach here, we successfully loaded our data
-                servers.append(plugin)
+            #
+            # Apply our tag groups if they're defined
+            #
+            for group, tags in group_tags.items():
+                # Detect if anything assigned to this tag also maps back to a
+                # group.  If so we want to add the group to our list
+                if next((True for tag in results['tag']
+                         if tag in tags), False):
+                    results['tag'].add(group)
+
+            # Now we generate our plugin
+            try:
+                # Attempt to create an instance of our plugin using the
+                # parsed URL information
+                plugin = common.\
+                    NOTIFY_SCHEMA_MAP[results['schema']](**results)
+
+                # Create log entry of loaded URL
+                ConfigBase.logger.debug(
+                    'Loaded URL: %s', plugin.url(
+                        privacy=results['asset'].secure_logging))
+
+            except Exception as e:
+                # the arguments are invalid or can not be used.
+                ConfigBase.logger.warning(
+                    'Could not load Apprise YAML configuration '
+                    'entry #{}, item #{}'
+                    .format(results['entry'], results['item']))
+                ConfigBase.logger.debug('Loading Exception: %s' % str(e))
+                continue
+
+            # if we reach here, we successfully loaded our data
+            servers.append(plugin)
 
         return (servers, configs)
 

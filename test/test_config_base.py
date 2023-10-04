@@ -1131,6 +1131,88 @@ def test_yaml_vs_text_tagging():
     assert 'mytag' in yaml_result[0]
 
 
+def test_config_base_config_tag_groups_yaml():
+    """
+    API: ConfigBase.config_tag_groups_yaml object
+
+    """
+
+    # general reference used below
+    asset = AppriseAsset()
+
+    # Valid Configuration
+    result, config = ConfigBase.config_parse_yaml("""
+# if no version is specified then version 1 is presumed
+version: 1
+
+groups:
+  - group1: tagB, tagC, tagNotAssigned
+  - group2:
+      - tagA
+      - tagC
+  - group3:
+      - tagD: optional comment
+      - tagA: optional comment #2
+
+  # No assignment
+  - group4
+
+  # No assignment type 2
+  - group5:
+
+  # Recursion
+  - groupA: groupB
+  - groupB: groupA
+
+  # Set up a larger recursive loop
+  - groupG: groupH
+  - groupH: groupI
+  - groupI: groupJ
+  - groupJ: groupK
+  - groupK: groupG
+
+#
+# Define your notification urls:
+#
+urls:
+  - form://localhost:
+     - tag: tagA
+  - mailto://test:password@gmail.com:
+     - tag: tagB
+  - xml://localhost:
+     - tag: tagC
+  - json://localhost:
+     - tag: tagD, tagA
+
+""", asset=asset)
+
+    # We expect to parse 3 entries from the above
+    assert isinstance(result, list)
+    assert isinstance(config, list)
+    assert len(result) == 4
+
+    # Our first element is our group tags
+    assert len(result[0].tags) == 2
+    assert 'group2' in result[0].tags
+    assert 'tagA' in result[0].tags
+
+    # No additional configuration is loaded
+    assert len(config) == 0
+
+    apobj = Apprise()
+    assert apobj.add(result)
+    # We match against 1 entry
+    assert len([x for x in apobj.find('tagA')]) == 2
+    assert len([x for x in apobj.find('tagB')]) == 1
+    assert len([x for x in apobj.find('tagC')]) == 1
+    assert len([x for x in apobj.find('tagD')]) == 1
+    assert len([x for x in apobj.find('group1')]) == 2
+    assert len([x for x in apobj.find('group2')]) == 3
+    assert len([x for x in apobj.find('group3')]) == 2  # Fix this as this IS the value we want
+    assert len([x for x in apobj.find('group4')]) == 0
+    assert len([x for x in apobj.find('group5')]) == 0
+
+
 def test_config_base_config_parse_yaml_globals():
     """
     API: ConfigBase.config_parse_yaml globals
