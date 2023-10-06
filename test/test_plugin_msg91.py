@@ -34,7 +34,8 @@ from unittest import mock
 
 import pytest
 import requests
-
+from json import loads
+from apprise import Apprise
 from apprise.plugins.NotifyMSG91 import NotifyMSG91
 from helpers import AppriseURLTester
 
@@ -53,69 +54,49 @@ apprise_url_tests = (
         'instance': TypeError,
     }),
     ('msg91://{}'.format('a' * 23), {
-        # valid AuthKey
+        # valid AuthKey but no Template ID
+        'instance': TypeError,
+    }),
+    ('msg91://{}@{}'.format('t' * 20, 'a' * 23), {
+        # Valid entry but no targets
         'instance': NotifyMSG91,
         # Since there are no targets specified we expect a False return on
         # send()
         'notify_response': False,
     }),
-    ('msg91://{}/123'.format('a' * 23), {
-        # invalid phone number
-        'instance': NotifyMSG91,
-        # Since there are no targets specified we expect a False return on
-        # send()
-        'notify_response': False,
-    }),
-    ('msg91://{}/abcd'.format('a' * 23), {
+    ('msg91://{}@{}/abcd'.format('t' * 20, 'a' * 23), {
         # No number to notify
         'instance': NotifyMSG91,
         # Since there are no targets specified we expect a False return on
         # send()
         'notify_response': False,
     }),
-    ('msg91://{}/15551232000/?country=invalid'.format('a' * 23), {
-        # invalid country
-        'instance': TypeError,
-    }),
-    ('msg91://{}/15551232000/?country=99'.format('a' * 23), {
-        # invalid country
-        'instance': TypeError,
-    }),
-    ('msg91://{}/15551232000/?route=invalid'.format('a' * 23), {
-        # invalid route
-        'instance': TypeError,
-    }),
-    ('msg91://{}/15551232000/?route=99'.format('a' * 23), {
-        # invalid route
-        'instance': TypeError,
-    }),
-    ('msg91://{}/15551232000'.format('a' * 23), {
+    ('msg91://{}@{}/15551232000'.format('t' * 20, 'a' * 23), {
         # a valid message
         'instance': NotifyMSG91,
 
         # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'msg91://a...a/15551232000',
+        'privacy_url': 'msg91://t...t@a...a/15551232000',
     }),
-    ('msg91://{}/?to=15551232000'.format('a' * 23), {
+    ('msg91://{}@{}/?to=15551232000&short_url=no'.format('t' * 20, 'a' * 23), {
         # a valid message
         'instance': NotifyMSG91,
     }),
-    ('msg91://{}/15551232000?country=91&route=1'.format('a' * 23), {
-        # using phone no with no target - we text ourselves in
-        # this case
+    ('msg91://{}@{}/15551232000?short_url=yes'.format('t' * 20, 'a' * 23), {
+        # testing short_url
         'instance': NotifyMSG91,
     }),
-    ('msg91://{}/15551232000'.format('a' * 23), {
+    ('msg91://{}@{}/15551232000'.format('t' * 20, 'a' * 23), {
         # use get args to acomplish the same thing
         'instance': NotifyMSG91,
     }),
-    ('msg91://{}/15551232000'.format('a' * 23), {
+    ('msg91://{}@{}/15551232000'.format('t' * 20, 'a' * 23), {
         'instance': NotifyMSG91,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
-    ('msg91://{}/15551232000'.format('a' * 23), {
+    ('msg91://{}@{}/15551232000'.format('t' * 20, 'a' * 23), {
         'instance': NotifyMSG91,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
@@ -149,11 +130,89 @@ def test_plugin_msg91_edge_cases(mock_post):
     mock_post.return_value = response
 
     # Initialize some generic (but valid) tokens
-    # authkey = '{}'.format('a' * 24)
     target = '+1 (555) 123-3456'
 
     # No authkey specified
     with pytest.raises(TypeError):
-        NotifyMSG91(authkey=None, targets=target)
+        NotifyMSG91(template="1234", authkey=None, targets=target)
     with pytest.raises(TypeError):
-        NotifyMSG91(authkey="    ", targets=target)
+        NotifyMSG91(template="1234", authkey="    ", targets=target)
+    with pytest.raises(TypeError):
+        NotifyMSG91(template="     ", authkey='a' * 23, targets=target)
+    with pytest.raises(TypeError):
+        NotifyMSG91(template=None, authkey='a' * 23, targets=target)
+
+
+@mock.patch('requests.post')
+def test_plugin_msg91_keywords(mock_post):
+    """
+    NotifyMSG91() Templating
+
+    """
+
+    response = mock.Mock()
+    response.content = ''
+    response.status_code = requests.codes.ok
+
+    # Prepare Mock
+    mock_post.return_value = response
+
+    target = '+1 (555) 123-3456'
+    template = '12345'
+    authkey = '{}'.format('b' * 32)
+
+    message_contents = "test"
+
+    # Variation of initialization without API key
+    obj = Apprise.instantiate(
+        'msg91://{}@{}/{}?:key=value&:mobiles=ignored'
+        .format(template, authkey, target))
+    assert isinstance(obj, NotifyMSG91) is True
+    assert isinstance(obj.url(), str) is True
+
+    # Send Notification
+    assert obj.send(body=message_contents) is True
+
+    # Validate expected call parameters
+    assert mock_post.call_count == 1
+    first_call = mock_post.call_args_list[0]
+
+    # URL and message parameters are the same for both calls
+    assert first_call[0][0] == 'https://control.msg91.com/api/v5/flow/'
+    response = loads(first_call[1]['data'])
+    assert response['template_id'] == template
+    assert response['short_url'] == 0
+    assert len(response['recipients']) == 1
+    # mobiles is not over-ridden as it is a special reserved token
+    assert response['recipients'][0]['mobiles'] == '15551233456'
+
+    # Our base tokens
+    assert response['recipients'][0]['body'] == message_contents
+    assert response['recipients'][0]['type'] == 'info'
+    assert response['recipients'][0]['key'] == 'value'
+
+    mock_post.reset_mock()
+
+    # Play with mapping
+    obj = Apprise.instantiate(
+        'msg91://{}@{}/{}?:body&:type=cat'.format(template, authkey, target))
+    assert isinstance(obj, NotifyMSG91) is True
+    assert isinstance(obj.url(), str) is True
+
+    # Send Notification
+    assert obj.send(body=message_contents) is True
+
+    # Validate expected call parameters
+    assert mock_post.call_count == 1
+    first_call = mock_post.call_args_list[0]
+
+    # URL and message parameters are the same for both calls
+    assert first_call[0][0] == 'https://control.msg91.com/api/v5/flow/'
+    response = loads(first_call[1]['data'])
+    assert response['template_id'] == template
+    assert response['short_url'] == 0
+    assert len(response['recipients']) == 1
+    assert response['recipients'][0]['mobiles'] == '15551233456'
+    assert 'body' not in response['recipients'][0]
+    assert 'type' not in response['recipients'][0]
+    assert response['recipients'][0]['cat'] == 'info'
