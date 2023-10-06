@@ -780,12 +780,23 @@ class NotifyMatrix(NotifyBase):
                 'user/pass combo is missing.')
             return False
 
-        # Prepare our Registration Payload
-        payload = {
-            'type': 'm.login.password',
-            'user': self.user,
-            'password': self.password,
-        }
+        # Prepare our Authentication Payload
+        if self.version == MatrixVersion.V3:
+            payload = {
+                'type': 'm.login.password',
+                'identifier': {
+                    'type': 'm.id.user',
+                    'user': self.user,
+                },
+                'password': self.password,
+            }
+
+        else:
+            payload = {
+                'type': 'm.login.password',
+                'user': self.user,
+                'password': self.password,
+            }
 
         # Build our URL
         postokay, response = self._fetch('/login', payload=payload)
