@@ -107,6 +107,11 @@ def test_conversion_html_to_text():
                    "<a href='#'>my link</a>") == \
         "test my link"
 
+    # a with missing href entry
+    assert to_html("<span></span<<span>test</span> "
+                   "<a>my link</a>") == \
+        "test my link"
+
     # </p> missing
     assert to_html("<body><div>line 1 <b>bold</b></div>  "
                    " <a href='#'>my link</a>"

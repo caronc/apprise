@@ -308,7 +308,7 @@ class HTMLMarkDownConverter(HTMLConverter):
             self._preserver_cr = True
 
         elif tag == 'a':
-            for name, link in attrs:
+            for name, link in attrs:  # pragma: no branch
                 if name == 'href':
                     self._link = '(' + link + ')'
                     # Take an early exit for speed (in case there are more
