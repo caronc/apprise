@@ -101,7 +101,7 @@ class HTMLConverter(HTMLParser, object):
 
     # The following tags must start on a new line
     BLOCK_TAGS = ('p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-                  'div', 'td', 'th', 'code', 'pre', 'label', 'li',)
+                  'div', 'td', 'th', 'pre', 'samp', 'label', 'li',)
 
     # the folowing tags ignore any internal text
     IGNORE_TAGS = (
@@ -216,14 +216,18 @@ class HTMLMarkDownConverter(HTMLConverter):
     """An HTML to markdown converter tuned for email messages."""
 
     # Escape markdown characters
-    MARKDOWN_ESCAPE = re.compile(r'([\\`*_{}[\]<>()#+\-.!|])',
-                                 re.DOTALL | re.MULTILINE)
+    MARKDOWN_ESCAPE = re.compile(r'([`*#])', re.DOTALL | re.MULTILINE)
+
+    # Detect Carriage Return
+    HAS_CR = re.compile(r'[\r*\n]+', re.DOTALL | re.MULTILINE)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
         # Store href value
         self._link = ""
+
+        self._preserver_cr = False
 
     def handle_data(self, data, *args, **kwargs):
         """
@@ -234,7 +238,8 @@ class HTMLMarkDownConverter(HTMLConverter):
         if self._do_store:
 
             # Tidy our whitespace
-            content = self.WS_TRIM.sub(' ', data)
+            content = self.WS_TRIM.sub(' ', data) \
+                if not self._preserver_cr else data
             content = self.MARKDOWN_ESCAPE.sub(r'\\\1', content)
 
             # Add hyperlink
@@ -287,19 +292,28 @@ class HTMLMarkDownConverter(HTMLConverter):
         elif tag == 'h6':
             self._result.append('###### ')
 
-        elif tag in ['strong', 'b']:
+        elif tag in ('strong', 'b'):
             self._result.append('**')
 
-        elif tag in ['em', 'i']:
+        elif tag in ('em', 'i'):
             self._result.append('*')
 
         elif tag == 'code':
             self._result.append('`')
+            self._preserver_cr = True
+
+        elif tag in ('pre', 'samp'):
+            self._result.append('```')
+            self._result.append(self.BLOCK_END)
+            self._preserver_cr = True
 
         elif tag == 'a':
             for name, link in attrs:
                 if name == 'href':
                     self._link = '(' + link + ')'
+                    # Take an early exit for speed (in case there are more
+                    # parameters - no need to waste time looking at them)
+                    break
 
     def handle_endtag(self, tag):
         """
@@ -311,11 +325,17 @@ class HTMLMarkDownConverter(HTMLConverter):
         if tag in self.BLOCK_TAGS:
             self._result.append(self.BLOCK_END)
 
-        if tag in ['strong', 'b']:
+        if tag in ('strong', 'b'):
             self._result.append('**')
 
-        elif tag in ['em', 'i']:
+        elif tag in ('em', 'i'):
             self._result.append('*')
 
         elif tag == 'code':
             self._result.append('`')
+            self._preserver_cr = False
+
+        elif tag in ('pre', 'samp'):
+            self._result.append('```')
+            self._result.append(self.BLOCK_END)
+            self._preserver_cr = False
