@@ -98,6 +98,16 @@ apprise_url_tests = (
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'notifiarr://m...y/#123',
     }),
+    ('notifiarr://123/?apikey=myapikey&source=My%20System', {
+        'instance': NotifyNotifiarr,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'notifiarr://m...y/#123',
+    }),
+    ('notifiarr://123/?apikey=myapikey&from=My%20System', {
+        'instance': NotifyNotifiarr,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'notifiarr://m...y/#123',
+    }),
     ('notifiarr://?apikey=myapikey', {
         # No Channel or host
         'instance': NotifyNotifiarr,

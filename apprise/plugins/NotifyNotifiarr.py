@@ -40,6 +40,7 @@ from ..common import NotifyType
 from ..AppriseLocale import gettext_lazy as _
 from ..common import NotifyImageSize
 from ..utils import parse_list, parse_bool
+from ..utils import validate_regex
 
 # Used to break path apart into list of channels
 CHANNEL_LIST_DELIM = re.compile(r'[ \t\r\n,#\\/]+')
@@ -139,6 +140,13 @@ class NotifyNotifiarr(NotifyBase):
             'default': False,
             'map_to': 'include_image',
         },
+        'source': {
+            'name': _('Source'),
+            'type': 'string',
+        },
+        'from': {
+            'alias_of': 'source'
+        },
         'to': {
             'alias_of': 'targets',
         },
@@ -146,7 +154,7 @@ class NotifyNotifiarr(NotifyBase):
 
     def __init__(self, apikey=None, include_image=None,
                  discord_user=None, discord_role=None, event=None,
-                 targets=None, **kwargs):
+                 targets=None, source=None, **kwargs):
         """
         Initialize Notifiarr Object
 
@@ -192,6 +200,9 @@ class NotifyNotifiarr(NotifyBase):
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
+        # Prepare our source (if set)
+        self.source = validate_regex(source)
+
         self.event = 0
         if event:
             try:
@@ -233,6 +244,9 @@ class NotifyNotifiarr(NotifyBase):
         params = {
             'image': 'yes' if self.include_image else 'no'
         }
+
+        if self.source:
+            params['source'] = self.source
 
         if self.discord_user:
             params['discord_user'] = self.discord_user
@@ -280,6 +294,7 @@ class NotifyNotifiarr(NotifyBase):
         for idx, channel in enumerate(self.targets['channels']):
             # prepare Notifiarr Object
             payload = {
+                'source': self.source if self.source else self.app_id,
                 'notification': {
                     'update': True if self.event else False,
                     'name': self.app_id,
@@ -416,6 +431,14 @@ class NotifyNotifiarr(NotifyBase):
 
         # Track if we need to extract the hostname as a target
         host_is_potential_target = False
+
+        if 'source' in results['qsd'] and len(results['qsd']['source']):
+            results['source'] = \
+                NotifyNotifiarr.unquote(results['qsd']['source'])
+
+        elif 'from' in results['qsd'] and len(results['qsd']['from']):
+            results['source'] = \
+                NotifyNotifiarr.unquote(results['qsd']['from'])
 
         # Set our apikey if found as an argument
         if 'apikey' in results['qsd'] and len(results['qsd']['apikey']):
