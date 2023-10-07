@@ -374,7 +374,7 @@ class ConfigBase(URLBase):
 
         """
         # Prepare a key set list we can use
-        tag_groups = set([x for x in group_tags.keys()])
+        tag_groups = set([str(x) for x in group_tags.keys()])
 
         def _expand(tags, ignore=None):
             """
@@ -394,10 +394,6 @@ class ConfigBase(URLBase):
                 if tag in ignore:
                     continue
 
-                if tag not in tag_groups:
-                    results.add(tag)
-                    continue
-
                 # Track our groups
                 groups.add(tag)
 
@@ -413,7 +409,7 @@ class ConfigBase(URLBase):
                     if gtag in ignore:
                         continue
 
-                    # Go deeper
+                    # Go deeper (recursion)
                     ignore.add(tag)
                     group_tags[gtag] = _expand(set([gtag]), ignore=ignore)
                     results |= group_tags[gtag]
@@ -425,7 +421,7 @@ class ConfigBase(URLBase):
 
         for tag in tag_groups:
             # Get our tags
-            group_tags[tag] = _expand(set([tag]))
+            group_tags[tag] |= _expand(set([tag]))
             if not group_tags[tag]:
                 ConfigBase.logger.warning(
                     'The group {} has no tags assigned to it'.format(tag))
@@ -643,14 +639,6 @@ class ConfigBase(URLBase):
             r'((?P<url>[a-z0-9]{2,9}://.*)|(?P<assign>[a-z0-9, \t_-]+))|'
             r'include\s+(?P<config>.+))?\s*$', re.I)
 
-        def _expanded(tags, carry=None):
-            """
-            Recursively expands a tag specified
-            """
-
-            # Initialize our carry forward
-            carry = {} if carry is None else carry
-
         try:
             # split our content up to read line by line
             content = re.split(r'\r*\n', content)
@@ -701,7 +689,7 @@ class ConfigBase(URLBase):
                 else cwe312_url(url)
 
             if assign:
-                groups = set(parse_list(result.group('tags')))
+                groups = set(parse_list(result.group('tags'), cast=str))
                 if not groups:
                     # no tags were assigned
                     ConfigBase.logger.warning(
@@ -710,7 +698,7 @@ class ConfigBase(URLBase):
                     continue
 
                 # Get our tags
-                tags = set(parse_list(assign))
+                tags = set(parse_list(assign, cast=str))
                 if not tags:
                     # no tags were assigned
                     ConfigBase.logger.warning(
@@ -739,7 +727,7 @@ class ConfigBase(URLBase):
 
             # Build a list of tags to associate with the newly added
             # notifications if any were set
-            results['tag'] = set(parse_list(result.group('tags')))
+            results['tag'] = set(parse_list(result.group('tags'), cast=str))
 
             # Set our Asset Object
             results['asset'] = asset
@@ -908,7 +896,7 @@ class ConfigBase(URLBase):
         tags = result.get('tag', None)
         if tags and isinstance(tags, (list, tuple, str)):
             # Store any preset tags
-            global_tags = set(parse_list(tags))
+            global_tags = set(parse_list(tags, cast=str))
 
         #
         # groups root directive
@@ -926,16 +914,27 @@ class ConfigBase(URLBase):
                         entry, no + 1))
                 continue
 
-            for group, tags in entry.items():
+            for _groups, tags in entry.items():
+                for group in parse_list(_groups, cast=str):
+                    if isinstance(tags, (list, tuple)):
+                        _tags = set()
+                        for e in tags:
+                            if isinstance(e, dict):
+                                _tags |= set(e.keys())
+                            else:
+                                _tags |= set(parse_list(e, cast=str))
 
-                if isinstance(tags, dict):
-                    # Allow entries with comments
-                    tags = set(tags.keys())
+                        # Final assignment
+                        tags = _tags
 
-                else:  # isinstance(tags, (str, list, tuple)):
-                    tags = set(parse_list(tags))
+                    else:
+                        tags = set(parse_list(tags, cast=str))
 
-                group_tags[group] = tags
+                    if group not in group_tags:
+                        group_tags[group] = tags
+
+                    else:
+                        group_tags[group] |= tags
 
         #
         # include root directive
@@ -1127,8 +1126,8 @@ class ConfigBase(URLBase):
                 # The below ensures our tags are set correctly
                 if 'tag' in _results:
                     # Tidy our list up
-                    _results['tag'] = \
-                        set(parse_list(_results['tag'])) | global_tags
+                    _results['tag'] = set(
+                        parse_list(_results['tag'], cast=str)) | global_tags
 
                 else:
                     # Just use the global settings
@@ -1201,7 +1200,7 @@ class ConfigBase(URLBase):
                 ConfigBase.logger.warning(
                     'Could not load Apprise YAML configuration '
                     'entry #{}, item #{}'
-                    .format(results['entry'], results['item']))
+                    .format(entry['entry'], entry['item']))
                 ConfigBase.logger.debug('Loading Exception: %s' % str(e))
                 continue
 

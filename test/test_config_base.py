@@ -377,6 +377,9 @@ def test_config_base_config_tag_groups_text():
     # Tag that recursively looks to more tags
     groupD = groupC
 
+    # Assigned ourselves
+    groupX = groupX
+
     # Set up a recursive loop
     groupE = groupF
     groupF = groupE
@@ -388,8 +391,16 @@ def test_config_base_config_tag_groups_text():
     groupJ = groupK
     groupK = groupG
 
+    # Bad assignments
+    groupM = , , ,
+     , ,   = , , ,
+
+    # int's and floats are okay
+    1 = 2
+    a = 5
+
     # A comment line over top of a URL
-    groupB = mailto://userb:pass@gmail.com
+    4, groupB = mailto://userb:pass@gmail.com
 
     # Tag Assignments
     tagA,groupB=json://localhost
@@ -408,8 +419,9 @@ def test_config_base_config_tag_groups_text():
     assert len(result) == 4
 
     # Our first element is our group tags
-    assert len(result[0].tags) == 1
+    assert len(result[0].tags) == 2
     assert 'groupB' in result[0].tags
+    assert '4' in result[0].tags
 
     # No additional configuration is loaded
     assert len(config) == 0
@@ -423,6 +435,22 @@ def test_config_base_config_tag_groups_text():
     assert len([x for x in apobj.find('groupB')]) == 3
     assert len([x for x in apobj.find('groupC')]) == 2
     assert len([x for x in apobj.find('groupD')]) == 3
+
+    # Invalid Assignment
+    result, config = ConfigBase.config_parse_text("""
+    # Must have something to equal or it's a bad line
+    group =
+
+    # A tag Assignments that is never gotten to as the line
+    # above is bad
+    groupD=form://localhost
+    """)
+
+    # We expect to parse 3 entries from the above
+    assert isinstance(result, list)
+    assert isinstance(config, list)
+    assert len(result) == 0
+    assert len(config) == 0
 
     # Invalid Assignment
     result, config = ConfigBase.config_parse_text("""
@@ -1160,17 +1188,40 @@ groups:
   # No assignment type 2
   - group5:
 
+  # Integer assignment
+  - group6: 3
+  - group6: 3, 4, 5, test
+  - group6: 3.5, tagC
+
   # Recursion
   - groupA: groupB
   - groupB: groupA
+  # And Again... (just because)
+  - groupA: groupB
+  - groupB: groupA
+
+  # Self assignment
+  - groupX: groupX
 
   # Set up a larger recursive loop
   - groupG: groupH
-  - groupH: groupI
-  - groupI: groupJ
-  - groupJ: groupK
+  - groupH: groupI, groupJ
+  - groupI: groupJ, groupG
+  - groupJ: groupK, groupH, groupI
   - groupK: groupG
 
+  # No tags assigned
+  - groupK: ",,  , ,"
+  - " , ": ",, , ,"
+
+  # Multi Assignments
+  - groupL, groupM: tagD, tagA
+  - 4, groupN:
+     - tagD
+     - tagE, TagA
+
+  # Add one more tag to groupL making it different then GroupM by 1
+  - groupL: tagB
 #
 # Define your notification urls:
 #
@@ -1192,8 +1243,11 @@ urls:
     assert len(result) == 4
 
     # Our first element is our group tags
-    assert len(result[0].tags) == 2
+    assert len(result[0].tags) == 5
     assert 'group2' in result[0].tags
+    assert 'group3' in result[0].tags
+    assert 'groupL' in result[0].tags
+    assert 'groupM' in result[0].tags
     assert 'tagA' in result[0].tags
 
     # No additional configuration is loaded
@@ -1208,9 +1262,12 @@ urls:
     assert len([x for x in apobj.find('tagD')]) == 1
     assert len([x for x in apobj.find('group1')]) == 2
     assert len([x for x in apobj.find('group2')]) == 3
-    assert len([x for x in apobj.find('group3')]) == 2  # Fix this as this IS the value we want
+    assert len([x for x in apobj.find('group3')]) == 2
     assert len([x for x in apobj.find('group4')]) == 0
     assert len([x for x in apobj.find('group5')]) == 0
+    assert len([x for x in apobj.find('group6')]) == 2
+    assert len([x for x in apobj.find('4')]) == 1
+    assert len([x for x in apobj.find('groupN')]) == 1
 
 
 def test_config_base_config_parse_yaml_globals():

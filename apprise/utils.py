@@ -1120,7 +1120,7 @@ def urlencode(query, doseq=False, safe='', encoding=None, errors=None):
         errors=errors)
 
 
-def parse_list(*args):
+def parse_list(*args, cast=None):
     """
     Take a string list and break it into a delimited
     list of arguments. This funciton also supports
@@ -1143,6 +1143,9 @@ def parse_list(*args):
 
     result = []
     for arg in args:
+        if not isinstance(arg, (str, set, list, bool, tuple)) and arg and cast:
+            arg = cast(arg)
+
         if isinstance(arg, str):
             result += re.split(STRING_DELIMITERS, arg)
 
@@ -1155,7 +1158,6 @@ def parse_list(*args):
     # Since Python v3 returns a filter (iterator) whereas Python v2 returned
     # a list, we need to change it into a list object to remain compatible with
     # both distribution types.
-    # TODO: Review after dropping support for Python 2.
     return sorted([x for x in filter(bool, list(set(result)))])
 
 
