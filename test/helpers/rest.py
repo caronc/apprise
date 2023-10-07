@@ -391,9 +391,13 @@ class AppriseURLTester:
                 targets = len(obj)
 
                 # check that we're as expected
-                assert obj.notify(
+                _resp = obj.notify(
                     body=self.body, title=self.title,
-                    notify_type=notify_type) == notify_response
+                    notify_type=notify_type)
+                if _resp != notify_response:
+                    print('%s notify() returned %s (but expected %s)' % (
+                        url, _resp, notify_response))
+                    assert False
 
                 if notify_response:
                     # If we successfully got a response, there must have been

@@ -143,14 +143,14 @@ NOTIFY_CUSTOM_DEL_TOKENS = re.compile(r'^-(?P<key>.*)\s*')
 NOTIFY_CUSTOM_COLON_TOKENS = re.compile(r'^:(?P<key>.*)\s*')
 
 # Used for attempting to acquire the schema if the URL can't be parsed.
-GET_SCHEMA_RE = re.compile(r'\s*(?P<schema>[a-z0-9]{2,9})://.*$', re.I)
+GET_SCHEMA_RE = re.compile(r'\s*(?P<schema>[a-z0-9]{1,12})://.*$', re.I)
 
 # Used for validating that a provided entry is indeed a schema
 # this is slightly different then the GET_SCHEMA_RE above which
 # insists the schema is only valid with a :// entry.  this one
 # extrapolates the individual entries
 URL_DETAILS_RE = re.compile(
-    r'\s*(?P<schema>[a-z0-9]{2,9})(://(?P<base>.*))?$', re.I)
+    r'\s*(?P<schema>[a-z0-9]{1,12})(://(?P<base>.*))?$', re.I)
 
 # Regular expression based and expanded from:
 # http://www.regular-expressions.info/email.html
@@ -194,7 +194,7 @@ CALL_SIGN_DETECTION_RE = re.compile(
 
 # Regular expression used to destinguish between multiple URLs
 URL_DETECTION_RE = re.compile(
-    r'([a-z0-9]+?:\/\/.*?)(?=$|[\s,]+[a-z0-9]{2,9}?:\/\/)', re.I)
+    r'([a-z0-9]+?:\/\/.*?)(?=$|[\s,]+[a-z0-9]{1,12}?:\/\/)', re.I)
 
 EMAIL_DETECTION_RE = re.compile(
     r'[\s,]*([^@]+@.*?)(?=$|[\s,]+'
