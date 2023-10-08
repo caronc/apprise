@@ -167,10 +167,6 @@ class NotifyAppriseAPI(NotifyBase):
         """
         super().__init__(**kwargs)
 
-        self.fullpath = kwargs.get('fullpath')
-        if not isinstance(self.fullpath, str):
-            self.fullpath = '/'
-
         self.token = validate_regex(
             token, *self.template_tokens['token']['regex'])
         if not self.token:
@@ -334,8 +330,8 @@ class NotifyAppriseAPI(NotifyBase):
             url += ':%d' % self.port
 
         fullpath = self.fullpath.strip('/')
-        url += '/{}/'.format(fullpath) if fullpath else '/'
-        url += 'notify/{}'.format(self.token)
+        url += '{}'.format('/' + fullpath) if fullpath else ''
+        url += '/notify/{}'.format(self.token)
 
         # Some entries can not be over-ridden
         headers.update({

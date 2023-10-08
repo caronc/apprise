@@ -70,9 +70,8 @@ def test_attach_base():
     # Create an object with no mimetype over-ride
     obj = AttachBase()
 
-    # Get our string object
-    with pytest.raises(NotImplementedError):
-        str(obj)
+    # Get our url object
+    str(obj)
 
     # We can not process name/path/mimetype at a Base level
     with pytest.raises(NotImplementedError):

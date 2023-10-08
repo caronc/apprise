@@ -265,4 +265,10 @@ def test_notify_apprise_api_attachments(mock_post):
             body='body', title='title', notify_type=NotifyType.INFO,
             attach=attach) is True
         assert mock_post.call_count == 1
+
+        details = mock_post.call_args_list[0]
+        assert details[0][0] == 'http://localhost/notify/mytoken1'
+        assert obj.url(privacy=False).startswith(
+            'apprise://user@localhost/mytoken1/')
+
         mock_post.reset_mock()

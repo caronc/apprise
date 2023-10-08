@@ -228,6 +228,11 @@ class URLBase:
             # Always unquote the password if it exists
             self.password = URLBase.unquote(self.password)
 
+        # Store our full path consistently ensuring it ends with a `/'
+        self.fullpath = URLBase.unquote(kwargs.get('fullpath'))
+        if not isinstance(self.fullpath, str) or not self.fullpath:
+            self.fullpath = '/'
+
         # Store our Timeout Variables
         if 'rto' in kwargs:
             try:
@@ -307,7 +312,36 @@ class URLBase:
         arguments provied.
 
         """
-        raise NotImplementedError("url() is implimented by the child class.")
+
+        # Our default parameters
+        params = self.url_parameters(privacy=privacy, *args, **kwargs)
+
+        # Determine Authentication
+        auth = ''
+        if self.user and self.password:
+            auth = '{user}:{password}@'.format(
+                user=URLBase.quote(self.user, safe=''),
+                password=self.pprint(
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
+            )
+        elif self.user:
+            auth = '{user}@'.format(
+                user=URLBase.quote(self.user, safe=''),
+            )
+
+        default_port = 443 if self.secure else 80
+
+        return '{schema}://{auth}{hostname}{port}{fullpath}?{params}'.format(
+            schema='https' if self.secure else 'http',
+            auth=auth,
+            # never encode hostname since we're expecting it to be a valid one
+            hostname=self.host,
+            port='' if self.port is None or self.port == default_port
+                 else ':{}'.format(self.port),
+            fullpath=URLBase.quote(self.fullpath, safe='/')
+            if self.fullpath else '/',
+            params=URLBase.urlencode(params),
+        )
 
     def __contains__(self, tags):
         """
@@ -582,6 +616,33 @@ class URLBase:
         that is used by requests.get() and requests.put() calls.
         """
         return (self.socket_connect_timeout, self.socket_read_timeout)
+
+    @property
+    def request_auth(self):
+        """This is primarily used to fullfill the `auth` keyword argument
+        that is used by requests.get() and requests.put() calls.
+        """
+        return (self.user, self.password) if self.user else None
+
+    @property
+    def request_url(self):
+        """
+        Assemble a simple URL that can be used by the requests library
+
+        """
+
+        # Acquire our schema
+        schema = 'https' if self.secure else 'http'
+
+        # Prepare our URL
+        url = '%s://%s' % (schema, self.host)
+
+        # Apply Port information if present
+        if isinstance(self.port, int):
+            url += ':%d' % self.port
+
+        # Append our full path
+        return url + self.fullpath
 
     def url_parameters(self, *args, **kwargs):
         """
