@@ -769,6 +769,9 @@ def test_plugin_matrix_rooms(mock_post, mock_get):
     obj._room_cache = {}
     assert obj._room_id('#abc123:localhost') is None
 
+    # Force a object removal (thus a logout call)
+    del obj
+
 
 def test_plugin_matrix_url_parsing():
     """
@@ -840,6 +843,9 @@ def test_plugin_matrix_image_errors(mock_post, mock_get):
     # post was okay
     assert obj.notify('test', 'test') is True
 
+    # Force a object removal (thus a logout call)
+    del obj
+
     def mock_function_handing(url, data, **kwargs):
         """
         dummy function for handling image posts (successfully)
@@ -872,6 +878,9 @@ def test_plugin_matrix_image_errors(mock_post, mock_get):
     assert obj.access_token is None
 
     assert obj.notify('test', 'test') is True
+
+    # Force a object removal (thus a logout call)
+    del obj
 
 
 @mock.patch('requests.get')
@@ -957,10 +966,13 @@ def test_plugin_matrix_attachments_api_v3(mock_post, mock_get):
     # handle a bad response
     bad_response = mock.Mock()
     bad_response.status_code = requests.codes.internal_server_error
-    mock_post.side_effect = [response, bad_response]
+    mock_post.side_effect = [response, bad_response, response]
 
     # We'll fail now because of an internal exception
     assert obj.send(body="test", attach=attach) is False
+
+    # Force a object removal (thus a logout call)
+    del obj
 
 
 @mock.patch('requests.get')
@@ -1053,15 +1065,23 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get):
 
     # Throw an exception on the first call to requests.post()
     for side_effect in (requests.RequestException(), OSError(), bad_response):
-        mock_post.side_effect = [side_effect]
-        mock_get.side_effect = [side_effect]
+        # Reset our value
+        mock_post.reset_mock()
+        mock_get.reset_mock()
+
+        mock_post.side_effect = [side_effect, response]
+        mock_get.side_effect = [side_effect, response]
 
         assert obj.send(body="test", attach=attach) is False
 
     # Throw an exception on the second call to requests.post()
     for side_effect in (requests.RequestException(), OSError(), bad_response):
-        mock_post.side_effect = [response, side_effect, side_effect]
-        mock_get.side_effect = [side_effect, side_effect]
+        # Reset our value
+        mock_post.reset_mock()
+        mock_get.reset_mock()
+
+        mock_post.side_effect = [response, side_effect, side_effect, response]
+        mock_get.side_effect = [side_effect, side_effect, response]
 
         # We'll fail now because of our error handling
         assert obj.send(body="test", attach=attach) is False
@@ -1070,9 +1090,12 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get):
     bad_response = mock.Mock()
     bad_response.status_code = requests.codes.internal_server_error
     mock_post.side_effect = \
-        [response, bad_response, response, response, response]
+        [response, bad_response, response, response, response, response]
     mock_get.side_effect = \
-        [response, bad_response, response, response, response]
+        [response, bad_response, response, response, response, response]
 
     # We'll fail now because of an internal exception
     assert obj.send(body="test", attach=attach) is False
+
+    # Force __del__() call
+    del obj
