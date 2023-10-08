@@ -741,6 +741,49 @@ def test_apprise_schemas(tmpdir):
         assert len(schemas) == 0
 
 
+def test_apprise_urlbase_object():
+    """
+    API: Apprise() URLBase object testing
+
+    """
+    results = URLBase.parse_url('https://localhost/path/?cto=3.0&verify=no')
+    assert results.get('user') is None
+    assert results.get('password') is None
+    assert results.get('path') == '/path/'
+    assert results.get('secure') is True
+    assert results.get('verify') is False
+    base = URLBase(**results)
+    assert base.request_timeout == (3.0, 4.0)
+    assert base.request_auth is None
+    assert base.request_url == 'https://localhost/path/'
+    assert base.url().startswith('https://localhost/')
+
+    results = URLBase.parse_url(
+        'http://user:pass@localhost:34/path/here?rto=3.0&verify=yes')
+    assert results.get('user') == 'user'
+    assert results.get('password') == 'pass'
+    assert results.get('fullpath') == '/path/here'
+    assert results.get('secure') is False
+    assert results.get('verify') is True
+    base = URLBase(**results)
+    assert base.request_timeout == (4.0, 3.0)
+    assert base.request_auth == ('user', 'pass')
+    assert base.request_url == 'http://localhost:34/path/here'
+    assert base.url().startswith('http://user:pass@localhost:34/path/here')
+
+    results = URLBase.parse_url('http://user@127.0.0.1/path/')
+    assert results.get('user') == 'user'
+    assert results.get('password') is None
+    assert results.get('fullpath') == '/path/'
+    assert results.get('secure') is False
+    assert results.get('verify') is True
+    base = URLBase(**results)
+    assert base.request_timeout == (4.0, 4.0)
+    assert base.request_auth == ('user', None)
+    assert base.request_url == 'http://127.0.0.1/path/'
+    assert base.url().startswith('http://user@127.0.0.1/path/')
+
+
 def test_apprise_notify_formats(tmpdir):
     """
     API: Apprise() Input Formats tests
