@@ -87,7 +87,7 @@ apprise_url_tests = (
         'notify_response': False,
 
         # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'twitter://c...y/****/a...2/****',
+        'privacy_url': 'x://c...y/****/a...2/****',
     }),
     ('twitter://consumer_key/consumer_secret/atoken3/access_secret'
         '?cache=no', {
