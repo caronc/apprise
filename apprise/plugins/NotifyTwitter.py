@@ -83,7 +83,7 @@ class NotifyTwitter(NotifyBase):
     service_url = 'https://twitter.com/'
 
     # The default secure protocol is twitter.
-    secure_protocol = ('twitter', 'tweet')
+    secure_protocol = ('x', 'twitter', 'tweet')
 
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_twitter'
