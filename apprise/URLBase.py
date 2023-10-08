@@ -204,7 +204,14 @@ class URLBase:
         self.verify_certificate = parse_bool(kwargs.get('verify', True))
 
         # Secure Mode
-        self.secure = kwargs.get('secure', False)
+        self.secure = kwargs.get('secure', None)
+        try:
+            if not isinstance(self.secure, bool):
+                # Attempt to detect
+                self.secure = kwargs.get('schema', '')[-1].lower() == 's'
+
+        except (TypeError, IndexError):
+            self.secure = False
 
         self.host = URLBase.unquote(kwargs.get('host'))
         self.port = kwargs.get('port')
@@ -664,7 +671,8 @@ class URLBase:
         }
 
     @staticmethod
-    def parse_url(url, verify_host=True, plus_to_space=False):
+    def parse_url(url, verify_host=True, plus_to_space=False,
+                  strict_port=False):
         """Parses the URL and returns it broken apart into a dictionary.
 
         This is very specific and customized for Apprise.
@@ -685,13 +693,13 @@ class URLBase:
 
         results = parse_url(
             url, default_schema='unknown', verify_host=verify_host,
-            plus_to_space=plus_to_space)
+            plus_to_space=plus_to_space, strict_port=strict_port)
 
         if not results:
             # We're done; we failed to parse our url
             return results
 
-        # if our URL ends with an 's', then assueme our secure flag is set.
+        # if our URL ends with an 's', then assume our secure flag is set.
         results['secure'] = (results['schema'][-1] == 's')
 
         # Support SSL Certificate 'verify' keyword. Default to being enabled
