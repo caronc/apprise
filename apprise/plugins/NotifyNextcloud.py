@@ -114,6 +114,10 @@ class NotifyNextcloud(NotifyBase):
             'min': 1,
             'default': 21,
         },
+        'url_prefix': {
+            'name': _('URL Prefix'),
+            'type': 'string',
+        },
         'to': {
             'alias_of': 'targets',
         },
@@ -127,7 +131,8 @@ class NotifyNextcloud(NotifyBase):
         },
     }
 
-    def __init__(self, targets=None, version=None, headers=None, **kwargs):
+    def __init__(self, targets=None, version=None, headers=None,
+                 url_prefix=None, **kwargs):
         """
         Initialize Nextcloud Object
         """
@@ -152,6 +157,10 @@ class NotifyNextcloud(NotifyBase):
                     .format(version)
                 self.logger.warning(msg)
                 raise TypeError(msg)
+
+        # Support URL Prefixes
+        self.url_prefix = '' if not url_prefix \
+            else '{}'.join(url_prefix.strip('/'))
 
         self.headers = {}
         if headers:
@@ -196,11 +205,11 @@ class NotifyNextcloud(NotifyBase):
                 auth = (self.user, self.password)
 
             # Nextcloud URL based on version used
-            notify_url = '{schema}://{host}/ocs/v2.php/'\
+            notify_url = '{schema}://{host}/{url_prefix}/ocs/v2.php/'\
                 'apps/admin_notifications/' \
                 'api/v1/notifications/{target}' \
                 if self.version < 21 else \
-                '{schema}://{host}/ocs/v2.php/'\
+                '{schema}://{host}/{url_prefix}/ocs/v2.php/'\
                 'apps/notifications/'\
                 'api/v2/admin_notifications/{target}'
 
@@ -208,6 +217,7 @@ class NotifyNextcloud(NotifyBase):
                 schema='https' if self.secure else 'http',
                 host=self.host if not isinstance(self.port, int)
                 else '{}:{}'.format(self.host, self.port),
+                url_prefix=self.url_prefix,
                 target=target,
             )
 
@@ -277,6 +287,9 @@ class NotifyNextcloud(NotifyBase):
         # Set our version
         params['version'] = str(self.version)
 
+        if self.url_prefix:
+            params['url_prefix'] = self.url_prefix
+
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
@@ -342,6 +355,12 @@ class NotifyNextcloud(NotifyBase):
         if 'version' in results['qsd'] and len(results['qsd']['version']):
             results['version'] = \
                 NotifyNextcloud.unquote(results['qsd']['version'])
+
+        # Support URL Prefixes
+        if 'url_prefix' in results['qsd'] \
+                and len(results['qsd']['url_prefix']):
+            results['url_prefix'] = \
+                NotifyNextcloud.unquote(results['qsd']['url_prefix'])
 
         # Add our headers that the user can potentially over-ride if they wish
         # to to our returned result set and tidy entries by unquoting them

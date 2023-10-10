@@ -77,6 +77,10 @@ apprise_url_tests = (
         'instance': NotifyNextcloudTalk,
         'requests_response_code': requests.codes.created,
     }),
+    ('nctalk://user:pass@localhost:8080/roomid?url_prefix=/prefix', {
+        'instance': NotifyNextcloudTalk,
+        'requests_response_code': requests.codes.created,
+    }),
     ('nctalks://user:pass@localhost/roomid', {
         'instance': NotifyNextcloudTalk,
         'requests_response_code': requests.codes.created,

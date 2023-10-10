@@ -104,6 +104,14 @@ class NotifyNextcloudTalk(NotifyBase):
         },
     })
 
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        'url_prefix': {
+            'name': _('URL Prefix'),
+            'type': 'string',
+        },
+    })
+
     # Define any kwargs we're using
     template_kwargs = {
         'headers': {
@@ -112,7 +120,7 @@ class NotifyNextcloudTalk(NotifyBase):
         },
     }
 
-    def __init__(self, targets=None, headers=None, **kwargs):
+    def __init__(self, targets=None, headers=None, url_prefix=None, **kwargs):
         """
         Initialize Nextcloud Talk Object
         """
@@ -128,6 +136,10 @@ class NotifyNextcloudTalk(NotifyBase):
             msg = 'At least one Nextcloud Talk Room ID must be specified.'
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        # Support URL Prefixes
+        self.url_prefix = '' if not url_prefix \
+            else '{}'.join(url_prefix.strip('/'))
 
         self.headers = {}
         if headers:
@@ -172,13 +184,14 @@ class NotifyNextcloudTalk(NotifyBase):
                 }
 
             # Nextcloud Talk URL
-            notify_url = '{schema}://{host}'\
+            notify_url = '{schema}://{host}/{url_prefix}'\
                          '/ocs/v2.php/apps/spreed/api/v1/chat/{target}'
 
             notify_url = notify_url.format(
                 schema='https' if self.secure else 'http',
                 host=self.host if not isinstance(self.port, int)
                 else '{}:{}'.format(self.host, self.port),
+                url_prefix=self.url_prefix,
                 target=target,
             )
 
@@ -241,6 +254,14 @@ class NotifyNextcloudTalk(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
+        # Our default set of parameters
+        params = self.url_parameters(privacy=privacy, *args, **kwargs)
+
+        # Append our headers into our parameters
+        params.update({'+{}'.format(k): v for k, v in self.headers.items()})
+        if self.url_prefix:
+            params['url_prefix'] = self.url_prefix
+
         # Determine Authentication
         auth = '{user}:{password}@'.format(
             user=NotifyNextcloudTalk.quote(self.user, safe=''),
@@ -250,7 +271,7 @@ class NotifyNextcloudTalk(NotifyBase):
 
         default_port = 443 if self.secure else 80
 
-        return '{schema}://{auth}{hostname}{port}/{targets}' \
+        return '{schema}://{auth}{hostname}{port}/{targets}?{params}' \
                .format(
                    schema=self.secure_protocol
                    if self.secure else self.protocol,
@@ -262,6 +283,7 @@ class NotifyNextcloudTalk(NotifyBase):
                         else ':{}'.format(self.port),
                    targets='/'.join([NotifyNextcloudTalk.quote(x)
                                      for x in self.targets]),
+                   params=NotifyNextcloudTalk.urlencode(params),
                )
 
     def __len__(self):
@@ -286,6 +308,12 @@ class NotifyNextcloudTalk(NotifyBase):
         # Fetch our targets
         results['targets'] = \
             NotifyNextcloudTalk.split_path(results['fullpath'])
+
+        # Support URL Prefixes
+        if 'url_prefix' in results['qsd'] \
+                and len(results['qsd']['url_prefix']):
+            results['url_prefix'] = \
+                NotifyNextcloudTalk.unquote(results['qsd']['url_prefix'])
 
         # Add our headers that the user can potentially over-ride if they wish
         # to to our returned result set and tidy entries by unquoting them

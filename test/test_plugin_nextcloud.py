@@ -81,6 +81,12 @@ apprise_url_tests = (
     ('ncloud://user@localhost?to=user1,user2&version=21', {
         'instance': NotifyNextcloud,
     }),
+    ('ncloud://user@localhost?to=user1&version=20&url_prefix=/abcd', {
+        'instance': NotifyNextcloud,
+    }),
+    ('ncloud://user@localhost?to=user1&version=21&url_prefix=/abcd', {
+        'instance': NotifyNextcloud,
+    }),
     ('ncloud://user:pass@localhost/user1/user2', {
         'instance': NotifyNextcloud,
 
