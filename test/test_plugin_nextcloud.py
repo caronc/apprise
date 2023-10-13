@@ -27,7 +27,8 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 from unittest import mock
-
+from apprise import Apprise
+from apprise import NotifyType
 import requests
 from apprise.plugins.NotifyNextcloud import NotifyNextcloud
 from helpers import AppriseURLTester
@@ -52,7 +53,10 @@ apprise_url_tests = (
     }),
     ('ncloud://localhost', {
         # No user specified
-        'instance': TypeError,
+        'instance': NotifyNextcloud,
+        # Since there are no targets specified we expect a False return on
+        # send()
+        'notify_response': False,
     }),
     ('ncloud://user@localhost?to=user1,user2&version=invalid', {
         # An invalid version was specified
@@ -166,3 +170,46 @@ def test_plugin_nextcloud_edge_cases(mock_post):
     assert 'shortMessage' in mock_post.call_args_list[0][1]['data']
     # The longMessage argument is not set
     assert 'longMessage' not in mock_post.call_args_list[0][1]['data']
+
+
+@mock.patch('requests.post')
+def test_plugin_nextcloud_url_prefix(mock_post):
+    """
+    NotifyNextcloud() URL Prefix Testing
+    """
+
+    response = mock.Mock()
+    response.content = ''
+    response.status_code = requests.codes.ok
+
+    # Prepare our mock object
+    mock_post.return_value = response
+
+    # instantiate our object (without a batch mode)
+    obj = Apprise.instantiate(
+        'ncloud://localhost/admin/?version=20&url_prefix=/abcd')
+
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
+
+    # Not set to batch, so we send 2 different messages
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'http://localhost/abcd/ocs/v2.php/apps/' \
+        'admin_notifications/api/v1/notifications/admin'
+
+    mock_post.reset_mock()
+
+    # instantiate our object (without a batch mode)
+    obj = Apprise.instantiate(
+        'ncloud://localhost/admin/?version=21&'
+        'url_prefix=a/longer/path/abcd/')
+
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
+
+    # Not set to batch, so we send 2 different messages
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'http://localhost/a/longer/path/abcd/' \
+        'ocs/v2.php/apps/notifications/api/v2/admin_notifications/admin'

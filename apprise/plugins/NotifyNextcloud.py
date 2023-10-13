@@ -138,11 +138,8 @@ class NotifyNextcloud(NotifyBase):
         """
         super().__init__(**kwargs)
 
+        # Store our targets
         self.targets = parse_list(targets)
-        if len(self.targets) == 0:
-            msg = 'At least one Nextcloud target user must be specified.'
-            self.logger.warning(msg)
-            raise TypeError(msg)
 
         self.version = self.template_args['version']['default']
         if version is not None:
@@ -158,9 +155,9 @@ class NotifyNextcloud(NotifyBase):
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
-        # Support URL Prefixes
+        # Support URL Prefix
         self.url_prefix = '' if not url_prefix \
-            else '{}'.join(url_prefix.strip('/'))
+            else url_prefix.strip('/')
 
         self.headers = {}
         if headers:
@@ -173,6 +170,11 @@ class NotifyNextcloud(NotifyBase):
         """
         Perform Nextcloud Notification
         """
+
+        if len(self.targets) == 0:
+            # There were no services to notify
+            self.logger.warning('There were no Nextcloud targets to notify.')
+            return False
 
         # Prepare our Header
         headers = {
@@ -327,7 +329,8 @@ class NotifyNextcloud(NotifyBase):
         """
         Returns the number of targets associated with this notification
         """
-        return len(self.targets)
+        targets = len(self.targets)
+        return targets if targets else 1
 
     @staticmethod
     def parse_url(url):

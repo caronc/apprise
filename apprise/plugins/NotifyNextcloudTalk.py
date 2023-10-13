@@ -131,15 +131,12 @@ class NotifyNextcloudTalk(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
+        # Store our targets
         self.targets = parse_list(targets)
-        if len(self.targets) == 0:
-            msg = 'At least one Nextcloud Talk Room ID must be specified.'
-            self.logger.warning(msg)
-            raise TypeError(msg)
 
-        # Support URL Prefixes
+        # Support URL Prefix
         self.url_prefix = '' if not url_prefix \
-            else '{}'.join(url_prefix.strip('/'))
+            else url_prefix.strip('/')
 
         self.headers = {}
         if headers:
@@ -152,6 +149,12 @@ class NotifyNextcloudTalk(NotifyBase):
         """
         Perform Nextcloud Talk Notification
         """
+
+        if len(self.targets) == 0:
+            # There were no services to notify
+            self.logger.warning(
+                'There were no Nextcloud Talk targets to notify.')
+            return False
 
         # Prepare our Header
         headers = {
@@ -214,7 +217,8 @@ class NotifyNextcloudTalk(NotifyBase):
                     verify=self.verify_certificate,
                     timeout=self.request_timeout,
                 )
-                if r.status_code != requests.codes.created:
+                if r.status_code not in (
+                        requests.codes.created, requests.codes.ok):
                     # We had a problem
                     status_str = \
                         NotifyNextcloudTalk.http_response_code_lookup(
@@ -290,7 +294,8 @@ class NotifyNextcloudTalk(NotifyBase):
         """
         Returns the number of targets associated with this notification
         """
-        return len(self.targets)
+        targets = len(self.targets)
+        return targets if targets else 1
 
     @staticmethod
     def parse_url(url):
