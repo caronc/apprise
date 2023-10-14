@@ -151,6 +151,9 @@ class NotifyMatrix(NotifyBase):
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_32
 
+    # Matrix is_image check
+    __matrix_is_image = re.compile(r'^image/.*', re.I)
+
     # The maximum allowable characters allowed in the body per message
     # https://spec.matrix.org/v1.6/client-server-api/#size-limits
     # The complete event MUST NOT be larger than 65536 bytes, when formatted
@@ -611,10 +614,15 @@ class NotifyMatrix(NotifyBase):
                 self.image_url(notify_type)
 
             # Build our path
-            path = '/rooms/{}/send/m.room.message'.format(
-                NotifyMatrix.quote(room_id))
+            if self.version == MatrixVersion.V3:
+                path = '/rooms/{}/send/m.room.message/0'.format(
+                    NotifyMatrix.quote(room_id))
 
-            if image_url:
+            else:
+                path = '/rooms/{}/send/m.room.message'.format(
+                    NotifyMatrix.quote(room_id))
+
+            if image_url and self.version == MatrixVersion.V2:
                 # Define our payload
                 image_payload = {
                     'msgtype': 'm.image',
@@ -631,6 +639,10 @@ class NotifyMatrix(NotifyBase):
 
             if attachments:
                 for attachment in attachments:
+                    if self.version == MatrixVersion.V3:
+                        attachment['room_id'] = room_id
+                        attachment['type'] = 'm.room.message'
+
                     postokay, response = self._fetch(path, payload=attachment)
                 if not postokay:
                     # Mark our failure
@@ -667,7 +679,9 @@ class NotifyMatrix(NotifyBase):
                 })
 
             # Post our content
-            postokay, response = self._fetch(path, payload=payload)
+            method = 'PUT' if self.version == MatrixVersion.V3 else 'POST'
+            postokay, response = self._fetch(
+                path, payload=payload, method=method)
             if not postokay:
                 # Notify our user
                 self.logger.warning(
@@ -705,15 +719,32 @@ class NotifyMatrix(NotifyBase):
             #     "content_uri": "mxc://example.com/a-unique-key"
             # }
 
-            # Prepare our payload
-            payloads.append({
-                "info": {
-                    "mimetype": attachment.mimetype,
-                },
-                "msgtype": "m.image",
-                "body": "tta.webp",
-                "url": response.get('content_uri'),
-            })
+            if self.version == MatrixVersion.V3:
+                # Prepare our payload
+                is_image = self.__matrix_is_image.match(attachment.mimetype)
+                payloads.append({
+                    "body": attachment.name,
+                    "info": {
+                        "mimetype": attachment.mimetype,
+                        "size": len(attachment),
+                    },
+                    "msgtype": "m.image" if is_image else "m.file",
+                    "url": response.get('content_uri'),
+                })
+                if not is_image:
+                    # Setup `m.file'
+                    payloads[-1]['filename'] = attachment.name
+
+            else:
+                # Prepare our payload
+                payloads.append({
+                    "info": {
+                        "mimetype": attachment.mimetype,
+                    },
+                    "msgtype": "m.image",
+                    "body": "tta.webp",
+                    "url": response.get('content_uri'),
+                })
 
         return payloads
 
@@ -1120,7 +1151,8 @@ class NotifyMatrix(NotifyBase):
         response = {}
 
         # fetch function
-        fn = requests.post if method == 'POST' else requests.get
+        fn = requests.post if method == 'POST' else (
+            requests.put if method == 'PUT' else requests.get)
 
         # Define how many attempts we'll make if we get caught in a throttle
         # event
@@ -1148,7 +1180,9 @@ class NotifyMatrix(NotifyBase):
                     timeout=self.request_timeout,
                 )
 
-                self.logger.debug('Matrix Response: %s' % str(r.content))
+                self.logger.debug(
+                    'Matrix Response: code=%d, %s' % (
+                        r.status_code, str(r.content)))
                 response = loads(r.content)
 
                 if r.status_code == 429:
