@@ -151,9 +151,6 @@ class NotifyMatrix(NotifyBase):
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_32
 
-    # Matrix is_image check
-    __matrix_is_image = re.compile(r'^image/.*', re.I)
-
     # The maximum allowable characters allowed in the body per message
     # https://spec.matrix.org/v1.6/client-server-api/#size-limits
     # The complete event MUST NOT be larger than 65536 bytes, when formatted
@@ -589,7 +586,7 @@ class NotifyMatrix(NotifyBase):
         attachments = None
         if attach and self.attachment_support:
             attachments = self._send_attachments(attach)
-            if not attachments:
+            if attachments is False:
                 # take an early exit
                 return False
 
@@ -622,32 +619,38 @@ class NotifyMatrix(NotifyBase):
                 path = '/rooms/{}/send/m.room.message'.format(
                     NotifyMatrix.quote(room_id))
 
-            if image_url and self.version == MatrixVersion.V2:
-                # Define our payload
-                image_payload = {
-                    'msgtype': 'm.image',
-                    'url': image_url,
-                    'body': '{}'.format(notify_type if not title else title),
-                }
+            if self.version == MatrixVersion.V2:
+                #
+                # Attachments don't work beyond V2 at this time
+                #
+                if image_url:
+                    # Define our payload
+                    image_payload = {
+                        'msgtype': 'm.image',
+                        'url': image_url,
+                        'body': '{}'.format(
+                            notify_type if not title else title),
+                    }
 
-                # Post our content
-                postokay, response = self._fetch(path, payload=image_payload)
-                if not postokay:
-                    # Mark our failure
-                    has_error = True
-                    continue
+                    # Post our content
+                    postokay, response = self._fetch(
+                        path, payload=image_payload)
+                    if not postokay:
+                        # Mark our failure
+                        has_error = True
+                        continue
 
-            if attachments:
-                for attachment in attachments:
-                    if self.version == MatrixVersion.V3:
+                if attachments:
+                    for attachment in attachments:
                         attachment['room_id'] = room_id
                         attachment['type'] = 'm.room.message'
 
-                    postokay, response = self._fetch(path, payload=attachment)
-                if not postokay:
-                    # Mark our failure
-                    has_error = True
-                    continue
+                        postokay, response = self._fetch(
+                            path, payload=attachment)
+                        if not postokay:
+                            # Mark our failure
+                            has_error = True
+                            continue
 
             # Define our payload
             payload = {
@@ -699,6 +702,11 @@ class NotifyMatrix(NotifyBase):
         """
 
         payloads = []
+        if self.version != MatrixVersion.V2:
+            self.logger.warning(
+                'Add ?v=2 to Apprise URL to support Attachments')
+            return next((False for a in attach if not a), [])
+
         for attachment in attach:
             if not attachment:
                 # invalid attachment (bad file)
@@ -721,19 +729,15 @@ class NotifyMatrix(NotifyBase):
 
             if self.version == MatrixVersion.V3:
                 # Prepare our payload
-                is_image = self.__matrix_is_image.match(attachment.mimetype)
                 payloads.append({
                     "body": attachment.name,
                     "info": {
                         "mimetype": attachment.mimetype,
                         "size": len(attachment),
                     },
-                    "msgtype": "m.image" if is_image else "m.file",
+                    "msgtype": "m.image",
                     "url": response.get('content_uri'),
                 })
-                if not is_image:
-                    # Setup `m.file'
-                    payloads[-1]['filename'] = attachment.name
 
             else:
                 # Prepare our payload

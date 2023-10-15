@@ -929,26 +929,21 @@ def test_plugin_matrix_attachments_api_v3(mock_post, mock_get, mock_put):
 
     # Test our call count
     assert mock_put.call_count == 1
-    assert mock_post.call_count == 4
+    assert mock_post.call_count == 2
     assert mock_post.call_args_list[0][0][0] == \
         'http://localhost/_matrix/client/v3/login'
     assert mock_post.call_args_list[1][0][0] == \
-        'http://localhost/_matrix/media/v3/upload'
-    assert mock_post.call_args_list[2][0][0] == \
         'http://localhost/_matrix/client/v3/join/%23general%3Alocalhost'
-    assert mock_post.call_args_list[3][0][0] == \
-        'http://localhost/_matrix/client/v3/rooms/%21abc123%3Alocalhost/' \
-        'send/m.room.message/0'
     assert mock_put.call_args_list[0][0][0] == \
         'http://localhost/_matrix/client/v3/rooms/%21abc123%3Alocalhost/' \
         'send/m.room.message/0'
 
-    # Attach an unsupported file type
+    # Attach an unsupported file type (it's just skipped)
     attach = AppriseAttachment(
         os.path.join(TEST_VAR_DIR, 'apprise-archive.zip'))
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
-        attach=attach) is False
+        attach=attach) is True
 
     # An invalid attachment will cause a failure
     path = os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
@@ -965,23 +960,23 @@ def test_plugin_matrix_attachments_api_v3(mock_post, mock_get, mock_put):
     for side_effect in (requests.RequestException(), OSError(), bad_response):
         mock_post.side_effect = [side_effect]
 
-        # We'll fail now because of our error handling
-        assert obj.send(body="test", attach=attach) is False
+        # We'll never fail because files are not attached
+        assert obj.send(body="test", attach=attach) is True
 
     # Throw an exception on the second call to requests.post()
     for side_effect in (requests.RequestException(), OSError(), bad_response):
         mock_post.side_effect = [response, side_effect]
 
-        # We'll fail now because of our error handling
-        assert obj.send(body="test", attach=attach) is False
+        # Attachment support does not exist vor v3 at time, so this will
+        # work nicely
+        assert obj.send(body="test", attach=attach) is True
 
     # handle a bad response
-    bad_response = mock.Mock()
-    bad_response.status_code = requests.codes.internal_server_error
     mock_post.side_effect = [response, bad_response, response]
 
-    # We'll fail now because of an internal exception
-    assert obj.send(body="test", attach=attach) is False
+    # Attachment support does not exist vor v3 at time, so this will
+    # work nicely
+    assert obj.send(body="test", attach=attach) is True
 
     # Force a object removal (thus a logout call)
     del obj
@@ -1055,12 +1050,12 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get):
         'https://localhost/_matrix/client/r0/rooms/%21abc123%3Alocalhost/' \
         'send/m.room.message'
 
-    # Attach an unsupported file type
+    # Attach an unsupported file type; these are skipped
     attach = AppriseAttachment(
         os.path.join(TEST_VAR_DIR, 'apprise-archive.zip'))
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
-        attach=attach) is False
+        attach=attach) is True
 
     # An invalid attachment will cause a failure
     path = os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
@@ -1099,8 +1094,6 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get):
         assert obj.send(body="test", attach=attach) is False
 
     # handle a bad response
-    bad_response = mock.Mock()
-    bad_response.status_code = requests.codes.internal_server_error
     mock_post.side_effect = \
         [response, bad_response, response, response, response, response]
     mock_get.side_effect = \
@@ -1108,6 +1101,39 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get):
 
     # We'll fail now because of an internal exception
     assert obj.send(body="test", attach=attach) is False
+
+    # Force a object removal (thus a logout call)
+    del obj
+
+    # Instantiate our object
+    obj = Apprise.instantiate(
+        'matrixs://user:pass@localhost/#general?v=2&image=y')
+
+    # Reset our object
+    mock_post.reset_mock()
+    mock_get.reset_mock()
+
+    mock_post.return_value = None
+    mock_get.return_value = None
+    mock_post.side_effect = \
+        [response, response, bad_response, response, response, response,
+         response]
+    mock_get.side_effect = \
+        [response, response, bad_response, response, response, response,
+         response]
+
+    # image attachment didn't succeed
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is False
+
+    # Error during image post
+    mock_post.return_value = response
+    mock_get.return_value = response
+    mock_post.side_effect = None
+    mock_get.side_effect = None
+
+    # We'll fail now because of an internal exception
+    assert obj.send(body="test", attach=attach) is True
 
     # Force __del__() call
     del obj
