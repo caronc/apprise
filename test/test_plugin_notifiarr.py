@@ -94,10 +94,10 @@ apprise_url_tests = (
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'notifiarr://m...y/#123',
     }),
-    ('notifiarr://123/?apikey=myapikey&footer=yes&image=yes', {
+    ('notifiarr://123/?apikey=myapikey&image=yes', {
         'instance': NotifyNotifiarr,
     }),
-    ('notifiarr://123/?apikey=myapikey&footer=yes&image=no', {
+    ('notifiarr://123/?apikey=myapikey&image=no', {
         'instance': NotifyNotifiarr,
     }),
     ('notifiarr://123/?apikey=myapikey&source=My%20System', {
