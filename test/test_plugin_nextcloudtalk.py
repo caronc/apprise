@@ -27,7 +27,8 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 from unittest import mock
-
+from apprise import Apprise
+from apprise import NotifyType
 import requests
 from apprise.plugins.NotifyNextcloudTalk import NotifyNextcloudTalk
 from helpers import AppriseURLTester
@@ -38,7 +39,7 @@ logging.disable(logging.CRITICAL)
 
 apprise_url_tests = (
     ##################################
-    # NotifyNextcloud
+    # NotifyNextcloudTalk
     ##################################
     ('nctalk://:@/', {
         'instance': None,
@@ -64,7 +65,10 @@ apprise_url_tests = (
     }),
     ('nctalk://user:pass@localhost', {
         # No roomid specified
-        'instance': TypeError,
+        'instance': NotifyNextcloudTalk,
+        # Since there are no targets specified we expect a False return on
+        # send()
+        'notify_response': False,
     }),
     ('nctalk://user:pass@localhost/roomid1/roomid2', {
         'instance': NotifyNextcloudTalk,
@@ -74,6 +78,10 @@ apprise_url_tests = (
         'privacy_url': 'nctalk://user:****@localhost/roomid1/roomid2',
     }),
     ('nctalk://user:pass@localhost:8080/roomid', {
+        'instance': NotifyNextcloudTalk,
+        'requests_response_code': requests.codes.created,
+    }),
+    ('nctalk://user:pass@localhost:8080/roomid?url_prefix=/prefix', {
         'instance': NotifyNextcloudTalk,
         'requests_response_code': requests.codes.created,
     }),
@@ -115,7 +123,7 @@ apprise_url_tests = (
 
 def test_plugin_nextcloudtalk_urls():
     """
-    NotifyNextcloud() Apprise URLs
+    NotifyNextcloudTalk() Apprise URLs
 
     """
 
@@ -126,7 +134,7 @@ def test_plugin_nextcloudtalk_urls():
 @mock.patch('requests.post')
 def test_plugin_nextcloudtalk_edge_cases(mock_post):
     """
-    NotifyNextcloud() Edge Cases
+    NotifyNextcloudTalk() Edge Cases
 
     """
 
@@ -148,3 +156,45 @@ def test_plugin_nextcloudtalk_edge_cases(mock_post):
     assert obj.send(body="") is True
     assert 'data' in mock_post.call_args_list[0][1]
     assert 'message' in mock_post.call_args_list[0][1]['data']
+
+
+@mock.patch('requests.post')
+def test_plugin_nextcloud_talk_url_prefix(mock_post):
+    """
+    NotifyNextcloudTalk() URL Prefix Testing
+    """
+
+    response = mock.Mock()
+    response.content = ''
+    response.status_code = requests.codes.created
+
+    # Prepare our mock object
+    mock_post.return_value = response
+
+    # instantiate our object (without a batch mode)
+    obj = Apprise.instantiate(
+        'nctalk://user:pass@localhost/admin/?url_prefix=/abcd')
+
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
+
+    # Not set to batch, so we send 2 different messages
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'http://localhost/abcd/ocs/v2.php/apps/spreed/api/v1/chat/admin'
+
+    mock_post.reset_mock()
+
+    # instantiate our object (without a batch mode)
+    obj = Apprise.instantiate(
+        'nctalk://user:pass@localhost/admin/?'
+        'url_prefix=a/longer/path/abcd/')
+
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
+
+    # Not set to batch, so we send 2 different messages
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'http://localhost/a/longer/path/abcd/' \
+        'ocs/v2.php/apps/spreed/api/v1/chat/admin'
