@@ -149,8 +149,8 @@ class NotifyNotifiarr(NotifyBase):
     })
 
     def __init__(self, apikey=None, include_image=None,
-                 discord_user=None, discord_role=None, event=None,
-                 targets=None, source=None, **kwargs):
+                 discord_user=None, discord_role=None,
+                 event=None, targets=None, source=None, **kwargs):
         """
         Initialize Notifiarr Object
 
@@ -238,7 +238,7 @@ class NotifyNotifiarr(NotifyBase):
 
         # Define any URL parameters
         params = {
-            'image': 'yes' if self.include_image else 'no'
+            'image': 'yes' if self.include_image else 'no',
         }
 
         if self.source:
@@ -310,6 +310,7 @@ class NotifyNotifiarr(NotifyBase):
                         'title': title,
                         'content': '',
                         'description': body,
+                        'footer': self.app_desc,
                     },
                     'ids': {
                         'channel': channel,
@@ -319,6 +320,9 @@ class NotifyNotifiarr(NotifyBase):
 
             if self.include_image and image_url:
                 payload['discord']['text']['icon'] = image_url
+                payload['discord']['images'] = {
+                    'thumbnail': image_url,
+                }
 
             if not self._send(payload):
                 has_error = True
