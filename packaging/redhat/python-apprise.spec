@@ -53,7 +53,7 @@ Streamlabs, Stride, Syslog, Techulus Push, Telegram, Twilio, Twitter, Twist,
 XBMC, Voipms, Vonage, WhatsApp, Webex Teams}
 
 Name:           python-%{pypi_name}
-Version:        1.5.0
+Version:        1.6.0
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        BSD
@@ -194,8 +194,12 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 %{python3_sitelib}/%{pypi_name}/cli.*
 
 %changelog
+* Sun Oct 15 2023 Chris Caron <lead2gold@gmail.com> - 1.6.0
+- Updated to v1.6.0
+
 * Sun Aug 27 2023 Chris Caron <lead2gold@gmail.com> - 1.5.0
 - Updated to v1.5.0
+- apprise-fedora-rpm-testcase-handling.patch added for test handling
 
 * Fri Jul 21 2023 Fedora Release Engineering <releng@fedoraproject.org> - 1.4.5-2
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_39_Mass_Rebuild
