@@ -586,7 +586,7 @@ class NotifyMatrix(NotifyBase):
         attachments = None
         if attach and self.attachment_support:
             attachments = self._send_attachments(attach)
-            if not attachments:
+            if attachments is False:
                 # take an early exit
                 return False
 
@@ -611,31 +611,46 @@ class NotifyMatrix(NotifyBase):
                 self.image_url(notify_type)
 
             # Build our path
-            path = '/rooms/{}/send/m.room.message'.format(
-                NotifyMatrix.quote(room_id))
+            if self.version == MatrixVersion.V3:
+                path = '/rooms/{}/send/m.room.message/0'.format(
+                    NotifyMatrix.quote(room_id))
 
-            if image_url:
-                # Define our payload
-                image_payload = {
-                    'msgtype': 'm.image',
-                    'url': image_url,
-                    'body': '{}'.format(notify_type if not title else title),
-                }
+            else:
+                path = '/rooms/{}/send/m.room.message'.format(
+                    NotifyMatrix.quote(room_id))
 
-                # Post our content
-                postokay, response = self._fetch(path, payload=image_payload)
-                if not postokay:
-                    # Mark our failure
-                    has_error = True
-                    continue
+            if self.version == MatrixVersion.V2:
+                #
+                # Attachments don't work beyond V2 at this time
+                #
+                if image_url:
+                    # Define our payload
+                    image_payload = {
+                        'msgtype': 'm.image',
+                        'url': image_url,
+                        'body': '{}'.format(
+                            notify_type if not title else title),
+                    }
 
-            if attachments:
-                for attachment in attachments:
-                    postokay, response = self._fetch(path, payload=attachment)
-                if not postokay:
-                    # Mark our failure
-                    has_error = True
-                    continue
+                    # Post our content
+                    postokay, response = self._fetch(
+                        path, payload=image_payload)
+                    if not postokay:
+                        # Mark our failure
+                        has_error = True
+                        continue
+
+                if attachments:
+                    for attachment in attachments:
+                        attachment['room_id'] = room_id
+                        attachment['type'] = 'm.room.message'
+
+                        postokay, response = self._fetch(
+                            path, payload=attachment)
+                        if not postokay:
+                            # Mark our failure
+                            has_error = True
+                            continue
 
             # Define our payload
             payload = {
@@ -667,7 +682,9 @@ class NotifyMatrix(NotifyBase):
                 })
 
             # Post our content
-            postokay, response = self._fetch(path, payload=payload)
+            method = 'PUT' if self.version == MatrixVersion.V3 else 'POST'
+            postokay, response = self._fetch(
+                path, payload=payload, method=method)
             if not postokay:
                 # Notify our user
                 self.logger.warning(
@@ -685,6 +702,11 @@ class NotifyMatrix(NotifyBase):
         """
 
         payloads = []
+        if self.version != MatrixVersion.V2:
+            self.logger.warning(
+                'Add ?v=2 to Apprise URL to support Attachments')
+            return next((False for a in attach if not a), [])
+
         for attachment in attach:
             if not attachment:
                 # invalid attachment (bad file)
@@ -705,15 +727,28 @@ class NotifyMatrix(NotifyBase):
             #     "content_uri": "mxc://example.com/a-unique-key"
             # }
 
-            # Prepare our payload
-            payloads.append({
-                "info": {
-                    "mimetype": attachment.mimetype,
-                },
-                "msgtype": "m.image",
-                "body": "tta.webp",
-                "url": response.get('content_uri'),
-            })
+            if self.version == MatrixVersion.V3:
+                # Prepare our payload
+                payloads.append({
+                    "body": attachment.name,
+                    "info": {
+                        "mimetype": attachment.mimetype,
+                        "size": len(attachment),
+                    },
+                    "msgtype": "m.image",
+                    "url": response.get('content_uri'),
+                })
+
+            else:
+                # Prepare our payload
+                payloads.append({
+                    "info": {
+                        "mimetype": attachment.mimetype,
+                    },
+                    "msgtype": "m.image",
+                    "body": "tta.webp",
+                    "url": response.get('content_uri'),
+                })
 
         return payloads
 
@@ -780,12 +815,23 @@ class NotifyMatrix(NotifyBase):
                 'user/pass combo is missing.')
             return False
 
-        # Prepare our Registration Payload
-        payload = {
-            'type': 'm.login.password',
-            'user': self.user,
-            'password': self.password,
-        }
+        # Prepare our Authentication Payload
+        if self.version == MatrixVersion.V3:
+            payload = {
+                'type': 'm.login.password',
+                'identifier': {
+                    'type': 'm.id.user',
+                    'user': self.user,
+                },
+                'password': self.password,
+            }
+
+        else:
+            payload = {
+                'type': 'm.login.password',
+                'user': self.user,
+                'password': self.password,
+            }
 
         # Build our URL
         postokay, response = self._fetch('/login', payload=payload)
@@ -1109,7 +1155,8 @@ class NotifyMatrix(NotifyBase):
         response = {}
 
         # fetch function
-        fn = requests.post if method == 'POST' else requests.get
+        fn = requests.post if method == 'POST' else (
+            requests.put if method == 'PUT' else requests.get)
 
         # Define how many attempts we'll make if we get caught in a throttle
         # event
@@ -1137,7 +1184,9 @@ class NotifyMatrix(NotifyBase):
                     timeout=self.request_timeout,
                 )
 
-                self.logger.debug('Matrix Response: %s' % str(r.content))
+                self.logger.debug(
+                    'Matrix Response: code=%d, %s' % (
+                        r.status_code, str(r.content)))
                 response = loads(r.content)
 
                 if r.status_code == 429:
