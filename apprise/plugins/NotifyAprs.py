@@ -125,14 +125,14 @@ class NotifyAprs(NotifyBase):
     socket_timeout = 15
 
     # Apprise APRS Device ID / TOCALL ID
-    # This is a fixed value which is associated with this software
-    # This value must not be changed. If you use this APRS plugin
-    # outside of Apprise, please request your own TOCALL ID.
+    # This is a fixed value which is associated with this plugin.
+    # Its value must not be changed. If you use this APRS plugin
+    # OUTSIDE of Apprise, please request your own TOCALL ID.
     # Details: see https://github.com/aprsorg/aprs-deviceid
     #
-    # DO NOT use the generic "APRS" TOCALL ID !!!!!
+    # Do NOT use the generic "APRS" TOCALL ID !!!!!
     #
-    device_id = 'APZ244'
+    device_id = 'APPRIS'
 
     # A title can not be used for APRS Messages.  Setting this to zero will
     # cause any title (if defined) to get placed into the message body.
