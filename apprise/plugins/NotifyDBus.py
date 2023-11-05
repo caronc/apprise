@@ -27,11 +27,11 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import sys
-from .NotifyBase import NotifyBase
-from ..common import NotifyImageSize
-from ..common import NotifyType
-from ..utils import parse_bool
+
 from ..AppriseLocale import gettext_lazy as _
+from ..common import NotifyImageSize, NotifyType
+from ..utils import parse_bool
+from .NotifyBase import NotifyBase
 
 # Default our global support flag
 NOTIFY_DBUS_SUPPORT_ENABLED = False
@@ -39,44 +39,16 @@ NOTIFY_DBUS_SUPPORT_ENABLED = False
 # Image support is dependant on the GdkPixbuf library being available
 NOTIFY_DBUS_IMAGE_SUPPORT = False
 
-# Initialize our mainloops
-LOOP_GLIB = None
-LOOP_QT = None
-
 
 try:
     # dbus essentials
-    from dbus import SessionBus
-    from dbus import Interface
-    from dbus import Byte
-    from dbus import ByteArray
-    from dbus import DBusException
+    import gi
+    gi.require_version("Gio", "2.0")
+    gi.require_version("GLib", "2.0")
+    from gi.repository import Gio, GLib
 
-    #
-    # now we try to determine which mainloop(s) we can access
-    #
-
-    # glib
-    try:
-        from dbus.mainloop.glib import DBusGMainLoop
-        LOOP_GLIB = DBusGMainLoop()
-
-    except ImportError:  # pragma: no cover
-        # No problem
-        pass
-
-    # qt
-    try:
-        from dbus.mainloop.qt import DBusQtMainLoop
-        LOOP_QT = DBusQtMainLoop(set_as_default=True)
-
-    except ImportError:
-        # No problem
-        pass
-
-    # We're good as long as at least one
-    NOTIFY_DBUS_SUPPORT_ENABLED = (
-        LOOP_GLIB is not None or LOOP_QT is not None)
+    # We're good
+    NOTIFY_DBUS_SUPPORT_ENABLED = True
 
     # ImportError: When using gi.repository you must not import static modules
     # like "gobject". Please change all occurrences of "import gobject" to
@@ -105,15 +77,8 @@ except ImportError:
     # library available to us (or maybe one we don't support)?
     pass
 
-# Define our supported protocols and the loop to assign them.
-# The key to value pairs are the actual supported schema's matched
-# up with the Main Loop they should reference when accessed.
-MAINLOOP_MAP = {
-    'qt': LOOP_QT,
-    'kde': LOOP_QT,
-    'glib': LOOP_GLIB,
-    'dbus': LOOP_QT if LOOP_QT else LOOP_GLIB,
-}
+# Define our supported protocols.
+PROTOCOLS_LIST = ('qt', 'kde', 'glib', 'dbus')
 
 
 # Urgencies
@@ -169,12 +134,7 @@ class NotifyDBus(NotifyBase):
     service_url = 'http://www.freedesktop.org/Software/dbus/'
 
     # The default protocols
-    # Python 3 keys() does not return a list object, it is its own dict_keys()
-    # object if we were to reference, we wouldn't be backwards compatible with
-    # Python v2.  So converting the result set back into a list makes us
-    # compatible
-    # TODO: Review after dropping support for Python 2.
-    protocol = list(MAINLOOP_MAP.keys())
+    protocol = list(PROTOCOLS_LIST)
 
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_dbus'
@@ -249,9 +209,8 @@ class NotifyDBus(NotifyBase):
         # Store our schema; default to dbus
         self.schema = kwargs.get('schema', 'dbus')
 
-        if self.schema not in MAINLOOP_MAP:
-            msg = 'The schema specified ({}) is not supported.' \
-                .format(self.schema)
+        if self.schema not in PROTOCOLS_LIST:
+            msg = f'The schema specified ({self.schema}) is not supported.'
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -272,8 +231,7 @@ class NotifyDBus(NotifyBase):
 
             except (TypeError, ValueError):
                 # Invalid x/y values specified
-                msg = 'The x,y coordinates specified ({},{}) are invalid.'\
-                    .format(x_axis, y_axis)
+                msg = f'The x,y coordinates specified ({x_axis},{y_axis}) are invalid.'
                 self.logger.warning(msg)
                 raise TypeError(msg)
         else:
@@ -287,11 +245,19 @@ class NotifyDBus(NotifyBase):
         """
         Perform DBus Notification
         """
-        # Acquire our session
+        # Acquire our dbus interface
         try:
-            session = SessionBus(mainloop=MAINLOOP_MAP[self.schema])
+            dbus_iface = Gio.DBusProxy.new_for_bus_sync(
+                Gio.BusType.SESSION,
+                Gio.DBusProxyFlags.NONE,
+                None,
+                self.dbus_interface,
+                self.dbus_setting_location,
+                self.dbus_interface,
+                None,
+            )
 
-        except DBusException as e:
+        except GLib.Error as e:
             # Handle exception
             self.logger.warning('Failed to send DBus notification.')
             self.logger.debug(f'DBus Exception: {e}')
@@ -303,31 +269,19 @@ class NotifyDBus(NotifyBase):
             title = body
             body = ''
 
-        # acquire our dbus object
-        dbus_obj = session.get_object(
-            self.dbus_interface,
-            self.dbus_setting_location,
-        )
-
-        # Acquire our dbus interface
-        dbus_iface = Interface(
-            dbus_obj,
-            dbus_interface=self.dbus_interface,
-        )
-
         # image path
         icon_path = None if not self.include_image \
             else self.image_path(notify_type, extension='.ico')
 
         # Our meta payload
         meta_payload = {
-            "urgency": Byte(self.urgency)
+            "urgency": GLib.Variant("y", self.urgency),
         }
 
         if not (self.x_axis is None and self.y_axis is None):
             # Set x/y access if these were set
-            meta_payload['x'] = self.x_axis
-            meta_payload['y'] = self.y_axis
+            meta_payload['x'] = GLib.Variant("i", self.x_axis)
+            meta_payload['y'] = GLib.Variant("i", self.y_axis)
 
         if NOTIFY_DBUS_IMAGE_SUPPORT and icon_path:
             try:
@@ -335,14 +289,17 @@ class NotifyDBus(NotifyBase):
                 image = GdkPixbuf.Pixbuf.new_from_file(icon_path)
 
                 # Associate our image to our notification
-                meta_payload['icon_data'] = (
-                    image.get_width(),
-                    image.get_height(),
-                    image.get_rowstride(),
-                    image.get_has_alpha(),
-                    image.get_bits_per_sample(),
-                    image.get_n_channels(),
-                    ByteArray(image.get_pixels())
+                meta_payload['icon_data'] = GLib.Variant(
+                    "(iiibiiay)",
+                    (
+                        image.get_width(),
+                        image.get_height(),
+                        image.get_rowstride(),
+                        image.get_has_alpha(),
+                        image.get_bits_per_sample(),
+                        image.get_n_channels(),
+                        image.get_pixels(),
+                    ),
                 )
 
             except Exception as e:
@@ -355,6 +312,7 @@ class NotifyDBus(NotifyBase):
             self.throttle()
 
             dbus_iface.Notify(
+                "(susssasa{sv}i)",
                 # Application Identifier
                 self.app_id,
                 # Message ID (0 = New Message)
@@ -407,15 +365,12 @@ class NotifyDBus(NotifyBase):
         if self.y_axis:
             params['y'] = str(self.y_axis)
 
-        return '{schema}://_/?{params}'.format(
-            schema=self.schema,
-            params=NotifyDBus.urlencode(params),
-        )
+        return f'{self.schema}://_/?{NotifyDBus.urlencode(params)}'
 
     @staticmethod
     def parse_url(url):
         """
-        There are no parameters nessisary for this protocol; simply having
+        There are no parameters necessary for this protocol; simply having
         gnome:// is all you need.  This function just makes sure that
         is in place.
 
