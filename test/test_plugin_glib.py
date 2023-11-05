@@ -47,9 +47,9 @@ if 'gi.repository.Gio' not in sys.modules:
     pytest.skip("Skipping dbus-python based tests", allow_module_level=True)
 
 
-import gi
+import gi  # noqa E402
 gi.require_version("GLib", "2.0")
-from gi.repository import GLib
+from gi.repository import GLib  # noqa E402
 
 from apprise.plugins.NotifyDBus import DBusUrgency, NotifyDBus  # noqa E402
 
@@ -435,7 +435,10 @@ def test_plugin_dbus_module_croaks(mocker, dbus_glib_environment):
 
     # Make importing `gi.repository.Gio` raise an ImportError.
     mocker.patch.dict(
-        sys.modules, {'gi.repository.Gio': compile('raise ImportError()', 'gi.repository.Gio', 'exec')})
+        sys.modules,
+        {'gi.repository.Gio': compile('raise ImportError()',
+                                      'gi.repository.Gio',
+                                      'exec')})
 
     # When patching something which has a side effect on the module-level code
     # of a plugin, make sure to reload it.
@@ -451,7 +454,8 @@ def test_plugin_dbus_session_croaks(mocker, dbus_glib_environment):
     Verify notification fails if DBus croaks.
     """
 
-    mocker.patch('gi.repository.Gio.DBusProxy.new_for_bus_sync', side_effect=GLib.Error('test'))
+    mocker.patch('gi.repository.Gio.DBusProxy.new_for_bus_sync',
+                 side_effect=GLib.Error('test'))
     setup_glib_environment()
 
     obj = apprise.Apprise.instantiate('dbus://', suppress_exceptions=False)

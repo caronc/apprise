@@ -231,7 +231,8 @@ class NotifyDBus(NotifyBase):
 
             except (TypeError, ValueError):
                 # Invalid x/y values specified
-                msg = f'The x,y coordinates specified ({x_axis},{y_axis}) are invalid.'
+                msg = 'The x,y coordinates specified ({},{}) are invalid.'\
+                    .format(x_axis, y_axis)
                 self.logger.warning(msg)
                 raise TypeError(msg)
         else:
