@@ -1584,3 +1584,38 @@ def test_plugin_email_plus_in_toemail(mock_smtp, mock_smtp_ssl):
     assert len(_to) == 1
     assert _to[0] == 'test+notification@gmail.com'
     assert _msg.split('\n')[-3] == 'test'
+
+
+@mock.patch('smtplib.SMTP_SSL')
+@mock.patch('smtplib.SMTP')
+def test_plugin_email_formatting_990(mock_smtp, mock_smtp_ssl):
+    """
+    NotifyEmail() GitHub Issue 990
+    https://github.com/caronc/apprise/issues/990
+    Email formatting not working correctly
+
+    """
+
+    response = mock.Mock()
+    mock_smtp_ssl.return_value = response
+    mock_smtp.return_value = response
+
+    results = NotifyEmail.parse_url(
+        'mailtos://mydomain.com?smtp=mail.local.mydomain.com'
+        '&user=noreply@mydomain.com&pass=mypassword'
+        '&from=noreply@mydomain.com&to=me@mydomain.com&mode=ssl&port=465')
+
+    assert isinstance(results, dict)
+    assert 'noreply@mydomain.com' == results['user']
+    assert 'mydomain.com' == results['host']
+    assert 'mail.local.mydomain.com' == results['smtp_host']
+    assert 'mypassword' == results['password']
+    assert 'ssl' == results['secure_mode']
+    assert '465' == results['port']
+    assert 'me@mydomain.com' in results['targets']
+
+    obj = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(obj, NotifyEmail) is True
+
+    assert len(obj.targets) == 1
+    assert (False, 'me@mydomain.com') in obj.targets
