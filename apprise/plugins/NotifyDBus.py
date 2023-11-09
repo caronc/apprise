@@ -59,7 +59,6 @@ try:
 
     try:
         # The following is required for Image/Icon loading only
-        import gi
         gi.require_version('GdkPixbuf', '2.0')
         from gi.repository import GdkPixbuf
         NOTIFY_DBUS_IMAGE_SUPPORT = True
