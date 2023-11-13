@@ -153,12 +153,13 @@ class NotifyThreema(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
+        # Verify our Gateway ID
         if len(self.user) != 8:
             msg = 'Threema Gateway ID must be 8 characters in length'
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # We always use a token if provided
+        # Verify our secret
         self.secret = validate_regex(secret)
         if not self.secret:
             msg = \
