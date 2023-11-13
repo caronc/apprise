@@ -550,7 +550,7 @@ class URLBase:
         return paths
 
     @staticmethod
-    def parse_list(content, unquote=True):
+    def parse_list(content, allow_whitespace=True, unquote=True):
         """A wrapper to utils.parse_list() with unquoting support
 
         Parses a specified set of data and breaks it into a list.
@@ -559,6 +559,9 @@ class URLBase:
             content (str): The path to split up into a list. If a list is
                  provided, then it's individual entries are processed.
 
+            allow_whitespace (:obj:`bool`, optional): whitespace is to be
+                 treated as a delimiter
+
             unquote (:obj:`bool`, optional): call unquote on each element
                  added to the returned list.
 
@@ -566,7 +569,7 @@ class URLBase:
             list: A unique list containing all of the elements in the path
         """
 
-        content = parse_list(content)
+        content = parse_list(content, allow_whitespace=allow_whitespace)
         if unquote:
             content = \
                 [URLBase.unquote(x) for x in filter(bool, content)]

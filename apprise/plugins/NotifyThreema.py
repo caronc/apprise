@@ -29,9 +29,6 @@
 # Create an account https://gateway.threema.ch/en/ if you don't already have
 # one
 #
-# API Details:
-#   - https://voip.ms/m/api.php
-#
 # Read more about VoIP.ms API here:
 #   - https://gateway.threema.ch/en/developer/api
 #   - https://gateway.threema.ch/en/developer/sdk-python
@@ -44,7 +41,8 @@ from ..common import NotifyType
 from ..utils import is_phone_no
 from ..utils import validate_regex
 from ..utils import is_email
-from ..utils import parse_phone_no
+from ..URLBase import PrivacyMode
+from ..utils import parse_list
 from ..AppriseLocale import gettext_lazy as _
 
 
@@ -52,7 +50,7 @@ class ThreemaRecipientTypes:
     """
     The supported recipient specifiers
     """
-    USER = 'to'
+    THREEMA_ID = 'to'
     PHONE = 'phone'
     EMAIL = 'email'
 
@@ -63,7 +61,7 @@ class NotifyThreema(NotifyBase):
     """
 
     # The default descriptive name associated with the Notification
-    service_name = 'Threema'
+    service_name = 'Threema Gateway'
 
     # The services URL
     service_url = 'https://gateway.threema.ch/'
@@ -74,7 +72,7 @@ class NotifyThreema(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_threema'
 
-    # Threema uses the http protocol with JSON requests
+    # Threema Gateway uses the http protocol with JSON requests
     notify_url = 'https://msgapi.threema.ch/send_simple'
 
     # The maximum length of the body
@@ -85,17 +83,17 @@ class NotifyThreema(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{user}@{secret}',
-        '{schema}://{user}@{secret}/{targets}',
+        '{schema}://{gateway_id}@{secret}/{targets}',
     )
 
     # Define our template tokens
     template_tokens = dict(NotifyBase.template_tokens, **{
-        'user': {
-            'name': _('User ID'),
+        'gateway_id': {
+            'name': _('Gateway ID'),
             'type': 'string',
             'private': True,
             'required': True,
+            'map_to': 'user',
         },
         'secret': {
             'name': _('API Secret'),
@@ -115,14 +113,15 @@ class NotifyThreema(NotifyBase):
             'type': 'string',
             'map_to': 'targets',
         },
-        'target_user': {
-            'name': _('Target Email'),
+        'target_threema_id': {
+            'name': _('Target Threema ID'),
             'type': 'string',
             'map_to': 'targets',
         },
         'targets': {
             'name': _('Targets'),
             'type': 'list:string',
+            'required': True,
         },
     })
 
@@ -132,7 +131,10 @@ class NotifyThreema(NotifyBase):
             'alias_of': 'targets',
         },
         'from': {
-            'alias_of': 'user',
+            'alias_of': 'gateway_id',
+        },
+        'gwid': {
+            'alias_of': 'gateway_id',
         },
         'secret': {
             'alias_of': 'secret',
@@ -141,19 +143,19 @@ class NotifyThreema(NotifyBase):
 
     def __init__(self, secret=None, targets=None, **kwargs):
         """
-        Initialize Threema Object
+        Initialize Threema Gateway Object
         """
         super().__init__(**kwargs)
 
         # Validate our params here.
 
         if not self.user:
-            msg = 'Threema Gateway UserID must be specified'
+            msg = 'Threema Gateway ID must be specified'
             self.logger.warning(msg)
             raise TypeError(msg)
 
         if len(self.user) != 8:
-            msg = 'Threema Gateway UserID must be 8 characters in length'
+            msg = 'Threema Gateway ID must be 8 characters in length'
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -172,53 +174,46 @@ class NotifyThreema(NotifyBase):
         # Used for URL generation afterwards only
         self.invalid_targets = list()
 
-        if targets:
-            for target in parse_phone_no(targets):
-                if len(target) == 8:
-                    # Store our user
-                    self.targets.append(
-                        (ThreemaRecipientTypes.USER, target))
-                    continue
+        for target in parse_list(targets, allow_whitespace=False):
+            if len(target) == 8:
+                # Store our user
+                self.targets.append(
+                    (ThreemaRecipientTypes.THREEMA_ID, target))
+                continue
 
-                # Check if an email was defined
-                result = is_email(target)
-                if result:
-                    # Store our user
-                    self.targets.append(
-                        (ThreemaRecipientTypes.EMAIL, result['full_email']))
-                    continue
+            # Check if an email was defined
+            result = is_email(target)
+            if result:
+                # Store our user
+                self.targets.append(
+                    (ThreemaRecipientTypes.EMAIL, result['full_email']))
+                continue
 
-                # Validate targets and drop bad ones:
-                result = is_phone_no(target)
-                if result:
-                    # store valid phone number
-                    self.targets.append((
-                        ThreemaRecipientTypes.PHONE,
-                        '{}{}'.format(
-                            '' if target[0] != '+' else '+', result['full'])))
-                    continue
+            # Validate targets and drop bad ones:
+            result = is_phone_no(target)
+            if result:
+                # store valid phone number
+                self.targets.append((
+                    ThreemaRecipientTypes.PHONE, result['full']))
+                continue
 
-                self.logger.warning(
-                    'Dropped invalid user/email/phone '
-                    '({}) specified'.format(target),
-                )
-                self.invalid_targets.append(target)
-
-        else:
-            # Send a message to ourselves
-            self.targets.append(
-                (ThreemaRecipientTypes.USER, self.user))
+            self.logger.warning(
+                'Dropped invalid user/email/phone '
+                '({}) specified'.format(target),
+            )
+            self.invalid_targets.append(target)
 
         return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
-        Perform Threema Notification
+        Perform Threema Gateway Notification
         """
 
         if len(self.targets) == 0:
             # There were no services to notify
-            self.logger.warning('There were no Threema targets to notify')
+            self.logger.warning(
+                'There were no Threema Gateway targets to notify')
             return False
 
         # error tracking (used for function return)
@@ -234,6 +229,7 @@ class NotifyThreema(NotifyBase):
         # Prepare our payload
         _payload = {
             'secret': self.secret,
+            'from': self.user,
             'text': body.encode('utf-8'),
         }
 
@@ -251,9 +247,10 @@ class NotifyThreema(NotifyBase):
             payload[key] = target
 
             # Some Debug Logging
-            self.logger.debug('Threema GET URL: {} (cert_verify={})'.format(
-                self.notify_url, self.verify_certificate))
-            self.logger.debug('Threema Payload: {}' .format(payload))
+            self.logger.debug(
+                'Threema Gateway GET URL: {} (cert_verify={})'.format(
+                    self.notify_url, self.verify_certificate))
+            self.logger.debug('Threema Gateway Payload: {}' .format(payload))
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -274,7 +271,7 @@ class NotifyThreema(NotifyBase):
                             r.status_code)
 
                     self.logger.warning(
-                        'Failed to send Threema notification to {}: '
+                        'Failed to send Threema Gateway notification to {}: '
                         '{}{}error={}'.format(
                             target,
                             status_str,
@@ -290,11 +287,11 @@ class NotifyThreema(NotifyBase):
 
                 # We wee successful
                 self.logger.info(
-                    'Sent Threema notification to %s' % target)
+                    'Sent Threema Gateway notification to %s' % target)
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occurred sending Threema:%s '
+                    'A Connection error occurred sending Threema Gateway:%s '
                     'notification' % target
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))
@@ -314,11 +311,13 @@ class NotifyThreema(NotifyBase):
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         schemaStr =  \
-            '{schema}://{user}@{secret}/{targets}?{params}'
+            '{schema}://{gatewayid}@{secret}/{targets}?{params}'
         return schemaStr.format(
             schema=self.secure_protocol,
-            user=self.pprint(self.user, privacy, safe=''),
-            secret=self.pprint(self.secret, privacy, safe=''),
+            gatewayid=self.pprint(
+                self.user, privacy, mode=PrivacyMode.Secret, safe=''),
+            secret=self.pprint(
+                self.secret, privacy, mode=PrivacyMode.Secret, safe=''),
             targets='/'.join(chain(
                 [NotifyThreema.quote(x[1], safe='@+') for x in self.targets],
                 [NotifyThreema.quote(x, safe='@+')
@@ -361,8 +360,13 @@ class NotifyThreema(NotifyBase):
             results['user'] = \
                 NotifyThreema.unquote(results['qsd']['from'])
 
+        elif 'gwid' in results['qsd'] and len(results['qsd']['gwid']):
+            results['user'] = \
+                NotifyThreema.unquote(results['qsd']['gwid'])
+
         if 'to' in results['qsd'] and len(results['qsd']['to']):
             results['targets'] += \
-                NotifyThreema.parse_list(results['qsd']['to'])
+                NotifyThreema.parse_list(
+                    results['qsd']['to'], allow_whitespace=False)
 
         return results
