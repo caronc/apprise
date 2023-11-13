@@ -1250,6 +1250,57 @@ def test_config_base_parse_yaml_file04(tmpdir):
     assert sum(1 for _ in a.find('test1, test3')) == 2
 
 
+def test_config_base_parse_yaml_file05(tmpdir):
+    """
+    API: ConfigBase.parse_yaml_file (#5)
+
+    Test groups
+
+    """
+    t = tmpdir.mkdir("always-keyword").join("apprise.yml")
+    t.write("""
+      version: 1
+      groups:
+        mygroup: user1, user2
+      
+      urls:
+        - json:///user:pass@localhost:
+          - to: user1@example.com
+            tag: user1
+          - to: user2@example.com
+            tag: user2
+    """)
+
+    # Create ourselves a config object
+    ac = AppriseConfig(paths=str(t))
+
+    # The number of configuration files that exist
+    assert len(ac) == 1
+
+    # no notifications are loaded
+    assert len(ac.servers()) == 2
+
+    # Test our ability to add Config objects to our apprise object
+    a = Apprise()
+
+    # Add our configuration object
+    assert a.add(servers=ac) is True
+
+    # Detect our 3 entry as they should have loaded successfully
+    assert len(a) == 2
+
+    # No match
+    assert sum(1 for _ in a.find('no-match')) == 0
+    # Match everything
+    assert sum(1 for _ in a.find('all')) == 2
+    # Match user1 entry
+    assert sum(1 for _ in a.find('user1')) == 1
+    # Match user2 entry
+    assert sum(1 for _ in a.find('user2')) == 1
+    # Match mygroup
+    assert sum(1 for _ in a.find('mygroup')) == 2
+
+
 def test_apprise_config_template_parse(tmpdir):
     """
     API: AppriseConfig parsing of templates
