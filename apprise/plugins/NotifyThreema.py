@@ -29,7 +29,7 @@
 # Create an account https://gateway.threema.ch/en/ if you don't already have
 # one
 #
-# Read more about VoIP.ms API here:
+# Read more about Threema Gateway API here:
 #   - https://gateway.threema.ch/en/developer/api
 #   - https://gateway.threema.ch/en/developer/sdk-python
 
