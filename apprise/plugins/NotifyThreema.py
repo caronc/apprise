@@ -336,7 +336,6 @@ class NotifyThreema(NotifyBase):
         """
         Parses the URL and returns enough arguments that can allow
         us to re-instantiate this object.
-
         """
 
         results = NotifyBase.parse_url(url, verify_host=False)
