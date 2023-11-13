@@ -31,7 +31,6 @@
 #
 # Read more about Threema Gateway API here:
 #   - https://gateway.threema.ch/en/developer/api
-#   - https://gateway.threema.ch/en/developer/sdk-python
 
 import requests
 from itertools import chain
