@@ -902,7 +902,7 @@ class ConfigBase(URLBase):
             #
             # Dictionary
             #
-            for no, (_groups, tags) in enumerate(groups.items()):
+            for _groups, tags in groups.items():
                 for group in parse_list(_groups, cast=str):
                     if isinstance(tags, (list, tuple)):
                         _tags = set()
@@ -959,7 +959,6 @@ class ConfigBase(URLBase):
                         else:
                             group_tags[group] |= tags
 
-        #
         # include root directive
         #
         includes = result.get('include', None)
