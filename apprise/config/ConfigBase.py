@@ -393,7 +393,11 @@ class ConfigBase(URLBase):
                 # Track our groups
                 groups.add(tag)
 
-                # Store what we know is worth keping
+                # Store what we know is worth keeping
+                if tag not in group_tags:  # pragma: no cover
+                    # handle cases where the tag doesn't exist
+                    group_tags[tag] = set()
+
                 results |= group_tags[tag] - tag_groups
 
                 # Get simple tag assignments

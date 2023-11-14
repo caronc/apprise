@@ -1384,6 +1384,7 @@ urls:
     assert len([x for x in apobj.find('group6')]) == 1
     assert len([x for x in apobj.find('4')]) == 1
     assert len([x for x in apobj.find('groupN')]) == 1
+    assert len([x for x in apobj.find('groupK')]) == 0
 
 
 def test_config_base_config_parse_yaml_globals():
