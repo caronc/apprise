@@ -34,7 +34,7 @@ import requests
 from unittest import mock
 
 import apprise
-from apprise.plugins.NotifyAprs import AprsLocale, NotifyAprs
+from apprise.plugins.NotifyAprs import NotifyAprs
 from helpers import AppriseURLTester
 from apprise import NotifyType
 
