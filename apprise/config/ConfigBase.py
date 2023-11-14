@@ -393,7 +393,11 @@ class ConfigBase(URLBase):
                 # Track our groups
                 groups.add(tag)
 
-                # Store what we know is worth keping
+                # Store what we know is worth keeping
+                if tag not in group_tags:  # pragma: no cover
+                    # handle cases where the tag doesn't exist
+                    group_tags[tag] = set()
+
                 results |= group_tags[tag] - tag_groups
 
                 # Get simple tag assignments
@@ -898,19 +902,11 @@ class ConfigBase(URLBase):
         # groups root directive
         #
         groups = result.get('groups', None)
-        if not isinstance(groups, (list, tuple)):
-            # Not a problem; we simply have no group entry
-            groups = list()
-
-        # Iterate over each group defined and store it
-        for no, entry in enumerate(groups):
-            if not isinstance(entry, dict):
-                ConfigBase.logger.warning(
-                    'No assignment for group {}, entry #{}'.format(
-                        entry, no + 1))
-                continue
-
-            for _groups, tags in entry.items():
+        if isinstance(groups, dict):
+            #
+            # Dictionary
+            #
+            for _groups, tags in groups.items():
                 for group in parse_list(_groups, cast=str):
                     if isinstance(tags, (list, tuple)):
                         _tags = set()
@@ -932,7 +928,41 @@ class ConfigBase(URLBase):
                     else:
                         group_tags[group] |= tags
 
-        #
+        elif isinstance(groups, (list, tuple)):
+            #
+            # List of Dictionaries
+            #
+
+            # Iterate over each group defined and store it
+            for no, entry in enumerate(groups):
+                if not isinstance(entry, dict):
+                    ConfigBase.logger.warning(
+                        'No assignment for group {}, entry #{}'.format(
+                            entry, no + 1))
+                    continue
+
+                for _groups, tags in entry.items():
+                    for group in parse_list(_groups, cast=str):
+                        if isinstance(tags, (list, tuple)):
+                            _tags = set()
+                            for e in tags:
+                                if isinstance(e, dict):
+                                    _tags |= set(e.keys())
+                                else:
+                                    _tags |= set(parse_list(e, cast=str))
+
+                            # Final assignment
+                            tags = _tags
+
+                        else:
+                            tags = set(parse_list(tags, cast=str))
+
+                        if group not in group_tags:
+                            group_tags[group] = tags
+
+                        else:
+                            group_tags[group] |= tags
+
         # include root directive
         #
         includes = result.get('include', None)
