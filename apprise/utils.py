@@ -96,6 +96,9 @@ VALID_QUERY_RE = re.compile(r'^(?P<path>.*[/\\])(?P<query>[^/\\]+)?$')
 # This is useful when turning a string into a list
 STRING_DELIMITERS = r'[\[\]\;,\s]+'
 
+# String Delimiters without the whitespace
+STRING_DELIMITERS_NO_WS = r'[\[\]\;,]+'
+
 # Pre-Escape content since we reference it so much
 ESCAPED_PATH_SEPARATOR = re.escape('\\/')
 ESCAPED_WIN_PATH_SEPARATOR = re.escape('\\')
@@ -1116,7 +1119,7 @@ def urlencode(query, doseq=False, safe='', encoding=None, errors=None):
         errors=errors)
 
 
-def parse_list(*args, cast=None):
+def parse_list(*args, cast=None, allow_whitespace=True):
     """
     Take a string list and break it into a delimited
     list of arguments. This funciton also supports
@@ -1143,10 +1146,12 @@ def parse_list(*args, cast=None):
             arg = cast(arg)
 
         if isinstance(arg, str):
-            result += re.split(STRING_DELIMITERS, arg)
+            result += re.split(
+                STRING_DELIMITERS if allow_whitespace
+                else STRING_DELIMITERS_NO_WS, arg)
 
         elif isinstance(arg, (set, list, tuple)):
-            result += parse_list(*arg)
+            result += parse_list(*arg, allow_whitespace=allow_whitespace)
 
     #
     # filter() eliminates any empty entries
@@ -1154,7 +1159,9 @@ def parse_list(*args, cast=None):
     # Since Python v3 returns a filter (iterator) whereas Python v2 returned
     # a list, we need to change it into a list object to remain compatible with
     # both distribution types.
-    return sorted([x for x in filter(bool, list(set(result)))])
+    return sorted([x for x in filter(bool, list(set(result)))]) \
+        if allow_whitespace else sorted(
+            [x.strip() for x in filter(bool, list(set(result))) if x.strip()])
 
 
 def is_exclusive_match(logic, data, match_all=common.MATCH_ALL_TAG,
