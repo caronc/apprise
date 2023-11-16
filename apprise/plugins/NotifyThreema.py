@@ -314,8 +314,7 @@ class NotifyThreema(NotifyBase):
             '{schema}://{gatewayid}@{secret}/{targets}?{params}'
         return schemaStr.format(
             schema=self.secure_protocol,
-            gatewayid=self.pprint(
-                self.user, privacy, mode=PrivacyMode.Secret, safe=''),
+            gatewayid=NotifyThreema.quote(self.user),
             secret=self.pprint(
                 self.secret, privacy, mode=PrivacyMode.Secret, safe=''),
             targets='/'.join(chain(

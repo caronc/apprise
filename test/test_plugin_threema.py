@@ -58,21 +58,21 @@ apprise_url_tests = (
         # Invalid target phone number
         'instance': NotifyThreema,
         'notify_response': False,
-        'privacy_url': 'threema://****@****/2222',
+        'privacy_url': 'threema://%2ATHEGWID@****/2222',
     }),
     ('threema://*THEGWID@secret/{targets}/'.format(
         targets='/'.join(['16134442222'])), {
 
         # Valid
         'instance': NotifyThreema,
-        'privacy_url': 'threema://****@****/16134442222',
+        'privacy_url': 'threema://%2ATHEGWID@****/16134442222',
     }),
     ('threema://*THEGWID@secret/{targets}/'.format(
         targets='/'.join(['16134442222', '16134443333'])), {
 
         # Valid multiple targets
         'instance': NotifyThreema,
-        'privacy_url': 'threema://****@****/16134442222/16134443333',
+        'privacy_url': 'threema://%2ATHEGWID@****/16134442222/16134443333',
     }),
     ('threema:///?secret=secret&from=*THEGWID&to={targets}'.format(
         targets=','.join(['16134448888', 'user1@gmail.com', 'abcd1234'])), {
