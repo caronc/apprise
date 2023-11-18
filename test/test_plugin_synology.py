@@ -31,6 +31,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import requests
+from unittest import mock
 
 from apprise.plugins.NotifySynology import NotifySynology
 from helpers import AppriseURLTester
@@ -133,3 +134,45 @@ def test_plugin_custom_synology_urls():
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+@mock.patch('requests.post')
+def test_plugin_synology_edge_cases(mock_post):
+    """
+    NotifySynology() Edge Cases
+
+    """
+
+    # Prepare our response
+    response = requests.Request()
+    response.status_code = requests.codes.ok
+
+    # Prepare Mock
+    mock_post.return_value = response
+
+    # This string also tests that type is set to nothing
+    results = NotifySynology.parse_url(
+        'synology://user:pass@localhost:8080/token')
+
+    assert isinstance(results, dict)
+    assert results['user'] == 'user'
+    assert results['password'] == 'pass'
+    assert results['port'] == 8080
+    assert results['host'] == 'localhost'
+    assert results['fullpath'] == ''
+    assert results['path'] == '/'
+    assert results['query'] == 'token'
+    assert results['schema'] == 'synology'
+    assert results['url'] == 'synology://user:pass@localhost:8080/token'
+
+    instance = NotifySynology(**results)
+    assert isinstance(instance, NotifySynology)
+
+    response = instance.send(title='title', body='body')
+    assert response is True
+    assert mock_post.call_count == 1
+
+    details = mock_post.call_args_list[0]
+    assert details[0][0] == 'http://localhost:8080/webapi/entry.cgi'
+
+    assert details[1]['data'].startswith('payload=')

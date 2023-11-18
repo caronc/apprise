@@ -215,7 +215,8 @@ class NotifySynology(NotifyBase):
         # Prepare HTTP Headers
         headers = {
             'User-Agent': self.app_id,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': '*/*',
         }
 
         # Apply any/all header over-rides defined
@@ -262,7 +263,7 @@ class NotifySynology(NotifyBase):
         try:
             r = requests.post(
                 url,
-                data=dumps(payload),
+                data=f"payload={dumps(payload)}",
                 params=params,
                 headers=headers,
                 auth=auth,
