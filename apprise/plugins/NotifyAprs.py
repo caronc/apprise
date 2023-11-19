@@ -74,16 +74,18 @@ import re
 from unidecode import unidecode
 import time
 
-# fixed APRS-IS server locales
-# default is 'EURO'
-# see https://www.aprs2.net/
-# for details
+# Fixed APRS-IS server locales
+# Default is 'EURO'
+# See https://www.aprs2.net/ for details
+# Select the rotating server in case you
+# don"t care about a specific locale
 APRS_LOCALES = {
     'NOAM': 'noam.aprs2.net',
     'SOAM': 'soam.aprs2.net',
     'EURO': 'euro.aprs2.net',
     'ASIA': 'asia.aprs2.net',
     'AUNZ': 'aunz.aprs2.net',
+    'ROTA': 'rotate.aprs2.net'
 }
 
 
@@ -114,16 +116,16 @@ class NotifyAprs(NotifyBase):
     # Details: https://www.aprs-is.net/Connecting.aspx
     notify_port = 10152
 
-    # The maximum length of the body
+    # The maximum length of the APRS message body
     body_maxlen = 67
 
     # socket timeout in seconds
     socket_timeout = 15
 
     # Apprise APRS Device ID / TOCALL ID
-    # This is a fixed value which is associated with this plugin.
-    # Its value must not be changed. If you use this APRS plugin
-    # OUTSIDE of Apprise, please request your own TOCALL ID.
+    # This is a FIXED value which is associated with this plugin.
+    # Its value MUST NOT be changed. If you use this APRS plugin
+    # code OUTSIDE of Apprise, please request your own TOCALL ID.
     # Details: see https://github.com/aprsorg/aprs-deviceid
     #
     # Do NOT use the generic "APRS" TOCALL ID !!!!!
@@ -136,10 +138,11 @@ class NotifyAprs(NotifyBase):
 
     # Helps to reduce the number of login-related errors where the
     # APRS-IS server "isn't ready yet". If we try to receive the rx buffer
-    # without this grace perid in place, we may receive "incomplete" responsese
+    # without this grace perid in place, we may receive "incomplete" responses
     # where the login response lacks information. In case you receive too many
     # "Rx: APRS-IS msg is too short - needs to have at least two lines" error
     # messages, you might want to increase this value to a larger time span
+    # Per previous experience, do not use values lower than 0.5 (seconds)
     sleep_after_socket_send = 0.8
 
     # Once we have sent a packet to APRS-IS, these are the number seconds
