@@ -60,6 +60,11 @@ from ..AppriseLocale import gettext_lazy as _
 from ..attachment.AttachBase import AttachBase
 
 
+# Used to detect user/role IDs
+USER_ROLE_DETECTION_RE = re.compile(
+    r'\s*(?:<@(?P<role>&?)(?P<id>[0-9]+)>|@(?P<value>[a-z0-9]+))', re.I)
+
+
 class NotifyDiscord(NotifyBase):
     """
     A wrapper to Discord Notifications
@@ -336,6 +341,33 @@ class NotifyDiscord(NotifyBase):
                 payload['content'] = \
                     body if not title else "{}\r\n{}".format(title, body)
 
+            # parse for user id's <@123> and role IDs <@&456>
+            results = USER_ROLE_DETECTION_RE.findall(body)
+            if results:
+                payload['allow_mentions'] = {
+                    'parse': [],
+                    'users': [],
+                    'roles': [],
+                }
+
+                _content = []
+                for (is_role, no, value) in results:
+                    if value:
+                        payload['allow_mentions']['parse'].append(value)
+                        _content.append(f'@{value}')
+
+                    elif is_role:
+                        payload['allow_mentions']['roles'].append(no)
+                        _content.append(f'<@&{no}>')
+
+                    else:  # is_user
+                        payload['allow_mentions']['users'].append(no)
+                        _content.append(f'<@{no}>')
+
+                if self.notify_format == NotifyFormat.MARKDOWN:
+                    # Add pingable elements to content field
+                    payload['content'] = '👉 ' + ' '.join(_content)
+
             if not self._send(payload, params=params):
                 # We failed to post our message
                 return False
@@ -360,16 +392,21 @@ class NotifyDiscord(NotifyBase):
                 'wait': True,
             })
 
+            #
             # Remove our text/title based content for attachment use
+            #
             if 'embeds' in payload:
-                # Markdown
                 del payload['embeds']
 
             if 'content' in payload:
-                # Markdown
                 del payload['content']
 
+            if 'allow_mentions' in payload:
+                del payload['allow_mentions']
+
+            #
             # Send our attachments
+            #
             for attachment in attach:
                 self.logger.info(
                     'Posting Discord Attachment {}'.format(attachment.name))

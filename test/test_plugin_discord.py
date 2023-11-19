@@ -32,6 +32,7 @@ from datetime import datetime, timedelta
 from datetime import timezone
 import pytest
 import requests
+from json import loads
 
 from apprise.plugins.NotifyDiscord import NotifyDiscord
 from helpers import AppriseURLTester
@@ -182,6 +183,113 @@ def test_plugin_discord_urls():
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+@mock.patch('requests.post')
+def test_plugin_discord_notifications(mock_post):
+    """
+    NotifyDiscord() Notifications/Ping Support
+
+    """
+
+    # Initialize some generic (but valid) tokens
+    webhook_id = 'A' * 24
+    webhook_token = 'B' * 64
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    # Test our header parsing when not lead with a header
+    body = """
+    # Heading
+    @everyone and @admin, wake and meet our new user <@123>; <@&456>"
+    """
+
+    results = NotifyDiscord.parse_url(
+        f'discord://{webhook_id}/{webhook_token}/?format=markdown')
+
+    assert isinstance(results, dict)
+    assert results['user'] is None
+    assert results['webhook_id'] == webhook_id
+    assert results['webhook_token'] == webhook_token
+    assert results['password'] is None
+    assert results['port'] is None
+    assert results['host'] == webhook_id
+    assert results['fullpath'] == f'/{webhook_token}/'
+    assert results['path'] == f'/{webhook_token}/'
+    assert results['query'] is None
+    assert results['schema'] == 'discord'
+    assert results['url'] == f'discord://{webhook_id}/{webhook_token}/'
+
+    instance = NotifyDiscord(**results)
+    assert isinstance(instance, NotifyDiscord)
+
+    response = instance.send(body=body)
+    assert response is True
+    assert mock_post.call_count == 1
+
+    details = mock_post.call_args_list[0]
+    assert details[0][0] == \
+        f'https://discord.com/api/webhooks/{webhook_id}/{webhook_token}'
+
+    payload = loads(details[1]['data'])
+
+    assert 'allow_mentions' in payload
+    assert 'users' in payload['allow_mentions']
+    assert len(payload['allow_mentions']['users']) == 1
+    assert '123' in payload['allow_mentions']['users']
+    assert 'roles' in payload['allow_mentions']
+    assert len(payload['allow_mentions']['roles']) == 1
+    assert '456' in payload['allow_mentions']['roles']
+    assert 'parse' in payload['allow_mentions']
+    assert len(payload['allow_mentions']['parse']) == 2
+    assert 'everyone' in payload['allow_mentions']['parse']
+    assert 'admin' in payload['allow_mentions']['parse']
+
+    # Reset our object
+    mock_post.reset_mock()
+
+    results = NotifyDiscord.parse_url(
+        f'discord://{webhook_id}/{webhook_token}/?format=text')
+
+    assert isinstance(results, dict)
+    assert results['user'] is None
+    assert results['webhook_id'] == webhook_id
+    assert results['webhook_token'] == webhook_token
+    assert results['password'] is None
+    assert results['port'] is None
+    assert results['host'] == webhook_id
+    assert results['fullpath'] == f'/{webhook_token}/'
+    assert results['path'] == f'/{webhook_token}/'
+    assert results['query'] is None
+    assert results['schema'] == 'discord'
+    assert results['url'] == f'discord://{webhook_id}/{webhook_token}/'
+
+    instance = NotifyDiscord(**results)
+    assert isinstance(instance, NotifyDiscord)
+
+    response = instance.send(body=body)
+    assert response is True
+    assert mock_post.call_count == 1
+
+    details = mock_post.call_args_list[0]
+    assert details[0][0] == \
+        f'https://discord.com/api/webhooks/{webhook_id}/{webhook_token}'
+
+    payload = loads(details[1]['data'])
+
+    assert 'allow_mentions' in payload
+    assert 'users' in payload['allow_mentions']
+    assert len(payload['allow_mentions']['users']) == 1
+    assert '123' in payload['allow_mentions']['users']
+    assert 'roles' in payload['allow_mentions']
+    assert len(payload['allow_mentions']['roles']) == 1
+    assert '456' in payload['allow_mentions']['roles']
+    assert 'parse' in payload['allow_mentions']
+    assert len(payload['allow_mentions']['parse']) == 2
+    assert 'everyone' in payload['allow_mentions']['parse']
+    assert 'admin' in payload['allow_mentions']['parse']
 
 
 @mock.patch('requests.post')
@@ -563,6 +671,26 @@ def test_plugin_discord_attachments(mock_post):
     assert mock_post.call_args_list[1][0][0] == \
         'https://discord.com/api/webhooks/{}/{}'.format(
             webhook_id, webhook_token)
+
+    # Reset our object
+    mock_post.reset_mock()
+
+    # Test notifications with mentions and attachments in it
+    assert obj.notify(
+        body='Say hello to <@1234>!', notify_type=NotifyType.INFO,
+        attach=attach) is True
+
+    # Test our call count
+    assert mock_post.call_count == 2
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://discord.com/api/webhooks/{}/{}'.format(
+            webhook_id, webhook_token)
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://discord.com/api/webhooks/{}/{}'.format(
+            webhook_id, webhook_token)
+
+    # Reset our object
+    mock_post.reset_mock()
 
     # An invalid attachment will cause a failure
     path = os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
