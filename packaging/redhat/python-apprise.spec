@@ -1,4 +1,4 @@
-# BSD 2-Clause License
+# BSD 3-Clause License
 #
 # Apprise - Push Notification Library.
 # Copyright (c) 2023, Chris Caron <lead2gold@gmail.com>
@@ -49,8 +49,8 @@ OneSignal, Opsgenie, PagerDuty, PagerTree, ParsePlatform, PopcornNotify,
 Prowl, Pushalot, PushBullet, Pushjet, PushMe, Pushover, PushSafer, Pushy,
 PushDeer, Reddit, Rocket.Chat, RSyslog, SendGrid, ServerChan, Signal,
 SimplePush, Sinch, Slack, SMSEagle, SMTP2Go, Spontit, SparkPost, Super Toasty,
-Streamlabs, Stride, Syslog, Techulus Push, Telegram, Threema Gateway, Twilio,
-Twitter, Twist, XBMC, Voipms, Vonage, WhatsApp, Webex Teams}
+Streamlabs, Stride, Synology Chat, Syslog, Techulus Push, Telegram, Threema
+Gateway, Twilio, Twitter, Twist, XBMC, Voipms, Vonage, WhatsApp, Webex Teams}
 
 Name:           python-%{pypi_name}
 Version:        1.6.0
