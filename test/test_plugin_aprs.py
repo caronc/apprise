@@ -36,107 +36,162 @@ from unittest import mock
 import apprise
 from apprise.plugins.NotifyAprs import NotifyAprs
 from helpers import AppriseURLTester
-from apprise import NotifyType
 
 # Disable logging for a cleaner testing output
 import logging
+
 logging.disable(logging.CRITICAL)
 
 # Our Testing URLs
 apprise_url_tests = (
-    ('aprs://', {
-        # We failed to identify any valid authentication
-        'instance': TypeError,
-    }),
-    ('aprs://:@/', {
-        # We failed to identify any valid authentication
-        'instance': TypeError,
-    }),
-    ('aprs://DF1JSL-15:12345', {
-        # No call-sign specified
-        'instance': TypeError,
-    }),
-    ('aprs://DF1JSL-15:12345', {
-        # No password specified
-        'instance': TypeError,
-    }),
-    ('aprs://DF1JSL-15:12345@{}'.format('DF1ABC'), {
-        # valid call sign
-        'instance': NotifyAprs,
-        'requests_response_code': requests.codes.created,
-    }),
-    ('aprs://DF1JSL-15:12345@{}/{}'.format('DF1ABC', 'DF1DEF'), {
-        # valid call signs
-        'instance': NotifyAprs,
-        'requests_response_code': requests.codes.created,
-    }),
-    ('aprs://DF1JSL-15:12345@DF1ABC-1/DF1ABC/DF1ABC-15', {
-        # valid call signs - not treated as duplicates
-        # as SSID's will be honored
-        'instance': NotifyAprs,
-        'requests_response_code': requests.codes.created,
-        # Our expected url(privacy=True) startswith() response:
-        # Note that only 1 entry is saved (as other 2 are duplicates)
-        'privacy_url': 'aprs://user:****@D...C?',
-    }),
-    ('aprs://DF1JSL-15:12345@?to={},{}'.format('DF1ABC', 'DF1DEF'), {
-        # support the two= argument
-        'instance': NotifyAprs,
-        'requests_response_code': requests.codes.created,
-    }),
-    ('aprs://DF1JSL-15:12345@{}?locale="EURO'.format('DF1ABC'), {
-        # valid call sign with locale setting
-        'instance': NotifyAprs,
-        'requests_response_code': requests.codes.created,
-    }),
-    ('aprs://DF1JSL-15:12345@{}?locale="NOAM'.format('DF1ABC'), {
-        # valid call sign with locale setting
-        'instance': NotifyAprs,
-        'requests_response_code': requests.codes.created,
-    }),
-    ('aprs://DF1JSL-15:12345@{}?locale="SOAM'.format('DF1ABC'), {
-        # valid call sign with locale setting
-        'instance': NotifyAprs,
-        'requests_response_code': requests.codes.created,
-    }),
-    ('aprs://DF1JSL-15:12345@{}?locale="AUNZ'.format('DF1ABC'), {
-        # valid call sign with locale setting
-        'instance': NotifyAprs,
-        'requests_response_code': requests.codes.created,
-    }),
-    ('aprs://DF1JSL-15:12345@{}?locale="ASIA'.format('DF1ABC'), {
-        # valid call sign with locale setting
-        'instance': NotifyAprs,
-        'requests_response_code': requests.codes.created,
-    }),
-    ('aprs://DF1JSL-15:12345@{}?locale="ROTA'.format('DF1ABC'), {
-        # valid call sign with locale setting
-        'instance': NotifyAprs,
-        'requests_response_code': requests.codes.created,
-    }),
-    ('aprs://DF1JSL-15:12345@{}?locale="ABCD'.format('DF1ABC'), {
-        # valid call sign with invalid locale setting
-        'instance': NotifyAprs,
-        'notify_response': False,
-    }),
-    ('aprs://DF1JSL-15:12345@{}/{}'.format('abcdefghi', 'a'), {
-        # invalid call signs
-        'instance': NotifyAprs,
-        'notify_response': False,
-    }),
+    (
+        "aprs://",
+        {
+            # We failed to identify any valid authentication
+            "instance": TypeError,
+        },
+    ),
+    (
+        "aprs://:@/",
+        {
+            # We failed to identify any valid authentication
+            "instance": TypeError,
+        },
+    ),
+    (
+        "aprs://DF1JSL-15:12345",
+        {
+            # No call-sign specified
+            "instance": TypeError,
+        },
+    ),
+    (
+        "aprs://DF1JSL-15:12345",
+        {
+            # No password specified
+            "instance": TypeError,
+        },
+    ),
+    (
+        "aprs://DF1JSL-15:12345@{}".format("DF1ABC"),
+        {
+            # valid call sign
+            "instance": NotifyAprs,
+            "requests_response_code": requests.codes.created,
+        },
+    ),
+    (
+        "aprs://DF1JSL-15:12345@{}/{}".format("DF1ABC", "DF1DEF"),
+        {
+            # valid call signs
+            "instance": NotifyAprs,
+            "requests_response_code": requests.codes.created,
+        },
+    ),
+    (
+        "aprs://DF1JSL-15:12345@DF1ABC-1/DF1ABC/DF1ABC-15",
+        {
+            # valid call signs - not treated as duplicates
+            # as SSID's will be honored
+            "instance": NotifyAprs,
+            "requests_response_code": requests.codes.created,
+            # Our expected url(privacy=True) startswith() response:
+            # Note that only 1 entry is saved (as other 2 are duplicates)
+            "privacy_url": "aprs://user:****@D...C?",
+        },
+    ),
+    (
+        "aprs://DF1JSL-15:12345@?to={},{}".format("DF1ABC", "DF1DEF"),
+        {
+            # support the two= argument
+            "instance": NotifyAprs,
+            "requests_response_code": requests.codes.created,
+        },
+    ),
+    (
+        'aprs://DF1JSL-15:12345@{}?locale="EURO'.format("DF1ABC"),
+        {
+            # valid call sign with locale setting
+            "instance": NotifyAprs,
+            "requests_response_code": requests.codes.created,
+        },
+    ),
+    (
+        'aprs://DF1JSL-15:12345@{}?locale="NOAM'.format("DF1ABC"),
+        {
+            # valid call sign with locale setting
+            "instance": NotifyAprs,
+            "requests_response_code": requests.codes.created,
+        },
+    ),
+    (
+        'aprs://DF1JSL-15:12345@{}?locale="SOAM'.format("DF1ABC"),
+        {
+            # valid call sign with locale setting
+            "instance": NotifyAprs,
+            "requests_response_code": requests.codes.created,
+        },
+    ),
+    (
+        'aprs://DF1JSL-15:12345@{}?locale="AUNZ'.format("DF1ABC"),
+        {
+            # valid call sign with locale setting
+            "instance": NotifyAprs,
+            "requests_response_code": requests.codes.created,
+        },
+    ),
+    (
+        'aprs://DF1JSL-15:12345@{}?locale="ASIA'.format("DF1ABC"),
+        {
+            # valid call sign with locale setting
+            "instance": NotifyAprs,
+            "requests_response_code": requests.codes.created,
+        },
+    ),
+    (
+        'aprs://DF1JSL-15:12345@{}?locale="ROTA'.format("DF1ABC"),
+        {
+            # valid call sign with locale setting
+            "instance": NotifyAprs,
+            "requests_response_code": requests.codes.created,
+        },
+    ),
+    (
+        'aprs://DF1JSL-15:12345@{}?locale="ABCD'.format("DF1ABC"),
+        {
+            # valid call sign with invalid locale setting
+            "instance": NotifyAprs,
+            "notify_response": False,
+        },
+    ),
+    (
+        "aprs://DF1JSL-15:12345@{}/{}".format("abcdefghi", "a"),
+        {
+            # invalid call signs
+            "instance": NotifyAprs,
+            "notify_response": False,
+        },
+    ),
     # Edge cases
-    ('aprs://DF1JSL-15:12345@{}'.format('DF1ABC'), {
-        'instance': NotifyAprs,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('aprs://DF1JSL-15:12345@{}'.format('DF1ABC'), {
-        'instance': NotifyAprs,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
+    (
+        "aprs://DF1JSL-15:12345@{}".format("DF1ABC"),
+        {
+            "instance": NotifyAprs,
+            # throw a bizzare code forcing us to fail to look it up
+            "response": False,
+            "requests_response_code": 999,
+        },
+    ),
+    (
+        "aprs://DF1JSL-15:12345@{}".format("DF1ABC"),
+        {
+            "instance": NotifyAprs,
+            # Throws a series of connection and transfer exceptions
+            # when this flagis set and tests that we
+            # gracfully handle them
+            "test_requests_exceptions": True,
+        },
+    ),
 )
 
 
@@ -150,7 +205,7 @@ def test_plugin_aprs_urls():
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-@mock.patch('requests.post')
+@mock.patch("requests.post")
 def test_plugin_aprs_edge_cases(mock_post):
     """
     NotifyAprs() Edge Cases
@@ -160,8 +215,7 @@ def test_plugin_aprs_edge_cases(mock_post):
     mock_post.return_value.status_code = requests.codes.created
 
     # test the handling of our batch modes
-    obj = apprise.Apprise.instantiate(
-        'aprs://DF1JSL-15:12345@DF1ABC/DF1DEF')
+    obj = apprise.Apprise.instantiate("aprs://DF1JSL-15:12345@DF1ABC/DF1DEF")
     assert isinstance(obj, NotifyAprs)
 
     # objects will be combined into a single post in batch mode
@@ -183,7 +237,8 @@ def test_plugin_aprs_edge_cases(mock_post):
     assert mock_post.call_count == 2
     """
 
-@mock.patch('requests.post')
+
+@mock.patch("requests.post")
 def test_plugin_aprs_config_files(mock_post):
     """
     NotifyAprs() Config File Cases
@@ -192,22 +247,22 @@ def test_plugin_aprs_config_files(mock_post):
     urls:
       - aprs://DF1JSL-15:12345@DF1ABC":
           - locale: NOAM
-    
+
       - aprs://DF1JSL-15:12345@DF1ABC:
           - locale: SOAM
-    
+
       - aprs://DF1JSL-15:12345@DF1ABC:
           - locale: EURO
-    
+
       - aprs://DF1JSL-15:12345@DF1ABC:
           - locale: ASIA
-    
+
       - aprs://DF1JSL-15:12345@DF1ABC:
           - locale: AUNZ
-    
+
       - aprs://DF1JSL-15:12345@DF1ABC:
           - locale: ROTA
-    
+
       # This will take on normal (default) priority
       - aprs://DF1JSL-15:12345@DF1ABC:
           - locale: aprs_invalid
@@ -232,7 +287,8 @@ def test_plugin_aprs_config_files(mock_post):
     assert len(ac.servers()) == 6
     assert len(aobj) == 6
 
+
 #    assert len([x for x in aobj.find(tag='aprs_str')]) == 6
 #    assert len([x for x in aobj.find(tag='aprs_invalid')]) == 1
-    # Notifications work
+# Notifications work
 #    assert aobj.notify(title="title", body="body") is True
