@@ -349,15 +349,24 @@ class NotifyDiscord(NotifyBase):
                     'users': [],
                     'roles': [],
                 }
+
+                _content = []
                 for (is_role, no, value) in results:
                     if value:
                         payload['allow_mentions']['parse'].append(value)
+                        _content.append(f'@{value}')
 
                     elif is_role:
                         payload['allow_mentions']['roles'].append(no)
+                        _content.append(f'<@&{no}>')
 
                     else:  # is_user
                         payload['allow_mentions']['users'].append(no)
+                        _content.append(f'<@{no}>')
+
+                if self.notify_format == NotifyFormat.MARKDOWN:
+                    # Add pingable elements to content field
+                    payload['content'] = '👉 ' + ' '.join(_content)
 
             if not self._send(payload, params=params):
                 # We failed to post our message
