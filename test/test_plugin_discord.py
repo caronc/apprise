@@ -672,6 +672,26 @@ def test_plugin_discord_attachments(mock_post):
         'https://discord.com/api/webhooks/{}/{}'.format(
             webhook_id, webhook_token)
 
+    # Reset our object
+    mock_post.reset_mock()
+
+    # Test notifications with mentions and attachments in it
+    assert obj.notify(
+        body='Say hello to <@1234>!', notify_type=NotifyType.INFO,
+        attach=attach) is True
+
+    # Test our call count
+    assert mock_post.call_count == 2
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://discord.com/api/webhooks/{}/{}'.format(
+            webhook_id, webhook_token)
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://discord.com/api/webhooks/{}/{}'.format(
+            webhook_id, webhook_token)
+
+    # Reset our object
+    mock_post.reset_mock()
+
     # An invalid attachment will cause a failure
     path = os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
     attach = AppriseAttachment(path)
