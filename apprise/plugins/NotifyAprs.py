@@ -44,6 +44,12 @@
 #   not use this plugin for spamming other ham radio operators
 
 #
+# In order to digest text input which is not in plain English,
+# users can install the optional 'unidecode' package as part
+# of their venv environment. Details: see plugin description
+#
+
+#
 # You're done at this point, you only need to know your user/pass that
 # you signed up with.
 
@@ -71,8 +77,18 @@ from ..utils import is_call_sign
 from ..utils import parse_call_sign
 from .. import __version__
 import re
-from unidecode import unidecode
 import time
+
+# Check if the 'unidecode' package is present
+# and use it later on, if available
+is_unidecode_present = False
+try:
+    from unidecode import unidecode
+
+    is_unidecode_present = True
+except ImportError:
+    pass
+
 
 # Fixed APRS-IS server locales
 # Default is 'EURO'
@@ -660,7 +676,10 @@ class NotifyAprs(NotifyBase):
         # the integrity of the message intact
         # Unidecode removes e.g. Umlauts and replaces them with
         # the next best character(s)
-        payload = unidecode(payload)
+        #
+        # Package might not be installed by default
+        if is_unidecode_present:
+            payload = unidecode(payload)
         #
         # Finally, constrain output string to 67 characters as
         # APRS messages are limited in length
