@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# BSD 3-Clause License
+# BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
 # Copyright (c) 2023, Chris Caron <lead2gold@gmail.com>
@@ -14,10 +14,6 @@
 #    this list of conditions and the following disclaimer in the documentation
 #    and/or other materials provided with the distribution.
 #
-# 3. Neither the name of the copyright holder nor the names of its
-#    contributors may be used to endorse or promote products derived from
-#    this software without specific prior written permission.
-#
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 # AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -30,216 +26,294 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import requests
 from unittest import mock
-
+import socket
 import apprise
 from apprise.plugins.NotifyAprs import NotifyAprs
-from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
 import logging
 
 logging.disable(logging.CRITICAL)
 
-# Our Testing URLs
-apprise_url_tests = (
-    (
-        "aprs://",
-        {
-            # We failed to identify any valid authentication
-            "instance": TypeError,
-        },
-    ),
-    (
-        "aprs://:@/",
-        {
-            # We failed to identify any valid authentication
-            "instance": TypeError,
-        },
-    ),
-    (
-        "aprs://DF1JSL-15:12345",
-        {
-            # No call-sign specified
-            "instance": TypeError,
-        },
-    ),
-    (
-        "aprs://DF1JSL-15:12345",
-        {
-            # No password specified
-            "instance": TypeError,
-        },
-    ),
-    (
-        "aprs://DF1JSL-15:12345@{}".format("DF1ABC"),
-        {
-            # valid call sign
-            "instance": NotifyAprs,
-            "requests_response_code": requests.codes.created,
-        },
-    ),
-    (
-        "aprs://DF1JSL-15:12345@{}/{}".format("DF1ABC", "DF1DEF"),
-        {
-            # valid call signs
-            "instance": NotifyAprs,
-            "requests_response_code": requests.codes.created,
-        },
-    ),
-    (
-        "aprs://DF1JSL-15:12345@DF1ABC-1/DF1ABC/DF1ABC-15",
-        {
-            # valid call signs - not treated as duplicates
-            # as SSID's will be honored
-            "instance": NotifyAprs,
-            "requests_response_code": requests.codes.created,
-            # Our expected url(privacy=True) startswith() response:
-            # Note that only 1 entry is saved (as other 2 are duplicates)
-            "privacy_url": "aprs://user:****@D...C?",
-        },
-    ),
-    (
-        "aprs://DF1JSL-15:12345@?to={},{}".format("DF1ABC", "DF1DEF"),
-        {
-            # support the two= argument
-            "instance": NotifyAprs,
-            "requests_response_code": requests.codes.created,
-        },
-    ),
-    (
-        'aprs://DF1JSL-15:12345@{}?locale="EURO'.format("DF1ABC"),
-        {
-            # valid call sign with locale setting
-            "instance": NotifyAprs,
-            "requests_response_code": requests.codes.created,
-        },
-    ),
-    (
-        'aprs://DF1JSL-15:12345@{}?locale="NOAM'.format("DF1ABC"),
-        {
-            # valid call sign with locale setting
-            "instance": NotifyAprs,
-            "requests_response_code": requests.codes.created,
-        },
-    ),
-    (
-        'aprs://DF1JSL-15:12345@{}?locale="SOAM'.format("DF1ABC"),
-        {
-            # valid call sign with locale setting
-            "instance": NotifyAprs,
-            "requests_response_code": requests.codes.created,
-        },
-    ),
-    (
-        'aprs://DF1JSL-15:12345@{}?locale="AUNZ'.format("DF1ABC"),
-        {
-            # valid call sign with locale setting
-            "instance": NotifyAprs,
-            "requests_response_code": requests.codes.created,
-        },
-    ),
-    (
-        'aprs://DF1JSL-15:12345@{}?locale="ASIA'.format("DF1ABC"),
-        {
-            # valid call sign with locale setting
-            "instance": NotifyAprs,
-            "requests_response_code": requests.codes.created,
-        },
-    ),
-    (
-        'aprs://DF1JSL-15:12345@{}?locale="ROTA'.format("DF1ABC"),
-        {
-            # valid call sign with locale setting
-            "instance": NotifyAprs,
-            "requests_response_code": requests.codes.created,
-        },
-    ),
-    (
-        'aprs://DF1JSL-15:12345@{}?locale="ABCD'.format("DF1ABC"),
-        {
-            # valid call sign with invalid locale setting
-            "instance": NotifyAprs,
-            "notify_response": False,
-        },
-    ),
-    (
-        "aprs://DF1JSL-15:12345@{}/{}".format("abcdefghi", "a"),
-        {
-            # invalid call signs
-            "instance": NotifyAprs,
-            "notify_response": False,
-        },
-    ),
-    # Edge cases
-    (
-        "aprs://DF1JSL-15:12345@{}".format("DF1ABC"),
-        {
-            "instance": NotifyAprs,
-            # throw a bizzare code forcing us to fail to look it up
-            "response": False,
-            "requests_response_code": 999,
-        },
-    ),
-    (
-        "aprs://DF1JSL-15:12345@{}".format("DF1ABC"),
-        {
-            "instance": NotifyAprs,
-            # Throws a series of connection and transfer exceptions
-            # when this flagis set and tests that we
-            # gracfully handle them
-            "test_requests_exceptions": True,
-        },
-    ),
-)
 
-
-def test_plugin_aprs_urls():
+@mock.patch('socket.create_connection')
+def test_plugin_aprs_urls(mock_create_connection):
     """
     NotifyAprs() Apprise URLs
 
     """
+    # A socket object
+    sobj = mock.Mock()
+    sobj.return_value = 1
+    sobj.getpeername.return_value = ('localhost', 1234)
+    sobj.socket_close.return_value = None
+    sobj.setblocking.return_value = True
+    sobj.recv.return_value = \
+        'ping\npong pong DF1JSL-15 verified pong'.encode('latin-1')
+    sobj.sendall.return_value = True
+    sobj.settimeout.return_value = True
 
-    # Run our general tests
-    AppriseURLTester(tests=apprise_url_tests).run_all()
+    # Prepare Mock
+    mock_create_connection.return_value = sobj
+
+    # Test invalid URLs
+    assert apprise.Apprise.instantiate("aprs://") is None
+    assert apprise.Apprise.instantiate("aprs://:@/") is None
+
+    # No call-sign specified
+    assert apprise.Apprise.instantiate("aprs://DF1JSL-15:12345") is None
+
+    # Garbage
+    assert NotifyAprs.parse_url(None) is None
+
+    # Valid call-sign but no password
+    assert apprise.Apprise.instantiate(
+        "aprs://DF1JSL-15:@DF1ABC") is None
+    assert apprise.Apprise.instantiate(
+        "aprs://DF1JSL-15@DF1ABC") is None
+    # Password of -1 not supported
+    assert apprise.Apprise.instantiate(
+        "aprs://DF1JSL-15:-1@DF1ABC") is None
+    # Alpha Password not supported
+    assert apprise.Apprise.instantiate(
+        "aprs://DF1JSL-15:abcd@DF1ABC") is None
+
+    # Valid instances
+    instance = apprise.Apprise.instantiate(
+        "aprs://DF1JSL-15:12345@DF1ABC")
+    assert isinstance(instance, NotifyAprs)
+    assert instance.url(privacy=True).startswith(
+        'aprs://DF1JSL-15:****@D...C?')
+    assert instance.notify('test') is True
+
+    instance = apprise.Apprise.instantiate(
+        "aprs://DF1JSL-15:12345@DF1ABC/DF1DEF")
+    assert isinstance(instance, NotifyAprs)
+    assert instance.url(privacy=True).startswith(
+        'aprs://DF1JSL-15:****@D...C/D...F?')
+    assert instance.notify('test') is True
+
+    instance = apprise.Apprise.instantiate(
+        "aprs://DF1JSL-15:12345@DF1ABC-1/DF1ABC/DF1ABC-15")
+    assert isinstance(instance, NotifyAprs)
+    assert instance.url(privacy=True).startswith(
+        'aprs://DF1JSL-15:****@D...1/D...C/D...5?')
+    assert instance.notify('test') is True
+
+    instance = apprise.Apprise.instantiate(
+        "aprs://DF1JSL-15:12345@?to=DF1ABC,DF1DEF")
+    assert isinstance(instance, NotifyAprs)
+    assert instance.url(privacy=True).startswith(
+        'aprs://DF1JSL-15:****@D...C/D...F?')
+    assert instance.notify('test') is True
+
+    # Test Locale settings
+    instance = apprise.Apprise.instantiate(
+        "aprs://DF1JSL-15:12345@DF1ABC?locale=EURO")
+    assert isinstance(instance, NotifyAprs)
+    assert instance.url(privacy=True).startswith(
+        'aprs://DF1JSL-15:****@D...C?')
+    # we used the default locale, so no setting
+    assert 'locale=' not in instance.url(privacy=True)
+    assert instance.notify('test') is True
+
+    instance = apprise.Apprise.instantiate(
+        "aprs://DF1JSL-15:12345@DF1ABC?locale=NOAM")
+    assert isinstance(instance, NotifyAprs)
+    assert instance.url(privacy=True).startswith(
+        'aprs://DF1JSL-15:****@D...C?')
+    # locale is set in URL
+    assert 'locale=NOAM' in instance.url(privacy=True)
+    assert instance.notify('test') is True
+
+    # Invalid locale
+    assert apprise.Apprise.instantiate(
+        "aprs://DF1JSL-15:12345@DF1ABC?locale=invalid") is None
+
+    # Invalid call signs
+    instance = apprise.Apprise.instantiate(
+        "aprs://DF1JSL-15:12345@abcdefghi/a")
+
+    # We still instantiate
+    assert isinstance(instance, NotifyAprs)
+
+    # We still load our bad entries
+    assert instance.url(privacy=True).startswith(
+        "aprs://DF1JSL-15:****@A...I/A...A?")
+
+    # But with only bad entries, we have nothing to notify
+    assert instance.notify('test') is False
+
+    # Enforces a close
+    del instance
 
 
-@mock.patch("requests.post")
-def test_plugin_aprs_edge_cases(mock_post):
+@mock.patch('socket.create_connection')
+def test_plugin_aprs_edge_cases(mock_create_connection):
     """
     NotifyAprs() Edge Cases
     """
+
+    # A socket object
+    sobj = mock.Mock()
+    sobj.return_value = 1
+    sobj.getpeername.return_value = ('localhost', 1234)
+    sobj.socket_close.return_value = None
+    sobj.setblocking.return_value = True
+    sobj.recv.return_value = \
+        'ping\npong pong DF1JSL-15 verified pong'.encode('latin-1')
+    sobj.sendall.return_value = True
+    sobj.settimeout.return_value = True
+
     # Prepare Mock
-    mock_post.return_value = requests.Request()
-    mock_post.return_value.status_code = requests.codes.created
+    mock_create_connection.return_value = sobj
 
-    # test the handling of our batch modes
-    obj = apprise.Apprise.instantiate("aprs://DF1JSL-15:12345@DF1ABC/DF1DEF")
-    assert isinstance(obj, NotifyAprs)
+    # Valid instances
+    instance = apprise.Apprise.instantiate(
+        "aprs://DF1JSL-15:12345@DF1ABC/DF1DEF")
+    assert isinstance(instance, NotifyAprs)
 
-    # objects will be combined into a single post in batch mode
-    assert len(obj) == 1
+    # Objects read
+    assert len(instance) == 2
 
-    # Force our batch to break into separate messages
-    obj.default_batch_size = 1
+    # Bad data
+    sobj.recv.return_value = 'one line'.encode('latin-1')
+    assert instance.notify(body='body', title='title') is False
+    sobj.recv.return_value = '\n\n\n'.encode('latin-1')
+    assert instance.notify(body='body', title='title') is False
+    sobj.recv.return_value = ''.encode('latin-1')
+    assert instance.notify(body='body', title='title') is False
+    sobj.recv.return_value = '\ndata'.encode('latin-1')
+    assert instance.notify(body='body', title='title') is False
+    # Different Call-Sign then what we logged in as
+    sobj.recv.return_value = \
+        'ping\npong pong DF1JSL-14 verified, pong'.encode('latin-1')
+    assert instance.notify(body='body', title='title') is False
+    # Unverified
+    sobj.recv.return_value = \
+        'ping\npong pong DF1JSL-15 unverified, pong'.encode('latin-1')
+    assert instance.notify(body='body', title='title') is False
 
-    # We'll send 1 message now
-    assert len(obj) == 1
+    #
+    # Test Login edge cases
+    #
+    sobj.return_value = False
+    assert instance.aprsis_login() is False
+    sobj.return_value = 1
+    sobj.recv.return_value = ''.encode('latin-1')
+    assert instance.aprsis_login() is False
+    sobj.recv.return_value = \
+        'ping\npong pong DF1JSL-15 verified pong'.encode('latin-1')
 
-    # omitting body test as this would initiate
-    # a real message to APRS-IS with an invalid
-    # passcode, thus returning a "false" from the
-    # plugin and then causes to fail the test.
-    """
-    assert obj.notify(
-        body='body', title='title') is True
-    assert mock_post.call_count == 2
-    """
+    #
+    # Test Socket Send Exceptions
+    #
+    sobj.sendall.return_value = None
+    sobj.sendall.side_effect = socket.gaierror('gaierror')
+    # No connection
+    assert instance.socket_send('data') is False
+    # Ensure we have a connection before calling socket_send()
+    assert instance.socket_open() is True
+    assert instance.socket_send('data') is False
+    sobj.sendall.side_effect = socket.timeout('timeout')
+    assert instance.socket_open() is True
+    assert instance.socket_send('data') is False
+    assert instance.socket_open() is True
+    sobj.sendall.side_effect = socket.error('error')
+    assert instance.socket_send('data') is False
+
+    # Login is impacted by socket_send
+    sobj.return_value = 1
+    assert instance.socket_open() is True
+    assert instance.aprsis_login() is False
+
+    # Return some of our
+    sobj.sendall.side_effect = None
+    sobj.sendall.return_value = True
+
+    assert instance.socket_open() is True
+    sobj.close.return_value = None
+    sobj.close.side_effect = socket.gaierror('gaierror')
+    instance.socket_close()
+    sobj.close.side_effect = socket.timeout('timeout')
+    instance.socket_close()
+    sobj.close.side_effect = socket.error('error')
+    instance.socket_close()
+    sobj.return_value = None
+    instance.socket_close()
+    # Socket isn't open; so we can't get content
+    assert instance.socket_receive(100) is False
+    sobj.close.side_effect = None
+    sobj.close.return_value = None
+    # Double close test
+    instance.socket_close()
+
+    sobj.return_value = 1
+    mock_create_connection.return_value = None
+    mock_create_connection.side_effect = socket.gaierror('gaierror')
+    assert instance.socket_open() is False
+    assert instance.notify('test') is False
+    mock_create_connection.side_effect = socket.timeout('timeout')
+    assert instance.socket_open() is False
+    assert instance.notify('test') is False
+    mock_create_connection.side_effect = socket.error('error')
+    assert instance.socket_open() is False
+    assert instance.notify('test') is False
+    mock_create_connection.side_effect = ConnectionError('ConnectionError')
+    assert instance.socket_open() is False
+    assert instance.notify('test') is False
+
+    # Restore our good connection
+    mock_create_connection.return_value = sobj
+    mock_create_connection.side_effect = None
+
+    # Functionality has been restored
+    assert instance.socket_open() is True
+
+    # Now play with getpeername
+    sobj.getpeername.return_value = None
+    sobj.getpeername.side_effect = ValueError('getpeername ValueError')
+    assert instance.socket_open() is True
+
+    sobj.getpeername.return_value = ('localhost', 1234)
+    assert instance.socket_open() is True
+    # Test different receive settings
+    assert instance.socket_receive(0)
+    assert instance.socket_receive(-1)
+    assert instance.socket_receive(100)
+
+    sobj.recv.side_effect = socket.gaierror('gaierror')
+    assert instance.socket_open() is True
+    assert instance.socket_receive(100) is False
+    sobj.recv.side_effect = socket.timeout('timeout')
+    assert instance.socket_open() is True
+    assert instance.socket_receive(100) is False
+    sobj.recv.side_effect = socket.error('error')
+    assert instance.socket_open() is True
+    assert instance.socket_receive(100) is False
+
+    # Restore
+    sobj.recv.side_effect = None
+    sobj.recv.return_value = \
+        'ping\npong pong DF1JSL-15 verified pong'.encode('latin-1')
+
+    # Simulate a successful connection, but a failed notification
+    # To do this we need to have a login succeed, but the second call to send
+    # to fail
+    sobj.sendall.return_value = True
+    assert instance.notify('test') is True
+
+    sobj.sendall.return_value = None
+    sobj.sendall.side_effect = (True, socket.gaierror('gaierror'))
+    assert instance.notify('test') is False
+
+    sobj.sendall.return_value = True
+    sobj.sendall.side_effect = None
+    del sobj
 
 
-@mock.patch("requests.post")
-def test_plugin_aprs_config_files(mock_post):
+def test_plugin_aprs_config_files():
     """
     NotifyAprs() Config File Cases
     """
@@ -263,14 +337,10 @@ def test_plugin_aprs_config_files(mock_post):
       - aprs://DF1JSL-15:12345@DF1ABC:
           - locale: ROTA
 
-      # This will take on normal (default) priority
+      # This will fail to load because the locale is bad
       - aprs://DF1JSL-15:12345@DF1ABC:
           - locale: aprs_invalid
     """
-
-    # Prepare Mock
-    mock_post.return_value = requests.Request()
-    mock_post.return_value.status_code = requests.codes.created
 
     # Create ourselves a config object
     ac = apprise.AppriseConfig()
@@ -281,14 +351,5 @@ def test_plugin_aprs_config_files(mock_post):
     # Add our configuration
     aobj.add(ac)
 
-    # We should be able to read our 7 servers from that
-    # 4x normal (invalid + 3 exclusively specified to be so)
-    # 3x emerg
     assert len(ac.servers()) == 6
     assert len(aobj) == 6
-
-
-#    assert len([x for x in aobj.find(tag='aprs_str')]) == 6
-#    assert len([x for x in aobj.find(tag='aprs_invalid')]) == 1
-# Notifications work
-#    assert aobj.notify(title="title", body="body") is True

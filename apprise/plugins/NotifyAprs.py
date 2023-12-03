@@ -69,6 +69,7 @@
 
 import socket
 import sys
+from itertools import chain
 from .NotifyBase import NotifyBase
 from ..AppriseLocale import gettext_lazy as _
 from ..URLBase import PrivacyMode
@@ -77,7 +78,6 @@ from ..utils import is_call_sign
 from ..utils import parse_call_sign
 from .. import __version__
 import re
-import time
 
 # Check if the 'unidecode' package is present
 # and use it later on, if available
@@ -122,21 +122,12 @@ class NotifyAprs(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = "https://github.com/caronc/apprise/wiki/Notify_aprs"
 
-    # APRS default server
-    notify_url = "euro.aprs2.net"
-
-    # Our (future) socket sobject
-    sock = None
-
     # APRS default port, supported by all core servers
     # Details: https://www.aprs-is.net/Connecting.aspx
     notify_port = 10152
 
     # The maximum length of the APRS message body
     body_maxlen = 67
-
-    # socket timeout in seconds
-    socket_timeout = 15
 
     # Apprise APRS Device ID / TOCALL ID
     # This is a FIXED value which is associated with this plugin.
@@ -159,11 +150,10 @@ class NotifyAprs(NotifyBase):
     # "Rx: APRS-IS msg is too short - needs to have at least two lines" error
     # messages, you might want to increase this value to a larger time span
     # Per previous experience, do not use values lower than 0.5 (seconds)
-    sleep_after_socket_send = 0.8
+    request_rate_per_sec = 0.8
 
-    # Once we have sent a packet to APRS-IS, these are the number seconds
-    # that we will wait before we will continue with the next package
-    sleep_after_payload_send = 5.0
+    # Encoding of retrieved content
+    aprs_encoding = 'latin-1'
 
     # Define object templates
     templates = ("{schema}://{user}:{password}@{targets}",)
@@ -218,11 +208,14 @@ class NotifyAprs(NotifyBase):
         }
     )
 
-    def __init__(self, targets=None, locale=None, batch=False, **kwargs):
+    def __init__(self, targets=None, locale=None, **kwargs):
         """
         Initialize APRS Object
         """
         super().__init__(**kwargs)
+
+        # Our (future) socket sobject
+        self.sock = None
 
         # Parse our targets
         self.targets = list()
@@ -265,7 +258,7 @@ class NotifyAprs(NotifyBase):
         APRS-IS-server and validate it, if necessary
         """
         if locale:
-            if locale not in APRS_LOCALES:
+            if locale.upper() not in APRS_LOCALES:
                 msg = (
                     "Unsupported APRS-IS server locale. "
                     "Received: {}. Valid: {}".format(
@@ -276,11 +269,12 @@ class NotifyAprs(NotifyBase):
                 raise TypeError(msg)
 
         # Set the transmitter group
-        self.locale = (
-            NotifyAprs.template_args["locale"]["default"]
-            if not locale
-            else locale
-        )
+        self.locale = \
+            NotifyAprs.template_args["locale"]["default"] \
+            if not locale else locale.upper()
+
+        # Used for URL generation afterwards only
+        self.invalid_targets = list()
 
         for target in parse_call_sign(targets):
             # Validate targets and drop bad ones
@@ -293,15 +287,11 @@ class NotifyAprs(NotifyBase):
                         target
                     ),
                 )
+                self.invalid_targets.append(target.upper())
                 continue
 
-            # Convert the call sign to upper case and
-            # try to add it to our list of targets
-            _target_upper = target.upper()
-
-            # Store call sign as is and ignore duplicates
-            if _target_upper not in self.targets:
-                self.targets.append(_target_upper)
+            # Store entry
+            self.targets.append(target.upper())
 
         return
 
@@ -313,32 +303,11 @@ class NotifyAprs(NotifyBase):
             try:
                 self.sock.close()
 
-            except socket.gaierror as e:
-                self.logger.debug(
-                    "Socket Exception socket_close: %s" % str(e)
-                )
-                self.sock = None
-                return False
+            except Exception:
+                # No worries if socket exception thrown on close()
+                pass
 
-            except socket.timeout as e:
-                (
-                    self.logger.debug(
-                        "Socket Timeout Exception socket_close: %s" % str(e)
-                    )
-                )
-                self.sock = None
-                return False
-
-            except Exception as e:
-                (
-                    self.logger.debug(
-                        "General Exception socket_close: %s" % str(e)
-                    )
-                )
-                self.sock = None
-                return False
-
-        self.sock = None
+            self.sock = None
 
     def socket_open(self):
         """
@@ -354,30 +323,27 @@ class NotifyAprs(NotifyBase):
         try:
             self.sock = socket.create_connection(
                 (APRS_LOCALES[self.locale], self.notify_port),
-                self.socket_timeout,
+                self.socket_connect_timeout,
             )
 
         except ConnectionError as e:
-            self.logger.debug("Socket Exception socket_open: %s" % str(e))
+            self.logger.debug("Socket Exception socket_open: %s", str(e))
             self.sock = None
             return False
 
         except socket.gaierror as e:
-            self.logger.debug("Socket Exception socket_open: %s" % str(e))
+            self.logger.debug("Socket Exception socket_open: %s", str(e))
             self.sock = None
             return False
 
         except socket.timeout as e:
-            (
-                self.logger.debug(
-                    "Socket Timeout Exception socket_open: %s" % str(e)
-                )
-            )
+            self.logger.debug(
+                "Socket Timeout Exception socket_open: %s", str(e))
             self.sock = None
             return False
 
         except Exception as e:
-            self.logger.debug("General Exception socket_open: %s" % str(e))
+            self.logger.debug("General Exception socket_open: %s", str(e))
             self.sock = None
             return False
 
@@ -389,7 +355,8 @@ class NotifyAprs(NotifyBase):
             # Get the physical host/port of the server
             host, port = self.sock.getpeername()
             # and create debug info
-            (self.logger.debug("Connected to {}:{}".format(host, port)))
+            self.logger.debug("Connected to {}:{}".format(host, port))
+
         except ValueError:
             # Seens as if we are running on an operating
             # system that does not support getpeername()
@@ -440,11 +407,6 @@ class NotifyAprs(NotifyBase):
         # APRS-IS sends at least two lines of data
         # The data that we need is in line #2 so
         # let's split the  content and see what we have
-        #
-        # note: if you see this error too often,
-        # increase the value for sleep_after_socket_send
-        # in this module
-        #
         rx_lines = rx_buf.splitlines()
         if len(rx_lines) < 2:
             self.logger.warning(
@@ -458,17 +420,12 @@ class NotifyAprs(NotifyBase):
         # both call sign and login status
         try:
             _, _, callsign, status, _ = rx_lines[1].split(" ", 4)
-        except IndexError:
+
+        except ValueError:
+            # ValueError is returned if there were not enough elements to
+            # populate the response
             self.logger.warning(
                 "socket_login: " "received invalid response from APRS-IS"
-            )
-            self.socket_close()
-            return False
-
-        # check if we were able to log in
-        if not callsign:
-            self.logger.warning(
-                "socket_login: " "did not receive call sign from APRS-IS"
             )
             self.socket_close()
             return False
@@ -480,7 +437,7 @@ class NotifyAprs(NotifyBase):
             self.socket_close()
             return False
 
-        if status == "unverified,":
+        if status.startswith("unverified"):
             self.logger.warning(
                 "socket_login: "
                 "invalid APRS-IS password for given call sign"
@@ -507,10 +464,14 @@ class NotifyAprs(NotifyBase):
             tx_data.encode("utf-8") if sys.version_info[0] >= 3 else tx_data
         )
 
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+
+        # Try to open the socket
         # Send the content to APRS-IS
         try:
             self.sock.setblocking(True)
-            self.sock.settimeout(self.socket_timeout)
+            self.sock.settimeout(self.socket_connect_timeout)
             self.sock.sendall(payload)
 
         except socket.gaierror as e:
@@ -537,7 +498,6 @@ class NotifyAprs(NotifyBase):
         # mandatory on several APRS-IS servers
         # helps to reduce the number of errors where
         # the server only returns an abbreviated message
-        time.sleep(self.sleep_after_socket_send)
         return True
 
     def socket_reset(self):
@@ -568,7 +528,7 @@ class NotifyAprs(NotifyBase):
         # Receive content from the socket
         try:
             self.sock.setblocking(False)
-            self.sock.settimeout(self.socket_timeout)
+            self.sock.settimeout(self.socket_connect_timeout)
             rx_buf = self.sock.recv(rx_len)
 
         except socket.gaierror as e:
@@ -576,24 +536,25 @@ class NotifyAprs(NotifyBase):
                 "Socket Exception socket_receive: %s" % str(e)
             )
             self.sock = None
-            rx_buf = ""
+            return False
 
         except socket.timeout as e:
             self.logger.warning(
                 "Socket Timeout Exception " "socket_receive: %s" % str(e)
             )
             self.sock = None
-            rx_buf = ""
+            return False
 
         except Exception as e:
             self.logger.warning(
                 "General Exception " "socket_receive: %s" % str(e)
             )
             self.sock = None
-            rx_buf = ""
+            return False
 
         rx_buf = (
-            rx_buf.decode("latin-1") if sys.version_info[0] >= 3 else rx_buf
+            rx_buf.decode(self.aprs_encoding)
+            if sys.version_info[0] >= 3 else rx_buf
         )
 
         # There will be no data in case we reset the socket
@@ -617,16 +578,8 @@ class NotifyAprs(NotifyBase):
             return False
 
         # prepare payload
-        if title:
-            # Format title
-            payload = "{}: {}".format(title, body)
-        else:
-            payload = body
+        payload = body
 
-        # Always call throttle before any remote server i/o is made
-        self.throttle()
-
-        # Try to open the socket
         # sock object is "None" if we were unable to establish a connection
         # In case of errors, the error message has already been sent
         # to the logger object
@@ -693,9 +646,6 @@ class NotifyAprs(NotifyBase):
 
         # send the message to our target call sign(s)
         for index in range(0, len(targets)):
-            # Always call throttle before any remote server i/o is made
-            self.throttle()
-
             # prepare the output string
             # Format:
             # Device ID/TOCALL - our call sign - target call sign - body
@@ -711,17 +661,7 @@ class NotifyAprs(NotifyBase):
             # send the content
             if not self.socket_send(buffer):
                 has_error = True
-
-            # apply grace sleep period in case we need to send
-            # another package to APRS-IS - otherwise, APRS-IS
-            # may choke on the torrent of incoming data
-            if (index + 1) < len(targets):
-                (
-                    self.logger.debug(
-                        "Initiating sleep between separate APRS messages"
-                    )
-                )
-                time.sleep(self.sleep_after_payload_send)
+                break
 
             # Finally, reset our socket buffer
             # we DO NOT read from the socket as we
@@ -730,8 +670,8 @@ class NotifyAprs(NotifyBase):
 
         self.logger.debug("Closing socket.")
         self.socket_close()
-        self.logger.info("Sent APRS-IS notification(s)")
-
+        self.logger.info(
+            "Sent %d/%d APRS-IS notification(s)", index + 1, len(targets))
         return not has_error
 
     def url(self, privacy=False, *args, **kwargs):
@@ -740,11 +680,11 @@ class NotifyAprs(NotifyBase):
         """
 
         # Define any URL parameters
-        params = {
-            "locale": APRS_LOCALES[self.template_args["locale"]["default"]]
-            if self.locale not in APRS_LOCALES
-            else APRS_LOCALES[self.locale],
-        }
+        params = {}
+
+        if self.locale != NotifyAprs.template_args["locale"]["default"]:
+            # Store our locale if not default
+            params['locale'] = self.locale
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
@@ -760,11 +700,26 @@ class NotifyAprs(NotifyBase):
         return "{schema}://{auth}{targets}?{params}".format(
             schema=self.secure_protocol,
             auth=auth,
-            targets="/".join(
-                [self.pprint(x, privacy, safe="") for x in self.targets]
-            ),
+            targets="/".join(chain(
+                [self.pprint(x, privacy, safe="") for x in self.targets],
+                [self.pprint(x, privacy, safe="")
+                 for x in self.invalid_targets],
+            )),
             params=NotifyAprs.urlencode(params),
         )
+
+    def __len__(self):
+        """
+        Returns the number of targets associated with this notification
+        """
+        targets = len(self.targets)
+        return targets if targets > 0 else 1
+
+    def __del__(self):
+        """
+        Ensure we close any lingering connections
+        """
+        self.socket_close()
 
     @staticmethod
     def parse_url(url):
