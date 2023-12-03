@@ -79,17 +79,6 @@ from ..utils import parse_call_sign
 from .. import __version__
 import re
 
-# Check if the 'unidecode' package is present
-# and use it later on, if available
-is_unidecode_present = False
-try:
-    from unidecode import unidecode
-
-    is_unidecode_present = True
-except ImportError:
-    pass
-
-
 # Fixed APRS-IS server locales
 # Default is 'EURO'
 # See https://www.aprs2.net/ for details
@@ -612,9 +601,8 @@ class NotifyAprs(NotifyBase):
         # payload that would break APRS
         # see https://www.aprs.org/doc/APRS101.PDF pg. 71
         payload = re.sub("[{}|~]+", "", payload)
-        #
-        # Now, replace German umlauts as these are not
-        # handled by unidecode - see https://pypi.org/project/Unidecode/
+
+        # Replace German umlauts
         payload = (
             payload.replace("Ä", "Ae")
             .replace("Ö", "Oe")
@@ -624,16 +612,7 @@ class NotifyAprs(NotifyBase):
             .replace("ü", "ue")
             .replace("ß", "ss")
         )
-        #
-        # Then convert to plain ASCII while trying to keep
-        # the integrity of the message intact
-        # Unidecode removes e.g. Umlauts and replaces them with
-        # the next best character(s)
-        #
-        # Package might not be installed by default
-        if is_unidecode_present:
-            payload = unidecode(payload)
-        #
+
         # Finally, constrain output string to 67 characters as
         # APRS messages are limited in length
         payload = payload[:67]
