@@ -35,7 +35,9 @@ EMOJI_WRAPPER = ':'
 # expression it should be swapped on.
 # This list was based on: https://github.com/ikatyang/emoji-cheat-sheet
 EMOJI_MAP = {
+    #
     # Face Smiling
+    #
     EMOJI_WRAPPER + r'grinning' + EMOJI_WRAPPER: '😄',
     EMOJI_WRAPPER + r'smile' + EMOJI_WRAPPER: '😄',
     EMOJI_WRAPPER + r'(laughing|satisfied)' + EMOJI_WRAPPER: '😆',
@@ -50,7 +52,133 @@ EMOJI_MAP = {
     EMOJI_WRAPPER + r'upside_down_face' + EMOJI_WRAPPER: '🙃',
     EMOJI_WRAPPER + r'blush' + EMOJI_WRAPPER: '😊',
 
+    #
     # Face Affection
+    #
+    EMOJI_WRAPPER + r'smiling_face_with_three_hearts' + EMOJI_WRAPPER: '🥰',
+    EMOJI_WRAPPER + r'star_struck' + EMOJI_WRAPPER: '🤩',
+    EMOJI_WRAPPER + r'kissing' + EMOJI_WRAPPER: '😗',
+    EMOJI_WRAPPER + r'kissing_closed_eyes' + EMOJI_WRAPPER: '😚',
+    EMOJI_WRAPPER + r'smiling_face_with_tear' + EMOJI_WRAPPER: '🥲',
+    EMOJI_WRAPPER + r'heart_eyes' + EMOJI_WRAPPER: '😍',
+    EMOJI_WRAPPER + r'kissing_heart' + EMOJI_WRAPPER: '😘',
+    EMOJI_WRAPPER + r'relaxed' + EMOJI_WRAPPER: '☺️',
+    EMOJI_WRAPPER + r'kissing_smiling_eyes' + EMOJI_WRAPPER: '😙',
+
+    #
+    # Face Tongue
+    #
+    EMOJI_WRAPPER + r'yum' + EMOJI_WRAPPER: '😋',
+    EMOJI_WRAPPER + r'stuck_out_tongue_winking_eye' + EMOJI_WRAPPER: '😜',
+    EMOJI_WRAPPER + r'stuck_out_tongue_closed_eyes' + EMOJI_WRAPPER: '😝',
+    EMOJI_WRAPPER + r'stuck_out_tongue' + EMOJI_WRAPPER: '😛',
+    EMOJI_WRAPPER + r'zany_face' + EMOJI_WRAPPER: '🤪',
+    EMOJI_WRAPPER + r'money_mouth_face' + EMOJI_WRAPPER: '🤑',
+
+    #
+    # Face Hand
+    #
+    EMOJI_WRAPPER + r'hugs' + EMOJI_WRAPPER: '🤗',
+    EMOJI_WRAPPER + r'shushing_face' + EMOJI_WRAPPER: '🤫',
+    EMOJI_WRAPPER + r'hand_over_mouth' + EMOJI_WRAPPER: '🤭',
+    EMOJI_WRAPPER + r'thinking' + EMOJI_WRAPPER: '🤔',
+
+    #
+    # Face Neutral Skeptical
+    #
+    EMOJI_WRAPPER + r'zipper_mouth_face' + EMOJI_WRAPPER: '🤐',
+    EMOJI_WRAPPER + r'neutral_face' + EMOJI_WRAPPER: '😐',
+    EMOJI_WRAPPER + r'no_mouth' + EMOJI_WRAPPER: '😶',
+    EMOJI_WRAPPER + r'smirk' + EMOJI_WRAPPER: '😏',
+    EMOJI_WRAPPER + r'roll_eyes' + EMOJI_WRAPPER: '🙄',
+    # face_exhaling is comprised of 3 unicode characters:
+    # 	1. U+1F62E FACE WITH OPEN MOUTH
+    #   2. U+200D ZERO WIDTH JOINER
+    #   3. U+1F4A8 DASH SYMBOL
+    EMOJI_WRAPPER + r'face_exhaling' + EMOJI_WRAPPER: '😮‍💨',
+    EMOJI_WRAPPER + r'raised_eyebrow' + EMOJI_WRAPPER: '🤨',
+    EMOJI_WRAPPER + r'expressionless' + EMOJI_WRAPPER: '😑',
+    # face_in_clouds is comprised of 4 unicode characters:
+    # 	1. U+1F636 FACE WITHOUT MOUTH
+    #   2. U+200D ZERO WIDTH JOINER
+    #   3. U+1F32B FOG
+    #   4. U+FE0F VARIATION SELECTOR-16
+    EMOJI_WRAPPER + r'face_in_clouds' + EMOJI_WRAPPER: '😶‍🌫️',
+    EMOJI_WRAPPER + r'unamused' + EMOJI_WRAPPER: '😒',
+    EMOJI_WRAPPER + r'grimacing' + EMOJI_WRAPPER: '😬',
+    EMOJI_WRAPPER + r'lying_face' + EMOJI_WRAPPER: '🤥',
+
+    #
+    # Face Sleepy
+    #
+    EMOJI_WRAPPER + r'relieved' + EMOJI_WRAPPER: '😌',
+    EMOJI_WRAPPER + r'sleepy' + EMOJI_WRAPPER: '😪',
+    EMOJI_WRAPPER + r'sleeping' + EMOJI_WRAPPER: '😴',
+    EMOJI_WRAPPER + r'pensive' + EMOJI_WRAPPER: '😔',
+    EMOJI_WRAPPER + r'drooling_face' + EMOJI_WRAPPER: '🤤',
+
+    #
+    # Face Unwell
+    #
+    EMOJI_WRAPPER + r'mask' + EMOJI_WRAPPER: '😷',
+    EMOJI_WRAPPER + r'face_with_head_bandage' + EMOJI_WRAPPER: '🤕',
+    EMOJI_WRAPPER + r'vomiting_face' + EMOJI_WRAPPER: '🤮',
+    EMOJI_WRAPPER + r'hot_face' + EMOJI_WRAPPER: '🥵',
+    EMOJI_WRAPPER + r'woozy_face' + EMOJI_WRAPPER: '🥴',
+    # face_with_spiral_eyes is comprised of 3 unicode characters:
+    # 	1. U+1F635 DIZZY FACE
+    #   2. U+200D ZERO WIDTH JOINER
+    #   3. U+1F4AB DIZZY SYMBOL
+    EMOJI_WRAPPER + r'face_with_spiral_eyes' + EMOJI_WRAPPER: '😵‍💫',
+    EMOJI_WRAPPER + r'face_with_thermometer' + EMOJI_WRAPPER: '🤒',
+    EMOJI_WRAPPER + r'nauseated_face' + EMOJI_WRAPPER: '🤢',
+    EMOJI_WRAPPER + r'sneezing_face' + EMOJI_WRAPPER: '🤧',
+    EMOJI_WRAPPER + r'cold_face' + EMOJI_WRAPPER: '🥶',
+    EMOJI_WRAPPER + r'dizzy_face' + EMOJI_WRAPPER: '😵',
+    EMOJI_WRAPPER + r'exploding_head' + EMOJI_WRAPPER: '🤯',
+
+    #
+    # Face Hat
+    #
+    EMOJI_WRAPPER + r'cowboy_hat_face' + EMOJI_WRAPPER: '🤠',
+    EMOJI_WRAPPER + r'disguised_face' + EMOJI_WRAPPER: '🥸',
+    EMOJI_WRAPPER + r'partying_face' + EMOJI_WRAPPER: '🥳',
+
+    #
+    # Face Glasses
+    #
+    EMOJI_WRAPPER + r'sunglasses' + EMOJI_WRAPPER: '😎',
+    EMOJI_WRAPPER + r'monocle_face' + EMOJI_WRAPPER: '🧐',
+    EMOJI_WRAPPER + r'nerd_face' + EMOJI_WRAPPER: '🤓',
+
+    #
+    # Face Concerned
+    #
+    EMOJI_WRAPPER + r'confused' + EMOJI_WRAPPER: '😕',
+    EMOJI_WRAPPER + r'slightly_frowning_face' + EMOJI_WRAPPER: '🙁',
+    EMOJI_WRAPPER + r'open_mouth' + EMOJI_WRAPPER: '😮',
+    EMOJI_WRAPPER + r'astonished' + EMOJI_WRAPPER: '😲',
+    EMOJI_WRAPPER + r'pleading_face' + EMOJI_WRAPPER: '🥺',
+    EMOJI_WRAPPER + r'anguished' + EMOJI_WRAPPER: '😧',
+    EMOJI_WRAPPER + r'cold_sweat' + EMOJI_WRAPPER: '😰',
+    EMOJI_WRAPPER + r'cry' + EMOJI_WRAPPER: '😢',
+    EMOJI_WRAPPER + r'scream' + EMOJI_WRAPPER: '😱',
+    EMOJI_WRAPPER + r'persevere' + EMOJI_WRAPPER: '😣',
+    EMOJI_WRAPPER + r'sweat' + EMOJI_WRAPPER: '😓',
+    EMOJI_WRAPPER + r'tired_face' + EMOJI_WRAPPER: '😫',
+    EMOJI_WRAPPER + r'worried' + EMOJI_WRAPPER: '😟',
+    EMOJI_WRAPPER + r'frowning_face' + EMOJI_WRAPPER: '☹️',
+    EMOJI_WRAPPER + r'hushed' + EMOJI_WRAPPER: '😯',
+    EMOJI_WRAPPER + r'flushed' + EMOJI_WRAPPER: '😳',
+    EMOJI_WRAPPER + r'frowning' + EMOJI_WRAPPER: '😦',
+    EMOJI_WRAPPER + r'fearful' + EMOJI_WRAPPER: '😨',
+    EMOJI_WRAPPER + r'disappointed_relieved' + EMOJI_WRAPPER: '😥',
+    EMOJI_WRAPPER + r'sob' + EMOJI_WRAPPER: '😭',
+    EMOJI_WRAPPER + r'confounded' + EMOJI_WRAPPER: '😖',
+    EMOJI_WRAPPER + r'disappointed' + EMOJI_WRAPPER: '😞',
+    EMOJI_WRAPPER + r'weary' + EMOJI_WRAPPER: '😩',
+    EMOJI_WRAPPER + r'yawning_face' + EMOJI_WRAPPER: '🥱',
+
 }
 
 # Our compiled mapping
