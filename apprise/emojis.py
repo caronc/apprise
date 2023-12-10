@@ -179,6 +179,118 @@ EMOJI_MAP = {
     EMOJI_WRAPPER + r'weary' + EMOJI_WRAPPER: '😩',
     EMOJI_WRAPPER + r'yawning_face' + EMOJI_WRAPPER: '🥱',
 
+    #
+    # Face Negative
+    #
+    EMOJI_WRAPPER + r'triumph' + EMOJI_WRAPPER: '😤',
+    EMOJI_WRAPPER + r'angry' + EMOJI_WRAPPER: '😠',
+    EMOJI_WRAPPER + r'smiling_imp' + EMOJI_WRAPPER: '😈',
+    EMOJI_WRAPPER + r'skull' + EMOJI_WRAPPER: '💀',
+    EMOJI_WRAPPER + r'(pout|rage)' + EMOJI_WRAPPER: '😡',
+    EMOJI_WRAPPER + r'cursing_face' + EMOJI_WRAPPER: '🤬',
+    EMOJI_WRAPPER + r'imp' + EMOJI_WRAPPER: '👿',
+    EMOJI_WRAPPER + r'skull_and_crossbones' + EMOJI_WRAPPER: '☠️',
+
+    #
+    # Face Costume
+    #
+    EMOJI_WRAPPER + r'(hankey|poop|shit)' + EMOJI_WRAPPER: '💩',
+    EMOJI_WRAPPER + r'japanese_ogre' + EMOJI_WRAPPER: '👹',
+    EMOJI_WRAPPER + r'ghost' + EMOJI_WRAPPER: '👻',
+    EMOJI_WRAPPER + r'space_invader' + EMOJI_WRAPPER: '👾',
+    EMOJI_WRAPPER + r'clown_face' + EMOJI_WRAPPER: '🤡',
+    EMOJI_WRAPPER + r'japanese_goblin' + EMOJI_WRAPPER: '👺',
+    EMOJI_WRAPPER + r'alien' + EMOJI_WRAPPER: '👽',
+    EMOJI_WRAPPER + r'robot' + EMOJI_WRAPPER: '🤖',
+
+    #
+    # Cat Face
+    #
+    EMOJI_WRAPPER + r'smiley_cat' + EMOJI_WRAPPER: '😺',
+    EMOJI_WRAPPER + r'joy_cat' + EMOJI_WRAPPER: '😹',
+    EMOJI_WRAPPER + r'smirk_cat' + EMOJI_WRAPPER: '😼',
+    EMOJI_WRAPPER + r'scream_cat' + EMOJI_WRAPPER: '🙀',
+    EMOJI_WRAPPER + r'pouting_cat' + EMOJI_WRAPPER: '😾',
+    EMOJI_WRAPPER + r'smile_cat' + EMOJI_WRAPPER: '😸',
+    EMOJI_WRAPPER + r'heart_eyes_cat' + EMOJI_WRAPPER: '😻',
+    EMOJI_WRAPPER + r'kissing_cat' + EMOJI_WRAPPER: '😽',
+    EMOJI_WRAPPER + r'crying_cat_face' + EMOJI_WRAPPER: '😿',
+
+    #
+    # Monkey Face
+    #
+    EMOJI_WRAPPER + r'see_no_evil' + EMOJI_WRAPPER: '🙈',
+    EMOJI_WRAPPER + r'speak_no_evil' + EMOJI_WRAPPER: '🙊',
+    EMOJI_WRAPPER + r'hear_no_evil' + EMOJI_WRAPPER: '🙉',
+
+    #
+    # Heart
+    #
+    EMOJI_WRAPPER + r'love_letter' + EMOJI_WRAPPER: '💌',
+    EMOJI_WRAPPER + r'gift_heart' + EMOJI_WRAPPER: '💝',
+    EMOJI_WRAPPER + r'heartpulse' + EMOJI_WRAPPER: '💗',
+    EMOJI_WRAPPER + r'revolving_hearts' + EMOJI_WRAPPER: '💞',
+    EMOJI_WRAPPER + r'heart_decoration' + EMOJI_WRAPPER: '💟',
+    EMOJI_WRAPPER + r'broken_heart' + EMOJI_WRAPPER: '💔',
+    # mending_heart is comprised of 4 unicode characters:
+    #   1. U+2764 HEAVY BLACK HEART
+    #   2. U+FE0F VARIATION SELECTOR-16
+    #   3. U+200D ZERO WIDTH JOINER
+    #   4. U+1FA79 ADHESIVE BANDAGE
+    EMOJI_WRAPPER + r'mending_heart' + EMOJI_WRAPPER: '❤️‍🩹',
+    EMOJI_WRAPPER + r'orange_heart' + EMOJI_WRAPPER: '🧡',
+    EMOJI_WRAPPER + r'green_heart' + EMOJI_WRAPPER: '💚',
+    EMOJI_WRAPPER + r'purple_heart' + EMOJI_WRAPPER: '💜',
+    EMOJI_WRAPPER + r'black_heart' + EMOJI_WRAPPER: '🖤',
+    EMOJI_WRAPPER + r'cupid' + EMOJI_WRAPPER: '💘',
+    EMOJI_WRAPPER + r'sparkling_heart' + EMOJI_WRAPPER: '💖',
+    EMOJI_WRAPPER + r'heartbeat' + EMOJI_WRAPPER: '💓',
+    EMOJI_WRAPPER + r'two_hearts' + EMOJI_WRAPPER: '💕',
+    EMOJI_WRAPPER + r'heavy_heart_exclamation' + EMOJI_WRAPPER: '❣️',
+    # mending_heart is comprised of 4 unicode characters:
+    #   1. U+2764 HEAVY BLACK HEART
+    #   2. U+FE0F VARIATION SELECTOR-16
+    #   3. U+200D ZERO WIDTH JOINER
+    #   4. U+1F525 FIRE
+    EMOJI_WRAPPER + r'heart_on_fire' + EMOJI_WRAPPER: '❤️‍🔥',
+    EMOJI_WRAPPER + r'heart' + EMOJI_WRAPPER: '❤️',
+    EMOJI_WRAPPER + r'yellow_heart' + EMOJI_WRAPPER: '💛',
+    EMOJI_WRAPPER + r'blue_heart' + EMOJI_WRAPPER: '💙',
+    EMOJI_WRAPPER + r'brown_heart' + EMOJI_WRAPPER: '🤎',
+    EMOJI_WRAPPER + r'white_heart' + EMOJI_WRAPPER: '🤍',
+
+    #
+    # Emotion
+    #
+    EMOJI_WRAPPER + r'kiss' + EMOJI_WRAPPER: '💋',
+    EMOJI_WRAPPER + r'anger' + EMOJI_WRAPPER: '💢',
+    EMOJI_WRAPPER + r'dizzy' + EMOJI_WRAPPER: '💫',
+    EMOJI_WRAPPER + r'dash' + EMOJI_WRAPPER: '💨',
+    EMOJI_WRAPPER + r'speech_balloon' + EMOJI_WRAPPER: '💬',
+    EMOJI_WRAPPER + r'left_speech_bubble' + EMOJI_WRAPPER: '🗨️',
+    EMOJI_WRAPPER + r'thought_balloon' + EMOJI_WRAPPER: '💭',
+    EMOJI_WRAPPER + r'100' + EMOJI_WRAPPER: '💯',
+    EMOJI_WRAPPER + r'(boom|collision)' + EMOJI_WRAPPER: '💥',
+    EMOJI_WRAPPER + r'sweat_drops' + EMOJI_WRAPPER: '💦',
+    EMOJI_WRAPPER + r'hole' + EMOJI_WRAPPER: '🕳️',
+    # eye_speech_bubble is comprised of 5 unicode characters:
+    #   1. U+1F441 EYE
+    #   2. U+FE0F VARIATION SELECTOR-16
+    #   3. U+200D ZERO WIDTH JOINER
+    #   4. U+1F5E8 LEFT SPEECH BUBBLE
+    #   5. U+FE0F VARIATION SELECTOR-16
+    EMOJI_WRAPPER + r'eye_speech_bubble' + EMOJI_WRAPPER: '👁️‍🗨️',
+    EMOJI_WRAPPER + r'right_anger_bubble' + EMOJI_WRAPPER: '🗯️',
+    EMOJI_WRAPPER + r'zzz' + EMOJI_WRAPPER: '💤',
+
+    #
+    # Hand Fingers Open
+    #
+    EMOJI_WRAPPER + r'wave' + EMOJI_WRAPPER: '👋',
+    EMOJI_WRAPPER + r'raised_hand_with_fingers_splayed' + EMOJI_WRAPPER: '🖐️',
+    EMOJI_WRAPPER + r'vulcan_salute' + EMOJI_WRAPPER: '🖖',
+    EMOJI_WRAPPER + r'raised_back_of_hand' + EMOJI_WRAPPER: '🤚',
+    EMOJI_WRAPPER + r'(raised_)?hand' + EMOJI_WRAPPER: '✋',
 }
 
 # Our compiled mapping
