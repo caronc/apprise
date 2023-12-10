@@ -32,6 +32,7 @@ from functools import partial
 
 from ..URLBase import URLBase
 from ..common import NotifyType
+from ..utils import parse_bool
 from ..common import NOTIFY_TYPES
 from ..common import NotifyFormat
 from ..common import NOTIFY_FORMATS
@@ -135,6 +136,9 @@ class NotifyBase(URLBase):
     # Default Overflow Mode
     overflow_mode = OverflowMode.UPSTREAM
 
+    # Default Emoji Interpretation
+    interpret_emojis = False
+
     # Support Attachments; this defaults to being disabled.
     # Since apprise allows you to send attachments without a body or title
     # defined, by letting Apprise know the plugin won't support attachments
@@ -183,6 +187,16 @@ class NotifyBase(URLBase):
             # runtime.
             '_lookup_default': 'notify_format',
         },
+        'emojis': {
+            'name': _('Interpret Emojis'),
+            # SSL Certificate Authority Verification
+            'type': 'bool',
+            # Provide a default
+            'default': interpret_emojis,
+            # look up default using the following parent class value at
+            # runtime.
+            '_lookup_default': 'interpret_emojis',
+        },
     })
 
     def __init__(self, **kwargs):
@@ -193,6 +207,29 @@ class NotifyBase(URLBase):
         """
 
         super().__init__(**kwargs)
+
+        # Store our interpret_emoji's setting
+        # If asset emoji value is set to a default of True and the user
+        #   specifies it to be false, this is accepted and False over-rides.
+        #
+        # If asset emoji value is set to a default of None, a user may
+        #   optionally over-ride this and set it to True from the Apprise
+        #   URL. ?emojis=yes
+        #
+        # If asset emoji value is set to a default of False, then all emoji's
+        # are turned off (no user over-rides allowed)
+        #
+
+        # Take a default
+        self.interpret_emojis = self.asset.interpret_emojis
+        if 'emojis' in kwargs:
+            # possibly over-ride default
+            self.interpret_emojis = True if self.interpret_emojis \
+                in (None, True) and \
+                parse_bool(
+                    kwargs.get('emojis', False),
+                    default=NotifyBase.template_args['emojis']['default']) \
+                else False
 
         if 'format' in kwargs:
             # Store the specified format if specified
@@ -547,6 +584,10 @@ class NotifyBase(URLBase):
                     'Unsupported overflow specified {}'.format(
                         results['overflow']))
                 del results['overflow']
+
+        # Allow emoji's override
+        if 'emojis' in results['qsd']:
+            results['emojis'] = parse_bool(results['qsd'].get('emojis'))
 
         return results
 

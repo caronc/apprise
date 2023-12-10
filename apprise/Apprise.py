@@ -36,6 +36,7 @@ from .utils import is_exclusive_match
 from .utils import parse_list
 from .utils import parse_urls
 from .utils import cwe312_url
+from .emojis import apply_emojis
 from .logger import logger
 from .AppriseAsset import AppriseAsset
 from .AppriseConfig import AppriseConfig
@@ -376,7 +377,7 @@ class Apprise:
                 body, title,
                 notify_type=notify_type, body_format=body_format,
                 tag=tag, match_always=match_always, attach=attach,
-                interpret_escapes=interpret_escapes
+                interpret_escapes=interpret_escapes,
             )
 
         except TypeError:
@@ -501,6 +502,11 @@ class Apprise:
             key = server.notify_format if server.title_maxlen > 0\
                 else f'_{server.notify_format}'
 
+            if server.interpret_emojis:
+                # alter our key slightly to handle emojis since their value is
+                # pulled out of the notification
+                key += "-emojis"
+
             if key not in conversion_title_map:
 
                 # Prepare our title
@@ -541,6 +547,16 @@ class Apprise:
                         msg = 'Failed to escape message body'
                         logger.error(msg)
                         raise TypeError(msg)
+
+                if server.interpret_emojis:
+                    #
+                    # Convert our :emoji: definitions
+                    #
+
+                    conversion_body_map[key] = \
+                        apply_emojis(conversion_body_map[key])
+                    conversion_title_map[key] = \
+                        apply_emojis(conversion_title_map[key])
 
             kwargs = dict(
                 body=conversion_body_map[key],
