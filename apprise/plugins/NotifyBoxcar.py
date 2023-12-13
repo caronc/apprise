@@ -33,11 +33,7 @@ from json import dumps
 from time import time
 from hashlib import sha1
 from itertools import chain
-try:
-    from urlparse import urlparse
-
-except ImportError:
-    from urllib.parse import urlparse
+from urllib.parse import urlparse
 
 from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
