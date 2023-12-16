@@ -107,13 +107,6 @@ class NotifyBulkVS(NotifyBase):
             'regex': (r'^[0-9\s)(+-]+$', 'i'),
             'map_to': 'targets',
         },
-        'target_group': {
-            'name': _('Target Group'),
-            'type': 'string',
-            'prefix': '+',
-            'regex': (r'^[A-Z0-9 _-]+$', 'i'),
-            'map_to': 'targets',
-        },
         'targets': {
             'name': _('Targets'),
             'type': 'list:string',
