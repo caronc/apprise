@@ -51,7 +51,7 @@ Pushover, PushSafer, Pushy, PushDeer, Reddit, Rocket.Chat, RSyslog, SendGrid,
 ServerChan, Signal, SimplePush, Sinch, Slack, SMSEagle, SMTP2Go, Spontit,
 SparkPost, Super Toasty, Streamlabs, Stride, Synology Chat, Syslog,
 Techulus Push, Telegram, Threema Gateway, Twilio, Twitter, Twist, XBMC,
-Voipms, Vonage, WhatsApp, Webex Teams}
+Voipms, Vonage, WeCom Bot, WhatsApp, Webex Teams}
 
 Name:           python-%{pypi_name}
 Version:        1.6.0
