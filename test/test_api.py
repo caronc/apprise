@@ -1520,7 +1520,7 @@ def test_apprise_details_plugin_verification():
         # General Parameters
         'user', 'password', 'port', 'host', 'schema', 'fullpath',
         # NotifyBase parameters:
-        'format', 'overflow',
+        'format', 'overflow', 'emojis',
         # URLBase parameters:
         'verify', 'cto', 'rto',
     ])

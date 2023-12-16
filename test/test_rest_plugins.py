@@ -27,6 +27,9 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import pytest
+import json
+from unittest import mock
+import requests
 from random import choice
 from string import ascii_uppercase as str_alpha
 from string import digits as str_num
@@ -34,6 +37,8 @@ from string import digits as str_num
 from apprise import NotifyBase
 from apprise.common import NotifyFormat
 from apprise.common import OverflowMode
+from apprise.AppriseAsset import AppriseAsset
+from apprise.Apprise import Apprise
 
 # Disable logging for a cleaner testing output
 import logging
@@ -382,9 +387,9 @@ def test_notify_overflow_split():
         offset += len(_body)
 
 
-def test_notify_overflow_general():
+def test_notify_markdown_general():
     """
-    API: Overflow General Testing
+    API: Markdown General Testing
 
     """
 
@@ -431,3 +436,233 @@ def test_notify_overflow_general():
     # Our title get's stripped off since it's not of valid markdown
     assert body == chunks[0].get('body')
     assert chunks[0].get('title') == ""
+
+
+@mock.patch('requests.post')
+def test_notify_emoji_general(mock_post):
+    """
+    API: Emoji General Testing
+
+    """
+
+    # Prepare our response
+    response = requests.Request()
+    response.status_code = requests.codes.ok
+
+    # Prepare Mock
+    mock_post.return_value = response
+
+    # Set up our emojis
+    title = ":smile:"
+    body = ":grin:"
+
+    # general reference used below (using default values)
+    asset = AppriseAsset()
+
+    #
+    # Test default emoji asset value
+    #
+
+    # Load our object
+    ap_obj = Apprise(asset=asset)
+    ap_obj.add('json://localhost')
+    assert len(ap_obj) == 1
+
+    assert ap_obj.notify(title=title, body=body) is True
+    assert mock_post.call_count == 1
+
+    details = mock_post.call_args_list[0]
+    dataset = json.loads(details[1]['data'])
+
+    # No changes
+    assert dataset['title'] == title
+    assert dataset['message'] == body
+
+    mock_post.reset_mock()
+
+    #
+    # Test URL over-ride while default value set in asset
+    #
+
+    # Load our object
+    ap_obj = Apprise(asset=asset)
+    ap_obj.add('json://localhost?emojis=no')
+    assert len(ap_obj) == 1
+
+    assert ap_obj.notify(title=title, body=body) is True
+    assert mock_post.call_count == 1
+
+    details = mock_post.call_args_list[0]
+    dataset = json.loads(details[1]['data'])
+
+    # No changes
+    assert dataset['title'] == title
+    assert dataset['message'] == body
+
+    mock_post.reset_mock()
+
+    #
+    # Test URL over-ride while default value set in asset pt 2
+    #
+
+    # Load our object
+    ap_obj = Apprise(asset=asset)
+    ap_obj.add('json://localhost?emojis=yes')
+    assert len(ap_obj) == 1
+
+    assert ap_obj.notify(title=title, body=body) is True
+    assert mock_post.call_count == 1
+
+    details = mock_post.call_args_list[0]
+    dataset = json.loads(details[1]['data'])
+
+    # Emoji's are displayed
+    assert dataset['title'] == '😄'
+    assert dataset['message'] == '😃'
+
+    mock_post.reset_mock()
+
+    #
+    # Test URL over-ride while default value set in asset pt 2
+    #
+
+    # Load our object
+    ap_obj = Apprise(asset=asset)
+    ap_obj.add('json://localhost?emojis=no')
+    assert len(ap_obj) == 1
+
+    assert ap_obj.notify(title=title, body=body) is True
+    assert mock_post.call_count == 1
+
+    details = mock_post.call_args_list[0]
+    dataset = json.loads(details[1]['data'])
+
+    # No changes
+    assert dataset['title'] == title
+    assert dataset['message'] == body
+
+    mock_post.reset_mock()
+
+    #
+    # Test Default Emoji settings
+    #
+
+    # Set our interpret emoji's flag
+    asset = AppriseAsset(interpret_emojis=True)
+
+    # Re-create our object
+    ap_obj = Apprise(asset=asset)
+
+    # Load our object
+    ap_obj.add('json://localhost')
+    assert len(ap_obj) == 1
+
+    assert ap_obj.notify(title=title, body=body) is True
+    assert mock_post.call_count == 1
+
+    details = mock_post.call_args_list[0]
+    dataset = json.loads(details[1]['data'])
+
+    # emoji's are displayed
+    assert dataset['title'] == '😄'
+    assert dataset['message'] == '😃'
+
+    mock_post.reset_mock()
+
+    #
+    # With Emoji's turned on by default, the user can optionally turn them
+    # off.
+    #
+
+    # Re-create our object
+    ap_obj = Apprise(asset=asset)
+
+    ap_obj.add('json://localhost?emojis=no')
+    assert len(ap_obj) == 1
+
+    assert ap_obj.notify(title=title, body=body) is True
+    assert mock_post.call_count == 1
+
+    details = mock_post.call_args_list[0]
+    dataset = json.loads(details[1]['data'])
+
+    # No changes
+    assert dataset['title'] == title
+    assert dataset['message'] == body
+
+    mock_post.reset_mock()
+
+    #
+    # With Emoji's turned on by default, there is no change when emojis
+    # flag is set to on
+    #
+
+    # Re-create our object
+    ap_obj = Apprise(asset=asset)
+
+    ap_obj.add('json://localhost?emojis=yes')
+    assert len(ap_obj) == 1
+
+    assert ap_obj.notify(title=title, body=body) is True
+    assert mock_post.call_count == 1
+
+    details = mock_post.call_args_list[0]
+    dataset = json.loads(details[1]['data'])
+
+    # emoji's are displayed
+    assert dataset['title'] == '😄'
+    assert dataset['message'] == '😃'
+
+    mock_post.reset_mock()
+
+    #
+    # Enforce the disabling of emojis
+    #
+
+    # Set our interpret emoji's flag
+    asset = AppriseAsset(interpret_emojis=False)
+
+    # Re-create our object
+    ap_obj = Apprise(asset=asset)
+
+    # Load our object
+    ap_obj.add('json://localhost')
+    assert len(ap_obj) == 1
+
+    assert ap_obj.notify(title=title, body=body) is True
+    assert mock_post.call_count == 1
+
+    details = mock_post.call_args_list[0]
+    dataset = json.loads(details[1]['data'])
+
+    # Disabled - no emojis
+    assert dataset['title'] == title
+    assert dataset['message'] == body
+
+    mock_post.reset_mock()
+
+    #
+    # Enforce the disabling of emojis
+    #
+
+    # Set our interpret emoji's flag
+    asset = AppriseAsset(interpret_emojis=False)
+
+    # Re-create our object
+    ap_obj = Apprise(asset=asset)
+
+    # Load our object
+    ap_obj.add('json://localhost?emojis=yes')
+    assert len(ap_obj) == 1
+
+    assert ap_obj.notify(title=title, body=body) is True
+    assert mock_post.call_count == 1
+
+    details = mock_post.call_args_list[0]
+    dataset = json.loads(details[1]['data'])
+
+    # Disabled - no emojis
+    assert dataset['title'] == title
+    assert dataset['message'] == body
+
+    mock_post.reset_mock()

@@ -599,6 +599,23 @@ def test_apprise_cli_nux_env(tmpdir):
     ])
     assert result.exit_code == 0
 
+    # Test Emojis:
+    result = runner.invoke(cli.main, [
+        '-j',
+        '-t', ':smile:',
+        '-b', ':grin:',
+        'good://localhost',
+    ])
+    assert result.exit_code == 0
+
+    result = runner.invoke(cli.main, [
+        '--interpret-emojis',
+        '-t', ':smile:',
+        '-b', ':grin:',
+        'good://localhost',
+    ])
+    assert result.exit_code == 0
+
 
 def test_apprise_cli_details(tmpdir):
     """

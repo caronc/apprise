@@ -70,6 +70,11 @@ The Apprise options are as follows:
   Enable interpretation of backslash escapes. For example, this would convert
   sequences such as \n and \r to their respected ascii new-line and carriage
 
+  `-j`, `--interpret-emojis`
+  Enable interpretation of emoji strings. For example, this would convert
+  sequences such as :smile: or :grin: to their respected unicode emoji
+  character.
+
   `-d`, `--dry-run`:
   Perform a trial run but only prints the notification services to-be
   triggered to **stdout**. Notifications are never sent using this mode.

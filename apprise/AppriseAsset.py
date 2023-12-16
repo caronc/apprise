@@ -121,6 +121,12 @@ class AppriseAsset:
     # notifications are sent sequentially (one after another)
     async_mode = True
 
+    # Support :smile:, and other alike keywords swapping them for their
+    # unicode value. A value of None leaves the interpretation up to the
+    # end user to control (allowing them to specify emojis=yes on the
+    # URL)
+    interpret_emojis = None
+
     # Whether or not to interpret escapes found within the input text prior
     # to passing it upstream. Such as converting \t to an actual tab and \n
     # to a new line.
