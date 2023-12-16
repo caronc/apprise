@@ -609,7 +609,6 @@ def test_apprise_cli_nux_env(tmpdir):
     ])
     assert result.exit_code == 0
 
-    # Test Escaping (without title)
     result = runner.invoke(cli.main, [
         '--interpret-emojis',
         '-t', ':smile:',
