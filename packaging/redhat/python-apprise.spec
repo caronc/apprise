@@ -39,7 +39,7 @@ Apprise is a Python package for simplifying access to all of the different
 notification services that are out there. Apprise opens the door and makes
 it easy to access:
 
-Apprise API, APRS, AWS SES, AWS SNS, Bark, Boxcar, Burst SMS, BulkSMS,
+Apprise API, APRS, AWS SES, AWS SNS, Bark, Boxcar, Burst SMS, BulkSMS, BulkVS,
 ClickSend, DAPNET, DingTalk, Discord, E-Mail, Emby, Faast, FCM, Flock,
 Google Chat, Gotify, Growl, Guilded, Home Assistant, IFTTT, Join, Kavenegar,
 KODI, Kumulos, LaMetric, Line, MacOSX, Mailgun, Mastodon, Mattermost,
