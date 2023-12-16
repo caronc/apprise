@@ -134,6 +134,7 @@ The table below identifies the services this tool supports and some example serv
 
 | Notification Service | Service ID | Default Port | Example Syntax |
 | -------------------- | ---------- | ------------ | -------------- |
+| [Automated Packet Reporting System (ARPS)](https://github.com/caronc/apprise/wiki/Notify_aprs)  | aprs:// | (TCP) 10152 | aprs://user:pass@callsign<br/>aprs://user:pass@callsign1/callsign2/callsignN
 | [AWS SNS](https://github.com/caronc/apprise/wiki/Notify_sns)  | sns://   | (TCP) 443   | sns://AccessKeyID/AccessSecretKey/RegionName/+PhoneNo<br/>sns://AccessKeyID/AccessSecretKey/RegionName/+PhoneNo1/+PhoneNo2/+PhoneNoN<br/>sns://AccessKeyID/AccessSecretKey/RegionName/Topic<br/>sns://AccessKeyID/AccessSecretKey/RegionName/Topic1/Topic2/TopicN
 | [BulkSMS](https://github.com/caronc/apprise/wiki/Notify_bulksms) | bulksms://  | (TCP) 443   | bulksms://user:password@ToPhoneNo<br/>bulksms://User:Password@ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
 | [Burst SMS](https://github.com/caronc/apprise/wiki/Notify_burst_sms) | burstsms://  | (TCP) 443   | burstsms://ApiKey:ApiSecret@FromPhoneNo/ToPhoneNo<br/>burstsms://ApiKey:ApiSecret@FromPhoneNo/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
