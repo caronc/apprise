@@ -31,7 +31,7 @@ FROM python:3.10-buster
 RUN apt-get update && \
     apt-get install -y --no-install-recommends libdbus-1-dev libgirepository1.0-dev build-essential musl-dev bash dbus && \
     rm -rf /var/lib/apt/lists/*
-RUN pip install --no-cache-dir dbus-python PyGObject
+RUN pip install --no-cache-dir dbus-python "PyGObject==3.44.2"
 
 # Apprise Setup
 VOLUME ["/apprise"]
