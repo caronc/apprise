@@ -33,8 +33,6 @@ from ..common import NotifyType
 from ..utils import parse_bool
 from ..AppriseLocale import gettext_lazy as _
 
-import pdb
-pdb.set_trace()
 # Image support is dependant on the GdkPixbuf library being available
 NOTIFY_QT_IMAGE_SUPPORT = False
 
