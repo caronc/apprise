@@ -617,7 +617,7 @@ class NotifyAprs(NotifyBase):
         # see https://www.aprs.org/doc/APRS101.PDF pg. 71
         payload = re.sub("[{}|~]+", "", payload)
 
-        payload = (
+        payload = (  # pragma: no branch
             APRS_COMPILED_MAP.sub(
                 lambda x: APRS_BAD_CHARMAP[x.group()], payload)
         )
