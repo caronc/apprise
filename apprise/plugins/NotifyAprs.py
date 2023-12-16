@@ -93,6 +93,21 @@ APRS_LOCALES = {
     "ROTA": "rotate.aprs2.net",
 }
 
+# Identify all unsupported characters
+APRS_BAD_CHARMAP = {
+    r"Ä": "Ae",
+    r"Ö": "Oe",
+    r"Ü": "Ue",
+    r"ä": "ae",
+    r"ö": "oe",
+    r"ü": "ue",
+    r"ß": "ss",
+}
+
+# Our compiled mapping of bad characters
+APRS_COMPILED_MAP = re.compile(
+    r'(' + '|'.join(APRS_BAD_CHARMAP.keys()) + r')')
+
 
 class NotifyAprs(NotifyBase):
     """
@@ -602,15 +617,9 @@ class NotifyAprs(NotifyBase):
         # see https://www.aprs.org/doc/APRS101.PDF pg. 71
         payload = re.sub("[{}|~]+", "", payload)
 
-        # Replace German umlauts
         payload = (
-            payload.replace("Ä", "Ae")
-            .replace("Ö", "Oe")
-            .replace("Ü", "Ue")
-            .replace("ä", "ae")
-            .replace("ö", "oe")
-            .replace("ü", "ue")
-            .replace("ß", "ss")
+            APRS_COMPILED_MAP.sub(
+                lambda x: APRS_BAD_CHARMAP[x.group()], payload)
         )
 
         # Finally, constrain output string to 67 characters as
