@@ -727,28 +727,38 @@ class NotifyMatrix(NotifyBase):
             #     "content_uri": "mxc://example.com/a-unique-key"
             # }
 
-            if self.version == MatrixVersion.V3:
-                # Prepare our payload
-                payloads.append({
-                    "body": attachment.name,
-                    "info": {
-                        "mimetype": attachment.mimetype,
-                        "size": len(attachment),
-                    },
-                    "msgtype": "m.image",
-                    "url": response.get('content_uri'),
-                })
+            # FUTURE if self.version == MatrixVersion.V3:
+            # FUTURE     # Prepare our payload
+            # FUTURE     payloads.append({
+            # FUTURE         "body": attachment.name,
+            # FUTURE         "info": {
+            # FUTURE             "mimetype": attachment.mimetype,
+            # FUTURE             "size": len(attachment),
+            # FUTURE         },
+            # FUTURE         "msgtype": "m.image",
+            # FUTURE         "url": response.get('content_uri'),
+            # FUTURE     })
 
-            else:
-                # Prepare our payload
-                payloads.append({
-                    "info": {
-                        "mimetype": attachment.mimetype,
-                    },
-                    "msgtype": "m.image",
-                    "body": "tta.webp",
-                    "url": response.get('content_uri'),
-                })
+            # FUTURE else:
+            # FUTURE     # Prepare our payload
+            # FUTURE     payloads.append({
+            # FUTURE         "info": {
+            # FUTURE             "mimetype": attachment.mimetype,
+            # FUTURE         },
+            # FUTURE         "msgtype": "m.image",
+            # FUTURE         "body": "tta.webp",
+            # FUTURE         "url": response.get('content_uri'),
+            # FUTURE     })
+
+            # Prepare our payload
+            payloads.append({
+                "info": {
+                    "mimetype": attachment.mimetype,
+                },
+                "msgtype": "m.image",
+                "body": "tta.webp",
+                "url": response.get('content_uri'),
+            })
 
         return payloads
 
@@ -1131,11 +1141,12 @@ class NotifyMatrix(NotifyBase):
                 or self.port == default_port else f':{self.port}')
 
         if path == '/upload':
-            if self.version == MatrixVersion.V3:
-                url += MATRIX_V3_MEDIA_PATH + path
+            # FUTURE if self.version == MatrixVersion.V3:
+            # FUTURE     url += MATRIX_V3_MEDIA_PATH + path
 
-            else:
-                url += MATRIX_V2_MEDIA_PATH + path
+            # FUTURE else:
+            # FUTURE     url += MATRIX_V2_MEDIA_PATH + path
+            url += MATRIX_V2_MEDIA_PATH + path
 
             params = {'filename': attachment.name}
             with open(attachment.path, 'rb') as fp:

@@ -248,7 +248,7 @@ class NotifyBulkSMS(NotifyBase):
 
         if not (self.targets or self.groups):
             # We have nothing to notify
-            self.logger.warning('There are no Twist targets to notify')
+            self.logger.warning('There are no BulkSMS targets to notify')
             return False
 
         # Send in batches if identified to do so

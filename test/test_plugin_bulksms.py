@@ -162,7 +162,7 @@ def test_plugin_bulksms_edge_cases(mock_post):
     # Prepare Mock
     mock_post.return_value = response
 
-    # Test our markdown
+    # Instantiate our object
     obj = Apprise.instantiate(
         'bulksms://{}:{}@{}?batch=n'.format(user, pwd, '/'.join(targets)))
 
