@@ -114,7 +114,6 @@ def setup_glib_environment():
 
     # When patching something which has a side effect on the module-level code
     # of a plugin, make sure to reload it.
-    current_module = sys.modules[__name__]
     reload_plugin('NotifyDBus')
 
 
@@ -416,7 +415,6 @@ def test_plugin_dbus_gi_missing(dbus_glib_environment):
 
     # When patching something which has a side effect on the module-level code
     # of a plugin, make sure to reload it.
-    current_module = sys.modules[__name__]
     reload_plugin('NotifyDBus')
 
     # Create the instance.
@@ -444,7 +442,6 @@ def test_plugin_dbus_gi_require_version_error(dbus_glib_environment):
 
     # When patching something which has a side effect on the module-level code
     # of a plugin, make sure to reload it.
-    current_module = sys.modules[__name__]
     reload_plugin('NotifyDBus')
 
     # Create instance.
@@ -472,7 +469,6 @@ def test_plugin_dbus_module_croaks(mocker, dbus_glib_environment):
 
     # When patching something which has a side effect on the module-level code
     # of a plugin, make sure to reload it.
-    current_module = sys.modules[__name__]
     reload_plugin('NotifyDBus')
 
     # Verify plugin is not available.

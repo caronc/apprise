@@ -34,35 +34,6 @@ import re
 # Grant access to our Notification Manager Singleton
 N_MGR = NotificationManager()
 
-# def reload_plugin(name, replace_in=None):
-#     """
-#     Reload built-in plugin module, e.g. `NotifyGnome`.
-# 
-#     Reloading plugin modules is needed when testing module-level code of
-#     notification plugins.
-# 
-#     See also https://stackoverflow.com/questions/31363311.
-#     """
-# 
-#     module_name = f"apprise.plugins.{name}"
-# 
-#     reload(sys.modules['apprise.common'])
-#     reload(sys.modules['apprise.attachment'])
-#     reload(sys.modules['apprise.config'])
-#     reload(sys.modules['apprise.plugins.NotifyBase'])
-#     reload(sys.modules['apprise.NotificationManager'])
-#     N_MGR.reload(name)
-#     reload(sys.modules['apprise.Apprise'])
-#     reload(sys.modules['apprise.utils'])
-#     reload(sys.modules['apprise.cli'])
-#     reload(sys.modules['apprise'])
-# 
-#     # Fix reference to new plugin class in given module.
-#     # Needed for updating the module-level import reference like
-#     # `from apprise.plugins.NotifyMacOSX import NotifyMacOSX`.
-#     if replace_in is not None:
-#         mod = import_module(module_name)
-#         setattr(replace_in, name, getattr(mod, name))
 
 def reload_plugin(name):
     """
@@ -90,10 +61,9 @@ def reload_plugin(name):
     tests = [k for k in sys.modules.keys() if re.match(r'^test_.+$', k)]
     new_mod = import_module(module_pyname)
     for module_name in tests:
-        #possible_matches = [m for m in dir(sys.modules[module_name]) \
-        #    if m == name]
-        possible_matches = [m for m in dir(sys.modules[module_name]) \
-            if re.match(r'^(?P<name>Notify[a-z0-9]+)$', m, re.I)]
+        possible_matches = \
+            [m for m in dir(sys.modules[module_name])
+             if re.match(r'^(?P<name>Notify[a-z0-9]+)$', m, re.I)]
         if not possible_matches:
             continue
 
