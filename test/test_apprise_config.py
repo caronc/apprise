@@ -37,15 +37,18 @@ from apprise import AppriseConfig
 from apprise import AppriseAsset
 from apprise.config.ConfigBase import ConfigBase
 from apprise.plugins.NotifyBase import NotifyBase
+from apprise.NotificationManager import NotificationManager
 
 from apprise.common import CONFIG_SCHEMA_MAP
-from apprise.common import NOTIFY_SCHEMA_MAP
 from apprise.config import __load_matrix
 from apprise.config.ConfigFile import ConfigFile
 
 # Disable logging for a cleaner testing output
 import logging
 logging.disable(logging.CRITICAL)
+
+# Grant access to our Notification Manager Singleton
+N_MGR = NotificationManager()
 
 
 def test_apprise_config(tmpdir):
@@ -248,7 +251,7 @@ def test_apprise_multi_config_entries(tmpdir):
             return ''
 
     # Store our good notification in our schema map
-    NOTIFY_SCHEMA_MAP['good'] = GoodNotification
+    N_MGR._schema_map['good'] = GoodNotification
 
     # Create ourselves a config object
     ac = AppriseConfig()
@@ -566,7 +569,7 @@ def test_apprise_config_with_apprise_obj(tmpdir):
             return ''
 
     # Store our good notification in our schema map
-    NOTIFY_SCHEMA_MAP['good'] = GoodNotification
+    N_MGR._schema_map['good'] = GoodNotification
 
     # Create ourselves a config object
     ac = AppriseConfig(cache=False)

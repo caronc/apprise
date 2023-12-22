@@ -36,22 +36,20 @@ from os.path import dirname
 from os.path import join
 from apprise import cli
 from apprise import NotifyBase
-from apprise.common import NOTIFY_CUSTOM_MODULE_MAP
-from apprise.utils import PATHS_PREVIOUSLY_SCANNED
+from apprise.NotificationManager import NotificationManager
 from click.testing import CliRunner
-from apprise.common import NOTIFY_SCHEMA_MAP
 from apprise.utils import environ
-from apprise.plugins import __load_matrix
-from apprise.plugins import __reset_matrix
 
 from apprise.AppriseLocale import gettext_lazy as _
 
 from importlib import reload
 
-
 # Disable logging for a cleaner testing output
 import logging
 logging.disable(logging.CRITICAL)
+
+# Grant access to our Notification Manager Singleton
+N_MGR = NotificationManager()
 
 
 def test_apprise_cli_nux_env(tmpdir):
@@ -89,8 +87,8 @@ def test_apprise_cli_nux_env(tmpdir):
             return 'bad://'
 
     # Set up our notification types
-    NOTIFY_SCHEMA_MAP['good'] = GoodNotification
-    NOTIFY_SCHEMA_MAP['bad'] = BadNotification
+    N_MGR['good'] = GoodNotification
+    N_MGR['bad'] = BadNotification
 
     runner = CliRunner()
     result = runner.invoke(cli.main)
@@ -639,8 +637,8 @@ def test_apprise_cli_details(tmpdir):
     ])
     assert result.exit_code == 0
 
-    # Reset our matrix
-    __reset_matrix()
+    # Clear loaded modules
+    N_MGR.unload_modules()
 
     # This is a made up class that is just used to verify
     class TestReq01Notification(NotifyBase):
@@ -665,7 +663,7 @@ def test_apprise_cli_details(tmpdir):
             # Pretend everything is okay (so we don't break other tests)
             return True
 
-    NOTIFY_SCHEMA_MAP['req01'] = TestReq01Notification
+    N_MGR['req01'] = TestReq01Notification
 
     # This is a made up class that is just used to verify
     class TestReq02Notification(NotifyBase):
@@ -695,7 +693,7 @@ def test_apprise_cli_details(tmpdir):
             # Pretend everything is okay (so we don't break other tests)
             return True
 
-    NOTIFY_SCHEMA_MAP['req02'] = TestReq02Notification
+    N_MGR['req02'] = TestReq02Notification
 
     # This is a made up class that is just used to verify
     class TestReq03Notification(NotifyBase):
@@ -721,7 +719,7 @@ def test_apprise_cli_details(tmpdir):
             # Pretend everything is okay (so we don't break other tests)
             return True
 
-    NOTIFY_SCHEMA_MAP['req03'] = TestReq03Notification
+    N_MGR['req03'] = TestReq03Notification
 
     # This is a made up class that is just used to verify
     class TestReq04Notification(NotifyBase):
@@ -741,7 +739,7 @@ def test_apprise_cli_details(tmpdir):
             # Pretend everything is okay (so we don't break other tests)
             return True
 
-    NOTIFY_SCHEMA_MAP['req04'] = TestReq04Notification
+    N_MGR['req04'] = TestReq04Notification
 
     # This is a made up class that is just used to verify
     class TestReq05Notification(NotifyBase):
@@ -762,7 +760,7 @@ def test_apprise_cli_details(tmpdir):
             # Pretend everything is okay (so we don't break other tests)
             return True
 
-    NOTIFY_SCHEMA_MAP['req05'] = TestReq05Notification
+    N_MGR['req05'] = TestReq05Notification
 
     class TestDisabled01Notification(NotifyBase):
         """
@@ -784,7 +782,7 @@ def test_apprise_cli_details(tmpdir):
             # Pretend everything is okay (so we don't break other tests)
             return True
 
-    NOTIFY_SCHEMA_MAP['na01'] = TestDisabled01Notification
+    N_MGR['na01'] = TestDisabled01Notification
 
     class TestDisabled02Notification(NotifyBase):
         """
@@ -809,7 +807,7 @@ def test_apprise_cli_details(tmpdir):
             # Pretend everything is okay (so we don't break other tests)
             return True
 
-    NOTIFY_SCHEMA_MAP['na02'] = TestDisabled02Notification
+    N_MGR['na02'] = TestDisabled02Notification
 
     # We'll add a good notification to our list
     class TesEnabled01Notification(NotifyBase):
@@ -829,7 +827,7 @@ def test_apprise_cli_details(tmpdir):
             # Pretend everything is okay (so we don't break other tests)
             return True
 
-    NOTIFY_SCHEMA_MAP['good'] = TesEnabled01Notification
+    N_MGR['good'] = TesEnabled01Notification
 
     # Verify that we can pass through all of our different details
     result = runner.invoke(cli.main, [
@@ -842,9 +840,8 @@ def test_apprise_cli_details(tmpdir):
     ])
     assert result.exit_code == 0
 
-    # Reset our matrix
-    __reset_matrix()
-    __load_matrix()
+    # Clear loaded modules
+    N_MGR.unload_modules()
 
 
 @mock.patch('requests.post')
@@ -863,8 +860,8 @@ def test_apprise_cli_plugin_loading(mock_post, tmpdir):
     # This simulates an actual call from the CLI.  Unfortunately through
     # testing were occupying the same memory space so our singleton's
     # have already been populated
-    PATHS_PREVIOUSLY_SCANNED.clear()
-    NOTIFY_CUSTOM_MODULE_MAP.clear()
+    N_MGR._paths_previously_scanned.clear()
+    N_MGR._custom_module_map.clear()
 
     # Test a path that has no files to load in it
     result = runner.invoke(cli.main, [
@@ -877,8 +874,8 @@ def test_apprise_cli_plugin_loading(mock_post, tmpdir):
     assert result.exit_code == 0
 
     # Directories that don't exist passed in by the CLI aren't even scanned
-    assert len(PATHS_PREVIOUSLY_SCANNED) == 0
-    assert len(NOTIFY_CUSTOM_MODULE_MAP) == 0
+    assert len(N_MGR._paths_previously_scanned) == 0
+    assert len(N_MGR._custom_module_map) == 0
 
     # Test our current existing path that has no entries in it
     result = runner.invoke(cli.main, [
@@ -889,18 +886,19 @@ def test_apprise_cli_plugin_loading(mock_post, tmpdir):
     # The path is silently loaded but fails... it's okay because the
     # notification we're choosing to notify does exist
     assert result.exit_code == 0
-    assert len(PATHS_PREVIOUSLY_SCANNED) == 1
-    assert join(str(tmpdir), 'empty') in PATHS_PREVIOUSLY_SCANNED
+    assert len(N_MGR._paths_previously_scanned) == 1
+    assert join(str(tmpdir), 'empty') in \
+        N_MGR._paths_previously_scanned
 
     # However there was nothing to load
-    assert len(NOTIFY_CUSTOM_MODULE_MAP) == 0
+    assert len(N_MGR._custom_module_map) == 0
 
     # Clear our working variables so they don't obstruct the next test
     # This simulates an actual call from the CLI.  Unfortunately through
     # testing were occupying the same memory space so our singleton's
     # have already been populated
-    PATHS_PREVIOUSLY_SCANNED.clear()
-    NOTIFY_CUSTOM_MODULE_MAP.clear()
+    N_MGR._paths_previously_scanned.clear()
+    N_MGR._custom_module_map.clear()
 
     # Prepare ourselves a file to work with
     notify_hook_a_base = tmpdir.mkdir('random')
@@ -921,10 +919,10 @@ def test_apprise_cli_plugin_loading(mock_post, tmpdir):
 
     # The path is silently loaded but fails... it's okay because the
     # notification we're choosing to notify does exist
-    assert len(PATHS_PREVIOUSLY_SCANNED) == 1
-    assert str(notify_hook_a) in PATHS_PREVIOUSLY_SCANNED
+    assert len(N_MGR._paths_previously_scanned) == 1
+    assert str(notify_hook_a) in N_MGR._paths_previously_scanned
     # However there was nothing to load
-    assert len(NOTIFY_CUSTOM_MODULE_MAP) == 0
+    assert len(N_MGR._custom_module_map) == 0
 
     # Prepare ourselves a file to work with
     notify_hook_aa = notify_hook_a_base.join('myhook02.py')
@@ -932,11 +930,12 @@ def test_apprise_cli_plugin_loading(mock_post, tmpdir):
     garbage entry
     """))
 
+    N_MGR.plugins()
     result = runner.invoke(cli.main, [
         '--plugin-path', str(notify_hook_aa),
         '-b', 'test\nbody',
         # A custom hook:
-        'clihook://',
+        'clihook://custom',
     ])
     # It doesn't exist so it will fail
     # meanwhile we would have failed to load the myhook path
@@ -944,18 +943,20 @@ def test_apprise_cli_plugin_loading(mock_post, tmpdir):
 
     # The path is silently loaded but fails...
     # as a result the path stacks with the last
-    assert len(PATHS_PREVIOUSLY_SCANNED) == 2
-    assert str(notify_hook_a) in PATHS_PREVIOUSLY_SCANNED
-    assert str(notify_hook_aa) in PATHS_PREVIOUSLY_SCANNED
+    assert len(N_MGR._paths_previously_scanned) == 2
+    assert str(notify_hook_a) in \
+        N_MGR._paths_previously_scanned
+    assert str(notify_hook_aa) in \
+        N_MGR._paths_previously_scanned
     # However there was nothing to load
-    assert len(NOTIFY_CUSTOM_MODULE_MAP) == 0
+    assert len(N_MGR._custom_module_map) == 0
 
     # Clear our working variables so they don't obstruct the next test
     # This simulates an actual call from the CLI.  Unfortunately through
     # testing were occupying the same memory space so our singleton's
     # have already been populated
-    PATHS_PREVIOUSLY_SCANNED.clear()
-    NOTIFY_CUSTOM_MODULE_MAP.clear()
+    N_MGR._paths_previously_scanned.clear()
+    N_MGR._custom_module_map.clear()
 
     # Prepare ourselves a file to work with
     notify_hook_b = tmpdir.mkdir('goodmodule').join('__init__.py')
@@ -975,7 +976,7 @@ def test_apprise_cli_plugin_loading(mock_post, tmpdir):
         '--plugin-path', str(tmpdir),
         '-b', 'test body',
         # A custom hook:
-        'clihook://',
+        'clihook://still/valid',
     ])
 
     # We can detect the goodmodule (which has an __init__.py in it)
@@ -983,51 +984,49 @@ def test_apprise_cli_plugin_loading(mock_post, tmpdir):
     assert result.exit_code == 0
 
     # Let's see how things got loaded:
-    assert len(PATHS_PREVIOUSLY_SCANNED) == 2
-    assert str(tmpdir) in PATHS_PREVIOUSLY_SCANNED
+    assert len(N_MGR._paths_previously_scanned) == 2
+    assert str(tmpdir) in N_MGR._paths_previously_scanned
     # absolute path to detected module is also added
     assert join(str(tmpdir), 'goodmodule', '__init__.py') \
-        in PATHS_PREVIOUSLY_SCANNED
+        in N_MGR._paths_previously_scanned
 
     # We also loaded our clihook properly
-    assert len(NOTIFY_CUSTOM_MODULE_MAP) == 1
+    assert len(N_MGR._custom_module_map) == 1
 
-    # We can find our new hook loaded in our NOTIFY_SCHEMA_MAP now...
-    assert 'clihook' in NOTIFY_SCHEMA_MAP
+    # We can find our new hook loaded in our schema map now...
+    assert 'clihook' in N_MGR
 
     # Capture our key for reference
-    key = [k for k in NOTIFY_CUSTOM_MODULE_MAP.keys()][0]
+    key = [k for k in N_MGR._custom_module_map.keys()][0]
 
-    assert len(NOTIFY_CUSTOM_MODULE_MAP[key]['notify']) == 1
-    assert 'clihook' in NOTIFY_CUSTOM_MODULE_MAP[key]['notify']
+    assert len(N_MGR._custom_module_map[key]['notify']) == 1
+    assert 'clihook' in N_MGR._custom_module_map[key]['notify']
 
     # Our function name
-    assert NOTIFY_CUSTOM_MODULE_MAP[key]['notify']['clihook']['fn_name'] \
+    assert N_MGR._custom_module_map[key]['notify']['clihook']['fn_name'] \
         == 'mywrapper'
     # What we parsed from the `on` keyword in the @notify decorator
-    assert NOTIFY_CUSTOM_MODULE_MAP[key]['notify']['clihook']['url'] \
+    assert N_MGR._custom_module_map[key]['notify']['clihook']['url'] \
         == 'clihook://'
     # our default name Assignment.  This can be-overridden on the @notify
     # decorator by just adding a name= to the parameter list
-    assert NOTIFY_CUSTOM_MODULE_MAP[key]['notify']['clihook']['name'] \
-        == 'Custom - clihook'
+    assert N_MGR['clihook'].service_name == 'Custom - clihook'
 
     # Our Base Notification object when initialized:
-    assert isinstance(
-        NOTIFY_CUSTOM_MODULE_MAP[key]['notify']['clihook']['plugin'](),
-        NotifyBase)
-
-    # This is how it ties together in the backend
-    assert NOTIFY_CUSTOM_MODULE_MAP[key]['notify']['clihook']['plugin'] == \
-        NOTIFY_SCHEMA_MAP['clihook']
+    assert len(
+        N_MGR._module_map[N_MGR._custom_module_map[key]['name']]['plugin']) \
+        == 1
+    for plugin in \
+            N_MGR._module_map[N_MGR._custom_module_map[key]['name']]['plugin']:
+        assert isinstance(plugin(), NotifyBase)
 
     # Clear our working variables so they don't obstruct the next test
     # This simulates an actual call from the CLI.  Unfortunately through
     # testing were occupying the same memory space so our singleton's
     # have already been populated
-    PATHS_PREVIOUSLY_SCANNED.clear()
-    NOTIFY_CUSTOM_MODULE_MAP.clear()
-    del NOTIFY_SCHEMA_MAP['clihook']
+    N_MGR._paths_previously_scanned.clear()
+    N_MGR._custom_module_map.clear()
+    del N_MGR['clihook']
 
     result = runner.invoke(cli.main, [
         '--plugin-path', str(notify_hook_b),
@@ -1046,9 +1045,9 @@ def test_apprise_cli_plugin_loading(mock_post, tmpdir):
     # This simulates an actual call from the CLI.  Unfortunately through
     # testing were occupying the same memory space so our singleton's
     # have already been populated
-    PATHS_PREVIOUSLY_SCANNED.clear()
-    NOTIFY_CUSTOM_MODULE_MAP.clear()
-    del NOTIFY_SCHEMA_MAP['clihook']
+    N_MGR._paths_previously_scanned.clear()
+    N_MGR._custom_module_map.clear()
+    del N_MGR['clihook']
 
     result = runner.invoke(cli.main, [
         '--plugin-path', dirname(str(notify_hook_b)),
@@ -1080,9 +1079,9 @@ def test_apprise_cli_plugin_loading(mock_post, tmpdir):
     # This simulates an actual call from the CLI.  Unfortunately through
     # testing were occupying the same memory space so our singleton's
     # have already been populated
-    PATHS_PREVIOUSLY_SCANNED.clear()
-    NOTIFY_CUSTOM_MODULE_MAP.clear()
-    del NOTIFY_SCHEMA_MAP['clihook']
+    N_MGR._paths_previously_scanned.clear()
+    N_MGR._custom_module_map.clear()
+    del N_MGR['clihook']
 
     # Prepare ourselves a file to work with
     notify_hook_b = tmpdir.mkdir('complex').join('complex.py')
@@ -1141,32 +1140,32 @@ def test_apprise_cli_plugin_loading(mock_post, tmpdir):
     assert result.exit_code == 1
 
     # Let's see how things got loaded
-    assert len(PATHS_PREVIOUSLY_SCANNED) == 2
+    assert len(N_MGR._paths_previously_scanned) == 2
     # Our path we specified on the CLI...
-    assert join(str(tmpdir), 'complex') in PATHS_PREVIOUSLY_SCANNED
+    assert join(str(tmpdir), 'complex') in N_MGR._paths_previously_scanned
 
     # absolute path to detected module is also added
     assert join(str(tmpdir), 'complex', 'complex.py') \
-        in PATHS_PREVIOUSLY_SCANNED
+        in N_MGR._paths_previously_scanned
 
     # We loaded our one module successfuly
-    assert len(NOTIFY_CUSTOM_MODULE_MAP) == 1
+    assert len(N_MGR._custom_module_map) == 1
 
     # We can find our new hook loaded in our SCHEMA_MAP now...
-    assert 'willfail' in NOTIFY_SCHEMA_MAP
-    assert 'clihook1' in NOTIFY_SCHEMA_MAP
-    assert 'clihook2' in NOTIFY_SCHEMA_MAP
+    assert 'willfail' in N_MGR
+    assert 'clihook1' in N_MGR
+    assert 'clihook2' in N_MGR
 
     # Capture our key for reference
-    key = [k for k in NOTIFY_CUSTOM_MODULE_MAP.keys()][0]
+    key = [k for k in N_MGR._custom_module_map.keys()][0]
 
-    assert len(NOTIFY_CUSTOM_MODULE_MAP[key]['notify']) == 3
-    assert 'willfail' in NOTIFY_CUSTOM_MODULE_MAP[key]['notify']
-    assert 'clihook1' in NOTIFY_CUSTOM_MODULE_MAP[key]['notify']
+    assert len(N_MGR._custom_module_map[key]['notify']) == 3
+    assert 'willfail' in N_MGR._custom_module_map[key]['notify']
+    assert 'clihook1' in N_MGR._custom_module_map[key]['notify']
     # We only load 1 instance of the clihook2, the second will fail
-    assert 'clihook2' in NOTIFY_CUSTOM_MODULE_MAP[key]['notify']
+    assert 'clihook2' in N_MGR._custom_module_map[key]['notify']
     # We can never load previously created notifications
-    assert 'json' not in NOTIFY_CUSTOM_MODULE_MAP[key]['notify']
+    assert 'json' not in N_MGR._custom_module_map[key]['notify']
 
     result = runner.invoke(cli.main, [
         '--plugin-path', join(str(tmpdir), 'complex'),

@@ -33,6 +33,7 @@ from itertools import chain
 from . import common
 from .conversion import convert_between
 from .utils import is_exclusive_match
+from .NotificationManager import NotificationManager
 from .utils import parse_list
 from .utils import parse_urls
 from .utils import cwe312_url
@@ -45,9 +46,11 @@ from .AppriseLocale import AppriseLocale
 from .config.ConfigBase import ConfigBase
 from .plugins.NotifyBase import NotifyBase
 
-
 from . import plugins
 from . import __version__
+
+# Grant access to our Notification Manager Singleton
+N_MGR = NotificationManager()
 
 
 class Apprise:
@@ -138,7 +141,7 @@ class Apprise:
             # We already have our result set
             results = url
 
-            if results.get('schema') not in common.NOTIFY_SCHEMA_MAP:
+            if results.get('schema') not in N_MGR:
                 # schema is a mandatory dictionary item as it is the only way
                 # we can index into our loaded plugins
                 logger.error('Dictionary does not include a "schema" entry.')
@@ -161,7 +164,7 @@ class Apprise:
                 type(url))
             return None
 
-        if not common.NOTIFY_SCHEMA_MAP[results['schema']].enabled:
+        if not N_MGR[results['schema']].enabled:
             #
             # First Plugin Enable Check (Pre Initialization)
             #
@@ -181,13 +184,12 @@ class Apprise:
             try:
                 # Attempt to create an instance of our plugin using the parsed
                 # URL information
-                plugin = common.NOTIFY_SCHEMA_MAP[results['schema']](**results)
+                plugin = N_MGR[results['schema']](**results)
 
                 # Create log entry of loaded URL
                 logger.debug(
                     'Loaded {} URL: {}'.format(
-                        common.
-                        NOTIFY_SCHEMA_MAP[results['schema']].service_name,
+                        N_MGR[results['schema']].service_name,
                         plugin.url(privacy=asset.secure_logging)))
 
             except Exception:
@@ -198,15 +200,14 @@ class Apprise:
                 # the arguments are invalid or can not be used.
                 logger.error(
                     'Could not load {} URL: {}'.format(
-                        common.
-                        NOTIFY_SCHEMA_MAP[results['schema']].service_name,
+                        N_MGR[results['schema']].service_name,
                         loggable_url))
                 return None
 
         else:
             # Attempt to create an instance of our plugin using the parsed
             # URL information but don't wrap it in a try catch
-            plugin = common.NOTIFY_SCHEMA_MAP[results['schema']](**results)
+            plugin = N_MGR[results['schema']](**results)
 
         if not plugin.enabled:
             #
@@ -690,7 +691,7 @@ class Apprise:
             'asset': self.asset.details(),
         }
 
-        for plugin in set(common.NOTIFY_SCHEMA_MAP.values()):
+        for plugin in N_MGR.plugins():
             # Iterate over our hashed plugins and dynamically build details on
             # their status:
 

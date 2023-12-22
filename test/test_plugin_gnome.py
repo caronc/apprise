@@ -97,8 +97,7 @@ def setup_glib_environment():
 
     # When patching something which has a side effect on the module-level code
     # of a plugin, make sure to reload it.
-    current_module = sys.modules[__name__]
-    reload_plugin('NotifyGnome', replace_in=current_module)
+    reload_plugin('NotifyGnome')
 
 
 @pytest.fixture
@@ -345,8 +344,7 @@ def test_plugin_gnome_gi_croaks():
 
     # When patching something which has a side effect on the module-level code
     # of a plugin, make sure to reload it.
-    current_module = sys.modules[__name__]
-    reload_plugin('NotifyGnome', replace_in=current_module)
+    reload_plugin('NotifyGnome')
 
     # Create instance.
     obj = apprise.Apprise.instantiate('gnome://', suppress_exceptions=False)

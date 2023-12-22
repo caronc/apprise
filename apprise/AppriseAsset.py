@@ -33,7 +33,11 @@ from os.path import dirname
 from os.path import isfile
 from os.path import abspath
 from .common import NotifyType
-from .utils import module_detection
+from .NotificationManager import NotificationManager
+
+
+# Grant access to our Notification Manager Singleton
+N_MGR = NotificationManager()
 
 
 class AppriseAsset:
@@ -180,7 +184,7 @@ class AppriseAsset:
 
         if plugin_paths:
             # Load any decorated modules if defined
-            module_detection(plugin_paths)
+            N_MGR.module_detection(plugin_paths)
 
     def color(self, notify_type, color_type=None):
         """
