@@ -33,10 +33,10 @@ import time
 import hashlib
 import inspect
 from .utils import import_module
+from .utils import parse_list
 from os.path import dirname
 from os.path import abspath
 from os.path import join
-from importlib import reload
 
 from .logger import logger
 
@@ -116,12 +116,18 @@ class NotificationManager(metaclass=Singleton):
         """
         Reset our object and unload all modules
         """
-        if self._custom_module_map and self._custom_module_map:
+        if self._custom_module_map:
             # Handle Custom Module Assignments
             for module_path in list(sys.modules.keys()):
                 for module_name, meta in self._custom_module_map.items():
                     if module_path.startswith(meta['path']):
                         del sys.modules[module_path]
+
+        # Reset disabled (if any)
+        for schema in self._disabled:
+            if schema in self._schema_map:
+                self._schema_map[schema].enabled = True
+        self._disabled.clear()
 
         # Reset our variables
         self._module_map = None if not disable_native else {}
@@ -130,7 +136,6 @@ class NotificationManager(metaclass=Singleton):
 
         # Reset our internal tracking flags
         self._paths_previously_scanned = set()
-        self._disabled = set()
 
     def load_modules(self, path=None, name=None):
         """
@@ -434,51 +439,22 @@ class NotificationManager(metaclass=Singleton):
 
         return True
 
-    def reload(self, module_name):
-        """
-        Reloads our module
-        """
-        if not self:
-            # Lazy load
-            self.load_modules()
-
-        module_pyname = '{}.{}'.format(self.module_name_prefix, module_name)
-        if module_name in self._module_map and module_pyname in sys.modules:
-            path = self._module_map[module_name]['path'] + '.'
-            for module_path in list(sys.modules.keys()):
-                if module_path.startswith(path):
-                    del sys.modules[module_path]
-
-            reload(sys.modules[module_pyname])
-
-            # Store our new values from the reload
-            module = sys.modules[module_pyname]
-            plugin = getattr(module, module_name)
-
-            # Update our Schema Map
-            for schema in self.schemas():
-                if self._schema_map[schema] \
-                        == self._module_map[module_name]['plugin']:
-                    # Update Plugin
-                    self._schema_map[schema] = plugin
-
-            # Update Module Map
-            self._module_map[module_name]['module'] = module
-            self._module_map[module_name]['plugin'].add(plugin)
-
     def remove(self, *schemas):
         """
         Removes a loaded element (if defined)
         """
         if not self:
-            # Nothing to do
-            return
+            # Lazy load
+            self.load_modules()
 
         for schema in schemas:
-            if self and schema in self:
-                del self._schema_map[schema]
+            try:
+                del self[schema]
 
-    def plugins(self):
+            except KeyError:
+                pass
+
+    def plugins(self, include_disabled=True):
         """
         Return all of our loaded plugins
         """
@@ -488,17 +464,24 @@ class NotificationManager(metaclass=Singleton):
 
         for module in self._module_map.values():
             for plugin in module['plugin']:
+                if not include_disabled and not plugin.enabled:
+                    continue
                 yield plugin
 
-    def schemas(self):
+    def schemas(self, include_disabled=True):
         """
         Return all of our loaded schemas
+
+        if include_disabled == True, then even disabled notifications are
+        returned
         """
         if not self:
             # Lazy load
             self.load_modules()
 
-        return list(self._schema_map.keys())
+        # Return our list
+        return list(self._schema_map.keys()) if include_disabled else \
+            [s for s in self._schema_map.keys() if self._schema_map[s].enabled]
 
     def disable(self, *schemas):
         """
@@ -530,23 +513,25 @@ class NotificationManager(metaclass=Singleton):
         # convert to set for faster indexing
         schemas = set(schemas)
 
-        # Track plugins added since they share 1 or more schemas
-        _enabled = set()
+        for plugin in self.plugins():
+            # Get our plugin's schema list
+            p_schemas = set(
+                parse_list(plugin.secure_protocol, plugin.protocol))
 
-        for schema in self._schema_map:
-
-            if schema not in schemas:
-                if self._schema_map[schema].enabled and \
-                        self._schema_map[schema] not in _enabled:
-                    # Disable
-                    self._schema_map[schema].enabled = False
-                    self._disabled.add(schema)
+            if not schemas & p_schemas:
+                if plugin.enabled:
+                    # Disable it (only if previously enabled); this prevents us
+                    # from adjusting schemas that were disabled due to missing
+                    # libraries or other environment reasons
+                    plugin.enabled = False
+                    self._disabled |= p_schemas
                 continue
 
-            if schema in self._disabled:
-                self._disabled.remove(schema)
-                self._schema_map[schema].enabled = True
-                _enabled.add(self._schema_map[schema])
+            # If we reach here, our schema was flagged to be enabled
+            if p_schemas & self._disabled:
+                # Previously disabled; no worries, let's clear this up
+                self._disabled -= p_schemas
+                plugin.enabled = True
 
     def __contains__(self, schema):
         """
@@ -563,13 +548,16 @@ class NotificationManager(metaclass=Singleton):
             # Lazy load
             self.load_modules()
 
-        for key in list(self._module_map.keys()):
-            if key not in self._module_map:
-                continue
+        # Get our plugin (otherwise we throw a KeyError) which is
+        # intended on del action that doesn't align
+        plugin = self._schema_map[schema]
 
-            if self._schema_map[schema] in self._module_map[key]['plugin']:
-                self._module_map[key]['plugin']\
-                    .remove(self._schema_map[schema])
+        # Our list of all schema entries
+        p_schemas = set([schema])
+
+        for key in list(self._module_map.keys()):
+            if plugin in self._module_map[key]['plugin']:
+                self._module_map[key]['plugin'].remove(plugin)
 
                 # Custom Plugin Entry; Clean up cross reference
                 module_pyname = self._module_map[key]['path']
@@ -591,14 +579,23 @@ class NotificationManager(metaclass=Singleton):
                     #
                     # Last element
                     #
+                    if self._module_map[key]['native']:
+                        # Get our plugin's schema list
+                        p_schemas = \
+                            set([s for s in parse_list(
+                                 plugin.secure_protocol, plugin.protocol)
+                                 if s in self._schema_map])
 
                     # free system memory
-                    del sys.modules[self._module_map[key]['path']]
+                    if self._module_map[key]['module']:
+                        del sys.modules[self._module_map[key]['path']]
 
                     # free last remaining pointer in module map
                     del self._module_map[key]
 
-        del self._schema_map[schema]
+        for schema in p_schemas:
+            # Final Tidy
+            del self._schema_map[schema]
 
     def __setitem__(self, schema, plugin):
         """
@@ -613,8 +610,22 @@ class NotificationManager(metaclass=Singleton):
             # Assign service name if one doesn't exist
             plugin.service_name = f'{schema}://'
 
-        # Assignment
-        self._schema_map[schema] = plugin
+        p_schemas = set(
+            parse_list(plugin.secure_protocol, plugin.protocol))
+        if not p_schemas:
+            # Assign our protocol
+            plugin.secure_protocol = schema
+            p_schemas.add(schema)
+
+        elif schema not in p_schemas:
+            # Add our others (if defined)
+            plugin.secure_protocol = \
+                set([schema] + parse_list(plugin.secure_protocol))
+            p_schemas.add(schema)
+
+        for _schema in p_schemas:
+            # Assignment
+            self._schema_map[_schema] = plugin
 
         module_name = hashlib.sha1(schema.encode('utf-8')).hexdigest()
         module_pyname = "{prefix}.{name}".format(

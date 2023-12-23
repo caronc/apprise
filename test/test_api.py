@@ -703,6 +703,11 @@ def test_apprise_schemas(tmpdir):
 
         secure_protocol = 'markdowns'
 
+    schemas = URLBase.schemas(TextNotification)
+    assert isinstance(schemas, set) is True
+    # We didn't define a protocol or secure protocol
+    assert len(schemas) == 0
+
     # Store our notifications into our schema map
     N_MGR['text'] = TextNotification
     N_MGR['html'] = HtmlNotification
@@ -710,8 +715,10 @@ def test_apprise_schemas(tmpdir):
 
     schemas = URLBase.schemas(TextNotification)
     assert isinstance(schemas, set) is True
-    # We didn't define a protocol or secure protocol
-    assert len(schemas) == 0
+    # We didn't define a protocol or secure protocol one
+    # but one got assigned in he above N_MGR call
+    assert len(schemas) == 1
+    assert 'text' in schemas
 
     schemas = URLBase.schemas(HtmlNotification)
     assert isinstance(schemas, set) is True
