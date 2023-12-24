@@ -26,6 +26,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import sys
 import re
 import pytest
 import types
@@ -59,6 +60,7 @@ def test_notification_manager_general():
     assert len(N_MGR) > 0
 
     N_MGR.unload_modules()
+    iter(N_MGR)
     iter(N_MGR)
 
     N_MGR.unload_modules()
@@ -236,6 +238,18 @@ def test_notification_manager_general():
     assert 'goods' not in N_MGR
 
 
+def test_notification_manager_module_loading(tmpdir):
+    """
+    N_MGR: Notification Manager Module Loading
+
+    """
+
+    # Handle loading modules twice (they gracefully handle not loading more in
+    # memory then needed)
+    N_MGR.load_modules()
+    N_MGR.load_modules()
+
+
 def test_notification_manager_decorators(tmpdir):
     """
     N_MGR: Notification Manager Decorator testing
@@ -255,8 +269,8 @@ def test_notification_manager_decorators(tmpdir):
 
         # No return (so a return of None) get's translated to True
 
-    # Define another in the same file
-    @notify(on="clihookb")
+    # Define another in the same file; uppercase goes to lower
+    @notify(on="CLIhookb")
     def mywrapper(body, title, notify_type, *args, **kwargs):
         # A simple test - print to screen
         print("B {}: {} - {}".format(notify_type, title, body))
@@ -271,3 +285,57 @@ def test_notification_manager_decorators(tmpdir):
     N_MGR.unload_modules()
     assert 'clihooka' not in N_MGR
     assert 'clihookb' not in N_MGR
+
+    N_MGR.module_detection(str(notify_hook))
+    assert 'clihooka' in N_MGR
+    assert 'clihookb' in N_MGR
+    del N_MGR['clihookb']
+    assert 'clihooka' in N_MGR
+    assert 'clihookb' not in N_MGR
+    del N_MGR['clihooka']
+    assert 'clihooka' not in N_MGR
+    assert 'clihookb' not in N_MGR
+
+    # Prepare ourselves a file to work with
+    notify_base = tmpdir.mkdir('plugins')
+    notify_test = notify_base.join('NotifyTest.py')
+    notify_test.write(cleandoc("""
+    #
+    # Bare Minimum Valid Object
+    #
+    from apprise.plugins.NotifyBase import NotifyBase
+    from apprise.common import NotifyType
+
+    class NotifyTest(NotifyBase):
+
+        service_name = 'Test'
+
+        # The services URL
+        service_url = 'https://github.com/caronc/apprise/'
+
+        # All boxcar notifications are secure
+        secure_protocol = 'mytest'
+
+        # A URL that takes you to the setup/help of the specific protocol
+        setup_url = 'https://github.com/caronc/apprise/wiki/Notify_mytest'
+
+        # Define object templates
+        templates = (
+            '{schema}://',
+        )
+
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+
+        def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
+            return True
+
+        def url(self):
+            return 'mytest://'
+    """))
+    assert 'mytest' not in N_MGR
+    N_MGR.load_modules(path=str(notify_base))
+    assert 'mytest' in N_MGR
+    del N_MGR['mytest']
+    assert 'mytest' not in N_MGR
+    sys.path.pop(0)

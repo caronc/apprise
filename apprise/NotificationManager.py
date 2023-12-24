@@ -119,15 +119,18 @@ class NotificationManager(metaclass=Singleton):
 
         if self._custom_module_map:
             # Handle Custom Module Assignments
-            for module_path in list(sys.modules.keys()):
-                for module_name, meta in self._custom_module_map.items():
-                    if meta['name'] not in self._module_map:
-                        # Nothing to remove
-                        continue
+            for meta in self._custom_module_map.values():
+                if meta['name'] not in self._module_map:
+                    # Nothing to remove
+                    continue
 
-                    if module_path.startswith(
-                            self._module_map[meta['name']]['path']):
-                        del sys.modules[module_path]
+                # For the purpose of tidying up un-used modules in memory
+                loaded = [m for m in sys.modules.keys()
+                          if m.startswith(
+                              self._module_map[meta['name']]['path'])]
+
+                for module_path in loaded:
+                    del sys.modules[module_path]
 
         # Reset disabled plugins (if any)
         for schema in self._disabled:
@@ -139,7 +142,7 @@ class NotificationManager(metaclass=Singleton):
         self._schema_map = {}
         self._custom_module_map = {}
 
-        # Reset our internal tracking flags
+        # Reset our path cache
         self._paths_previously_scanned = set()
 
     def load_modules(self, path=None, name=None):
@@ -184,8 +187,11 @@ class NotificationManager(metaclass=Singleton):
                     fromlist=[module_name])
 
             except ImportError:
-                # No problem, we can't use this object
-                continue
+                # No problem, we can try again another way...
+                module = import_module(
+                    os.path.join(module_path, f), module_pyname)
+                if not module:
+                    continue
 
             if not hasattr(module, module_name):
                 # Not a library we can load as it doesn't follow the simple
@@ -686,7 +692,7 @@ class NotificationManager(metaclass=Singleton):
         """
         Returns an iterator so we can iterate over our loaded modules
         """
-        if self._module_map is None:
+        if not self:
             # Lazy load
             self.load_modules()
 
