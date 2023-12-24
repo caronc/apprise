@@ -364,7 +364,11 @@ def apprise_test(do_notify):
             # Support URL
             return ''
 
+    N_MGR.unload_modules()
     N_MGR['throw'] = ThrowInstantiateNotification
+
+    # Store our good notification in our schema map
+    N_MGR['good'] = GoodNotification
 
     # Reset our object
     a.clear()

@@ -203,8 +203,8 @@ class CustomNotifyPlugin(NotifyBase):
 
         # Store our plugin into our core map file
         return N_MGR.add(
-            schema=schema,
             plugin=CustomNotifyPluginWrapper,
+            schemas=schema,
             send_func=send_func,
             url=url,
         )

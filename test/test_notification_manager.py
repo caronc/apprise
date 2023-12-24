@@ -29,6 +29,7 @@
 import re
 import pytest
 import types
+from inspect import cleandoc
 
 from apprise.NotificationManager import NotificationManager
 from apprise.plugins.NotifyBase import NotifyBase
@@ -41,7 +42,7 @@ logging.disable(logging.CRITICAL)
 N_MGR = NotificationManager()
 
 
-def test_notification_manager():
+def test_notification_manager_general():
     """
     N_MGR: Notification Manager General testing
 
@@ -56,6 +57,9 @@ def test_notification_manager():
 
     N_MGR.unload_modules()
     assert len(N_MGR) > 0
+
+    N_MGR.unload_modules()
+    iter(N_MGR)
 
     N_MGR.unload_modules()
     assert bool(N_MGR) is False
@@ -106,6 +110,32 @@ def test_notification_manager():
             return ''
 
     N_MGR.unload_modules()
+    assert N_MGR.add(GoodNotification)
+    assert 'good' in N_MGR
+    assert 'goods' in N_MGR
+    assert 'abcd' not in N_MGR
+    assert 'xyz' not in N_MGR
+
+    N_MGR.unload_modules()
+    assert N_MGR.add(GoodNotification, 'abcd')
+    assert 'good' in N_MGR
+    assert 'goods' in N_MGR
+    assert 'abcd' in N_MGR
+    assert 'xyz' not in N_MGR
+
+    N_MGR.unload_modules()
+    assert N_MGR.add(GoodNotification, ['abcd', 'xYz'])
+    assert 'good' in N_MGR
+    assert 'goods' in N_MGR
+    assert 'abcd' in N_MGR
+    # Lower case
+    assert 'xyz' in N_MGR
+
+    N_MGR.unload_modules()
+    # Not going to work; schemas must be a list of string
+    assert N_MGR.add(GoodNotification, object) is False
+
+    N_MGR.unload_modules()
     with pytest.raises(KeyError):
         del N_MGR['good']
     N_MGR['good'] = GoodNotification
@@ -120,12 +150,18 @@ def test_notification_manager():
     assert N_MGR['jsons'].enabled is True
     assert N_MGR['xml'].enabled is True
     assert N_MGR['xmls'].enabled is True
+
+    # Only two plugins are enabled
+    assert len([p for p in N_MGR.plugins(include_disabled=False)]) == 2
+
     N_MGR.enable_only('good')
     assert N_MGR['good'].enabled is True
     assert N_MGR['json'].enabled is False
     assert N_MGR['jsons'].enabled is False
     assert N_MGR['xml'].enabled is False
     assert N_MGR['xmls'].enabled is False
+
+    assert len([p for p in N_MGR.plugins(include_disabled=False)]) == 1
 
     N_MGR.unload_modules()
     N_MGR['disabled'] = DisabledNotification
@@ -136,6 +172,10 @@ def test_notification_manager():
 
     N_MGR['good'] = GoodNotification
     assert N_MGR['good'].enabled is True
+
+    # You can't disable someething already disabled
+    N_MGR.disable('disabled')
+    assert N_MGR['disabled'].enabled is False
 
     N_MGR.unload_modules()
     N_MGR.enable_only('form', 'xml')
@@ -162,6 +202,9 @@ def test_notification_manager():
         N_MGR['invalid']
 
     N_MGR.unload_modules()
+    N_MGR.disable('invalid', 'xml')
+
+    N_MGR.unload_modules()
     assert N_MGR['json'].enabled is True
 
     # Work with an empty module tree
@@ -171,9 +214,60 @@ def test_notification_manager():
         N_MGR['good']
 
     N_MGR.unload_modules()
+    assert 'hello' not in N_MGR
+    assert 'good' not in N_MGR
+    assert 'goods' not in N_MGR
+
+    N_MGR['hello'] = GoodNotification
+    assert 'hello' in N_MGR
+    assert 'good' in N_MGR
+    assert 'goods' in N_MGR
+
+    N_MGR.unload_modules()
     N_MGR['good'] = GoodNotification
+
+    with pytest.raises(KeyError):
+        # Can not assign the value again without getting a Conflict
+        N_MGR['good'] = GoodNotification
 
     N_MGR.unload_modules()
     N_MGR.remove('good', 'invalid')
     assert 'good' not in N_MGR
     assert 'goods' not in N_MGR
+
+
+def test_notification_manager_decorators(tmpdir):
+    """
+    N_MGR: Notification Manager Decorator testing
+
+    """
+
+    # Prepare ourselves a file to work with
+    notify_hook = tmpdir.mkdir('goodmodule').join('__init__.py')
+    notify_hook.write(cleandoc("""
+    from apprise.decorators import notify
+
+    # We want to trigger on anyone who configures a call to clihook://
+    @notify(on="clihooka")
+    def mywrapper(body, title, notify_type, *args, **kwargs):
+        # A simple test - print to screen
+        print("A {}: {} - {}".format(notify_type, title, body))
+
+        # No return (so a return of None) get's translated to True
+
+    # Define another in the same file
+    @notify(on="clihookb")
+    def mywrapper(body, title, notify_type, *args, **kwargs):
+        # A simple test - print to screen
+        print("B {}: {} - {}".format(notify_type, title, body))
+
+        # No return (so a return of None) get's translated to True
+    """))
+
+    N_MGR.module_detection(str(notify_hook))
+
+    assert 'clihooka' in N_MGR
+    assert 'clihookb' in N_MGR
+    N_MGR.unload_modules()
+    assert 'clihooka' not in N_MGR
+    assert 'clihookb' not in N_MGR

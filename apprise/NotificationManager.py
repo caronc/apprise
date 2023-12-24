@@ -116,17 +116,22 @@ class NotificationManager(metaclass=Singleton):
         """
         Reset our object and unload all modules
         """
+
         if self._custom_module_map:
             # Handle Custom Module Assignments
             for module_path in list(sys.modules.keys()):
                 for module_name, meta in self._custom_module_map.items():
-                    if module_path.startswith(meta['path']):
+                    if meta['name'] not in self._module_map:
+                        # Nothing to remove
+                        continue
+
+                    if module_path.startswith(
+                            self._module_map[meta['name']]['path']):
                         del sys.modules[module_path]
 
-        # Reset disabled (if any)
+        # Reset disabled plugins (if any)
         for schema in self._disabled:
-            if schema in self._schema_map:
-                self._schema_map[schema].enabled = True
+            self._schema_map[schema].enabled = True
         self._disabled.clear()
 
         # Reset our variables
@@ -383,7 +388,7 @@ class NotificationManager(metaclass=Singleton):
 
             return None
 
-    def add(self, schema, plugin, url=None, send_func=None):
+    def add(self, plugin, schemas=None, url=None, send_func=None):
         """
         Ability to manually add Notification services to our stack
         """
@@ -392,12 +397,35 @@ class NotificationManager(metaclass=Singleton):
             # Lazy load
             self.load_modules()
 
-        if schema in self:
+        # Acquire a list of schemas
+        p_schemas = parse_list(plugin.secure_protocol, plugin.protocol)
+        if isinstance(schemas, str):
+            schemas = [schemas, ]
+
+        elif schemas is None:
+            # Default
+            schemas = p_schemas
+
+        if not schemas or not isinstance(schemas, (set, tuple, list)):
+            # We're done
+            logger.error(
+                'The schemas provided (type %s) is unsupported; '
+                'loaded from %s.',
+                type(schemas),
+                send_func.__name__ if send_func else plugin.__class__.__name__)
+            return False
+
+        # Convert our schemas into a set
+        schemas = set([s.lower() for s in schemas]) | set(p_schemas)
+
+        # Valdation
+        conflict = [s for s in schemas if s in self]
+        if conflict:
             # we're already handling this schema
             logger.warning(
-                'The schema (%s) is already defined and could not be '
+                'The schema(s) (%s) are already defined and could not be '
                 'loaded from %s%s.',
-                schema,
+                ', '.join(conflict),
                 'custom notify function ' if send_func else '',
                 send_func.__name__ if send_func else plugin.__class__.__name__)
             return False
@@ -426,16 +454,33 @@ class NotificationManager(metaclass=Singleton):
                     'notify': {},
                 }
 
-            self._custom_module_map[module_name]['notify'][schema] = {
-                # The name of the send function the @notify decorator wrapped
-                'fn_name': fn_name,
-                # The URL that was provided in the @notify decorator call
-                # associated with the 'on='
-                'url': url,
+            for schema in schemas:
+                self._custom_module_map[module_name]['notify'][schema] = {
+                    # The name of the send function the @notify decorator
+                    # wrapped
+                    'fn_name': fn_name,
+                    # The URL that was provided in the @notify decorator call
+                    # associated with the 'on='
+                    'url': url,
+                }
+
+        else:
+            module_name = hashlib.sha1(
+                ''.join(schemas).encode('utf-8')).hexdigest()
+            module_pyname = "{prefix}.{name}".format(
+                prefix='apprise.adhoc.module', name=module_name)
+
+            # Add our plugin name to our module map
+            self._module_map[module_name] = {
+                'plugin': set([plugin]),
+                'module': None,
+                'path': module_pyname,
+                'native': False,
             }
 
-        # Assign our mapping
-        self._schema_map[schema] = plugin
+        for schema in schemas:
+            # Assign our mapping
+            self._schema_map[schema] = plugin
 
         return True
 
@@ -557,6 +602,7 @@ class NotificationManager(metaclass=Singleton):
 
         for key in list(self._module_map.keys()):
             if plugin in self._module_map[key]['plugin']:
+                # Remove our plugin
                 self._module_map[key]['plugin'].remove(plugin)
 
                 # Custom Plugin Entry; Clean up cross reference
@@ -623,21 +669,8 @@ class NotificationManager(metaclass=Singleton):
                 set([schema] + parse_list(plugin.secure_protocol))
             p_schemas.add(schema)
 
-        for _schema in p_schemas:
-            # Assignment
-            self._schema_map[_schema] = plugin
-
-        module_name = hashlib.sha1(schema.encode('utf-8')).hexdigest()
-        module_pyname = "{prefix}.{name}".format(
-            prefix='apprise.adhoc.module', name=module_name)
-
-        # Add our plugin name to our module map
-        self._module_map[module_name] = {
-            'plugin': set([plugin]),
-            'module': None,
-            'path': '{}.{}'.format(module_pyname, module_name),
-            'native': False,
-        }
+        if not self.add(plugin, schemas=p_schemas):
+            raise KeyError('Conflicting Assignment')
 
     def __getitem__(self, schema):
         """

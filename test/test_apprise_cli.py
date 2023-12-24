@@ -970,6 +970,14 @@ def test_apprise_cli_plugin_loading(mock_post, tmpdir):
         print("{}: {} - {}".format(notify_type, title, body))
 
         # No return (so a return of None) get's translated to True
+
+    # Define another in the same file
+    @notify(on="clihookA")
+    def mywrapper(body, title, notify_type, *args, **kwargs):
+        # A simple test - print to screen
+        print("!! {}: {} - {}".format(notify_type, title, body))
+
+        # No return (so a return of None) get's translated to True
     """))
 
     result = runner.invoke(cli.main, [
@@ -999,8 +1007,11 @@ def test_apprise_cli_plugin_loading(mock_post, tmpdir):
     # Capture our key for reference
     key = [k for k in N_MGR._custom_module_map.keys()][0]
 
-    assert len(N_MGR._custom_module_map[key]['notify']) == 1
+    # We loaded 2 entries from the same file
+    assert len(N_MGR._custom_module_map[key]['notify']) == 2
     assert 'clihook' in N_MGR._custom_module_map[key]['notify']
+    # Converted to lower case
+    assert 'clihooka' in N_MGR._custom_module_map[key]['notify']
 
     # Our function name
     assert N_MGR._custom_module_map[key]['notify']['clihook']['fn_name'] \
@@ -1015,7 +1026,7 @@ def test_apprise_cli_plugin_loading(mock_post, tmpdir):
     # Our Base Notification object when initialized:
     assert len(
         N_MGR._module_map[N_MGR._custom_module_map[key]['name']]['plugin']) \
-        == 1
+        == 2
     for plugin in \
             N_MGR._module_map[N_MGR._custom_module_map[key]['name']]['plugin']:
         assert isinstance(plugin(), NotifyBase)
