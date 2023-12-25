@@ -68,7 +68,7 @@ def import_module(path, name):
         module = None
 
         logger.debug(
-            'Custom module exception raised from %s (name=%s) %s',
+            'Module exception raised from %s (name=%s) %s',
             path, name, str(e))
 
     return module

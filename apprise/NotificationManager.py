@@ -180,6 +180,12 @@ class NotificationManager(metaclass=Singleton):
             module_name = match.group('name')
             module_pyname = '{}.{}'.format(module_name_prefix, module_name)
 
+            if module_name in self._module_map:
+                logger.warning(
+                    "Notification (%s) already loaded; ignoring %s",
+                    module_name, os.path.join(module_path, f))
+                continue
+
             try:
                 module = __import__(
                     module_pyname,
@@ -191,22 +197,26 @@ class NotificationManager(metaclass=Singleton):
                 module = import_module(
                     os.path.join(module_path, f), module_pyname)
                 if not module:
+                    # logging found in import_module and not needed here
                     continue
 
             if not hasattr(module, module_name):
                 # Not a library we can load as it doesn't follow the simple
                 # rule that the class must bear the same name as the
                 # notification file itself.
+                logger.trace(
+                    "Notification (%s) import failed; no filename/Class "
+                    "match found in %s",
+                    module_name, os.path.join(module_path, f))
                 continue
 
             # Get our plugin
             plugin = getattr(module, module_name)
             if not hasattr(plugin, 'app_id'):
                 # Filter out non-notification modules
-                continue
-
-            elif module_name in self._module_map:
-                # we're already handling this object
+                logger.trace(
+                    "Notification (%s) import failed; no app_id defined in %s",
+                    module_name, os.path.join(module_path, f))
                 continue
 
             # Add our plugin name to our module map

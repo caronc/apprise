@@ -26,7 +26,6 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import sys
 import re
 import pytest
 import types
@@ -338,4 +337,53 @@ def test_notification_manager_decorators(tmpdir):
     assert 'mytest' in N_MGR
     del N_MGR['mytest']
     assert 'mytest' not in N_MGR
-    sys.path.pop(0)
+
+    # Prepare ourselves a file to work with
+    notify_test = notify_base.join('NotifyNoAlign.py')
+    notify_test.write(cleandoc("""
+    #
+    # Bare Minimum Valid Object
+    #
+    from apprise.plugins.NotifyBase import NotifyBase
+    from apprise.common import NotifyType
+
+    class NotifyDifferentName(NotifyBase):
+
+        service_name = 'Unloadable'
+
+        # The services URL
+        service_url = 'https://github.com/caronc/apprise/'
+
+        # All boxcar notifications are secure
+        secure_protocol = 'noload'
+
+        # A URL that takes you to the setup/help of the specific protocol
+        setup_url = 'https://github.com/caronc/apprise/wiki/Notify_mytest'
+
+        # Define object templates
+        templates = (
+            '{schema}://',
+        )
+
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
+
+        def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
+            return True
+
+        def url(self):
+            return 'mytest://'
+    """))
+    assert 'mytest' not in N_MGR
+    N_MGR.load_modules(path=str(notify_base))
+    assert 'mytest' in N_MGR
+
+    # Could not be loaded because the filename did not align with the class
+    # name.
+    assert 'noload' not in N_MGR
+
+    # Double load will test section of code that prevents a notification
+    # From reloading if previously already loaded
+    N_MGR.load_modules(path=str(notify_base))
+    # Our item is still loaded as expected
+    assert 'mytest' in N_MGR
