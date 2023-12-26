@@ -294,7 +294,7 @@ class URLBase:
         # the defined request_rate_per_sec then we need to throttle for the
         # remaining balance of this time.
 
-        elapsed = (reference - self._last_io_datetime).total_seconds()
+        elapsed = abs(reference - self._last_io_datetime).total_seconds()
 
         if wait is not None:
             self.logger.debug('Throttling forced for {}s...'.format(wait))
