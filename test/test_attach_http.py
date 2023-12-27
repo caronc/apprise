@@ -36,8 +36,8 @@ from os.path import dirname
 from os.path import getsize
 from apprise.attachment.AttachHTTP import AttachHTTP
 from apprise import AppriseAttachment
+from apprise.NotificationManager import NotificationManager
 from apprise.plugins.NotifyBase import NotifyBase
-from apprise.common import NOTIFY_SCHEMA_MAP
 from apprise.common import ContentLocation
 
 # Disable logging for a cleaner testing output
@@ -45,6 +45,9 @@ import logging
 logging.disable(logging.CRITICAL)
 
 TEST_VAR_DIR = join(dirname(__file__), 'var')
+
+# Grant access to our Notification Manager Singleton
+N_MGR = NotificationManager()
 
 # Some exception handling we'll use
 REQUEST_EXCEPTIONS = (
@@ -131,7 +134,7 @@ def test_attach_http(mock_get):
             return ''
 
     # Store our good notification in our schema map
-    NOTIFY_SCHEMA_MAP['good'] = GoodNotification
+    N_MGR['good'] = GoodNotification
 
     # Temporary path
     path = join(TEST_VAR_DIR, 'apprise-test.gif')

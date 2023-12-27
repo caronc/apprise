@@ -40,7 +40,6 @@ from ..AppriseLocale import gettext_lazy as _
 NOTIFY_MACOSX_SUPPORT_ENABLED = False
 
 
-# TODO: The module will be easier to test without module-level code.
 if platform.system() == 'Darwin':
     # Check this is Mac OS X 10.8, or higher
     major, minor = platform.mac_ver()[0].split('.')[:2]

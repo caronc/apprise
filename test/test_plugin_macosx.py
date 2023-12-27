@@ -43,7 +43,7 @@ logging.disable(logging.CRITICAL)
 
 
 if sys.platform not in ["darwin", "linux"]:
-    pytest.skip("Only makes sense on macOS, but also works on Linux",
+    pytest.skip("Only makes sense on macOS, but testable in Linux",
                 allow_module_level=True)
 
 
@@ -56,8 +56,7 @@ def pretend_macos(mocker):
     mocker.patch("platform.mac_ver", return_value=('10.8', ('', '', ''), ''))
 
     # Reload plugin module, in order to re-run module-level code.
-    current_module = sys.modules[__name__]
-    reload_plugin("NotifyMacOSX", replace_in=current_module)
+    reload_plugin("NotifyMacOSX")
 
 
 @pytest.fixture
@@ -93,6 +92,7 @@ def test_plugin_macosx_general_success(macos_notify_environment):
     NotifyMacOSX() general checks
     """
 
+    # Toggle Enable Flag
     obj = apprise.Apprise.instantiate(
         'macosx://_/?image=True', suppress_exceptions=False)
     assert isinstance(obj, NotifyMacOSX) is True

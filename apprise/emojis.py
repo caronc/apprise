@@ -27,6 +27,8 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import re
+import time
+from .logger import logger
 
 # All Emoji's are wrapped in this character
 DELIM = ':'
@@ -2242,10 +2244,8 @@ EMOJI_MAP = {
     DELIM + r'wales' + DELIM: '🏴󠁧󠁢󠁷󠁬󠁳󠁿',
 }
 
-# Our compiled mapping
-EMOJI_COMPILED_MAP = re.compile(
-    r'(' + '|'.join(EMOJI_MAP.keys()) + r')',
-    re.IGNORECASE)
+# Define our singlton
+EMOJI_COMPILED_MAP = None
 
 
 def apply_emojis(content):
@@ -2253,6 +2253,17 @@ def apply_emojis(content):
     Takes the content and swaps any matched emoji's found with their
     utf-8 encoded mapping
     """
+
+    global EMOJI_COMPILED_MAP
+
+    if EMOJI_COMPILED_MAP is None:
+        t_start = time.time()
+        # Perform our compilation
+        EMOJI_COMPILED_MAP = re.compile(
+            r'(' + '|'.join(EMOJI_MAP.keys()) + r')',
+            re.IGNORECASE)
+        logger.trace(
+            'Emoji engine loaded in {:.4f}s'.format((time.time() - t_start)))
 
     try:
         return EMOJI_COMPILED_MAP.sub(lambda x: EMOJI_MAP[x.group()], content)

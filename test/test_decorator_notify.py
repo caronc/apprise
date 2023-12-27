@@ -34,10 +34,14 @@ from apprise import AppriseConfig
 from apprise import AppriseAsset
 from apprise import AppriseAttachment
 from apprise import common
+from apprise.NotificationManager import NotificationManager
 
 # Disable logging for a cleaner testing output
 import logging
 logging.disable(logging.CRITICAL)
+
+# Grant access to our Notification Manager Singleton
+N_MGR = NotificationManager()
 
 TEST_VAR_DIR = join(dirname(__file__), 'var')
 
@@ -48,7 +52,7 @@ def test_notify_simple_decoration():
 
     # Verify our schema we're about to declare doesn't already exist
     # in our schema map:
-    assert 'utiltest' not in common.NOTIFY_SCHEMA_MAP
+    assert 'utiltest' not in N_MGR
 
     verify_obj = {}
 
@@ -68,7 +72,7 @@ def test_notify_simple_decoration():
         })
 
     # Now after our hook being inline... it's been loaded
-    assert 'utiltest' in common.NOTIFY_SCHEMA_MAP
+    assert 'utiltest' in N_MGR
 
     # Create ourselves an apprise object
     aobj = Apprise()
@@ -146,7 +150,7 @@ def test_notify_simple_decoration():
     assert verify_obj['kwargs']['meta']['schema'] == 'utiltest'
     assert verify_obj['kwargs']['meta']['url'] == 'utiltest://'
 
-    assert 'notexc' not in common.NOTIFY_SCHEMA_MAP
+    assert 'notexc' not in N_MGR
 
     # Define a function here on the spot
     @notify(on="notexc", name="Apprise @notify Exception Handling")
@@ -154,7 +158,7 @@ def test_notify_simple_decoration():
             body, title, notify_type, attach, *args, **kwargs):
         raise ValueError("An exception was thrown!")
 
-    assert 'notexc' in common.NOTIFY_SCHEMA_MAP
+    assert 'notexc' in N_MGR
 
     # Create ourselves an apprise object
     aobj = Apprise()
@@ -165,8 +169,7 @@ def test_notify_simple_decoration():
     assert aobj.notify("Exceptions will be thrown!") is False
 
     # Tidy
-    del common.NOTIFY_SCHEMA_MAP['utiltest']
-    del common.NOTIFY_SCHEMA_MAP['notexc']
+    N_MGR.remove('utiltest', 'notexc')
 
 
 def test_notify_complex_decoration():
@@ -175,7 +178,7 @@ def test_notify_complex_decoration():
 
     # Verify our schema we're about to declare doesn't already exist
     # in our schema map:
-    assert 'utiltest' not in common.NOTIFY_SCHEMA_MAP
+    assert 'utiltest' not in N_MGR
 
     verify_obj = {}
 
@@ -196,7 +199,7 @@ def test_notify_complex_decoration():
         })
 
     # Now after our hook being inline... it's been loaded
-    assert 'utiltest' in common.NOTIFY_SCHEMA_MAP
+    assert 'utiltest' in N_MGR
 
     # Create ourselves an apprise object
     aobj = Apprise()
@@ -312,7 +315,7 @@ def test_notify_complex_decoration():
     assert 'key2=another' in verify_obj['kwargs']['meta']['url']
 
     # Tidy
-    del common.NOTIFY_SCHEMA_MAP['utiltest']
+    N_MGR.remove('utiltest')
 
 
 def test_notify_multi_instance_decoration(tmpdir):
@@ -321,7 +324,7 @@ def test_notify_multi_instance_decoration(tmpdir):
 
     # Verify our schema we're about to declare doesn't already exist
     # in our schema map:
-    assert 'multi' not in common.NOTIFY_SCHEMA_MAP
+    assert 'multi' not in N_MGR
 
     verify_obj = []
 
@@ -342,7 +345,7 @@ def test_notify_multi_instance_decoration(tmpdir):
         })
 
     # Now after our hook being inline... it's been loaded
-    assert 'multi' in common.NOTIFY_SCHEMA_MAP
+    assert 'multi' in N_MGR
 
     # Prepare our config
     t = tmpdir.mkdir("multi-test").join("apprise.yml")
@@ -449,4 +452,4 @@ def test_notify_multi_instance_decoration(tmpdir):
     assert meta['url'] == 'multi://user2:pass2@hostname'
 
     # Tidy
-    del common.NOTIFY_SCHEMA_MAP['multi']
+    N_MGR.remove('multi')

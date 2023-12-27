@@ -28,6 +28,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 from ..plugins.NotifyBase import NotifyBase
+from ..NotificationManager import NotificationManager
 from ..utils import URL_DETAILS_RE
 from ..utils import parse_url
 from ..utils import url_assembly
@@ -35,6 +36,9 @@ from ..utils import dict_full_update
 from .. import common
 from ..logger import logger
 import inspect
+
+# Grant access to our Notification Manager Singleton
+N_MGR = NotificationManager()
 
 
 class CustomNotifyPlugin(NotifyBase):
@@ -91,17 +95,17 @@ class CustomNotifyPlugin(NotifyBase):
             logger.warning(msg)
             return None
 
-        # Acquire our plugin name
-        plugin_name = re_match.group('schema').lower()
+        # Acquire our schema
+        schema = re_match.group('schema').lower()
 
         if not re_match.group('base'):
-            url = '{}://'.format(plugin_name)
+            url = '{}://'.format(schema)
 
         # Keep a default set of arguments to apply to all called references
         base_args = parse_url(
-            url, default_schema=plugin_name, verify_host=False, simple=True)
+            url, default_schema=schema, verify_host=False, simple=True)
 
-        if plugin_name in common.NOTIFY_SCHEMA_MAP:
+        if schema in N_MGR:
             # we're already handling this object
             msg = 'The schema ({}) is already defined and could not be ' \
                 'loaded from custom notify function {}.' \
@@ -117,10 +121,10 @@ class CustomNotifyPlugin(NotifyBase):
 
             # Our Service Name
             service_name = name if isinstance(name, str) \
-                and name else 'Custom - {}'.format(plugin_name)
+                and name else 'Custom - {}'.format(schema)
 
             # Store our matched schema
-            secure_protocol = plugin_name
+            secure_protocol = schema
 
             requirements = {
                 # Define our required packaging in order to work
@@ -181,51 +185,26 @@ class CustomNotifyPlugin(NotifyBase):
                     # Unhandled Exception
                     self.logger.warning(
                         'An exception occured sending a %s notification.',
-                        common.
-                        NOTIFY_SCHEMA_MAP[self.secure_protocol].service_name)
+                        N_MGR[self.secure_protocol].service_name)
                     self.logger.debug(
                         '%s Exception: %s',
-                        common.NOTIFY_SCHEMA_MAP[self.secure_protocol], str(e))
+                        N_MGR[self.secure_protocol], str(e))
                     return False
 
                 if response:
                     self.logger.info(
                         'Sent %s notification.',
-                        common.
-                        NOTIFY_SCHEMA_MAP[self.secure_protocol].service_name)
+                        N_MGR[self.secure_protocol].service_name)
                 else:
                     self.logger.warning(
                         'Failed to send %s notification.',
-                        common.
-                        NOTIFY_SCHEMA_MAP[self.secure_protocol].service_name)
+                        N_MGR[self.secure_protocol].service_name)
                 return response
 
         # Store our plugin into our core map file
-        common.NOTIFY_SCHEMA_MAP[plugin_name] = CustomNotifyPluginWrapper
-
-        # Update our custom plugin map
-        module_pyname = str(send_func.__module__)
-        if module_pyname not in common.NOTIFY_CUSTOM_MODULE_MAP:
-            # Support non-dynamic includes as well...
-            common.NOTIFY_CUSTOM_MODULE_MAP[module_pyname] = {
-                'path': inspect.getfile(send_func),
-
-                # Initialize our template
-                'notify': {},
-            }
-
-        common.\
-            NOTIFY_CUSTOM_MODULE_MAP[module_pyname]['notify'][plugin_name] = {
-                # Our Serivice Description (for API and CLI --details view)
-                'name': CustomNotifyPluginWrapper.service_name,
-                # The name of the send function the @notify decorator wrapped
-                'fn_name': send_func.__name__,
-                # The URL that was provided in the @notify decorator call
-                # associated with the 'on='
-                'url': url,
-                # The Initialized Plugin that was generated based on the above
-                # parameters
-                'plugin': CustomNotifyPluginWrapper}
-
-        # return our plugin
-        return common.NOTIFY_SCHEMA_MAP[plugin_name]
+        return N_MGR.add(
+            plugin=CustomNotifyPluginWrapper,
+            schemas=schema,
+            send_func=send_func,
+            url=url,
+        )

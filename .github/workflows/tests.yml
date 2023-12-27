@@ -31,7 +31,7 @@ jobs:
       # expanded using subsequent `include` items.
       matrix:
         os: ["ubuntu-latest"]
-        python-version: ["3.10"]
+        python-version: ["3.11"]
         bare: [false]
 
         include:
@@ -39,14 +39,14 @@ jobs:
           # Within the `bare` environment, `all-plugin-requirements.txt` will NOT be
           # installed, to verify the application also works without those dependencies.
           - os: "ubuntu-latest"
-            python-version: "3.10"
+            python-version: "3.11"
             bare: true
 
           # Let's save resources and only build a single slot on macOS- and Windows.
           - os: "macos-latest"
-            python-version: "3.10"
+            python-version: "3.11"
           - os: "windows-latest"
-            python-version: "3.10"
+            python-version: "3.11"
 
           # Test more available versions of CPython on Linux.
           - os: "ubuntu-20.04"

@@ -33,7 +33,7 @@ from inspect import cleandoc
 from urllib.parse import unquote
 
 from apprise import utils
-from apprise import common
+from apprise.NotificationManager import NotificationManager
 
 # Disable logging for a cleaner testing output
 import logging
@@ -41,6 +41,9 @@ logging.disable(logging.CRITICAL)
 
 # Ensure we don't create .pyc files for these tests
 sys.dont_write_bytecode = True
+
+# Grant access to our Notification Manager Singleton
+N_MGR = NotificationManager()
 
 
 def test_parse_qsd():
@@ -2030,15 +2033,15 @@ def test_module_detection(tmpdir):
     """
 
     # Clear our working variables so they don't obstruct with the tests here
-    utils.PATHS_PREVIOUSLY_SCANNED.clear()
-    common.NOTIFY_CUSTOM_MODULE_MAP.clear()
+    N_MGR._paths_previously_scanned.clear()
+    N_MGR._custom_module_map.clear()
 
     # Test case where we load invalid data
-    utils.module_detection(None)
+    N_MGR.module_detection(None)
 
     # Invalid data does not load anything
-    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 0
-    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 0
+    assert len(N_MGR._paths_previously_scanned) == 0
+    assert len(N_MGR._custom_module_map) == 0
 
     # Prepare ourselves a file to work with
     notify_hook_a_base = tmpdir.mkdir('a')
@@ -2057,30 +2060,29 @@ def test_module_detection(tmpdir):
     """))
 
     # Not previously loaded
-    assert 'clihook' not in common.NOTIFY_SCHEMA_MAP
+    assert 'clihook' not in N_MGR
 
     # load entry by string
-    utils.module_detection(str(notify_hook_a))
-    utils.module_detection(str(notify_ignore))
-    utils.module_detection(str(notify_hook_a_base))
+    N_MGR.module_detection(str(notify_hook_a))
+    N_MGR.module_detection(str(notify_ignore))
+    N_MGR.module_detection(str(notify_hook_a_base))
 
-    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 3
-    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 1
+    assert len(N_MGR._paths_previously_scanned) == 3
+    assert len(N_MGR._custom_module_map) == 1
 
     # Now loaded
-    assert 'clihook' in common.NOTIFY_SCHEMA_MAP
+    assert 'clihook' in N_MGR
 
     # load entry by array
-    utils.module_detection([str(notify_hook_a)])
+    N_MGR.module_detection([str(notify_hook_a)])
 
     # No changes to our path
-    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 3
-    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 1
+    assert len(N_MGR._paths_previously_scanned) == 3
+    assert len(N_MGR._custom_module_map) == 1
 
     # Reset our variables for the next test
-    utils.PATHS_PREVIOUSLY_SCANNED.clear()
-    common.NOTIFY_CUSTOM_MODULE_MAP.clear()
-    del common.NOTIFY_SCHEMA_MAP['clihook']
+    N_MGR._paths_previously_scanned.clear()
+    N_MGR._custom_module_map.clear()
 
     # Hidden files are ignored
     notify_hook_b_base = tmpdir.mkdir('b')
@@ -2094,36 +2096,36 @@ def test_module_detection(tmpdir):
         pass
     """))
 
-    assert 'hidden' not in common.NOTIFY_SCHEMA_MAP
+    assert 'hidden' not in N_MGR
 
-    utils.module_detection([str(notify_hook_b)])
+    N_MGR.module_detection([str(notify_hook_b)])
 
     # Verify that it did not load
-    assert 'hidden' not in common.NOTIFY_SCHEMA_MAP
+    assert 'hidden' not in N_MGR
 
     # Path was scanned; nothing loaded
-    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 1
-    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 0
+    assert len(N_MGR._paths_previously_scanned) == 1
+    assert len(N_MGR._custom_module_map) == 0
 
     # Reset our variables for the next test
-    utils.PATHS_PREVIOUSLY_SCANNED.clear()
-    common.NOTIFY_CUSTOM_MODULE_MAP.clear()
+    N_MGR._paths_previously_scanned.clear()
+    N_MGR._custom_module_map.clear()
 
     # modules with no hooks found are ignored
     notify_hook_c_base = tmpdir.mkdir('c')
     notify_hook_c = notify_hook_c_base.join('empty.py')
     notify_hook_c.write("")
 
-    utils.module_detection([str(notify_hook_c)])
+    N_MGR.module_detection([str(notify_hook_c)])
 
     # File was found, no custom modules
-    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 1
-    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 0
+    assert len(N_MGR._paths_previously_scanned) == 1
+    assert len(N_MGR._custom_module_map) == 0
 
     # A new path scanned
-    utils.module_detection([str(notify_hook_c_base)])
-    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 2
-    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 0
+    N_MGR.module_detection([str(notify_hook_c_base)])
+    assert len(N_MGR._paths_previously_scanned) == 2
+    assert len(N_MGR._custom_module_map) == 0
 
     def create_hook(tdir, cache=True, on="valid1"):
         """
@@ -2139,39 +2141,39 @@ def test_module_detection(tmpdir):
             pass
         """.format(on)))
 
-        utils.module_detection([str(tdir)], cache=cache)
+        N_MGR.module_detection([str(tdir)], cache=cache)
 
     create_hook(notify_hook_c, on='valid1')
-    assert 'valid1' not in common.NOTIFY_SCHEMA_MAP
+    assert 'valid1' not in N_MGR
 
     # Even if we correct our empty file; the fact the directory has been
     # scanned and failed to load (same with file), it won't be loaded
     # a second time. This is intentional since module_detection() get's
     # called for every AppriseAsset() object creation.  This prevents us
     # from reloading conent over and over again wasting resources
-    assert 'valid1' not in common.NOTIFY_SCHEMA_MAP
-    utils.module_detection([str(notify_hook_c)])
-    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 2
-    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 0
+    assert 'valid1' not in N_MGR
+    N_MGR.module_detection([str(notify_hook_c)])
+    assert len(N_MGR._paths_previously_scanned) == 2
+    assert len(N_MGR._custom_module_map) == 0
 
     # Even by absolute path...
-    utils.module_detection([str(notify_hook_c)])
-    assert 'valid1' not in common.NOTIFY_SCHEMA_MAP
-    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 2
-    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 0
+    N_MGR.module_detection([str(notify_hook_c)])
+    assert 'valid1' not in N_MGR
+    assert len(N_MGR._paths_previously_scanned) == 2
+    assert len(N_MGR._custom_module_map) == 0
 
     # However we can bypass the cache if we really want to
-    utils.module_detection([str(notify_hook_c_base)], cache=False)
-    assert 'valid1' in common.NOTIFY_SCHEMA_MAP
-    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 2
-    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 1
+    N_MGR.module_detection([str(notify_hook_c_base)], cache=False)
+    assert 'valid1' in N_MGR
+    assert len(N_MGR._paths_previously_scanned) == 2
+    assert len(N_MGR._custom_module_map) == 1
 
     # Bypassing it twice causes the module to load twice (not very efficient)
     # However we can bypass the cache if we really want to
-    utils.module_detection([str(notify_hook_c_base)], cache=False)
-    assert 'valid1' in common.NOTIFY_SCHEMA_MAP
-    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 2
-    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 1
+    N_MGR.module_detection([str(notify_hook_c_base)], cache=False)
+    assert 'valid1' in N_MGR
+    assert len(N_MGR._paths_previously_scanned) == 2
+    assert len(N_MGR._custom_module_map) == 1
 
     # If you update the module (corrupting it in the process and reload)
     notify_hook_c.write(cleandoc("""
@@ -2179,50 +2181,50 @@ def test_module_detection(tmpdir):
     """))
 
     # Force no cache to cause the file to be replaced
-    utils.module_detection([str(notify_hook_c_base)], cache=False)
+    N_MGR.module_detection([str(notify_hook_c_base)], cache=False)
 
     # Our valid entry is no longer loaded
-    assert 'valid1' not in common.NOTIFY_SCHEMA_MAP
+    assert 'valid1' not in N_MGR
 
     # No change to scanned paths
-    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 2
+    assert len(N_MGR._paths_previously_scanned) == 2
     # The previously loaded module is now gone
-    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 0
+    assert len(N_MGR._custom_module_map) == 0
 
     # Reload our valid1 entry
     create_hook(notify_hook_c, on='valid1', cache=False)
-    assert 'valid1' in common.NOTIFY_SCHEMA_MAP
-    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 2
-    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 1
+    assert 'valid1' in N_MGR
+    assert len(N_MGR._paths_previously_scanned) == 2
+    assert len(N_MGR._custom_module_map) == 1
 
     # Prepare an empty file
     notify_hook_c.write("")
-    utils.module_detection([str(notify_hook_c_base)], cache=False)
+    N_MGR.module_detection([str(notify_hook_c_base)], cache=False)
 
     # Our valid entry is no longer loaded
-    assert 'valid1' not in common.NOTIFY_SCHEMA_MAP
-    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 2
-    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 0
+    assert 'valid1' not in N_MGR
+    assert len(N_MGR._paths_previously_scanned) == 2
+    assert len(N_MGR._custom_module_map) == 0
 
     # Now reload our module again (this time rather then an exception, the
     # module is read back and swaps `valid1` for `valid2`
     create_hook(notify_hook_c, on='valid1', cache=False)
-    assert 'valid1' in common.NOTIFY_SCHEMA_MAP
-    assert 'valid2' not in common.NOTIFY_SCHEMA_MAP
-    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 2
-    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 1
+    assert 'valid1' in N_MGR
+    assert 'valid2' not in N_MGR
+    assert len(N_MGR._paths_previously_scanned) == 2
+    assert len(N_MGR._custom_module_map) == 1
 
     create_hook(notify_hook_c, on='valid2', cache=False)
-    assert 'valid1' not in common.NOTIFY_SCHEMA_MAP
-    assert 'valid2' in common.NOTIFY_SCHEMA_MAP
-    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 2
-    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 1
+    assert 'valid1' not in N_MGR
+    assert 'valid2' in N_MGR
+    assert len(N_MGR._paths_previously_scanned) == 2
+    assert len(N_MGR._custom_module_map) == 1
 
     # Reset our variables for the next test
     create_hook(notify_hook_c, on='valid1', cache=False)
-    del common.NOTIFY_SCHEMA_MAP['valid1']
-    utils.PATHS_PREVIOUSLY_SCANNED.clear()
-    common.NOTIFY_CUSTOM_MODULE_MAP.clear()
+    del N_MGR['valid1']
+    N_MGR._paths_previously_scanned.clear()
+    N_MGR._custom_module_map.clear()
 
     notify_hook_d = notify_hook_c_base.join('.ignore.py')
     notify_hook_d.write("")
@@ -2241,71 +2243,71 @@ def test_module_detection(tmpdir):
     # Try to load our base directory again; this time we search by the
     # directory; the only edge case we're testing here is it will not
     # even look at the .ignore.py file found since it is invalid
-    utils.module_detection([str(notify_hook_c_base)])
-    assert 'valid1' in common.NOTIFY_SCHEMA_MAP
-    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 2
-    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 1
+    N_MGR.module_detection([str(notify_hook_c_base)])
+    assert 'valid1' in N_MGR
+    assert len(N_MGR._paths_previously_scanned) == 2
+    assert len(N_MGR._custom_module_map) == 1
 
     # Reset our variables for the next test
-    del common.NOTIFY_SCHEMA_MAP['valid1']
-    utils.PATHS_PREVIOUSLY_SCANNED.clear()
-    common.NOTIFY_CUSTOM_MODULE_MAP.clear()
+    del N_MGR._schema_map['valid1']
+    N_MGR._paths_previously_scanned.clear()
+    N_MGR._custom_module_map.clear()
 
     # Try to load our base directory again
-    utils.module_detection([str(notify_hook_c)])
-    assert 'valid1' in common.NOTIFY_SCHEMA_MAP
+    N_MGR.module_detection([str(notify_hook_c)])
+    assert 'valid1' in N_MGR
 
     # Hidden directories are not scanned
-    assert 'valid2' not in common.NOTIFY_SCHEMA_MAP
+    assert 'valid2' not in N_MGR
 
-    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 1
-    assert str(notify_hook_c) in utils.PATHS_PREVIOUSLY_SCANNED
-    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 1
+    assert len(N_MGR._paths_previously_scanned) == 1
+    assert str(notify_hook_c) in N_MGR._paths_previously_scanned
+    assert len(N_MGR._custom_module_map) == 1
 
     # However a direct reference to the hidden directory is okay
-    utils.module_detection([str(notify_hook_e_base)])
+    N_MGR.module_detection([str(notify_hook_e_base)])
 
     # We loaded our module
-    assert 'valid2' in common.NOTIFY_SCHEMA_MAP
-    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 3
-    assert str(notify_hook_c) in utils.PATHS_PREVIOUSLY_SCANNED
-    assert str(notify_hook_e) in utils.PATHS_PREVIOUSLY_SCANNED
-    assert str(notify_hook_e_base) in utils.PATHS_PREVIOUSLY_SCANNED
-    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 2
+    assert 'valid2' in N_MGR
+    assert len(N_MGR._paths_previously_scanned) == 3
+    assert str(notify_hook_c) in N_MGR._paths_previously_scanned
+    assert str(notify_hook_e) in N_MGR._paths_previously_scanned
+    assert str(notify_hook_e_base) in N_MGR._paths_previously_scanned
+    assert len(N_MGR._custom_module_map) == 2
 
     # Reset our variables for the next test
-    del common.NOTIFY_SCHEMA_MAP['valid1']
-    del common.NOTIFY_SCHEMA_MAP['valid2']
-    utils.PATHS_PREVIOUSLY_SCANNED.clear()
-    common.NOTIFY_CUSTOM_MODULE_MAP.clear()
+    del N_MGR._schema_map['valid1']
+    del N_MGR._schema_map['valid2']
+    N_MGR._paths_previously_scanned.clear()
+    N_MGR._custom_module_map.clear()
 
     # Load our file directly
-    assert 'valid2' not in common.NOTIFY_SCHEMA_MAP
-    utils.module_detection([str(notify_hook_e)])
+    assert 'valid2' not in N_MGR
+    N_MGR.module_detection([str(notify_hook_e)])
 
     # Now we have it loaded as expected
-    assert 'valid2' in common.NOTIFY_SCHEMA_MAP
-    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 1
-    assert str(notify_hook_e) in utils.PATHS_PREVIOUSLY_SCANNED
-    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 1
+    assert 'valid2' in N_MGR
+    assert len(N_MGR._paths_previously_scanned) == 1
+    assert str(notify_hook_e) in N_MGR._paths_previously_scanned
+    assert len(N_MGR._custom_module_map) == 1
 
     # however if we try to load the base directory where the __init__.py
     # was already loaded from, it will not change anything
-    utils.module_detection([str(notify_hook_e_base)])
-    assert 'valid2' in common.NOTIFY_SCHEMA_MAP
-    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 2
-    assert str(notify_hook_e) in utils.PATHS_PREVIOUSLY_SCANNED
-    assert str(notify_hook_e_base) in utils.PATHS_PREVIOUSLY_SCANNED
-    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 1
+    N_MGR.module_detection([str(notify_hook_e_base)])
+    assert 'valid2' in N_MGR
+    assert len(N_MGR._paths_previously_scanned) == 2
+    assert str(notify_hook_e) in N_MGR._paths_previously_scanned
+    assert str(notify_hook_e_base) in N_MGR._paths_previously_scanned
+    assert len(N_MGR._custom_module_map) == 1
 
     # Tidy up for the next test
-    del common.NOTIFY_SCHEMA_MAP['valid2']
-    utils.PATHS_PREVIOUSLY_SCANNED.clear()
-    common.NOTIFY_CUSTOM_MODULE_MAP.clear()
+    del N_MGR._schema_map['valid2']
+    N_MGR._paths_previously_scanned.clear()
+    N_MGR._custom_module_map.clear()
 
-    assert 'valid1' not in common.NOTIFY_SCHEMA_MAP
-    assert 'valid2' not in common.NOTIFY_SCHEMA_MAP
-    assert 'valid3' not in common.NOTIFY_SCHEMA_MAP
+    assert 'valid1' not in N_MGR
+    assert 'valid2' not in N_MGR
+    assert 'valid3' not in N_MGR
     notify_hook_f_base = tmpdir.mkdir('f')
     notify_hook_f = notify_hook_f_base.join('invalid.py')
     notify_hook_f.write(cleandoc("""
@@ -2334,20 +2336,20 @@ def test_module_detection(tmpdir):
 
     """))
 
-    utils.module_detection([str(notify_hook_f)])
+    N_MGR.module_detection([str(notify_hook_f)])
 
-    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 1
-    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 1
-    assert 'valid1' in common.NOTIFY_SCHEMA_MAP
-    assert 'valid2' in common.NOTIFY_SCHEMA_MAP
-    assert 'valid3' in common.NOTIFY_SCHEMA_MAP
+    assert len(N_MGR._paths_previously_scanned) == 1
+    assert len(N_MGR._custom_module_map) == 1
+    assert 'valid1' in N_MGR
+    assert 'valid2' in N_MGR
+    assert 'valid3' in N_MGR
 
     # Reset our variables for the next test
-    del common.NOTIFY_SCHEMA_MAP['valid1']
-    del common.NOTIFY_SCHEMA_MAP['valid2']
-    del common.NOTIFY_SCHEMA_MAP['valid3']
-    utils.PATHS_PREVIOUSLY_SCANNED.clear()
-    common.NOTIFY_CUSTOM_MODULE_MAP.clear()
+    del N_MGR._schema_map['valid1']
+    del N_MGR._schema_map['valid2']
+    del N_MGR._schema_map['valid3']
+    N_MGR._paths_previously_scanned.clear()
+    N_MGR._custom_module_map.clear()
 
     # Now test the handling of just bad data entirely
     notify_hook_g_base = tmpdir.mkdir('g')
@@ -2355,13 +2357,13 @@ def test_module_detection(tmpdir):
     with open(str(notify_hook_g), 'wb') as fout:
         fout.write(os.urandom(512))
 
-    utils.module_detection([str(notify_hook_g)])
-    assert len(utils.PATHS_PREVIOUSLY_SCANNED) == 1
-    assert len(common.NOTIFY_CUSTOM_MODULE_MAP) == 0
+    N_MGR.module_detection([str(notify_hook_g)])
+    assert len(N_MGR._paths_previously_scanned) == 1
+    assert len(N_MGR._custom_module_map) == 0
 
     # Reset our variables before we leave
-    utils.PATHS_PREVIOUSLY_SCANNED.clear()
-    common.NOTIFY_CUSTOM_MODULE_MAP.clear()
+    N_MGR._paths_previously_scanned.clear()
+    N_MGR._custom_module_map.clear()
 
 
 def test_exclusive_match():

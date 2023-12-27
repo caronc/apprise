@@ -26,11 +26,21 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from itertools import chain
 from importlib import import_module, reload
+from apprise.NotificationManager import NotificationManager
+from apprise.AttachmentManager import AttachmentManager
 import sys
+import re
+
+# Grant access to our Notification Manager Singleton
+N_MGR = NotificationManager()
+
+# Grant access to our Attachment Manager Singleton
+A_MGR = AttachmentManager()
 
 
-def reload_plugin(name, replace_in=None):
+def reload_plugin(name):
     """
     Reload built-in plugin module, e.g. `NotifyGnome`.
 
@@ -40,21 +50,72 @@ def reload_plugin(name, replace_in=None):
     See also https://stackoverflow.com/questions/31363311.
     """
 
-    module_name = f"apprise.plugins.{name}"
+    A_MGR.unload_modules()
 
-    reload(sys.modules['apprise.common'])
-    reload(sys.modules['apprise.attachment'])
-    reload(sys.modules['apprise.config'])
-    if module_name in sys.modules:
-        reload(sys.modules[module_name])
-    reload(sys.modules['apprise.plugins'])
+    reload(sys.modules['apprise.attachment.AttachBase'])
+    reload(sys.modules['apprise.AppriseAttachment'])
+    new_apprise_attachment_mod = import_module('apprise.AppriseAttachment')
+    reload(sys.modules['apprise.AttachmentManager'])
+
+    module_pyname = '{}.{}'.format(N_MGR.module_name_prefix, name)
+    if module_pyname in sys.modules:
+        reload(sys.modules[module_pyname])
+    new_notify_mod = import_module(module_pyname)
+
+    reload(sys.modules['apprise.NotificationManager'])
     reload(sys.modules['apprise.Apprise'])
     reload(sys.modules['apprise.utils'])
     reload(sys.modules['apprise'])
 
-    # Fix reference to new plugin class in given module.
-    # Needed for updating the module-level import reference like
-    # `from apprise.plugins.NotifyMacOSX import NotifyMacOSX`.
-    if replace_in is not None:
-        mod = import_module(module_name)
-        setattr(replace_in, name, getattr(mod, name))
+    # Filter our keys
+    tests = [k for k in sys.modules.keys() if re.match(r'^test_.+$', k)]
+    for module_name in tests:
+        possible_matches = \
+            [m for m in dir(sys.modules[module_name])
+             if re.match(r'^(?P<name>Notify[a-z0-9]+)$', m, re.I)]
+        if not possible_matches:
+            continue
+
+        # Fix reference to new plugin class in given module.
+        # Needed for updating the module-level import reference like
+        # `from apprise.plugins.NotifyABCDE import NotifyABCDE`.
+        #
+        # We reload NotifyABCDE and place it back in its spot
+        test_mod = import_module(module_name)
+        setattr(test_mod, name, getattr(new_notify_mod, name))
+
+    # Detect our Apprise Modules (include helpers)
+    apprise_modules = \
+        [k for k in sys.modules.keys()
+         if re.match(r'^(apprise|helpers)(\.|.+)$', k)]
+
+    for entry in A_MGR:
+        reload(sys.modules[entry['path']])
+        for module_pyname in chain(apprise_modules, tests):
+            detect = re.compile(
+                r'^(?P<name>(AppriseAttachment|AttachBase|' +
+                entry['path'].split('.')[-1] + r'))$')
+
+            possible_matches = \
+                [m for m in dir(sys.modules[module_pyname]) if detect.match(m)]
+            if not possible_matches:
+                continue
+
+            apprise_mod = import_module(module_pyname)
+            # Fix reference to new plugin class in given module.
+            # Needed for updating the module-level import reference
+            # like `from apprise.<etc> import NotifyABCDE`.
+            #
+            # We reload NotifyABCDE and place it back in its spot
+            # new_attach = import_module(entry['path'])
+            for name in possible_matches:
+                if name == 'AppriseAttachment':
+                    setattr(
+                        apprise_mod, name,
+                        getattr(new_apprise_attachment_mod, name))
+
+                else:
+                    module_pyname = '{}.{}'.format(
+                        A_MGR.module_name_prefix, name)
+                    new_attach_mod = import_module(module_pyname)
+                    setattr(apprise_mod, name, getattr(new_attach_mod, name))

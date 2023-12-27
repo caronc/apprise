@@ -31,12 +31,14 @@ import pytest
 from apprise import Apprise
 from apprise import NotifyBase
 from apprise import NotifyFormat
-
-from apprise.common import NOTIFY_SCHEMA_MAP
+from apprise.NotificationManager import NotificationManager
 
 # Disable logging for a cleaner testing output
 import logging
 logging.disable(logging.CRITICAL)
+
+# Grant access to our Notification Manager Singleton
+N_MGR = NotificationManager()
 
 
 @pytest.mark.skipif(sys.version_info >= (3, 7),
@@ -65,7 +67,7 @@ def test_apprise_asyncio_runtime_error():
             return NotifyBase.parse_url(url, verify_host=False)
 
     # Store our good notification in our schema map
-    NOTIFY_SCHEMA_MAP['good'] = GoodNotification
+    N_MGR['good'] = GoodNotification
 
     # Create ourselves an Apprise object
     a = Apprise()

@@ -26,14 +26,29 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-# Used for testing
-from .ConfigBase import ConfigBase
-from ..ConfigurationManager import ConfigurationManager
+from os.path import dirname
+from os.path import abspath
+from os.path import join
+from .manager import PluginManager
 
-# Initalize our Config Manager Singleton
-C_MGR = ConfigurationManager()
 
-__all__ = [
-    # Reference
-    'ConfigBase',
-]
+class NotificationManager(PluginManager):
+    """
+    Designed to be a singleton object to maintain all initialized notifications
+    in memory.
+    """
+
+    # Description (used for logging)
+    name = 'Notification Plugin'
+
+    # Filename Prefix to filter on
+    fname_prefix = 'Notify'
+
+    # Memory Space
+    _id = 'plugins'
+
+    # Our Module Python path name
+    module_name_prefix = f'apprise.{_id}'
+
+    # The module path to scan
+    module_path = join(abspath(dirname(__file__)), _id)

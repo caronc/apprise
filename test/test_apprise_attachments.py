@@ -26,16 +26,15 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import sys
 import pytest
 from os.path import getsize
 from os.path import join
 from os.path import dirname
+from inspect import cleandoc
+from apprise.AttachmentManager import AttachmentManager
 from apprise.AppriseAttachment import AppriseAttachment
 from apprise.AppriseAsset import AppriseAsset
 from apprise.attachment.AttachBase import AttachBase
-from apprise.common import ATTACHMENT_SCHEMA_MAP
-from apprise.attachment import __load_matrix
 from apprise.common import ContentLocation
 
 # Disable logging for a cleaner testing output
@@ -43,6 +42,9 @@ import logging
 logging.disable(logging.CRITICAL)
 
 TEST_VAR_DIR = join(dirname(__file__), 'var')
+
+# Grant access to our Attachment Manager Singleton
+A_MGR = AttachmentManager()
 
 
 def test_apprise_attachment():
@@ -278,7 +280,7 @@ def test_apprise_attachment_instantiate():
             raise TypeError()
 
     # Store our bad attachment type in our schema map
-    ATTACHMENT_SCHEMA_MAP['bad'] = BadAttachType
+    A_MGR['bad'] = BadAttachType
 
     with pytest.raises(TypeError):
         AppriseAttachment.instantiate(
@@ -287,77 +289,6 @@ def test_apprise_attachment_instantiate():
     # Same call but exceptions suppressed
     assert AppriseAttachment.instantiate(
         'bad://path', suppress_exceptions=True) is None
-
-
-def test_apprise_attachment_matrix_load():
-    """
-    API: AppriseAttachment() matrix initialization
-
-    """
-
-    import apprise
-
-    class AttachmentDummy(AttachBase):
-        """
-        A dummy wrapper for testing the different options in the load_matrix
-        function
-        """
-
-        # The default descriptive name associated with the Notification
-        service_name = 'dummy'
-
-        # protocol as tuple
-        protocol = ('uh', 'oh')
-
-        # secure protocol as tuple
-        secure_protocol = ('no', 'yes')
-
-    class AttachmentDummy2(AttachBase):
-        """
-        A dummy wrapper for testing the different options in the load_matrix
-        function
-        """
-
-        # The default descriptive name associated with the Notification
-        service_name = 'dummy2'
-
-        # secure protocol as tuple
-        secure_protocol = ('true', 'false')
-
-    class AttachmentDummy3(AttachBase):
-        """
-        A dummy wrapper for testing the different options in the load_matrix
-        function
-        """
-
-        # The default descriptive name associated with the Notification
-        service_name = 'dummy3'
-
-        # secure protocol as string
-        secure_protocol = 'true'
-
-    class AttachmentDummy4(AttachBase):
-        """
-        A dummy wrapper for testing the different options in the load_matrix
-        function
-        """
-
-        # The default descriptive name associated with the Notification
-        service_name = 'dummy4'
-
-        # protocol as string
-        protocol = 'true'
-
-    # Generate ourselves a fake entry
-    apprise.attachment.AttachmentDummy = AttachmentDummy
-    apprise.attachment.AttachmentDummy2 = AttachmentDummy2
-    apprise.attachment.AttachmentDummy3 = AttachmentDummy3
-    apprise.attachment.AttachmentDummy4 = AttachmentDummy4
-
-    __load_matrix()
-
-    # Call it again so we detect our entries already loaded
-    __load_matrix()
 
 
 def test_attachment_matrix_dynamic_importing(tmpdir):
@@ -372,53 +303,55 @@ def test_attachment_matrix_dynamic_importing(tmpdir):
 
     module_name = 'badattach'
 
-    # Update our path to point to our new test suite
-    sys.path.insert(0, str(suite))
-
     # Create a base area to work within
     base = suite.mkdir(module_name)
     base.join("__init__.py").write('')
 
     # Test no app_id
-    base.join('AttachBadFile1.py').write(
+    base.join('AttachBadFile1.py').write(cleandoc(
         """
-class AttachBadFile1:
-    pass""")
+        class AttachBadFile1:
+            pass
+        """))
 
     # No class of the same name
-    base.join('AttachBadFile2.py').write(
+    base.join('AttachBadFile2.py').write(cleandoc(
         """
-class BadClassName:
-    pass""")
+        class BadClassName:
+            pass
+        """))
 
     # Exception thrown
     base.join('AttachBadFile3.py').write("""raise ImportError()""")
 
     # Utilizes a schema:// already occupied (as string)
-    base.join('AttachGoober.py').write(
+    base.join('AttachGoober.py').write(cleandoc(
         """
-from apprise import AttachBase
-class AttachGoober(AttachBase):
-    # This class tests the fact we have a new class name, but we're
-    # trying to over-ride items previously used
+        from apprise import AttachBase
+        class AttachGoober(AttachBase):
+            # This class tests the fact we have a new class name, but we're
+            # trying to over-ride items previously used
 
-    # The default simple (insecure) protocol
-    protocol = 'http'
+            # The default simple (insecure) protocol
+            protocol = 'http'
 
-    # The default secure protocol
-    secure_protocol = 'https'""")
+            # The default secure protocol
+            secure_protocol = 'https'
+        """))
 
     # Utilizes a schema:// already occupied (as tuple)
-    base.join('AttachBugger.py').write("""
-from apprise import AttachBase
-class AttachBugger(AttachBase):
-    # This class tests the fact we have a new class name, but we're
-    # trying to over-ride items previously used
+    base.join('AttachBugger.py').write(cleandoc(
+        """
+        from apprise import AttachBase
+        class AttachBugger(AttachBase):
+            # This class tests the fact we have a new class name, but we're
+            # trying to over-ride items previously used
 
-    # The default simple (insecure) protocol
-    protocol = ('http', 'bugger-test' )
+            # The default simple (insecure) protocol
+            protocol = ('http', 'bugger-test' )
 
-    # The default secure protocol
-    secure_protocol = ('https', 'bugger-tests')""")
+            # The default secure protocol
+            secure_protocol = ('https', 'bugger-tests')
+        """))
 
-    __load_matrix(path=str(base), name=module_name)
+    A_MGR.load_modules(path=str(base), name=module_name)

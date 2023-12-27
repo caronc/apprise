@@ -34,12 +34,14 @@ import requests
 from apprise.common import ConfigFormat
 from apprise.config.ConfigHTTP import ConfigHTTP
 from apprise.plugins.NotifyBase import NotifyBase
-from apprise.common import NOTIFY_SCHEMA_MAP
+from apprise.NotificationManager import NotificationManager
 
 # Disable logging for a cleaner testing output
 import logging
 logging.disable(logging.CRITICAL)
 
+# Grant access to our Notification Manager Singleton
+N_MGR = NotificationManager()
 
 # Some exception handling we'll use
 REQUEST_EXCEPTIONS = (
@@ -77,7 +79,7 @@ def test_config_http(mock_post):
             return ''
 
     # Store our good notification in our schema map
-    NOTIFY_SCHEMA_MAP['good'] = GoodNotification
+    N_MGR['good'] = GoodNotification
 
     # Our default content
     default_content = """taga,tagb=good://server01"""

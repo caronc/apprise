@@ -26,14 +26,17 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from . import attachment
 from . import URLBase
+from .attachment.AttachBase import AttachBase
 from .AppriseAsset import AppriseAsset
+from .AttachmentManager import AttachmentManager
 from .logger import logger
 from .common import ContentLocation
 from .common import CONTENT_LOCATIONS
-from .common import ATTACHMENT_SCHEMA_MAP
 from .utils import GET_SCHEMA_RE
+
+# Grant access to our Notification Manager Singleton
+A_MGR = AttachmentManager()
 
 
 class AppriseAttachment:
@@ -139,7 +142,7 @@ class AppriseAttachment:
             # prepare default asset
             asset = self.asset
 
-        if isinstance(attachments, attachment.AttachBase):
+        if isinstance(attachments, AttachBase):
             # Go ahead and just add our attachments into our list
             self.attachments.append(attachments)
             return True
@@ -169,7 +172,7 @@ class AppriseAttachment:
                 # returns None if it fails
                 instance = AppriseAttachment.instantiate(
                     _attachment, asset=asset, cache=cache)
-                if not isinstance(instance, attachment.AttachBase):
+                if not isinstance(instance, AttachBase):
                     return_status = False
                     continue
 
@@ -178,7 +181,7 @@ class AppriseAttachment:
                 # append our content together
                 instance = _attachment.attachments
 
-            elif not isinstance(_attachment, attachment.AttachBase):
+            elif not isinstance(_attachment, AttachBase):
                 logger.warning(
                     "An invalid attachment (type={}) was specified.".format(
                         type(_attachment)))
@@ -228,7 +231,7 @@ class AppriseAttachment:
         schema = GET_SCHEMA_RE.match(url)
         if schema is None:
             # Plan B is to assume we're dealing with a file
-            schema = attachment.AttachFile.protocol
+            schema = 'file'
             url = '{}://{}'.format(schema, URLBase.quote(url))
 
         else:
@@ -236,13 +239,13 @@ class AppriseAttachment:
             schema = schema.group('schema').lower()
 
             # Some basic validation
-            if schema not in ATTACHMENT_SCHEMA_MAP:
+            if schema not in A_MGR:
                 logger.warning('Unsupported schema {}.'.format(schema))
                 return None
 
         # Parse our url details of the server object as dictionary containing
         # all of the information parsed from our URL
-        results = ATTACHMENT_SCHEMA_MAP[schema].parse_url(url)
+        results = A_MGR[schema].parse_url(url)
 
         if not results:
             # Failed to parse the server URL
@@ -261,8 +264,7 @@ class AppriseAttachment:
             try:
                 # Attempt to create an instance of our plugin using the parsed
                 # URL information
-                attach_plugin = \
-                    ATTACHMENT_SCHEMA_MAP[results['schema']](**results)
+                attach_plugin = A_MGR[results['schema']](**results)
 
             except Exception:
                 # the arguments are invalid or can not be used.
@@ -272,7 +274,7 @@ class AppriseAttachment:
         else:
             # Attempt to create an instance of our plugin using the parsed
             # URL information but don't wrap it in a try catch
-            attach_plugin = ATTACHMENT_SCHEMA_MAP[results['schema']](**results)
+            attach_plugin = A_MGR[results['schema']](**results)
 
         return attach_plugin
 

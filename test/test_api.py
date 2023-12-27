@@ -32,6 +32,7 @@ import re
 import sys
 import pytest
 import requests
+from inspect import cleandoc
 from unittest import mock
 
 from os.path import dirname
@@ -50,9 +51,7 @@ from apprise import PrivacyMode
 from apprise.AppriseLocale import LazyTranslation
 from apprise.AppriseLocale import gettext_lazy as _
 
-from apprise import common
-from apprise.plugins import __load_matrix
-from apprise.plugins import __reset_matrix
+from apprise.NotificationManager import NotificationManager
 from apprise.utils import parse_list
 from helpers import OuterEventLoop
 import inspect
@@ -64,8 +63,11 @@ logging.disable(logging.CRITICAL)
 # Attachment Directory
 TEST_VAR_DIR = join(dirname(__file__), 'var')
 
+# Grant access to our Notification Manager Singleton
+N_MGR = NotificationManager()
 
-def test_apprise():
+
+def test_apprise_object():
     """
     API: Apprise() object
 
@@ -90,11 +92,6 @@ def test_apprise_async():
 
 
 def apprise_test(do_notify):
-    # Caling load matix a second time which is an internal function causes it
-    # to skip over content already loaded into our matrix and thefore accesses
-    # other if/else parts of the code that aren't otherwise called
-    __load_matrix()
-
     a = Apprise()
 
     # no items
@@ -217,10 +214,10 @@ def apprise_test(do_notify):
             return NotifyBase.parse_url(url, verify_host=False)
 
     # Store our bad notification in our schema map
-    common.NOTIFY_SCHEMA_MAP['bad'] = BadNotification
+    N_MGR['bad'] = BadNotification
 
     # Store our good notification in our schema map
-    common.NOTIFY_SCHEMA_MAP['good'] = GoodNotification
+    N_MGR['good'] = GoodNotification
 
     # Just to explain what is happening here, we would have parsed the
     # url properly but failed when we went to go and create an instance
@@ -334,13 +331,13 @@ def apprise_test(do_notify):
             return ''
 
     # Store our bad notification in our schema map
-    common.NOTIFY_SCHEMA_MAP['throw'] = ThrowNotification
+    N_MGR['throw'] = ThrowNotification
 
     # Store our good notification in our schema map
-    common.NOTIFY_SCHEMA_MAP['fail'] = FailNotification
+    N_MGR['fail'] = FailNotification
 
     # Store our good notification in our schema map
-    common.NOTIFY_SCHEMA_MAP['runtime'] = RuntimeNotification
+    N_MGR['runtime'] = RuntimeNotification
 
     for async_mode in (True, False):
         # Create an Asset object
@@ -368,7 +365,11 @@ def apprise_test(do_notify):
             # Support URL
             return ''
 
-    common.NOTIFY_SCHEMA_MAP['throw'] = ThrowInstantiateNotification
+    N_MGR.unload_modules()
+    N_MGR['throw'] = ThrowInstantiateNotification
+
+    # Store our good notification in our schema map
+    N_MGR['good'] = GoodNotification
 
     # Reset our object
     a.clear()
@@ -680,11 +681,7 @@ def test_apprise_schemas(tmpdir):
     API: Apprise().schema() tests
 
     """
-    # Caling load matix a second time which is an internal function causes it
-    # to skip over content already loaded into our matrix and thefore accesses
-    # other if/else parts of the code that aren't otherwise called
-    __load_matrix()
-
+    # Clear loaded modules
     a = Apprise()
 
     # no items
@@ -711,15 +708,22 @@ def test_apprise_schemas(tmpdir):
 
         secure_protocol = 'markdowns'
 
-    # Store our notifications into our schema map
-    common.NOTIFY_SCHEMA_MAP['text'] = TextNotification
-    common.NOTIFY_SCHEMA_MAP['html'] = HtmlNotification
-    common.NOTIFY_SCHEMA_MAP['markdown'] = MarkDownNotification
-
     schemas = URLBase.schemas(TextNotification)
     assert isinstance(schemas, set) is True
     # We didn't define a protocol or secure protocol
     assert len(schemas) == 0
+
+    # Store our notifications into our schema map
+    N_MGR['text'] = TextNotification
+    N_MGR['html'] = HtmlNotification
+    N_MGR['markdown'] = MarkDownNotification
+
+    schemas = URLBase.schemas(TextNotification)
+    assert isinstance(schemas, set) is True
+    # We didn't define a protocol or secure protocol one
+    # but one got assigned in he above N_MGR call
+    assert len(schemas) == 1
+    assert 'text' in schemas
 
     schemas = URLBase.schemas(HtmlNotification)
     assert isinstance(schemas, set) is True
@@ -784,11 +788,6 @@ def test_apprise_notify_formats(tmpdir):
     API: Apprise() Input Formats tests
 
     """
-    # Caling load matix a second time which is an internal function causes it
-    # to skip over content already loaded into our matrix and thefore accesses
-    # other if/else parts of the code that aren't otherwise called
-    __load_matrix()
-
     # Need to set async_mode=False to call notify() instead of async_notify().
     asset = AppriseAsset(async_mode=False)
 
@@ -845,9 +844,9 @@ def test_apprise_notify_formats(tmpdir):
             return ''
 
     # Store our notifications into our schema map
-    common.NOTIFY_SCHEMA_MAP['text'] = TextNotification
-    common.NOTIFY_SCHEMA_MAP['html'] = HtmlNotification
-    common.NOTIFY_SCHEMA_MAP['markdown'] = MarkDownNotification
+    N_MGR['text'] = TextNotification
+    N_MGR['html'] = HtmlNotification
+    N_MGR['markdown'] = MarkDownNotification
 
     # Test Markdown; the above calls the markdown because our good://
     # defined plugin above was defined to default to HTML which triggers
@@ -1021,8 +1020,9 @@ def test_apprise_disabled_plugins():
     API: Apprise() Disabled Plugin States
 
     """
-    # Reset our matrix
-    __reset_matrix()
+    # Ensure there are no other drives loaded
+    N_MGR.unload_modules(disable_native=True)
+    assert len(N_MGR) == 0
 
     class TestDisabled01Notification(NotifyBase):
         """
@@ -1044,7 +1044,7 @@ def test_apprise_disabled_plugins():
             # Pretend everything is okay (so we don't break other tests)
             return True
 
-    common.NOTIFY_SCHEMA_MAP['na01'] = TestDisabled01Notification
+    N_MGR['na01'] = TestDisabled01Notification
 
     class TestDisabled02Notification(NotifyBase):
         """
@@ -1069,7 +1069,7 @@ def test_apprise_disabled_plugins():
             # Pretend everything is okay (so we don't break other tests)
             return True
 
-    common.NOTIFY_SCHEMA_MAP['na02'] = TestDisabled02Notification
+    N_MGR['na02'] = TestDisabled02Notification
 
     # Create our Apprise instance
     a = Apprise()
@@ -1127,7 +1127,7 @@ def test_apprise_disabled_plugins():
             # Pretend everything is okay (so we don't break other tests)
             return True
 
-    common.NOTIFY_SCHEMA_MAP['good'] = TesEnabled01Notification
+    N_MGR['good'] = TesEnabled01Notification
 
     # The last thing we'll simulate is a case where the plugin is just
     # disabled at a later time long into it's life.  this is just to allow
@@ -1148,9 +1148,8 @@ def test_apprise_disabled_plugins():
     # our notifications will go okay now
     assert plugin.notify("My Message") is True
 
-    # Reset our matrix
-    __reset_matrix()
-    __load_matrix()
+    # Restore our modules
+    N_MGR.unload_modules()
 
 
 def test_apprise_details():
@@ -1158,9 +1157,6 @@ def test_apprise_details():
     API: Apprise() Details
 
     """
-    # Reset our matrix
-    __reset_matrix()
-
     # This is a made up class that is just used to verify
     class TestDetailNotification(NotifyBase):
         """
@@ -1190,22 +1186,23 @@ def test_apprise_details():
         # previously defined in the base package and builds onto them
         template_tokens = dict(NotifyBase.template_tokens, **{
             'notype': {
-                # Nothing defined is still valid
+                # name is a minimum requirement
+                'name': _('no type'),
             },
             'regex_test01': {
                 'name': _('RegexTest'),
                 'type': 'string',
-                'regex': r'[A-Z0-9]',
+                'regex': r'^[A-Z0-9]$',
             },
             'regex_test02': {
                 'name': _('RegexTest'),
                 # Support regex options too
-                'regex': (r'[A-Z0-9]', 'i'),
+                'regex': (r'^[A-Z0-9]$', 'i'),
             },
             'regex_test03': {
                 'name': _('RegexTest'),
                 # Support regex option without a second option
-                'regex': (r'[A-Z0-9]'),
+                'regex': (r'^[A-Z0-9]$'),
             },
             'regex_test04': {
                 # this entry would just end up getting removed
@@ -1267,7 +1264,7 @@ def test_apprise_details():
             return True
 
     # Store our good detail notification in our schema map
-    common.NOTIFY_SCHEMA_MAP['details'] = TestDetailNotification
+    N_MGR['details'] = TestDetailNotification
 
     # This is a made up class that is just used to verify
     class TestReq01Notification(NotifyBase):
@@ -1292,7 +1289,7 @@ def test_apprise_details():
             # Pretend everything is okay (so we don't break other tests)
             return True
 
-    common.NOTIFY_SCHEMA_MAP['req01'] = TestReq01Notification
+    N_MGR['req01'] = TestReq01Notification
 
     # This is a made up class that is just used to verify
     class TestReq02Notification(NotifyBase):
@@ -1322,7 +1319,7 @@ def test_apprise_details():
             # Pretend everything is okay (so we don't break other tests)
             return True
 
-    common.NOTIFY_SCHEMA_MAP['req02'] = TestReq02Notification
+    N_MGR['req02'] = TestReq02Notification
 
     # This is a made up class that is just used to verify
     class TestReq03Notification(NotifyBase):
@@ -1348,7 +1345,7 @@ def test_apprise_details():
             # Pretend everything is okay (so we don't break other tests)
             return True
 
-    common.NOTIFY_SCHEMA_MAP['req03'] = TestReq03Notification
+    N_MGR['req03'] = TestReq03Notification
 
     # This is a made up class that is just used to verify
     class TestReq04Notification(NotifyBase):
@@ -1368,7 +1365,7 @@ def test_apprise_details():
             # Pretend everything is okay (so we don't break other tests)
             return True
 
-    common.NOTIFY_SCHEMA_MAP['req04'] = TestReq04Notification
+    N_MGR['req04'] = TestReq04Notification
 
     # This is a made up class that is just used to verify
     class TestReq05Notification(NotifyBase):
@@ -1390,7 +1387,7 @@ def test_apprise_details():
             # Pretend everything is okay (so we don't break other tests)
             return True
 
-    common.NOTIFY_SCHEMA_MAP['req05'] = TestReq05Notification
+    N_MGR['req05'] = TestReq05Notification
 
     # Create our Apprise instance
     a = Apprise()
@@ -1451,21 +1448,13 @@ def test_apprise_details():
         assert isinstance(entry['requirements']['packages_required'], list)
         assert isinstance(entry['requirements']['packages_recommended'], list)
 
-    # Reset our matrix
-    __reset_matrix()
-    __load_matrix()
-
 
 def test_apprise_details_plugin_verification():
     """
     API: Apprise() Details Plugin Verification
 
     """
-
-    # Reset our matrix
-    __reset_matrix()
-    __load_matrix()
-
+    # Prepare our object
     a = Apprise()
 
     # Details object
@@ -1757,7 +1746,7 @@ def test_apprise_details_plugin_verification():
                                 )
 
         spec = inspect.getfullargspec(
-            common.NOTIFY_SCHEMA_MAP[protocols[0]].__init__)
+            N_MGR._schema_map[protocols[0]].__init__)
 
         function_args = \
             (set(parse_list(spec.varkw)) - set(['kwargs'])) \
@@ -1773,7 +1762,8 @@ def test_apprise_details_plugin_verification():
                     '{}.__init__() expects a {}=None entry according to '
                     'template configuration'
                     .format(
-                        common.NOTIFY_SCHEMA_MAP[protocols[0]].__name__, arg))
+                        N_MGR._schema_map
+                        [protocols[0]].__name__, arg))
 
         # Iterate over all of the function arguments and make sure that
         # it maps back to a key
@@ -1783,8 +1773,7 @@ def test_apprise_details_plugin_verification():
                 raise AssertionError(
                     '{}.__init__({}) found but not defined in the '
                     'template configuration'
-                    .format(
-                        common.NOTIFY_SCHEMA_MAP[protocols[0]].__name__, arg))
+                    .format(N_MGR._schema_map[protocols[0]].__name__, arg))
 
         # Iterate over our map_to_aliases and make sure they were defined in
         # either the as a token or arg
@@ -1935,56 +1924,61 @@ def test_notify_matrix_dynamic_importing(tmpdir):
     base.join("__init__.py").write('')
 
     # Test no app_id
-    base.join('NotifyBadFile1.py').write(
+    base.join('NotifyBadFile1.py').write(cleandoc(
         """
-class NotifyBadFile1:
-    pass""")
+        class NotifyBadFile1:
+            pass
+        """))
 
     # No class of the same name
-    base.join('NotifyBadFile2.py').write(
+    base.join('NotifyBadFile2.py').write(cleandoc(
         """
-class BadClassName:
-    pass""")
+        class BadClassName:
+            pass
+        """))
 
     # Exception thrown
     base.join('NotifyBadFile3.py').write("""raise ImportError()""")
 
     # Utilizes a schema:// already occupied (as string)
-    base.join('NotifyGoober.py').write(
+    base.join('NotifyGoober.py').write(cleandoc(
         """
-from apprise import NotifyBase
-class NotifyGoober(NotifyBase):
-    # This class tests the fact we have a new class name, but we're
-    # trying to over-ride items previously used
+        from apprise import NotifyBase
+        class NotifyGoober(NotifyBase):
+            # This class tests the fact we have a new class name, but we're
+            # trying to over-ride items previously used
 
-    # The default simple (insecure) protocol (used by NotifyMail)
-    protocol = ('mailto', 'goober')
+            # The default simple (insecure) protocol (used by NotifyMail)
+            protocol = ('mailto', 'goober')
 
-    # The default secure protocol (used by NotifyMail)
-    secure_protocol = 'mailtos'
+            # The default secure protocol (used by NotifyMail)
+            secure_protocol = 'mailtos'
 
-    @staticmethod
-    def parse_url(url, *args, **kwargs):
-        # always parseable
-        return ConfigBase.parse_url(url, verify_host=False)""")
+            @staticmethod
+            def parse_url(url, *args, **kwargs):
+                # always parseable
+                return ConfigBase.parse_url(url, verify_host=False)
+        """))
 
     # Utilizes a schema:// already occupied (as tuple)
-    base.join('NotifyBugger.py').write("""
-from apprise import NotifyBase
-class NotifyBugger(NotifyBase):
-    # This class tests the fact we have a new class name, but we're
-    # trying to over-ride items previously used
+    base.join('NotifyBugger.py').write(cleandoc(
+        """
+        from apprise import NotifyBase
+        class NotifyBugger(NotifyBase):
+            # This class tests the fact we have a new class name, but we're
+            # trying to over-ride items previously used
 
-    # The default simple (insecure) protocol (used by NotifyMail), the other
-    # isn't
-    protocol = ('mailto', 'bugger-test' )
+            # The default simple (insecure) protocol (used by NotifyMail), the
+            # other isn't
+            protocol = ('mailto', 'bugger-test' )
 
-    # The default secure protocol (used by NotifyMail), the other isn't
-    secure_protocol = ('mailtos', ['garbage'])
+            # The default secure protocol (used by NotifyMail), the other isn't
+            secure_protocol = ('mailtos', ['garbage'])
 
-    @staticmethod
-    def parse_url(url, *args, **kwargs):
-        # always parseable
-        return ConfigBase.parse_url(url, verify_host=False)""")
+            @staticmethod
+            def parse_url(url, *args, **kwargs):
+                # always parseable
+                return ConfigBase.parse_url(url, verify_host=False)
+            """))
 
-    __load_matrix(path=str(base), name=module_name)
+    N_MGR.load_modules(path=str(base), name=module_name)

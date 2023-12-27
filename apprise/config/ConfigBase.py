@@ -35,15 +35,23 @@ from .. import plugins
 from .. import common
 from ..AppriseAsset import AppriseAsset
 from ..URLBase import URLBase
+from ..ConfigurationManager import ConfigurationManager
 from ..utils import GET_SCHEMA_RE
 from ..utils import parse_list
 from ..utils import parse_bool
 from ..utils import parse_urls
 from ..utils import cwe312_url
+from ..NotificationManager import NotificationManager
 
 # Test whether token is valid or not
 VALID_TOKEN = re.compile(
     r'(?P<token>[a-z0-9][a-z0-9_]+)', re.I)
+
+# Grant access to our Notification Manager Singleton
+N_MGR = NotificationManager()
+
+# Grant access to our Configuration Manager Singleton
+C_MGR = ConfigurationManager()
 
 
 class ConfigBase(URLBase):
@@ -229,7 +237,7 @@ class ConfigBase(URLBase):
                     schema = schema.group('schema').lower()
 
                     # Some basic validation
-                    if schema not in common.CONFIG_SCHEMA_MAP:
+                    if schema not in C_MGR:
                         ConfigBase.logger.warning(
                             'Unsupported include schema {}.'.format(schema))
                         continue
@@ -240,7 +248,7 @@ class ConfigBase(URLBase):
 
                 # Parse our url details of the server object as dictionary
                 # containing all of the information parsed from our URL
-                results = common.CONFIG_SCHEMA_MAP[schema].parse_url(url)
+                results = C_MGR[schema].parse_url(url)
                 if not results:
                     # Failed to parse the server URL
                     self.logger.warning(
@@ -248,11 +256,10 @@ class ConfigBase(URLBase):
                     continue
 
                 # Handle cross inclusion based on allow_cross_includes rules
-                if (common.CONFIG_SCHEMA_MAP[schema].allow_cross_includes ==
+                if (C_MGR[schema].allow_cross_includes ==
                         common.ContentIncludeMode.STRICT
                         and schema not in self.schemas()
-                        and not self.insecure_includes) or \
-                        common.CONFIG_SCHEMA_MAP[schema] \
+                        and not self.insecure_includes) or C_MGR[schema] \
                         .allow_cross_includes == \
                         common.ContentIncludeMode.NEVER:
 
@@ -280,8 +287,7 @@ class ConfigBase(URLBase):
                 try:
                     # Attempt to create an instance of our plugin using the
                     # parsed URL information
-                    cfg_plugin = \
-                        common.CONFIG_SCHEMA_MAP[results['schema']](**results)
+                    cfg_plugin = C_MGR[results['schema']](**results)
 
                 except Exception as e:
                     # the arguments are invalid or can not be used.
@@ -765,8 +771,7 @@ class ConfigBase(URLBase):
             try:
                 # Attempt to create an instance of our plugin using the
                 # parsed URL information
-                plugin = common.NOTIFY_SCHEMA_MAP[
-                    results['schema']](**results)
+                plugin = N_MGR[results['schema']](**results)
 
                 # Create log entry of loaded URL
                 ConfigBase.logger.debug(
@@ -1094,7 +1099,7 @@ class ConfigBase(URLBase):
                                 del entries['schema']
 
                             # support our special tokens (if they're present)
-                            if schema in common.NOTIFY_SCHEMA_MAP:
+                            if schema in N_MGR:
                                 entries = ConfigBase._special_token_handler(
                                     schema, entries)
 
@@ -1106,7 +1111,7 @@ class ConfigBase(URLBase):
 
                 elif isinstance(tokens, dict):
                     # support our special tokens (if they're present)
-                    if schema in common.NOTIFY_SCHEMA_MAP:
+                    if schema in N_MGR:
                         tokens = ConfigBase._special_token_handler(
                             schema, tokens)
 
@@ -1140,7 +1145,7 @@ class ConfigBase(URLBase):
                 # Grab our first item
                 _results = results.pop(0)
 
-                if _results['schema'] not in common.NOTIFY_SCHEMA_MAP:
+                if _results['schema'] not in N_MGR:
                     # the arguments are invalid or can not be used.
                     ConfigBase.logger.warning(
                         'An invalid Apprise schema ({}) in YAML configuration '
@@ -1213,8 +1218,7 @@ class ConfigBase(URLBase):
             try:
                 # Attempt to create an instance of our plugin using the
                 # parsed URL information
-                plugin = common.\
-                    NOTIFY_SCHEMA_MAP[results['schema']](**results)
+                plugin = N_MGR[results['schema']](**results)
 
                 # Create log entry of loaded URL
                 ConfigBase.logger.debug(
@@ -1267,8 +1271,7 @@ class ConfigBase(URLBase):
         # Create a copy of our dictionary
         tokens = tokens.copy()
 
-        for kw, meta in common.NOTIFY_SCHEMA_MAP[schema]\
-                .template_kwargs.items():
+        for kw, meta in N_MGR[schema].template_kwargs.items():
 
             # Determine our prefix:
             prefix = meta.get('prefix', '+')
@@ -1311,8 +1314,7 @@ class ConfigBase(URLBase):
         #
         # This function here allows these mappings to take place within the
         # YAML file as independant arguments.
-        class_templates = \
-            plugins.details(common.NOTIFY_SCHEMA_MAP[schema])
+        class_templates = plugins.details(N_MGR[schema])
 
         for key in list(tokens.keys()):
 
