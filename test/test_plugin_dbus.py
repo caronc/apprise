@@ -31,35 +31,37 @@ import logging
 import re
 import sys
 import types
-from unittest.mock import ANY, Mock, call
+from unittest.mock import Mock, call, ANY
 
 import pytest
 
 import apprise
 from helpers import reload_plugin
 
-try:
-    from gi.repository import Gio  # noqa F401
-
-except ImportError:
-    pass
 
 # Disable logging for a cleaner testing output
 logging.disable(logging.CRITICAL)
 
-# Skip tests when Python environment does not provide the `gio` package.
-if 'gi.repository.Gio' not in sys.modules:
-    pytest.skip("Skipping glib based tests", allow_module_level=True)
+try:
+    import dbus
 
-from gi.repository import GLib  # noqa E402
+except ImportError:
+    pass
 
-from apprise.plugins.NotifyGLib import DBusUrgency, NotifyGLib  # noqa E402
+# Skip tests when Python environment does not provide the `dbus` package.
+if 'dbus' not in sys.modules:
+    pytest.skip("Skipping dbus-python based tests", allow_module_level=True)
 
 
-def setup_glib_environment():
+from dbus import DBusException  # noqa E402
+from apprise.plugins.NotifyDBus import DBusUrgency, NotifyDBus  # noqa E402
+
+
+def setup_dbus_environment():
     """
     Setup a heavily mocked Glib environment.
     """
+    mock_mainloop = Mock()
 
     # Our module base
     gi_name = 'gi'
@@ -72,9 +74,9 @@ def setup_glib_environment():
         # for the purpose of testing and capture the handling of the
         # library when it is missing
         del sys.modules[gi_name]
-        importlib.reload(sys.modules['apprise.plugins.NotifyGLib'])
+        importlib.reload(sys.modules['apprise.plugins.NotifyDBus'])
 
-    # We need to fake our gio environment for testing purposes since
+    # We need to fake our dbus environment for testing purposes since
     # the gi library isn't available on CI
     gi = types.ModuleType(gi_name)
     gi.repository = types.ModuleType(gi_name + '.repository')
@@ -103,17 +105,32 @@ def setup_glib_environment():
     sys.modules[gi_name] = gi
     sys.modules[gi_name + '.repository'] = gi.repository
 
+    # Exception Handling
+    mock_mainloop.qt.DBusQtMainLoop.return_value = True
+    mock_mainloop.qt.DBusQtMainLoop.side_effect = ImportError
+    sys.modules['dbus.mainloop.qt'] = mock_mainloop.qt
+    mock_mainloop.qt.DBusQtMainLoop.side_effect = None
+
+    mock_mainloop.glib.NativeMainLoop.return_value = True
+    mock_mainloop.glib.NativeMainLoop.side_effect = ImportError()
+    sys.modules['dbus.mainloop.glib'] = mock_mainloop.glib
+    mock_mainloop.glib.DBusGMainLoop.side_effect = None
+    mock_mainloop.glib.NativeMainLoop.side_effect = None
+
     # When patching something which has a side effect on the module-level code
     # of a plugin, make sure to reload it.
-    reload_plugin('NotifyGLib')
+    reload_plugin('NotifyDBus')
 
 
 @pytest.fixture
-def gio_environment(mocker):
+def dbus_environment(mocker):
     """
     Fixture to provide a mocked Dbus environment to test case functions.
     """
-    mocker.patch('gi.repository', spec=True, Notify=Mock())
+    interface_mock = mocker.patch('dbus.Interface', spec=True,
+                                  Notify=Mock())
+    mocker.patch('dbus.SessionBus', spec=True,
+                 **{"get_object.return_value": interface_mock})
 
 
 @pytest.fixture
@@ -121,37 +138,41 @@ def glib_environment():
     """
     Fixture to provide a mocked DBus environment to test case functions.
     """
-    setup_glib_environment()
+    setup_dbus_environment()
 
 
 @pytest.fixture
-def gio_glib_environment(glib_environment, gio_environment):
+def dbus_glib_environment(dbus_environment, glib_environment):
     """
-    Fixture to provide a mocked Glib/Gio environment to test case functions.
+    Fixture to provide a mocked Glib/DBus environment to test case functions.
     """
     pass
 
 
-def test_plugin_glib_general_success(mocker, gio_glib_environment):
+def test_plugin_dbus_general_success(mocker, dbus_glib_environment):
     """
-    NotifyGLib() general tests
+    NotifyDBus() general tests
 
     Test class loading using different arguments, provided via URL.
     """
 
     # Create our instance (identify all supported types)
-    obj = apprise.Apprise.instantiate('glib://', suppress_exceptions=False)
-    assert isinstance(obj, NotifyGLib) is True
+    obj = apprise.Apprise.instantiate('dbus://', suppress_exceptions=False)
+    assert isinstance(obj, NotifyDBus) is True
     assert isinstance(obj.url(), str) is True
-    assert obj.url().startswith('glib://_/')
-    obj = apprise.Apprise.instantiate('gio://', suppress_exceptions=False)
-    assert isinstance(obj, NotifyGLib) is True
+    assert obj.url().startswith('dbus://_/')
+    obj = apprise.Apprise.instantiate('kde://', suppress_exceptions=False)
+    assert isinstance(obj, NotifyDBus) is True
     assert isinstance(obj.url(), str) is True
-    assert obj.url().startswith('glib://_/')
+    assert obj.url().startswith('kde://_/')
+    obj = apprise.Apprise.instantiate('qt://', suppress_exceptions=False)
+    assert isinstance(obj, NotifyDBus) is True
+    assert isinstance(obj.url(), str) is True
+    assert obj.url().startswith('qt://_/')
     obj.duration = 0
 
     # Set our X and Y coordinate and try the notification
-    assert NotifyGLib(
+    assert NotifyDBus(
         x_axis=0, y_axis=0, **{'schema': 'dbus'})\
         .notify(title='', body='body',
                 notify_type=apprise.NotifyType.INFO) is True
@@ -168,10 +189,10 @@ def test_plugin_glib_general_success(mocker, gio_glib_environment):
 
     # Test our arguments through the instantiate call
     obj = apprise.Apprise.instantiate(
-        'glib://_/?image=True', suppress_exceptions=False)
-    assert isinstance(obj, NotifyGLib) is True
+        'dbus://_/?image=True', suppress_exceptions=False)
+    assert isinstance(obj, NotifyDBus) is True
     assert isinstance(obj.url(), str) is True
-    assert obj.url().startswith('glib://_/')
+    assert obj.url().startswith('dbus://_/')
     assert re.search('image=yes', obj.url())
 
     assert obj.notify(
@@ -179,10 +200,10 @@ def test_plugin_glib_general_success(mocker, gio_glib_environment):
         notify_type=apprise.NotifyType.INFO) is True
 
     obj = apprise.Apprise.instantiate(
-        'glib://_/?image=False', suppress_exceptions=False)
-    assert isinstance(obj, NotifyGLib) is True
+        'dbus://_/?image=False', suppress_exceptions=False)
+    assert isinstance(obj, NotifyDBus) is True
     assert isinstance(obj.url(), str) is True
-    assert obj.url().startswith('glib://_/')
+    assert obj.url().startswith('dbus://_/')
     assert re.search('image=no', obj.url())
 
     assert obj.notify(
@@ -191,24 +212,24 @@ def test_plugin_glib_general_success(mocker, gio_glib_environment):
 
     # Test priority (alias to urgency) handling
     obj = apprise.Apprise.instantiate(
-        'glib://_/?priority=invalid', suppress_exceptions=False)
-    assert isinstance(obj, NotifyGLib) is True
+        'dbus://_/?priority=invalid', suppress_exceptions=False)
+    assert isinstance(obj, NotifyDBus) is True
     assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True
 
     obj = apprise.Apprise.instantiate(
-        'glib://_/?priority=high', suppress_exceptions=False)
-    assert isinstance(obj, NotifyGLib) is True
+        'dbus://_/?priority=high', suppress_exceptions=False)
+    assert isinstance(obj, NotifyDBus) is True
     assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True
 
     obj = apprise.Apprise.instantiate(
-        'glib://_/?priority=2', suppress_exceptions=False)
-    assert isinstance(obj, NotifyGLib) is True
+        'dbus://_/?priority=2', suppress_exceptions=False)
+    assert isinstance(obj, NotifyDBus) is True
     assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
@@ -216,32 +237,32 @@ def test_plugin_glib_general_success(mocker, gio_glib_environment):
 
     # Test urgency handling
     obj = apprise.Apprise.instantiate(
-        'glib://_/?urgency=invalid', suppress_exceptions=False)
-    assert isinstance(obj, NotifyGLib) is True
+        'dbus://_/?urgency=invalid', suppress_exceptions=False)
+    assert isinstance(obj, NotifyDBus) is True
     assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True
 
     obj = apprise.Apprise.instantiate(
-        'glib://_/?urgency=high', suppress_exceptions=False)
-    assert isinstance(obj, NotifyGLib) is True
+        'dbus://_/?urgency=high', suppress_exceptions=False)
+    assert isinstance(obj, NotifyDBus) is True
     assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True
 
     obj = apprise.Apprise.instantiate(
-        'glib://_/?urgency=2', suppress_exceptions=False)
-    assert isinstance(obj, NotifyGLib) is True
+        'dbus://_/?urgency=2', suppress_exceptions=False)
+    assert isinstance(obj, NotifyDBus) is True
     assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True
 
     obj = apprise.Apprise.instantiate(
-        'glib://_/?urgency=', suppress_exceptions=False)
-    assert isinstance(obj, NotifyGLib) is True
+        'dbus://_/?urgency=', suppress_exceptions=False)
+    assert isinstance(obj, NotifyDBus) is True
     assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
@@ -249,30 +270,30 @@ def test_plugin_glib_general_success(mocker, gio_glib_environment):
 
     # Test x/y
     obj = apprise.Apprise.instantiate(
-        'glib://_/?x=5&y=5', suppress_exceptions=False)
-    assert isinstance(obj, NotifyGLib) is True
+        'dbus://_/?x=5&y=5', suppress_exceptions=False)
+    assert isinstance(obj, NotifyDBus) is True
     assert isinstance(obj.url(), str) is True
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True
 
 
-def test_plugin_glib_general_failure(gio_glib_environment):
+def test_plugin_dbus_general_failure(dbus_glib_environment):
     """
     Verify a few failure conditions.
     """
 
     with pytest.raises(TypeError):
-        apprise.Apprise.instantiate('glib://_/?x=invalid&y=invalid',
+        apprise.Apprise.instantiate('dbus://_/?x=invalid&y=invalid',
                                     suppress_exceptions=False)
 
 
-def test_plugin_glib_parse_configuration(gio_glib_environment):
+def test_plugin_dbus_parse_configuration(dbus_glib_environment):
 
     # Test configuration parsing
     content = """
     urls:
-      - glib://:
+      - dbus://:
           - priority: 0
             tag: dbus_int low
           - priority: "0"
@@ -292,7 +313,7 @@ def test_plugin_glib_parse_configuration(gio_glib_environment):
           - urgency: invalid
             tag: dbus_invalid
 
-      - glib://:
+      - dbus://:
           - priority: 2
             tag: dbus_int high
           - priority: "2"
@@ -339,7 +360,7 @@ def test_plugin_glib_parse_configuration(gio_glib_environment):
         assert s.urgency == DBusUrgency.NORMAL
 
 
-def test_plugin_glib_missing_icon(mocker, gio_glib_environment):
+def test_plugin_dbus_missing_icon(mocker, dbus_glib_environment):
     """
     Test exception when loading icon; the notification will still be sent.
     """
@@ -349,7 +370,7 @@ def test_plugin_glib_missing_icon(mocker, gio_glib_environment):
     gi.repository.GdkPixbuf.Pixbuf.new_from_file.side_effect = \
         AttributeError("Something failed")
 
-    obj = apprise.Apprise.instantiate('glib://', suppress_exceptions=False)
+    obj = apprise.Apprise.instantiate('dbus://', suppress_exceptions=False)
     logger: Mock = mocker.spy(obj, "logger")
     assert obj.notify(
         title='title', body='body',
@@ -361,11 +382,11 @@ def test_plugin_glib_missing_icon(mocker, gio_glib_environment):
     ]
 
 
-def test_plugin_glib_disabled_plugin(gio_glib_environment):
+def test_plugin_dbus_disabled_plugin(dbus_glib_environment):
     """
     Verify notification will not be submitted if plugin is disabled.
     """
-    obj = apprise.Apprise.instantiate('glib://', suppress_exceptions=False)
+    obj = apprise.Apprise.instantiate('dbus://', suppress_exceptions=False)
 
     obj.enabled = False
 
@@ -374,16 +395,16 @@ def test_plugin_glib_disabled_plugin(gio_glib_environment):
         notify_type=apprise.NotifyType.INFO) is False
 
 
-def test_plugin_glib_set_urgency():
+def test_plugin_dbus_set_urgency():
     """
     Test the setting of an urgency.
     """
-    NotifyGLib(urgency=0)
+    NotifyDBus(urgency=0)
 
 
-def test_plugin_glib_gi_missing(gio_glib_environment):
+def test_plugin_dbus_gi_missing(dbus_glib_environment):
     """
-    Verify plugin is not available when the `gi` package is not available.
+    Verify notification succeeds even if the `gi` package is not available.
     """
 
     # Make `require_version` function raise an ImportError.
@@ -392,16 +413,25 @@ def test_plugin_glib_gi_missing(gio_glib_environment):
 
     # When patching something which has a side effect on the module-level code
     # of a plugin, make sure to reload it.
-    reload_plugin('NotifyGLib')
+    reload_plugin('NotifyDBus')
 
     # Create the instance.
-    obj = apprise.Apprise.instantiate('glib://', suppress_exceptions=False)
-    assert isinstance(obj, NotifyGLib) is False
+    obj = apprise.Apprise.instantiate('dbus://', suppress_exceptions=False)
+    assert isinstance(obj, NotifyDBus) is True
+    obj.duration = 0
+
+    # Test url() call.
+    assert isinstance(obj.url(), str) is True
+
+    # The notification succeeds even though the gi library was not loaded.
+    assert obj.notify(
+        title='title', body='body',
+        notify_type=apprise.NotifyType.INFO) is True
 
 
-def test_plugin_glib_gi_require_version_error(gio_glib_environment):
+def test_plugin_dbus_gi_require_version_error(dbus_glib_environment):
     """
-    Verify plugin is not available when the `gi.require_version()` croaks.
+    Verify notification succeeds even if `gi.require_version()` croaks.
     """
 
     # Make `require_version` function raise a ValueError.
@@ -410,23 +440,49 @@ def test_plugin_glib_gi_require_version_error(gio_glib_environment):
 
     # When patching something which has a side effect on the module-level code
     # of a plugin, make sure to reload it.
-    reload_plugin('NotifyGLib')
+    reload_plugin('NotifyDBus')
 
     # Create instance.
-    obj = apprise.Apprise.instantiate('glib://', suppress_exceptions=False)
-    assert isinstance(obj, NotifyGLib) is False
+    obj = apprise.Apprise.instantiate('dbus://', suppress_exceptions=False)
+    assert isinstance(obj, NotifyDBus) is True
+    obj.duration = 0
+
+    # Test url() call.
+    assert isinstance(obj.url(), str) is True
+
+    # The notification succeeds even though the gi library was not loaded.
+    assert obj.notify(
+        title='title', body='body',
+        notify_type=apprise.NotifyType.INFO) is True
 
 
-def test_plugin_glib_session_croaks(mocker, gio_glib_environment):
+def test_plugin_dbus_module_croaks(mocker, dbus_glib_environment):
+    """
+    Verify plugin is not available when `dbus` module is missing.
+    """
+
+    # Make importing `dbus` raise an ImportError.
+    mocker.patch.dict(
+        sys.modules, {'dbus': compile('raise ImportError()', 'dbus', 'exec')})
+
+    # When patching something which has a side effect on the module-level code
+    # of a plugin, make sure to reload it.
+    reload_plugin('NotifyDBus')
+
+    # Verify plugin is not available.
+    obj = apprise.Apprise.instantiate('dbus://', suppress_exceptions=False)
+    assert obj is None
+
+
+def test_plugin_dbus_session_croaks(mocker, dbus_glib_environment):
     """
     Verify notification fails if DBus croaks.
     """
 
-    mocker.patch('gi.repository.Gio.DBusProxy.new_for_bus_sync',
-                 side_effect=GLib.Error('test'))
-    setup_glib_environment()
+    mocker.patch('dbus.SessionBus', side_effect=DBusException('test'))
+    setup_dbus_environment()
 
-    obj = apprise.Apprise.instantiate('glib://', suppress_exceptions=False)
+    obj = apprise.Apprise.instantiate('dbus://', suppress_exceptions=False)
 
     # Emulate DBus session initialization error.
     assert obj.notify(
@@ -434,24 +490,25 @@ def test_plugin_glib_session_croaks(mocker, gio_glib_environment):
         notify_type=apprise.NotifyType.INFO) is False
 
 
-def test_plugin_glib_interface_notify_croaks(mocker, gio_glib_environment):
+def test_plugin_dbus_interface_notify_croaks(mocker):
     """
     Fail gracefully if underlying object croaks for whatever reason.
     """
 
-    # Inject an error when invoking `gi.repository.Gio.DBusProxy.Notify()`.
-    mocker.patch('gi.repository.Gio.DBusProxy', spec=True,
+    # Inject an error when invoking `dbus.Interface().Notify()`.
+    mocker.patch('dbus.SessionBus', spec=True)
+    mocker.patch('dbus.Interface', spec=True,
                  Notify=Mock(side_effect=AttributeError("Something failed")))
-    setup_glib_environment()
+    setup_dbus_environment()
 
-    obj = apprise.Apprise.instantiate('glib://', suppress_exceptions=False)
-    assert isinstance(obj, NotifyGLib) is True
+    obj = apprise.Apprise.instantiate('dbus://', suppress_exceptions=False)
+    assert isinstance(obj, NotifyDBus) is True
 
     logger: Mock = mocker.spy(obj, "logger")
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is False
     assert [
-        call.warning('Failed to send GLib/Gio notification.'),
-        call.debug('GLib/Gio Exception: Something failed'),
+        call.warning('Failed to send DBus notification.'),
+        call.debug('DBus Exception: Something failed'),
     ] in logger.mock_calls
