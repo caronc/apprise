@@ -1,8 +1,8 @@
-diff -Naur apprise-1.6.0/test/conftest.py apprise-1.6.0.patched/test/conftest.py
---- apprise-1.6.0/test/conftest.py	2023-12-22 15:46:50.000000000 -0500
-+++ apprise-1.6.0.patched/test/conftest.py	2023-12-22 17:24:28.229650303 -0500
-@@ -39,8 +39,8 @@
- N_MGR = NotificationManager()
+diff -Naur apprise-1.6.0/test/conftest.py apprise-1.6.0-patched/test/conftest.py
+--- apprise-1.6.0/test/conftest.py	2023-12-27 11:20:40.000000000 -0500
++++ apprise-1.6.0-patched/test/conftest.py	2023-12-27 13:43:22.583100037 -0500
+@@ -45,8 +45,8 @@
+ A_MGR = AttachmentManager()
  
  
 -@pytest.fixture(scope="function", autouse=True)
@@ -12,8 +12,8 @@ diff -Naur apprise-1.6.0/test/conftest.py apprise-1.6.0.patched/test/conftest.py
      """
      A pytest session fixture which disables throttling on all notifiers.
      It is automatically enabled.
-@@ -49,4 +49,4 @@
-     N_MGR.unload_modules()
+@@ -57,4 +57,4 @@
+     A_MGR.unload_modules()
  
      for plugin in N_MGR.plugins():
 -        session_mocker.patch.object(plugin, "request_rate_per_sec", 0)
