@@ -86,6 +86,7 @@ from ..utils import is_email
 from ..utils import parse_bool
 from ..utils import parse_list
 from ..utils import validate_regex
+from ..utils import remove_from_targets_and_return_on_prefix
 from ..AppriseLocale import gettext_lazy as _
 
 # Extend HTTP Error Messages
@@ -161,6 +162,9 @@ class NotifySlack(NotifyBase):
     # Bot's do not have default channels to notify; so #general
     # becomes the default channel in BOT mode
     default_notification_channel = '#general'
+
+    # Default value for Thread Key
+    default_reply_timestamp_key = "ts="
 
     # Define object templates
     templates = (
@@ -329,6 +333,13 @@ class NotifySlack(NotifyBase):
             use_blocks, self.template_args['blocks']['default']) \
             if use_blocks is not None \
             else self.template_args['blocks']['default']
+        # Assign ts_thread as Default value
+        self.ts_thread = False
+        # Extract thread from targets
+        index_of_thread = remove_from_targets_and_return_on_prefix(
+            self.default_reply_timestamp_key, targets)
+        if index_of_thread is not False:
+            self.ts_thread = targets.pop(index_of_thread)
 
         # Build list of channels
         self.channels = parse_list(targets)
@@ -545,6 +556,8 @@ class NotifySlack(NotifyBase):
         channels = list(self.channels)
 
         attach_channel_list = []
+        if self.ts_thread:
+            payload['thread_ts'] = self.ts_thread
         while len(channels):
             channel = channels.pop(0)
 
@@ -567,7 +580,6 @@ class NotifySlack(NotifyBase):
                 elif channel[0] == '@':
                     # Treat @ value 'as is'
                     payload['channel'] = channel
-
                 else:
                     # We'll perform a user lookup if we detect an email
                     email = is_email(channel)
@@ -795,7 +807,7 @@ class NotifySlack(NotifyBase):
         """
         Wrapper to the requests (post) object
         """
-
+        print(payload)
         self.logger.debug('Slack POST URL: %s (cert_verify=%r)' % (
             url, self.verify_certificate,
         ))
