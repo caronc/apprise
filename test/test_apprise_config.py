@@ -38,9 +38,8 @@ from apprise import AppriseAsset
 from apprise.config.ConfigBase import ConfigBase
 from apprise.plugins.NotifyBase import NotifyBase
 from apprise.NotificationManager import NotificationManager
+from apprise.ConfigurationManager import ConfigurationManager
 
-from apprise.common import CONFIG_SCHEMA_MAP
-from apprise.config import __load_matrix
 from apprise.config.ConfigFile import ConfigFile
 
 # Disable logging for a cleaner testing output
@@ -49,6 +48,9 @@ logging.disable(logging.CRITICAL)
 
 # Grant access to our Notification Manager Singleton
 N_MGR = NotificationManager()
+
+# Grant access to our Configuration Manager Singleton
+C_MGR = ConfigurationManager()
 
 
 def test_apprise_config(tmpdir):
@@ -471,7 +473,7 @@ def test_apprise_config_instantiate():
             return ConfigBase.parse_url(url, verify_host=False)
 
     # Store our bad configuration in our schema map
-    CONFIG_SCHEMA_MAP['bad'] = BadConfig
+    C_MGR['bad'] = BadConfig
 
     with pytest.raises(TypeError):
         AppriseConfig.instantiate(
@@ -504,7 +506,7 @@ def test_invalid_apprise_config(tmpdir):
             return ConfigBase.parse_url(url, verify_host=False)
 
     # Store our bad configuration in our schema map
-    CONFIG_SCHEMA_MAP['bad'] = BadConfig
+    C_MGR['bad'] = BadConfig
 
     # temporary file to work with
     t = tmpdir.mkdir("apprise-bad-obj").join("invalid")
@@ -768,9 +770,9 @@ def test_recursive_config_inclusion(tmpdir):
         allow_cross_includes = ContentIncludeMode.NEVER
 
     # store our entries
-    CONFIG_SCHEMA_MAP['never'] = ConfigCrossPostNever
-    CONFIG_SCHEMA_MAP['strict'] = ConfigCrossPostStrict
-    CONFIG_SCHEMA_MAP['always'] = ConfigCrossPostAlways
+    C_MGR['never'] = ConfigCrossPostNever
+    C_MGR['strict'] = ConfigCrossPostStrict
+    C_MGR['always'] = ConfigCrossPostAlways
 
     # Make our new path valid
     suite = tmpdir.mkdir("apprise_config_recursion")
@@ -977,11 +979,6 @@ def test_apprise_config_matrix_load():
     apprise.config.ConfigDummy3 = ConfigDummy3
     apprise.config.ConfigDummy4 = ConfigDummy4
 
-    __load_matrix()
-
-    # Call it again so we detect our entries already loaded
-    __load_matrix()
-
 
 def test_configmatrix_dynamic_importing(tmpdir):
     """
@@ -1054,8 +1051,6 @@ class ConfigBugger(ConfigBase):
     def parse_url(url, *args, **kwargs):
         # always parseable
         return ConfigBase.parse_url(url, verify_host=False)""")
-
-    __load_matrix(path=str(base), name=module_name)
 
 
 @mock.patch('os.path.getsize')

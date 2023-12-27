@@ -26,12 +26,6 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-# Maintains a mapping of all configuration schema's supported
-CONFIG_SCHEMA_MAP = {}
-
-# Maintains a mapping of all attachment schema's supported
-ATTACHMENT_SCHEMA_MAP = {}
-
 
 class NotifyType:
     """

@@ -29,6 +29,7 @@
 from . import config
 from . import ConfigBase
 from . import CONFIG_FORMATS
+from .ConfigurationManager import ConfigurationManager
 from . import URLBase
 from .AppriseAsset import AppriseAsset
 from . import common
@@ -36,6 +37,9 @@ from .utils import GET_SCHEMA_RE
 from .utils import parse_list
 from .utils import is_exclusive_match
 from .logger import logger
+
+# Grant access to our Configuration Manager Singleton
+C_MGR = ConfigurationManager()
 
 
 class AppriseConfig:
@@ -251,7 +255,7 @@ class AppriseConfig:
         logger.debug("Loading raw configuration: {}".format(content))
 
         # Create ourselves a ConfigMemory Object to store our configuration
-        instance = config.ConfigMemory(
+        instance = config.ConfigMemory.ConfigMemory(
             content=content, format=format, asset=asset, tag=tag,
             recursion=recursion, insecure_includes=insecure_includes)
 
@@ -326,7 +330,7 @@ class AppriseConfig:
         schema = GET_SCHEMA_RE.match(url)
         if schema is None:
             # Plan B is to assume we're dealing with a file
-            schema = config.ConfigFile.protocol
+            schema = config.ConfigFile.ConfigFile.protocol
             url = '{}://{}'.format(schema, URLBase.quote(url))
 
         else:
@@ -334,13 +338,13 @@ class AppriseConfig:
             schema = schema.group('schema').lower()
 
             # Some basic validation
-            if schema not in common.CONFIG_SCHEMA_MAP:
+            if schema not in C_MGR:
                 logger.warning('Unsupported schema {}.'.format(schema))
                 return None
 
         # Parse our url details of the server object as dictionary containing
         # all of the information parsed from our URL
-        results = common.CONFIG_SCHEMA_MAP[schema].parse_url(url)
+        results = C_MGR[schema].parse_url(url)
 
         if not results:
             # Failed to parse the server URL
@@ -368,8 +372,7 @@ class AppriseConfig:
             try:
                 # Attempt to create an instance of our plugin using the parsed
                 # URL information
-                cfg_plugin = \
-                    common.CONFIG_SCHEMA_MAP[results['schema']](**results)
+                cfg_plugin = C_MGR[results['schema']](**results)
 
             except Exception:
                 # the arguments are invalid or can not be used.
@@ -379,7 +382,7 @@ class AppriseConfig:
         else:
             # Attempt to create an instance of our plugin using the parsed
             # URL information but don't wrap it in a try catch
-            cfg_plugin = common.CONFIG_SCHEMA_MAP[results['schema']](**results)
+            cfg_plugin = C_MGR[results['schema']](**results)
 
         return cfg_plugin
 

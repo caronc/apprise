@@ -32,6 +32,7 @@ import re
 import sys
 import pytest
 import requests
+from inspect import cleandoc
 from unittest import mock
 
 from os.path import dirname
@@ -1923,56 +1924,61 @@ def test_notify_matrix_dynamic_importing(tmpdir):
     base.join("__init__.py").write('')
 
     # Test no app_id
-    base.join('NotifyBadFile1.py').write(
+    base.join('NotifyBadFile1.py').write(cleandoc(
         """
-class NotifyBadFile1:
-    pass""")
+        class NotifyBadFile1:
+            pass
+        """))
 
     # No class of the same name
-    base.join('NotifyBadFile2.py').write(
+    base.join('NotifyBadFile2.py').write(cleandoc(
         """
-class BadClassName:
-    pass""")
+        class BadClassName:
+            pass
+        """))
 
     # Exception thrown
     base.join('NotifyBadFile3.py').write("""raise ImportError()""")
 
     # Utilizes a schema:// already occupied (as string)
-    base.join('NotifyGoober.py').write(
+    base.join('NotifyGoober.py').write(cleandoc(
         """
-from apprise import NotifyBase
-class NotifyGoober(NotifyBase):
-    # This class tests the fact we have a new class name, but we're
-    # trying to over-ride items previously used
+        from apprise import NotifyBase
+        class NotifyGoober(NotifyBase):
+            # This class tests the fact we have a new class name, but we're
+            # trying to over-ride items previously used
 
-    # The default simple (insecure) protocol (used by NotifyMail)
-    protocol = ('mailto', 'goober')
+            # The default simple (insecure) protocol (used by NotifyMail)
+            protocol = ('mailto', 'goober')
 
-    # The default secure protocol (used by NotifyMail)
-    secure_protocol = 'mailtos'
+            # The default secure protocol (used by NotifyMail)
+            secure_protocol = 'mailtos'
 
-    @staticmethod
-    def parse_url(url, *args, **kwargs):
-        # always parseable
-        return ConfigBase.parse_url(url, verify_host=False)""")
+            @staticmethod
+            def parse_url(url, *args, **kwargs):
+                # always parseable
+                return ConfigBase.parse_url(url, verify_host=False)
+        """))
 
     # Utilizes a schema:// already occupied (as tuple)
-    base.join('NotifyBugger.py').write("""
-from apprise import NotifyBase
-class NotifyBugger(NotifyBase):
-    # This class tests the fact we have a new class name, but we're
-    # trying to over-ride items previously used
+    base.join('NotifyBugger.py').write(cleandoc(
+        """
+        from apprise import NotifyBase
+        class NotifyBugger(NotifyBase):
+            # This class tests the fact we have a new class name, but we're
+            # trying to over-ride items previously used
 
-    # The default simple (insecure) protocol (used by NotifyMail), the other
-    # isn't
-    protocol = ('mailto', 'bugger-test' )
+            # The default simple (insecure) protocol (used by NotifyMail), the
+            # other isn't
+            protocol = ('mailto', 'bugger-test' )
 
-    # The default secure protocol (used by NotifyMail), the other isn't
-    secure_protocol = ('mailtos', ['garbage'])
+            # The default secure protocol (used by NotifyMail), the other isn't
+            secure_protocol = ('mailtos', ['garbage'])
 
-    @staticmethod
-    def parse_url(url, *args, **kwargs):
-        # always parseable
-        return ConfigBase.parse_url(url, verify_host=False)""")
+            @staticmethod
+            def parse_url(url, *args, **kwargs):
+                # always parseable
+                return ConfigBase.parse_url(url, verify_host=False)
+            """))
 
     N_MGR.load_modules(path=str(base), name=module_name)

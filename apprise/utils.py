@@ -208,6 +208,22 @@ VALID_PYTHON_FILE_RE = re.compile(r'.+\.py(o|c)?$', re.IGNORECASE)
 REGEX_VALIDATE_LOOKUP = {}
 
 
+class Singleton(type):
+    """
+    Our Singleton MetaClass
+    """
+    _instances = {}
+
+    def __call__(cls, *args, **kwargs):
+        """
+        instantiate our singleton meta entry
+        """
+        if cls not in cls._instances:
+            # we have not every built an instance before.  Build one now.
+            cls._instances[cls] = super().__call__(*args, **kwargs)
+        return cls._instances[cls]
+
+
 class TemplateType:
     """
     Defines the different template types we can perform parsing on

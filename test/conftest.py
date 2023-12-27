@@ -32,11 +32,17 @@ import os
 import pytest
 
 from apprise.NotificationManager import NotificationManager
+from apprise.ConfigurationManager import ConfigurationManager
+from apprise.AttachmentManager import AttachmentManager
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'helpers'))
 
 # Grant access to our Notification Manager Singleton
 N_MGR = NotificationManager()
+# Grant access to our Config Manager Singleton
+C_MGR = ConfigurationManager()
+# Grant access to our Attachment Manager Singleton
+A_MGR = AttachmentManager()
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -47,6 +53,8 @@ def no_throttling_everywhere(session_mocker):
     """
     # Ensure we're working with a clean slate for each test
     N_MGR.unload_modules()
+    C_MGR.unload_modules()
+    A_MGR.unload_modules()
 
     for plugin in N_MGR.plugins():
         session_mocker.patch.object(plugin, "request_rate_per_sec", 0)

@@ -35,6 +35,7 @@ from .. import plugins
 from .. import common
 from ..AppriseAsset import AppriseAsset
 from ..URLBase import URLBase
+from ..ConfigurationManager import ConfigurationManager
 from ..utils import GET_SCHEMA_RE
 from ..utils import parse_list
 from ..utils import parse_bool
@@ -48,6 +49,9 @@ VALID_TOKEN = re.compile(
 
 # Grant access to our Notification Manager Singleton
 N_MGR = NotificationManager()
+
+# Grant access to our Configuration Manager Singleton
+C_MGR = ConfigurationManager()
 
 
 class ConfigBase(URLBase):
@@ -233,7 +237,7 @@ class ConfigBase(URLBase):
                     schema = schema.group('schema').lower()
 
                     # Some basic validation
-                    if schema not in common.CONFIG_SCHEMA_MAP:
+                    if schema not in C_MGR:
                         ConfigBase.logger.warning(
                             'Unsupported include schema {}.'.format(schema))
                         continue
@@ -244,7 +248,7 @@ class ConfigBase(URLBase):
 
                 # Parse our url details of the server object as dictionary
                 # containing all of the information parsed from our URL
-                results = common.CONFIG_SCHEMA_MAP[schema].parse_url(url)
+                results = C_MGR[schema].parse_url(url)
                 if not results:
                     # Failed to parse the server URL
                     self.logger.warning(
@@ -252,11 +256,10 @@ class ConfigBase(URLBase):
                     continue
 
                 # Handle cross inclusion based on allow_cross_includes rules
-                if (common.CONFIG_SCHEMA_MAP[schema].allow_cross_includes ==
+                if (C_MGR[schema].allow_cross_includes ==
                         common.ContentIncludeMode.STRICT
                         and schema not in self.schemas()
-                        and not self.insecure_includes) or \
-                        common.CONFIG_SCHEMA_MAP[schema] \
+                        and not self.insecure_includes) or C_MGR[schema] \
                         .allow_cross_includes == \
                         common.ContentIncludeMode.NEVER:
 
@@ -284,8 +287,7 @@ class ConfigBase(URLBase):
                 try:
                     # Attempt to create an instance of our plugin using the
                     # parsed URL information
-                    cfg_plugin = \
-                        common.CONFIG_SCHEMA_MAP[results['schema']](**results)
+                    cfg_plugin = C_MGR[results['schema']](**results)
 
                 except Exception as e:
                     # the arguments are invalid or can not be used.

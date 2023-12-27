@@ -32,20 +32,20 @@ from os.path import join
 from .manager import PluginManager
 
 
-class NotificationManager(PluginManager):
+class AttachmentManager(PluginManager):
     """
-    Designed to be a singleton object to maintain all initialized notifications
-    in memory.
+    Designed to be a singleton object to maintain all initialized
+    attachment plugins/modules in memory.
     """
 
     # Description (used for logging)
-    name = 'Notification Plugin'
+    name = 'Attachment Plugin'
 
     # Filename Prefix to filter on
-    fname_prefix = 'Notify'
+    fname_prefix = 'Attach'
 
     # Memory Space
-    _id = 'plugins'
+    _id = 'attachment'
 
     # Our Module Python path name
     module_name_prefix = f'apprise.{_id}'
