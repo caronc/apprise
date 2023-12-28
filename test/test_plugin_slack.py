@@ -729,7 +729,7 @@ def test_plugin_slack_thread_reply(mock_post):
     mock_post.return_value = request
 
     # Variation Initializations
-    obj = NotifySlack(access_token=token, targets=[f'ts={timestamp}'])
+    obj = NotifySlack(access_token=token)
     assert isinstance(obj, NotifySlack) is True
     assert isinstance(obj.url(), str) is True
 

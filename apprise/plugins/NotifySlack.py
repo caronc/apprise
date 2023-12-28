@@ -86,7 +86,6 @@ from ..utils import is_email
 from ..utils import parse_bool
 from ..utils import parse_list
 from ..utils import validate_regex
-from ..utils import remove_from_targets_and_return_on_prefix
 from ..AppriseLocale import gettext_lazy as _
 
 # Extend HTTP Error Messages
@@ -96,6 +95,8 @@ SLACK_HTTP_ERROR_MAP = {
 
 # Used to break path apart into list of channels
 CHANNEL_LIST_DELIM = re.compile(r'[ \t\r\n,#\\/]+')
+
+# Regex for reply Detection
 
 
 class SlackMode:
@@ -162,9 +163,6 @@ class NotifySlack(NotifyBase):
     # Bot's do not have default channels to notify; so #general
     # becomes the default channel in BOT mode
     default_notification_channel = '#general'
-
-    # Default value for Thread Key
-    default_reply_timestamp_key = "ts="
 
     # Define object templates
     templates = (
@@ -333,13 +331,6 @@ class NotifySlack(NotifyBase):
             use_blocks, self.template_args['blocks']['default']) \
             if use_blocks is not None \
             else self.template_args['blocks']['default']
-        # Assign ts_thread as Default value
-        self.ts_thread = False
-        # Extract thread from targets
-        index_of_thread = remove_from_targets_and_return_on_prefix(
-            self.default_reply_timestamp_key, targets)
-        if index_of_thread is not False:
-            self.ts_thread = targets.pop(index_of_thread)
 
         # Build list of channels
         self.channels = parse_list(targets)
@@ -556,11 +547,8 @@ class NotifySlack(NotifyBase):
         channels = list(self.channels)
 
         attach_channel_list = []
-        if self.ts_thread:
-            payload['thread_ts'] = self.ts_thread
         while len(channels):
             channel = channels.pop(0)
-
             if channel is not None:
                 channel = validate_regex(channel, r'[+#@]?[A-Z0-9_]{1,32}')
                 if not channel:
@@ -572,6 +560,13 @@ class NotifySlack(NotifyBase):
                     # Mark our failure
                     has_error = True
                     continue
+
+                # Add timestamp to payload if present
+                if timestamp_match := re.compile(
+                        r':(.*)',
+                        re.IGNORECASE).search(channel):
+                    payload['thread_ts'] = timestamp_match.group(1)
+                    channel = channel[:timestamp_match.start()]
 
                 if channel[0] == '+':
                     # Treat as encoded id if prefixed with a +

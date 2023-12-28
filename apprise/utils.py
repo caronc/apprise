@@ -1589,20 +1589,3 @@ def dict_full_update(dict1, dict2):
 
     _merge(dict1, dict2)
     return
-
-
-def remove_from_targets_and_return_on_prefix(prefix, targets):
-    """
-    Removes a value from list target based on prefix values.
-
-    Args:
-        prefix (string): prefix string query on.
-        targets (list): list of all targets in given url
-
-    Returns:
-        int: value of prefix, False if not found
-    """
-    for index, value in enumerate(targets):
-        if value.startswith(prefix):
-            return index
-    return False
