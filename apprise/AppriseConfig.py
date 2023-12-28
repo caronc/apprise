@@ -26,7 +26,6 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from . import config
 from . import ConfigBase
 from . import CONFIG_FORMATS
 from .ConfigurationManager import ConfigurationManager
