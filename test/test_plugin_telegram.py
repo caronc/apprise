@@ -243,7 +243,7 @@ def test_plugin_telegram_general(mock_post):
     invalid_bot_token = 'abcd:123'
 
     # Chat ID
-    chat_ids = 'l2g, lead2gold'
+    chat_ids = 'l2g:1234, lead2gold'
 
     # Prepare Mock
     mock_post.return_value = requests.Request()
@@ -397,7 +397,7 @@ def test_plugin_telegram_general(mock_post):
 
     obj = NotifyTelegram(bot_token=bot_token, targets='12345')
     assert len(obj.targets) == 1
-    assert obj.targets[0] == '12345'
+    assert obj.targets[0] == (12345, None)
 
     # Test the escaping of characters since Telegram escapes stuff for us to
     # which we need to consider
@@ -440,7 +440,7 @@ def test_plugin_telegram_general(mock_post):
 
     assert obj.notify(title='hello', body='world') is True
     assert len(obj.targets) == 1
-    assert obj.targets[0] == '532389719'
+    assert obj.targets[0] == ('532389719', None)
 
     # Do the test again, but without the expected (parsed response)
     mock_post.return_value.content = dumps({
@@ -550,7 +550,7 @@ def test_plugin_telegram_general(mock_post):
         'tgram://123456789:ABCdefghijkl123456789opqyz/-123456789525')
     assert isinstance(obj, NotifyTelegram)
     assert len(obj.targets) == 1
-    assert '-123456789525' in obj.targets
+    assert (-123456789525, None) in obj.targets
 
 
 @mock.patch('requests.post')
