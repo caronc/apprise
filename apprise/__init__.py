@@ -27,7 +27,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 __title__ = 'Apprise'
-__version__ = '1.7.0'
+__version__ = '1.7.1'
 __author__ = 'Chris Caron'
 __license__ = 'BSD'
 __copywrite__ = 'Copyright (C) 2023 Chris Caron <lead2gold@gmail.com>'
