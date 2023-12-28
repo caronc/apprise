@@ -6,16 +6,16 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: apprise 1.6.0\n"
+"Project-Id-Version: apprise 1.7.0\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2023-10-15 15:56-0400\n"
+"POT-Creation-Date: 2023-12-27 20:32-0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.11.0\n"
+"Generated-By: Babel 2.12.1\n"
 
 msgid "A local Gnome environment is required."
 msgstr ""
@@ -123,6 +123,9 @@ msgid "Bot Name"
 msgstr ""
 
 msgid "Bot Token"
+msgstr ""
+
+msgid "Bot Webhook Key"
 msgstr ""
 
 msgid "Cache Age"
@@ -281,6 +284,12 @@ msgstr ""
 msgid "GET Params"
 msgstr ""
 
+msgid "Gateway"
+msgstr ""
+
+msgid "Gateway ID"
+msgstr ""
+
 msgid "Gnome Notification"
 msgstr ""
 
@@ -323,6 +332,9 @@ msgstr ""
 msgid "Integration Key"
 msgstr ""
 
+msgid "Interpret Emojis"
+msgstr ""
+
 msgid "Is Ad?"
 msgstr ""
 
@@ -342,6 +354,9 @@ msgid "Level"
 msgstr ""
 
 msgid "Local File"
+msgstr ""
+
+msgid "Locale"
 msgstr ""
 
 msgid "Log PID"
@@ -661,6 +676,9 @@ msgstr ""
 msgid "Target Team"
 msgstr ""
 
+msgid "Target Threema ID"
+msgstr ""
+
 msgid "Target Topic"
 msgstr ""
 
@@ -755,6 +773,9 @@ msgid "URL Title"
 msgstr ""
 
 msgid "Unicode Characters"
+msgstr ""
+
+msgid "Upload"
 msgstr ""
 
 msgid "Urgency"
