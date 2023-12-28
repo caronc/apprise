@@ -96,8 +96,6 @@ SLACK_HTTP_ERROR_MAP = {
 # Used to break path apart into list of channels
 CHANNEL_LIST_DELIM = re.compile(r'[ \t\r\n,#\\/]+')
 
-# Regex for reply Detection
-
 
 class SlackMode:
     """
@@ -562,10 +560,11 @@ class NotifySlack(NotifyBase):
                     continue
 
                 # Add timestamp to payload if present
-                if timestamp_match := re.compile(
-                        r':(.*)',
-                        re.IGNORECASE).search(channel):
+                timestamp_match = re.compile(r':(.*)',
+                                             re.IGNORECASE).search(channel)
+                if timestamp_match:
                     payload['thread_ts'] = timestamp_match.group(1)
+                    # reset channel name to remove the timestamp that is given
                     channel = channel[:timestamp_match.start()]
 
                 if channel[0] == '+':
@@ -802,7 +801,6 @@ class NotifySlack(NotifyBase):
         """
         Wrapper to the requests (post) object
         """
-        print(payload)
         self.logger.debug('Slack POST URL: %s (cert_verify=%r)' % (
             url, self.verify_certificate,
         ))
