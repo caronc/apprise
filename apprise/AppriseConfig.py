@@ -255,7 +255,7 @@ class AppriseConfig:
         logger.debug("Loading raw configuration: {}".format(content))
 
         # Create ourselves a ConfigMemory Object to store our configuration
-        instance = config.ConfigMemory.ConfigMemory(
+        instance = C_MGR['memory'](
             content=content, format=format, asset=asset, tag=tag,
             recursion=recursion, insecure_includes=insecure_includes)
 
@@ -330,7 +330,7 @@ class AppriseConfig:
         schema = GET_SCHEMA_RE.match(url)
         if schema is None:
             # Plan B is to assume we're dealing with a file
-            schema = config.ConfigFile.ConfigFile.protocol
+            schema = 'file'
             url = '{}://{}'.format(schema, URLBase.quote(url))
 
         else:
