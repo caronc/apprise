@@ -96,6 +96,10 @@ SLACK_HTTP_ERROR_MAP = {
 # Used to break path apart into list of channels
 CHANNEL_LIST_DELIM = re.compile(r'[ \t\r\n,#\\/]+')
 
+# Channel Regular Expression Parsing
+CHANNEL_RE = re.compile(
+    r'^(?P<channel>[+#@]?[A-Z0-9_-]{1,32})(:(?P<thread_ts>[0-9.]+))?$', re.I)
+
 
 class SlackMode:
     """
@@ -547,39 +551,52 @@ class NotifySlack(NotifyBase):
         attach_channel_list = []
         while len(channels):
             channel = channels.pop(0)
-
             if channel is not None:
-                channel = validate_regex(channel, r'[+#@]?[A-Z0-9_]{1,32}')
-                if not channel:
-                    # Channel over-ride was specified
-                    self.logger.warning(
-                        "The specified target {} is invalid;"
-                        "skipping.".format(channel))
+                # We'll perform a user lookup if we detect an email
+                email = is_email(channel)
+                if email:
+                    payload['channel'] = \
+                        self.lookup_userid(email['full_email'])
 
-                    # Mark our failure
-                    has_error = True
-                    continue
+                    if not payload['channel']:
+                        # Move along; any notifications/logging would have
+                        # come from lookup_userid()
+                        has_error = True
+                        continue
 
-                if channel[0] == '+':
-                    # Treat as encoded id if prefixed with a +
-                    payload['channel'] = channel[1:]
+                else:  # Channel
+                    result = CHANNEL_RE.match(channel)
 
-                elif channel[0] == '@':
-                    # Treat @ value 'as is'
-                    payload['channel'] = channel
+                    if not result:
+                        # Channel over-ride was specified
+                        self.logger.warning(
+                            "The specified Slack target {} is invalid;"
+                            "skipping.".format(channel))
 
-                else:
-                    # We'll perform a user lookup if we detect an email
-                    email = is_email(channel)
-                    if email:
-                        payload['channel'] = \
-                            self.lookup_userid(email['full_email'])
+                        # Mark our failure
+                        has_error = True
+                        continue
 
-                        if not payload['channel']:
-                            # Move along; any notifications/logging would have
-                            # come from lookup_userid()
-                            has_error = True
-                            continue
+                    # Store oure content
+                    channel, thread_ts = \
+                        result.group('channel'), result.group('thread_ts')
+                    if thread_ts:
+                        payload['thread_ts'] = thread_ts
+
+                    elif 'thread_ts' in payload:
+                        # Handle situations where one channel has a thread_id
+                        # specified, and the next does not.  We do not want to
+                        # cary forward the last value specified
+                        del payload['thread_ts']
+
+                    if channel[0] == '+':
+                        # Treat as encoded id if prefixed with a +
+                        payload['channel'] = channel[1:]
+
+                    elif channel[0] == '@':
+                        # Treat @ value 'as is'
+                        payload['channel'] = channel
+
                     else:
                         # Prefix with channel hash tag (if not already)
                         payload['channel'] = \
@@ -795,7 +812,6 @@ class NotifySlack(NotifyBase):
         """
         Wrapper to the requests (post) object
         """
-
         self.logger.debug('Slack POST URL: %s (cert_verify=%r)' % (
             url, self.verify_certificate,
         ))

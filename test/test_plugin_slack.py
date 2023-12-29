@@ -253,6 +253,29 @@ apprise_url_tests = (
         'test_requests_exceptions': True,
         'requests_response_text': 'ok',
     }),
+    ('slack://notify@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#b:100', {
+        'instance': NotifySlack,
+        'requests_response_text': 'ok',
+    }),
+    ('slack://notify@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/+124:100', {
+        'instance': NotifySlack,
+        'requests_response_text': 'ok',
+    }),
+    # test a case where we have a channel defined alone (without a thread_ts)
+    # that exists after a definition where a thread_ts does exist.  this
+    # tests the branch of code that ensures we do not pass the same thread_ts
+    # twice
+    ('slack://notify@T1JJ3T3L2/A1BRTD4JD/'
+     'TIiajkdnlazkcOXrIdevi7FQ/+124:100/@chan', {
+         'instance': NotifySlack,
+         'requests_response_text': 'ok',
+     }),
+    ('slack://notify@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#b:bad', {
+        'instance': NotifySlack,
+        'requests_response_text': 'ok',
+        # we'll fail because our thread_ts is bad
+        'response': False,
+    }),
 )
 
 
@@ -702,3 +725,94 @@ def test_plugin_slack_markdown(mock_get, mock_post):
         "We also want to be able to support <https://slack.com> "\
         "links without the\ndescription."\
         "\n\nChannel Testing\n<!channelA>\n<!channelA|Description>"
+
+
+@mock.patch('requests.post')
+def test_plugin_slack_single_thread_reply(mock_post):
+    """
+    NotifySlack() Send Notification as a Reply
+
+    """
+
+    # Generate a (valid) bot token
+    token = 'xoxb-1234-1234-abc124'
+    thread_id = 100
+    request = mock.Mock()
+    request.content = dumps({
+        'ok': True,
+        'message': '',
+        'user': {
+            'id': 'ABCD1234'
+        }
+    })
+    request.status_code = requests.codes.ok
+
+    # Prepare Mock
+    mock_post.return_value = request
+
+    # Variation Initializations
+    obj = NotifySlack(access_token=token, targets=[f'#general:{thread_id}'])
+    assert isinstance(obj, NotifySlack) is True
+    assert isinstance(obj.url(), str) is True
+
+    # No calls made yet
+    assert mock_post.call_count == 0
+
+    # Send our notification
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
+
+    # Post was made
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://slack.com/api/chat.postMessage'
+    assert loads(mock_post.call_args_list[0][1]['data']).get("thread_ts") \
+        == str(thread_id)
+
+
+@mock.patch('requests.post')
+def test_plugin_slack_multiple_thread_reply(mock_post):
+    """
+    NotifySlack() Send Notification to multiple channels as Reply
+
+    """
+
+    # Generate a (valid) bot token
+    token = 'xoxb-1234-1234-abc124'
+    thread_id_1, thread_id_2 = 100, 200
+    request = mock.Mock()
+    request.content = dumps({
+        'ok': True,
+        'message': '',
+        'user': {
+            'id': 'ABCD1234'
+        }
+    })
+    request.status_code = requests.codes.ok
+
+    # Prepare Mock
+    mock_post.return_value = request
+
+    # Variation Initializations
+    obj = NotifySlack(access_token=token,
+                      targets=[
+                          f'#general:{thread_id_1}',
+                          f'#other:{thread_id_2}'])
+    assert isinstance(obj, NotifySlack) is True
+    assert isinstance(obj.url(), str) is True
+
+    # No calls made yet
+    assert mock_post.call_count == 0
+
+    # Send our notification
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
+
+    # Post was made
+    assert mock_post.call_count == 2
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://slack.com/api/chat.postMessage'
+    assert loads(mock_post.call_args_list[0][1]['data']).get("thread_ts") \
+        == str(thread_id_1)
+    assert loads(mock_post.call_args_list[1][1]['data']).get("thread_ts") \
+        == str(thread_id_2)
