@@ -494,14 +494,18 @@ class NotifyBase(URLBase):
             # Truncate our Title
             title = title[:self.title_maxlen]
 
-        if self.body_maxlen > 0 and len(body) <= self.body_maxlen:
+        # Combine title length into body if defined (2 for \r\n)
+        body_maxlen = self.body_maxlen \
+            if not title else self.body_maxlen - len(title) - 2
+
+        if body_maxlen > 0 and len(body) <= body_maxlen:
             response.append({'body': body, 'title': title})
             return response
 
         if overflow == OverflowMode.TRUNCATE:
             # Truncate our body and return
             response.append({
-                'body': body[:self.body_maxlen],
+                'body': body[:body_maxlen],
                 'title': title,
             })
             # For truncate mode, we're done now
@@ -511,8 +515,8 @@ class NotifyBase(URLBase):
         # For here, we want to split the message as many times as we have to
         # in order to fit it within the designated limits.
         response = [{
-            'body': body[i: i + self.body_maxlen],
-            'title': title} for i in range(0, len(body), self.body_maxlen)]
+            'body': body[i: i + body_maxlen],
+            'title': title} for i in range(0, len(body), body_maxlen)]
 
         return response
 
