@@ -427,8 +427,6 @@ def test_notify_overflow_split():
         offset += len(_body)
 
 
-
-
 def test_notify_markdown_general():
     """
     API: Markdown General Testing
