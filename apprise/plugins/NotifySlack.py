@@ -98,7 +98,7 @@ CHANNEL_LIST_DELIM = re.compile(r'[ \t\r\n,#\\/]+')
 
 # Channel Regular Expression Parsing
 CHANNEL_RE = re.compile(
-    r'^(?P<channel>[+#@]?[A-Z0-9_]{1,32})(:(?P<thread_ts>[0-9]+))?$', re.I)
+    r'^(?P<channel>[+#@]?[A-Z0-9_-]{1,32})(:(?P<thread_ts>[0-9.]+))?$', re.I)
 
 
 class SlackMode:
