@@ -338,6 +338,21 @@ def test_notify_overflow_split():
         assert body[offset: len(_body) + offset].rstrip() == _body
         offset += len(_body)
 
+    # Another edge case where the title just isn't that long leaving
+    # a lot of space for the [xx/xx] entries (no truncation needed)
+    chunks = obj._apply_overflow(body=body, title=title[:20])
+    offset = 0
+    assert len(chunks) == 4
+    for idx, chunk in enumerate(chunks, start=1):
+        # Our title has a counter added to it
+        assert title[:20] == chunk.get('title')[:-8]
+        assert chunk.get('title')[-8:] == \
+            ' [{:02}/{:02}]'.format(idx, len(chunks))
+        # Our body is only broken up; not lost
+        _body = chunk.get('body')
+        assert body[offset: len(_body) + offset].rstrip() == _body
+        offset += len(_body)
+
     #
     # Next Test: Append title to body + split body
     #
