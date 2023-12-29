@@ -328,10 +328,11 @@ def test_notify_overflow_split():
     chunks = obj._apply_overflow(body=body, title=title)
     offset = 0
     assert len(chunks) == 4
-    for chunk in chunks:
-        # Our title never changes
-        assert title == chunk.get('title')
-
+    for idx, chunk in enumerate(chunks, start=1):
+        # Our title has a counter added to it
+        assert title[:-8] == chunk.get('title')[:-8]
+        assert chunk.get('title')[-8:] == \
+            ' [{:02}/{:02}]'.format(idx, len(chunks))
         # Our body is only broken up; not lost
         _body = chunk.get('body')
         assert body[offset: len(_body) + offset].rstrip() == _body
@@ -386,6 +387,46 @@ def test_notify_overflow_split():
         _body = chunk.get('body')
         assert bulk[offset: len(_body) + offset] == _body
         offset += len(_body)
+
+    #
+    # Test case where our title_len is shorter then the value
+    # that would otherwise trigger the [XX/XX] elements
+    #
+
+    class TestNotification(NotifyBase):
+
+        # Set a small title length
+        title_maxlen = 100
+
+        # Enforce a body length. Make sure it's an int.
+        body_maxlen = int(body_len / 4)
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(**kwargs)
+
+        def notify(self, *args, **kwargs):
+            # Pretend everything is okay
+            return True
+
+    # Load our object
+    obj = TestNotification(overflow=OverflowMode.SPLIT)
+    assert obj is not None
+
+    # Verify that we break the title to a max length of our title_max
+    # and that the body remains untouched
+    chunks = obj._apply_overflow(body=body, title=title)
+    offset = 0
+    assert len(chunks) == 7
+    for idx, chunk in enumerate(chunks, start=1):
+        # Our title is truncated and no counter added
+        assert title[:100] == chunk.get('title')
+
+        # Our body is only broken up; not lost
+        _body = chunk.get('body')
+        assert body[offset: len(_body) + offset].rstrip() == _body
+        offset += len(_body)
+
+
 
 
 def test_notify_markdown_general():
