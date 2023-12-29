@@ -255,8 +255,26 @@ apprise_url_tests = (
     }),
     ('slack://notify@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#b:100', {
         'instance': NotifySlack,
-        'test_requests_exceptions': 200,
         'requests_response_text': 'ok',
+    }),
+    ('slack://notify@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/+124:100', {
+        'instance': NotifySlack,
+        'requests_response_text': 'ok',
+    }),
+    # test a case where we have a channel defined alone (without a thread_ts)
+    # that exists after a definition where a thread_ts does exist.  this
+    # tests the branch of code that ensures we do not pass the same thread_ts
+    # twice
+    ('slack://notify@T1JJ3T3L2/A1BRTD4JD/'
+     'TIiajkdnlazkcOXrIdevi7FQ/+124:100/@chan', {
+         'instance': NotifySlack,
+         'requests_response_text': 'ok',
+     }),
+    ('slack://notify@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#b:bad', {
+        'instance': NotifySlack,
+        'requests_response_text': 'ok',
+        # we'll fail because our thread_ts is bad
+        'response': False,
     }),
 )
 
