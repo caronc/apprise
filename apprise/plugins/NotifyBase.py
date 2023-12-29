@@ -494,9 +494,13 @@ class NotifyBase(URLBase):
             # Truncate our Title
             title = title[:self.title_maxlen]
 
-        # Combine title length into body if defined (2 for \r\n)
-        body_maxlen = self.body_maxlen \
-            if not title else self.body_maxlen - len(title) - 2
+        if self.body_maxlen > self.title_maxlen - 2:
+            # Combine title length into body if defined (2 for \r\n)
+            body_maxlen = self.body_maxlen \
+                if not title else self.body_maxlen - len(title) - 2
+        else:
+            # status quo
+            body_maxlen = self.body_maxlen
 
         if body_maxlen > 0 and len(body) <= body_maxlen:
             response.append({'body': body, 'title': title})

@@ -163,7 +163,8 @@ def test_notify_overflow_truncate():
     # and that the body remains untouched
     chunks = obj._apply_overflow(body=body, title=title)
     assert len(chunks) == 1
-    assert body[0:TestNotification.body_maxlen] == chunks[0].get('body')
+    # -2 because \r\n are factored into calculation (safe whitespace)
+    assert body[0:TestNotification.body_maxlen - 2] == chunks[0].get('body')
     assert title == chunks[0].get('title')
 
     #
