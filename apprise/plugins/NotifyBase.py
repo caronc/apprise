@@ -494,25 +494,58 @@ class NotifyBase(URLBase):
             # Truncate our Title
             title = title[:self.title_maxlen]
 
-        if self.body_maxlen > 0 and len(body) <= self.body_maxlen:
+        if self.body_maxlen > self.title_maxlen - 2:
+            # Combine title length into body if defined (2 for \r\n)
+            body_maxlen = self.body_maxlen \
+                if not title else self.body_maxlen - len(title) - 2
+        else:
+            # status quo
+            body_maxlen = self.body_maxlen
+
+        if body_maxlen > 0 and len(body) <= body_maxlen:
             response.append({'body': body, 'title': title})
             return response
 
         if overflow == OverflowMode.TRUNCATE:
             # Truncate our body and return
             response.append({
-                'body': body[:self.body_maxlen],
+                'body': body[:body_maxlen],
                 'title': title,
             })
             # For truncate mode, we're done now
             return response
 
+        # Display Count  [XX/XX]
+        #               ^^^^^^^^
+        #               \\\\\\\\
+        #               8 characters (space + count)
+        display_count_width = 8
+
+        # the min accepted length of a title to allow for a counter display
+        display_count_threshold = 130
+
+        show_counter = title and len(body) > body_maxlen \
+            and self.title_maxlen > \
+            (display_count_threshold + display_count_width)
+
+        count = 0
+        if show_counter:
+            count = int(len(body) / body_maxlen) \
+                + (1 if len(body) % body_maxlen else 0)
+
+            if len(title) > self.title_maxlen - display_count_width:
+                # Truncate our title further
+                title = title[:self.title_maxlen - display_count_width]
+
         # If we reach here, then we are in SPLIT mode.
         # For here, we want to split the message as many times as we have to
         # in order to fit it within the designated limits.
         response = [{
-            'body': body[i: i + self.body_maxlen],
-            'title': title} for i in range(0, len(body), self.body_maxlen)]
+            'body': body[i: i + body_maxlen],
+            'title': title + (
+                '' if not count else
+                ' [{:02}/{:02}]'.format(idx, count))} for idx, i in
+            enumerate(range(0, len(body), body_maxlen), start=1)]
 
         return response
 

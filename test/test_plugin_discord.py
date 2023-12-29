@@ -40,6 +40,11 @@ from apprise import Apprise
 from apprise import AppriseAttachment
 from apprise import NotifyType
 from apprise import NotifyFormat
+from apprise.common import OverflowMode
+
+from random import choice
+from string import ascii_uppercase as str_alpha
+from string import digits as str_num
 
 # Disable logging for a cleaner testing output
 import logging
@@ -591,6 +596,63 @@ def test_plugin_discord_general(mock_post):
     response = mock_post.call_args_list[0][1]
     assert 'params' in response
     assert response['params'].get('thread_id') == '12345'
+
+
+@mock.patch('requests.post')
+def test_plugin_discord_overflow(mock_post):
+    """
+    NotifyDiscord() Overflow Checks
+
+    """
+
+    # Initialize some generic (but valid) tokens
+    webhook_id = 'A' * 24
+    webhook_token = 'B' * 64
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    # Some variables we use to control the data we work with
+    body_len = 8000
+    title_len = 1024
+
+    # Number of characters per line
+    row = 24
+
+    # Create a large body and title with random data
+    body = ''.join(choice(str_alpha + str_num + ' ') for _ in range(body_len))
+    body = '\r\n'.join([body[i: i + row] for i in range(0, len(body), row)])
+
+    # Create our title using random data
+    title = ''.join(choice(str_alpha + str_num) for _ in range(title_len))
+
+    results = NotifyDiscord.parse_url(
+        f'discord://{webhook_id}/{webhook_token}/?overflow=split')
+
+    assert isinstance(results, dict)
+    assert results['user'] is None
+    assert results['webhook_id'] == webhook_id
+    assert results['webhook_token'] == webhook_token
+    assert results['password'] is None
+    assert results['port'] is None
+    assert results['host'] == webhook_id
+    assert results['fullpath'] == f'/{webhook_token}/'
+    assert results['path'] == f'/{webhook_token}/'
+    assert results['query'] is None
+    assert results['schema'] == 'discord'
+    assert results['url'] == f'discord://{webhook_id}/{webhook_token}/'
+
+    instance = NotifyDiscord(**results)
+    assert isinstance(instance, NotifyDiscord)
+
+    results = instance._apply_overflow(
+        body, title=title, overflow=OverflowMode.SPLIT)
+
+    # Ensure we never exceed 2000 characters
+    for entry in results:
+        assert len(entry['title']) <= instance.title_maxlen
+        assert len(entry['title']) + len(entry['body']) < instance.body_maxlen
 
 
 @mock.patch('requests.post')
