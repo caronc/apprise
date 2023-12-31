@@ -652,7 +652,7 @@ def test_plugin_discord_overflow(mock_post):
     # Ensure we never exceed 2000 characters
     for entry in results:
         assert len(entry['title']) <= instance.title_maxlen
-        assert len(entry['title']) + len(entry['body']) < instance.body_maxlen
+        assert len(entry['title']) + len(entry['body']) <= instance.body_maxlen
 
 
 @mock.patch('requests.post')

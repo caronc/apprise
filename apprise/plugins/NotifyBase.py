@@ -199,6 +199,53 @@ class NotifyBase(URLBase):
         },
     })
 
+    #
+    # Overflow Defaults / Configuration applicable to SPLIT mode only
+    #
+
+    # Display Count  [X/X]
+    #               ^^^^^^
+    #               \\\\\\
+    #               6 characters (space + count)
+    # Display Count  [XX/XX]
+    #               ^^^^^^^^
+    #               \\\\\\\\
+    #               8 characters (space + count)
+    # Display Count  [XXX/XXX]
+    #               ^^^^^^^^^^
+    #               \\\\\\\\\\
+    #               10 characters (space + count)
+    # Display Count  [XXXX/XXXX]
+    #               ^^^^^^^^^^^^
+    #               \\\\\\\\\\\\
+    #               12 characters (space + count)
+    #
+    # Given the above + some buffer we come up with the following:
+    # If this value is exceeded, display counts automatically shut off
+    overflow_max_display_count_width = 12
+
+    # The number of characters to reserver for whitespace buffering
+    # it should be at the very least 2 (for \r\n)
+    overflow_whitespace_buffer = 2
+
+    # the min accepted length of a title to allow for a counter display
+    overflow_display_count_threshold = 130
+
+    # Whether or not when over-flow occurs, if the title should be repeated
+    # each time the message is split up
+    #   - None: Detect
+    #   - True: Always display title once
+    #   - False: Display the title for each occurance
+    overflow_display_title_once = None
+
+    # If this is set to to True:
+    #   The title_maxlen should be considered as a subset of the body_maxlen
+    #    Hence: len(title) + len(body) should never be greater then body_maxlen
+    #
+    # If set to False, then there is no corrorlation between title_maxlen
+    #  restrictions and that of body_maxlen
+    overflow_amalgamate_title = True
+
     def __init__(self, **kwargs):
         """
         Initialize some general configuration that will keep things consistent
@@ -490,19 +537,34 @@ class NotifyBase(URLBase):
             response.append({'body': body, 'title': title})
             return response
 
-        elif len(title) > self.title_maxlen:
-            # Truncate our Title
-            title = title[:self.title_maxlen]
+        #
+        # If we reach here in our code, then we're using TRUNCATE, or SPLIT
+        # actions which require some math to handle the data
+        #
 
-        if self.body_maxlen > self.title_maxlen - 2:
-            # Combine title length into body if defined (2 for \r\n)
-            body_maxlen = self.body_maxlen \
-                if not title else self.body_maxlen - len(title) - 2
+        # Handle situations where our body and title are amalamated into one
+        # calculation
+        title_maxlen = self.title_maxlen \
+            if not self.overflow_amalgamate_title \
+            else min(len(title) + self.overflow_whitespace_buffer +
+                     self.overflow_max_display_count_width,
+                     self.title_maxlen, self.body_maxlen)
+
+        if len(title) > title_maxlen:
+            # Truncate our Title
+            title = title[:title_maxlen]
+
+        if self.overflow_amalgamate_title and self.body_maxlen >= title_maxlen:
+            body_maxlen = self.body_maxlen if not title else (
+                self.body_maxlen - title_maxlen)
         else:
             # status quo
-            body_maxlen = self.body_maxlen
+            body_maxlen = self.body_maxlen \
+                if not self.overflow_amalgamate_title else \
+                (self.body_maxlen - self.overflow_whitespace_buffer)
 
-        if body_maxlen > 0 and len(body) <= body_maxlen:
+        if body_maxlen > 0 and \
+                len(body) <= (body_maxlen + self.overflow_whitespace_buffer):
             response.append({'body': body, 'title': title})
             return response
 
@@ -515,37 +577,97 @@ class NotifyBase(URLBase):
             # For truncate mode, we're done now
             return response
 
-        # Display Count  [XX/XX]
-        #               ^^^^^^^^
-        #               \\\\\\\\
-        #               8 characters (space + count)
-        display_count_width = 8
-
-        # the min accepted length of a title to allow for a counter display
-        display_count_threshold = 130
-
-        show_counter = title and len(body) > body_maxlen \
-            and self.title_maxlen > \
-            (display_count_threshold + display_count_width)
-
-        count = 0
-        if show_counter:
-            count = int(len(body) / body_maxlen) \
-                + (1 if len(body) % body_maxlen else 0)
-
-            if len(title) > self.title_maxlen - display_count_width:
-                # Truncate our title further
-                title = title[:self.title_maxlen - display_count_width]
+        # Whether we display the title only once due to it consuming the
+        # majority of the message size. We use what is defined otherwise
+        # we detect it based on whether the calculated (displayable) body
+        # after accomodating for the title length is less than 50% of
+        # it's original value:
+        if self.overflow_display_title_once is None:
+            overflow_display_title_once = \
+                True if (
+                    self.overflow_amalgamate_title and
+                    ((body_maxlen < int(self.body_maxlen / 2))
+                        or title_maxlen > self.body_maxlen)) else False
+        else:
+            # Take on defined value
+            overflow_display_title_once = self.overflow_display_title_once
 
         # If we reach here, then we are in SPLIT mode.
         # For here, we want to split the message as many times as we have to
         # in order to fit it within the designated limits.
-        response = [{
-            'body': body[i: i + body_maxlen],
-            'title': title + (
-                '' if not count else
-                ' [{:02}/{:02}]'.format(idx, count))} for idx, i in
-            enumerate(range(0, len(body), body_maxlen), start=1)]
+        if not overflow_display_title_once:
+            show_counter = not overflow_display_title_once and \
+                title and len(body) > body_maxlen and self.title_maxlen > \
+                (self.overflow_display_count_threshold +
+                 self.overflow_max_display_count_width +
+                 self.overflow_whitespace_buffer)
+
+            count = 0
+            template = ''
+            if show_counter:
+                # introduce padding
+                body_maxlen -= self.overflow_whitespace_buffer
+
+                count = int(len(body) / body_maxlen) \
+                    + (1 if len(body) % body_maxlen else 0)
+
+                # Detect padding and prepare template
+                digits = len(str(count))
+                template = ' [{:0%d}/{:0%d}]' % (digits, digits)
+
+                # Update our counter
+                overflow_display_count_width = 4 + (digits * 2)
+                if overflow_display_count_width <= \
+                        self.overflow_max_display_count_width:
+                    if len(title) > \
+                            self.title_maxlen - overflow_display_count_width:
+                        # Truncate our title further
+                        title = title[:self.title_maxlen -
+                                      overflow_display_count_width]
+
+                else:  # Way to many messages to display
+                    show_counter = False
+
+            response = [{
+                'body': body[i: i + body_maxlen],
+                'title': title + (
+                    '' if not show_counter else
+                    template.format(idx, count))} for idx, i in
+                enumerate(range(0, len(body), body_maxlen), start=1)]
+
+        else:   # Display title once and move on
+            response = []
+            try:
+                i = range(0, len(body), body_maxlen)[0]
+
+                response.append({
+                    'body': body[i: i + body_maxlen],
+                    'title': title,
+                })
+
+            except (ValueError, IndexError):
+                # IndexError:
+                #  - This happens if there simply was no body to display
+
+                # ValueError:
+                #  - This happens when body_maxlen < 0 (due to title being
+                #    so large)
+
+                # No worries; send title along
+                response.append({
+                    'body': '',
+                    'title': title,
+                })
+
+                # Ensure our start is set properly
+                body_maxlen = 0
+
+            # Now re-calculate based on the increased length
+            for i in range(body_maxlen, len(body), self.body_maxlen):
+                response.append({
+                    'body': body[i: i + self.body_maxlen],
+                    'title': '',
+                })
 
         return response
 
