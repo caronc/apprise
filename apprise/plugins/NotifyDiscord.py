@@ -105,6 +105,10 @@ class NotifyDiscord(NotifyBase):
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 2000
 
+    # The 2000 characters above defined by the body_maxlen include that of the
+    # title.  Setting this to True ensures overflow options behave properly
+    overflow_amalgamate_title = True
+
     # Discord has a limit of the number of fields you can include in an
     # embeds message. This value allows the discord message to safely
     # break into multiple messages to handle these cases.

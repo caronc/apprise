@@ -795,6 +795,9 @@ def test_notify_overflow_split_with_amalgamation():
         # Enforce a body length. Make sure it's an int.
         body_maxlen = 150
 
+        # With amalgamation
+        overflow_amalgamate_title = True
+
         def __init__(self, *args, **kwargs):
             super().__init__(**kwargs)
 
@@ -1206,6 +1209,9 @@ def test_notify_overflow_split_no_amalgamation():
         # Enforce a body length. Make sure it's an int.
         body_maxlen = 150
 
+        # No amalgamation
+        overflow_amalgamate_title = False
+
         def __init__(self, *args, **kwargs):
             super().__init__(**kwargs)
 
@@ -1223,17 +1229,13 @@ def test_notify_overflow_split_no_amalgamation():
     chunks = obj._apply_overflow(body=new_body, title="")
     chunks = obj._apply_overflow(body=new_body, title=title)
     offset = 0
-    assert len(chunks) == 36
+    assert len(chunks) == 35
+    c_len = len(' [XX/XX]')
     for idx, chunk in enumerate(chunks, start=1):
-        # Our title has no counter added to it
-        if idx > 1:
-            # Empty (no title displayed on following entries
-            assert chunk.get('title') == ""
-        else:
-            # Because 150 is what we set the title limit to
-            assert len(chunk.get('title')) == obj.title_maxlen
-            assert title[:obj.title_maxlen] == chunk.get('title')
-
+        # Our title has a counter added to it
+        assert title[:obj.title_maxlen][:-c_len] == chunk.get('title')[:-c_len]
+        assert chunk.get('title')[-c_len:] == \
+            ' [{:02}/{:02}]'.format(idx, len(chunks))
         # Our body is only broken up; not lost
         _body = chunk.get('body')
         assert new_body[offset: len(_body) + offset] == _body

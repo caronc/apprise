@@ -244,7 +244,7 @@ class NotifyBase(URLBase):
     #
     # If set to False, then there is no corrorlation between title_maxlen
     #  restrictions and that of body_maxlen
-    overflow_amalgamate_title = True
+    overflow_amalgamate_title = False
 
     def __init__(self, **kwargs):
         """
