@@ -220,6 +220,31 @@ urls:
     assert isinstance(result, list)
     assert len(result) == 1
 
+def test_config_base_discord_bug_report_01():
+    """
+    API: ConfigBase.config_parse user feedback
+
+    A Discord report that a tag was not correctly assigned to a URL when
+    presented in the following format
+       urls:
+         - json://myhost:
+           - tag: test
+             userid: test
+    """
+    result, config = ConfigBase.config_parse("""
+    urls:
+      - json://myhost:
+        - tag: test
+          userid: test
+    """, asset=AppriseAsset())
+
+    # We expect to parse 4 entries from the above
+    assert isinstance(result, list)
+    assert isinstance(config, list)
+    assert len(result) == 1
+    assert len(result[0].tags) == 1
+    assert 'test' in result[0].tags
+
 
 def test_config_base_config_parse_text():
     """
