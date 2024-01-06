@@ -596,7 +596,11 @@ class NotifyBase(URLBase):
         # If we reach here, then we are in SPLIT mode.
         # For here, we want to split the message as many times as we have to
         # in order to fit it within the designated limits.
-        if not overflow_display_title_once:
+        if not overflow_display_title_once and not (
+                # edge case that can occur when overflow_display_title_once is
+                # forced off, but no body exists
+                self.overflow_amalgamate_title and body_maxlen <= 0):
+
             show_counter = title and len(body) > body_maxlen and \
                 ((self.overflow_amalgamate_title and
                   body_maxlen >= self.overflow_display_count_threshold) or
