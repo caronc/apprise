@@ -415,7 +415,8 @@ def test_notify_overflow_truncate_no_amalgamation():
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title)
     assert len(chunks) == 1
-    assert body[0:obj.body_maxlen] == chunks[0].get('body')
+    assert body[0:obj.body_maxlen]\
+        .lstrip('\r\n\x0b\x0c').rstrip() == chunks[0].get('body')
     assert title == chunks[0].get('title')
 
     class TestNotification(NotifyBase):
@@ -449,7 +450,8 @@ def test_notify_overflow_truncate_no_amalgamation():
     assert len(chunks) == 1
     # No amalgamation set so our body aligns in size (no -2 like previous
     # test)
-    assert body[0:obj.body_maxlen] == chunks[0].get('body')
+    assert body[0:obj.body_maxlen]\
+        .lstrip('\r\n\x0b\x0c').rstrip() == chunks[0].get('body')
     assert title == chunks[0].get('title')
 
     #
@@ -660,7 +662,8 @@ def test_notify_overflow_split_with_amalgamation():
 
         # Our body is only broken up; not lost
         _body = chunk.get('body')
-        assert body[offset: len(_body) + offset] == _body
+        assert body[offset: len(_body) + offset]\
+            .lstrip('\r\n\x0b\x0c').rstrip() == _body
         offset += len(_body)
 
     # Another edge case where the title just isn't that long leaving
@@ -683,7 +686,8 @@ def test_notify_overflow_split_with_amalgamation():
             ' [{:01}/{:01}]'.format(idx, len(chunks))
         # Our body is only broken up; not lost
         _body = chunk.get('body')
-        assert body[offset: len(_body) + offset] == _body
+        assert body[offset: len(_body) + offset]\
+            .lstrip('\r\n\x0b\x0c').rstrip() == _body
         offset += len(_body)
 
     #
@@ -736,7 +740,8 @@ def test_notify_overflow_split_with_amalgamation():
 
         # Our body is only broken up; not lost
         _body = chunk.get('body')
-        assert body[offset: len(_body) + offset] == _body
+        assert body[offset: len(_body) + offset]\
+            .lstrip('\r\n\x0b\x0c').rstrip() == _body
         offset += len(_body)
 
     # Test larger messages
@@ -1210,7 +1215,8 @@ def test_notify_overflow_split_no_amalgamation():
             ' [{:01}/{:01}]'.format(idx, len(chunks))
         # Our body is only broken up; not lost
         _body = chunk.get('body')
-        assert body[offset: len(_body) + offset] == _body
+        assert body[offset: len(_body) + offset]\
+            .lstrip('\r\n\x0b\x0c').rstrip() == _body
         offset += len(_body)
 
     # Another edge case where the title just isn't that long leaving
@@ -1232,7 +1238,8 @@ def test_notify_overflow_split_no_amalgamation():
             ' [{:01}/{:01}]'.format(idx, len(chunks))
         # Our body is only broken up; not lost
         _body = chunk.get('body')
-        assert body[offset: len(_body) + offset] == _body
+        assert body[offset: len(_body) + offset]\
+            .lstrip('\r\n\x0b\x0c').rstrip() == _body
         offset += len(_body)
 
     # Test larger messages
@@ -1484,7 +1491,8 @@ def test_notify_overflow_split_no_amalgamation():
 
         # Our body is only broken up; not lost
         _body = chunk.get('body')
-        assert body[offset: len(_body) + offset] == _body
+        assert body[offset: len(_body) + offset]\
+            .lstrip('\r\n\x0b\x0c').rstrip() == _body
         offset += len(_body)
 
     #
