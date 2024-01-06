@@ -225,8 +225,9 @@ class NotifyBase(URLBase):
     overflow_max_display_count_width = 12
 
     # The number of characters to reserver for whitespace buffering
-    # it should be at the very least 2 (for \r\n)
-    overflow_whitespace_buffer = 2
+    # This is detected automatically, but you can enforce a value if
+    # you desire:
+    overflow_buffer = 0
 
     # the min accepted length of a title to allow for a counter display
     overflow_display_count_threshold = 130
@@ -501,7 +502,6 @@ class NotifyBase(URLBase):
             overflow = self.overflow_mode
 
         if self.title_maxlen <= 0 and len(title) > 0:
-
             if self.notify_format == NotifyFormat.HTML:
                 # Content is appended to body as html
                 body = '<{open_tag}>{title}</{close_tag}>' \
@@ -537,6 +537,12 @@ class NotifyBase(URLBase):
             response.append({'body': body, 'title': title})
             return response
 
+        # a value of '2' allows for the \r\n that is applied when
+        # amalgamating the title
+        overflow_buffer = max(2, self.overflow_buffer) \
+            if (self.title_maxlen == 0 and len(title)) \
+            else self.overflow_buffer
+
         #
         # If we reach here in our code, then we're using TRUNCATE, or SPLIT
         # actions which require some math to handle the data
@@ -546,67 +552,65 @@ class NotifyBase(URLBase):
         # calculation
         title_maxlen = self.title_maxlen \
             if not self.overflow_amalgamate_title \
-            else min(len(title) + self.overflow_whitespace_buffer +
-                     self.overflow_max_display_count_width,
+            else min(len(title) + self.overflow_max_display_count_width,
                      self.title_maxlen, self.body_maxlen)
 
         if len(title) > title_maxlen:
             # Truncate our Title
-            title = title[:title_maxlen]
+            title = title[:title_maxlen].rstrip()
 
-        if self.overflow_amalgamate_title and self.body_maxlen >= title_maxlen:
-            body_maxlen = self.body_maxlen if not title else (
-                self.body_maxlen - title_maxlen)
+        if self.overflow_amalgamate_title and (
+                self.body_maxlen - overflow_buffer) >= title_maxlen:
+            body_maxlen = (self.body_maxlen if not title else (
+                self.body_maxlen - title_maxlen)) - overflow_buffer
         else:
             # status quo
             body_maxlen = self.body_maxlen \
                 if not self.overflow_amalgamate_title else \
-                (self.body_maxlen - self.overflow_whitespace_buffer)
+                (self.body_maxlen - overflow_buffer)
 
-        if body_maxlen > 0 and \
-                len(body) <= (body_maxlen + self.overflow_whitespace_buffer):
+        if body_maxlen > 0 and len(body) <= body_maxlen:
             response.append({'body': body, 'title': title})
             return response
 
         if overflow == OverflowMode.TRUNCATE:
             # Truncate our body and return
             response.append({
-                'body': body[:body_maxlen],
+                'body': body[:body_maxlen].lstrip('\r\n\x0b\x0c').rstrip(),
                 'title': title,
             })
             # For truncate mode, we're done now
             return response
 
-        # Whether we display the title only once due to it consuming the
-        # majority of the message size. We use what is defined otherwise
-        # we detect it based on whether the calculated (displayable) body
-        # after accomodating for the title length is less than 50% of
-        # it's original value:
         if self.overflow_display_title_once is None:
+            # Detect if we only display our title once or not:
             overflow_display_title_once = \
-                True if (
-                    self.overflow_amalgamate_title and
-                    ((body_maxlen < int(self.body_maxlen / 2))
-                        or title_maxlen > self.body_maxlen)) else False
+                True if self.overflow_amalgamate_title and \
+                body_maxlen < self.overflow_display_count_threshold \
+                else False
         else:
             # Take on defined value
+
             overflow_display_title_once = self.overflow_display_title_once
 
         # If we reach here, then we are in SPLIT mode.
         # For here, we want to split the message as many times as we have to
         # in order to fit it within the designated limits.
         if not overflow_display_title_once:
-            show_counter = not overflow_display_title_once and \
-                title and len(body) > body_maxlen and self.title_maxlen > \
-                (self.overflow_display_count_threshold +
-                 self.overflow_max_display_count_width +
-                 self.overflow_whitespace_buffer)
+            show_counter = title and len(body) > body_maxlen and \
+                ((self.overflow_amalgamate_title and
+                  body_maxlen >= self.overflow_display_count_threshold) or
+                 (not self.overflow_amalgamate_title and
+                  title_maxlen > self.overflow_display_count_threshold)) and (
+                title_maxlen > (self.overflow_max_display_count_width +
+                                overflow_buffer) and
+                self.title_maxlen >= self.overflow_display_count_threshold)
 
             count = 0
             template = ''
             if show_counter:
                 # introduce padding
-                body_maxlen -= self.overflow_whitespace_buffer
+                body_maxlen -= overflow_buffer
 
                 count = int(len(body) / body_maxlen) \
                     + (1 if len(body) % body_maxlen else 0)
@@ -620,16 +624,17 @@ class NotifyBase(URLBase):
                 if overflow_display_count_width <= \
                         self.overflow_max_display_count_width:
                     if len(title) > \
-                            self.title_maxlen - overflow_display_count_width:
+                            title_maxlen - overflow_display_count_width:
                         # Truncate our title further
-                        title = title[:self.title_maxlen -
+                        title = title[:title_maxlen -
                                       overflow_display_count_width]
 
                 else:  # Way to many messages to display
                     show_counter = False
 
             response = [{
-                'body': body[i: i + body_maxlen],
+                'body': body[i: i + body_maxlen]
+                .lstrip('\r\n\x0b\x0c').rstrip(),
                 'title': title + (
                     '' if not show_counter else
                     template.format(idx, count))} for idx, i in
@@ -641,7 +646,8 @@ class NotifyBase(URLBase):
                 i = range(0, len(body), body_maxlen)[0]
 
                 response.append({
-                    'body': body[i: i + body_maxlen],
+                    'body': body[i: i + body_maxlen]
+                    .lstrip('\r\n\x0b\x0c').rstrip(),
                     'title': title,
                 })
 
@@ -665,7 +671,8 @@ class NotifyBase(URLBase):
             # Now re-calculate based on the increased length
             for i in range(body_maxlen, len(body), self.body_maxlen):
                 response.append({
-                    'body': body[i: i + self.body_maxlen],
+                    'body': body[i: i + self.body_maxlen]
+                    .lstrip('\r\n\x0b\x0c').rstrip(),
                     'title': '',
                 })
 
