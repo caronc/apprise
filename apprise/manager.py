@@ -302,10 +302,9 @@ class PluginManager(metaclass=Singleton):
             if module_pyname in self._custom_module_map:
                 logger.debug(
                     'Custom module %s - %d schema(s) (name=%s) '
-                    'loaded in {:.6f}s',
-                    _path, module_name,
+                    'loaded in %.6fs', _path,
                     len(self._custom_module_map[module_pyname]['notify']),
-                    (time.time() - t_start))
+                    module_name, (time.time() - t_start))
 
                 # Add our plugin name to our module map
                 self._module_map[module_name] = {
