@@ -220,6 +220,7 @@ urls:
     assert isinstance(result, list)
     assert len(result) == 1
 
+
 def test_config_base_discord_bug_report_01():
     """
     API: ConfigBase.config_parse user feedback
