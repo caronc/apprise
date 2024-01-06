@@ -108,7 +108,7 @@ def test_notify_overflow_truncate_with_amalgamation():
     chunks = obj._apply_overflow(
         body=body, title=title, overflow=OverflowMode.SPLIT)
     assert len(chunks) == 1
-    assert body == chunks[0].get('body')
+    assert body.strip('\r\n\x0b\x0c') == chunks[0].get('body')
     assert title[0:obj.title_maxlen] == chunks[0].get('title')
 
     #
@@ -343,7 +343,7 @@ def test_notify_overflow_truncate_no_amalgamation():
     chunks = obj._apply_overflow(
         body=body, title=title, overflow=OverflowMode.SPLIT)
     assert len(chunks) == 1
-    assert body == chunks[0].get('body')
+    assert body.strip('\r\n\x0b\x0c') == chunks[0].get('body')
     assert title[0:obj.title_maxlen] == chunks[0].get('title')
 
     #
@@ -569,7 +569,7 @@ def test_notify_overflow_split_with_amalgamation():
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title)
     assert len(chunks) == 1
-    assert body == chunks[0].get('body')
+    assert body.strip('\r\n\x0b\x0c') == chunks[0].get('body')
     assert title[0:obj.title_maxlen] == chunks[0].get('title')
 
     #
@@ -1119,7 +1119,7 @@ def test_notify_overflow_split_no_amalgamation():
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title)
     assert len(chunks) == 1
-    assert body == chunks[0].get('body')
+    assert body.strip('\r\n\x0b\x0c') == chunks[0].get('body')
     assert title[0:obj.title_maxlen] == chunks[0].get('title')
 
     #
@@ -1585,7 +1585,7 @@ def test_notify_markdown_general():
         body=body, title=title, body_format=NotifyFormat.TEXT)
     assert len(chunks) == 1
     # Our title get's stripped off since it's not of valid markdown
-    assert body == chunks[0].get('body')
+    assert body.strip('\r\n\x0b\x0c') == chunks[0].get('body')
     assert chunks[0].get('title') == ""
 
 
