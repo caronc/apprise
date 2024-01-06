@@ -108,7 +108,7 @@ def test_notify_overflow_truncate_with_amalgamation():
     chunks = obj._apply_overflow(
         body=body, title=title, overflow=OverflowMode.SPLIT)
     assert len(chunks) == 1
-    assert body.strip('\r\n\x0b\x0c') == chunks[0].get('body')
+    assert body.lstrip('\r\n\x0b\x0c').rstrip() == chunks[0].get('body')
     assert title[0:obj.title_maxlen] == chunks[0].get('title')
 
     #
@@ -343,7 +343,7 @@ def test_notify_overflow_truncate_no_amalgamation():
     chunks = obj._apply_overflow(
         body=body, title=title, overflow=OverflowMode.SPLIT)
     assert len(chunks) == 1
-    assert body.strip('\r\n\x0b\x0c') == chunks[0].get('body')
+    assert body.lstrip('\r\n\x0b\x0c').rstrip() == chunks[0].get('body')
     assert title[0:obj.title_maxlen] == chunks[0].get('title')
 
     #
@@ -569,7 +569,7 @@ def test_notify_overflow_split_with_amalgamation():
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title)
     assert len(chunks) == 1
-    assert body.strip('\r\n\x0b\x0c') == chunks[0].get('body')
+    assert body.lstrip('\r\n\x0b\x0c').rstrip() == chunks[0].get('body')
     assert title[0:obj.title_maxlen] == chunks[0].get('title')
 
     #
@@ -787,10 +787,11 @@ def test_notify_overflow_split_with_amalgamation():
         # Un-used whitespace is always cleaned up; make sure we account for
         # this in our new calculation
         ws_diff = len(new_body[offset: len(_body) + offset]) - \
-            len(new_body[offset: len(_body) + offset].strip('\r\n\x0b\x0c'))
+            len(new_body[offset: len(_body) + offset]
+                .lstrip('\r\n\x0b\x0c').rstrip())
 
         assert new_body[offset: len(_body) + offset + ws_diff]\
-            .strip('\r\n\x0b\x0c') == _body
+            .lstrip('\r\n\x0b\x0c').rstrip() == _body
         offset += (len(_body) + ws_diff)
 
     # Body chunk is beyond 4 digits, so [XXXX/XXXX] is turned off
@@ -815,10 +816,11 @@ def test_notify_overflow_split_with_amalgamation():
         # Un-used whitespace is always cleaned up; make sure we account for
         # this in our new calculation
         ws_diff = len(new_body[offset: len(_body) + offset]) - \
-            len(new_body[offset: len(_body) + offset].strip('\r\n\x0b\x0c'))
+            len(new_body[offset: len(_body) + offset]
+                .lstrip('\r\n\x0b\x0c').rstrip())
 
         assert new_body[offset: len(_body) + offset + ws_diff]\
-            .strip('\r\n\x0b\x0c') == _body
+            .lstrip('\r\n\x0b\x0c').rstrip() == _body
         offset += (len(_body) + ws_diff)
 
     # Test larger messages
@@ -872,10 +874,11 @@ def test_notify_overflow_split_with_amalgamation():
         # Un-used whitespace is always cleaned up; make sure we account for
         # this in our new calculation
         ws_diff = len(new_body[offset: len(_body) + offset]) - \
-            len(new_body[offset: len(_body) + offset].strip('\r\n\x0b\x0c'))
+            len(new_body[offset: len(_body) + offset]
+                .lstrip('\r\n\x0b\x0c').rstrip())
 
         assert new_body[offset: len(_body) + offset + ws_diff]\
-            .strip('\r\n\x0b\x0c') == _body
+            .lstrip('\r\n\x0b\x0c').rstrip() == _body
         offset += (len(_body) + ws_diff)
 
     #
@@ -939,10 +942,11 @@ def test_notify_overflow_split_with_amalgamation():
         # Un-used whitespace is always cleaned up; make sure we account for
         # this in our new calculation
         ws_diff = len(bulk[offset: len(_body) + offset]) - \
-            len(bulk[offset: len(_body) + offset].strip('\r\n\x0b\x0c'))
+            len(bulk[offset: len(_body) + offset]
+                .lstrip('\r\n\x0b\x0c').rstrip())
 
         assert bulk[offset: len(_body) + offset + ws_diff]\
-            .strip('\r\n\x0b\x0c') == _body
+            .lstrip('\r\n\x0b\x0c').rstrip() == _body
         offset += (len(_body) + ws_diff)
 
     #
@@ -994,10 +998,11 @@ def test_notify_overflow_split_with_amalgamation():
         # Un-used whitespace is always cleaned up; make sure we account for
         # this in our new calculation
         ws_diff = len(body[offset: len(_body) + offset]) - \
-            len(body[offset: len(_body) + offset].strip('\r\n\x0b\x0c'))
+            len(body[offset: len(_body) + offset]
+                .lstrip('\r\n\x0b\x0c').rstrip())
 
         assert body[offset: len(_body) + offset + ws_diff]\
-            .strip('\r\n\x0b\x0c') == _body
+            .lstrip('\r\n\x0b\x0c').rstrip() == _body
         offset += (len(_body) + ws_diff)
 
     #
@@ -1055,10 +1060,11 @@ def test_notify_overflow_split_with_amalgamation():
         # Un-used whitespace is always cleaned up; make sure we account for
         # this in our new calculation
         ws_diff = len(body[offset: len(_body) + offset]) - \
-            len(body[offset: len(_body) + offset].strip('\r\n\x0b\x0c'))
+            len(body[offset: len(_body) + offset]
+                .lstrip('\r\n\x0b\x0c').rstrip())
 
         assert body[offset: len(_body) + offset + ws_diff]\
-            .strip('\r\n\x0b\x0c') == _body
+            .lstrip('\r\n\x0b\x0c').rstrip() == _body
         offset += (len(_body) + ws_diff)
 
 
@@ -1119,7 +1125,7 @@ def test_notify_overflow_split_no_amalgamation():
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title)
     assert len(chunks) == 1
-    assert body.strip('\r\n\x0b\x0c') == chunks[0].get('body')
+    assert body.lstrip('\r\n\x0b\x0c').rstrip() == chunks[0].get('body')
     assert title[0:obj.title_maxlen] == chunks[0].get('title')
 
     #
@@ -1275,10 +1281,11 @@ def test_notify_overflow_split_no_amalgamation():
         # Un-used whitespace is always cleaned up; make sure we account for
         # this in our new calculation
         ws_diff = len(new_body[offset: len(_body) + offset]) - \
-            len(new_body[offset: len(_body) + offset].strip('\r\n\x0b\x0c'))
+            len(new_body[offset: len(_body) + offset]
+                .lstrip('\r\n\x0b\x0c').rstrip())
 
         assert new_body[offset: len(_body) + offset + ws_diff]\
-            .strip('\r\n\x0b\x0c') == _body
+            .lstrip('\r\n\x0b\x0c').rstrip() == _body
         offset += (len(_body) + ws_diff)
 
     # Body chunk is beyond 4 digits, so [XXXX/XXXX] is turned off
@@ -1302,10 +1309,11 @@ def test_notify_overflow_split_no_amalgamation():
         # Un-used whitespace is always cleaned up; make sure we account for
         # this in our new calculation
         ws_diff = len(new_body[offset: len(_body) + offset]) - \
-            len(new_body[offset: len(_body) + offset].strip('\r\n\x0b\x0c'))
+            len(new_body[offset: len(_body) + offset]
+                .lstrip('\r\n\x0b\x0c').rstrip())
 
         assert new_body[offset: len(_body) + offset + ws_diff]\
-            .strip('\r\n\x0b\x0c') == _body
+            .lstrip('\r\n\x0b\x0c').rstrip() == _body
         offset += (len(_body) + ws_diff)
 
     # Test larger messages
@@ -1355,10 +1363,11 @@ def test_notify_overflow_split_no_amalgamation():
         # Un-used whitespace is always cleaned up; make sure we account for
         # this in our new calculation
         ws_diff = len(new_body[offset: len(_body) + offset]) - \
-            len(new_body[offset: len(_body) + offset].strip('\r\n\x0b\x0c'))
+            len(new_body[offset: len(_body) + offset]
+                .lstrip('\r\n\x0b\x0c').rstrip())
 
         assert new_body[offset: len(_body) + offset + ws_diff]\
-            .strip('\r\n\x0b\x0c') == _body
+            .lstrip('\r\n\x0b\x0c').rstrip() == _body
         offset += (len(_body) + ws_diff)
 
     #
@@ -1423,10 +1432,11 @@ def test_notify_overflow_split_no_amalgamation():
         # Un-used whitespace is always cleaned up; make sure we account for
         # this in our new calculation
         ws_diff = len(bulk[offset: len(_body) + offset]) - \
-            len(bulk[offset: len(_body) + offset].strip('\r\n\x0b\x0c'))
+            len(bulk[offset: len(_body) + offset]
+                .lstrip('\r\n\x0b\x0c').rstrip())
 
         assert bulk[offset: len(_body) + offset + ws_diff]\
-            .strip('\r\n\x0b\x0c') == _body
+            .lstrip('\r\n\x0b\x0c').rstrip() == _body
         offset += (len(_body) + ws_diff)
 
     #
@@ -1525,10 +1535,11 @@ def test_notify_overflow_split_no_amalgamation():
         # Un-used whitespace is always cleaned up; make sure we account for
         # this in our new calculation
         ws_diff = len(body[offset: len(_body) + offset]) - \
-            len(body[offset: len(_body) + offset].strip('\r\n\x0b\x0c'))
+            len(body[offset: len(_body) + offset]
+                .lstrip('\r\n\x0b\x0c').rstrip())
 
         assert body[offset: len(_body) + offset + ws_diff]\
-            .strip('\r\n\x0b\x0c') == _body
+            .lstrip('\r\n\x0b\x0c').rstrip() == _body
         offset += (len(_body) + ws_diff)
 
 
@@ -1585,7 +1596,7 @@ def test_notify_markdown_general():
         body=body, title=title, body_format=NotifyFormat.TEXT)
     assert len(chunks) == 1
     # Our title get's stripped off since it's not of valid markdown
-    assert body.strip('\r\n\x0b\x0c') == chunks[0].get('body')
+    assert body.lstrip('\r\n\x0b\x0c').rstrip() == chunks[0].get('body')
     assert chunks[0].get('title') == ""
 
 
