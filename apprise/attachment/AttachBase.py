@@ -100,7 +100,8 @@ class AttachBase(URLBase):
         },
     }
 
-    def __init__(self, name=None, mimetype=None, cache=None, **kwargs):
+    def __init__(self, name=None, mimetype=None, cache=None,
+                 auto_delete=False, **kwargs):
         """
         Initialize some general logging and common server arguments that will
         keep things consistent when working with the configurations that
@@ -122,6 +123,10 @@ class AttachBase(URLBase):
         You can alternatively set the cache value to an int identifying the
         number of seconds the previously retrieved can exist for before it
         should be considered expired.
+
+        Set auto_delete to True if you wish the file to remove itself when
+        this object goes out of memory. This is more useful for remote
+        retrieval and should not be used for local file reference.
         """
 
         super().__init__(**kwargs)
@@ -136,6 +141,9 @@ class AttachBase(URLBase):
         # The mime type of the attached content.  This is detected if not
         # otherwise specified.
         self._mimetype = mimetype
+
+        # Set auto delete flag
+        self._auto_delete = auto_delete
 
         # The detected_mimetype, this is only used as a fallback if the
         # mimetype wasn't forced by the user
@@ -295,9 +303,22 @@ class AttachBase(URLBase):
           - download_path: Must contain a absolute path to content
           - detected_mimetype: Should identify mimetype of content
         """
+        if self._auto_delete and self.download_path:
+            try:
+                os.remove(self.download_path)
+                self.logger.debug(
+                    'Removed temporary file: %s%s',
+                    f':{self._name} - ' if self.__name else '',
+                    self.download_path)
+
+            except FileNotFoundError:
+                # no problem
+                pass
+
         self.detected_name = None
         self.download_path = None
         self.detected_mimetype = None
+
         return
 
     def download(self):
@@ -361,6 +382,12 @@ class AttachBase(URLBase):
                 results['cache'] = parse_bool(results['qsd']['cache'])
 
         return results
+
+    def __del__(self):
+        """
+        De-Construtor is used to tidy up files during garbage collection
+        """
+        self.invalidate()
 
     def __len__(self):
         """
