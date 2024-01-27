@@ -1,7 +1,7 @@
 # BSD 3-Clause License
 #
 # Apprise - Push Notification Library.
-# Copyright (c) 2023, Chris Caron <lead2gold@gmail.com>
+# Copyright (c) 2024, Chris Caron <lead2gold@gmail.com>
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -54,7 +54,7 @@ Techulus Push, Telegram, Threema Gateway, Twilio, Twitter, Twist, XBMC,
 Voipms, Vonage, WeCom Bot, WhatsApp, Webex Teams}
 
 Name:           python-%{pypi_name}
-Version:        1.7.1
+Version:        1.7.2
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        BSD
@@ -195,11 +195,14 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 %{python3_sitelib}/%{pypi_name}/cli.*
 
 %changelog
-* Thu Dec 28 2023 Chris Caron <lead2gold@gmail.com> - 1.7.1
-- Updated to v1.7.1
+* Sat Jan 27 2024 Chris Caron <lead2gold@gmail.com> - 1.7.2
+- Updated to v1.7.2
 
-* Wed Dec 27 2023 Chris Caron <lead2gold@gmail.com> - 1.7.0
-- Updated to v1.7.0
+* Fri Jan 26 2024 Fedora Release Engineering <releng@fedoraproject.org> - 1.6.0-3
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_40_Mass_Rebuild
+
+* Sun Jan 21 2024 Fedora Release Engineering <releng@fedoraproject.org> - 1.6.0-2
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_40_Mass_Rebuild
 
 * Sun Oct 15 2023 Chris Caron <lead2gold@gmail.com> - 1.6.0
 - Updated to v1.6.0

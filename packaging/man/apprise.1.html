@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv='content-type' value='text/html;charset=utf8'>
+  <meta name='generator' value='Ronn/v0.7.3 (http://github.com/rtomayko/ronn/tree/0.7.3)'>
+  <title>apprise(1) - Push Notifications that work with just about every platform!</title>
+  <style type='text/css' media='all'>
+  /* style: man */
+  body#manpage {margin:0}
+  .mp {max-width:100ex;padding:0 9ex 1ex 4ex}
+  .mp p,.mp pre,.mp ul,.mp ol,.mp dl {margin:0 0 20px 0}
+  .mp h2 {margin:10px 0 0 0}
+  .mp > p,.mp > pre,.mp > ul,.mp > ol,.mp > dl {margin-left:8ex}
+  .mp h3 {margin:0 0 0 4ex}
+  .mp dt {margin:0;clear:left}
+  .mp dt.flush {float:left;width:8ex}
+  .mp dd {margin:0 0 0 9ex}
+  .mp h1,.mp h2,.mp h3,.mp h4 {clear:left}
+  .mp pre {margin-bottom:20px}
+  .mp pre+h2,.mp pre+h3 {margin-top:22px}
+  .mp h2+pre,.mp h3+pre {margin-top:5px}
+  .mp img {display:block;margin:auto}
+  .mp h1.man-title {display:none}
+  .mp,.mp code,.mp pre,.mp tt,.mp kbd,.mp samp,.mp h3,.mp h4 {font-family:monospace;font-size:14px;line-height:1.42857142857143}
+  .mp h2 {font-size:16px;line-height:1.25}
+  .mp h1 {font-size:20px;line-height:2}
+  .mp {text-align:justify;background:#fff}
+  .mp,.mp code,.mp pre,.mp pre code,.mp tt,.mp kbd,.mp samp {color:#131211}
+  .mp h1,.mp h2,.mp h3,.mp h4 {color:#030201}
+  .mp u {text-decoration:underline}
+  .mp code,.mp strong,.mp b {font-weight:bold;color:#131211}
+  .mp em,.mp var {font-style:italic;color:#232221;text-decoration:none}
+  .mp a,.mp a:link,.mp a:hover,.mp a code,.mp a pre,.mp a tt,.mp a kbd,.mp a samp {color:#0000ff}
+  .mp b.man-ref {font-weight:normal;color:#434241}
+  .mp pre {padding:0 4ex}
+  .mp pre code {font-weight:normal;color:#434241}
+  .mp h2+pre,h3+pre {padding-left:0}
+  ol.man-decor,ol.man-decor li {margin:3px 0 10px 0;padding:0;float:left;width:33%;list-style-type:none;text-transform:uppercase;color:#999;letter-spacing:1px}
+  ol.man-decor {width:100%}
+  ol.man-decor li.tl {text-align:left}
+  ol.man-decor li.tc {text-align:center;letter-spacing:4px}
+  ol.man-decor li.tr {text-align:right;float:right}
+  </style>
+</head>
+<!--
+  The following styles are deprecated and will be removed at some point:
+  div#man, div#man ol.man, div#man ol.head, div#man ol.man.
+
+  The .man-page, .man-decor, .man-head, .man-foot, .man-title, and
+  .man-navigation should be used instead.
+-->
+<body id='manpage'>
+  <div class='mp' id='man'>
+
+  <div class='man-navigation' style='display:none'>
+    <a href="#NAME">NAME</a>
+    <a href="#SYNOPSIS">SYNOPSIS</a>
+    <a href="#DESCRIPTION">DESCRIPTION</a>
+    <a href="#OPTIONS">OPTIONS</a>
+    <a href="#EXIT-STATUS">EXIT STATUS</a>
+    <a href="#SERVICE-URLS">SERVICE URLS</a>
+    <a href="#EXAMPLES">EXAMPLES</a>
+    <a href="#CUSTOM-PLUGIN-NOTIFICATIONS">CUSTOM PLUGIN/NOTIFICATIONS</a>
+    <a href="#CONFIGURATION">CONFIGURATION</a>
+    <a href="#BUGS">BUGS</a>
+    <a href="#COPYRIGHT">COPYRIGHT</a>
+  </div>
+
+  <ol class='man-decor man-head man head'>
+    <li class='tl'>apprise(1)</li>
+    <li class='tc'></li>
+    <li class='tr'>apprise(1)</li>
+  </ol>
+
+  <h2 id="NAME">NAME</h2>
+<p class="man-name">
+  <code>apprise</code> - <span class="man-whatis">Push Notifications that work with just about every platform!</span>
+</p>
+
+<h2 id="SYNOPSIS">SYNOPSIS</h2>
+
+<p><code>apprise</code> [<var>options</var>...] <var>service-url</var>...<br /></p>
+
+<h2 id="DESCRIPTION">DESCRIPTION</h2>
+
+<p><strong>Apprise</strong> allows you to send a notification to <em>almost all</em> of the most
+popular notification services available to us today such as: Discord,
+Telegram, Pushbullet, Slack, Twitter, etc.</p>
+
+<ul>
+<li>One notification library to rule them all.</li>
+<li>A common and intuitive notification syntax.</li>
+<li>Supports the handling of images (to the notification services that will
+accept them).</li>
+</ul>
+
+
+<h2 id="OPTIONS">OPTIONS</h2>
+
+<p>The Apprise options are as follows:</p>
+
+<p>  <code>-b</code>, <code>--body=</code><var>TEXT</var>:
+  Specify the message body. If no body is specified then content is read from
+  <var>stdin</var>.</p>
+
+<p>  <code>-t</code>, <code>--title=</code><var>TEXT</var>:
+  Specify the message title. This field is complete optional.</p>
+
+<p>  <code>-c</code>, <code>--config=</code><var>CONFIG-URL</var>:
+  Specify one or more configuration locations.</p>
+
+<p>  <code>-a</code>, <code>--attach=</code><var>ATTACH-URL</var>:
+  Specify one or more file attachment locations.</p>
+
+<p>  <code>-P</code>, <code>--plugin-path=</code><var>PLUGIN-PATH</var>:
+  Specify a path to scan for custom notification plugin support.
+  You can create your own notification by simply creating a Python file
+  that contains the <code>@notify("schema")</code> decorator.</p>
+
+<p>  You can optioanly chose to specify more then one <strong>--plugin-path</strong> (<strong>-P</strong>)
+  to increase the modules included.</p>
+
+<p>  <code>-n</code>, <code>--notification-type=</code><var>TYPE</var>:
+  Specify the message type (default=info). Possible values are "info",
+  "success", "failure", and "warning".</p>
+
+<p>  <code>-i</code>, <code>--input-format=</code><var>FORMAT</var>:
+  Specify the input message format (default=text). Possible values are "text",
+  "html", and "markdown".</p>
+
+<p>  <code>-T</code>, <code>--theme=</code>THEME:
+  Specify the default theme.</p>
+
+<p>  <code>-g</code>, <code>--tag=</code>TAG:
+  Specify one or more tags to filter which services to notify. Use multiple
+  <strong>--tag</strong> (<strong>-g</strong>) entries to <code>OR</code> the tags together and comma separated
+  to <code>AND</code> them. If no tags are specified then all services are notified.</p>
+
+<p>  <code>-Da</code>, <code>--disable-async</code>:
+  Send notifications synchronously (one after the other) instead of
+  all at once.</p>
+
+<p>  <code>-R</code>, <code>--recursion-depth</code>:
+  he number of recursive import entries that can be loaded from within
+  Apprise configuration. By default this is set to 1. If this is set to
+  zero, then import statements found in any configuration is ignored.</p>
+
+<p>  <code>-e</code>, <code>--interpret-escapes</code>
+  Enable interpretation of backslash escapes. For example, this would convert
+  sequences such as \n and \r to their respected ascii new-line and carriage</p>
+
+<p>  <code>-j</code>, <code>--interpret-emojis</code>
+  Enable interpretation of emoji strings. For example, this would convert
+  sequences such as :smile: or :grin: to their respected unicode emoji
+  character.</p>
+
+<p>  <code>-d</code>, <code>--dry-run</code>:
+  Perform a trial run but only prints the notification services to-be
+  triggered to <strong>stdout</strong>. Notifications are never sent using this mode.</p>
+
+<p>  return characters prior to the delivery of the notification.</p>
+
+<p>  <code>-l</code>, <code>--details</code>
+  Prints details about the current services supported by Apprise.</p>
+
+<p>  <code>-v</code>, <code>--verbose</code>:
+  The more of these you specify, the more verbose the output is. e.g: -vvvv</p>
+
+<p>  <code>-D</code>, <code>--debug</code>:
+  A debug mode; useful for troubleshooting.</p>
+
+<p>  <code>-V</code>, <code>--version</code>:
+  Display the apprise version and exit.</p>
+
+<p>  <code>-h</code>, <code>--help</code>:
+  Show this message and exit.</p>
+
+<h2 id="EXIT-STATUS">EXIT STATUS</h2>
+
+<p><strong>apprise</strong> exits with a status of:</p>
+
+<ul>
+<li><strong>0</strong> if all of the notifications were sent successfully.</li>
+<li><strong>1</strong> if one or more notifications could not be sent.</li>
+<li><strong>2</strong> if there was an error specified on the command line such as not
+providing an valid argument.</li>
+<li><strong>3</strong> if there was one or more Apprise Service URLs successfully
+loaded but none could be notified due to user filtering (via tags).</li>
+</ul>
+
+
+<h2 id="SERVICE-URLS">SERVICE URLS</h2>
+
+<p>There are to many service URL and combinations to list here. It's best to
+visit the <a href="https://github.com/caronc/apprise/wiki#notification-services">Apprise GitHub page</a> and see what's available.</p>
+
+<h2 id="EXAMPLES">EXAMPLES</h2>
+
+<p>Send a notification to as many servers as you want to specify as you can
+easily chain them together:</p>
+
+<pre><code>$ apprise -vv -t "my title" -b "my notification body" \
+   "mailto://myemail:mypass@gmail.com" \
+   "pbul://o.gn5kj6nfhv736I7jC3cj3QLRiyhgl98b"
+</code></pre>
+
+<p>If you don't specify a <strong>--body</strong> (<strong>-b</strong>) then stdin is used allowing you to
+use the tool as part of your every day administration:</p>
+
+<pre><code>$ cat /proc/cpuinfo | apprise -vv -t "cpu info" \
+    "mailto://myemail:mypass@gmail.com"
+</code></pre>
+
+<p>Load in a configuration file which identifies all of your notification service
+URLs and notify them all:</p>
+
+<pre><code>$ apprise -vv -t "my title" -b "my notification body" \
+   --config=~/apprise.yml
+</code></pre>
+
+<p>Load in a configuration file from a remote server that identifies all of your
+notification service URLs and only notify the ones tagged as <em>devops</em>.</p>
+
+<pre><code>$ apprise -vv -t "my title" -b "my notification body" \
+   --config=https://localhost/my/apprise/config \
+   -t devops
+</code></pre>
+
+<p>Include an attachment:</p>
+
+<pre><code>$ apprise -vv -t "School Assignment" -b "See attached" \
+   --attach=Documents/FinalReport.docx
+</code></pre>
+
+<h2 id="CUSTOM-PLUGIN-NOTIFICATIONS">CUSTOM PLUGIN/NOTIFICATIONS</h2>
+
+<p>Apprise can additionally allow you to define your own custom <strong>schema://</strong>
+entries that you can trigger on and call services you've defined.</p>
+
+<p>By default <strong>apprise</strong> looks in the following local locations for custom plugin
+files and loads them:</p>
+
+<pre><code>~/.apprise/plugins
+~/.config/apprise/plugins
+/var/lib/apprise/plugins
+</code></pre>
+
+<p>Simply create your own python file with the following bare minimum content in
+it:
+    from apprise.decorators import notify</p>
+
+<pre><code># This example assumes you want your function to trigger on foobar://
+# references:
+@notify(on="foobar", name="My Custom Notification")
+def my_wrapper(body, title, notify_type, *args, **kwargs):
+
+     &lt;define your custom code here>
+
+        # Returning True/False is a way to relay your status back to Apprise.
+        # Returning nothing (None by default) is always interpreted as a Success
+     return True
+</code></pre>
+
+<h2 id="CONFIGURATION">CONFIGURATION</h2>
+
+<p>A configuration file can be in the format of either <strong>TEXT</strong> or <strong>YAML</strong> where
+[TEXT][textconfig] is the easiest and most ideal solution for most users.  However
+<a href="https://github.com/caronc/apprise/wiki/config_yaml">YAML</a> configuration files grants the user a bit more leverage and access
+to some of the internal features of Apprise. Reguardless of which format you choose,
+both provide the users the ability to leverage <strong>tagging</strong> which adds a more rich and
+powerful notification environment.</p>
+
+<p>Configuration files can be directly referenced via <strong>apprise</strong> when referencing
+the <code>--config=</code> (<code>-c</code>) CLI directive.  You can identify as many as you like on the
+command line and all of them will be loaded.  You can also point your configuration to
+a cloud location (by referencing <code>http://</code> or <code>https://</code>. By default <strong>apprise</strong> looks
+in the following local locations for configuration files and loads them:</p>
+
+<pre><code>~/.apprise
+~/.apprise.yml
+~/.config/apprise
+~/.config/apprise.yml
+
+~/.apprise/apprise
+~/.apprise/apprise.yaml
+~/.config/apprise/apprise
+~/.config/apprise/apprise.yaml
+
+/etc/apprise
+/etc/apprise.yml
+/etc/apprise/apprise
+/etc/apprise/apprise.yml
+</code></pre>
+
+<p>If a default configuration file is referenced in any way by the <strong>apprise</strong>
+tool, you no longer need to provide it a Service URL.  Usage of the <strong>apprise</strong>
+tool simplifies to:</p>
+
+<pre><code>$ apprise -vv -t "my title" -b "my notification body"
+</code></pre>
+
+<p>If you leveraged <a href="https://github.com/caronc/apprise/wiki/CLI_Usage#label-leverage-tagging">tagging</a>, you can define all of Apprise Service URLs in your
+configuration that you want and only specifically notify a subset of them:</p>
+
+<pre><code>$ apprise -vv -t "Will Be Late" -b "Go ahead and make dinner without me" \
+          --tag=family
+</code></pre>
+
+<h2 id="BUGS">BUGS</h2>
+
+<p>If you find any bugs, please make them known at:
+<a href="https://github.com/caronc/apprise/issues" data-bare-link="true">https://github.com/caronc/apprise/issues</a></p>
+
+<h2 id="COPYRIGHT">COPYRIGHT</h2>
+
+<p>Apprise is Copyright (C) 2024 Chris Caron <a href="&#109;&#x61;&#x69;&#108;&#116;&#x6f;&#x3a;&#x6c;&#x65;&#x61;&#x64;&#50;&#x67;&#111;&#x6c;&#100;&#x40;&#103;&#x6d;&#x61;&#105;&#x6c;&#x2e;&#99;&#111;&#109;" data-bare-link="true">&#x6c;&#x65;&#97;&#x64;&#50;&#103;&#111;&#x6c;&#100;&#64;&#103;&#x6d;&#x61;&#x69;&#108;&#46;&#x63;&#x6f;&#x6d;</a></p>
+
+
+  <ol class='man-decor man-foot man foot'>
+    <li class='tl'>Chris Caron &lt;lead2gold@gmail.com&gt;</li>
+    <li class='tc'>January 2024</li>
+    <li class='tr'>apprise(1)</li>
+  </ol>
+
+  </div>
+</body>
+</html>

@@ -1,14 +1,14 @@
 # Translations template for apprise.
-# Copyright (C) 2023 Chris Caron
+# Copyright (C) 2024 Chris Caron
 # This file is distributed under the same license as the apprise project.
-# FIRST AUTHOR <EMAIL@ADDRESS>, 2023.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2024.
 #
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: apprise 1.7.1\n"
+"Project-Id-Version: apprise 1.7.2\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2023-12-28 14:34-0500\n"
+"POT-Creation-Date: 2024-01-27 15:34-0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -794,9 +794,6 @@ msgid "Use Session"
 msgstr ""
 
 msgid "User Email"
-msgstr ""
-
-msgid "User ID"
 msgstr ""
 
 msgid "User Key"

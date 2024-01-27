@@ -226,4 +226,4 @@ If you find any bugs, please make them known at:
 
 ## COPYRIGHT
 
-Apprise is Copyright (C) 2023 Chris Caron <lead2gold@gmail.com>
+Apprise is Copyright (C) 2024 Chris Caron <lead2gold@gmail.com>
