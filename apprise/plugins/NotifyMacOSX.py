@@ -98,6 +98,7 @@ class NotifyMacOSX(NotifyBase):
         '/usr/local/bin/terminal-notifier',
         '/usr/bin/terminal-notifier',
         '/bin/terminal-notifier',
+        '/opt/local/bin/terminal-notifier',
     )
 
     # Define object templates
