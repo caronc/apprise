@@ -219,6 +219,9 @@ class AppriseLocale:
             try:
                 # Acquire our locale
                 lang = locale.getlocale()[0]
+                # Compatibility for Python >= 3.12
+                if lang == 'C':
+                    lang = 'en_US'
 
             except (ValueError, TypeError) as e:
                 # This occurs when an invalid locale was parsed from the
