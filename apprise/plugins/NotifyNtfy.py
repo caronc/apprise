@@ -42,6 +42,7 @@ from json import dumps
 from os.path import basename
 
 from .NotifyBase import NotifyBase
+from ..common import NotifyFormat
 from ..common import NotifyType
 from ..common import NotifyImageSize
 from ..AppriseLocale import gettext_lazy as _
@@ -514,6 +515,10 @@ class NotifyNtfy(NotifyBase):
 
         if body:
             virt_payload['message'] = body
+
+        if self.notify_format == NotifyFormat.MARKDOWN:
+            # Support Markdown
+            headers['X-Markdown'] = 'yes'
 
         if self.priority != NtfyPriority.NORMAL:
             headers['X-Priority'] = self.priority
