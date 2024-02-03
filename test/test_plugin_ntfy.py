@@ -487,6 +487,22 @@ def test_plugin_custom_ntfy_edge_cases(mock_post):
     assert response['attach'] == 'http://example.com/file.jpg'
     assert response['filename'] == 'smoke.jpg'
 
+    # Reset our mock object
+    mock_post.reset_mock()
+
+    # Markdown Support
+    results = NotifyNtfy.parse_url('ntfys://topic/?format=markdown')
+    assert isinstance(results, dict)
+    instance = NotifyNtfy(**results)
+
+    assert instance.notify(
+        body='body', title='title',
+        notify_type=apprise.NotifyType.INFO) is True
+
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == 'https://ntfy.sh'
+    assert 'X-Markdown' in mock_post.call_args_list[0][1]['headers']
+
 
 @mock.patch('requests.post')
 @mock.patch('requests.get')
