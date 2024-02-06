@@ -144,7 +144,7 @@ class NotifyRevolt(NotifyBase):
         if not self.bot_token:
             msg = 'An invalid Revolt Bot Token ' \
                 '({}) was specified.'.format(bot_token)
-            self.logger.warn(msg)
+            self.logger.warning(msg)
             raise TypeError(msg)
 
         # Channel Id
@@ -152,7 +152,7 @@ class NotifyRevolt(NotifyBase):
         if not self.channel_id:
             msg = 'An invalid Revolt Channel Id' \
                 '({}) was specified.'.format(channel_id)
-            self.logger.warn(msg)
+            self.logger.warning(msg)
             raise TypeError(msg)
 
         # Use custom image for embed image
@@ -191,7 +191,7 @@ class NotifyRevolt(NotifyBase):
                 if len(title) > 100:
                     msg = 'Title length must be less than 100 when ' \
                         'embeds are enabled (is %s)' % len(title)
-                    self.logger.warn(msg)
+                    self.logger.warning(msg)
                     title = title[0:100]
                 payload['embeds'] = [{
                     'title': title,
