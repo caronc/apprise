@@ -32,12 +32,10 @@ from datetime import datetime, timedelta
 from datetime import timezone
 import pytest
 import requests
-from json import loads
 
 from apprise.plugins.NotifyRevolt import NotifyRevolt
 from helpers import AppriseURLTester
 from apprise import Apprise
-from apprise import AppriseAttachment
 from apprise import NotifyType
 from apprise import NotifyFormat
 from apprise.common import OverflowMode
@@ -358,7 +356,6 @@ def test_plugin_revolt_general(mock_post):
     a.asset.image_url_logo = None
     assert a.notify(
         body='body', title='title', notify_type=NotifyType.INFO) is True
-
 
 
 @mock.patch('requests.post')

@@ -32,11 +32,10 @@
 #  This plugin will simply work using the url of:
 #     revolt://BOT_TOKEN/CHANNEL_ID
 #
-# API Documentation on sending messages:
-#    - https://api.revolt.chat/swagger/index.html#operations-Messaging-message_send_message_send
+# API Documentation:
+#    - https://api.revolt.chat/swagger/index.html
 #
 
-import re
 import requests
 from json import dumps
 from datetime import timedelta
@@ -50,7 +49,7 @@ from ..common import NotifyType
 from ..utils import parse_bool
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
-from ..attachment.AttachBase import AttachBase
+
 
 class NotifyRevolt(NotifyBase):
     """
@@ -75,17 +74,16 @@ class NotifyRevolt(NotifyBase):
     # Revolt supports attachments but don't implemenet for now
     attachment_support = False
 
-    
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_256
 
-    # Discord is kind enough to return how many more requests we're allowed to
+    # Revolt is kind enough to return how many more requests we're allowed to
     # continue to make within it's header response as:
     # X-RateLimit-Reset: The epoc time (in seconds) we can expect our
     #                    rate-limit to be reset.
     # X-RateLimit-Remaining: an integer identifying how many requests we're
     #                        still allow to make.
-    request_rate_per_sec = 0
+    request_rate_per_sec = 3
 
     # Taken right from google.auth.helpers:
     clock_skew = timedelta(seconds=10)
@@ -136,9 +134,9 @@ class NotifyRevolt(NotifyBase):
     })
 
     def __init__(self, bot_token, channel_id,
-        is_embed=False, embed_img=None, embed_url=None,
-        custom_img=False,
-        **kwargs):
+                 is_embed=False, embed_img=None, embed_url=None,
+                 custom_img=False,
+                 **kwargs):
         super().__init__(**kwargs)
 
         # Bot Token
@@ -148,7 +146,7 @@ class NotifyRevolt(NotifyBase):
                 '({}) was specified.'.format(bot_token)
             self.logger.warn(msg)
             raise TypeError(msg)
-        
+
         # Channel Id
         self.channel_id = validate_regex(channel_id)
         if not self.channel_id:
@@ -173,15 +171,15 @@ class NotifyRevolt(NotifyBase):
         self.ratelimit_remaining = 1.0
 
         return
-    
-    def send(self, body, title='', notify_type=NotifyType.INFO,
-        **kwargs):
+
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Revolt Notification
+
         """
 
         payload = {}
-        
+
         # Acquire image_url
         image_url = self.image_url(notify_type)
 
@@ -191,9 +189,10 @@ class NotifyRevolt(NotifyBase):
         if body:
             if self.notify_format == NotifyFormat.MARKDOWN:
                 if len(title) > 100:
-                    msg = 'Title length must be less than 100 when embeds are enabled (is %s)' % len(title)
+                    msg = 'Title length must be less than 100 when ' \
+                        'embeds are enabled (is %s)' % len(title)
                     self.logger.warn(msg)
-                    title=title[0:100]
+                    title = title[0:100]
                 payload['embeds'] = [{
                     'title': title,
                     'description': body,
@@ -209,16 +208,16 @@ class NotifyRevolt(NotifyBase):
             else:
                 payload['content'] = \
                     body if not title else "{}\n{}".format(title, body)
-            
+
             if not self._send(payload):
                 # Failed to send message
                 return False
         return True
 
-    def _send(self, payload, rate_limit=1,
-        **kwargs):
+    def _send(self, payload, rate_limit=1, **kwargs):
         """
         Wrapper to the requests (post) object
+
         """
 
         headers = {
@@ -232,11 +231,11 @@ class NotifyRevolt(NotifyBase):
             self.channel_id
         )
 
-        self.logger.debug('Revolt POST URL: %s (cert_verify=%r)' %(
+        self.logger.debug('Revolt POST URL: %s (cert_verify=%r)' % (
             notify_url, self.verify_certificate
         ))
         self.logger.debug('Revolt Payload: %s' % str(payload))
-        
+
         # By default set wait to None
         wait = None
 
@@ -253,7 +252,7 @@ class NotifyRevolt(NotifyBase):
                 wait = abs(
                     (self.ratelimit_reset - now + self.clock_skew)
                     .total_seconds())
-                    
+
         # Always call throttle before any remote server i/o is made;
         self.throttle(wait=wait)
 
@@ -328,6 +327,7 @@ class NotifyRevolt(NotifyBase):
     def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
+
         """
 
         params = {}
@@ -337,7 +337,7 @@ class NotifyRevolt(NotifyBase):
 
         if self.embed_url:
             params['embed_url'] = self.embed_url
-        
+
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         return '{schema}://{bot_token}/{channel_id}/?{params}'.format(
@@ -346,6 +346,7 @@ class NotifyRevolt(NotifyBase):
             channel_id=self.pprint(self.channel_id, privacy, safe=''),
             params=NotifyRevolt.urlencode(params),
         )
+
     @staticmethod
     def parse_url(url):
         """
@@ -353,7 +354,7 @@ class NotifyRevolt(NotifyBase):
         us to re-instantiate this object.
 
         Syntax:
-          discord://webhook_id/webhook_token
+          revolt://bot_token/channel_id
 
         """
         results = NotifyBase.parse_url(url, verify_host=False)
@@ -361,10 +362,10 @@ class NotifyRevolt(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
-        # Store our webhook ID
+        # Store our bot token
         bot_token = NotifyRevolt.unquote(results['host'])
 
-        # Now fetch our tokens
+        # Now fetch the channel id
         try:
             channel_id = \
                 NotifyRevolt.split_path(results['fullpath'])[0]
