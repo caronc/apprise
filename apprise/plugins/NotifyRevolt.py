@@ -134,7 +134,7 @@ class NotifyRevolt(NotifyBase):
     })
 
     def __init__(self, bot_token, channel_id,
-                 is_embed=False, embed_img=None, embed_url=None,
+                 embed_img=None, embed_url=None,
                  custom_img=False,
                  **kwargs):
         super().__init__(**kwargs)
