@@ -64,6 +64,10 @@ apprise_url_tests = (
     ('revolt://%s' % ('i' * 24), {
         'instance': TypeError,
     }),
+    # channel_id specified on url
+    ('revolt://?channel_id=%s' % ('i' * 24), {
+        'instance': TypeError,
+    }),
     # Provide both a bot token and a channel id
     ('revolt://%s/%s' % ('i' * 24, 't' * 64), {
         'instance': NotifyRevolt,
@@ -71,6 +75,10 @@ apprise_url_tests = (
     }),
     # Provide a temporary username
     ('revolt://l2g@%s/%s' % ('i' * 24, 't' * 64), {
+        'instance': NotifyRevolt,
+        'requests_response_code': requests.codes.no_content,
+    }),
+    ('revolt://l2g@_?bot_token=%s&channel_id=%s' % ('i' * 24, 't' * 64), {
         'instance': NotifyRevolt,
         'requests_response_code': requests.codes.no_content,
     }),

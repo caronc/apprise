@@ -121,6 +121,9 @@ class NotifyRevolt(NotifyBase):
         'channel_id': {
             'alias_of': 'channel_id',
         },
+        'bot_token': {
+            'alias_of': 'bot_token',
+        },
         'embed_img': {
             'name': _('Embed Image Url'),
             'type': 'string'
@@ -131,13 +134,13 @@ class NotifyRevolt(NotifyBase):
         },
         'custom_img': {
             'name': _('Custom Embed Url'),
-            'type': 'boolean',
+            'type': 'bool',
             'default': False
         }
     })
 
     def __init__(self, bot_token, channel_id, embed_img=None, embed_url=None,
-                 custom_img=False, **kwargs):
+                 custom_img=None, **kwargs):
         super().__init__(**kwargs)
 
         # Bot Token
@@ -157,7 +160,9 @@ class NotifyRevolt(NotifyBase):
             raise TypeError(msg)
 
         # Use custom image for embed image
-        self.custom_img = custom_img
+        self.custom_img = parse_bool(custom_img) \
+            if custom_img is not None \
+            else self.template_args['custom_img']['default']
 
         # Image for Embed
         self.embed_img = embed_img
@@ -204,6 +209,7 @@ class NotifyRevolt(NotifyBase):
 
                 if self.embed_img:
                     payload['embeds'][0]['icon_url'] = image_url
+
                 if self.embed_url:
                     payload['embeds'][0]['url'] = self.embed_url
             else:
@@ -387,10 +393,19 @@ class NotifyRevolt(NotifyBase):
             results['channel_id'] = \
                 NotifyRevolt.unquote(results['qsd']['channel_id'])
 
+        # Support bot token on the URL string (if specified)
+        if 'bot_token' in results['qsd']:
+            results['bot_token'] = \
+                NotifyRevolt.unquote(results['qsd']['bot_token'])
+
         # Extract avatar url if it was specified
         if 'embed_img' in results['qsd']:
             results['embed_img'] = \
                 NotifyRevolt.unquote(results['qsd']['embed_img'])
+
+        if 'custom_img' in results['qsd']:
+            results['custom_img'] = \
+                NotifyRevolt.unquote(results['qsd']['custom_img'])
 
         elif 'embed_url' in results['qsd']:
             results['embed_url'] = \
