@@ -118,6 +118,9 @@ class NotifyRevolt(NotifyBase):
 
     # Define our template arguments
     template_args = dict(NotifyBase.template_args, **{
+        'channel_id': {
+            'alias_of': 'channel_id',
+        },
         'embed_img': {
             'name': _('Embed Image Url'),
             'type': 'string'
@@ -133,10 +136,8 @@ class NotifyRevolt(NotifyBase):
         }
     })
 
-    def __init__(self, bot_token, channel_id,
-                 embed_img=None, embed_url=None,
-                 custom_img=False,
-                 **kwargs):
+    def __init__(self, bot_token, channel_id, embed_img=None, embed_url=None,
+                 custom_img=False, **kwargs):
         super().__init__(**kwargs)
 
         # Bot Token
@@ -380,6 +381,11 @@ class NotifyRevolt(NotifyBase):
 
         # Text To Speech
         results['tts'] = parse_bool(results['qsd'].get('tts', False))
+
+        # Support channel id on the URL string (if specified)
+        if 'channel_id' in results['qsd']:
+            results['channel_id'] = \
+                NotifyRevolt.unquote(results['qsd']['channel_id'])
 
         # Extract avatar url if it was specified
         if 'embed_img' in results['qsd']:
