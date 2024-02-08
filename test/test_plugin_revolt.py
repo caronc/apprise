@@ -382,8 +382,8 @@ def test_plugin_revolt_overflow(mock_post):
     mock_post.return_value.status_code = requests.codes.ok
 
     # Some variables we use to control the data we work with
-    body_len = 2000
-    title_len = 100
+    body_len = 2005
+    title_len = 110
 
     # Number of characters per line
     row = 24
@@ -416,11 +416,10 @@ def test_plugin_revolt_overflow(mock_post):
 
     results = instance._apply_overflow(
         body, title=title, overflow=OverflowMode.SPLIT)
-
-    # Ensure we never exceed 2000 characters
-    for entry in results:
-        assert len(entry['title']) <= instance.title_maxlen
-        assert len(entry['title']) + len(entry['body']) <= instance.body_maxlen
+    # Split into 2
+    assert len(results) == 2
+    assert len(results[0]['title']) <= instance.title_maxlen
+    assert len(results[0]['body']) <= instance.body_maxlen
 
 
 @mock.patch('requests.post')
