@@ -66,7 +66,7 @@ class NotifyRevolt(NotifyBase):
     secure_protocol = 'revolt'
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_Revolt'
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_revolt'
 
     # Revolt Channel Message
     notify_url = 'https://api.revolt.chat/'
@@ -97,7 +97,7 @@ class NotifyRevolt(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{bot_token}/{channel_id}'
+        '{schema}://{bot_token}/{channel_id}',
     )
 
     # Defile out template tokens
