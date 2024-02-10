@@ -295,6 +295,21 @@ EMAIL_TEMPLATES = (
         },
     ),
 
+    # Comcast.net
+    (
+        'Comcast.net',
+        re.compile(
+            r'^((?P<label>[^+]+)\+)?(?P<id>[^@]+)@'
+            r'(?P<domain>(comcast)\.net)$', re.I),
+        {
+            'port': 465,
+            'smtp_host': 'smtp.comcast.net',
+            'secure': True,
+            'secure_mode': SecureMailMode.SSL,
+            'login_type': (WebBaseLogin.EMAIL, )
+        },
+    ),
+
     # Catch All
     (
         'Custom',
