@@ -59,6 +59,9 @@ class RocketChatAuthMode:
     # providing a webhook
     WEBHOOK = "webhook"
 
+    # Support token submission
+    TOKEN = "token"
+
     # Providing a username and password (default)
     BASIC = "basic"
 
@@ -66,6 +69,7 @@ class RocketChatAuthMode:
 # Define our authentication modes
 ROCKETCHAT_AUTH_MODES = (
     RocketChatAuthMode.WEBHOOK,
+    RocketChatAuthMode.TOKEN,
     RocketChatAuthMode.BASIC,
 )
 
@@ -107,6 +111,8 @@ class NotifyRocketChat(NotifyBase):
     templates = (
         '{schema}://{user}:{password}@{host}:{port}/{targets}',
         '{schema}://{user}:{password}@{host}/{targets}',
+        '{schema}://{user}:{token}@{host}:{port}/{targets}',
+        '{schema}://{user}:{token}@{host}/{targets}',
         '{schema}://{webhook}@{host}',
         '{schema}://{webhook}@{host}:{port}',
         '{schema}://{webhook}@{host}/{targets}',
@@ -133,6 +139,11 @@ class NotifyRocketChat(NotifyBase):
         'password': {
             'name': _('Password'),
             'type': 'string',
+            'private': True,
+        },
+        'token': {
+            'name': _('API Token'),
+            'map_to': 'password',
             'private': True,
         },
         'webhook': {
@@ -230,13 +241,20 @@ class NotifyRocketChat(NotifyBase):
             if self.webhook is not None:
                 # Just a username was specified, we treat this as a webhook
                 self.mode = RocketChatAuthMode.WEBHOOK
+            elif self.password and len(self.password) > 32:
+                self.mode = RocketChatAuthMode.TOKEN
             else:
                 self.mode = RocketChatAuthMode.BASIC
 
-        if self.mode == RocketChatAuthMode.BASIC \
+            self.logger.debug(
+                "Auto-Detected Rocketchat Auth Mode: %s", self.mode)
+
+        if self.mode in (RocketChatAuthMode.BASIC, RocketChatAuthMode.TOKEN) \
                 and not (self.user and self.password):
             # Username & Password is required for Rocket Chat to work
-            msg = 'No Rocket.Chat user/pass combo was specified.'
+            msg = 'No Rocket.Chat {} was specified.'.format(
+                'user/pass combo' if self.mode == RocketChatAuthMode.BASIC else
+                'user/apikey')
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -244,6 +262,13 @@ class NotifyRocketChat(NotifyBase):
             msg = 'No Rocket.Chat Incoming Webhook was specified.'
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        if self.mode == RocketChatAuthMode.TOKEN:
+            # Set our headers for further communication
+            self.headers.update({
+                'X-User-Id': self.user,
+                'X-Auth-Token': self.password,
+            })
 
         # Validate recipients and drop bad ones:
         for recipient in parse_list(targets):
@@ -309,12 +334,13 @@ class NotifyRocketChat(NotifyBase):
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Determine Authentication
-        if self.mode == RocketChatAuthMode.BASIC:
+        if self.mode in (RocketChatAuthMode.BASIC, RocketChatAuthMode.TOKEN):
             auth = '{user}:{password}@'.format(
                 user=NotifyRocketChat.quote(self.user, safe=''),
                 password=self.pprint(
                     self.password, privacy, mode=PrivacyMode.Secret, safe=''),
             )
+
         else:
             auth = '{user}{webhook}@'.format(
                 user='{}:'.format(NotifyRocketChat.quote(self.user, safe=''))
@@ -359,8 +385,11 @@ class NotifyRocketChat(NotifyBase):
         # Call the _send_ function applicable to whatever mode we're in
         # - calls _send_webhook_notification if the mode variable is set
         # - calls _send_basic_notification if the mode variable is not set
-        return getattr(self, '_send_{}_notification'.format(self.mode))(
-            body=body, title=title, notify_type=notify_type, **kwargs)
+        return getattr(self, '_send_{}_notification'.format(
+            RocketChatAuthMode.WEBHOOK
+            if self.mode == RocketChatAuthMode.WEBHOOK
+            else RocketChatAuthMode.BASIC))(
+                body=body, title=title, notify_type=notify_type, **kwargs)
 
     def _send_webhook_notification(self, body, title='',
                                    notify_type=NotifyType.INFO, **kwargs):
@@ -412,7 +441,7 @@ class NotifyRocketChat(NotifyBase):
         """
         # Track whether we authenticated okay
 
-        if not self.login():
+        if self.mode == RocketChatAuthMode.BASIC and not self.login():
             return False
 
         # prepare JSON Object
@@ -432,9 +461,7 @@ class NotifyRocketChat(NotifyBase):
             channel = channels.pop(0)
             payload['channel'] = channel
 
-            if not self._send(
-                    payload, notify_type=notify_type, headers=self.headers,
-                    **kwargs):
+            if not self._send(payload, notify_type=notify_type, **kwargs):
 
                 # toggle flag
                 has_error = True
@@ -447,15 +474,14 @@ class NotifyRocketChat(NotifyBase):
             room = rooms.pop(0)
             payload['roomId'] = room
 
-            if not self._send(
-                    payload, notify_type=notify_type, headers=self.headers,
-                    **kwargs):
+            if not self._send(payload, notify_type=notify_type, **kwargs):
 
                 # toggle flag
                 has_error = True
 
-        # logout
-        self.logout()
+        if self.mode == RocketChatAuthMode.BASIC:
+            # logout
+            self.logout()
 
         return not has_error
 
@@ -476,7 +502,7 @@ class NotifyRocketChat(NotifyBase):
         return payload
 
     def _send(self, payload, notify_type, path='api/v1/chat.postMessage',
-              headers={}, **kwargs):
+              **kwargs):
         """
         Perform Notify Rocket.Chat Notification
         """
@@ -486,6 +512,9 @@ class NotifyRocketChat(NotifyBase):
         self.logger.debug('Rocket.Chat POST URL: %s (cert_verify=%r)' % (
             api_url, self.verify_certificate))
         self.logger.debug('Rocket.Chat Payload: %s' % str(payload))
+
+        # Copy our existing headers
+        headers = self.headers.copy()
 
         # Apply minimum headers
         headers.update({
