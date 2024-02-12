@@ -30,3 +30,6 @@ The contributors have been listed in chronological order:
 
 * Joey Espinosa <@particledecay>
   * Apr 3rd 2022 - Added Ntfy Support
+
+* Kate Ward <https://kate.pet>
+  * 6th Feb 2024 - Add Revolt Support
