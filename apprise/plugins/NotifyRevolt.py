@@ -232,7 +232,7 @@ class NotifyRevolt(NotifyBase):
             'Content-Type': 'application/json; charset=utf-8'
         }
 
-        notify_url = '{0}/channels/{1}/send'.format(
+        notify_url = '{0}channels/{1}/messages'.format(
             self.notify_url,
             self.channel_id
         )
