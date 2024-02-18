@@ -298,14 +298,19 @@ def test_plugin_discord_notifications(mock_post):
 
 
 @mock.patch('requests.post')
-def test_plugin_discord_general(mock_post):
+@mock.patch('time.sleep')
+def test_plugin_discord_general(mock_sleep, mock_post):
     """
     NotifyDiscord() General Checks
 
     """
 
+    # Prevent throttling
+    mock_sleep.return_value = True
+
     # Turn off clock skew for local testing
     NotifyDiscord.clock_skew = timedelta(seconds=0)
+
     # Epoch time:
     epoch = datetime.fromtimestamp(0, timezone.utc)
 

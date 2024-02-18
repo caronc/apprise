@@ -297,7 +297,6 @@ class NotifyTelegram(NotifyBase):
             'name': _('Target Chat ID'),
             'type': 'string',
             'map_to': 'targets',
-            'map_to': 'targets',
             'regex': (r'^((-?[0-9]{1,32})|([a-z_-][a-z0-9_-]+))$', 'i'),
         },
         'targets': {
@@ -916,7 +915,7 @@ class NotifyTelegram(NotifyBase):
         """
         Returns the number of targets associated with this notification
         """
-        return len(self.targets)
+        return 1 if not self.targets else len(self.targets)
 
     @staticmethod
     def parse_url(url):
