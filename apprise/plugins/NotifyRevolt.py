@@ -37,7 +37,7 @@
 #
 
 import requests
-from json import dumps
+from json import dumps, loads
 from datetime import timedelta
 from datetime import datetime
 from datetime import timezone
@@ -46,8 +46,8 @@ from .NotifyBase import NotifyBase
 from ..common import NotifyImageSize
 from ..common import NotifyFormat
 from ..common import NotifyType
-from ..utils import parse_bool
 from ..utils import validate_regex
+from ..utils import parse_list
 from ..AppriseLocale import gettext_lazy as _
 
 
@@ -60,7 +60,7 @@ class NotifyRevolt(NotifyBase):
     service_name = 'Revolt'
 
     # The services URL
-    service_url = 'https://api.revolt.chat/'
+    service_url = 'https://revolt.chat/'
 
     # The default secure protocol
     secure_protocol = 'revolt'
@@ -71,7 +71,7 @@ class NotifyRevolt(NotifyBase):
     # Revolt Channel Message
     notify_url = 'https://api.revolt.chat/'
 
-    # Revolt supports attachments but don't implemenet for now
+    # Revolt supports attachments but doesn't support it here (for now)
     attachment_support = False
 
     # Allows the user to specify the NotifyImageSize object
@@ -85,8 +85,8 @@ class NotifyRevolt(NotifyBase):
     #                        still allow to make.
     request_rate_per_sec = 3
 
-    # Taken right from google.auth.helpers:
-    clock_skew = timedelta(seconds=10)
+    # Safety net
+    clock_skew = timedelta(seconds=2)
 
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 2000
@@ -96,7 +96,7 @@ class NotifyRevolt(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{bot_token}/{channel_id}',
+        '{schema}://{bot_token}/{targets}',
     )
 
     # Defile out template tokens
@@ -107,39 +107,44 @@ class NotifyRevolt(NotifyBase):
             'private': True,
             'required': True,
         },
-        'channel_id': {
-            'name': _('Channel Id'),
+        'target_channel': {
+            'name': _('Channel ID'),
             'type': 'string',
+            'map_to': 'targets',
+            'regex': (r'^[a-z0-9_-]+$', 'i'),
             'private': True,
             'required': True,
+        },
+        'targets': {
+            'name': _('Targets'),
+            'type': 'list:string',
         },
     })
 
     # Define our template arguments
     template_args = dict(NotifyBase.template_args, **{
-        'channel_id': {
-            'alias_of': 'channel_id',
+        'channel': {
+            'alias_of': 'targets',
         },
         'bot_token': {
             'alias_of': 'bot_token',
         },
-        'embed_img': {
-            'name': _('Embed Image Url'),
+        'icon_url': {
+            'name': _('Icon URL'),
             'type': 'string'
         },
-        'embed_url': {
-            'name': _('Embed Url'),
-            'type': 'string'
+        'url': {
+            'name': _('Embed URL'),
+            'type': 'string',
+            'map_to': 'link',
         },
-        'custom_img': {
-            'name': _('Custom Embed Url'),
-            'type': 'bool',
-            'default': False
-        }
+        'to': {
+            'alias_of': 'targets',
+        },
     })
 
-    def __init__(self, bot_token, channel_id, embed_img=None, embed_url=None,
-                 custom_img=None, **kwargs):
+    def __init__(self, bot_token, targets, icon_url=None, link=None,
+                 **kwargs):
         super().__init__(**kwargs)
 
         # Bot Token
@@ -150,24 +155,27 @@ class NotifyRevolt(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # Channel Id
-        self.channel_id = validate_regex(channel_id)
-        if not self.channel_id:
-            msg = 'An invalid Revolt Channel Id' \
-                '({}) was specified.'.format(channel_id)
-            self.logger.warning(msg)
-            raise TypeError(msg)
+        # Parse our Channel IDs
+        self.targets = []
+        for target in parse_list(targets):
+            results = validate_regex(
+                target, *self.template_tokens['target_channel']['regex'])
 
-        # Use custom image for embed image
-        self.custom_img = parse_bool(custom_img) \
-            if custom_img is not None \
-            else self.template_args['custom_img']['default']
+            if not results:
+                self.logger.warning(
+                    'Dropped invalid Revolt channel ({}) specified.'
+                    .format(target),
+                )
+                continue
+
+            # Add our target
+            self.targets.append(target)
 
         # Image for Embed
-        self.embed_img = embed_img
+        self.icon_url = icon_url
 
         # Url for embed title
-        self.embed_url = embed_url
+        self.link = link
 
         # For Tracking Purposes
         self.ratelimit_reset = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -183,44 +191,47 @@ class NotifyRevolt(NotifyBase):
 
         """
 
+        if len(self.targets) == 0:
+            self.logger.warning('There were not Revolt channels to notify.')
+            return False
+
         payload = {}
 
         # Acquire image_url
-        image_url = self.image_url(notify_type)
+        image_url = self.icon_url \
+            if self.icon_url else self.image_url(notify_type)
 
-        if self.custom_img and (image_url or self.embed_url):
-            image_url = self.embed_url if self.embed_url else image_url
+        if self.notify_format == NotifyFormat.MARKDOWN:
+            payload['embeds'] = [{
+                'title': None if not title else title[0:self.title_maxlen],
+                'description': body,
 
-        if body:
-            if self.notify_format == NotifyFormat.MARKDOWN:
-                if len(title) > 100:
-                    msg = 'Title length must be less than 100 when ' \
-                        'embeds are enabled (is %s)' % len(title)
-                    self.logger.warning(msg)
-                    title = title[0:100]
-                payload['embeds'] = [{
-                    'title': title,
-                    'description': body,
+                # Our color associated with our notification
+                'colour': self.color(notify_type),
+                'replies': None
+            }]
 
-                    # Our color associated with our notification
-                    'colour': self.color(notify_type, int)
-                }]
+            if image_url:
+                payload['embeds'][0]['icon_url'] = image_url
 
-                if self.embed_img:
-                    payload['embeds'][0]['icon_url'] = image_url
+            if self.link:
+                payload['embeds'][0]['url'] = self.link
 
-                if self.embed_url:
-                    payload['embeds'][0]['url'] = self.embed_url
-            else:
-                payload['content'] = \
-                    body if not title else "{}\n{}".format(title, body)
+        else:
+            payload['content'] = \
+                body if not title else "{}\n{}".format(title, body)
 
-            if not self._send(payload):
+        has_error = False
+        channel_ids = list(self.targets)
+        for channel_id in channel_ids:
+            postokay, response = self._send(payload, channel_id)
+            if not postokay:
                 # Failed to send message
-                return False
-        return True
+                has_error = True
 
-    def _send(self, payload, rate_limit=1, **kwargs):
+        return not has_error
+
+    def _send(self, payload, channel_id, retries=1, **kwargs):
         """
         Wrapper to the requests (post) object
 
@@ -229,12 +240,13 @@ class NotifyRevolt(NotifyBase):
         headers = {
             'User-Agent': self.app_id,
             'X-Bot-Token': self.bot_token,
-            'Content-Type': 'application/json; charset=utf-8'
+            'Content-Type': 'application/json; charset=utf-8',
+            'Accept': 'application/json; charset=utf-8',
         }
 
         notify_url = '{0}channels/{1}/messages'.format(
             self.notify_url,
-            self.channel_id
+            channel_id
         )
 
         self.logger.debug('Revolt POST URL: %s (cert_verify=%r)' % (
@@ -245,19 +257,21 @@ class NotifyRevolt(NotifyBase):
         # By default set wait to None
         wait = None
 
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         if self.ratelimit_remaining <= 0.0:
             # Determine how long we should wait for or if we should wait at
             # all. This isn't fool-proof because we can't be sure the client
             # time (calling this script) is completely synced up with the
             # Discord server.  One would hope we're on NTP and our clocks are
             # the same allowing this to role smoothly:
-
-            now = datetime.now(timezone.utc).replace(tzinfo=None)
             if now < self.ratelimit_reset:
                 # We need to throttle for the difference in seconds
                 wait = abs(
                     (self.ratelimit_reset - now + self.clock_skew)
                     .total_seconds())
+
+        # Default content response object
+        content = {}
 
         # Always call throttle before any remote server i/o is made;
         self.throttle(wait=wait)
@@ -271,15 +285,23 @@ class NotifyRevolt(NotifyBase):
                 timeout=self.request_timeout
             )
 
+            try:
+                content = loads(r.content)
+
+            except (AttributeError, TypeError, ValueError):
+                # ValueError = r.content is Unparsable
+                # TypeError = r.content is None
+                # AttributeError = r is None
+                content = {}
+
             # Handle rate limiting (if specified)
             try:
                 # Store our rate limiting (if provided)
                 self.ratelimit_remaining = \
-                    float(r.headers.get(
-                        'X-RateLimit-Remaining'))
-                self.ratelimit_reset = datetime.fromtimestamp(
-                    int(r.headers.get('X-RateLimit-Reset')),
-                    timezone.utc).replace(tzinfo=None)
+                    int(r.headers.get('X-RateLimit-Remaining'))
+                self.ratelimit_reset = \
+                    now + timedelta(seconds=(int(
+                        r.headers.get('X-RateLimit-Reset-After')) / 1000))
 
             except (TypeError, ValueError):
                 # This is returned if we could not retrieve this
@@ -289,23 +311,27 @@ class NotifyRevolt(NotifyBase):
             if r.status_code not in (
                     requests.codes.ok, requests.codes.no_content):
 
+                # Some details to debug by
+                self.logger.debug('Response Details:\r\n{}'.format(
+                    content if content else r.content))
+
                 # We had a problem
                 status_str = \
                     NotifyBase.http_response_code_lookup(r.status_code)
 
+                self.logger.warning(
+                    'Revolt request limit reached; '
+                    'instructed to throttle for %.3fs',
+                    abs((self.ratelimit_reset - now + self.clock_skew)
+                        .total_seconds()))
+
                 if r.status_code == requests.codes.too_many_requests \
-                        and rate_limit > 0:
+                        and retries > 0:
 
-                    # handle rate limiting
-                    self.logger.warning(
-                        'Revolt rate limiting in effect; '
-                        'blocking for %.2f second(s)',
-                        self.ratelimit_remaining)
-
-                    # Try one more time before failing
+                    # Try again
                     return self._send(
-                        payload=payload,
-                        rate_limit=rate_limit - 1, **kwargs)
+                        payload=payload, channel_id=channel_id,
+                        retries=retries - 1, **kwargs)
 
                 self.logger.warning(
                     'Failed to send to Revolt notification: '
@@ -314,10 +340,8 @@ class NotifyRevolt(NotifyBase):
                         ', ' if status_str else '',
                         r.status_code))
 
-                self.logger.debug('Response Details:\r\n{}'.format(r.content))
-
                 # Return; we're done
-                return False
+                return (False, content)
 
             else:
                 self.logger.info('Sent Revolt notification.')
@@ -326,9 +350,9 @@ class NotifyRevolt(NotifyBase):
             self.logger.warning(
                 'A Connection error occurred posting to Revolt.')
             self.logger.debug('Socket Exception: %s' % str(e))
-            return False
+            return (False, content)
 
-        return True
+        return (True, content)
 
     def url(self, privacy=False, *args, **kwargs):
         """
@@ -336,31 +360,36 @@ class NotifyRevolt(NotifyBase):
 
         """
 
+        # Define any URL parameters
         params = {}
 
-        if self.embed_img:
-            params['embed_img'] = self.embed_img
+        if self.icon_url:
+            params['icon_url'] = self.icon_url
 
-        if self.embed_url:
-            params['embed_url'] = self.embed_url
+        if self.link:
+            params['url'] = self.link
 
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        return '{schema}://{bot_token}/{channel_id}/?{params}'.format(
+        return '{schema}://{bot_token}/{targets}/?{params}'.format(
             schema=self.secure_protocol,
             bot_token=self.pprint(self.bot_token, privacy, safe=''),
-            channel_id=self.pprint(self.channel_id, privacy, safe=''),
+            targets='/'.join(
+                [self.pprint(x, privacy, safe='') for x in self.targets]),
             params=NotifyRevolt.urlencode(params),
         )
+
+    def __len__(self):
+        """
+        Returns the number of targets associated with this notification
+        """
+        return 1 if not self.targets else len(self.targets)
 
     @staticmethod
     def parse_url(url):
         """
         Parses the URL and returns enough arguments that can allow
         us to re-instantiate this object.
-
-        Syntax:
-          revolt://bot_token/channel_id
 
         """
         results = NotifyBase.parse_url(url, verify_host=False)
@@ -371,44 +400,37 @@ class NotifyRevolt(NotifyBase):
         # Store our bot token
         bot_token = NotifyRevolt.unquote(results['host'])
 
-        # Now fetch the channel id
-        try:
-            channel_id = \
-                NotifyRevolt.split_path(results['fullpath'])[0]
-
-        except IndexError:
-            # Force some bad values that will get caught
-            # in parsing later
-            channel_id = None
+        # Now fetch the Channel IDs
+        targets = NotifyRevolt.split_path(results['fullpath'])
 
         results['bot_token'] = bot_token
-        results['channel_id'] = channel_id
+        results['targets'] = targets
 
-        # Text To Speech
-        results['tts'] = parse_bool(results['qsd'].get('tts', False))
+        # Support the 'to' variable so that we can support rooms this way too
+        # The 'to' makes it easier to use yaml configuration
+        if 'to' in results['qsd'] and len(results['qsd']['to']):
+            results['targets'] += \
+                NotifyRevolt.parse_list(results['qsd']['to'])
 
         # Support channel id on the URL string (if specified)
-        if 'channel_id' in results['qsd']:
-            results['channel_id'] = \
-                NotifyRevolt.unquote(results['qsd']['channel_id'])
+        if 'channel' in results['qsd']:
+            results['targets'] += \
+                NotifyRevolt.parse_list(results['qsd']['channel'])
 
         # Support bot token on the URL string (if specified)
         if 'bot_token' in results['qsd']:
             results['bot_token'] = \
                 NotifyRevolt.unquote(results['qsd']['bot_token'])
 
-        # Extract avatar url if it was specified
-        if 'embed_img' in results['qsd']:
-            results['embed_img'] = \
-                NotifyRevolt.unquote(results['qsd']['embed_img'])
+        if 'icon_url' in results['qsd']:
+            results['icon_url'] = \
+                NotifyRevolt.unquote(results['qsd']['icon_url'])
 
-        if 'custom_img' in results['qsd']:
-            results['custom_img'] = \
-                NotifyRevolt.unquote(results['qsd']['custom_img'])
+        if 'url' in results['qsd']:
+            results['link'] = NotifyRevolt.unquote(results['qsd']['url'])
 
-        elif 'embed_url' in results['qsd']:
-            results['embed_url'] = \
-                NotifyRevolt.unquote(results['qsd']['embed_url'])
+        if 'format' not in results['qsd'] and (
+                'url' in results or 'icon_url' in results):
             # Markdown is implied
             results['format'] = NotifyFormat.MARKDOWN
 

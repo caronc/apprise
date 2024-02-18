@@ -29,7 +29,7 @@
 import os
 from unittest import mock
 from datetime import datetime, timedelta
-from datetime import timezone
+from json import dumps
 import pytest
 import requests
 
@@ -51,6 +51,15 @@ logging.disable(logging.CRITICAL)
 # Attachment Directory
 TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), 'var')
 
+# Prepare a Valid Response
+REVOLT_GOOD_RESPONSE = dumps({
+    '_id': 'AAAPWPMMQA2JJB59BR2EASWWWW',
+    'nonce': '01HPWPPMDJABC2FTDG54CBKKKS',
+    'channel': '00000000000000000000000000',
+    'author': '011244Q9S8NCS67KMM9543W7JJ',
+    'content': 'test',
+})
+
 # Our Testing URLs
 apprise_url_tests = (
     ('revolt://', {
@@ -62,82 +71,128 @@ apprise_url_tests = (
     }),
     # No channel_id specified
     ('revolt://%s' % ('i' * 24), {
+        'instance': NotifyRevolt,
+        # Notify will fail
+        'response': False,
+        # Our response expected server response
+        'requests_response_text': REVOLT_GOOD_RESPONSE,
+    }),
+    # channel_id specified on url, but no Bot Token
+    ('revolt://?channel=%s' % ('i' * 24), {
         'instance': TypeError,
     }),
     # channel_id specified on url
-    ('revolt://?channel_id=%s' % ('i' * 24), {
-        'instance': TypeError,
+    ('revolt://%s/?channel=%s' % ('i' * 24, 'i' * 24), {
+        'instance': NotifyRevolt,
+        # Our response expected server response
+        'requests_response_text': REVOLT_GOOD_RESPONSE,
+    }),
+    ('revolt://%s/?to=%s' % ('i' * 24, 'i' * 24), {
+        'instance': NotifyRevolt,
+        # Our response expected server response
+        'requests_response_text': REVOLT_GOOD_RESPONSE,
+    }),
+    ('revolt://%s/?to=%s' % ('i' * 24, 'i' * 24), {
+        'instance': NotifyRevolt,
+        # an invalid JSON Response
+        'requests_response_text': '{',
+    }),
+    # channel_id specified on url
+    ('revolt://%s/?channel=%s,%%20' % ('i' * 24, 'i' * 24), {
+        'instance': NotifyRevolt,
+        # Our response expected server response
+        'requests_response_text': REVOLT_GOOD_RESPONSE,
     }),
     # Provide both a bot token and a channel id
     ('revolt://%s/%s' % ('i' * 24, 't' * 64), {
         'instance': NotifyRevolt,
-        'requests_response_code': requests.codes.no_content,
+        'requests_response_code': requests.codes.ok,
+        # Our response expected server response
+        'requests_response_text': REVOLT_GOOD_RESPONSE,
     }),
-    # Provide a temporary username
-    ('revolt://l2g@%s/%s' % ('i' * 24, 't' * 64), {
+    ('revolt://_?bot_token=%s&channel=%s' % ('i' * 24, 't' * 64), {
         'instance': NotifyRevolt,
-        'requests_response_code': requests.codes.no_content,
-    }),
-    ('revolt://l2g@_?bot_token=%s&channel_id=%s' % ('i' * 24, 't' * 64), {
-        'instance': NotifyRevolt,
-        'requests_response_code': requests.codes.no_content,
-    }),
-    # test custom_img= field
-    ('revolt://%s/%s?format=markdown&custom_img=Yes' % (
-        'i' * 24, 't' * 64), {
-            'instance': NotifyRevolt,
-            'requests_response_code': requests.codes.no_content,
-    }),
-    ('revolt://%s/%s?format=markdown&custom_img=No' % (
-        'i' * 24, 't' * 64), {
-            'instance': NotifyRevolt,
-            'requests_response_code': requests.codes.no_content,
+        'requests_response_code': requests.codes.ok,
+        # Our response expected server response
+        'requests_response_text': REVOLT_GOOD_RESPONSE,
     }),
     # different format support
     ('revolt://%s/%s?format=markdown' % ('i' * 24, 't' * 64), {
         'instance': NotifyRevolt,
-        'requests_response_code': requests.codes.no_content,
+        'requests_response_code': requests.codes.ok,
+        # Our response expected server response
+        'requests_response_text': REVOLT_GOOD_RESPONSE,
     }),
     ('revolt://%s/%s?format=text' % ('i' * 24, 't' * 64), {
         'instance': NotifyRevolt,
-        'requests_response_code': requests.codes.no_content,
+        'requests_response_code': requests.codes.ok,
+        # Our response expected server response
+        'requests_response_text': REVOLT_GOOD_RESPONSE,
     }),
-    # Test with embed_url (title link)
-    ('revolt://%s/%s?hmarkdown=true&embed_url=http://localhost' % (
+    # Test with url
+    ('revolt://%s/%s?url=http://localhost' % (
         'i' * 24, 't' * 64), {
             'instance': NotifyRevolt,
-            'requests_response_code': requests.codes.no_content,
+            'requests_response_code': requests.codes.ok,
+            # Our response expected server response
+            'requests_response_text': REVOLT_GOOD_RESPONSE,
     }),
-    # Test with avatar URL
-    ('revolt://%s/%s?embed_img=http://localhost/test.jpg' % (
+    # URL implies markdown unless explicitly set otherwise
+    ('revolt://%s/%s?format=text&url=http://localhost' % (
         'i' * 24, 't' * 64), {
             'instance': NotifyRevolt,
-            'requests_response_code': requests.codes.no_content,
+            'requests_response_code': requests.codes.ok,
+            # Our response expected server response
+            'requests_response_text': REVOLT_GOOD_RESPONSE,
     }),
-    # Test without image set
+    # Test with Icon URL
+    ('revolt://%s/%s?icon_url=http://localhost/test.jpg' % (
+        'i' * 24, 't' * 64), {
+            'instance': NotifyRevolt,
+            'requests_response_code': requests.codes.ok,
+            # Our response expected server response
+            'requests_response_text': REVOLT_GOOD_RESPONSE,
+    }),
+    # Icon URL implies markdown unless explicitly set otherwise
+    ('revolt://%s/%s?format=text&icon_url=http://localhost/test.jpg' % (
+        'i' * 24, 't' * 64), {
+            'instance': NotifyRevolt,
+            'requests_response_code': requests.codes.ok,
+            # Our response expected server response
+            'requests_response_text': REVOLT_GOOD_RESPONSE,
+    }),
+    # Test without any image set
     ('revolt://%s/%s' % ('i' * 24, 't' * 64), {
         'instance': NotifyRevolt,
-        'requests_response_code': requests.codes.no_content,
+        'requests_response_code': requests.codes.ok,
         # don't include an image by default
-        'embed_img': False,
+        'include_image': False,
+        # Our response expected server response
+        'requests_response_text': REVOLT_GOOD_RESPONSE,
     }),
     ('revolt://%s/%s/' % ('a' * 24, 'b' * 64), {
         'instance': NotifyRevolt,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
+        # Our response expected server response
+        'requests_response_text': REVOLT_GOOD_RESPONSE,
     }),
     ('revolt://%s/%s/' % ('a' * 24, 'b' * 64), {
         'instance': NotifyRevolt,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
+        # Our response expected server response
+        'requests_response_text': REVOLT_GOOD_RESPONSE,
     }),
     ('revolt://%s/%s/' % ('a' * 24, 'b' * 64), {
         'instance': NotifyRevolt,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
+        # Our response expected server response
+        'requests_response_text': REVOLT_GOOD_RESPONSE,
     }),
 )
 
@@ -155,7 +210,7 @@ def test_plugin_revolt_urls():
 @mock.patch('requests.post')
 def test_plugin_revolt_notifications(mock_post):
     """
-    NotifyRevolt() Notifications/Ping Support
+    NotifyRevolt() Notifications
 
     """
 
@@ -166,6 +221,7 @@ def test_plugin_revolt_notifications(mock_post):
     # Prepare Mock
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = REVOLT_GOOD_RESPONSE
 
     # Test our header parsing when not lead with a header
     body = """
@@ -179,7 +235,7 @@ def test_plugin_revolt_notifications(mock_post):
     assert isinstance(results, dict)
     assert results['user'] is None
     assert results['bot_token'] == bot_token
-    assert results['channel_id'] == channel_id
+    assert results['targets'] == [channel_id, ]
     assert results['password'] is None
     assert results['port'] is None
     assert results['host'] == bot_token
@@ -205,7 +261,7 @@ def test_plugin_revolt_notifications(mock_post):
     assert isinstance(results, dict)
     assert results['user'] is None
     assert results['bot_token'] == bot_token
-    assert results['channel_id'] == channel_id
+    assert results['targets'] == [channel_id, ]
     assert results['password'] is None
     assert results['port'] is None
     assert results['host'] == bot_token
@@ -224,48 +280,42 @@ def test_plugin_revolt_notifications(mock_post):
 
 
 @mock.patch('requests.post')
-def test_plugin_revolt_general(mock_post):
+@mock.patch('time.sleep')
+def test_plugin_revolt_general(mock_sleep, mock_post):
     """
     NotifyRevolt() General Checks
 
     """
 
+    # Prevent throttling
+    mock_sleep.return_value = True
+
     # Turn off clock skew for local testing
     NotifyRevolt.clock_skew = timedelta(seconds=0)
-    # Epoch time:
-    epoch = datetime.fromtimestamp(0, timezone.utc)
 
     # Initialize some generic (but valid) tokens
     bot_token = 'A' * 24
-    channel_id = 'B' * 64
+    channel_id = ','.join(['B' * 32, 'C' * 32]) + ', ,%%'
 
     # Prepare Mock
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.ok
-    mock_post.return_value.content = ''
+    mock_post.return_value.content = REVOLT_GOOD_RESPONSE
     mock_post.return_value.headers = {
-        'X-RateLimit-Reset': (
-            datetime.now(timezone.utc) - epoch).total_seconds(),
-        'X-RateLimit-Remaining': 1,
+        'X-RateLimit-Remaining': 0,
+        'X-RateLimit-Reset-After': 1,
     }
 
     # Invalid bot_token
     with pytest.raises(TypeError):
-        NotifyRevolt(bot_token=None, channel_id=channel_id)
+        NotifyRevolt(bot_token=None, targets=channel_id)
     # Invalid bot_token (whitespace)
     with pytest.raises(TypeError):
-        NotifyRevolt(bot_token="  ", channel_id=channel_id)
-
-    # Invalid channel_id
-    with pytest.raises(TypeError):
-        NotifyRevolt(bot_token=bot_token, channel_id=None)
-    # Invalid channel_id (whitespace)
-    with pytest.raises(TypeError):
-        NotifyRevolt(bot_token=bot_token, channel_id="   ")
+        NotifyRevolt(bot_token="  ", targets=channel_id)
 
     obj = NotifyRevolt(
         bot_token=bot_token,
-        channel_id=channel_id)
+        targets=channel_id)
     assert obj.ratelimit_remaining == 1
 
     # Test that we get a string response
@@ -277,9 +327,8 @@ def test_plugin_revolt_general(mock_post):
 
     # Force a case where there are no more remaining posts allowed
     mock_post.return_value.headers = {
-        'X-RateLimit-Reset': (
-            datetime.now(timezone.utc) - epoch).total_seconds(),
         'X-RateLimit-Remaining': 0,
+        'X-RateLimit-Reset-After': 0,
     }
 
     # This call includes an image with it's payload:
@@ -289,31 +338,31 @@ def test_plugin_revolt_general(mock_post):
     # behind the scenes, it should cause us to update our rate limit
     assert obj.send(body="test") is True
     assert obj.ratelimit_remaining == 0
+    assert isinstance(obj.ratelimit_reset, datetime)
 
     # This should cause us to block
     mock_post.return_value.headers = {
-        'X-RateLimit-Reset': (
-            datetime.now(timezone.utc) - epoch).total_seconds(),
-        'X-RateLimit-Remaining': 10,
+        'X-RateLimit-Remaining': 0,
+        'X-RateLimit-Reset-After': 3000,
     }
     assert obj.send(body="test") is True
-    assert obj.ratelimit_remaining == 10
+    assert obj.ratelimit_remaining == 0
+    assert isinstance(obj.ratelimit_reset, datetime)
 
     # Reset our variable back to 1
     mock_post.return_value.headers = {
-        'X-RateLimit-Reset': (
-            datetime.now(timezone.utc) - epoch).total_seconds(),
-        'X-RateLimit-Remaining': 1,
+        'X-RateLimit-Remaining': 0,
+        'X-RateLimit-Reset-After': 10000,
     }
-    # Handle cases where our epoch time is wrong
-    del mock_post.return_value.headers['X-RateLimit-Reset']
+    del mock_post.return_value.headers['X-RateLimit-Remaining']
     assert obj.send(body="test") is True
+    assert obj.ratelimit_remaining == 0
+    assert isinstance(obj.ratelimit_reset, datetime)
 
     # Return our object, but place it in the future forcing us to block
     mock_post.return_value.headers = {
-        'X-RateLimit-Reset': (
-            datetime.now(timezone.utc) - epoch).total_seconds() + 1,
         'X-RateLimit-Remaining': 0,
+        'X-RateLimit-Reset-After': 0,
     }
 
     obj.ratelimit_remaining = 0
@@ -329,9 +378,8 @@ def test_plugin_revolt_general(mock_post):
     # Return our object, but place it in the future forcing us to block
     mock_post.return_value.status_code = requests.codes.ok
     mock_post.return_value.headers = {
-        'X-RateLimit-Reset': (
-            datetime.now(timezone.utc) - epoch).total_seconds() - 1,
         'X-RateLimit-Remaining': 0,
+        'X-RateLimit-Reset-After': 0,
     }
     assert obj.send(body="test") is True
 
@@ -340,9 +388,8 @@ def test_plugin_revolt_general(mock_post):
 
     # Return our headers to normal
     mock_post.return_value.headers = {
-        'X-RateLimit-Reset': (
-            datetime.now(timezone.utc) - epoch).total_seconds(),
-        'X-RateLimit-Remaining': 1,
+        'X-RateLimit-Remaining': 0,
+        'X-RateLimit-Reset-After': 1,
     }
 
     # This call includes an image with it's payload:
@@ -380,6 +427,7 @@ def test_plugin_revolt_overflow(mock_post):
     # Prepare Mock
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = REVOLT_GOOD_RESPONSE
 
     # Some variables we use to control the data we work with
     body_len = 2005
@@ -401,7 +449,7 @@ def test_plugin_revolt_overflow(mock_post):
     assert isinstance(results, dict)
     assert results['user'] is None
     assert results['bot_token'] == bot_token
-    assert results['channel_id'] == channel_id
+    assert results['targets'] == [channel_id, ]
     assert results['password'] is None
     assert results['port'] is None
     assert results['host'] == bot_token
@@ -436,6 +484,7 @@ def test_plugin_revolt_markdown_extra(mock_post):
     # Prepare Mock
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = REVOLT_GOOD_RESPONSE
 
     # Reset our apprise object
     a = Apprise()

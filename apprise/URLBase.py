@@ -28,7 +28,7 @@
 
 import re
 from .logger import logger
-from time import sleep
+import time
 from datetime import datetime
 from xml.sax.saxutils import escape as sax_escape
 
@@ -298,12 +298,12 @@ class URLBase:
 
         if wait is not None:
             self.logger.debug('Throttling forced for {}s...'.format(wait))
-            sleep(wait)
+            time.sleep(wait)
 
         elif elapsed < self.request_rate_per_sec:
             self.logger.debug('Throttling for {}s...'.format(
                 self.request_rate_per_sec - elapsed))
-            sleep(self.request_rate_per_sec - elapsed)
+            time.sleep(self.request_rate_per_sec - elapsed)
 
         # Update our timestamp before we leave
         self._last_io_datetime = datetime.now()
