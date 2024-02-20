@@ -175,9 +175,57 @@ def apprise_test(do_notify):
 
     # Clear our server listings again
     a.clear()
+    assert len(a) == 0
 
     # No servers to notify
     assert do_notify(a, title="my title", body="my body") is False
+
+    # More Variations of Multiple Adding of URLs
+    a = Apprise()
+    assert a.add(servers)
+    assert len(a) == 2
+    a.clear()
+
+    assert a.add('ntfys://user:pass@host/test, json://localhost')
+    assert len(a) == 2
+    a.clear()
+
+    assert a.add(['ntfys://user:pass@host/test', 'json://localhost'])
+    assert len(a) == 2
+    a.clear()
+
+    assert a.add(('ntfys://user:pass@host/test', 'json://localhost'))
+    assert len(a) == 2
+    a.clear()
+
+    assert a.add(set(['ntfys://user:pass@host/test', 'json://localhost']))
+    assert len(a) == 2
+    a.clear()
+
+    # Pass a list entry containing 1 string with 2 elements in it
+    # Mimic Home-Assistant core-2024.2.1 Issue:
+    #   - https://github.com/home-assistant/core/issues/110242
+    #
+    # In this case, the first one will load, but not the second entry
+    # This is by design; but captured here to illustrate the issue
+    assert a.add(['ntfys://user:pass@host/test, json://localhost'])
+    assert len(a) == 1
+    assert a[0].url().startswith('ntfys://')
+    a.clear()
+
+    # Following thorugh with the problem of providing a list containing
+    # an entry with 2 URLs in it... while the ntfys parsed okay above,
+    # the same can't be said for other combinations.  It's important
+    # to always keep strings separately
+    assert a.add(['mailto://user:pass@example.com, json://localhost']) is False
+    assert len(a) == 0
+
+    # Showing that the URLs were valid on their own:
+    assert a.add(*['mailto://user:pass@example.com, json://localhost'])
+    assert len(a) == 2
+    assert a[0].url().startswith('mailto://')
+    assert a[1].url().startswith('json://')
+    a.clear()
 
     class BadNotification(NotifyBase):
         def __init__(self, **kwargs):
