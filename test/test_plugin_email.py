@@ -1144,6 +1144,34 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     response.reset_mock()
 
     results = NotifyEmail.parse_url(
+        'mailto://user:pass@comcast.net')
+    obj = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(obj, NotifyEmail) is True
+    assert obj.smtp_host == 'smtp.comcast.net'
+    assert obj.user == 'user@comcast.net'
+    assert obj.password == 'pass'
+    assert obj.secure_mode == 'ssl'
+    assert obj.port == 465
+
+    assert mock_smtp.call_count == 0
+    assert mock_smtp_ssl.call_count == 0
+    assert response.starttls.call_count == 0
+    assert obj.notify("test") is True
+    assert mock_smtp.call_count == 0
+    assert mock_smtp_ssl.call_count == 1
+    assert response.starttls.call_count == 0
+    assert response.login.call_count == 1
+    assert response.sendmail.call_count == 1
+
+    user, pw = response.login.call_args[0]
+    assert pw == 'pass'
+    assert user == 'user@comcast.net'
+
+    mock_smtp.reset_mock()
+    mock_smtp_ssl.reset_mock()
+    response.reset_mock()
+
+    results = NotifyEmail.parse_url(
         'mailtos://user:pass123@live.com')
     obj = Apprise.instantiate(results, suppress_exceptions=False)
     assert isinstance(obj, NotifyEmail) is True
