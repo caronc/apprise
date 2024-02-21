@@ -9,4 +9,5 @@ cryptography
 gntp
 
 # Provides mqtt:// support
-paho-mqtt
+# use v1.x due to https://github.com/eclipse/paho.mqtt.python/issues/814
+paho-mqtt < 2.0.0
