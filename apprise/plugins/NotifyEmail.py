@@ -496,34 +496,6 @@ class NotifyEmail(NotifyBase):
         # addresses from the URL provided
         self.from_addr = [False, '']
 
-        if self.user and self.host:
-            # Prepare the bases of our email
-            self.from_addr = [self.app_id, '{}@{}'.format(
-                re.split(r'[\s@]+', self.user)[0],
-                self.host,
-            )]
-
-        if from_addr:
-            result = is_email(from_addr)
-            if result:
-                self.from_addr = (
-                    result['name'] if result['name'] else False,
-                    result['full_email'])
-            else:
-                self.from_addr[0] = from_addr
-
-        result = is_email(self.from_addr[1])
-        if not result:
-            # Parse Source domain based on from_addr
-            msg = 'Invalid ~From~ email specified: {}'.format(
-                '{} <{}>'.format(self.from_addr[0], self.from_addr[1])
-                if self.from_addr[0] else '{}'.format(self.from_addr[1]))
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        # Store our lookup
-        self.names[self.from_addr[1]] = self.from_addr[0]
-
         # Now detect the SMTP Server
         self.smtp_host = \
             smtp_host if isinstance(smtp_host, str) else ''
@@ -542,25 +514,6 @@ class NotifyEmail(NotifyBase):
                   .format(secure_mode)
             self.logger.warning(msg)
             raise TypeError(msg)
-
-        if targets:
-            # Validate recipients (to:) and drop bad ones:
-            for recipient in parse_emails(targets):
-                result = is_email(recipient)
-                if result:
-                    self.targets.append(
-                        (result['name'] if result['name'] else False,
-                            result['full_email']))
-                    continue
-
-                self.logger.warning(
-                    'Dropped invalid To email '
-                    '({}) specified.'.format(recipient),
-                )
-
-        else:
-            # If our target email list is empty we want to add ourselves to it
-            self.targets.append((False, self.from_addr[1]))
 
         # Validate recipients (cc:) and drop bad ones:
         for recipient in parse_emails(cc):
@@ -612,6 +565,54 @@ class NotifyEmail(NotifyBase):
 
         # Apply any defaults based on certain known configurations
         self.NotifyEmailDefaults(secure_mode=secure_mode, **kwargs)
+
+        if self.user and self.host:
+            # Prepare the bases of our email
+            self.from_addr = [self.app_id, '{}@{}'.format(
+                re.split(r'[\s@]+', self.user)[0],
+                self.host,
+            )]
+
+        if from_addr:
+            result = is_email(from_addr)
+            if result:
+                self.from_addr = (
+                    result['name'] if result['name'] else False,
+                    result['full_email'])
+            else:
+                # Only update the string but use the already detected info
+                self.from_addr[0] = from_addr
+
+        result = is_email(self.from_addr[1])
+        if not result:
+            # Parse Source domain based on from_addr
+            msg = 'Invalid ~From~ email specified: {}'.format(
+                '{} <{}>'.format(self.from_addr[0], self.from_addr[1])
+                if self.from_addr[0] else '{}'.format(self.from_addr[1]))
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
+        # Store our lookup
+        self.names[self.from_addr[1]] = self.from_addr[0]
+
+        if targets:
+            # Validate recipients (to:) and drop bad ones:
+            for recipient in parse_emails(targets):
+                result = is_email(recipient)
+                if result:
+                    self.targets.append(
+                        (result['name'] if result['name'] else False,
+                            result['full_email']))
+                    continue
+
+                self.logger.warning(
+                    'Dropped invalid To email '
+                    '({}) specified.'.format(recipient),
+                )
+
+        else:
+            # If our target email list is empty we want to add ourselves to it
+            self.targets.append((False, self.from_addr[1]))
 
         if not self.secure and self.secure_mode != SecureMailMode.INSECURE:
             # Enable Secure mode if not otherwise set
@@ -679,9 +680,7 @@ class NotifyEmail(NotifyBase):
                 # was specified, then we default to having them all set (which
                 # basically implies that there are no restrictions and use use
                 # whatever was specified)
-                login_type = EMAIL_TEMPLATES[i][2]\
-                    .get('login_type', [])
-
+                login_type = EMAIL_TEMPLATES[i][2].get('login_type', [])
                 if login_type:
                     # only apply additional logic to our user if a login_type
                     # was specified.
@@ -690,6 +689,10 @@ class NotifyEmail(NotifyBase):
                             # Email specified but login type
                             # not supported; switch it to user id
                             self.user = match.group('id')
+
+                        else:
+                            # Enforce our host information
+                            self.host = self.user.split('@')[1]
 
                     elif WebBaseLogin.USERID not in login_type:
                         # user specified but login type

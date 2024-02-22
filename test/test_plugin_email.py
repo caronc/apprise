@@ -1421,6 +1421,113 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     mock_smtp_ssl.reset_mock()
     response.reset_mock()
 
+    # Issue github.com/caronc/apprise/issue/1040
+    #  mailto://fastmail.com?user=username@customdomain.com \
+    #          &to=username@customdomain.com&pass=password123
+    #
+    # should just have to be written like (to= omitted)
+    #  mailto://fastmail.com?user=username@customdomain.com&pass=password123
+    #
+    results = NotifyEmail.parse_url(
+        'mailto://fastmail.com?user=username@customdomain.com'
+        '&pass=password123')
+    assert isinstance(results, dict)
+    assert 'username@customdomain.com' == results['user']
+    assert results['from_addr'] == ''
+    assert results['port'] is None
+    assert 'fastmail.com' == results['host']
+    assert 'password123' == results['password']
+    assert results['smtp_host'] == ''
+
+    obj = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(obj, NotifyEmail) is True
+    # During instantiation, our variables get detected
+    assert obj.smtp_host == 'smtp.fastmail.com'
+    assert obj.from_addr == ['Apprise', 'username@customdomain.com']
+    assert obj.host == 'customdomain.com'
+    # detected from
+    assert (False, 'username@customdomain.com') in obj.targets
+
+    assert mock_smtp.call_count == 0
+    assert mock_smtp_ssl.call_count == 0
+    assert obj.notify("test") is True
+    assert mock_smtp.call_count == 0
+    assert mock_smtp_ssl.call_count == 1
+    assert response.starttls.call_count == 0
+    assert response.login.call_count == 1
+    assert response.sendmail.call_count == 1
+    # Store our Sent Arguments
+    # Syntax is:
+    #  sendmail(from_addr, to_addrs, msg, mail_options=(), rcpt_options=())
+    #             [0]        [1]     [2]
+    _from = response.sendmail.call_args[0][0]
+    _to = response.sendmail.call_args[0][1]
+    _msg = response.sendmail.call_args[0][2]
+    assert _from == 'username@customdomain.com'
+    assert isinstance(_to, list)
+    assert len(_to) == 1
+    assert _to[0] == 'username@customdomain.com'
+    assert _msg.split('\n')[-3] == 'test'
+
+    user, pw = response.login.call_args[0]
+    assert pw == 'password123'
+    assert user == 'username@customdomain.com'
+
+    mock_smtp.reset_mock()
+    mock_smtp_ssl.reset_mock()
+    response.reset_mock()
+
+    # Similar test as above, just showing that we can over-ride the From=
+    # with these custom URLs as well and not require a full email
+    results = NotifyEmail.parse_url(
+        'mailto://fastmail.com?user=username@customdomain.com'
+        '&pass=password123&from=Custom')
+    assert isinstance(results, dict)
+    assert 'username@customdomain.com' == results['user']
+    assert results['from_addr'] == 'Custom'
+    assert results['port'] is None
+    assert 'fastmail.com' == results['host']
+    assert 'password123' == results['password']
+    assert results['smtp_host'] == ''
+
+    obj = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(obj, NotifyEmail) is True
+    # During instantiation, our variables get detected
+    assert obj.smtp_host == 'smtp.fastmail.com'
+    assert obj.from_addr == ['Custom', 'username@customdomain.com']
+    assert obj.host == 'customdomain.com'
+    # detected from
+    assert (False, 'username@customdomain.com') in obj.targets
+
+    assert mock_smtp.call_count == 0
+    assert mock_smtp_ssl.call_count == 0
+    assert obj.notify("test") is True
+    assert mock_smtp.call_count == 0
+    assert mock_smtp_ssl.call_count == 1
+    assert response.starttls.call_count == 0
+    assert response.login.call_count == 1
+    assert response.sendmail.call_count == 1
+    # Store our Sent Arguments
+    # Syntax is:
+    #  sendmail(from_addr, to_addrs, msg, mail_options=(), rcpt_options=())
+    #             [0]        [1]     [2]
+    _from = response.sendmail.call_args[0][0]
+    _to = response.sendmail.call_args[0][1]
+    _msg = response.sendmail.call_args[0][2]
+    assert _from == 'username@customdomain.com'
+    assert isinstance(_to, list)
+    assert len(_to) == 1
+    assert _to[0] == 'username@customdomain.com'
+    assert _msg.split('\n')[-3] == 'test'
+
+    user, pw = response.login.call_args[0]
+    assert pw == 'password123'
+    assert user == 'username@customdomain.com'
+
+    mock_smtp.reset_mock()
+    mock_smtp_ssl.reset_mock()
+    response.reset_mock()
+
     # Issue github.com/caronc/apprise/issue/941
 
     # mail domain = mail-domain.com
@@ -1502,6 +1609,9 @@ def test_plugin_email_plus_in_toemail(mock_smtp, mock_smtp_ssl):
 
     assert len(obj.targets) == 1
     assert ('Plus Support', 'test+notification@gmail.com') in obj.targets
+    assert obj.smtp_host == 'smtp.gmail.com'
+    assert obj.from_addr == ['Apprise', 'user@gmail.com']
+    assert obj.host == 'gmail.com'
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
