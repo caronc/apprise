@@ -194,9 +194,9 @@ in the following local locations for configuration files and loads them:
     ~/.config/apprise.yml
 
     ~/.apprise/apprise
-    ~/.apprise/apprise.yaml
+    ~/.apprise/apprise.yml
     ~/.config/apprise/apprise
-    ~/.config/apprise/apprise.yaml
+    ~/.config/apprise/apprise.yml
 
     /etc/apprise
     /etc/apprise.yml
