@@ -68,20 +68,26 @@ DEFAULT_CONFIG_PATHS = (
     # Legacy Path Support
     '~/.apprise',
     '~/.apprise.yml',
+    '~/.apprise.yaml',
     '~/.config/apprise',
     '~/.config/apprise.yml',
+    '~/.config/apprise.yaml',
 
     # Plugin Support Extended Directory Search Paths
     '~/.apprise/apprise',
     '~/.apprise/apprise.yml',
+    '~/.apprise/apprise.yaml',
     '~/.config/apprise/apprise',
     '~/.config/apprise/apprise.yml',
+    '~/.config/apprise/apprise.yaml',
 
     # Global Configuration Support
     '/etc/apprise',
     '/etc/apprise.yml',
+    '/etc/apprise.yaml',
     '/etc/apprise/apprise',
     '/etc/apprise/apprise.yml',
+    '/etc/apprise/apprise.yaml',
 )
 
 # Define our paths to search for plugins
@@ -99,8 +105,10 @@ if platform.system() == 'Windows':
     DEFAULT_CONFIG_PATHS = (
         expandvars('%APPDATA%\\Apprise\\apprise'),
         expandvars('%APPDATA%\\Apprise\\apprise.yml'),
+        expandvars('%APPDATA%\\Apprise\\apprise.yaml'),
         expandvars('%LOCALAPPDATA%\\Apprise\\apprise'),
         expandvars('%LOCALAPPDATA%\\Apprise\\apprise.yml'),
+        expandvars('%LOCALAPPDATA%\\Apprise\\apprise.yaml'),
 
         #
         # Global Support
@@ -109,14 +117,17 @@ if platform.system() == 'Windows':
         # C:\ProgramData\Apprise\
         expandvars('%ALLUSERSPROFILE%\\Apprise\\apprise'),
         expandvars('%ALLUSERSPROFILE%\\Apprise\\apprise.yml'),
+        expandvars('%ALLUSERSPROFILE%\\Apprise\\apprise.yaml'),
 
         # C:\Program Files\Apprise
         expandvars('%PROGRAMFILES%\\Apprise\\apprise'),
         expandvars('%PROGRAMFILES%\\Apprise\\apprise.yml'),
+        expandvars('%PROGRAMFILES%\\Apprise\\apprise.yaml'),
 
         # C:\Program Files\Common Files
         expandvars('%COMMONPROGRAMFILES%\\Apprise\\apprise'),
         expandvars('%COMMONPROGRAMFILES%\\Apprise\\apprise.yml'),
+        expandvars('%COMMONPROGRAMFILES%\\Apprise\\apprise.yaml'),
     )
 
     # Default Plugin Search Path for Windows Users

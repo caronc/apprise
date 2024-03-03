@@ -235,28 +235,37 @@ No one wants to put their credentials out for everyone to see on the command lin
 #  ~/.apprise.yml
 #  ~/.config/apprise
 #  ~/.config/apprise.yml
+#  ~/.config/apprise.yaml
 #  /etc/apprise
 #  /etc/apprise.yml
+#  /etc/apprise.yaml
 
 # Also a subdirectory handling allows you to leverage plugins
 #  ~/.apprise/apprise
 #  ~/.apprise/apprise.yml
 #  ~/.config/apprise/apprise
 #  ~/.config/apprise/apprise.yml
+#  ~/.config/apprise/apprise.yaml
 #  /etc/apprise/apprise
 #  /etc/apprise/apprise.yml
+#  /etc/apprise/apprise.yaml
 
 # Windows users can store their default configuration files here:
 #  %APPDATA%/Apprise/apprise
 #  %APPDATA%/Apprise/apprise.yml
+#  %APPDATA%/Apprise/apprise.yaml
 #  %LOCALAPPDATA%/Apprise/apprise
 #  %LOCALAPPDATA%/Apprise/apprise.yml
+#  %LOCALAPPDATA%/Apprise/apprise.yaml
 #  %ALLUSERSPROFILE%\Apprise\apprise
 #  %ALLUSERSPROFILE%\Apprise\apprise.yml
+#  %ALLUSERSPROFILE%\Apprise\apprise.yaml
 #  %PROGRAMFILES%\Apprise\apprise
 #  %PROGRAMFILES%\Apprise\apprise.yml
+#  %PROGRAMFILES%\Apprise\apprise.yaml
 #  %COMMONPROGRAMFILES%\Apprise\apprise
 #  %COMMONPROGRAMFILES%\Apprise\apprise.yml
+#  %COMMONPROGRAMFILES%\Apprise\apprise.yaml
 
 # If you loaded one of those files, your command line gets really easy:
 apprise -vv -t 'my title' -b 'my notification body'
