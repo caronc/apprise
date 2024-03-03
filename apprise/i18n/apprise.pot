@@ -6,9 +6,9 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: apprise 1.7.2\n"
+"Project-Id-Version: apprise 1.7.3\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2024-01-27 15:34-0500\n"
+"POT-Creation-Date: 2024-03-03 18:04-0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -143,6 +143,9 @@ msgstr ""
 msgid "Category"
 msgstr ""
 
+msgid "Channel ID"
+msgstr ""
+
 msgid "Channels"
 msgstr ""
 
@@ -233,6 +236,9 @@ msgstr ""
 msgid "Email Header"
 msgstr ""
 
+msgid "Embed URL"
+msgstr ""
+
 msgid "Entity"
 msgstr ""
 
@@ -306,6 +312,9 @@ msgid "IRC Colors"
 msgstr ""
 
 msgid "Icon Type"
+msgstr ""
+
+msgid "Icon URL"
 msgstr ""
 
 msgid "Idempotency-Key"

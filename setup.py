@@ -62,7 +62,7 @@ else:
 
 setup(
     name='apprise',
-    version='1.7.2',
+    version='1.7.3',
     description='Push Notifications that work with just about every platform!',
     license='BSD',
     long_description=open('README.md', encoding="utf-8").read(),

@@ -54,7 +54,7 @@ Techulus Push, Telegram, Threema Gateway, Twilio, Twitter, Twist, XBMC,
 Voipms, Vonage, WeCom Bot, WhatsApp, Webex Teams}
 
 Name:           python-%{pypi_name}
-Version:        1.7.2
+Version:        1.7.3
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        BSD
@@ -195,6 +195,9 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 %{python3_sitelib}/%{pypi_name}/cli.*
 
 %changelog
+* Sun Mar  3 2024 Chris Caron <lead2gold@gmail.com> - 1.7.3
+- Updated to v1.7.3
+
 * Sat Jan 27 2024 Chris Caron <lead2gold@gmail.com> - 1.7.2
 - Updated to v1.7.2
 
