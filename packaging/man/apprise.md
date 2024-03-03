@@ -190,18 +190,24 @@ in the following local locations for configuration files and loads them:
 
     ~/.apprise
     ~/.apprise.yml
+    ~/.apprise.yaml
     ~/.config/apprise
     ~/.config/apprise.yml
+    ~/.config/apprise.yaml
 
     ~/.apprise/apprise
     ~/.apprise/apprise.yml
+    ~/.apprise/apprise.yaml
     ~/.config/apprise/apprise
     ~/.config/apprise/apprise.yml
+    ~/.config/apprise/apprise.yaml
 
     /etc/apprise
     /etc/apprise.yml
+    /etc/apprise.yaml
     /etc/apprise/apprise
     /etc/apprise/apprise.yml
+    /etc/apprise/apprise.yaml
 
 If a default configuration file is referenced in any way by the **apprise**
 tool, you no longer need to provide it a Service URL.  Usage of the **apprise**
