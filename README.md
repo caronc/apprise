@@ -233,6 +233,7 @@ No one wants to put their credentials out for everyone to see on the command lin
 # configuration files (if present) from:
 #  ~/.apprise
 #  ~/.apprise.yml
+#  ~/.apprise.yaml
 #  ~/.config/apprise
 #  ~/.config/apprise.yml
 #  ~/.config/apprise.yaml
@@ -243,6 +244,7 @@ No one wants to put their credentials out for everyone to see on the command lin
 # Also a subdirectory handling allows you to leverage plugins
 #  ~/.apprise/apprise
 #  ~/.apprise/apprise.yml
+#  ~/.apprise/apprise.yaml
 #  ~/.config/apprise/apprise
 #  ~/.config/apprise/apprise.yml
 #  ~/.config/apprise/apprise.yaml
