@@ -29,8 +29,10 @@
 import re
 import pytest
 import types
+import threading
 from inspect import cleandoc
 
+from apprise import Apprise
 from apprise.NotificationManager import NotificationManager
 from apprise.plugins.NotifyBase import NotifyBase
 
@@ -247,6 +249,48 @@ def test_notification_manager_module_loading(tmpdir):
     # memory then needed)
     N_MGR.load_modules()
     N_MGR.load_modules()
+
+    #
+    # Thread Testing
+    #
+
+    # This tests against a racing condition when the modules have not been
+    # loaded.  When multiple instances of Apprise are all instantiated,
+    # the loading of the modules will occur for each instance if detected
+    # having not been previously done, this tests that we can dynamically
+    # support the loading of modules once whe multiple instances to apprise
+    # are instantiated.
+    thread_count = 10
+
+    def thread_test(result, no):
+        """
+        Load our apprise object with valid URLs and store our result
+        """
+        apobj = Apprise()
+        result[no] = apobj.add('json://localhost') and \
+            apobj.add('form://localhost') and \
+            apobj.add('xml://localhost')
+
+    # Unload our modules
+    N_MGR.unload_modules()
+
+    # Prepare threads to load
+    results = [None] * thread_count
+    threads = [
+        threading.Thread(target=thread_test, args=(results, no))
+        for no in range(thread_count)
+    ]
+
+    # Verify we can safely load our modules in a thread safe environment
+    for t in threads:
+        t.start()
+
+    for t in threads:
+        t.join()
+
+    # Verify we loaded our urls in all threads successfully
+    for result in results:
+        assert result is True
 
 
 def test_notification_manager_decorators(tmpdir):
