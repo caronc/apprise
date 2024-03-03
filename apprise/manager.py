@@ -343,67 +343,69 @@ class PluginManager(metaclass=Singleton):
             # end of _import_module()
             return
 
-        for _path in paths:
-            path = os.path.abspath(os.path.expanduser(_path))
-            if (cache and path in self._paths_previously_scanned) \
-                    or not os.path.exists(path):
-                # We're done as we've already scanned this
-                continue
-
-            # Store our path as a way of hashing it has been handled
-            self._paths_previously_scanned.add(path)
-
-            if os.path.isdir(path) and not \
-                    os.path.isfile(os.path.join(path, '__init__.py')):
-
-                logger.debug('Scanning for custom plugins in: %s', path)
-                for entry in os.listdir(path):
-                    re_match = module_re.match(entry)
-                    if not re_match:
-                        # keep going
-                        logger.trace('Plugin Scan: Ignoring %s', entry)
-                        continue
-
-                    new_path = os.path.join(path, entry)
-                    if os.path.isdir(new_path):
-                        # Update our path
-                        new_path = os.path.join(path, entry, '__init__.py')
-                        if not os.path.isfile(new_path):
-                            logger.trace(
-                                'Plugin Scan: Ignoring %s',
-                                os.path.join(path, entry))
-                            continue
-
-                    if not cache or \
-                            (cache and
-                             new_path not in self._paths_previously_scanned):
-                        # Load our module
-                        _import_module(new_path)
-
-                        # Add our subdir path
-                        self._paths_previously_scanned.add(new_path)
-            else:
-                if os.path.isdir(path):
-                    # This logic is safe to apply because we already validated
-                    # the directories state above; update our path
-                    path = os.path.join(path, '__init__.py')
-                    if cache and path in self._paths_previously_scanned:
-                        continue
-
-                    self._paths_previously_scanned.add(path)
-
-                # directly load as is
-                re_match = module_re.match(os.path.basename(path))
-                # must be a match and must have a .py extension
-                if not re_match or not re_match.group(1):
-                    # keep going
-                    logger.trace('Plugin Scan: Ignoring %s', path)
+        with self._lock:
+            for _path in paths:
+                path = os.path.abspath(os.path.expanduser(_path))
+                if (cache and path in self._paths_previously_scanned) \
+                        or not os.path.exists(path):
+                    # We're done as we've already scanned this
                     continue
 
-                # Load our module
-                _import_module(path)
+                # Store our path as a way of hashing it has been handled
+                self._paths_previously_scanned.add(path)
 
-            return None
+                if os.path.isdir(path) and not \
+                        os.path.isfile(os.path.join(path, '__init__.py')):
+
+                    logger.debug('Scanning for custom plugins in: %s', path)
+                    for entry in os.listdir(path):
+                        re_match = module_re.match(entry)
+                        if not re_match:
+                            # keep going
+                            logger.trace('Plugin Scan: Ignoring %s', entry)
+                            continue
+
+                        new_path = os.path.join(path, entry)
+                        if os.path.isdir(new_path):
+                            # Update our path
+                            new_path = os.path.join(path, entry, '__init__.py')
+                            if not os.path.isfile(new_path):
+                                logger.trace(
+                                    'Plugin Scan: Ignoring %s',
+                                    os.path.join(path, entry))
+                                continue
+
+                        if not cache or \
+                                (cache and new_path not in
+                                 self._paths_previously_scanned):
+                            # Load our module
+                            _import_module(new_path)
+
+                            # Add our subdir path
+                            self._paths_previously_scanned.add(new_path)
+                else:
+                    if os.path.isdir(path):
+                        # This logic is safe to apply because we already
+                        # validated the directories state above; update our
+                        # path
+                        path = os.path.join(path, '__init__.py')
+                        if cache and path in self._paths_previously_scanned:
+                            continue
+
+                        self._paths_previously_scanned.add(path)
+
+                    # directly load as is
+                    re_match = module_re.match(os.path.basename(path))
+                    # must be a match and must have a .py extension
+                    if not re_match or not re_match.group(1):
+                        # keep going
+                        logger.trace('Plugin Scan: Ignoring %s', path)
+                        continue
+
+                    # Load our module
+                    _import_module(path)
+
+        return None
 
     def add(self, plugin, schemas=None, url=None, send_func=None):
         """
