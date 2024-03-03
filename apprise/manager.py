@@ -107,6 +107,9 @@ class PluginManager(metaclass=Singleton):
         # effort/overhead doing it again
         self._paths_previously_scanned = set()
 
+        # Track loaded module paths to prevent from loading them again
+        self._loaded = set()
+
     def unload_modules(self, disable_native=False):
         """
         Reset our object and unload all modules
@@ -134,14 +137,19 @@ class PluginManager(metaclass=Singleton):
             self._disabled.clear()
 
             # Reset our variables
-            self._module_map = None if not disable_native else {}
             self._schema_map = {}
             self._custom_module_map = {}
+            if disable_native:
+                self._module_map = {}
+
+            else:
+                self._module_map = None
+                self._loaded = set()
 
             # Reset our path cache
             self._paths_previously_scanned = set()
 
-    def load_modules(self, path=None, name=None):
+    def load_modules(self, path=None, name=None, force=False):
         """
         Load our modules into memory
         """
@@ -151,6 +159,14 @@ class PluginManager(metaclass=Singleton):
         module_path = self.module_path if path is None else path
 
         with self._lock:
+            if not force and module_path in self._loaded:
+                # We're done
+                return
+
+            # Our base reference
+            module_count = len(self._module_map) if self._module_map else 0
+            schema_count = len(self._schema_map) if self._schema_map else 0
+
             if not self:
                 # Initialize our maps
                 self._module_map = {}
@@ -245,10 +261,16 @@ class PluginManager(metaclass=Singleton):
                 logger.trace(
                     '{} {} loaded in {:.6f}s'.format(
                         self.name, module_name, (time.time() - tl_start)))
+
+            # Track the directory loaded so we never load it again
+            self._loaded.add(module_path)
+
             logger.debug(
                 '{} {}(s) and {} Schema(s) loaded in {:.4f}s'
                 .format(
-                    self.name, len(self._module_map), len(self._schema_map),
+                    self.name,
+                    len(self._module_map) - module_count,
+                    len(self._schema_map) - schema_count,
                     (time.time() - t_start)))
 
     def module_detection(self, paths, cache=True):
@@ -725,4 +747,4 @@ class PluginManager(metaclass=Singleton):
         """
         Determines if object has loaded or not
         """
-        return True if self._module_map is not None else False
+        return True if self._loaded and self._module_map is not None else False

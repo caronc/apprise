@@ -420,6 +420,10 @@ def test_notification_manager_decorators(tmpdir):
     """))
     assert 'mytest' not in N_MGR
     N_MGR.load_modules(path=str(notify_base))
+
+    # It's still not loaded because the path has already been scanned
+    assert 'mytest' not in N_MGR
+    N_MGR.load_modules(path=str(notify_base), force=True)
     assert 'mytest' in N_MGR
 
     # Could not be loaded because the filename did not align with the class
