@@ -435,3 +435,7 @@ def test_notification_manager_decorators(tmpdir):
     N_MGR.load_modules(path=str(notify_base))
     # Our item is still loaded as expected
     assert 'mytest' in N_MGR
+
+    # Simple test to make sure we can handle duplicate entries loaded
+    N_MGR.load_modules(path=str(notify_base), force=True)
+    N_MGR.load_modules(path=str(notify_base), force=True)
