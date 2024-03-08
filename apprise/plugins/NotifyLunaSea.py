@@ -154,7 +154,7 @@ class NotifyLunaSea(NotifyBase):
         'image': {
             'name': _('Include Image'),
             'type': 'bool',
-            'default': True,
+            'default': False,
             'map_to': 'include_image',
         },
         'mode': {
@@ -166,14 +166,16 @@ class NotifyLunaSea(NotifyBase):
     })
 
     def __init__(self, targets=None, mode=None, token=None,
-                 include_image=True, **kwargs):
+                 include_image=False, **kwargs):
         """
         Initialize LunaSea Object
         """
         super().__init__(**kwargs)
 
         # Show image associated with notification
-        self.include_image = include_image
+        self.include_image = \
+            self.template_args['image']['default'] \
+            if include_image is None else include_image
 
         # Prepare our mode
         self.mode = mode.strip().lower() \
@@ -260,15 +262,10 @@ class NotifyLunaSea(NotifyBase):
         while len(targets):
             target = targets.pop(0)
 
-            # Prepare our payload
-            _payload = payload.copy()
-
             if target[0] == '+':
-                _payload['device_id'] = target[1]
                 url = notify_url + self.notify_device_path.format(target[1])
 
             else:
-                _payload['user_id'] = target[1]
                 url = notify_url + self.notify_user_path.format(target[1])
 
             self.logger.debug('LunaSea POST URL: %s (cert_verify=%r)' % (
@@ -282,7 +279,7 @@ class NotifyLunaSea(NotifyBase):
             try:
                 r = requests.post(
                     url,
-                    data=dumps(_payload),
+                    data=dumps(payload),
                     headers=headers,
                     auth=auth,
                     verify=self.verify_certificate,

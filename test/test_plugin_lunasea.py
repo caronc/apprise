@@ -28,6 +28,7 @@
 
 import os
 from unittest import mock
+from json import loads
 
 import requests
 from helpers import AppriseURLTester
@@ -86,7 +87,7 @@ apprise_url_tests = (
         'instance': NotifyLunaSea,
     }),
     # No user/pass combo
-    ('lunasea://localhost/@user/@user2/', {
+    ('lunasea://localhost/@user/@user2/?image=True', {
         'instance': NotifyLunaSea,
     }),
     # A Email Testing
@@ -170,22 +171,101 @@ def test_plugin_custom_lunasea_edge_cases(mock_post):
     # Prepare Mock
     mock_post.return_value = response
 
-    results = NotifyLunaSea.parse_url('lsea://user:pass@@user,+device,~~,,')
+    # Prepare a URL with some garbage in it that gets parsed out anyway
+    # key take away is we provided userA and device1
+    results = NotifyLunaSea.parse_url('lsea://user:pass@@userA,+device1,~~,,')
 
     assert isinstance(results, dict)
     assert results['user'] == 'user'
     assert results['password'] == 'pass'
     assert results['port'] is None
-    assert results['host'] == 'user,+device,~~,,'
+    assert results['host'] == 'userA,+device1,~~,,'
     assert results['fullpath'] is None
     assert results['path'] is None
     assert results['query'] is None
     assert results['schema'] == 'lsea'
-    assert results['url'] == 'lsea://user:pass@user,+device,~~,,'
+    assert results['url'] == 'lsea://user:pass@userA,+device1,~~,,'
     assert isinstance(results['qsd:'], dict) is True
 
     instance = NotifyLunaSea(**results)
     assert isinstance(instance, NotifyLunaSea)
     assert len(instance.targets) == 2
-    assert ('@', 'user') in instance.targets
-    assert ('+', 'device') in instance.targets
+    assert ('@', 'userA') in instance.targets
+    assert ('+', 'device1') in instance.targets
+
+    assert instance.notify("test") is True
+
+    # 1 call to user, and second to device
+    assert mock_post.call_count == 2
+
+    url = mock_post.call_args_list[0][0][0]
+    assert url == 'https://notify.lunasea.app/v1/custom/device/device1'
+    payload = loads(mock_post.call_args_list[0][1]['data'])
+    assert 'title' in payload
+    assert 'body' in payload
+    assert 'image' not in payload
+    assert payload['body'] == 'test'
+    assert payload['title'] == 'Apprise Notifications'
+
+    url = mock_post.call_args_list[1][0][0]
+    assert url == 'https://notify.lunasea.app/v1/custom/user/userA'
+    payload = loads(mock_post.call_args_list[1][1]['data'])
+    assert 'title' in payload
+    assert 'body' in payload
+    assert 'image' not in payload
+    assert payload['body'] == 'test'
+    assert payload['title'] == 'Apprise Notifications'
+
+    assert '@userA' in instance.url()
+    assert '+device1' in instance.url()
+
+    # Test using a locally hosted instance now:
+    mock_post.reset_mock()
+
+    results = NotifyLunaSea.parse_url(
+        'lseas://user:pass@myhost:3222/@userA,+device1,~~,,')
+
+    assert isinstance(results, dict)
+    assert results['user'] == 'user'
+    assert results['password'] == 'pass'
+    assert results['port'] == 3222
+    assert results['host'] == 'myhost'
+    assert results['fullpath'] == '/%40userA%2C%2Bdevice1%2C~~%2C%2C'
+    assert results['path'] == '/'
+    assert results['query'] == '%40userA%2C%2Bdevice1%2C~~%2C%2C'
+    assert results['schema'] == 'lseas'
+    assert results['url'] == \
+        'lseas://user:pass@myhost:3222/%40userA%2C%2Bdevice1%2C~~%2C%2C'
+    assert isinstance(results['qsd:'], dict) is True
+
+    instance = NotifyLunaSea(**results)
+    assert isinstance(instance, NotifyLunaSea)
+    assert len(instance.targets) == 2
+    assert ('@', 'userA') in instance.targets
+    assert ('+', 'device1') in instance.targets
+
+    assert instance.notify("test") is True
+
+    # 1 call to user, and second to device
+    assert mock_post.call_count == 2
+
+    url = mock_post.call_args_list[0][0][0]
+    assert url == 'https://myhost:3222/v1/custom/device/device1'
+    payload = loads(mock_post.call_args_list[0][1]['data'])
+    assert 'title' in payload
+    assert 'body' in payload
+    assert 'image' not in payload
+    assert payload['body'] == 'test'
+    assert payload['title'] == 'Apprise Notifications'
+
+    url = mock_post.call_args_list[1][0][0]
+    assert url == 'https://myhost:3222/v1/custom/user/userA'
+    payload = loads(mock_post.call_args_list[1][1]['data'])
+    assert 'title' in payload
+    assert 'body' in payload
+    assert 'image' not in payload
+    assert payload['body'] == 'test'
+    assert payload['title'] == 'Apprise Notifications'
+
+    assert '@userA' in instance.url()
+    assert '+device1' in instance.url()
