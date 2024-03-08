@@ -242,8 +242,13 @@ class NotifyLunaSea(NotifyBase):
         if image_url:
             payload['image'] = image_url
 
-        # Prepare our Authentication
-        auth = (self.user, self.password)
+        # Prepare our Authentication (if defined)
+        if self.user and self.password:
+            auth = (self.user, self.password)
+
+        else:
+            # No Auth
+            auth = None
 
         if self.mode == LunaSeaMode.CLOUD:
             # Cloud Service

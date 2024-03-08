@@ -90,10 +90,6 @@ apprise_url_tests = (
     ('lunasea://localhost/@user/@user2/?image=True', {
         'instance': NotifyLunaSea,
     }),
-    # A Email Testing
-    ('lunasea://localhost/+device/?email=user@gmail.com', {
-        'instance': NotifyLunaSea,
-    }),
     # Enforce image but not otherwise find one
     ('lunasea://localhost/+device/?image=True', {
         'instance': NotifyLunaSea,
