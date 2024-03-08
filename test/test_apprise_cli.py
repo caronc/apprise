@@ -615,6 +615,68 @@ def test_apprise_cli_nux_env(tmpdir):
     assert result.exit_code == 0
 
 
+def test_apprise_cli_modules(tmpdir):
+    """
+    CLI: --plugin (-P)
+
+    """
+
+    runner = CliRunner()
+
+    #
+    # Loading of modules works correctly
+    #
+    notify_cmod_base = tmpdir.mkdir('cli_modules')
+    notify_cmod = notify_cmod_base.join('hook.py')
+    notify_cmod.write(cleandoc("""
+    from apprise.decorators import notify
+
+    @notify(on="climod")
+    def mywrapper(body, title, notify_type, *args, **kwargs):
+        pass
+    """))
+
+    result = runner.invoke(cli.main, [
+        '--plugin-path', str(notify_cmod),
+        '-t', 'title',
+        '-b', 'body',
+        'climod://',
+    ])
+
+    assert result.exit_code == 0
+
+    # Test -P
+    result = runner.invoke(cli.main, [
+        '-P', str(notify_cmod),
+        '-t', 'title',
+        '-b', 'body',
+        'climod://',
+    ])
+
+    assert result.exit_code == 0
+
+    # Test double hooks
+    notify_cmod2 = notify_cmod_base.join('hook2.py')
+    notify_cmod2.write(cleandoc("""
+    from apprise.decorators import notify
+
+    @notify(on="climod2")
+    def mywrapper(body, title, notify_type, *args, **kwargs):
+        pass
+    """))
+
+    result = runner.invoke(cli.main, [
+        '--plugin-path', str(notify_cmod),
+        '--plugin-path', str(notify_cmod2),
+        '-t', 'title',
+        '-b', 'body',
+        'climod://',
+        'climod2://',
+    ])
+
+    assert result.exit_code == 0
+
+
 def test_apprise_cli_details(tmpdir):
     """
     CLI: --details (-l)
