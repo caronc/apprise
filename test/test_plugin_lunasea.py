@@ -230,12 +230,25 @@ def test_plugin_custom_lunasea_edge_cases(mock_post):
     assert results['password'] == 'pass'
     assert results['port'] == 3222
     assert results['host'] == 'myhost'
-    assert results['fullpath'] == '/%40userA%2C%2Bdevice1%2C~~%2C%2C'
+    assert (
+        results['fullpath'] == '/%40userA%2C%2Bdevice1%2C~~%2C%2C' or
+        # Compatible with RHEL8 (Python v3.6.8)
+        results['fullpath'] == '/%40userA%2C%2Bdevice1%2C%7E%7E%2C%2C'
+    )
     assert results['path'] == '/'
-    assert results['query'] == '%40userA%2C%2Bdevice1%2C~~%2C%2C'
+    assert (
+        results['query'] == '%40userA%2C%2Bdevice1%2C~~%2C%2C' or
+        # Compatible with RHEL8 (Python v3.6.8)
+        results['query'] == '%40userA%2C%2Bdevice1%2C%7E%7E%2C%2C'
+    )
     assert results['schema'] == 'lseas'
-    assert results['url'] == \
-        'lseas://user:pass@myhost:3222/%40userA%2C%2Bdevice1%2C~~%2C%2C'
+    assert (
+        results['url'] ==
+        'lseas://user:pass@myhost:3222/%40userA%2C%2Bdevice1%2C~~%2C%2C' or
+        # Compatible with RHEL8 (Python v3.6.8)
+        results['url'] ==
+        'lseas://user:pass@myhost:3222/%40userA%2C%2Bdevice1%2C%7E%7E%2C%2C'
+    )
     assert isinstance(results['qsd:'], dict) is True
 
     instance = NotifyLunaSea(**results)
