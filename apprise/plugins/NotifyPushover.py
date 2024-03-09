@@ -161,6 +161,9 @@ class NotifyPushover(NotifyBase):
     # Pushover uses the http protocol with JSON requests
     notify_url = 'https://api.pushover.net/1/messages.json'
 
+    # NotifyBase throttles but Pushover does not require throttling, so disable it
+    request_rate_per_sec = 0.0
+
     # Support attachments
     attachment_support = True
 
