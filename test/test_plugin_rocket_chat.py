@@ -107,6 +107,16 @@ apprise_url_tests = (
         },
         'privacy_url': 'rockets://user:****@localhost',
     }),
+    # A channel using token based
+    ('rockets://user:token@localhost/#channel?mode=token', {
+        'instance': NotifyRocketChat,
+        'privacy_url': 'rockets://user:****@localhost',
+    }),
+    # Token is detected based o it's length
+    ('rockets://user:{}@localhost/#channel'.format('t' * 40), {
+        'instance': NotifyRocketChat,
+        'privacy_url': 'rockets://user:****@localhost',
+    }),
     # Several channels
     ('rocket://user:pass@localhost/#channel1/#channel2/?avatar=Yes', {
         'instance': NotifyRocketChat,
