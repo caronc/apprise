@@ -232,42 +232,34 @@ No one wants to put their credentials out for everyone to see on the command lin
 # By default if no url or configuration is specified apprise will attempt to load
 # configuration files (if present) from:
 #  ~/.apprise
-#  ~/.apprise.yml
 #  ~/.apprise.yaml
-#  ~/.config/apprise
-#  ~/.config/apprise.yml
+#  ~/.config/apprise.conf
 #  ~/.config/apprise.yaml
-#  /etc/apprise
-#  /etc/apprise.yml
+#  /etc/apprise.conf
 #  /etc/apprise.yaml
 
 # Also a subdirectory handling allows you to leverage plugins
 #  ~/.apprise/apprise
-#  ~/.apprise/apprise.yml
 #  ~/.apprise/apprise.yaml
-#  ~/.config/apprise/apprise
-#  ~/.config/apprise/apprise.yml
+#  ~/.config/apprise/apprise.conf
 #  ~/.config/apprise/apprise.yaml
-#  /etc/apprise/apprise
-#  /etc/apprise/apprise.yml
 #  /etc/apprise/apprise.yaml
+#  /etc/apprise/apprise.conf
 
 # Windows users can store their default configuration files here:
-#  %APPDATA%/Apprise/apprise
-#  %APPDATA%/Apprise/apprise.yml
+#  %APPDATA%/Apprise/apprise.conf
 #  %APPDATA%/Apprise/apprise.yaml
-#  %LOCALAPPDATA%/Apprise/apprise
-#  %LOCALAPPDATA%/Apprise/apprise.yml
+#  %LOCALAPPDATA%/Apprise/apprise.conf
 #  %LOCALAPPDATA%/Apprise/apprise.yaml
-#  %ALLUSERSPROFILE%\Apprise\apprise
-#  %ALLUSERSPROFILE%\Apprise\apprise.yml
+#  %ALLUSERSPROFILE%\Apprise\apprise.conf
 #  %ALLUSERSPROFILE%\Apprise\apprise.yaml
-#  %PROGRAMFILES%\Apprise\apprise
-#  %PROGRAMFILES%\Apprise\apprise.yml
+#  %PROGRAMFILES%\Apprise\apprise.conf
 #  %PROGRAMFILES%\Apprise\apprise.yaml
-#  %COMMONPROGRAMFILES%\Apprise\apprise
-#  %COMMONPROGRAMFILES%\Apprise\apprise.yml
+#  %COMMONPROGRAMFILES%\Apprise\apprise.conf
 #  %COMMONPROGRAMFILES%\Apprise\apprise.yaml
+
+# Note: .yml extensions are also scanned (above) and files without .conf
+#      extension for backwards compatibility with previous versions of apprise
 
 # If you loaded one of those files, your command line gets really easy:
 apprise -vv -t 'my title' -b 'my notification body'

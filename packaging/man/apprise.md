@@ -188,26 +188,23 @@ command line and all of them will be loaded.  You can also point your configurat
 a cloud location (by referencing `http://` or `https://`. By default **apprise** looks
 in the following local locations for configuration files and loads them:
 
-    ~/.apprise
-    ~/.apprise.yml
+    ~/.apprise.conf
     ~/.apprise.yaml
-    ~/.config/apprise
-    ~/.config/apprise.yml
+    ~/.config/apprise.conf
     ~/.config/apprise.yaml
 
-    ~/.apprise/apprise
-    ~/.apprise/apprise.yml
+    ~/.apprise/apprise.conf
     ~/.apprise/apprise.yaml
-    ~/.config/apprise/apprise
-    ~/.config/apprise/apprise.yml
+    ~/.config/apprise/apprise.conf
     ~/.config/apprise/apprise.yaml
 
-    /etc/apprise
-    /etc/apprise.yml
+    /etc/apprise.conf
     /etc/apprise.yaml
-    /etc/apprise/apprise
-    /etc/apprise/apprise.yml
+    /etc/apprise/apprise.conf
     /etc/apprise/apprise.yaml
+
+The **configuration files** specified above can also be identified with a `.yml`
+extension or even just entirely removing the `.conf` extension altogether.
 
 If a default configuration file is referenced in any way by the **apprise**
 tool, you no longer need to provide it a Service URL.  Usage of the **apprise**
