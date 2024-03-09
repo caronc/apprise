@@ -154,7 +154,7 @@ class NotifySignalAPI(NotifyBase):
         'status': {
             'name': _('Show Status'),
             'type': 'bool',
-            'default': False,
+            'default': True,
         },
     })
 
@@ -486,6 +486,6 @@ class NotifySignalAPI(NotifyBase):
 
         # Get status switch
         results['status'] = \
-            parse_bool(results['qsd'].get('status', False))
+            parse_bool(results['qsd'].get('status', True))
 
         return results
