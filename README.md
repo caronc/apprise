@@ -258,8 +258,8 @@ No one wants to put their credentials out for everyone to see on the command lin
 #  %COMMONPROGRAMFILES%\Apprise\apprise.conf
 #  %COMMONPROGRAMFILES%\Apprise\apprise.yaml
 
-# Note: .yml extensions are also scanned (above) and files without .conf
-#      extension for backwards compatibility with previous versions of apprise
+# The configuration files specified above can also be identified with a `.yml`
+# extension or even just entirely removing the `.conf` extension altogether.
 
 # If you loaded one of those files, your command line gets really easy:
 apprise -vv -t 'my title' -b 'my notification body'
