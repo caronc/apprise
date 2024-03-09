@@ -67,25 +67,30 @@ CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
 DEFAULT_CONFIG_PATHS = (
     # Legacy Path Support
     '~/.apprise',
+    '~/.apprise.conf',
     '~/.apprise.yml',
     '~/.apprise.yaml',
     '~/.config/apprise',
+    '~/.config/apprise.conf',
     '~/.config/apprise.yml',
     '~/.config/apprise.yaml',
 
     # Plugin Support Extended Directory Search Paths
     '~/.apprise/apprise',
+    '~/.apprise/apprise.conf',
     '~/.apprise/apprise.yml',
     '~/.apprise/apprise.yaml',
     '~/.config/apprise/apprise',
+    '~/.config/apprise/apprise.conf',
     '~/.config/apprise/apprise.yml',
     '~/.config/apprise/apprise.yaml',
 
-    # Global Configuration Support
+    # Global Configuration File Support
     '/etc/apprise',
     '/etc/apprise.yml',
     '/etc/apprise.yaml',
     '/etc/apprise/apprise',
+    '/etc/apprise/apprise.conf',
     '/etc/apprise/apprise.yml',
     '/etc/apprise/apprise.yaml',
 )
@@ -104,9 +109,11 @@ if platform.system() == 'Windows':
     # Default Config Search Path for Windows Users
     DEFAULT_CONFIG_PATHS = (
         expandvars('%APPDATA%\\Apprise\\apprise'),
+        expandvars('%APPDATA%\\Apprise\\apprise.conf'),
         expandvars('%APPDATA%\\Apprise\\apprise.yml'),
         expandvars('%APPDATA%\\Apprise\\apprise.yaml'),
         expandvars('%LOCALAPPDATA%\\Apprise\\apprise'),
+        expandvars('%LOCALAPPDATA%\\Apprise\\apprise.conf'),
         expandvars('%LOCALAPPDATA%\\Apprise\\apprise.yml'),
         expandvars('%LOCALAPPDATA%\\Apprise\\apprise.yaml'),
 
@@ -116,16 +123,19 @@ if platform.system() == 'Windows':
 
         # C:\ProgramData\Apprise\
         expandvars('%ALLUSERSPROFILE%\\Apprise\\apprise'),
+        expandvars('%ALLUSERSPROFILE%\\Apprise\\apprise.conf'),
         expandvars('%ALLUSERSPROFILE%\\Apprise\\apprise.yml'),
         expandvars('%ALLUSERSPROFILE%\\Apprise\\apprise.yaml'),
 
         # C:\Program Files\Apprise
         expandvars('%PROGRAMFILES%\\Apprise\\apprise'),
+        expandvars('%PROGRAMFILES%\\Apprise\\apprise.conf'),
         expandvars('%PROGRAMFILES%\\Apprise\\apprise.yml'),
         expandvars('%PROGRAMFILES%\\Apprise\\apprise.yaml'),
 
         # C:\Program Files\Common Files
         expandvars('%COMMONPROGRAMFILES%\\Apprise\\apprise'),
+        expandvars('%COMMONPROGRAMFILES%\\Apprise\\apprise.conf'),
         expandvars('%COMMONPROGRAMFILES%\\Apprise\\apprise.yml'),
         expandvars('%COMMONPROGRAMFILES%\\Apprise\\apprise.yaml'),
     )
