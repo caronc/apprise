@@ -276,27 +276,24 @@ command line and all of them will be loaded.  You can also point your configurat
 a cloud location (by referencing <code>http://</code> or <code>https://</code>. By default <strong>apprise</strong> looks
 in the following local locations for configuration files and loads them:</p>
 
-<pre><code>~/.apprise
-~/.apprise.yml
+<pre><code>~/.apprise.conf
 ~/.apprise.yaml
-~/.config/apprise
-~/.config/apprise.yml
+~/.config/apprise.conf
 ~/.config/apprise.yaml
 
-~/.apprise/apprise
-~/.apprise/apprise.yml
+~/.apprise/apprise.conf
 ~/.apprise/apprise.yaml
-~/.config/apprise/apprise
-~/.config/apprise/apprise.yml
+~/.config/apprise/apprise.conf
 ~/.config/apprise/apprise.yaml
 
-/etc/apprise
-/etc/apprise.yml
+/etc/apprise.conf
 /etc/apprise.yaml
-/etc/apprise/apprise
-/etc/apprise/apprise.yml
+/etc/apprise/apprise.conf
 /etc/apprise/apprise.yaml
 </code></pre>
+
+<p>The <strong>configuration files</strong> specified above can also be identified with a <code>.yml</code>
+extension or even just entirely removing the <code>.conf</code> extension altogether.</p>
 
 <p>If a default configuration file is referenced in any way by the <strong>apprise</strong>
 tool, you no longer need to provide it a Service URL.  Usage of the <strong>apprise</strong>
@@ -319,7 +316,7 @@ configuration that you want and only specifically notify a subset of them:</p>
 
 <h2 id="COPYRIGHT">COPYRIGHT</h2>
 
-<p>Apprise is Copyright (C) 2024 Chris Caron <a href="&#109;&#x61;&#105;&#108;&#116;&#111;&#58;&#x6c;&#x65;&#97;&#x64;&#50;&#x67;&#111;&#108;&#x64;&#x40;&#103;&#109;&#97;&#105;&#x6c;&#46;&#99;&#111;&#109;" data-bare-link="true">&#108;&#x65;&#x61;&#100;&#50;&#x67;&#x6f;&#x6c;&#x64;&#64;&#x67;&#x6d;&#x61;&#105;&#x6c;&#x2e;&#99;&#x6f;&#x6d;</a></p>
+<p>Apprise is Copyright (C) 2024 Chris Caron <a href="&#109;&#97;&#x69;&#108;&#x74;&#111;&#58;&#108;&#101;&#97;&#100;&#50;&#x67;&#111;&#x6c;&#x64;&#64;&#103;&#x6d;&#x61;&#105;&#x6c;&#46;&#99;&#x6f;&#109;" data-bare-link="true">&#x6c;&#x65;&#x61;&#x64;&#x32;&#103;&#x6f;&#108;&#100;&#64;&#103;&#109;&#97;&#105;&#108;&#46;&#x63;&#111;&#109;</a></p>
 
 
   <ol class='man-decor man-foot man foot'>
