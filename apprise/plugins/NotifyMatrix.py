@@ -145,6 +145,8 @@ class NotifyMatrix(NotifyBase):
     # Support Attachments
     attachment_support = True
 
+    notify_format = NotifyFormat.HTML
+
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_matrix'
 
