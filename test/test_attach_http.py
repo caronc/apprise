@@ -35,7 +35,7 @@ from os.path import join
 from os.path import dirname
 from os.path import getsize
 from apprise.attachment.AttachHTTP import AttachHTTP
-from apprise import AppriseAttachment
+from apprise import Apprise, AppriseAttachment
 from apprise.NotificationManager import NotificationManager
 from apprise.plugins.NotifyBase import NotifyBase
 from apprise.common import ContentLocation
@@ -113,8 +113,9 @@ def test_attach_http_query_string_dictionary():
     assert re.search(r'[?&]_var=test', obj.url())
 
 
+@mock.patch('requests.post')
 @mock.patch('requests.get')
-def test_attach_http(mock_get):
+def test_attach_http(mock_get, mock_post):
     """
     API: AttachHTTP() object
 
@@ -422,3 +423,50 @@ def test_attach_http(mock_get):
 
     # Restore value
     AttachHTTP.max_file_size = max_file_size
+
+    # Multi Message Testing
+    mock_get.side_effect = None
+    mock_get.return_value = DummyResponse()
+
+    # Prepare our POST response (from notify call)
+    response = requests.Request()
+    response.status_code = requests.codes.ok
+    response.content = ""
+    mock_post.return_value = response
+
+    mock_get.reset_mock()
+    mock_post.reset_mock()
+    assert mock_get.call_count == 0
+
+    apobj = Apprise()
+    assert apobj.add('form://localhost')
+    assert apobj.add('json://localhost')
+    assert apobj.add('xml://localhost')
+    assert len(apobj) == 3
+    assert apobj.notify(
+        body='one attachment split 3 times',
+        attach="http://localhost/test.gif",
+    ) is True
+
+    # We posted 3 times
+    assert mock_post.call_count == 3
+    # We only fetched once and re-used the same fetch for all posts
+    assert mock_get.call_count == 1
+
+    mock_get.reset_mock()
+    mock_post.reset_mock()
+    apobj = Apprise()
+    for n in range(10):
+        assert apobj.add(f'json://localhost?:entry={n}&method=post')
+        assert apobj.add(f'form://localhost?:entry={n}&method=post')
+        assert apobj.add(f'xml://localhost?:entry={n}&method=post')
+
+    assert apobj.notify(
+        body='one attachment split 30 times',
+        attach="http://localhost/test.gif",
+    ) is True
+
+    # We posted 30 times
+    assert mock_post.call_count == 30
+    # We only fetched once and re-used the same fetch for all posts
+    assert mock_get.call_count == 1
