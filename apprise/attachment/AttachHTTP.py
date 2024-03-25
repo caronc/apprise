@@ -29,6 +29,7 @@
 import re
 import os
 import requests
+import threading
 from tempfile import NamedTemporaryFile
 from .AttachBase import AttachBase
 from ..common import ContentLocation
@@ -55,6 +56,9 @@ class AttachHTTP(AttachBase):
 
     # Web based requests are remote/external to our current location
     location = ContentLocation.HOSTED
+
+    # thread safe loading
+    _lock = threading.Lock()
 
     def __init__(self, headers=None, **kwargs):
         """
@@ -96,9 +100,6 @@ class AttachHTTP(AttachBase):
             # our content is inaccessible
             return False
 
-        # Ensure any existing content set has been invalidated
-        self.invalidate()
-
         # prepare header
         headers = {
             'User-Agent': self.app_id,
@@ -117,135 +118,153 @@ class AttachHTTP(AttachBase):
 
         url += self.fullpath
 
-        self.logger.debug('HTTP POST URL: %s (cert_verify=%r)' % (
-            url, self.verify_certificate,
-        ))
-
         # Where our request object will temporarily live.
         r = None
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
 
-        try:
-            # Make our request
-            with requests.get(
-                    url,
-                    headers=headers,
-                    auth=auth,
-                    params=self.qsd,
-                    verify=self.verify_certificate,
-                    timeout=self.request_timeout,
-                    stream=True) as r:
+        with self._lock:
+            if self.exists(retrieve_if_missing=False):
+                # Due to locking; it's possible a concurrent thread already
+                # handled the retrieval in which case we can safely move on
+                self.logger.trace(
+                    'HTTP Attachment %s already retrieved',
+                    self._temp_file.name)
+                return True
 
-                # Handle Errors
-                r.raise_for_status()
-
-                # Get our file-size (if known)
-                try:
-                    file_size = int(r.headers.get('Content-Length', '0'))
-                except (TypeError, ValueError):
-                    # Handle edge case where Content-Length is a bad value
-                    file_size = 0
-
-                # Perform a little Q/A on file limitations and restrictions
-                if self.max_file_size > 0 and file_size > self.max_file_size:
-
-                    # The content retrieved is to large
-                    self.logger.error(
-                        'HTTP response exceeds allowable maximum file length '
-                        '({}KB): {}'.format(
-                            int(self.max_file_size / 1024),
-                            self.url(privacy=True)))
-
-                    # Return False (signifying a failure)
-                    return False
-
-                # Detect config format based on mime if the format isn't
-                # already enforced
-                self.detected_mimetype = r.headers.get('Content-Type')
-
-                d = r.headers.get('Content-Disposition', '')
-                result = re.search(
-                    "filename=['\"]?(?P<name>[^'\"]+)['\"]?", d, re.I)
-                if result:
-                    self.detected_name = result.group('name').strip()
-
-                # Create a temporary file to work with
-                self._temp_file = NamedTemporaryFile()
-
-                # Get our chunk size
-                chunk_size = self.chunk_size
-
-                # Track all bytes written to disk
-                bytes_written = 0
-
-                # If we get here, we can now safely write our content to disk
-                for chunk in r.iter_content(chunk_size=chunk_size):
-                    # filter out keep-alive chunks
-                    if chunk:
-                        self._temp_file.write(chunk)
-                        bytes_written = self._temp_file.tell()
-
-                        # Prevent a case where Content-Length isn't provided
-                        # we don't want to fetch beyond our limits
-                        if self.max_file_size > 0:
-                            if bytes_written > self.max_file_size:
-                                # The content retrieved is to large
-                                self.logger.error(
-                                    'HTTP response exceeds allowable maximum '
-                                    'file length ({}KB): {}'.format(
-                                        int(self.max_file_size / 1024),
-                                        self.url(privacy=True)))
-
-                                # Invalidate any variables previously set
-                                self.invalidate()
-
-                                # Return False (signifying a failure)
-                                return False
-
-                            elif bytes_written + chunk_size \
-                                    > self.max_file_size:
-                                # Adjust out next read to accomodate up to our
-                                # limit +1. This will prevent us from readig
-                                # to much into our memory buffer
-                                self.max_file_size - bytes_written + 1
-
-                # Ensure our content is flushed to disk for post-processing
-                self._temp_file.flush()
-
-            # Set our minimum requirements for a successful download() call
-            self.download_path = self._temp_file.name
-            if not self.detected_name:
-                self.detected_name = os.path.basename(self.fullpath)
-
-        except requests.RequestException as e:
-            self.logger.error(
-                'A Connection error occurred retrieving HTTP '
-                'configuration from %s.' % self.host)
-            self.logger.debug('Socket Exception: %s' % str(e))
-
-            # Invalidate any variables previously set
+            # Ensure any existing content set has been invalidated
             self.invalidate()
 
-            # Return False (signifying a failure)
-            return False
+            self.logger.debug(
+                'HTTP Attachment Fetch URL: %s (cert_verify=%r)' % (
+                    url, self.verify_certificate))
 
-        except (IOError, OSError):
-            # IOError is present for backwards compatibility with Python
-            # versions older then 3.3.  >= 3.3 throw OSError now.
+            try:
+                # Make our request
+                with requests.get(
+                        url,
+                        headers=headers,
+                        auth=auth,
+                        params=self.qsd,
+                        verify=self.verify_certificate,
+                        timeout=self.request_timeout,
+                        stream=True) as r:
 
-            # Could not open and/or write the temporary file
-            self.logger.error(
-                'Could not write attachment to disk: {}'.format(
-                    self.url(privacy=True)))
+                    # Handle Errors
+                    r.raise_for_status()
 
-            # Invalidate any variables previously set
-            self.invalidate()
+                    # Get our file-size (if known)
+                    try:
+                        file_size = int(r.headers.get('Content-Length', '0'))
+                    except (TypeError, ValueError):
+                        # Handle edge case where Content-Length is a bad value
+                        file_size = 0
 
-            # Return False (signifying a failure)
-            return False
+                    # Perform a little Q/A on file limitations and restrictions
+                    if self.max_file_size > 0 and \
+                            file_size > self.max_file_size:
 
+                        # The content retrieved is to large
+                        self.logger.error(
+                            'HTTP response exceeds allowable maximum file '
+                            'length ({}KB): {}'.format(
+                                int(self.max_file_size / 1024),
+                                self.url(privacy=True)))
+
+                        # Return False (signifying a failure)
+                        return False
+
+                    # Detect config format based on mime if the format isn't
+                    # already enforced
+                    self.detected_mimetype = r.headers.get('Content-Type')
+
+                    d = r.headers.get('Content-Disposition', '')
+                    result = re.search(
+                        "filename=['\"]?(?P<name>[^'\"]+)['\"]?", d, re.I)
+                    if result:
+                        self.detected_name = result.group('name').strip()
+
+                    # Create a temporary file to work with
+                    self._temp_file = NamedTemporaryFile()
+
+                    # Get our chunk size
+                    chunk_size = self.chunk_size
+
+                    # Track all bytes written to disk
+                    bytes_written = 0
+
+                    # If we get here, we can now safely write our content to
+                    # disk
+                    for chunk in r.iter_content(chunk_size=chunk_size):
+                        # filter out keep-alive chunks
+                        if chunk:
+                            self._temp_file.write(chunk)
+                            bytes_written = self._temp_file.tell()
+
+                            # Prevent a case where Content-Length isn't
+                            # provided. In this case we don't want to fetch
+                            # beyond our limits
+                            if self.max_file_size > 0:
+                                if bytes_written > self.max_file_size:
+                                    # The content retrieved is to large
+                                    self.logger.error(
+                                        'HTTP response exceeds allowable '
+                                        'maximum file length '
+                                        '({}KB): {}'.format(
+                                            int(self.max_file_size / 1024),
+                                            self.url(privacy=True)))
+
+                                    # Invalidate any variables previously set
+                                    self.invalidate()
+
+                                    # Return False (signifying a failure)
+                                    return False
+
+                                elif bytes_written + chunk_size \
+                                        > self.max_file_size:
+                                    # Adjust out next read to accomodate up to
+                                    # our limit +1. This will prevent us from
+                                    # reading to much into our memory buffer
+                                    self.max_file_size - bytes_written + 1
+
+                    # Ensure our content is flushed to disk for post-processing
+                    self._temp_file.flush()
+
+                    # Set our minimum requirements for a successful download()
+                    # call
+                    self.download_path = self._temp_file.name
+                    if not self.detected_name:
+                        self.detected_name = os.path.basename(self.fullpath)
+
+            except requests.RequestException as e:
+                self.logger.error(
+                    'A Connection error occurred retrieving HTTP '
+                    'configuration from %s.' % self.host)
+                self.logger.debug('Socket Exception: %s' % str(e))
+
+                # Invalidate any variables previously set
+                self.invalidate()
+
+                # Return False (signifying a failure)
+                return False
+
+            except (IOError, OSError):
+                # IOError is present for backwards compatibility with Python
+                # versions older then 3.3.  >= 3.3 throw OSError now.
+
+                # Could not open and/or write the temporary file
+                self.logger.error(
+                    'Could not write attachment to disk: {}'.format(
+                        self.url(privacy=True)))
+
+                # Invalidate any variables previously set
+                self.invalidate()
+
+                # Return False (signifying a failure)
+                return False
+
+        self.logger.debug('Attach Unlock')
         # Return our success
         return True
 
@@ -254,10 +273,19 @@ class AttachHTTP(AttachBase):
         Close our temporary file
         """
         if self._temp_file:
+            self.logger.trace(
+                'Attachment cleanup of %s', self._temp_file.name)
             self._temp_file.close()
             self._temp_file = None
 
         super().invalidate()
+
+    def __del__(self):
+        """
+        Tidy memory if open
+        """
+        with self._lock:
+            self.invalidate()
 
     def url(self, privacy=False, *args, **kwargs):
         """
