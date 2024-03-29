@@ -29,6 +29,7 @@
 from os.path import dirname
 from os.path import join
 from apprise.decorators import notify
+from apprise.decorators.CustomNotifyPlugin import CustomNotifyPlugin
 from apprise import Apprise
 from apprise import AppriseConfig
 from apprise import AppriseAsset
@@ -351,7 +352,7 @@ def test_notify_multi_instance_decoration(tmpdir):
     t = tmpdir.mkdir("multi-test").join("apprise.yml")
     t.write("""urls:
     - multi://user1:pass@hostname
-    - multi://user2:pass2@hostname
+    - multi://user2:pass2@hostname?verify=no
     """)
 
     # Create ourselves a config object
@@ -404,11 +405,12 @@ def test_notify_multi_instance_decoration(tmpdir):
     assert 'tag' in meta
     assert isinstance(meta['tag'], set)
 
-    assert len(meta) == 7
+    assert len(meta) == 8
     # We carry all of our default arguments from the @notify's initialization
     assert meta['schema'] == 'multi'
     assert meta['host'] == 'hostname'
     assert meta['user'] == 'user1'
+    assert meta['verify'] is True
     assert meta['password'] == 'pass'
 
     # Verify our URL is correct
@@ -441,15 +443,24 @@ def test_notify_multi_instance_decoration(tmpdir):
     assert 'tag' in meta
     assert isinstance(meta['tag'], set)
 
-    assert len(meta) == 7
+    assert len(meta) == 9
     # We carry all of our default arguments from the @notify's initialization
     assert meta['schema'] == 'multi'
     assert meta['host'] == 'hostname'
     assert meta['user'] == 'user2'
     assert meta['password'] == 'pass2'
+    assert meta['verify'] is False
+    assert meta['qsd']['verify'] == 'no'
 
     # Verify our URL is correct
-    assert meta['url'] == 'multi://user2:pass2@hostname'
+    assert meta['url'] == 'multi://user2:pass2@hostname?verify=no'
 
     # Tidy
     N_MGR.remove('multi')
+
+
+def test_custom_notify_plugin_decoration():
+    """decorators: CustomNotifyPlugin testing
+    """
+
+    CustomNotifyPlugin()

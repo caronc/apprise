@@ -1184,6 +1184,9 @@ class ConfigBase(URLBase):
                 # Prepare our Asset Object
                 _results['asset'] = asset
 
+                # Handle post processing of result set
+                _results = URLBase.post_process_parse_url_results(_results)
+
                 # Store our preloaded entries
                 preloaded.append({
                     'results': _results,
