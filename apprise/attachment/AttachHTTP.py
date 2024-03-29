@@ -185,8 +185,10 @@ class AttachHTTP(AttachBase):
                     if result:
                         self.detected_name = result.group('name').strip()
 
-                    # Create a temporary file to work with
-                    self._temp_file = NamedTemporaryFile()
+                    # Create a temporary file to work with; delete must be set
+                    # to False or it isn't compatible with Microsoft Windows instances.
+                    # in lieu of this, __del__ will clean up the file for us.
+                    self._temp_file = NamedTemporaryFile(delete=False)
 
                     # Get our chunk size
                     chunk_size = self.chunk_size
@@ -264,7 +266,6 @@ class AttachHTTP(AttachBase):
                 # Return False (signifying a failure)
                 return False
 
-        self.logger.debug('Attach Unlock')
         # Return our success
         return True
 
@@ -276,6 +277,16 @@ class AttachHTTP(AttachBase):
             self.logger.trace(
                 'Attachment cleanup of %s', self._temp_file.name)
             self._temp_file.close()
+
+            try:
+                # Ensure our file is removed (if it exists)
+                os.unlink(self._temp_file.name)
+
+            except OSError:
+                pass
+
+            # Reset our temporary file to prevent from entering
+            # this block again
             self._temp_file = None
 
         super().invalidate()
