@@ -147,6 +147,10 @@ class CustomNotifyPlugin(NotifyBase):
 
                 self._default_args = {}
 
+                # Some variables do not need to be set
+                if 'secure' in kwargs:
+                    del kwargs['secure']
+
                 # Apply our updates based on what was parsed
                 dict_full_update(self._default_args, self._base_args)
                 dict_full_update(self._default_args, kwargs)

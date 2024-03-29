@@ -30,6 +30,7 @@ import logging
 import os
 import re
 from unittest import mock
+from inspect import cleandoc
 
 import smtplib
 from email.header import decode_header
@@ -37,6 +38,8 @@ from email.header import decode_header
 from apprise import NotifyType, NotifyBase
 from apprise import Apprise
 from apprise import AttachBase
+from apprise.AppriseAsset import AppriseAsset
+from apprise.config.ConfigBase import ConfigBase
 from apprise import AppriseAttachment
 from apprise.plugins.NotifyEmail import NotifyEmail
 from apprise.plugins import NotifyEmail as NotifyEmailModule
@@ -1757,3 +1760,58 @@ def test_plugin_email_formatting_990(mock_smtp, mock_smtp_ssl):
 
     assert len(obj.targets) == 1
     assert (False, 'me@mydomain.com') in obj.targets
+
+
+def test_plugin_email_variables_1087():
+    """
+    NotifyEmail() GitHub Issue 1087
+    https://github.com/caronc/apprise/issues/1087
+    Email variables reported not working correctly
+
+    """
+
+    # Valid Configuration
+    result, _ = ConfigBase.config_parse(cleandoc("""
+    #
+    # Test Email Parsing
+    #
+    urls:
+      - mailtos://alt.lan/:
+        - user: testuser@alt.lan
+          pass: xxxxXXXxxx
+          smtp: smtp.alt.lan
+          to: alteriks@alt.lan
+    """), asset=AppriseAsset())
+
+    assert isinstance(result, list)
+    assert len(result) == 1
+
+    email = result[0]
+    assert email.from_addr == ['Apprise', 'testuser@alt.lan']
+    assert email.user == 'testuser@alt.lan'
+    assert email.smtp_host == 'smtp.alt.lan'
+    assert email.targets == [(False, 'alteriks@alt.lan')]
+    assert email.password == 'xxxxXXXxxx'
+
+    # Valid Configuration
+    result, _ = ConfigBase.config_parse(cleandoc("""
+    #
+    # Test Email Parsing where qsd over-rides all
+    #
+    urls:
+      - mailtos://alt.lan/?pass=abcd&user=joe@alt.lan:
+        - user: testuser@alt.lan
+          pass: xxxxXXXxxx
+          smtp: smtp.alt.lan
+          to: alteriks@alt.lan
+    """), asset=AppriseAsset())
+
+    assert isinstance(result, list)
+    assert len(result) == 1
+
+    email = result[0]
+    assert email.from_addr == ['Apprise', 'joe@alt.lan']
+    assert email.user == 'joe@alt.lan'
+    assert email.smtp_host == 'smtp.alt.lan'
+    assert email.targets == [(False, 'alteriks@alt.lan')]
+    assert email.password == 'abcd'
