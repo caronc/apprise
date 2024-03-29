@@ -1,0 +1,9 @@
+{
+    "python.testing.pytestArgs": [],
+    "python.testing.cwd": "${workspaceFolder}",
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true,
+    "terminal.integrated.env.linux": {
+      "PYTHONPATH": "${workspaceFolder}"
+    }
+}
