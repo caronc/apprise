@@ -186,8 +186,9 @@ class AttachHTTP(AttachBase):
                         self.detected_name = result.group('name').strip()
 
                     # Create a temporary file to work with; delete must be set
-                    # to False or it isn't compatible with Microsoft Windows instances.
-                    # in lieu of this, __del__ will clean up the file for us.
+                    # to False or it isn't compatible with Microsoft Windows
+                    # instances. In lieu of this, __del__ will clean up the
+                    # file for us.
                     self._temp_file = NamedTemporaryFile(delete=False)
 
                     # Get our chunk size
