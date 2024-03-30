@@ -54,7 +54,7 @@ Stride, Synology Chat, Syslog, Techulus Push, Telegram, Threema Gateway, Twilio,
 Twitter, Twist, XBMC, Voipms, Vonage, WeCom Bot, WhatsApp, Webex Teams}
 
 Name:           python-%{pypi_name}
-Version:        1.7.4
+Version:        1.7.5
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        BSD
@@ -195,6 +195,9 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 %{python3_sitelib}/%{pypi_name}/cli.*
 
 %changelog
+* Sat Mar 30 2024 Chris Caron <lead2gold@gmail.com> - 1.7.5
+- Updated to v1.7.5
+
 * Sat Mar  9 2024 Chris Caron <lead2gold@gmail.com> - 1.7.4
 - Updated to v1.7.4
 
