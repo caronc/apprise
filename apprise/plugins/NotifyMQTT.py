@@ -89,7 +89,7 @@ class NotifyMQTT(NotifyBase):
 
     requirements = {
         # Define our required packaging in order to work
-        'packages_required': 'paho-mqtt <= 2.0.0'
+        'packages_required': 'paho-mqtt < 2.0.0'
     }
 
     # The default descriptive name associated with the Notification
