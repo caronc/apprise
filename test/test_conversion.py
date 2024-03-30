@@ -29,6 +29,7 @@
 from apprise import NotifyFormat
 from apprise.conversion import convert_between
 import pytest
+from inspect import cleandoc
 
 # Disable logging for a cleaner testing output
 import logging
@@ -150,3 +151,60 @@ def test_conversion_text_to():
     assert response == \
         '&lt;title&gt;Test&nbsp;Message&lt;/title&gt;&lt;body&gt;Body&lt;'\
         '/body&gt;'
+
+
+def test_conversion_markdown_to_html():
+    """conversion: Test markdown to html
+    """
+
+    # While this uses the underlining markdown library
+    # what we're testing for are the edge cases we know it doesn't support
+    # hence, `-` (a dash) with the markdown library must be a `*` to work
+    # correctly
+    response = convert_between(
+        NotifyFormat.MARKDOWN, NotifyFormat.HTML, cleandoc("""
+        ## Some Heading
+
+        With Data:
+
+        - Foo
+        - Bar
+        """))
+
+    assert '<li>Foo</li>' in response
+    assert '<li>Bar</li>' in response
+    assert '<h2>Some Heading</h2>' in response
+    assert '<br />' not in response
+
+    # if the - follows With Data on the very next line, it's consider to not
+    # requiring indentation
+    response = convert_between(
+        NotifyFormat.MARKDOWN, NotifyFormat.HTML, cleandoc("""
+        ## Some Heading
+
+        With Data:
+        - Foo
+        - Bar
+        """))
+
+    # Breaks are added:
+    assert '<br />' in response
+    assert '- Foo' in response
+    assert '- Bar' in response
+
+    # Table formatting
+    response = convert_between(
+        NotifyFormat.MARKDOWN, NotifyFormat.HTML, cleandoc("""
+        First Header   | Second Header
+        -------------- | -------------
+        Content Cell1  | Content Cell3
+        Content Cell2  | Content Cell4
+        """))
+
+    assert '<table>' in response
+    assert '<th>First Header</th>' in response
+    assert '<th>Second Header</th>' in response
+    assert '<td>Content Cell1</td>' in response
+    assert '<td>Content Cell2</td>' in response
+    assert '<td>Content Cell3</td>' in response
+    assert '<td>Content Cell4</td>' in response
