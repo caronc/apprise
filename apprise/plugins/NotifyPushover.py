@@ -34,6 +34,7 @@ from .NotifyBase import NotifyBase
 from ..common import NotifyType
 from ..common import NotifyFormat
 from ..conversion import convert_between
+from ..utils import parse_bool
 from ..utils import parse_list
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
@@ -247,6 +248,11 @@ class NotifyPushover(NotifyBase):
             'max': 10800,
             'default': 3600,  # 1 hour
         },
+        'multiple_attachments': {
+            'name': _('Multiple Attachments'),
+            'type': 'bool',
+            'default': True,
+        },
         'to': {
             'alias_of': 'targets',
         },
@@ -254,7 +260,8 @@ class NotifyPushover(NotifyBase):
 
     def __init__(self, user_key, token, targets=None, priority=None,
                  sound=None, retry=None, expire=None, supplemental_url=None,
-                 supplemental_url_title=None, **kwargs):
+                 supplemental_url_title=None, multiple_attachments=None,
+                 **kwargs):
         """
         Initialize Pushover Object
         """
@@ -310,6 +317,10 @@ class NotifyPushover(NotifyBase):
         if self.sound and self.sound not in PUSHOVER_SOUNDS:
             msg = 'Using custom sound specified ({}). '.format(sound)
             self.logger.debug(msg)
+
+        self.multiple_attachments = bool(multiple_attachments)\
+            if multiple_attachments is not None\
+            else self.template_args['multiple_attachments']['default']
 
         # The Priority of the message
         self.priority = int(
@@ -399,6 +410,8 @@ class NotifyPushover(NotifyBase):
             # Send with attachments
             for no, attachment in enumerate(attach):
                 if no or not body:
+                    if no and not self.multiple_attachments:
+                        break
                     # To handle multiple attachments, clean up our message
                     _payload['message'] = attachment.name
 
@@ -560,6 +573,8 @@ class NotifyPushover(NotifyBase):
                 PUSHOVER_PRIORITIES[self.template_args['priority']['default']]
                 if self.priority not in PUSHOVER_PRIORITIES
                 else PUSHOVER_PRIORITIES[self.priority],
+            'multiple_attachments':
+                'yes' if self.multiple_attachments else 'no',
         }
 
         # Only add expire and retry for emergency messages,
@@ -628,6 +643,12 @@ class NotifyPushover(NotifyBase):
             results['expire'] = results['qsd']['expire']
         if 'retry' in results['qsd'] and len(results['qsd']['retry']):
             results['retry'] = results['qsd']['retry']
+
+        # Whether to send multiple empty messages with attachments
+        results['multiple_attachments'] = parse_bool(results['qsd'].get(
+            'multiple_attachments',
+            NotifyPushover.template_args['multiple_attachments']['default']
+        ))
 
         # The 'to' makes it easier to use yaml configuration
         if 'to' in results['qsd'] and len(results['qsd']['to']):
