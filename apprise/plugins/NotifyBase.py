@@ -557,6 +557,7 @@ class NotifyBase(URLBase):
         # If we reach here in our code, then we're using TRUNCATE, or SPLIT
         # actions which require some math to handle the data
         #
+
         # Handle situations where our body and title are amalamated into one
         # calculation
         title_maxlen = self.title_maxlen \
@@ -654,7 +655,8 @@ class NotifyBase(URLBase):
                 .lstrip('\r\n\x0b\x0c').rstrip(),
                 'title': title + (
                     '' if not show_counter else
-                    template.format(idx, count))} for idx, i in
+                    template.format(idx, count)),
+                'attach': ''} for idx, i in
                 enumerate(range(0, len(body), body_maxlen), start=1)]
 
         else:   # Display title once and move on
@@ -666,6 +668,7 @@ class NotifyBase(URLBase):
                     'body': body[i: i + body_maxlen]
                     .lstrip('\r\n\x0b\x0c').rstrip(),
                     'title': title,
+                    'attach': '',
                 })
 
             except (ValueError, IndexError):
@@ -680,6 +683,7 @@ class NotifyBase(URLBase):
                 response.append({
                     'body': '',
                     'title': title,
+                    'attach': '',
                 })
 
                 # Ensure our start is set properly
@@ -691,6 +695,7 @@ class NotifyBase(URLBase):
                     'body': body[i: i + self.body_maxlen]
                     .lstrip('\r\n\x0b\x0c').rstrip(),
                     'title': '',
+                    'attach': '',
                 })
 
         # Bundle attachments as per the notifier limits
