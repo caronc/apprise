@@ -548,7 +548,8 @@ class NotifyBase(URLBase):
             else self.overflow_buffer
 
         if attach:
-            attachment_maxcount = self.attachment_maxcount if self.attachment_maxcount else len(attach)
+            attachment_maxcount = self.attachment_maxcount \
+                if self.attachment_maxcount else len(attach)
         else:
             attachment_maxcount = 1
 
@@ -588,7 +589,7 @@ class NotifyBase(URLBase):
             return response
 
         if body_maxlen > 0 and len(body) <= body_maxlen and \
-            attachment_maxcount > len(attach):
+                attachment_maxcount > len(attach):
             response.append({'body': body, 'title': title, 'attach': attach})
             return response
 
@@ -626,11 +627,10 @@ class NotifyBase(URLBase):
                 # introduce padding
                 body_maxlen -= overflow_buffer
 
-                count = max(int(len(body) / body_maxlen) \
-                    + (1 if len(body) % body_maxlen else 0),
-                    int(len(attach) / attachment_maxcount) \
-                    + (1 if len(attach) % attachment_maxcount else 0)
-                )
+                count = max(int(len(body) / body_maxlen)
+                            + (1 if len(body) % body_maxlen else 0),
+                            int(len(attach) / attachment_maxcount)
+                            + (1 if len(attach) % attachment_maxcount else 0))
 
                 # Detect padding and prepare template
                 digits = len(str(count))
@@ -693,22 +693,27 @@ class NotifyBase(URLBase):
                     'title': '',
                 })
 
+        # Bundle attachments as per the notifier limits
         attach = [
-            attach[i:i+attachment_maxcount]
-            for i in range(0,len(attach),attachment_maxcount)
+            attach[i:i + attachment_maxcount]
+            for i in range(0, len(attach), attachment_maxcount)
         ]
 
+        # Merge attachments with split-up response
         for i in range(min(len(attach), len(response))):
             response[i]['attach'] = attach[i]
+        # Append attachments to responses if there are less split messages than
+        # attachment bundles
         if len(attach) > len(response):
-            for idx, i in enumerate(range(len(response), len(attach)), start=1):
+            for idx, i in enumerate(range(len(response), len(attach)),
+                                    start=1):
                 response.append({
-                        'body': '',
-                        'title': title + (
-                            '' if not show_counter else
-                            template.format(idx, count)),
-                        'attach':attach[i],
-                    })
+                    'body': '',
+                    'title': title + (
+                        '' if not show_counter else
+                        template.format(idx, count)),
+                    'attach': attach[i],
+                })
 
         return response
 
