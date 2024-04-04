@@ -150,6 +150,7 @@ class NotifyBase(URLBase):
     # may not be set.  There will never be a case where a body, or attachment
     # isn't set in the same call to your notify() function.
     attachment_support = False
+    attachment_maxcount = None
 
     # Default Title HTML Tagging
     # When a title is specified for a notification service that doesn't accept
@@ -459,17 +460,17 @@ class NotifyBase(URLBase):
 
         # Apply our overflow (if defined)
         for chunk in self._apply_overflow(
-                body=body, title=title, overflow=overflow,
+                body=body, title=title, attach=attach, overflow=overflow,
                 body_format=body_format):
 
             # Send notification
             yield dict(
                 body=chunk['body'], title=chunk['title'],
-                notify_type=notify_type, attach=attach,
+                notify_type=notify_type, attach=chunk['attach'],
                 body_format=body_format
             )
 
-    def _apply_overflow(self, body, title=None, overflow=None,
+    def _apply_overflow(self, body, title=None, attach=None, overflow=None,
                         body_format=None):
         """
         Takes the message body and title as input.  This function then
@@ -482,10 +483,12 @@ class NotifyBase(URLBase):
                 {
                     title: 'the title goes here',
                     body: 'the message body goes here',
+                    attach: 'the attachment object goes here',
                 },
                 {
                     title: 'the title goes here',
                     body: 'the message body goes here',
+                    attach: 'the attachment object goes here',
                 },
 
             ]
@@ -496,6 +499,7 @@ class NotifyBase(URLBase):
         # tidy
         title = '' if not title else title.strip()
         body = '' if not body else body.rstrip()
+        attach = [] if not attach else attach
 
         if overflow is None:
             # default
@@ -534,7 +538,7 @@ class NotifyBase(URLBase):
 
         if overflow == OverflowMode.UPSTREAM:
             # Nothing more to do
-            response.append({'body': body, 'title': title})
+            response.append({'body': body, 'title': title, 'attach': attach})
             return response
 
         # a value of '2' allows for the \r\n that is applied when
@@ -543,11 +547,15 @@ class NotifyBase(URLBase):
             if (self.title_maxlen == 0 and len(title)) \
             else self.overflow_buffer
 
+        if attach:
+            attachment_maxcount = self.attachment_maxcount if self.attachment_maxcount else len(attach)
+        else:
+            attachment_maxcount = 1
+
         #
         # If we reach here in our code, then we're using TRUNCATE, or SPLIT
         # actions which require some math to handle the data
         #
-
         # Handle situations where our body and title are amalamated into one
         # calculation
         title_maxlen = self.title_maxlen \
@@ -569,17 +577,19 @@ class NotifyBase(URLBase):
                 if not self.overflow_amalgamate_title else \
                 (self.body_maxlen - overflow_buffer)
 
-        if body_maxlen > 0 and len(body) <= body_maxlen:
-            response.append({'body': body, 'title': title})
-            return response
-
         if overflow == OverflowMode.TRUNCATE:
             # Truncate our body and return
             response.append({
                 'body': body[:body_maxlen].lstrip('\r\n\x0b\x0c').rstrip(),
                 'title': title,
+                'attach': attach[:attachment_maxcount],
             })
             # For truncate mode, we're done now
+            return response
+
+        if body_maxlen > 0 and len(body) <= body_maxlen and \
+            attachment_maxcount > len(attach):
+            response.append({'body': body, 'title': title, 'attach': attach})
             return response
 
         if self.overflow_display_title_once is None:
@@ -616,8 +626,11 @@ class NotifyBase(URLBase):
                 # introduce padding
                 body_maxlen -= overflow_buffer
 
-                count = int(len(body) / body_maxlen) \
-                    + (1 if len(body) % body_maxlen else 0)
+                count = max(int(len(body) / body_maxlen) \
+                    + (1 if len(body) % body_maxlen else 0),
+                    int(len(attach) / attachment_maxcount) \
+                    + (1 if len(attach) % attachment_maxcount else 0)
+                )
 
                 # Detect padding and prepare template
                 digits = len(str(count))
@@ -679,6 +692,23 @@ class NotifyBase(URLBase):
                     .lstrip('\r\n\x0b\x0c').rstrip(),
                     'title': '',
                 })
+
+        attach = [
+            attach[i:i+attachment_maxcount]
+            for i in range(0,len(attach),attachment_maxcount)
+        ]
+
+        for i in range(min(len(attach), len(response))):
+            response[i]['attach'] = attach[i]
+        if len(attach) > len(response):
+            for idx, i in enumerate(range(len(response), len(attach)), start=1):
+                response.append({
+                        'body': '',
+                        'title': title + (
+                            '' if not show_counter else
+                            template.format(idx, count)),
+                        'attach':attach[i],
+                    })
 
         return response
 

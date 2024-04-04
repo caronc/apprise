@@ -163,6 +163,7 @@ class NotifyPushover(NotifyBase):
 
     # Support attachments
     attachment_support = True
+    attachment_maxcount = 1
 
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 1024
