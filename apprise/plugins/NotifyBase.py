@@ -582,20 +582,20 @@ class NotifyBase(URLBase):
                 (self.body_maxlen - overflow_buffer)
 
         if overflow == OverflowMode.TRUNCATE:
+            if attach and len(attach) > attachment_maxcount:
+                # log entry that attachments were truncated
+                t_attach = AppriseAttachment()
+                # store attachment up to plugin limit only
+                t_attach.add(attach[:attachment_maxcount])
+                # swap in new attachment placeholder, garbage collector
+                # will handle previous attach module now dereferenced
+                attach = t_attach
             # Truncate our body and return
             response.append({
                 'body': body[:body_maxlen].lstrip('\r\n\x0b\x0c').rstrip(),
                 'title': title,
-                'attach': attach[:attachment_maxcount],
+                'attach': attach,
             })
-            if attach and len(attach) > 1:
-                # log entry that attachments were truncated
-                t_attach = AppriseAttachment()
-                # store first attachment only
-                t_attach.add(attach[0])
-                # swap in new attachment placeholder, garbage collector
-                # will handle previous attach module now dereferenced
-                attach = t_attach
             # For truncate mode, we're done now
             return response
 
