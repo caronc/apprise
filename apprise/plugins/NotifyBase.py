@@ -586,6 +586,14 @@ class NotifyBase(URLBase):
                 'title': title,
                 'attach': attach[:attachment_maxcount],
             })
+            if attach and len(attach) > 1:
+                # log entry that attachments were truncated
+                t_attach = AppriseAttachment()
+                # store first attachment only
+                t_attach.add(attach[0])
+                # swap in new attachment placeholder, garbage collector
+                # will handle previous attach module now dereferenced
+                attach = t_attach
             # For truncate mode, we're done now
             return response
 
