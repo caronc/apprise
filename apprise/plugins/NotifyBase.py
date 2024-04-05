@@ -464,11 +464,13 @@ class NotifyBase(URLBase):
                 body_format=body_format):
 
             # Send notification
-            yield dict(
-                body=chunk['body'], title=chunk['title'],
-                notify_type=notify_type, attach=chunk['attach'],
-                body_format=body_format
-            )
+            yield {
+                "body": chunk['body'],
+                "title": chunk['title'],
+                "notify_type": notify_type,
+                "attach": chunk['attach'],
+                "body_format": body_format,
+            }
 
     def _apply_overflow(self, body, title=None, attach=None, overflow=None,
                         body_format=None):
