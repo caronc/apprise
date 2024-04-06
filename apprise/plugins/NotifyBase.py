@@ -600,7 +600,7 @@ class NotifyBase(URLBase):
             return response
 
         if body_maxlen > 0 and len(body) <= body_maxlen and \
-                attachment_maxcount > len(attach):
+                len(attach) <= attachment_maxcount:
             response.append({'body': body, 'title': title, 'attach': attach})
             return response
 
