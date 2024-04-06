@@ -698,7 +698,7 @@ class NotifyNtfy(NotifyBase):
         """
         Returns the number of targets associated with this notification
         """
-        return len(self.topics)
+        return 1 if not self.topics else len(self.topics)
 
     @staticmethod
     def parse_url(url):
