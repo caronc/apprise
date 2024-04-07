@@ -45,7 +45,7 @@ from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyFormat, NotifyType
 from ..conversion import convert_between
-from ..utils import is_email, parse_emails
+from ..utils import is_email, parse_emails, is_hostname
 from ..AppriseLocale import gettext_lazy as _
 from ..logger import logger
 
@@ -566,12 +566,20 @@ class NotifyEmail(NotifyBase):
         # Apply any defaults based on certain known configurations
         self.NotifyEmailDefaults(secure_mode=secure_mode, **kwargs)
 
-        if self.user and self.host:
-            # Prepare the bases of our email
-            self.from_addr = [self.app_id, '{}@{}'.format(
-                re.split(r'[\s@]+', self.user)[0],
-                self.host,
-            )]
+        if self.user:
+            if self.host:
+                # Prepare the bases of our email
+                self.from_addr = [self.app_id, '{}@{}'.format(
+                    re.split(r'[\s@]+', self.user)[0],
+                    self.host,
+                )]
+
+            else:
+                result = is_email(self.user)
+                if result:
+                    # Prepare the bases of our email and include domain
+                    self.host = result['domain']
+                    self.from_addr = [self.app_id, self.user]
 
         if from_addr:
             result = is_email(from_addr)
@@ -1037,10 +1045,24 @@ class NotifyEmail(NotifyBase):
         us to re-instantiate this object.
 
         """
-        results = NotifyBase.parse_url(url)
+        results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
+
+        # Prepare our target lists
+        results['targets'] = []
+
+        if not is_hostname(results['host'], ipv4=False, ipv6=False,
+                           underscore=False):
+
+            if is_email(NotifyEmail.unquote(results['host'])):
+                # Don't lose defined email addresses
+                results['targets'].append(NotifyEmail.unquote(results['host']))
+
+            # Detect if we have a valid hostname or not; be sure to reset it's
+            # value if invalid; we'll attempt to figure this out later on
+            results['host'] = ''
 
         # The From address is a must; either through the use of templates
         # from= entry and/or merging the user and hostname together, this
@@ -1052,7 +1074,7 @@ class NotifyEmail(NotifyBase):
 
         # Get our potential email targets; if none our found we'll just
         # add one to ourselves
-        results['targets'] = NotifyEmail.split_path(results['fullpath'])
+        results['targets'] += NotifyEmail.split_path(results['fullpath'])
 
         # Attempt to detect 'to' email address
         if 'to' in results['qsd'] and len(results['qsd']['to']):
