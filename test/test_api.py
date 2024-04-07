@@ -109,7 +109,7 @@ def apprise_test(do_notify):
 
     # We can load our servers up front as well
     servers = [
-        'faast://abcdefghijklmnop-abcdefg',
+        'json://myhost',
         'kodi://kodi.server.local',
     ]
 
