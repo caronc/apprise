@@ -574,10 +574,12 @@ class NotifyEmail(NotifyBase):
                     self.host,
                 )]
 
-            elif result := is_email(self.user):
-                # Prepare the bases of our email and include domain
-                self.host = result['domain']
-                self.from_addr = [self.app_id, self.user]
+            else:
+                result = is_email(self.user)
+                if result:
+                    # Prepare the bases of our email and include domain
+                    self.host = result['domain']
+                    self.from_addr = [self.app_id, self.user]
 
         if from_addr:
             result = is_email(from_addr)
