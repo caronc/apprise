@@ -378,12 +378,9 @@ def test_plugin_email(mock_smtp, mock_smtpssl):
                     assert False
 
                 # Verify there is no change from the old and the new
-                if len(obj) != len(obj_cmp):
-                    print('%d targets found in %s' % (
-                        len(obj), obj.url(privacy=True)))
-                    print('But %d targets found in %s' % (
-                        len(obj_cmp), obj_cmp.url(privacy=True)))
-                    raise AssertionError("Target miscount %d != %d")
+                assert len(obj) == len(obj_cmp), '%d targets found in %s, But %d targets found in %s' % (
+                        len(obj), obj.url(privacy=True), len(obj_cmp), obj_cmp.url(privacy=True))
+
 
             if self:
                 # Iterate over our expected entries inside of our object

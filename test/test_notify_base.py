@@ -64,15 +64,12 @@ def test_notify_base():
     assert isinstance(nb.url(), str)
     assert str(nb) == nb.url()
 
-    try:
-        nb.send('test message')
-        assert False
-
-    except NotImplementedError:
+    with pytest.raises(NotImplementedError):
         # Each sub-module is that inherits this as a parent is required to
         # over-ride this function. So direct calls to this throws a not
         # implemented error intentionally
-        assert True
+        nb.send('test message')
+
 
     # Throttle overrides..
     nb = NotifyBase()

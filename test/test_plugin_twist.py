@@ -28,6 +28,7 @@
 
 from unittest import mock
 
+import pytest
 import requests
 from json import dumps
 from apprise import Apprise
@@ -111,19 +112,13 @@ def test_plugin_twist_init():
     NotifyTwist() init()
 
     """
-    try:
+    with pytest.raises(TypeError):
         NotifyTwist(email='invalid', targets=None)
-        assert False
-    except TypeError:
-        # Invalid email address
-        assert True
 
-    try:
+
+    with pytest.raises(TypeError):
         NotifyTwist(email='user@domain', targets=None)
-        assert False
-    except TypeError:
-        # No password was specified
-        assert True
+
 
     # Simple object initialization
     result = NotifyTwist(
