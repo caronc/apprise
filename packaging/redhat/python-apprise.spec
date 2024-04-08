@@ -40,7 +40,7 @@ notification services that are out there. Apprise opens the door and makes
 it easy to access:
 
 Apprise API, APRS, AWS SES, AWS SNS, Bark, Boxcar, Burst SMS, BulkSMS, BulkVS,
-ClickSend, DAPNET, DingTalk, Discord, E-Mail, Emby, Faast, FCM, Flock,
+ClickSend, DAPNET, DingTalk, Discord, E-Mail, Emby, FCM, Flock,
 Free Mobile, Google Chat, Gotify, Growl, Guilded, Home Assistant, httpSMS,
 IFTTT, Join, Kavenegar, KODI, Kumulos, LaMetric, Line, LunaSea, MacOSX,
 Mailgun, Mastodon, Mattermost,Matrix, MessageBird, Microsoft Windows,
