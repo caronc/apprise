@@ -27,10 +27,14 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import pytest
+import json
+import requests
+from unittest import mock
 from os.path import getsize
 from os.path import join
 from os.path import dirname
 from inspect import cleandoc
+from apprise.Apprise import Apprise
 from apprise.AttachmentManager import AttachmentManager
 from apprise.AppriseAttachment import AppriseAttachment
 from apprise.AppriseAsset import AppriseAsset
@@ -259,6 +263,59 @@ def test_apprise_attachment():
 
     # Total length will also return 0
     assert aa.size() == 0
+
+
+@mock.patch('requests.get')
+def test_apprise_attachment_truncate(mock_get):
+    """
+    API: AppriseAttachment when truncation in place
+
+    """
+
+    # Prepare our response
+    response = requests.Request()
+    response.status_code = requests.codes.ok
+
+    # Prepare Mock
+    mock_get.return_value = response
+
+    # our Apprise Object
+    ap_obj = Apprise()
+
+    # Add ourselves an object set to truncate
+    ap_obj.add('json://localhost/?method=GET&overflow=truncate')
+
+    # Add ourselves a second object without truncate
+    ap_obj.add('json://localhost/?method=GET&overflow=upstream')
+
+    # Create ourselves an attachment object
+    aa = AppriseAttachment()
+
+    # There are no attachents loaded
+    assert len(aa) == 0
+
+    # Object can be directly checked as a boolean; response is False
+    # when there are no entries loaded
+    assert not aa
+
+    # Add 2 attachments
+    assert aa.add(join(TEST_VAR_DIR, 'apprise-test.gif'))
+    assert aa.add(join(TEST_VAR_DIR, 'apprise-test.png'))
+
+    assert mock_get.call_count == 0
+    assert ap_obj.notify(body='body', title='title', attach=aa)
+
+    assert mock_get.call_count == 2
+
+    # Our first item was truncated, so only 1 attachment
+    details = mock_get.call_args_list[0]
+    dataset = json.loads(details[1]['data'])
+    assert len(dataset['attachments']) == 1
+
+    # Our second item was not truncated, so all attachments
+    details = mock_get.call_args_list[1]
+    dataset = json.loads(details[1]['data'])
+    assert len(dataset['attachments']) == 2
 
 
 def test_apprise_attachment_instantiate():
