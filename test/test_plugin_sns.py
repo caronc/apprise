@@ -113,7 +113,7 @@ def test_plugin_sns_edge_cases(mock_post):
     NotifySNS() Edge Cases
 
     """
-
+    target = '+1800555999'
     # Initializes the plugin with a valid access, but invalid access key
     with pytest.raises(TypeError):
         # No access_key_id specified
@@ -121,7 +121,7 @@ def test_plugin_sns_edge_cases(mock_post):
             access_key_id=None,
             secret_access_key=TEST_ACCESS_KEY_SECRET,
             region_name=TEST_REGION,
-            targets='+1800555999',
+            targets=target,
         )
 
     with pytest.raises(TypeError):
@@ -130,7 +130,7 @@ def test_plugin_sns_edge_cases(mock_post):
             access_key_id=TEST_ACCESS_KEY_ID,
             secret_access_key=None,
             region_name=TEST_REGION,
-            targets='+1800555999',
+            targets=target,
         )
 
     with pytest.raises(TypeError):
@@ -139,7 +139,7 @@ def test_plugin_sns_edge_cases(mock_post):
             access_key_id=TEST_ACCESS_KEY_ID,
             secret_access_key=TEST_ACCESS_KEY_SECRET,
             region_name=None,
-            targets='+1800555999',
+            targets=target,
         )
 
     # No recipients
@@ -200,20 +200,22 @@ def test_plugin_sns_url_parsing():
     assert 'secret_access_key' in results
     assert TEST_ACCESS_KEY_SECRET == results['secret_access_key']
 
+    target = '+18001234567'
+    topic = 'MyTopic'
     # Detect recipients
     results = NotifySNS.parse_url('sns://%s/%s/%s/%s/%s/' % (
         TEST_ACCESS_KEY_ID,
         TEST_ACCESS_KEY_SECRET,
         # Uppercase Region won't break anything
         TEST_REGION.upper(),
-        '+18001234567',
-        'MyTopic')
+        target,
+        topic)
     )
 
     # Confirm that our recipients were found
     assert len(results['targets']) == 2
-    assert '+18001234567' in results['targets']
-    assert 'MyTopic' in results['targets']
+    assert target in results['targets']
+    assert topic in results['targets']
     assert 'region_name' in results
     assert TEST_REGION == results['region_name']
     assert 'access_key_id' in results
