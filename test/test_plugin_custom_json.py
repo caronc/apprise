@@ -187,7 +187,7 @@ def test_plugin_custom_json_edge_cases(mock_get, mock_post):
     assert results['query'] == 'command'
     assert results['schema'] == 'json'
     assert results['url'] == 'json://localhost:8080/command'
-    assert isinstance(results['qsd:'], dict) is True
+    assert isinstance(results['qsd:'], dict)
     assert results['qsd:']['message'] == 'msg'
     # empty special mapping
     assert results['qsd:']['type'] == ''
@@ -248,7 +248,7 @@ def test_notify_json_plugin_attachments(mock_post):
     attach = AppriseAttachment(path)
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
-        attach=attach) is True
+        attach=attach)
 
     # Test invalid attachment
     path = os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
@@ -281,7 +281,7 @@ def test_notify_json_plugin_attachments(mock_post):
     mock_post.reset_mock()
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
-        attach=attach) is True
+        attach=attach)
     assert mock_post.call_count == 1
 
 
@@ -321,7 +321,7 @@ def test_plugin_custom_form_for_synology(mock_post):
     assert results['query'] == 'entry.cgi'
     assert results['schema'] == 'jsons'
     assert results['url'] == 'jsons://localhost:8081/webapi/entry.cgi'
-    assert isinstance(results['qsd:'], dict) is True
+    assert isinstance(results['qsd:'], dict)
     # Header Entries
     assert results['qsd-']['api'] == 'SYNO.Chat.External'
     assert results['qsd-']['method'] == 'incoming'

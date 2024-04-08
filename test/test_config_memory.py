@@ -48,8 +48,8 @@ def test_config_memory():
     assert len(cm) == 1
 
     # Test general functions
-    assert isinstance(cm.url(), str) is True
-    assert isinstance(cm.read(), str) is True
+    assert isinstance(cm.url(), str)
+    assert isinstance(cm.read(), str)
 
     # Test situation where an auto-detect is required:
     cm = ConfigMemory(content="json://localhost")
@@ -58,8 +58,8 @@ def test_config_memory():
     assert len(cm) == 1
 
     # Test general functions
-    assert isinstance(cm.url(), str) is True
-    assert isinstance(cm.read(), str) is True
+    assert isinstance(cm.url(), str)
+    assert isinstance(cm.read(), str)
 
     # Test situation where we can not detect the data
     assert len(ConfigMemory(content="garbage")) == 0

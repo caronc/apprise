@@ -345,14 +345,14 @@ def test_plugin_email(mock_smtp, mock_smtpssl):
 
             if isinstance(obj, NotifyBase):
                 # We loaded okay; now lets make sure we can reverse this url
-                assert isinstance(obj.url(), str) is True
+                assert isinstance(obj.url(), str)
 
                 # Verify we can acquire a target count as an integer
                 assert isinstance(len(obj), int)
 
                 # Test url() with privacy=True
                 assert isinstance(
-                    obj.url(privacy=True), str) is True
+                    obj.url(privacy=True), str)
 
                 # Some Simple Invalid Instance Testing
                 assert instance.parse_url(None) is None
@@ -530,7 +530,7 @@ def test_plugin_email_smtplib_send_okay(mock_smtplib):
     mock_smtplib.quit.return_value = True
 
     assert obj.notify(
-        body='body', title='test', notify_type=NotifyType.INFO) is True
+        body='body', title='test', notify_type=NotifyType.INFO)
 
     # Set Text
     obj = Apprise.instantiate(
@@ -538,7 +538,7 @@ def test_plugin_email_smtplib_send_okay(mock_smtplib):
     assert isinstance(obj, NotifyEmail)
 
     assert obj.notify(
-        body='body', title='test', notify_type=NotifyType.INFO) is True
+        body='body', title='test', notify_type=NotifyType.INFO)
 
     # Create an apprise object to work with as well
     a = Apprise()
@@ -548,19 +548,19 @@ def test_plugin_email_smtplib_send_okay(mock_smtplib):
     attach = os.path.join(TEST_VAR_DIR, 'apprise-test.gif')
     assert obj.notify(
         body='body', title='test', notify_type=NotifyType.INFO,
-        attach=attach) is True
+        attach=attach)
 
     # same results happen from our Apprise object
-    assert a.notify(body='body', title='test', attach=attach) is True
+    assert a.notify(body='body', title='test', attach=attach)
 
     # test using an Apprise Attachment object
     assert obj.notify(
         body='body', title='test', notify_type=NotifyType.INFO,
-        attach=AppriseAttachment(attach)) is True
+        attach=AppriseAttachment(attach))
 
     # same results happen from our Apprise object
     assert a.notify(
-        body='body', title='test', attach=AppriseAttachment(attach)) is True
+        body='body', title='test', attach=AppriseAttachment(attach))
 
     max_file_size = AttachBase.max_file_size
     # Now do a case where the file can't be sent
@@ -592,7 +592,7 @@ def test_plugin_email_smtplib_send_multiple_recipients(mock_smtplib):
     assert isinstance(obj, NotifyEmail)
 
     assert obj.notify(
-        body='body', title='test', notify_type=NotifyType.INFO) is True
+        body='body', title='test', notify_type=NotifyType.INFO)
 
     assert mock_smtplib.mock_calls == [
         mock.call('mail.example.org', 25, None, timeout=15),
@@ -686,7 +686,7 @@ def test_plugin_email_smtplib_internationalization(mock_smtp):
         title='دعونا نجعل العالم مكانا أفضل.',
         # Google Translated to Hungarian: "One line of code at a time.'
         body='Egy sor kódot egyszerre.',
-        notify_type=NotifyType.INFO) is True
+        notify_type=NotifyType.INFO)
 
 
 def test_plugin_email_url_escaping():
@@ -704,7 +704,7 @@ def test_plugin_email_url_escaping():
     obj = NotifyEmail.parse_url(
         'mailto://user:{}@gmail.com?format=text'.format(passwd))
 
-    assert isinstance(obj, dict) is True
+    assert isinstance(obj, dict)
     assert 'password' in obj
 
     # Escaping doesn't happen at this stage because we want to leave this to
@@ -714,7 +714,7 @@ def test_plugin_email_url_escaping():
     obj = Apprise.instantiate(
         'mailto://user:{}@gmail.com?format=text'.format(passwd),
         suppress_exceptions=False)
-    assert isinstance(obj, NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail)
 
     # The password is escaped only 'once'
     assert obj.password == ' %20'
@@ -732,7 +732,7 @@ def test_plugin_email_url_variations():
             user='apprise%40example21.ca',
             passwd='abcd123'),
         suppress_exceptions=False)
-    assert isinstance(obj, NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail)
 
     assert obj.password == 'abcd123'
     assert obj.user == 'apprise@example21.ca'
@@ -755,7 +755,7 @@ def test_plugin_email_url_variations():
             user='apprise%40example21.ca',
             passwd='abcd123'),
         suppress_exceptions=False)
-    assert isinstance(obj, NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail)
 
     assert obj.password == 'abcd123'
     assert obj.user == 'apprise@example21.ca'
@@ -777,7 +777,7 @@ def test_plugin_email_url_variations():
             user='apprise%40example21.ca',
             passwd='abcd123'),
         suppress_exceptions=False)
-    assert isinstance(obj, NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail)
 
     assert obj.password == 'abcd123'
     assert obj.user == 'apprise@example21.ca'
@@ -807,7 +807,7 @@ def test_plugin_email_url_variations():
             user='apprise%40example21.ca',
             passwd='abcd123'),
         suppress_exceptions=False)
-    assert isinstance(obj, NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail)
 
     assert obj.password == 'abcd123'
     assert obj.user == 'apprise@example21.ca'
@@ -841,7 +841,7 @@ def test_plugin_email_url_variations():
             that='to@example.jp',
             smtp_host='smtp.example.edu'),
         suppress_exceptions=False)
-    assert isinstance(obj, NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail)
 
     assert obj.password == 'abcd123'
     assert obj.user == 'apprise@example21.ca'
@@ -863,7 +863,7 @@ def test_plugin_email_url_variations():
 
         obj = Apprise.instantiate(
             'mailto://user:pass@domain.com{}'.format(toaddr))
-        assert isinstance(obj, NotifyEmail) is True
+        assert isinstance(obj, NotifyEmail)
         assert obj.password == 'pass'
         assert obj.user == 'user'
         assert obj.host == 'domain.com'
@@ -886,7 +886,7 @@ def test_plugin_email_dict_variations():
         'user': 'apprise@example.com',
         'password': 'abd123',
         'host': 'example.com'}, suppress_exceptions=False)
-    assert isinstance(obj, NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail)
 
 
 @mock.patch('smtplib.SMTP_SSL')
@@ -916,11 +916,11 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert 'user2@yahoo.com' in results['targets']
 
     obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail)
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test") is True
+    assert obj.notify("test")
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -964,11 +964,11 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert 'user2@yahoo.com' in results['targets']
     assert 'ssl' == results['secure_mode']
     obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail)
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test") is True
+    assert obj.notify("test")
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 1
     assert response.starttls.call_count == 0
@@ -1010,7 +1010,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     results = NotifyEmail.parse_url(
         'mailtos://user:pass123@hotmail.com')
     obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail)
     assert obj.smtp_host == 'smtp-mail.outlook.com'
     # No entries in the reply_to
     assert not obj.reply_to
@@ -1018,7 +1018,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert obj.notify("test")
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1036,7 +1036,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     results = NotifyEmail.parse_url(
         'mailtos://user:pass123@outlook.com')
     obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail)
     assert obj.smtp_host == 'smtp.outlook.com'
     # No entries in the reply_to
     assert not obj.reply_to
@@ -1044,7 +1044,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert obj.notify("test")
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1062,7 +1062,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     results = NotifyEmail.parse_url(
         'mailtos://user:pass123@outlook.com.au')
     obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail)
     assert obj.smtp_host == 'smtp.outlook.com'
     # No entries in the reply_to
     assert not obj.reply_to
@@ -1070,7 +1070,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert obj.notify("test")
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1090,7 +1090,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
         'mailtos://outlook.com?smtp=smtp.outlook.com'
         '&user=user@outlook.com&pass=app.pw')
     obj1 = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj1, NotifyEmail) is True
+    assert isinstance(obj1, NotifyEmail)
     assert obj1.smtp_host == 'smtp.outlook.com'
     assert obj1.user == 'user@outlook.com'
     assert obj1.password == 'app.pw'
@@ -1100,7 +1100,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj1.notify("test") is True
+    assert obj1.notify("test")
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1118,7 +1118,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     results = NotifyEmail.parse_url(
         'mailtos://user:app.pw@outlook.com')
     obj2 = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj2, NotifyEmail) is True
+    assert isinstance(obj2, NotifyEmail)
     assert obj2.smtp_host == obj1.smtp_host
     assert obj2.user == obj1.user
     assert obj2.password == obj1.password
@@ -1128,7 +1128,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj2.notify("test") is True
+    assert obj2.notify("test")
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1146,7 +1146,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     results = NotifyEmail.parse_url(
         'mailto://user:pass@comcast.net')
     obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail)
     assert obj.smtp_host == 'smtp.comcast.net'
     assert obj.user == 'user@comcast.net'
     assert obj.password == 'pass'
@@ -1156,7 +1156,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert obj.notify("test")
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 1
     assert response.starttls.call_count == 0
@@ -1174,14 +1174,14 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     results = NotifyEmail.parse_url(
         'mailtos://user:pass123@live.com')
     obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail)
     # No entries in the reply_to
     assert not obj.reply_to
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert obj.notify("test")
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1199,14 +1199,14 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     results = NotifyEmail.parse_url(
         'mailtos://user:pass123@hotmail.com')
     obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail)
     # No entries in the reply_to
     assert not obj.reply_to
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert obj.notify("test")
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1228,7 +1228,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
         "mailtos://abc:password@xyz.cn:465?"
         "smtp=smtp.exmail.qq.com&mode=ssl")
     obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail)
 
     # Verify our over-rides are in place
     assert obj.smtp_host == 'smtp.exmail.qq.com'
@@ -1253,7 +1253,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert obj.notify("test")
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 1
     assert response.starttls.call_count == 0
@@ -1272,7 +1272,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
         "mailtos://abc:password@xyz.cn?"
         "smtp=smtp.exmail.qq.com&mode=ssl&port=465")
     obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail)
 
     # Verify our over-rides are in place
     assert obj.smtp_host == 'smtp.exmail.qq.com'
@@ -1286,7 +1286,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert obj.notify("test")
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 1
     assert response.starttls.call_count == 0
@@ -1307,7 +1307,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     results = NotifyEmail.parse_url(
         "mailtos://user:pass@example.com?reply=noreply@example.com")
     obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail)
     # Verify our over-rides are in place
     assert obj.smtp_host == 'example.com'
     assert obj.from_addr[0] == obj.app_id
@@ -1321,7 +1321,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert obj.notify("test")
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1342,7 +1342,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     results = NotifyEmail.parse_url(
         "mailtos://user:pass@example.com?reply=Chris<noreply@example.ca>")
     obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail)
     # Verify our over-rides are in place
     assert obj.smtp_host == 'example.com'
     assert obj.from_addr[0] == obj.app_id
@@ -1356,7 +1356,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert obj.notify("test")
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1390,11 +1390,11 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert 'hello@concordium-explorer.nl' in results['targets']
 
     obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail)
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test") is True
+    assert obj.notify("test")
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 1
     assert response.starttls.call_count == 0
@@ -1440,7 +1440,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert results['smtp_host'] == ''
 
     obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail)
     # During instantiation, our variables get detected
     assert obj.smtp_host == 'smtp.fastmail.com'
     assert obj.from_addr == ['Apprise', 'username@customdomain.com']
@@ -1450,7 +1450,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test") is True
+    assert obj.notify("test")
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 1
     assert response.starttls.call_count == 0
@@ -1491,7 +1491,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert results['smtp_host'] == ''
 
     obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail)
     # During instantiation, our variables get detected
     assert obj.smtp_host == 'smtp.fastmail.com'
     assert obj.from_addr == ['Custom', 'username@customdomain.com']
@@ -1501,7 +1501,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test") is True
+    assert obj.notify("test")
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 1
     assert response.starttls.call_count == 0
@@ -1548,7 +1548,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert 'mail@mail-domain.com' in results['targets']
 
     obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail)
 
     # Not that our from_address takes on 'admin@domain.subdomain.com'
     assert obj.from_addr == ['Apprise', 'admin@domain.subdomain.com']
@@ -1556,7 +1556,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert obj.notify("test")
     assert mock_smtp.call_count == 1
     assert response.starttls.call_count == 1
     assert mock_smtp_ssl.call_count == 0
@@ -1605,7 +1605,7 @@ def test_plugin_email_plus_in_toemail(mock_smtp, mock_smtp_ssl):
     assert 'Plus Support<test+notification@gmail.com>' in results['targets']
 
     obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail)
 
     assert len(obj.targets) == 1
     assert ('Plus Support', 'test+notification@gmail.com') in obj.targets
@@ -1615,7 +1615,7 @@ def test_plugin_email_plus_in_toemail(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test") is True
+    assert obj.notify("test")
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1653,14 +1653,14 @@ def test_plugin_email_plus_in_toemail(mock_smtp, mock_smtp_ssl):
     assert 'test+notification@gmail.com' in results['targets']
 
     obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail)
 
     assert len(obj.targets) == 1
     assert (False, 'test+notification@gmail.com') in obj.targets
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test") is True
+    assert obj.notify("test")
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1697,14 +1697,14 @@ def test_plugin_email_plus_in_toemail(mock_smtp, mock_smtp_ssl):
     assert 'test+notification@gmail.com' in results['targets']
 
     obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail)
 
     assert len(obj.targets) == 1
     assert (False, 'test+notification@gmail.com') in obj.targets
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test") is True
+    assert obj.notify("test")
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1753,7 +1753,7 @@ def test_plugin_email_formatting_990(mock_smtp, mock_smtp_ssl):
     assert 'me@mydomain.com' in results['targets']
 
     obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, NotifyEmail) is True
+    assert isinstance(obj, NotifyEmail)
 
     assert len(obj.targets) == 1
     assert (False, 'me@mydomain.com') in obj.targets

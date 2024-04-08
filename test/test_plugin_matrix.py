@@ -254,51 +254,51 @@ def test_plugin_matrix_general(mock_post, mock_get, mock_put):
 
     # Variation Initializations
     obj = NotifyMatrix(host='host', targets='#abcd')
-    assert isinstance(obj, NotifyMatrix) is True
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj, NotifyMatrix)
+    assert isinstance(obj.url(), str)
     # Registration successful
-    assert obj.send(body="test") is True
+    assert obj.send(body="test")
 
     obj = NotifyMatrix(host='host', user='user', targets='#abcd')
-    assert isinstance(obj, NotifyMatrix) is True
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj, NotifyMatrix)
+    assert isinstance(obj.url(), str)
     # Registration successful
-    assert obj.send(body="test") is True
+    assert obj.send(body="test")
 
     obj = NotifyMatrix(host='host', password='passwd', targets='#abcd')
-    assert isinstance(obj, NotifyMatrix) is True
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj, NotifyMatrix)
+    assert isinstance(obj.url(), str)
     # A username gets automatically generated in these cases
-    assert obj.send(body="test") is True
+    assert obj.send(body="test")
 
     obj = NotifyMatrix(
         host='host', user='user', password='passwd', targets='#abcd')
-    assert isinstance(obj.url(), str) is True
-    assert isinstance(obj, NotifyMatrix) is True
+    assert isinstance(obj.url(), str)
+    assert isinstance(obj, NotifyMatrix)
     # Registration Successful
-    assert obj.send(body="test") is True
+    assert obj.send(body="test")
 
     # Test sending other format types
     kwargs = NotifyMatrix.parse_url(
         'matrix://user:passwd@hostname/#abcd?format=html')
     obj = NotifyMatrix(**kwargs)
-    assert isinstance(obj.url(), str) is True
-    assert isinstance(obj, NotifyMatrix) is True
-    obj.send(body="test") is True
-    obj.send(title="title", body="test") is True
+    assert isinstance(obj.url(), str)
+    assert isinstance(obj, NotifyMatrix)
+    assert obj.send(body="test")
+    assert obj.send(title="title", body="test")
 
     kwargs = NotifyMatrix.parse_url(
         'matrix://user:passwd@hostname/#abcd/#abcd:localhost?format=markdown')
     obj = NotifyMatrix(**kwargs)
-    assert isinstance(obj.url(), str) is True
-    assert isinstance(obj, NotifyMatrix) is True
-    obj.send(body="test") is True
-    obj.send(title="title", body="test") is True
+    assert isinstance(obj.url(), str)
+    assert isinstance(obj, NotifyMatrix)
+    assert obj.send(body="test")
+    assert obj.send(title="title", body="test")
 
     kwargs = NotifyMatrix.parse_url(
         'matrix://user:passwd@hostname/#abcd/!abcd:localhost?format=text')
     obj = NotifyMatrix(**kwargs)
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj.url(), str)
     assert isinstance(obj, NotifyMatrix) is True
     obj.send(body="test") is True
     obj.send(title="title", body="test") is True
@@ -309,8 +309,8 @@ def test_plugin_matrix_general(mock_post, mock_get, mock_put):
     obj = NotifyMatrix(**kwargs)
     assert isinstance(obj.url(), str) is True
     assert isinstance(obj, NotifyMatrix) is True
-    obj.send(body="test") is True
-    obj.send(title="title", body="test") is True
+    assert obj.send(body="test") is True
+    assert obj.send(title="title", body="test") is True
 
     with pytest.raises(TypeError):
         # invalid message type specified

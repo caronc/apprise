@@ -139,7 +139,7 @@ def test_plugin_smsmgr_edge_cases(mock_get):
         'smsmgr://{}@{}?batch=n'.format(apikey, '/'.join(targets)))
 
     assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO) is True
+        body='body', title='title', notify_type=NotifyType.INFO)
 
     # We know there are 2 (valid) targets
     assert len(obj) == 2
@@ -180,7 +180,7 @@ def test_plugin_smsmgr_edge_cases(mock_get):
     assert len(obj) == 1
 
     assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO) is True
+        body='body', title='title', notify_type=NotifyType.INFO)
 
     # Test our call count (batched into 1)
     assert mock_get.call_count == 1

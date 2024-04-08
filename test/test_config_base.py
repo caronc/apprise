@@ -980,9 +980,9 @@ urls:
     assert asset.theme == AppriseAsset().theme
 
     # Empty string assignment
-    assert isinstance(asset.image_url_mask, str) is True
+    assert isinstance(asset.image_url_mask, str)
     assert asset.image_url_mask == ""
-    assert isinstance(asset.image_url_logo, str) is True
+    assert isinstance(asset.image_url_logo, str)
     assert asset.image_url_logo == ""
 
     # For on-lookers looking through this file; here is a perfectly formatted

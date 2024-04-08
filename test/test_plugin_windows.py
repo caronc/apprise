@@ -109,7 +109,7 @@ def test_plugin_windows_mocked():
     obj.duration = 0
 
     # Test URL functionality
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj.url(), str)
 
     # Check that it found our mocked environments
     assert obj.enabled is True
@@ -120,32 +120,32 @@ def test_plugin_windows_mocked():
     # test notifications
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO) is True
+        notify_type=apprise.NotifyType.INFO)
 
     obj = apprise.Apprise.instantiate(
         'windows://_/?image=True', suppress_exceptions=False)
     obj.duration = 0
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj.url(), str)
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO) is True
+        notify_type=apprise.NotifyType.INFO)
 
     obj = apprise.Apprise.instantiate(
         'windows://_/?image=False', suppress_exceptions=False)
     obj.duration = 0
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj.url(), str)
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO) is True
+        notify_type=apprise.NotifyType.INFO)
 
     obj = apprise.Apprise.instantiate(
         'windows://_/?duration=1', suppress_exceptions=False)
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj.url(), str)
     # loads okay
     assert obj.duration == 1
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO) is True
+        notify_type=apprise.NotifyType.INFO)
 
     obj = apprise.Apprise.instantiate(
         'windows://_/?duration=invalid', suppress_exceptions=False)
@@ -170,7 +170,7 @@ def test_plugin_windows_mocked():
     win32gui.LoadImage.side_effect = AttributeError
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO) is True
+        notify_type=apprise.NotifyType.INFO)
     # Undo our change
     win32gui.LoadImage.side_effect = None
 
@@ -211,7 +211,7 @@ def test_plugin_windows_native(mock_loadimage,
     obj.duration = 0
 
     # Test URL functionality
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj.url(), str)
 
     # Check that it found our mocked environments
     assert obj.enabled is True
@@ -222,30 +222,30 @@ def test_plugin_windows_native(mock_loadimage,
     # test notifications
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO) is True
+        notify_type=apprise.NotifyType.INFO)
 
     obj = apprise.Apprise.instantiate(
         'windows://_/?image=True', suppress_exceptions=False)
     obj.duration = 0
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj.url(), str)
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO) is True
+        notify_type=apprise.NotifyType.INFO)
 
     obj = apprise.Apprise.instantiate(
         'windows://_/?image=False', suppress_exceptions=False)
     obj.duration = 0
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj.url(), str)
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO) is True
+        notify_type=apprise.NotifyType.INFO)
 
     obj = apprise.Apprise.instantiate(
         'windows://_/?duration=1', suppress_exceptions=False)
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj.url(), str)
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO) is True
+        notify_type=apprise.NotifyType.INFO)
     # loads okay
     assert obj.duration == 1
 
@@ -273,7 +273,7 @@ def test_plugin_windows_native(mock_loadimage,
     mock_loadimage.side_effect = AttributeError
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO) is True
+        notify_type=apprise.NotifyType.INFO)
     # Undo our change
     mock_loadimage.side_effect = None
 

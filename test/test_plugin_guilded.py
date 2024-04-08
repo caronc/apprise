@@ -183,4 +183,4 @@ def test_plugin_guilded_general(mock_post):
         footer=True, thumbnail=False)
 
     # Test that we get a string response
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj.url(), str)

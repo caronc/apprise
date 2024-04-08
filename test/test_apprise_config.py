@@ -130,7 +130,7 @@ def test_apprise_config(tmpdir):
     cb = ConfigBase()
 
     # Test adding of all entries
-    assert ac.add(configs=cb, asset=AppriseAsset(), tag='test') is True
+    assert ac.add(configs=cb, asset=AppriseAsset(), tag='test')
 
     # Test adding of all entries
     assert ac.add(
@@ -189,7 +189,7 @@ def test_apprise_config(tmpdir):
     assert isinstance(ac[0].url(), str)
 
     # pop an entry from our list
-    assert isinstance(ac.pop(0), ConfigBase) is True
+    assert isinstance(ac.pop(0), ConfigBase)
 
     # Determine we have no more configuration entries loaded
     assert len(ac) == 0
@@ -262,28 +262,22 @@ def test_apprise_multi_config_entries(tmpdir):
     assert len(ac) == 0
 
     # Support adding of muilt strings and objects:
-    assert ac.add(configs=(str(t), str(t))) is True
+    assert ac.add(configs=(str(t), str(t)))
     assert ac.add(configs=(
-        ConfigFile(path=str(te)), ConfigFile(path=str(t)))) is True
+        ConfigFile(path=str(te)), ConfigFile(path=str(t))))
 
     # don't support the adding of invalid content
     assert ac.add(configs=(object(), object())) is False
     assert ac.add(configs=object()) is False
 
     # Try to pop an element out of range
-    try:
+    with pytest.raises(IndexError):
         ac.server_pop(len(ac.servers()))
-        # We should have thrown an exception here
-        assert False
-
-    except IndexError:
-        # We expect to be here
-        assert True
 
     # Pop our elements
     while len(ac.servers()) > 0:
         assert isinstance(
-            ac.server_pop(len(ac.servers()) - 1), NotifyBase) is True
+            ac.server_pop(len(ac.servers()) - 1), NotifyBase)
 
 
 def test_apprise_add_config():
@@ -310,7 +304,7 @@ def test_apprise_add_config():
     """
     # Create ourselves a config object
     ac = AppriseConfig()
-    assert ac.add_config(content=content) is True
+    assert ac.add_config(content=content)
 
     # One configuration file should have been found
     assert len(ac) == 1
@@ -336,7 +330,7 @@ def test_apprise_add_config():
 
     # Test having a pre-defined asset object and tag created
     assert ac.add_config(
-        content=content, asset=AppriseAsset(), tag='a') is True
+        content=content, asset=AppriseAsset(), tag='a')
 
     # Now there are 2 servers loaded
     assert len(ac) == 2
@@ -364,7 +358,7 @@ def test_apprise_add_config():
 
     # Create ourselves a config object
     ac = AppriseConfig()
-    assert ac.add_config(content=content) is True
+    assert ac.add_config(content=content)
 
     # One configuration file should have been found
     assert len(ac) == 1
@@ -403,11 +397,11 @@ def test_apprise_config_tagging(tmpdir):
     ac = AppriseConfig()
 
     # Add an item associated with tag a
-    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='a') is True
+    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='a')
     # Add an item associated with tag b
-    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='b') is True
+    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='b')
     # Add an item associated with tag a or b
-    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='a,b') is True
+    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='a,b')
 
     # Now filter: a:
     assert len(ac.servers(tag='a')) == 2
@@ -423,11 +417,11 @@ def test_apprise_config_tagging(tmpdir):
     ac = AppriseConfig()
 
     # Add an item associated with tag a
-    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='a,always') is True
+    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='a,always')
     # Add an item associated with tag b
-    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='b') is True
+    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='b')
     # Add an item associated with tag a or b
-    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='c,d') is True
+    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='c,d')
 
     # Now filter: a:
     assert len(ac.servers(tag='a')) == 1
@@ -533,7 +527,7 @@ def test_invalid_apprise_config(tmpdir):
     assert len(ac) == 0
 
     # Add our config
-    assert ac.add(configs=str(t), asset=AppriseAsset()) is True
+    assert ac.add(configs=str(t), asset=AppriseAsset())
 
     # One configuration file
     assert len(ac) == 1
@@ -580,7 +574,7 @@ def test_apprise_config_with_apprise_obj(tmpdir):
     assert len(ac) == 0
 
     # Add an item associated with tag a
-    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='a') is True
+    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='a')
 
     # One configuration file
     assert len(ac) == 1
@@ -598,17 +592,17 @@ def test_apprise_config_with_apprise_obj(tmpdir):
     a = Apprise()
 
     # Add our configuration object
-    assert a.add(servers=ac) is True
+    assert a.add(servers=ac)
 
     # Detect our 1 entry (originally there were 2 but we deleted one)
     assert len(a) == 1
 
     # Notify our service
-    assert a.notify(body='apprise configuration power!') is True
+    assert a.notify(body='apprise configuration power!')
 
     # Add our configuration object
     assert a.add(
-        servers=[AppriseConfig(str(t)), AppriseConfig(str(t))]) is True
+        servers=[AppriseConfig(str(t)), AppriseConfig(str(t))])
 
     # Detect our 5 loaded entries now; 1 from first config, and another
     # 2x2 based on adding our list above
@@ -623,7 +617,7 @@ def test_apprise_config_with_apprise_obj(tmpdir):
 
     # reference index 0 of our list
     ref = a[0]
-    assert isinstance(ref, NotifyBase) is True
+    assert isinstance(ref, NotifyBase)
 
     # Our length is unchanged
     assert len(a) == 5
@@ -632,7 +626,7 @@ def test_apprise_config_with_apprise_obj(tmpdir):
     ref_popped = a.pop(0)
 
     # Verify our response
-    assert isinstance(ref_popped, NotifyBase) is True
+    assert isinstance(ref_popped, NotifyBase)
 
     # Our length drops by 1
     assert len(a) == 4
@@ -642,34 +636,21 @@ def test_apprise_config_with_apprise_obj(tmpdir):
     assert ref == ref_popped
 
     # pop an index out of range
-    try:
+    with pytest.raises(IndexError):
         a.pop(len(a))
-        # We'll thrown an IndexError and not make it this far
-        assert False
-
-    except IndexError:
-        # As expected
-        assert True
 
     # Our length remains unchanged
     assert len(a) == 4
 
     # Reference content out of range
-    try:
+    with pytest.raises(IndexError):
         a[len(a)]
-
-        # We'll thrown an IndexError and not make it this far
-        assert False
-
-    except IndexError:
-        # As expected
-        assert True
 
     # reference index at the end of our list
     ref = a[len(a) - 1]
 
     # Verify our response
-    assert isinstance(ref, NotifyBase) is True
+    assert isinstance(ref, NotifyBase)
 
     # Our length stays the same
     assert len(a) == 4
@@ -678,7 +659,7 @@ def test_apprise_config_with_apprise_obj(tmpdir):
     ref_popped = a.pop(len(a) - 1)
 
     # Verify our response
-    assert isinstance(ref_popped, NotifyBase) is True
+    assert isinstance(ref_popped, NotifyBase)
 
     # Content popped is the same as one referenced by index
     # earlier
@@ -694,7 +675,7 @@ def test_apprise_config_with_apprise_obj(tmpdir):
         servers=[
             ConfigFile(path=(str(t))),
             'good://another.host',
-            GoodNotification(**{'host': 'nuxref.com'})]) is True
+            GoodNotification(**{'host': 'nuxref.com'})])
 
     # Our length increases by 4 (2 entries in the config file, + 2 others)
     assert len(a) == 7
@@ -703,13 +684,13 @@ def test_apprise_config_with_apprise_obj(tmpdir):
     ref = a[len(a) - 1]
 
     # Verify our response
-    assert isinstance(ref, NotifyBase) is True
+    assert isinstance(ref, NotifyBase)
 
     # We can pop from the back of the list without a problem too
     ref_popped = a.pop(len(a) - 1)
 
     # Verify our response
-    assert isinstance(ref_popped, NotifyBase) is True
+    assert isinstance(ref_popped, NotifyBase)
 
     # Content popped is the same as one referenced by index
     # earlier
@@ -720,7 +701,7 @@ def test_apprise_config_with_apprise_obj(tmpdir):
 
     # pop our list
     while len(a) > 0:
-        assert isinstance(a.pop(len(a) - 1), NotifyBase) is True
+        assert isinstance(a.pop(len(a) - 1), NotifyBase)
 
 
 def test_recursive_config_inclusion(tmpdir):
@@ -830,7 +811,7 @@ include strict://{}""".format(str(cfg04), str(cfg04), str(cfg04)))
     assert len(ac) == 0
 
     # load our configuration
-    assert ac.add(configs=str(cfg01)) is True
+    assert ac.add(configs=str(cfg01))
 
     # verify it loaded
     assert len(ac) == 1
@@ -842,7 +823,7 @@ include strict://{}""".format(str(cfg04), str(cfg04), str(cfg04)))
     ac = AppriseConfig(recursion=1)
 
     # load our configuration
-    assert ac.add(configs=str(cfg01)) is True
+    assert ac.add(configs=str(cfg01))
 
     # verify one configuration file loaded however since it recursively
     # loaded itself 1 more time, it still doesn't impact the load count:
@@ -862,7 +843,7 @@ include strict://{}""".format(str(cfg04), str(cfg04), str(cfg04)))
     assert len(ac) == 0
 
     # load our configuration
-    assert ac.add(configs=str(cfg02)) is True
+    assert ac.add(configs=str(cfg02))
 
     # verify it loaded
     assert len(ac) == 1
@@ -880,7 +861,7 @@ include strict://{}""".format(str(cfg04), str(cfg04), str(cfg04)))
     assert len(ac) == 0
 
     # load our configuration
-    assert ac.add(configs=str(cfg04)) is True
+    assert ac.add(configs=str(cfg04))
 
     # verify it loaded
     assert len(ac) == 1
@@ -902,7 +883,7 @@ include strict://{}""".format(str(cfg04), str(cfg04), str(cfg04)))
     assert len(ac) == 0
 
     # load our configuration
-    assert ac.add(configs=str(cfg04)) is True
+    assert ac.add(configs=str(cfg04))
 
     # verify it loaded
     assert len(ac) == 1
@@ -1125,7 +1106,7 @@ def test_config_base_parse_yaml_file02(tmpdir):
     a = Apprise()
 
     # Add our configuration object
-    assert a.add(servers=ac) is True
+    assert a.add(servers=ac)
 
     # Detect our 3 entry as they should have loaded successfully
     assert len(a) == 3
@@ -1176,7 +1157,7 @@ def test_config_base_parse_yaml_file03(tmpdir):
     a = Apprise()
 
     # Add our configuration object
-    assert a.add(servers=ac) is True
+    assert a.add(servers=ac)
 
     # Detect our 3 entry as they should have loaded successfully
     assert len(a) == 3
@@ -1224,7 +1205,7 @@ def test_config_base_parse_yaml_file04(tmpdir):
     a = Apprise()
 
     # Add our configuration object
-    assert a.add(servers=ac) is True
+    assert a.add(servers=ac)
 
     # Detect our 3 entry as they should have loaded successfully
     assert len(a) == 3

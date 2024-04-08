@@ -229,7 +229,7 @@ def test_plugin_pushover_attachments(mock_post, tmpdir):
     assert isinstance(obj, NotifyPushover)
 
     # Test our attachment
-    assert obj.notify(body="test", attach=attach) is True
+    assert obj.notify(body="test", attach=attach)
 
     # Test our call count
     assert mock_post.call_count == 1
@@ -241,7 +241,7 @@ def test_plugin_pushover_attachments(mock_post, tmpdir):
 
     # Test multiple attachments
     assert attach.add(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
-    assert obj.notify(body="test", attach=attach) is True
+    assert obj.notify(body="test", attach=attach)
 
     # Test our call count
     assert mock_post.call_count == 2
@@ -257,7 +257,7 @@ def test_plugin_pushover_attachments(mock_post, tmpdir):
     image.write('a' * NotifyPushover.attach_max_size_bytes)
 
     attach = apprise.AppriseAttachment.instantiate(str(image))
-    assert obj.notify(body="test", attach=attach) is True
+    assert obj.notify(body="test", attach=attach)
 
     # Test our call count
     assert mock_post.call_count == 1
@@ -293,7 +293,7 @@ def test_plugin_pushover_attachments(mock_post, tmpdir):
     attach = apprise.AppriseAttachment.instantiate(str(image))
 
     # Content is silently ignored
-    assert obj.notify(body="test", attach=attach) is True
+    assert obj.notify(body="test", attach=attach)
 
     # prepare our attachment
     attach = apprise.AppriseAttachment(
@@ -340,17 +340,17 @@ def test_plugin_pushover_edge_cases(mock_post):
 
     obj = NotifyPushover(
         user_key=user_key, token=token, targets=devices)
-    assert isinstance(obj, NotifyPushover) is True
+    assert isinstance(obj, NotifyPushover)
     # Our invalid device is ignored
     assert len(obj.targets) == 2
 
     # We notify the 2 devices loaded
     assert obj.notify(
         body='body', title='title',
-        notify_type=apprise.NotifyType.INFO) is True
+        notify_type=apprise.NotifyType.INFO)
 
     obj = NotifyPushover(user_key=user_key, token=token)
-    assert isinstance(obj, NotifyPushover) is True
+    assert isinstance(obj, NotifyPushover)
     # Default is to send to all devices, so there will be a
     # device defined here
     assert len(obj.targets) == 1
@@ -358,11 +358,11 @@ def test_plugin_pushover_edge_cases(mock_post):
     # This call succeeds because all of the devices are valid
     assert obj.notify(
         body='body', title='title',
-        notify_type=apprise.NotifyType.INFO) is True
+        notify_type=apprise.NotifyType.INFO)
 
     obj = NotifyPushover(
         user_key=user_key, token=token, targets=set())
-    assert isinstance(obj, NotifyPushover) is True
+    assert isinstance(obj, NotifyPushover)
     # Default is to send to all devices, so there will be a
     # device defined here
     assert len(obj.targets) == 1
@@ -413,7 +413,7 @@ def test_plugin_pushover_config_files(mock_post):
 
     # Create ourselves a config object
     ac = apprise.AppriseConfig()
-    assert ac.add_config(content=content) is True
+    assert ac.add_config(content=content)
 
     aobj = apprise.Apprise()
 
@@ -445,7 +445,7 @@ def test_plugin_pushover_config_files(mock_post):
     # Notifications work
     # We test 'pushover_str_int' and 'low' which only matches 1 end point
     assert aobj.notify(
-        title="title", body="body", tag=[('pushover_str_int', 'low')]) is True
+        title="title", body="body", tag=[('pushover_str_int', 'low')])
 
     # Notify everything loaded
-    assert aobj.notify(title="title", body="body") is True
+    assert aobj.notify(title="title", body="body")

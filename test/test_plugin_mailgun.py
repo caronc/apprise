@@ -217,7 +217,7 @@ def test_plugin_mailgun_attachments(mock_post):
     attach = AppriseAttachment(path)
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
-        attach=attach) is True
+        attach=attach)
 
     # Test invalid attachment
     path = os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
@@ -297,7 +297,7 @@ def test_plugin_mailgun_attachments(mock_post):
 
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
-        attach=attach) is True
+        attach=attach)
     assert mock_post.call_count == 2
 
     # single batch
@@ -307,7 +307,7 @@ def test_plugin_mailgun_attachments(mock_post):
 
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
-        attach=attach) is True
+        attach=attach)
     assert mock_post.call_count == 1
 
 
@@ -331,14 +331,14 @@ def test_plugin_mailgun_header_check(mock_post):
     obj = Apprise.instantiate(
         'mailgun://user@localhost.localdomain/{}'.format(apikey))
     assert isinstance(obj, NotifyMailgun)
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj.url(), str)
 
     # No calls made yet
     assert mock_post.call_count == 0
 
     # Send our notification
     assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO) is True
+        body='body', title='title', notify_type=NotifyType.INFO)
 
     # 2 calls were made, one to perform an email lookup, the second
     # was the notification itself
@@ -358,14 +358,14 @@ def test_plugin_mailgun_header_check(mock_post):
         'mailgun://user@localhost.localdomain/'
         '{}?from=Luke%20Skywalker'.format(apikey))
     assert isinstance(obj, NotifyMailgun)
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj.url(), str)
 
     # No calls made yet
     assert mock_post.call_count == 0
 
     # Send our notification
     assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO) is True
+        body='body', title='title', notify_type=NotifyType.INFO)
 
     assert mock_post.call_count == 1
     payload = mock_post.call_args_list[0][1]['data']
@@ -381,14 +381,14 @@ def test_plugin_mailgun_header_check(mock_post):
         'mailgun://user@localhost.localdomain/{}'
         '?from=Luke%20Skywalker<luke@rebels.com>'.format(apikey))
     assert isinstance(obj, NotifyMailgun)
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj.url(), str)
 
     # No calls made yet
     assert mock_post.call_count == 0
 
     # Send our notification
     assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO) is True
+        body='body', title='title', notify_type=NotifyType.INFO)
 
     assert mock_post.call_count == 1
     payload = mock_post.call_args_list[0][1]['data']
@@ -404,14 +404,14 @@ def test_plugin_mailgun_header_check(mock_post):
         'mailgun://user@localhost.localdomain/{}'
         '?from=luke@rebels.com'.format(apikey))
     assert isinstance(obj, NotifyMailgun)
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj.url(), str)
 
     # No calls made yet
     assert mock_post.call_count == 0
 
     # Send our notification
     assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO) is True
+        body='body', title='title', notify_type=NotifyType.INFO)
 
     assert mock_post.call_count == 1
     payload = mock_post.call_args_list[0][1]['data']

@@ -153,20 +153,20 @@ def test_plugin_dbus_general_success(mocker, dbus_glib_environment):
 
     # Create our instance (identify all supported types)
     obj = apprise.Apprise.instantiate('dbus://', suppress_exceptions=False)
-    assert isinstance(obj, NotifyDBus) is True
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj, NotifyDBus)
+    assert isinstance(obj.url(), str)
     assert obj.url().startswith('dbus://_/')
     obj = apprise.Apprise.instantiate('kde://', suppress_exceptions=False)
-    assert isinstance(obj, NotifyDBus) is True
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj, NotifyDBus)
+    assert isinstance(obj.url(), str)
     assert obj.url().startswith('kde://_/')
     obj = apprise.Apprise.instantiate('qt://', suppress_exceptions=False)
-    assert isinstance(obj, NotifyDBus) is True
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj, NotifyDBus)
+    assert isinstance(obj.url(), str)
     assert obj.url().startswith('qt://_/')
     obj = apprise.Apprise.instantiate('glib://', suppress_exceptions=False)
-    assert isinstance(obj, NotifyDBus) is True
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj, NotifyDBus)
+    assert isinstance(obj.url(), str)
     assert obj.url().startswith('glib://_/')
     obj.duration = 0
 
@@ -174,104 +174,104 @@ def test_plugin_dbus_general_success(mocker, dbus_glib_environment):
     assert NotifyDBus(
         x_axis=0, y_axis=0, **{'schema': 'dbus'})\
         .notify(title='', body='body',
-                notify_type=apprise.NotifyType.INFO) is True
+                notify_type=apprise.NotifyType.INFO)
 
     # test notifications
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO) is True
+        notify_type=apprise.NotifyType.INFO)
 
     # test notification without a title
     assert obj.notify(
         title='', body='body',
-        notify_type=apprise.NotifyType.INFO) is True
+        notify_type=apprise.NotifyType.INFO)
 
     # Test our arguments through the instantiate call
     obj = apprise.Apprise.instantiate(
         'dbus://_/?image=True', suppress_exceptions=False)
-    assert isinstance(obj, NotifyDBus) is True
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj, NotifyDBus)
+    assert isinstance(obj.url(), str)
     assert obj.url().startswith('dbus://_/')
     assert re.search('image=yes', obj.url())
 
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO) is True
+        notify_type=apprise.NotifyType.INFO)
 
     obj = apprise.Apprise.instantiate(
         'dbus://_/?image=False', suppress_exceptions=False)
-    assert isinstance(obj, NotifyDBus) is True
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj, NotifyDBus)
+    assert isinstance(obj.url(), str)
     assert obj.url().startswith('dbus://_/')
     assert re.search('image=no', obj.url())
 
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO) is True
+        notify_type=apprise.NotifyType.INFO)
 
     # Test priority (alias to urgency) handling
     obj = apprise.Apprise.instantiate(
         'dbus://_/?priority=invalid', suppress_exceptions=False)
-    assert isinstance(obj, NotifyDBus) is True
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj, NotifyDBus)
+    assert isinstance(obj.url(), str)
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO) is True
+        notify_type=apprise.NotifyType.INFO)
 
     obj = apprise.Apprise.instantiate(
         'dbus://_/?priority=high', suppress_exceptions=False)
-    assert isinstance(obj, NotifyDBus) is True
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj, NotifyDBus)
+    assert isinstance(obj.url(), str)
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO) is True
+        notify_type=apprise.NotifyType.INFO)
 
     obj = apprise.Apprise.instantiate(
         'dbus://_/?priority=2', suppress_exceptions=False)
-    assert isinstance(obj, NotifyDBus) is True
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj, NotifyDBus)
+    assert isinstance(obj.url(), str)
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO) is True
+        notify_type=apprise.NotifyType.INFO)
 
     # Test urgency handling
     obj = apprise.Apprise.instantiate(
         'dbus://_/?urgency=invalid', suppress_exceptions=False)
-    assert isinstance(obj, NotifyDBus) is True
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj, NotifyDBus)
+    assert isinstance(obj.url(), str)
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO) is True
+        notify_type=apprise.NotifyType.INFO)
 
     obj = apprise.Apprise.instantiate(
         'dbus://_/?urgency=high', suppress_exceptions=False)
-    assert isinstance(obj, NotifyDBus) is True
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj, NotifyDBus)
+    assert isinstance(obj.url(), str)
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO) is True
+        notify_type=apprise.NotifyType.INFO)
 
     obj = apprise.Apprise.instantiate(
         'dbus://_/?urgency=2', suppress_exceptions=False)
-    assert isinstance(obj, NotifyDBus) is True
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj, NotifyDBus)
+    assert isinstance(obj.url(), str)
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO) is True
+        notify_type=apprise.NotifyType.INFO)
 
     obj = apprise.Apprise.instantiate(
         'dbus://_/?urgency=', suppress_exceptions=False)
-    assert isinstance(obj, NotifyDBus) is True
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj, NotifyDBus)
+    assert isinstance(obj.url(), str)
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO) is True
+        notify_type=apprise.NotifyType.INFO)
 
     # Test x/y
     obj = apprise.Apprise.instantiate(
         'dbus://_/?x=5&y=5', suppress_exceptions=False)
-    assert isinstance(obj, NotifyDBus) is True
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj, NotifyDBus)
+    assert isinstance(obj.url(), str)
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True

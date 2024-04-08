@@ -167,7 +167,7 @@ def test_plugin_bulksms_edge_cases(mock_post):
         'bulksms://{}:{}@{}?batch=n'.format(user, pwd, '/'.join(targets)))
 
     assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO) is True
+        body='body', title='title', notify_type=NotifyType.INFO)
 
     # We know there are 4 targets
     assert len(obj) == 4

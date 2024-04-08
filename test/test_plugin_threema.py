@@ -153,7 +153,7 @@ def test_plugin_threema_edge_cases(mock_post):
     assert results['query'] is None
     assert results['schema'] == 'threema'
     assert results['url'] == 'threema:///'
-    assert isinstance(results['targets'], list) is True
+    assert isinstance(results['targets'], list)
     assert len(results['targets']) == 1
     assert results['targets'][0] == targets
 

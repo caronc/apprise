@@ -256,7 +256,7 @@ def test_plugin_fcm_legacy_default(mock_post_legacy):
         '&image_url=https://example.com/interesting.png')
 
     # Send our notification
-    assert obj.notify("test") is True
+    assert obj.notify("test")
 
     # Test our call count
     assert mock_post_legacy.call_count == 1
@@ -293,7 +293,7 @@ def test_plugin_fcm_legacy_priorities(mock_post_legacy):
     assert mock_post_legacy.call_count == 0
 
     # Send our notification
-    assert obj.notify(title="title", body="body") is True
+    assert obj.notify(title="title", body="body")
 
     # Test our call count
     assert mock_post_legacy.call_count == 1
@@ -326,7 +326,7 @@ def test_plugin_fcm_legacy_no_colors(mock_post_legacy):
     assert mock_post_legacy.call_count == 0
 
     # Send our notification
-    assert obj.notify(title="title", body="body") is True
+    assert obj.notify(title="title", body="body")
 
     # Test our call count
     assert mock_post_legacy.call_count == 1
@@ -356,7 +356,7 @@ def test_plugin_fcm_legacy_colors(mock_post_legacy):
     assert mock_post_legacy.call_count == 0
 
     # Send our notification
-    assert obj.notify(title="title", body="body") is True
+    assert obj.notify(title="title", body="body")
 
     # Test our call count
     assert mock_post_legacy.call_count == 1
@@ -387,7 +387,7 @@ def test_plugin_fcm_oauth_default(mock_post):
         f'fcm://mock-project-id/device/#topic/?keyfile={FCM_KEYFILE}')
 
     # send our notification
-    assert obj.notify("test") is True
+    assert obj.notify("test")
 
     # Test our call count
     assert mock_post.call_count == 3
@@ -451,7 +451,7 @@ def test_plugin_fcm_oauth_data_parameters(mock_post):
     assert mock_post.call_count == 0
 
     # send our notification
-    assert obj.notify("test") is True
+    assert obj.notify("test")
 
     # Test our call count
     assert mock_post.call_count == 3
@@ -511,7 +511,7 @@ def test_plugin_fcm_oauth_priorities(mock_post):
     assert mock_post.call_count == 0
 
     # Send our notification
-    assert obj.notify(title="title", body="body") is True
+    assert obj.notify(title="title", body="body")
 
     # Test our call count
     assert mock_post.call_count == 2
@@ -546,7 +546,7 @@ def test_plugin_fcm_oauth_no_colors(mock_post):
     assert mock_post.call_count == 0
 
     # Send our notification
-    assert obj.notify(title="title", body="body") is True
+    assert obj.notify(title="title", body="body")
 
     # Test our call count
     assert mock_post.call_count == 2
@@ -578,7 +578,7 @@ def test_plugin_fcm_oauth_colors(mock_post):
     assert mock_post.call_count == 0
 
     # Send our notification
-    assert obj.notify(title="title", body="body") is True
+    assert obj.notify(title="title", body="body")
 
     # Test our call count
     assert mock_post.call_count == 2
@@ -610,7 +610,7 @@ def test_plugin_fcm_keyfile_parse_default(mock_post):
     assert oauth.access_token is None
 
     # Load our content
-    assert oauth.load(FCM_KEYFILE) is True
+    assert oauth.load(FCM_KEYFILE)
     assert oauth.access_token is not None
 
     # Test our call count
@@ -638,7 +638,7 @@ def test_plugin_fcm_keyfile_parse_no_expiry(mock_post):
     })
 
     oauth = GoogleOAuth()
-    assert oauth.load(FCM_KEYFILE) is True
+    assert oauth.load(FCM_KEYFILE)
     assert oauth.access_token is not None
 
     # Test our call count
@@ -655,7 +655,7 @@ def test_plugin_fcm_keyfile_parse_user_agent(mock_post):
     """
 
     oauth = GoogleOAuth(user_agent="test-agent-override")
-    assert oauth.load(FCM_KEYFILE) is True
+    assert oauth.load(FCM_KEYFILE)
     assert oauth.access_token is not None
     assert mock_post.call_count == 1
     assert mock_post.call_args_list[0][0][0] == \
@@ -727,7 +727,7 @@ def test_plugin_fcm_keyfile_parse_token_failures(mock_post):
     mock_post.return_value.status_code = requests.codes.internal_server_error
 
     oauth = GoogleOAuth()
-    assert oauth.load(FCM_KEYFILE) is True
+    assert oauth.load(FCM_KEYFILE)
 
     # We'll fail due to an bad web response
     assert oauth.access_token is None
@@ -754,7 +754,7 @@ def test_plugin_fcm_keyfile_parse_token_failures(mock_post):
 
         # Test all of our bad side effects
         oauth = GoogleOAuth()
-        assert oauth.load(FCM_KEYFILE) is True
+        assert oauth.load(FCM_KEYFILE)
 
         # We'll fail due to an bad web response
         assert oauth.access_token is None
@@ -873,13 +873,13 @@ def test_plugin_fcm_color_manager():
 
     # We will be `true` because we can acquire a color based on what was
     # passed in
-    assert bool(instance) is True
+    assert bool(instance)
 
     # Custom color
     instance = FCMColorManager('#A2B3A4')
     assert isinstance(instance.get(), str)
     assert instance.get() == '#a2b3a4'
-    assert bool(instance) is True
+    assert bool(instance)
     # str() response does not include hashtag
     assert str(instance) == 'a2b3a4'
 
@@ -888,7 +888,7 @@ def test_plugin_fcm_color_manager():
     assert isinstance(instance.get(), str)
     # Hashtag is always part of output
     assert instance.get() == '#a2b3a4'
-    assert bool(instance) is True
+    assert bool(instance)
     # str() response does not include hashtag
     assert str(instance) == 'a2b3a4'
 
@@ -897,7 +897,7 @@ def test_plugin_fcm_color_manager():
     assert isinstance(instance.get(), str)
     # Hashtag is always part of output
     assert instance.get() == '#aacc44'
-    assert bool(instance) is True
+    assert bool(instance)
     # str() response does not include hashtag
     assert str(instance) == 'aacc44'
 

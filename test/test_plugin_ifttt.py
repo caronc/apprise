@@ -150,20 +150,20 @@ def test_plugin_ifttt_edge_cases(mock_post, mock_get):
         NotifyIFTTT(webhook_id=webhook_id, events=None)
 
     obj = NotifyIFTTT(webhook_id=webhook_id, events=events)
-    assert isinstance(obj, NotifyIFTTT) is True
+    assert isinstance(obj, NotifyIFTTT)
 
     assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO) is True
+        body='body', title='title', notify_type=NotifyType.INFO)
 
     # Test the addition of tokens
     obj = NotifyIFTTT(
         webhook_id=webhook_id, events=events,
         add_tokens={'Test': 'ValueA', 'Test2': 'ValueB'})
 
-    assert isinstance(obj, NotifyIFTTT) is True
+    assert isinstance(obj, NotifyIFTTT)
 
     assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO) is True
+        body='body', title='title', notify_type=NotifyType.INFO)
 
     # Invalid del_tokens entry
     with pytest.raises(TypeError):
@@ -171,10 +171,10 @@ def test_plugin_ifttt_edge_cases(mock_post, mock_get):
             webhook_id=webhook_id, events=events,
             del_tokens=NotifyIFTTT.ifttt_default_title_key)
 
-    assert isinstance(obj, NotifyIFTTT) is True
+    assert isinstance(obj, NotifyIFTTT)
 
     assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO) is True
+        body='body', title='title', notify_type=NotifyType.INFO)
 
     # Test removal of tokens by a list
     obj = NotifyIFTTT(
@@ -187,10 +187,10 @@ def test_plugin_ifttt_edge_cases(mock_post, mock_get):
             NotifyIFTTT.ifttt_default_body_key,
             NotifyIFTTT.ifttt_default_type_key))
 
-    assert isinstance(obj, NotifyIFTTT) is True
+    assert isinstance(obj, NotifyIFTTT)
 
     assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO) is True
+        body='body', title='title', notify_type=NotifyType.INFO)
 
     # Test removal of tokens as dict
     obj = NotifyIFTTT(
@@ -203,4 +203,4 @@ def test_plugin_ifttt_edge_cases(mock_post, mock_get):
             NotifyIFTTT.ifttt_default_body_key: None,
             NotifyIFTTT.ifttt_default_type_key: None})
 
-    assert isinstance(obj, NotifyIFTTT) is True
+    assert isinstance(obj, NotifyIFTTT)
