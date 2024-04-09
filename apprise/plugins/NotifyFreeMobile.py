@@ -79,11 +79,13 @@ class NotifyFreeMobile(NotifyBase):
         'user': {
             'name': _('Username'),
             'type': 'string',
+            'required': True,
         },
         'password': {
             'name': _('Password'),
             'type': 'string',
             'private': True,
+            'required': True,
         },
     })
 
