@@ -84,6 +84,10 @@ apprise_url_tests = (
     ('zulip://botname@apprise/{}/?to=channel1/channel2'.format('a' * 32), {
         'instance': NotifyZulip,
     }),
+    # Test token=
+    ('zulip://botname@apprise/?token={}&to=channel1'.format('a' * 32), {
+        'instance': NotifyZulip,
+    }),
     # Valid everything - 2 emails specified
     ('zulip://botname@apprise/{}/user@example.com/user2@example.com'.format(
         'a' * 32), {
