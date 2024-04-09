@@ -50,7 +50,7 @@ class NotifyChantify(NotifyBase):
     service_name = _('Chantify')
 
     # The services URL
-    service_url = 'https://api.chanify.net/v1/sender'
+    service_url = 'https://chanify.net/'
 
     # The default secure protocol
     secure_protocol = 'chantify'
