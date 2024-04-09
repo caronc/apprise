@@ -27,6 +27,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import logging
+import pytest
 import os
 import re
 from unittest import mock
@@ -56,13 +57,13 @@ TEST_URLS = (
     # NotifyEmail
     ##################################
     ('mailto://', {
-        'instance': None,
+        'instance': TypeError,
     }),
     ('mailtos://', {
-        'instance': None,
+        'instance': TypeError,
     }),
     ('mailto://:@/', {
-        'instance': None
+        'instance': TypeError,
     }),
     # No Username
     ('mailtos://:pass@nuxref.com:567', {
@@ -438,9 +439,12 @@ def test_plugin_email(mock_smtp, mock_smtpssl):
         except Exception as e:
             # Handle our exception
             if instance is None:
+                print('%s generated %s' % (url, str(e)))
                 raise
 
             if not isinstance(e, instance):
+                print('%s Exception (expected %s); got %s' % (
+                    url, str(instance), str(e)))
                 raise
 
 
@@ -1812,3 +1816,190 @@ def test_plugin_email_variables_1087():
     assert email.smtp_host == 'smtp.alt.lan'
     assert email.targets == [(False, 'alteriks@alt.lan')]
     assert email.password == 'abcd'
+
+
+@mock.patch('smtplib.SMTP_SSL')
+@mock.patch('smtplib.SMTP')
+def test_plugin_host_detection_from_source_email(mock_smtp, mock_smtp_ssl):
+    """
+    NotifyEmail() Discord Issue reporting that the following did not work:
+     mailtos://?smtp=mobile.charter.net&pass=password&user=name@spectrum.net
+
+    """
+
+    response = mock.Mock()
+    mock_smtp_ssl.return_value = response
+    mock_smtp.return_value = response
+
+    results = NotifyEmail.parse_url(
+        'mailtos://spectrum.net?smtp=mobile.charter.net'
+        '&pass=password&user=name@spectrum.net')
+
+    assert isinstance(results, dict)
+    assert 'name@spectrum.net' == results['user']
+    assert 'spectrum.net' == results['host']
+    assert 'mobile.charter.net' == results['smtp_host']
+    assert 'password' == results['password']
+
+    obj = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(obj, NotifyEmail) is True
+
+    assert len(obj.targets) == 1
+    assert (False, 'name@spectrum.net') in obj.targets
+    assert obj.from_addr[0] == obj.app_id
+    assert obj.from_addr[1] == 'name@spectrum.net'
+    assert obj.password == 'password'
+    assert obj.user == 'name@spectrum.net'
+    assert obj.secure is True
+    assert obj.port == 587
+    assert obj.smtp_host == 'mobile.charter.net'
+
+    assert mock_smtp.call_count == 0
+    assert mock_smtp_ssl.call_count == 0
+    assert obj.notify('body', 'title') is True
+
+    assert mock_smtp.call_count == 1
+    assert mock_smtp_ssl.call_count == 0
+    assert response.starttls.call_count == 1
+    assert response.login.call_count == 1
+    assert response.sendmail.call_count == 1
+    # Store our Sent Arguments
+    # Syntax is:
+    #  sendmail(from_addr, to_addrs, msg, mail_options=(), rcpt_options=())
+    #             [0]        [1]     [2]
+    _from = response.sendmail.call_args[0][0]
+    _to = response.sendmail.call_args[0][1]
+    _msg = response.sendmail.call_args[0][2]
+    assert _from == 'name@spectrum.net'
+    assert isinstance(_to, list)
+    assert len(_to) == 1
+    assert _to[0] == 'name@spectrum.net'
+    assert _msg.split('\n')[-3] == 'body'
+
+    #
+    # Now let's do a shortened version of the same URL where the host isn't
+    # specified but is parseable from he user login
+    #
+    mock_smtp.reset_mock()
+    mock_smtp_ssl.reset_mock()
+    response.reset_mock()
+
+    results = NotifyEmail.parse_url(
+        'mailtos://?smtp=mobile.charter.net'
+        '&pass=password&user=name@spectrum.net')
+
+    assert isinstance(results, dict)
+    assert 'name@spectrum.net' == results['user']
+    assert '' == results['host']  # No hostname defined; it's detected later
+    assert 'mobile.charter.net' == results['smtp_host']
+    assert 'password' == results['password']
+
+    obj = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(obj, NotifyEmail) is True
+
+    assert len(obj.targets) == 1
+    assert (False, 'name@spectrum.net') in obj.targets
+    assert obj.from_addr[0] == obj.app_id
+    assert obj.from_addr[1] == 'name@spectrum.net'
+    assert obj.password == 'password'
+    assert obj.user == 'name@spectrum.net'
+    assert obj.secure is True
+    assert obj.port == 587
+    assert obj.smtp_host == 'mobile.charter.net'
+
+    assert mock_smtp.call_count == 0
+    assert mock_smtp_ssl.call_count == 0
+    assert obj.notify('body', 'title') is True
+
+    assert mock_smtp.call_count == 1
+    assert mock_smtp_ssl.call_count == 0
+    assert response.starttls.call_count == 1
+    assert response.login.call_count == 1
+    assert response.sendmail.call_count == 1
+    # Store our Sent Arguments
+    # Syntax is:
+    #  sendmail(from_addr, to_addrs, msg, mail_options=(), rcpt_options=())
+    #             [0]        [1]     [2]
+    _from = response.sendmail.call_args[0][0]
+    _to = response.sendmail.call_args[0][1]
+    _msg = response.sendmail.call_args[0][2]
+    assert _from == 'name@spectrum.net'
+    assert isinstance(_to, list)
+    assert len(_to) == 1
+    assert _to[0] == 'name@spectrum.net'
+    assert _msg.split('\n')[-3] == 'body'
+
+    #
+    # Now let's do a shortened version of the same URL where the host isn't
+    # specified but is parseable from he user login
+    #
+    mock_smtp.reset_mock()
+    mock_smtp_ssl.reset_mock()
+    response.reset_mock()
+
+    results = NotifyEmail.parse_url(
+        'mailtos://?smtp=mobile.charter.net'
+        '&pass=password&user=userid-without-domain')
+
+    assert isinstance(results, dict)
+    assert 'userid-without-domain' == results['user']
+    assert '' == results['host']  # No hostname defined
+    assert 'mobile.charter.net' == results['smtp_host']
+    assert 'password' == results['password']
+
+    with pytest.raises(TypeError):
+        # We will fail
+        Apprise.instantiate(results, suppress_exceptions=False)
+
+    #
+    # Now support target emails in place of the hostname
+    #
+
+    mock_smtp.reset_mock()
+    mock_smtp_ssl.reset_mock()
+    response.reset_mock()
+
+    results = NotifyEmail.parse_url(
+        'mailtos://John Doe<john%40yahoo.ca>?smtp=mobile.charter.net'
+        '&pass=password&user=name@spectrum.net')
+
+    assert isinstance(results, dict)
+    assert 'name@spectrum.net' == results['user']
+    assert '' == results['host']  # No hostname defined; it's detected later
+    assert 'mobile.charter.net' == results['smtp_host']
+    assert 'password' == results['password']
+
+    obj = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(obj, NotifyEmail) is True
+
+    assert len(obj.targets) == 1
+    assert ('John Doe', 'john@yahoo.ca') in obj.targets
+    assert obj.from_addr[0] == obj.app_id
+    assert obj.from_addr[1] == 'name@spectrum.net'
+    assert obj.password == 'password'
+    assert obj.user == 'name@spectrum.net'
+    assert obj.secure is True
+    assert obj.port == 587
+    assert obj.smtp_host == 'mobile.charter.net'
+
+    assert mock_smtp.call_count == 0
+    assert mock_smtp_ssl.call_count == 0
+    assert obj.notify('body', 'title') is True
+
+    assert mock_smtp.call_count == 1
+    assert mock_smtp_ssl.call_count == 0
+    assert response.starttls.call_count == 1
+    assert response.login.call_count == 1
+    assert response.sendmail.call_count == 1
+    # Store our Sent Arguments
+    # Syntax is:
+    #  sendmail(from_addr, to_addrs, msg, mail_options=(), rcpt_options=())
+    #             [0]        [1]     [2]
+    _from = response.sendmail.call_args[0][0]
+    _to = response.sendmail.call_args[0][1]
+    _msg = response.sendmail.call_args[0][2]
+    assert _from == 'name@spectrum.net'
+    assert isinstance(_to, list)
+    assert len(_to) == 1
+    assert _to[0] == 'john@yahoo.ca'
+    assert _msg.split('\n')[-3] == 'body'

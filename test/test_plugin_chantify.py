@@ -28,7 +28,7 @@
 
 import requests
 
-from apprise.plugins.NotifyFaast import NotifyFaast
+from apprise.plugins.NotifyChantify import NotifyChantify
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -37,38 +37,37 @@ logging.disable(logging.CRITICAL)
 
 # Our Testing URLs
 apprise_url_tests = (
-    ('faast://', {
+    ('chantify://', {
         'instance': TypeError,
     }),
-    ('faast://:@/', {
+    ('chantify://:@/', {
         'instance': TypeError,
     }),
-    # Auth Token specified
-    ('faast://%s' % ('a' * 32), {
-        'instance': NotifyFaast,
-
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'faast://a...a',
+    ('chantify://%badtoken%', {
+        'instance': TypeError,
     }),
-    ('faast://%s' % ('a' * 32), {
-        'instance': NotifyFaast,
-        # don't include an image by default
-        'include_image': False,
+    ('chantify://abc123', {
+        # Test token
+        'instance': NotifyChantify,
     }),
-    ('faast://%s' % ('a' * 32), {
-        'instance': NotifyFaast,
+    ('chantify://?token=abc123', {
+        # Test token
+        'instance': NotifyChantify,
+    }),
+    ('chantify://token', {
+        'instance': NotifyChantify,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
-    ('faast://%s' % ('a' * 32), {
-        'instance': NotifyFaast,
+    ('chantify://token', {
+        'instance': NotifyChantify,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
-    ('faast://%s' % ('a' * 32), {
-        'instance': NotifyFaast,
+    ('chantify://token', {
+        'instance': NotifyChantify,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -76,9 +75,9 @@ apprise_url_tests = (
 )
 
 
-def test_plugin_faast_urls():
+def test_plugin_chantify_urls():
     """
-    NotifyFaast() Apprise URLs
+    NotifyChantify() Apprise URLs
 
     """
 

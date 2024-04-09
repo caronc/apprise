@@ -457,6 +457,19 @@ class NotifyBase(URLBase):
         # Handle situations where the title is None
         title = '' if not title else title
 
+        # Truncate flag set with attachments ensures that only 1
+        # attachment passes through. In the event there could be many
+        # services specified, we only want to do this logic once.
+        # The logic is only applicable if ther was more then 1 attachment
+        # specified
+        overflow = self.overflow_mode if overflow is None else overflow
+        if attach and len(attach) > 1 and overflow == OverflowMode.TRUNCATE:
+            # Save first attachment
+            _attach = AppriseAttachment(attach[0], asset=self.asset)
+        else:
+            # reference same attachment
+            _attach = attach
+
         # Apply our overflow (if defined)
         for chunk in self._apply_overflow(
                 body=body, title=title, overflow=overflow,
@@ -465,7 +478,7 @@ class NotifyBase(URLBase):
             # Send notification
             yield dict(
                 body=chunk['body'], title=chunk['title'],
-                notify_type=notify_type, attach=attach,
+                notify_type=notify_type, attach=_attach,
                 body_format=body_format
             )
 
@@ -485,7 +498,7 @@ class NotifyBase(URLBase):
                 },
                 {
                     title: 'the title goes here',
-                    body: 'the message body goes here',
+                    body: 'the continued message body goes here',
                 },
 
             ]

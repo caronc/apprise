@@ -163,6 +163,9 @@ class NotifyZulip(NotifyBase):
         'to': {
             'alias_of': 'targets',
         },
+        'token': {
+            'alias_of': 'token',
+        },
     })
 
     # The default hostname to append to a defined organization
@@ -377,20 +380,23 @@ class NotifyZulip(NotifyBase):
         # The botname
         results['botname'] = NotifyZulip.unquote(results['user'])
 
-        # The first token is stored in the hostname
+        # The organization is stored in the hostname
         results['organization'] = NotifyZulip.unquote(results['host'])
 
-        # Now fetch the remaining tokens
-        try:
-            results['token'] = \
-                NotifyZulip.split_path(results['fullpath'])[0]
+        # Store our targets
+        results['targets'] = NotifyZulip.split_path(results['fullpath'])
 
-        except IndexError:
+        if 'token' in results['qsd'] and len(results['qsd']['token']):
+            # Store our token if specified
+            results['token'] = NotifyZulip.unquote(results['qsd']['token'])
+
+        elif results['targets']:
+            # First item is the token
+            results['token'] = results['targets'].pop(0)
+
+        else:
             # no token
             results['token'] = None
-
-        # Get unquoted entries
-        results['targets'] = NotifyZulip.split_path(results['fullpath'])[1:]
 
         # Support the 'to' variable so that we can support rooms this way too
         # The 'to' makes it easier to use yaml configuration
