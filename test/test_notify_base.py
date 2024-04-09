@@ -70,7 +70,6 @@ def test_notify_base():
         # implemented error intentionally
         nb.send('test message')
 
-
     # Throttle overrides..
     nb = NotifyBase()
     nb.request_rate_per_sec = 0.0

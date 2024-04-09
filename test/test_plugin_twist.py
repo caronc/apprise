@@ -115,10 +115,8 @@ def test_plugin_twist_init():
     with pytest.raises(TypeError):
         NotifyTwist(email='invalid', targets=None)
 
-
     with pytest.raises(TypeError):
         NotifyTwist(email='user@domain', targets=None)
-
 
     # Simple object initialization
     result = NotifyTwist(
