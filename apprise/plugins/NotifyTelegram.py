@@ -717,7 +717,7 @@ class NotifyTelegram(NotifyBase):
 
         # Prepare Message Body
         if self.notify_format == NotifyFormat.MARKDOWN:
-            _payload['parse_mode'] = 'MARKDOWN'
+            _payload['parse_mode'] = 'MarkdownV2'
 
             _payload['text'] = body
 
