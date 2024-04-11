@@ -174,17 +174,17 @@ def test_plugin_dbus_general_success(mocker, dbus_glib_environment):
     assert NotifyDBus(
         x_axis=0, y_axis=0, **{'schema': 'dbus'})\
         .notify(title='', body='body',
-                notify_type=apprise.NotifyType.INFO)
+                notify_type=apprise.NotifyType.INFO) is True
 
     # test notifications
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO)
+        notify_type=apprise.NotifyType.INFO) is True
 
     # test notification without a title
     assert obj.notify(
         title='', body='body',
-        notify_type=apprise.NotifyType.INFO)
+        notify_type=apprise.NotifyType.INFO) is True
 
     # Test our arguments through the instantiate call
     obj = apprise.Apprise.instantiate(
@@ -196,7 +196,7 @@ def test_plugin_dbus_general_success(mocker, dbus_glib_environment):
 
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO)
+        notify_type=apprise.NotifyType.INFO) is True
 
     obj = apprise.Apprise.instantiate(
         'dbus://_/?image=False', suppress_exceptions=False)
@@ -207,7 +207,7 @@ def test_plugin_dbus_general_success(mocker, dbus_glib_environment):
 
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO)
+        notify_type=apprise.NotifyType.INFO) is True
 
     # Test priority (alias to urgency) handling
     obj = apprise.Apprise.instantiate(
@@ -216,7 +216,7 @@ def test_plugin_dbus_general_success(mocker, dbus_glib_environment):
     assert isinstance(obj.url(), str)
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO)
+        notify_type=apprise.NotifyType.INFO) is True
 
     obj = apprise.Apprise.instantiate(
         'dbus://_/?priority=high', suppress_exceptions=False)
@@ -224,7 +224,7 @@ def test_plugin_dbus_general_success(mocker, dbus_glib_environment):
     assert isinstance(obj.url(), str)
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO)
+        notify_type=apprise.NotifyType.INFO) is True
 
     obj = apprise.Apprise.instantiate(
         'dbus://_/?priority=2', suppress_exceptions=False)
@@ -232,7 +232,7 @@ def test_plugin_dbus_general_success(mocker, dbus_glib_environment):
     assert isinstance(obj.url(), str)
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO)
+        notify_type=apprise.NotifyType.INFO) is True
 
     # Test urgency handling
     obj = apprise.Apprise.instantiate(
@@ -241,7 +241,7 @@ def test_plugin_dbus_general_success(mocker, dbus_glib_environment):
     assert isinstance(obj.url(), str)
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO)
+        notify_type=apprise.NotifyType.INFO) is True
 
     obj = apprise.Apprise.instantiate(
         'dbus://_/?urgency=high', suppress_exceptions=False)
@@ -249,7 +249,7 @@ def test_plugin_dbus_general_success(mocker, dbus_glib_environment):
     assert isinstance(obj.url(), str)
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO)
+        notify_type=apprise.NotifyType.INFO) is True
 
     obj = apprise.Apprise.instantiate(
         'dbus://_/?urgency=2', suppress_exceptions=False)
@@ -257,7 +257,7 @@ def test_plugin_dbus_general_success(mocker, dbus_glib_environment):
     assert isinstance(obj.url(), str)
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO)
+        notify_type=apprise.NotifyType.INFO) is True
 
     obj = apprise.Apprise.instantiate(
         'dbus://_/?urgency=', suppress_exceptions=False)
@@ -265,7 +265,7 @@ def test_plugin_dbus_general_success(mocker, dbus_glib_environment):
     assert isinstance(obj.url(), str)
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO)
+        notify_type=apprise.NotifyType.INFO) is True
 
     # Test x/y
     obj = apprise.Apprise.instantiate(

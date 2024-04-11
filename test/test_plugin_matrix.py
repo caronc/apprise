@@ -257,26 +257,26 @@ def test_plugin_matrix_general(mock_post, mock_get, mock_put):
     assert isinstance(obj, NotifyMatrix)
     assert isinstance(obj.url(), str)
     # Registration successful
-    assert obj.send(body="test")
+    assert obj.send(body="test") is True
 
     obj = NotifyMatrix(host='host', user='user', targets='#abcd')
     assert isinstance(obj, NotifyMatrix)
     assert isinstance(obj.url(), str)
     # Registration successful
-    assert obj.send(body="test")
+    assert obj.send(body="test") is True
 
     obj = NotifyMatrix(host='host', password='passwd', targets='#abcd')
     assert isinstance(obj, NotifyMatrix)
     assert isinstance(obj.url(), str)
     # A username gets automatically generated in these cases
-    assert obj.send(body="test")
+    assert obj.send(body="test") is True
 
     obj = NotifyMatrix(
         host='host', user='user', password='passwd', targets='#abcd')
     assert isinstance(obj.url(), str)
     assert isinstance(obj, NotifyMatrix)
     # Registration Successful
-    assert obj.send(body="test")
+    assert obj.send(body="test") is True
 
     # Test sending other format types
     kwargs = NotifyMatrix.parse_url(
@@ -284,16 +284,16 @@ def test_plugin_matrix_general(mock_post, mock_get, mock_put):
     obj = NotifyMatrix(**kwargs)
     assert isinstance(obj.url(), str)
     assert isinstance(obj, NotifyMatrix)
-    assert obj.send(body="test")
-    assert obj.send(title="title", body="test")
+    assert obj.send(body="test") is True
+    assert obj.send(title="title", body="test") is True
 
     kwargs = NotifyMatrix.parse_url(
         'matrix://user:passwd@hostname/#abcd/#abcd:localhost?format=markdown')
     obj = NotifyMatrix(**kwargs)
     assert isinstance(obj.url(), str)
     assert isinstance(obj, NotifyMatrix)
-    assert obj.send(body="test")
-    assert obj.send(title="title", body="test")
+    assert obj.send(body="test") is True
+    assert obj.send(title="title", body="test") is True
 
     kwargs = NotifyMatrix.parse_url(
         'matrix://user:passwd@hostname/#abcd/!abcd:localhost?format=text')

@@ -130,7 +130,7 @@ def test_apprise_config(tmpdir):
     cb = ConfigBase()
 
     # Test adding of all entries
-    assert ac.add(configs=cb, asset=AppriseAsset(), tag='test')
+    assert ac.add(configs=cb, asset=AppriseAsset(), tag='test') is True
 
     # Test adding of all entries
     assert ac.add(
@@ -262,9 +262,9 @@ def test_apprise_multi_config_entries(tmpdir):
     assert len(ac) == 0
 
     # Support adding of muilt strings and objects:
-    assert ac.add(configs=(str(t), str(t)))
+    assert ac.add(configs=(str(t), str(t))) is True
     assert ac.add(configs=(
-        ConfigFile(path=str(te)), ConfigFile(path=str(t))))
+        ConfigFile(path=str(te)), ConfigFile(path=str(t)))) is True
 
     # don't support the adding of invalid content
     assert ac.add(configs=(object(), object())) is False
@@ -304,7 +304,7 @@ def test_apprise_add_config():
     """
     # Create ourselves a config object
     ac = AppriseConfig()
-    assert ac.add_config(content=content)
+    assert ac.add_config(content=content) is True
 
     # One configuration file should have been found
     assert len(ac) == 1
@@ -330,7 +330,7 @@ def test_apprise_add_config():
 
     # Test having a pre-defined asset object and tag created
     assert ac.add_config(
-        content=content, asset=AppriseAsset(), tag='a')
+        content=content, asset=AppriseAsset(), tag='a') is True
 
     # Now there are 2 servers loaded
     assert len(ac) == 2
@@ -358,7 +358,7 @@ def test_apprise_add_config():
 
     # Create ourselves a config object
     ac = AppriseConfig()
-    assert ac.add_config(content=content)
+    assert ac.add_config(content=content) is True
 
     # One configuration file should have been found
     assert len(ac) == 1
@@ -397,11 +397,11 @@ def test_apprise_config_tagging(tmpdir):
     ac = AppriseConfig()
 
     # Add an item associated with tag a
-    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='a')
+    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='a') is True
     # Add an item associated with tag b
-    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='b')
+    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='b') is True
     # Add an item associated with tag a or b
-    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='a,b')
+    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='a,b') is True
 
     # Now filter: a:
     assert len(ac.servers(tag='a')) == 2
@@ -417,11 +417,11 @@ def test_apprise_config_tagging(tmpdir):
     ac = AppriseConfig()
 
     # Add an item associated with tag a
-    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='a,always')
+    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='a,always') is True
     # Add an item associated with tag b
-    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='b')
+    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='b') is True
     # Add an item associated with tag a or b
-    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='c,d')
+    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='c,d') is True
 
     # Now filter: a:
     assert len(ac.servers(tag='a')) == 1
@@ -527,7 +527,7 @@ def test_invalid_apprise_config(tmpdir):
     assert len(ac) == 0
 
     # Add our config
-    assert ac.add(configs=str(t), asset=AppriseAsset())
+    assert ac.add(configs=str(t), asset=AppriseAsset()) is True
 
     # One configuration file
     assert len(ac) == 1
@@ -574,7 +574,7 @@ def test_apprise_config_with_apprise_obj(tmpdir):
     assert len(ac) == 0
 
     # Add an item associated with tag a
-    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='a')
+    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='a') is True
 
     # One configuration file
     assert len(ac) == 1
@@ -592,17 +592,17 @@ def test_apprise_config_with_apprise_obj(tmpdir):
     a = Apprise()
 
     # Add our configuration object
-    assert a.add(servers=ac)
+    assert a.add(servers=ac) is True
 
     # Detect our 1 entry (originally there were 2 but we deleted one)
     assert len(a) == 1
 
     # Notify our service
-    assert a.notify(body='apprise configuration power!')
+    assert a.notify(body='apprise configuration power!') is True
 
     # Add our configuration object
     assert a.add(
-        servers=[AppriseConfig(str(t)), AppriseConfig(str(t))])
+        servers=[AppriseConfig(str(t)), AppriseConfig(str(t))]) is True
 
     # Detect our 5 loaded entries now; 1 from first config, and another
     # 2x2 based on adding our list above
@@ -675,7 +675,7 @@ def test_apprise_config_with_apprise_obj(tmpdir):
         servers=[
             ConfigFile(path=(str(t))),
             'good://another.host',
-            GoodNotification(**{'host': 'nuxref.com'})])
+            GoodNotification(**{'host': 'nuxref.com'})]) is True
 
     # Our length increases by 4 (2 entries in the config file, + 2 others)
     assert len(a) == 7
@@ -811,7 +811,7 @@ include strict://{}""".format(str(cfg04), str(cfg04), str(cfg04)))
     assert len(ac) == 0
 
     # load our configuration
-    assert ac.add(configs=str(cfg01))
+    assert ac.add(configs=str(cfg01)) is True
 
     # verify it loaded
     assert len(ac) == 1
@@ -823,7 +823,7 @@ include strict://{}""".format(str(cfg04), str(cfg04), str(cfg04)))
     ac = AppriseConfig(recursion=1)
 
     # load our configuration
-    assert ac.add(configs=str(cfg01))
+    assert ac.add(configs=str(cfg01)) is True
 
     # verify one configuration file loaded however since it recursively
     # loaded itself 1 more time, it still doesn't impact the load count:
@@ -843,7 +843,7 @@ include strict://{}""".format(str(cfg04), str(cfg04), str(cfg04)))
     assert len(ac) == 0
 
     # load our configuration
-    assert ac.add(configs=str(cfg02))
+    assert ac.add(configs=str(cfg02)) is True
 
     # verify it loaded
     assert len(ac) == 1
@@ -861,7 +861,7 @@ include strict://{}""".format(str(cfg04), str(cfg04), str(cfg04)))
     assert len(ac) == 0
 
     # load our configuration
-    assert ac.add(configs=str(cfg04))
+    assert ac.add(configs=str(cfg04)) is True
 
     # verify it loaded
     assert len(ac) == 1
@@ -883,7 +883,7 @@ include strict://{}""".format(str(cfg04), str(cfg04), str(cfg04)))
     assert len(ac) == 0
 
     # load our configuration
-    assert ac.add(configs=str(cfg04))
+    assert ac.add(configs=str(cfg04)) is True
 
     # verify it loaded
     assert len(ac) == 1
@@ -1106,7 +1106,7 @@ def test_config_base_parse_yaml_file02(tmpdir):
     a = Apprise()
 
     # Add our configuration object
-    assert a.add(servers=ac)
+    assert a.add(servers=ac) is True
 
     # Detect our 3 entry as they should have loaded successfully
     assert len(a) == 3
@@ -1157,7 +1157,7 @@ def test_config_base_parse_yaml_file03(tmpdir):
     a = Apprise()
 
     # Add our configuration object
-    assert a.add(servers=ac)
+    assert a.add(servers=ac) is True
 
     # Detect our 3 entry as they should have loaded successfully
     assert len(a) == 3
@@ -1205,7 +1205,7 @@ def test_config_base_parse_yaml_file04(tmpdir):
     a = Apprise()
 
     # Add our configuration object
-    assert a.add(servers=ac)
+    assert a.add(servers=ac) is True
 
     # Detect our 3 entry as they should have loaded successfully
     assert len(a) == 3

@@ -278,7 +278,7 @@ def test_plugin_reddit_general(mock_post):
     assert isinstance(obj.url(), str)
 
     # Dynamically pick up on a link
-    assert obj.send(body="http://hostname")
+    assert obj.send(body="http://hostname") is True
 
     bad_response = mock.Mock()
     bad_response.content = ''
@@ -299,7 +299,7 @@ def test_plugin_reddit_general(mock_post):
         'X-RateLimit-Remaining': 0,
     }
     # behind the scenes, it should cause us to update our rate limit
-    assert obj.send(body="test")
+    assert obj.send(body="test") is True
     assert obj.ratelimit_remaining == 0
 
     # This should cause us to block
@@ -308,12 +308,12 @@ def test_plugin_reddit_general(mock_post):
             datetime.now(timezone.utc) - epoch).total_seconds(),
         'X-RateLimit-Remaining': 10,
     }
-    assert obj.send(body="test")
+    assert obj.send(body="test") is True
     assert obj.ratelimit_remaining == 10
 
     # Handle cases where we simply couldn't get this field
     del good_response.headers['X-RateLimit-Remaining']
-    assert obj.send(body="test")
+    assert obj.send(body="test") is True
     # It remains set to the last value
     assert obj.ratelimit_remaining == 10
 
@@ -325,7 +325,7 @@ def test_plugin_reddit_general(mock_post):
     }
     # Handle cases where our epoch time is wrong
     del good_response.headers['X-RateLimit-Reset']
-    assert obj.send(body="test")
+    assert obj.send(body="test") is True
 
     # Return our object, but place it in the future forcing us to block
     good_response.headers = {
@@ -335,7 +335,7 @@ def test_plugin_reddit_general(mock_post):
     }
 
     obj.ratelimit_remaining = 0
-    assert obj.send(body="test")
+    assert obj.send(body="test") is True
 
     # Return our object, but place it in the future forcing us to block
     good_response.headers = {
@@ -343,7 +343,7 @@ def test_plugin_reddit_general(mock_post):
             datetime.now(timezone.utc) - epoch).total_seconds() - 1,
         'X-RateLimit-Remaining': 0,
     }
-    assert obj.send(body="test")
+    assert obj.send(body="test") is True
 
     # Return our limits to always work
     obj.ratelimit_remaining = 1
@@ -409,7 +409,7 @@ def test_plugin_reddit_general(mock_post):
     mock_post.side_effect = [
         good_response, bad_response, good_response, good_response]
     obj = NotifyReddit(**kwargs)
-    assert obj.send(body="test")
+    assert obj.send(body="test") is True
     assert mock_post.call_count == 4
     assert mock_post.call_args_list[0][0][0] == \
         'https://www.reddit.com/api/v1/access_token'

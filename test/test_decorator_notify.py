@@ -78,7 +78,7 @@ def test_notify_simple_decoration():
     # Create ourselves an apprise object
     aobj = Apprise()
 
-    assert aobj.add("utiltest://")
+    assert aobj.add("utiltest://") is True
 
     assert len(verify_obj) == 0
 
@@ -89,7 +89,7 @@ def test_notify_simple_decoration():
             join(TEST_VAR_DIR, 'apprise-test.gif'),
             join(TEST_VAR_DIR, 'apprise-test.png'),
         )
-    )
+    ) is True
 
     # Our content was populated after the notify() call
     assert len(verify_obj) > 0
@@ -125,7 +125,7 @@ def test_notify_simple_decoration():
         "Hello Another World", title="My Other Title",
         body_format=common.NotifyFormat.HTML,
         notify_type=common.NotifyType.WARNING,
-    )
+    ) is True
 
     # Our content was populated after the notify() call
     assert len(verify_obj) > 0
@@ -164,7 +164,7 @@ def test_notify_simple_decoration():
     # Create ourselves an apprise object
     aobj = Apprise()
 
-    assert aobj.add("notexc://")
+    assert aobj.add("notexc://") is True
 
     # Isn't handled
     assert aobj.notify("Exceptions will be thrown!") is False
@@ -205,7 +205,7 @@ def test_notify_complex_decoration():
     # Create ourselves an apprise object
     aobj = Apprise()
 
-    assert aobj.add("utiltest://")
+    assert aobj.add("utiltest://") is True
 
     assert len(verify_obj) == 0
 
@@ -216,7 +216,7 @@ def test_notify_complex_decoration():
             join(TEST_VAR_DIR, 'apprise-test.gif'),
             join(TEST_VAR_DIR, 'apprise-test.png'),
         )
-    )
+    ) is True
 
     # Our content was populated after the notify() call
     assert len(verify_obj) > 0
@@ -263,12 +263,12 @@ def test_notify_complex_decoration():
     # We'll do another test now
     aobj = Apprise()
 
-    assert aobj.add("utiltest://customhost?key=new&key2=another")
+    assert aobj.add("utiltest://customhost?key=new&key2=another") is True
 
     assert len(verify_obj) == 0
 
     # Send our notification
-    assert aobj.notify("Hello World", title="My Title")
+    assert aobj.notify("Hello World", title="My Title") is True
 
     # Our content was populated after the notify() call
     assert len(verify_obj) > 0
@@ -373,7 +373,7 @@ def test_notify_multi_instance_decoration(tmpdir):
     # Nothing stored yet in our object
     assert len(verify_obj) == 0
 
-    assert aobj.notify("Hello World", title="My Title")
+    assert aobj.notify("Hello World", title="My Title") is True
 
     assert len(verify_obj) == 2
 

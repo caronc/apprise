@@ -206,7 +206,7 @@ def test_plugin_join_config_files(mock_post):
 
     # Create ourselves a config object
     ac = apprise.AppriseConfig()
-    assert ac.add_config(content=content)
+    assert ac.add_config(content=content) is True
 
     aobj = apprise.Apprise()
 
@@ -236,4 +236,4 @@ def test_plugin_join_config_files(mock_post):
         JoinPriority.NORMAL
 
     # Notifications work
-    assert aobj.notify(title="title", body="body")
+    assert aobj.notify(title="title", body="body") is True

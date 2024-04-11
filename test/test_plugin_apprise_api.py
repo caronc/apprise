@@ -217,7 +217,7 @@ def test_notify_apprise_api_attachments(mock_post):
         attach = AppriseAttachment(path)
         assert obj.notify(
             body='body', title='title', notify_type=NotifyType.INFO,
-            attach=attach)
+            attach=attach) is True
 
         # Test invalid attachment
         path = os.path.join(
@@ -259,7 +259,7 @@ def test_notify_apprise_api_attachments(mock_post):
 
         assert obj.notify(
             body='body', title='title', notify_type=NotifyType.INFO,
-            attach=attach)
+            attach=attach) is True
         assert mock_post.call_count == 1
 
         details = mock_post.call_args_list[0]

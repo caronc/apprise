@@ -162,7 +162,7 @@ def test_plugin_twilio_auth(mock_post):
     assert isinstance(obj.url(), str)
 
     # Send Notification
-    assert obj.send(body=message_contents)
+    assert obj.send(body=message_contents) is True
 
     # Variation of initialization with API key
     obj = Apprise.instantiate(
@@ -172,7 +172,7 @@ def test_plugin_twilio_auth(mock_post):
     assert isinstance(obj.url(), str)
 
     # Send Notification
-    assert obj.send(body=message_contents)
+    assert obj.send(body=message_contents) is True
 
     # Validate expected call parameters
     assert mock_post.call_count == 2

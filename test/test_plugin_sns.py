@@ -240,14 +240,14 @@ def test_plugin_sns_object_parsing():
 
     # This is valid but without valid recipients; while it's still a valid URL
     # it won't do much when the user goes to send a notification
-    assert a.add('sns://norecipient/norecipient/us-west-2')
+    assert a.add('sns://norecipient/norecipient/us-west-2') is True
     assert len(a) == 1
 
     # Parse a good one
-    assert a.add('sns://oh/yeah/us-west-2/abcdtopic/+12223334444')
+    assert a.add('sns://oh/yeah/us-west-2/abcdtopic/+12223334444') is True
     assert len(a) == 2
 
-    assert a.add('sns://oh/yeah/us-west-2/12223334444')
+    assert a.add('sns://oh/yeah/us-west-2/12223334444') is True
     assert len(a) == 3
 
 
@@ -434,4 +434,4 @@ def test_plugin_sns_aws_topic_handling(mock_post):
     robj.status_code = requests.codes.ok
     mock_post.return_value = robj
     # We would have failed to make Post
-    assert a.notify(title='', body='test')
+    assert a.notify(title='', body='test') is True

@@ -103,11 +103,11 @@ def test_plugin_mqtt_default_success(mqtt_client_mock):
     assert re.search(r'client_id=', obj.url()) is None
 
     # Verify notification succeeds.
-    assert obj.notify(body="test=test")
+    assert obj.notify(body="test=test") is True
 
     # Send another notification (a new connection isn't attempted to be
     # established as one already exists)
-    assert obj.notify(body="foo=bar")
+    assert obj.notify(body="foo=bar") is True
 
     # Verify the right calls have been made to the MQTT client object.
     assert mqtt_client_mock.mock_calls == [
@@ -140,7 +140,7 @@ def test_plugin_mqtt_multiple_topics_success(mqtt_client_mock):
     assert obj.url().startswith('mqtt://localhost')
     assert re.search(r'my/topic', obj.url())
     assert re.search(r'my/other/topic', obj.url())
-    assert obj.notify(body="test=test")
+    assert obj.notify(body="test=test") is True
 
     # Verify the right calls have been made to the MQTT client object.
     assert mqtt_client_mock.mock_calls == [
@@ -173,7 +173,7 @@ def test_plugin_mqtt_to_success(mqtt_client_mock):
     assert re.search(r'version=v3.1.1', obj.url())
 
     # Verify notification succeeds.
-    assert obj.notify(body="test=test")
+    assert obj.notify(body="test=test") is True
 
 
 def test_plugin_mqtt_valid_settings_success(mqtt_client_mock):
@@ -239,7 +239,7 @@ def test_plugin_mqtt_tls_connect_success(mqtt_client_mock):
         'mqtts://user:pass@localhost/my/topic', suppress_exceptions=False)
     assert isinstance(obj, NotifyMQTT)
     assert obj.url().startswith('mqtts://user:pass@localhost/my/topic')
-    assert obj.notify(body="test=test")
+    assert obj.notify(body="test=test") is True
 
     # Verify the right calls have been made to the MQTT client object.
     assert mqtt_client_mock.mock_calls == [
@@ -295,7 +295,7 @@ def test_plugin_mqtt_tls_no_verify_success(mqtt_client_mock):
         'mqtts://user:pass@localhost/my/topic?verify=False',
         suppress_exceptions=False)
     assert isinstance(obj, NotifyMQTT)
-    assert obj.notify(body="test=test")
+    assert obj.notify(body="test=test") is True
 
     # Verify the right calls have been made to the MQTT client object.
     # Let's only validate the single call of interest is present.
@@ -317,7 +317,7 @@ def test_plugin_mqtt_session_client_id_success(mqtt_client_mock):
     assert re.search(r'my/topic', obj.url())
     assert re.search(r'client_id=apprise', obj.url())
     assert re.search(r'session=yes', obj.url())
-    assert obj.notify(body="test=test")
+    assert obj.notify(body="test=test") is True
 
 
 def test_plugin_mqtt_connect_failure(mqtt_client_mock):
@@ -421,4 +421,4 @@ def test_plugin_mqtt_not_published_recovery_success(mqtt_client_mock):
         'mqtt://localhost/my/topic', suppress_exceptions=False)
 
     # Verify notification fails.
-    assert obj.notify(body="test=test")
+    assert obj.notify(body="test=test") is True

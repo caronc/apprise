@@ -193,7 +193,7 @@ def test_notify_xml_plugin_attachments(mock_post):
     attach = AppriseAttachment(path)
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
-        attach=attach)
+        attach=attach) is True
 
     # Test invalid attachment
     path = os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
@@ -226,7 +226,7 @@ def test_notify_xml_plugin_attachments(mock_post):
     mock_post.reset_mock()
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
-        attach=attach)
+        attach=attach) is True
     assert mock_post.call_count == 1
 
 

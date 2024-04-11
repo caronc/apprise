@@ -194,7 +194,7 @@ def test_plugin_mastodon_general(mock_post, mock_get):
     assert isinstance(obj.url(), str)
 
     # apprise room was found
-    assert obj.send(body="test")
+    assert obj.send(body="test") is True
 
     # Change our status code and try again
     request.status_code = 403
@@ -206,17 +206,17 @@ def test_plugin_mastodon_general(mock_post, mock_get):
     # Force a reset
     request.headers['X-RateLimit-Remaining'] = 0
     # behind the scenes, it should cause us to update our rate limit
-    assert obj.send(body="test")
+    assert obj.send(body="test") is True
     assert obj.ratelimit_remaining == 0
 
     # This should cause us to block
     request.headers['X-RateLimit-Remaining'] = 10
-    assert obj.send(body="test")
+    assert obj.send(body="test") is True
     assert obj.ratelimit_remaining == 10
 
     # Handle cases where we simply couldn't get this field
     del request.headers['X-RateLimit-Remaining']
-    assert obj.send(body="test")
+    assert obj.send(body="test") is True
     # It remains set to the last value
     assert obj.ratelimit_remaining == 10
 
@@ -225,21 +225,21 @@ def test_plugin_mastodon_general(mock_post, mock_get):
 
     # Handle cases where our epoch time is wrong
     del request.headers['X-RateLimit-Limit']
-    assert obj.send(body="test")
+    assert obj.send(body="test") is True
 
     # Return our object, but place it in the future forcing us to block
     request.headers['X-RateLimit-Limit'] = \
         (datetime.now(timezone.utc) - epoch).total_seconds() + 1
     request.headers['X-RateLimit-Remaining'] = 0
     obj.ratelimit_remaining = 0
-    assert obj.send(body="test")
+    assert obj.send(body="test") is True
 
     # Return our object, but place it in the future forcing us to block
     request.headers['X-RateLimit-Limit'] = \
         (datetime.now(timezone.utc) - epoch).total_seconds() - 1
     request.headers['X-RateLimit-Remaining'] = 0
     obj.ratelimit_remaining = 0
-    assert obj.send(body="test")
+    assert obj.send(body="test") is True
 
     # Return our limits to always work
     request.headers['X-RateLimit-Limit'] = \
@@ -257,11 +257,11 @@ def test_plugin_mastodon_general(mock_post, mock_get):
 
     # Cause content response to be None
     request.content = None
-    assert obj.send(body="test")
+    assert obj.send(body="test") is True
 
     # Invalid JSON
     request.content = '{'
-    assert obj.send(body="test")
+    assert obj.send(body="test") is True
 
     # Return it to a parseable string
     request.content = '{}'
@@ -273,10 +273,10 @@ def test_plugin_mastodon_general(mock_post, mock_get):
 
     # cause a json parsing issue now
     response_obj = None
-    assert obj.send(body="test")
+    assert obj.send(body="test") is True
 
     response_obj = '{'
-    assert obj.send(body="test")
+    assert obj.send(body="test") is True
 
     mock_get.reset_mock()
     mock_post.reset_mock()
@@ -369,7 +369,7 @@ def test_plugin_mastodon_attachments(mock_get, mock_post):
     # Send our notification
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
-        attach=attach)
+        attach=attach) is True
 
     # Test our call count
     assert mock_get.call_count == 0
@@ -420,7 +420,7 @@ def test_plugin_mastodon_attachments(mock_get, mock_post):
     # Send our notification
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
-        attach=attach)
+        attach=attach) is True
 
     # Test our call count
     assert mock_get.call_count == 1
@@ -492,7 +492,7 @@ def test_plugin_mastodon_attachments(mock_get, mock_post):
     assert obj.notify(
         body='Check this out @caronc', title='Apprise',
         notify_type=NotifyType.INFO,
-        attach=attach)
+        attach=attach) is True
 
     # Test our call count
     assert mock_get.call_count == 1
@@ -548,7 +548,7 @@ def test_plugin_mastodon_attachments(mock_get, mock_post):
     assert obj.notify(
         body='Check this out @caronc', title='Apprise',
         notify_type=NotifyType.INFO,
-        attach=attach)
+        attach=attach) is True
 
     # Same number of posts
     assert mock_post.call_count == 5
@@ -575,7 +575,7 @@ def test_plugin_mastodon_attachments(mock_get, mock_post):
     assert obj.notify(
         body='Check this out @caronc', title='Apprise',
         notify_type=NotifyType.INFO,
-        attach=attach)
+        attach=attach) is True
 
     # 2 attachments + 2 different status messages
     assert mock_post.call_count == 4

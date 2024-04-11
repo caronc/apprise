@@ -167,7 +167,7 @@ def test_plugin_msg91_keywords(mock_post):
     assert isinstance(obj.url(), str)
 
     # Send Notification
-    assert obj.send(body=message_contents)
+    assert obj.send(body=message_contents) is True
 
     # Validate expected call parameters
     assert mock_post.call_count == 1
@@ -196,7 +196,7 @@ def test_plugin_msg91_keywords(mock_post):
     assert isinstance(obj.url(), str)
 
     # Send Notification
-    assert obj.send(body=message_contents)
+    assert obj.send(body=message_contents) is True
 
     # Validate expected call parameters
     assert mock_post.call_count == 1

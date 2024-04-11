@@ -114,7 +114,7 @@ def test_plugin_pushdeer_general(mock_post):
     assert isinstance(obj.url(), str)
 
     # Send Notification
-    assert obj.send(body="test")
+    assert obj.send(body="test") is True
 
     assert mock_post.call_count == 1
     assert mock_post.call_args_list[0][0][0] == \

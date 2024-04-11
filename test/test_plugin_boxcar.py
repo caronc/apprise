@@ -172,7 +172,7 @@ def test_plugin_boxcar_edge_cases(mock_post, mock_get):
 
     # Acceptable when data is provided:
     assert p.notify(
-        body="Test", title=None, notify_type=NotifyType.INFO)
+        body="Test", title=None, notify_type=NotifyType.INFO) is True
 
     # Test comma, separate values
     device = 'a' * 64

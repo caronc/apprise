@@ -217,7 +217,7 @@ def test_plugin_mailgun_attachments(mock_post):
     attach = AppriseAttachment(path)
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
-        attach=attach)
+        attach=attach) is True
 
     # Test invalid attachment
     path = os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
@@ -297,7 +297,7 @@ def test_plugin_mailgun_attachments(mock_post):
 
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
-        attach=attach)
+        attach=attach) is True
     assert mock_post.call_count == 2
 
     # single batch
@@ -307,7 +307,7 @@ def test_plugin_mailgun_attachments(mock_post):
 
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
-        attach=attach)
+        attach=attach) is True
     assert mock_post.call_count == 1
 
 
@@ -338,7 +338,7 @@ def test_plugin_mailgun_header_check(mock_post):
 
     # Send our notification
     assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO)
+        body='body', title='title', notify_type=NotifyType.INFO) is True
 
     # 2 calls were made, one to perform an email lookup, the second
     # was the notification itself
@@ -365,7 +365,7 @@ def test_plugin_mailgun_header_check(mock_post):
 
     # Send our notification
     assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO)
+        body='body', title='title', notify_type=NotifyType.INFO) is True
 
     assert mock_post.call_count == 1
     payload = mock_post.call_args_list[0][1]['data']
@@ -388,7 +388,7 @@ def test_plugin_mailgun_header_check(mock_post):
 
     # Send our notification
     assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO)
+        body='body', title='title', notify_type=NotifyType.INFO) is True
 
     assert mock_post.call_count == 1
     payload = mock_post.call_args_list[0][1]['data']
@@ -411,7 +411,7 @@ def test_plugin_mailgun_header_check(mock_post):
 
     # Send our notification
     assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO)
+        body='body', title='title', notify_type=NotifyType.INFO) is True
 
     assert mock_post.call_count == 1
     payload = mock_post.call_args_list[0][1]['data']

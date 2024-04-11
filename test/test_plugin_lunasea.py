@@ -189,7 +189,7 @@ def test_plugin_custom_lunasea_edge_cases(mock_post):
     assert ('@', 'userA') in instance.targets
     assert ('+', 'device1') in instance.targets
 
-    assert instance.notify("test")
+    assert instance.notify("test") is True
 
     # 1 call to user, and second to device
     assert mock_post.call_count == 2
@@ -253,7 +253,7 @@ def test_plugin_custom_lunasea_edge_cases(mock_post):
     assert ('@', 'userA') in instance.targets
     assert ('+', 'device1') in instance.targets
 
-    assert instance.notify("test")
+    assert instance.notify("test") is True
 
     # 1 call to user, and second to device
     assert mock_post.call_count == 2

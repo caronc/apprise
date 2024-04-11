@@ -323,7 +323,7 @@ def test_plugin_revolt_general(mock_sleep, mock_post):
 
     # This call includes an image with it's payload:
     assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO)
+        body='body', title='title', notify_type=NotifyType.INFO) is True
 
     # Force a case where there are no more remaining posts allowed
     mock_post.return_value.headers = {
@@ -333,10 +333,10 @@ def test_plugin_revolt_general(mock_sleep, mock_post):
 
     # This call includes an image with it's payload:
     assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO)
+        body='body', title='title', notify_type=NotifyType.INFO) is True
 
     # behind the scenes, it should cause us to update our rate limit
-    assert obj.send(body="test")
+    assert obj.send(body="test") is True
     assert obj.ratelimit_remaining == 0
     assert isinstance(obj.ratelimit_reset, datetime)
 
@@ -345,7 +345,7 @@ def test_plugin_revolt_general(mock_sleep, mock_post):
         'X-RateLimit-Remaining': 0,
         'X-RateLimit-Reset-After': 3000,
     }
-    assert obj.send(body="test")
+    assert obj.send(body="test") is True
     assert obj.ratelimit_remaining == 0
     assert isinstance(obj.ratelimit_reset, datetime)
 
@@ -355,7 +355,7 @@ def test_plugin_revolt_general(mock_sleep, mock_post):
         'X-RateLimit-Reset-After': 10000,
     }
     del mock_post.return_value.headers['X-RateLimit-Remaining']
-    assert obj.send(body="test")
+    assert obj.send(body="test") is True
     assert obj.ratelimit_remaining == 0
     assert isinstance(obj.ratelimit_reset, datetime)
 
@@ -366,7 +366,7 @@ def test_plugin_revolt_general(mock_sleep, mock_post):
     }
 
     obj.ratelimit_remaining = 0
-    assert obj.send(body="test")
+    assert obj.send(body="test") is True
 
     # Test 429 error response
     mock_post.return_value.status_code = requests.codes.too_many_requests
@@ -381,7 +381,7 @@ def test_plugin_revolt_general(mock_sleep, mock_post):
         'X-RateLimit-Remaining': 0,
         'X-RateLimit-Reset-After': 0,
     }
-    assert obj.send(body="test")
+    assert obj.send(body="test") is True
 
     # Return our limits to always work
     obj.ratelimit_remaining = 1
@@ -394,7 +394,7 @@ def test_plugin_revolt_general(mock_sleep, mock_post):
 
     # This call includes an image with it's payload:
     assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO)
+        body='body', title='title', notify_type=NotifyType.INFO) is True
 
     # Create an apprise instance
     a = Apprise()
@@ -405,12 +405,12 @@ def test_plugin_revolt_general(mock_sleep, mock_post):
         'revolt://{bot_token}/{channel_id}/'
         '?format=markdown'.format(
             bot_token=bot_token,
-            channel_id=channel_id))
+            channel_id=channel_id)) is True
 
     # Toggle our logo availability
     a.asset.image_url_logo = None
     assert a.notify(
-        body='body', title='title', notify_type=NotifyType.INFO)
+        body='body', title='title', notify_type=NotifyType.INFO) is True
 
 
 @mock.patch('requests.post')
@@ -502,7 +502,7 @@ def test_plugin_revolt_markdown_extra(mock_post):
     # This call includes an image with it's payload:
     assert a.notify(body=test_markdown, title='title',
                     notify_type=NotifyType.INFO,
-                    body_format=NotifyFormat.TEXT)
+                    body_format=NotifyFormat.TEXT) is True
 
     assert a.notify(
-        body='body', title='title', notify_type=NotifyType.INFO)
+        body='body', title='title', notify_type=NotifyType.INFO) is True

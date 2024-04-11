@@ -146,19 +146,19 @@ def test_notification_manager_general():
 
     N_MGR.unload_modules()
     N_MGR['good'] = GoodNotification
-    assert N_MGR['good'].enabled
+    assert N_MGR['good'].enabled is True
     N_MGR.enable_only('json', 'xml')
     assert N_MGR['good'].enabled is False
-    assert N_MGR['json'].enabled
-    assert N_MGR['jsons'].enabled
-    assert N_MGR['xml'].enabled
-    assert N_MGR['xmls'].enabled
+    assert N_MGR['json'].enabled is True
+    assert N_MGR['jsons'].enabled is True
+    assert N_MGR['xml'].enabled is True
+    assert N_MGR['xmls'].enabled is True
 
     # Only two plugins are enabled
     assert len([p for p in N_MGR.plugins(include_disabled=False)]) == 2
 
     N_MGR.enable_only('good')
-    assert N_MGR['good'].enabled
+    assert N_MGR['good'].enabled is True
     assert N_MGR['json'].enabled is False
     assert N_MGR['jsons'].enabled is False
     assert N_MGR['xml'].enabled is False
@@ -174,7 +174,7 @@ def test_notification_manager_general():
     assert N_MGR['disabled'].enabled is False
 
     N_MGR['good'] = GoodNotification
-    assert N_MGR['good'].enabled
+    assert N_MGR['good'].enabled is True
 
     # You can't disable someething already disabled
     N_MGR.disable('disabled')
@@ -186,16 +186,16 @@ def test_notification_manager_general():
         assert re.match(r'^(form|xml)s?$', schema, re.IGNORECASE) is not None
 
     N_MGR.unload_modules()
-    assert N_MGR['form'].enabled
-    assert N_MGR['xml'].enabled
-    assert N_MGR['json'].enabled
+    assert N_MGR['form'].enabled is True
+    assert N_MGR['xml'].enabled is True
+    assert N_MGR['json'].enabled is True
     N_MGR.enable_only('form', 'xml')
-    assert N_MGR['form'].enabled
-    assert N_MGR['xml'].enabled
+    assert N_MGR['form'].enabled is True
+    assert N_MGR['xml'].enabled is True
     assert N_MGR['json'].enabled is False
 
     N_MGR.disable('invalid', 'xml')
-    assert N_MGR['form'].enabled
+    assert N_MGR['form'].enabled is True
     assert N_MGR['xml'].enabled is False
     assert N_MGR['json'].enabled is False
 
@@ -208,7 +208,7 @@ def test_notification_manager_general():
     N_MGR.disable('invalid', 'xml')
 
     N_MGR.unload_modules()
-    assert N_MGR['json'].enabled
+    assert N_MGR['json'].enabled is True
 
     # Work with an empty module tree
     N_MGR.unload_modules(disable_native=True)
@@ -290,7 +290,7 @@ def test_notification_manager_module_loading(tmpdir):
 
     # Verify we loaded our urls in all threads successfully
     for result in results:
-        assert result
+        assert result is True
 
 
 def test_notification_manager_decorators(tmpdir):

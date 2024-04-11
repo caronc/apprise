@@ -153,7 +153,7 @@ def test_plugin_ifttt_edge_cases(mock_post, mock_get):
     assert isinstance(obj, NotifyIFTTT)
 
     assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO)
+        body='body', title='title', notify_type=NotifyType.INFO) is True
 
     # Test the addition of tokens
     obj = NotifyIFTTT(
@@ -163,7 +163,7 @@ def test_plugin_ifttt_edge_cases(mock_post, mock_get):
     assert isinstance(obj, NotifyIFTTT)
 
     assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO)
+        body='body', title='title', notify_type=NotifyType.INFO) is True
 
     # Invalid del_tokens entry
     with pytest.raises(TypeError):
@@ -174,7 +174,7 @@ def test_plugin_ifttt_edge_cases(mock_post, mock_get):
     assert isinstance(obj, NotifyIFTTT)
 
     assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO)
+        body='body', title='title', notify_type=NotifyType.INFO) is True
 
     # Test removal of tokens by a list
     obj = NotifyIFTTT(
@@ -190,7 +190,7 @@ def test_plugin_ifttt_edge_cases(mock_post, mock_get):
     assert isinstance(obj, NotifyIFTTT)
 
     assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO)
+        body='body', title='title', notify_type=NotifyType.INFO) is True
 
     # Test removal of tokens as dict
     obj = NotifyIFTTT(

@@ -535,7 +535,7 @@ def test_plugin_email_smtplib_send_okay(mock_smtplib):
     mock_smtplib.quit.return_value = True
 
     assert obj.notify(
-        body='body', title='test', notify_type=NotifyType.INFO)
+        body='body', title='test', notify_type=NotifyType.INFO) is True
 
     # Set Text
     obj = Apprise.instantiate(
@@ -543,7 +543,7 @@ def test_plugin_email_smtplib_send_okay(mock_smtplib):
     assert isinstance(obj, NotifyEmail)
 
     assert obj.notify(
-        body='body', title='test', notify_type=NotifyType.INFO)
+        body='body', title='test', notify_type=NotifyType.INFO) is True
 
     # Create an apprise object to work with as well
     a = Apprise()
@@ -553,19 +553,19 @@ def test_plugin_email_smtplib_send_okay(mock_smtplib):
     attach = os.path.join(TEST_VAR_DIR, 'apprise-test.gif')
     assert obj.notify(
         body='body', title='test', notify_type=NotifyType.INFO,
-        attach=attach)
+        attach=attach) is True
 
     # same results happen from our Apprise object
-    assert a.notify(body='body', title='test', attach=attach)
+    assert a.notify(body='body', title='test', attach=attach) is True
 
     # test using an Apprise Attachment object
     assert obj.notify(
         body='body', title='test', notify_type=NotifyType.INFO,
-        attach=AppriseAttachment(attach))
+        attach=AppriseAttachment(attach)) is True
 
     # same results happen from our Apprise object
     assert a.notify(
-        body='body', title='test', attach=AppriseAttachment(attach))
+        body='body', title='test', attach=AppriseAttachment(attach)) is True
 
     max_file_size = AttachBase.max_file_size
     # Now do a case where the file can't be sent
@@ -597,7 +597,7 @@ def test_plugin_email_smtplib_send_multiple_recipients(mock_smtplib):
     assert isinstance(obj, NotifyEmail)
 
     assert obj.notify(
-        body='body', title='test', notify_type=NotifyType.INFO)
+        body='body', title='test', notify_type=NotifyType.INFO) is True
 
     assert mock_smtplib.mock_calls == [
         mock.call('mail.example.org', 25, None, timeout=15),
@@ -691,7 +691,7 @@ def test_plugin_email_smtplib_internationalization(mock_smtp):
         title='دعونا نجعل العالم مكانا أفضل.',
         # Google Translated to Hungarian: "One line of code at a time.'
         body='Egy sor kódot egyszerre.',
-        notify_type=NotifyType.INFO)
+        notify_type=NotifyType.INFO) is True
 
 
 def test_plugin_email_url_escaping():
@@ -925,7 +925,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test")
+    assert obj.notify("test") is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -973,7 +973,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test")
+    assert obj.notify("test") is True
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 1
     assert response.starttls.call_count == 0
@@ -1023,7 +1023,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test")
+    assert obj.notify("test") is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1049,7 +1049,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test")
+    assert obj.notify("test") is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1075,7 +1075,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test")
+    assert obj.notify("test") is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1105,7 +1105,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj1.notify("test")
+    assert obj1.notify("test") is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1133,7 +1133,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj2.notify("test")
+    assert obj2.notify("test") is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1161,7 +1161,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test")
+    assert obj.notify("test") is True
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 1
     assert response.starttls.call_count == 0
@@ -1186,7 +1186,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test")
+    assert obj.notify("test") is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1211,7 +1211,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test")
+    assert obj.notify("test") is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1258,7 +1258,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test")
+    assert obj.notify("test") is True
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 1
     assert response.starttls.call_count == 0
@@ -1291,7 +1291,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test")
+    assert obj.notify("test") is True
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 1
     assert response.starttls.call_count == 0
@@ -1326,7 +1326,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test")
+    assert obj.notify("test") is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1361,7 +1361,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test")
+    assert obj.notify("test") is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1399,7 +1399,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test")
+    assert obj.notify("test") is True
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 1
     assert response.starttls.call_count == 0
@@ -1455,7 +1455,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test")
+    assert obj.notify("test") is True
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 1
     assert response.starttls.call_count == 0
@@ -1506,7 +1506,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test")
+    assert obj.notify("test") is True
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 1
     assert response.starttls.call_count == 0
@@ -1561,7 +1561,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test")
+    assert obj.notify("test") is True
     assert mock_smtp.call_count == 1
     assert response.starttls.call_count == 1
     assert mock_smtp_ssl.call_count == 0
@@ -1620,7 +1620,7 @@ def test_plugin_email_plus_in_toemail(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test")
+    assert obj.notify("test") is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1665,7 +1665,7 @@ def test_plugin_email_plus_in_toemail(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test")
+    assert obj.notify("test") is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1709,7 +1709,7 @@ def test_plugin_email_plus_in_toemail(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test")
+    assert obj.notify("test") is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1

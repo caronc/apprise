@@ -378,10 +378,10 @@ def test_apprise_secure_logging(mock_post):
 
     with LogCapture(level=logging.DEBUG) as stream:
         # add a test server
-        assert a.add("json://user:pass1$-3!@localhost")
+        assert a.add("json://user:pass1$-3!@localhost") is True
 
         # Our servers should carry this flag
-        a[0].asset.secure_logging is True
+        assert a[0].asset.secure_logging is True
 
         logs = re.split(r'\r*\n', stream.getvalue().rstrip())
         assert len(logs) == 1
@@ -412,7 +412,7 @@ def test_apprise_secure_logging(mock_post):
 
     with LogCapture(level=logging.DEBUG) as stream:
         # add a test server
-        assert a.add("json://user:pass1$-3!@localhost")
+        assert a.add("json://user:pass1$-3!@localhost")is True
 
         # Our servers should carry this flag
         a[0].asset.secure_logging is False

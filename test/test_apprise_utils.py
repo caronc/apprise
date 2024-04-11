@@ -1125,42 +1125,42 @@ def test_url_assembly():
 def test_parse_bool():
     "utils: parse_bool() testing """
 
-    assert utils.parse_bool('Enabled', None)
+    assert utils.parse_bool('Enabled', None) is True
     assert utils.parse_bool('Disabled', None) is False
-    assert utils.parse_bool('Allow', None)
+    assert utils.parse_bool('Allow', None) is True
     assert utils.parse_bool('Deny', None) is False
-    assert utils.parse_bool('Yes', None)
-    assert utils.parse_bool('YES', None)
-    assert utils.parse_bool('Always', None)
+    assert utils.parse_bool('Yes', None) is True
+    assert utils.parse_bool('YES', None) is True
+    assert utils.parse_bool('Always', None) is True
     assert utils.parse_bool('No', None) is False
     assert utils.parse_bool('NO', None) is False
     assert utils.parse_bool('NEVER', None) is False
-    assert utils.parse_bool('TrUE', None)
-    assert utils.parse_bool('tRUe', None)
+    assert utils.parse_bool('TrUE', None) is True
+    assert utils.parse_bool('tRUe', None) is True
     assert utils.parse_bool('FAlse', None) is False
     assert utils.parse_bool('F', None) is False
-    assert utils.parse_bool('T', None)
+    assert utils.parse_bool('T', None) is True
     assert utils.parse_bool('0', None) is False
-    assert utils.parse_bool('1', None)
-    assert utils.parse_bool('True', None)
-    assert utils.parse_bool('Yes', None)
-    assert utils.parse_bool(1, None)
+    assert utils.parse_bool('1', None) is True
+    assert utils.parse_bool('True', None) is True
+    assert utils.parse_bool('Yes', None) is True
+    assert utils.parse_bool(1, None) is True
     assert utils.parse_bool(0, None) is False
-    assert utils.parse_bool(True, None)
+    assert utils.parse_bool(True, None) is True
     assert utils.parse_bool(False, None) is False
 
     # only the int of 0 will return False since the function
     # casts this to a boolean
-    assert utils.parse_bool(2, None)
+    assert utils.parse_bool(2, None) is True
     # An empty list is still false
     assert utils.parse_bool([], None) is False
     # But a list that contains something is True
-    assert utils.parse_bool(['value', ], None)
+    assert utils.parse_bool(['value', ], None) is True
 
     # Use Default (which is False)
-    assert utils.parse_bool('OhYeah') is False
+    assert utils.parse_bool('OhYeah') is False is True
     # Adjust Default and get a different result
-    assert utils.parse_bool('OhYeah', True)
+    assert utils.parse_bool('OhYeah', True) is True
 
 
 def test_is_uuid():
@@ -1178,8 +1178,8 @@ def test_is_uuid():
     assert utils.is_uuid('591ed387-fa65-Jc97-9712-b9d2a15e42a9') is False
 
     # Valid UUID4 Entries
-    assert utils.is_uuid('591ed387-fa65-4c97-9712-b9d2a15e42a9')
-    assert utils.is_uuid('32b0b447-fe84-4df1-8368-81925e729265')
+    assert utils.is_uuid('591ed387-fa65-4c97-9712-b9d2a15e42a9') is True
+    assert utils.is_uuid('32b0b447-fe84-4df1-8368-81925e729265') is True
 
 
 def test_is_hostname():
@@ -2371,10 +2371,10 @@ def test_exclusive_match():
     """
 
     # No Logic always returns True if there is also no data
-    assert utils.is_exclusive_match(data=None, logic=None)
-    assert utils.is_exclusive_match(data=None, logic=set())
-    assert utils.is_exclusive_match(data='', logic=set())
-    assert utils.is_exclusive_match(data=u'', logic=set())
+    assert utils.is_exclusive_match(data=None, logic=None) is True
+    assert utils.is_exclusive_match(data=None, logic=set()) is True
+    assert utils.is_exclusive_match(data='', logic=set()) is True
+    assert utils.is_exclusive_match(data=u'', logic=set()) is True
 
     # however, once data is introduced, True is no longer returned
     # if no logic has been specified
@@ -2384,7 +2384,7 @@ def test_exclusive_match():
 
     # String delimters are stripped out so that a list can be formed
     # the below is just an empty token list
-    assert utils.is_exclusive_match(data=set(), logic=',;   ,')
+    assert utils.is_exclusive_match(data=set(), logic=',;   ,') is True
 
     # garbage logic is never an exclusive match
     assert utils.is_exclusive_match(data=set(), logic=object()) is False
@@ -2409,16 +2409,16 @@ def test_exclusive_match():
         logic=set(['def', ]), data=data) is False
     # abc in data
     assert utils.is_exclusive_match(
-        logic=['abc', ], data=data)
+        logic=['abc', ], data=data) is True
     # abc in data
     assert utils.is_exclusive_match(
-        logic=('abc', ), data=data)
+        logic=('abc', ), data=data) is True
     # abc in data
     assert utils.is_exclusive_match(
-        logic=set(['abc', ]), data=data)
+        logic=set(['abc', ]), data=data) is True
     # abc or def in data
     assert utils.is_exclusive_match(
-        logic='abc, def', data=data)
+        logic='abc, def', data=data) is True
 
     #
     # Update our data set so we can do more advance checks
@@ -2426,12 +2426,12 @@ def test_exclusive_match():
     data = set(['abc', 'def', 'efg', 'xyz'])
 
     # match_all matches everything
-    assert utils.is_exclusive_match(logic='all', data=data)
-    assert utils.is_exclusive_match(logic=['all'], data=data)
+    assert utils.is_exclusive_match(logic='all', data=data) is True
+    assert utils.is_exclusive_match(logic=['all'], data=data) is True
 
     # def and abc in data
     assert utils.is_exclusive_match(
-        logic=[('abc', 'def')], data=data)
+        logic=[('abc', 'def')], data=data) is True
 
     # cba and abc in data
     assert utils.is_exclusive_match(
@@ -2439,10 +2439,10 @@ def test_exclusive_match():
 
     # www or zzz or abc and xyz
     assert utils.is_exclusive_match(
-        logic=['www', 'zzz', ('abc', 'xyz')], data=data)
+        logic=['www', 'zzz', ('abc', 'xyz')], data=data) is True
     # www or zzz or abc and xyz (strings are valid too)
     assert utils.is_exclusive_match(
-        logic=['www', 'zzz', ('abc, xyz')], data=data)
+        logic=['www', 'zzz', ('abc, xyz')], data=data) is True
 
     # www or zzz or abc and jjj
     assert utils.is_exclusive_match(
@@ -2453,15 +2453,15 @@ def test_exclusive_match():
     #
     data = set()
     assert utils.is_exclusive_match(logic=['www'], data=data) is False
-    assert utils.is_exclusive_match(logic='all', data=data)
+    assert utils.is_exclusive_match(logic='all', data=data) is True
 
     #
     # Update our data set so we can do more advance checks
     #
     data = set(['always', 'entry1'])
     # We'll always match on the with keyword always
-    assert utils.is_exclusive_match(logic='always', data=data)
-    assert utils.is_exclusive_match(logic='garbage', data=data)
+    assert utils.is_exclusive_match(logic='always', data=data) is True
+    assert utils.is_exclusive_match(logic='garbage', data=data) is True
     # However we will not match if we turn this feature off
     assert utils.is_exclusive_match(
         logic='garbage', data=data, match_always=False) is False
@@ -2469,7 +2469,7 @@ def test_exclusive_match():
     # Change default value from 'all' to 'match_me'. Logic matches
     # so we pass
     assert utils.is_exclusive_match(
-        logic='match_me', data=data, match_all='match_me')
+        logic='match_me', data=data, match_all='match_me') is True
 
 
 def test_apprise_validate_regex():

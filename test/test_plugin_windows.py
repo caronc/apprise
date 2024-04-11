@@ -120,7 +120,7 @@ def test_plugin_windows_mocked():
     # test notifications
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO)
+        notify_type=apprise.NotifyType.INFO) is True
 
     obj = apprise.Apprise.instantiate(
         'windows://_/?image=True', suppress_exceptions=False)
@@ -128,7 +128,7 @@ def test_plugin_windows_mocked():
     assert isinstance(obj.url(), str)
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO)
+        notify_type=apprise.NotifyType.INFO) is True
 
     obj = apprise.Apprise.instantiate(
         'windows://_/?image=False', suppress_exceptions=False)
@@ -136,7 +136,7 @@ def test_plugin_windows_mocked():
     assert isinstance(obj.url(), str)
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO)
+        notify_type=apprise.NotifyType.INFO) is True
 
     obj = apprise.Apprise.instantiate(
         'windows://_/?duration=1', suppress_exceptions=False)
@@ -145,7 +145,7 @@ def test_plugin_windows_mocked():
     assert obj.duration == 1
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO)
+        notify_type=apprise.NotifyType.INFO) is True
 
     obj = apprise.Apprise.instantiate(
         'windows://_/?duration=invalid', suppress_exceptions=False)
@@ -170,7 +170,7 @@ def test_plugin_windows_mocked():
     win32gui.LoadImage.side_effect = AttributeError
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO)
+        notify_type=apprise.NotifyType.INFO) is True
     # Undo our change
     win32gui.LoadImage.side_effect = None
 
@@ -222,7 +222,7 @@ def test_plugin_windows_native(mock_loadimage,
     # test notifications
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO)
+        notify_type=apprise.NotifyType.INFO) is True
 
     obj = apprise.Apprise.instantiate(
         'windows://_/?image=True', suppress_exceptions=False)
@@ -230,7 +230,7 @@ def test_plugin_windows_native(mock_loadimage,
     assert isinstance(obj.url(), str)
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO)
+        notify_type=apprise.NotifyType.INFO) is True
 
     obj = apprise.Apprise.instantiate(
         'windows://_/?image=False', suppress_exceptions=False)
@@ -238,14 +238,14 @@ def test_plugin_windows_native(mock_loadimage,
     assert isinstance(obj.url(), str)
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO)
+        notify_type=apprise.NotifyType.INFO) is True
 
     obj = apprise.Apprise.instantiate(
         'windows://_/?duration=1', suppress_exceptions=False)
     assert isinstance(obj.url(), str)
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO)
+        notify_type=apprise.NotifyType.INFO) is True
     # loads okay
     assert obj.duration == 1
 
@@ -273,7 +273,7 @@ def test_plugin_windows_native(mock_loadimage,
     mock_loadimage.side_effect = AttributeError
     assert obj.notify(
         title='title', body='body',
-        notify_type=apprise.NotifyType.INFO)
+        notify_type=apprise.NotifyType.INFO) is True
     # Undo our change
     mock_loadimage.side_effect = None
 

@@ -72,8 +72,8 @@ def test_plugin_syslog_by_url(openlog, syslog):
     assert re.search(r'logperror=yes', obj.url()) is not None
 
     # Test sending a notification
-    assert obj.notify("body")
-    assert obj.notify(title="title", body="body")
+    assert obj.notify("body") is True
+    assert obj.notify(title="title", body="body") is True
 
     # Invalid Notification Type
     assert obj.notify("body", notify_type='invalid') is False

@@ -163,7 +163,7 @@ def test_plugin_dapnet_edge_cases(mock_post):
     assert len(obj) == 2
 
     assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO)
+        body='body', title='title', notify_type=NotifyType.INFO) is True
     assert mock_post.call_count == 2
 
 
@@ -201,7 +201,7 @@ def test_plugin_dapnet_config_files(mock_post):
 
     # Create ourselves a config object
     ac = apprise.AppriseConfig()
-    assert ac.add_config(content=content)
+    assert ac.add_config(content=content) is True
 
     aobj = apprise.Apprise()
 
@@ -230,4 +230,4 @@ def test_plugin_dapnet_config_files(mock_post):
         DapnetPriority.NORMAL
 
     # Notifications work
-    assert aobj.notify(title="title", body="body")
+    assert aobj.notify(title="title", body="body") is True
