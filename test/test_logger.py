@@ -392,7 +392,7 @@ def test_apprise_secure_logging(mock_post):
             'Loaded JSON URL: json://user:****@localhost/')
 
     # Send notification
-    assert a.notify("test")
+    assert a.notify("test") is True
 
     # Test our call count
     assert mock_post.call_count == 1
@@ -412,7 +412,7 @@ def test_apprise_secure_logging(mock_post):
 
     with LogCapture(level=logging.DEBUG) as stream:
         # add a test server
-        assert a.add("json://user:pass1$-3!@localhost")is True
+        assert a.add("json://user:pass1$-3!@localhost") is True
 
         # Our servers should carry this flag
         a[0].asset.secure_logging is False

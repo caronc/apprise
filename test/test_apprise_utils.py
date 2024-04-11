@@ -1158,7 +1158,7 @@ def test_parse_bool():
     assert utils.parse_bool(['value', ], None) is True
 
     # Use Default (which is False)
-    assert utils.parse_bool('OhYeah') is False is True
+    assert utils.parse_bool('OhYeah') is False
     # Adjust Default and get a different result
     assert utils.parse_bool('OhYeah', True) is True
 

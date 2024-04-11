@@ -495,7 +495,7 @@ def test_plugin_revolt_markdown_extra(mock_post):
         'revolt://{bot_token}/{channel_id}/'
         '?format=markdown'.format(
             bot_token=bot_token,
-            channel_id=channel_id))
+            channel_id=channel_id)) is True
 
     test_markdown = "[green-blue](https://google.com)"
 
