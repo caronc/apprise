@@ -82,6 +82,34 @@ IS_CHAT_ID_RE = re.compile(
 )
 
 
+class TelegramMarkdownVersion:
+    """
+    Telegram Markdown Version
+    """
+    # Classic (Original Telegram Markdown)
+    ONE = 'MARKDOWN'
+
+    # Supports strikethrough and many other items
+    TWO = 'MarkdownV2'
+
+
+TELEGRAM_MARKDOWN_VERSION_MAP = {
+    # v1
+    "v1": TelegramMarkdownVersion.ONE,
+    "1": TelegramMarkdownVersion.ONE,
+    # v2
+    "v2": TelegramMarkdownVersion.TWO,
+    "2": TelegramMarkdownVersion.TWO,
+    "default": TelegramMarkdownVersion.TWO,
+}
+
+TELEGRAM_MARKDOWN_VERSIONS = {
+    # Note: This also acts as a reverse lookup mapping
+    TelegramMarkdownVersion.ONE: 'v1',
+    TelegramMarkdownVersion.TWO: 'v2',
+}
+
+
 class TelegramContentPlacement:
     """
     The Telegram Content Placement
@@ -333,6 +361,12 @@ class NotifyTelegram(NotifyBase):
             'name': _('Topic Thread ID'),
             'type': 'int',
         },
+        'mdv': {
+            'name': _('Markdown Version'),
+            'type': 'choice:string',
+            'values': ('v1', 'v2'),
+            'default': 'v2',
+        },
         'to': {
             'alias_of': 'targets',
         },
@@ -346,7 +380,7 @@ class NotifyTelegram(NotifyBase):
 
     def __init__(self, bot_token, targets, detect_owner=True,
                  include_image=False, silent=None, preview=None, topic=None,
-                 content=None, **kwargs):
+                 content=None, mdv=None, **kwargs):
         """
         Initialize Telegram Object
         """
@@ -360,6 +394,17 @@ class NotifyTelegram(NotifyBase):
                 bot_token)
             self.logger.warning(err)
             raise TypeError(err)
+
+        # Get our Markdown Version
+        self.markdown_ver = \
+            TELEGRAM_MARKDOWN_VERSION_MAP[NotifyTelegram.
+                                          template_args['mdv']['default']] \
+            if mdv is None else \
+            next((
+                v for k, v in TELEGRAM_MARKDOWN_VERSION_MAP.items()
+                if str(mdv).lower().startswith(k)),
+                TELEGRAM_MARKDOWN_VERSION_MAP[NotifyTelegram.
+                                              template_args['mdv']['default']])
 
         # Define whether or not we should make audible alarms
         self.silent = self.template_args['silent']['default'] \
@@ -717,8 +762,7 @@ class NotifyTelegram(NotifyBase):
 
         # Prepare Message Body
         if self.notify_format == NotifyFormat.MARKDOWN:
-            _payload['parse_mode'] = 'MARKDOWN'
-
+            _payload['parse_mode'] = self.markdown_ver
             _payload['text'] = body
 
         else:  # HTML
@@ -886,6 +930,7 @@ class NotifyTelegram(NotifyBase):
             'silent': 'yes' if self.silent else 'no',
             'preview': 'yes' if self.preview else 'no',
             'content': self.content,
+            'mdv': TELEGRAM_MARKDOWN_VERSIONS[self.markdown_ver],
         }
 
         if self.topic:
@@ -989,6 +1034,10 @@ class NotifyTelegram(NotifyBase):
 
         # Store our bot token
         results['bot_token'] = bot_token
+
+        # Support Markdown Version
+        if 'mdv' in results['qsd'] and len(results['qsd']['mdv']):
+            results['mdv'] = results['qsd']['mdv']
 
         # Support Thread Topic
         if 'topic' in results['qsd'] and len(results['qsd']['topic']):
