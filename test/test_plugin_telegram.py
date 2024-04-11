@@ -122,6 +122,16 @@ apprise_url_tests = (
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?format=markdown', {
         'instance': NotifyTelegram,
     }),
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?format=markdown&mdv=v1', {
+        'instance': NotifyTelegram,
+    }),
+    ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?format=markdown&mdv=v2', {
+        'instance': NotifyTelegram,
+    }),
+    ('tgram://123456789:abcdefg_hijklmnop/l2g/?format=markdown&mdv=bad', {
+        # Defaults to v2
+        'instance': NotifyTelegram,
+    }),
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?format=html', {
         'instance': NotifyTelegram,
     }),
