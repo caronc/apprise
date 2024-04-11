@@ -119,6 +119,7 @@ jobs:
     # and run project-specific tasks.
     - name: Setup project
       run: |
+        python -m pip install --upgrade pip setuptools wheel
         pip install --editable=.
         python setup.py compile_catalog
 
