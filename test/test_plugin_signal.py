@@ -195,7 +195,7 @@ def test_plugin_signal_edge_cases(request_mock):
     details = request_mock.call_args_list[0]
     assert details[0][0] == 'https://localhost:231/v2/send'
     payload = loads(details[1]['data'])
-    assert payload['message'] == 'My Title\r\ntest body'
+    assert payload['message'] == '[i] My Title\r\ntest body'
 
     # Reset our mock object
     request_mock.reset_mock()
@@ -275,7 +275,7 @@ def test_plugin_signal_based_on_feedback(request_mock):
     aobj = Apprise()
     aobj.add(
         'signal://10.0.0.112:8080/+12512222222/+12513333333/'
-        '12514444444?batch=yes')
+        '12514444444?batch=yes&status=no')
 
     assert aobj.notify(title=title, body=body)
 
@@ -298,7 +298,7 @@ def test_plugin_signal_based_on_feedback(request_mock):
     aobj = Apprise()
     aobj.add(
         'signal://10.0.0.112:8080/+12512222222/+12513333333/'
-        '12514444444?batch=no')
+        '12514444444?batch=no&status=no')
 
     assert aobj.notify(title=title, body=body)
 
@@ -329,7 +329,7 @@ def test_plugin_signal_based_on_feedback(request_mock):
     aobj = Apprise()
     aobj.add(
         'signal://10.0.0.112:8080/+12513333333/@group1/@group2/'
-        '12514444444?batch=yes')
+        '12514444444?batch=yes&status=no')
 
     assert aobj.notify(title=title, body=body)
 
@@ -361,7 +361,7 @@ def test_notify_signal_plugin_attachments(request_mock):
 
     obj = Apprise.instantiate(
         'signal://10.0.0.112:8080/+12512222222/+12513333333/'
-        '12514444444?batch=no')
+        '12514444444?batch=no&status=no')
     assert isinstance(obj, NotifySignalAPI)
 
     # Test Valid Attachment
