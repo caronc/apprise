@@ -293,7 +293,8 @@ class NotifyAprs(NotifyBase):
                     raise ValueError()
 
             except (TypeError, ValueError):
-                msg = "Unsupported APRS-IS delay ({}) specified. ".format(delay)
+                msg = "Unsupported APRS-IS delay ({}) specified. ".format(
+                    delay)
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
