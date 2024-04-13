@@ -91,14 +91,17 @@ def test_plugin_aprs_urls(mock_create_connection):
         "aprs://DF1JSL-15:12345@DF1ABC?delay=3.0")
     assert isinstance(instance, NotifyAprs)
     instance = apprise.Apprise.instantiate(
+        "aprs://DF1JSL-15:12345@DF1ABC?delay=2")
+    assert isinstance(instance, NotifyAprs)
+    instance = apprise.Apprise.instantiate(
         "aprs://DF1JSL-15:12345@DF1ABC?delay=-3.0")
-    assert isinstance(instance, None)
+    assert instance is None
     instance = apprise.Apprise.instantiate(
         "aprs://DF1JSL-15:12345@DF1ABC?delay=40.0")
-    assert isinstance(instance, None)
+    assert instance is None
     instance = apprise.Apprise.instantiate(
         "aprs://DF1JSL-15:12345@DF1ABC?delay=invalid")
-    assert isinstance(instance, None)
+    assert instance is None
 
     instance = apprise.Apprise.instantiate(
         "aprs://DF1JSL-15:12345@DF1ABC/DF1DEF")

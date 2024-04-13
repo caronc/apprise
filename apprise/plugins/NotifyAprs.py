@@ -186,13 +186,6 @@ class NotifyAprs(NotifyBase):
                 ),
                 "map_to": "targets",
             },
-            "delay": {
-                "name": _("Resend Delay"),
-                "type": "float",
-                "min": 0.0,
-                "max": 5.0,
-                "default": 0.0,
-            },
             "targets": {
                 "name": _("Targets"),
                 "type": "list:string",
@@ -209,6 +202,13 @@ class NotifyAprs(NotifyBase):
                 "name": _("Target Callsign"),
                 "type": "string",
                 "map_to": "targets",
+            },
+            "delay": {
+                "name": _("Resend Delay"),
+                "type": "float",
+                "min": 0.0,
+                "max": 5.0,
+                "default": 0.0,
             },
             "locale": {
                 "name": _("Locale"),
@@ -293,7 +293,7 @@ class NotifyAprs(NotifyBase):
                     raise ValueError()
 
             except (TypeError, ValueError):
-                msg = "Unsupported APRS-IS delay {} specified. ".format(delay)
+                msg = "Unsupported APRS-IS delay ({}) specified. ".format(delay)
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
