@@ -203,6 +203,13 @@ class NotifyAprs(NotifyBase):
                 "type": "string",
                 "map_to": "targets",
             },
+            "delay": {
+                "name": _("Resend Delay"),
+                "type": "float",
+                "min": 0.0,
+                "max": 5.0,
+                "default": 0.0,
+            },
             "locale": {
                 "name": _("Locale"),
                 "type": "choice:string",
@@ -212,7 +219,7 @@ class NotifyAprs(NotifyBase):
         }
     )
 
-    def __init__(self, targets=None, locale=None, **kwargs):
+    def __init__(self, targets=None, locale=None, delay=None, **kwargs):
         """
         Initialize APRS Object
         """
@@ -271,6 +278,28 @@ class NotifyAprs(NotifyBase):
                 )
                 self.logger.warning(msg)
                 raise TypeError(msg)
+
+        # Update our delay
+        if delay is None:
+            self.delay = NotifyAprs.template_args["delay"]["default"]
+
+        else:
+            try:
+                self.delay = float(delay)
+                if self.delay < NotifyAprs.template_args["delay"]["min"]:
+                    raise ValueError()
+
+                elif self.delay >= NotifyAprs.template_args["delay"]["max"]:
+                    raise ValueError()
+
+            except (TypeError, ValueError):
+                msg = "Unsupported APRS-IS delay ({}) specified. ".format(
+                    delay)
+                self.logger.warning(msg)
+                raise TypeError(msg)
+
+        # Bump up our request_rate
+        self.request_rate_per_sec += self.delay
 
         # Set the transmitter group
         self.locale = \
@@ -674,6 +703,10 @@ class NotifyAprs(NotifyBase):
             # Store our locale if not default
             params['locale'] = self.locale
 
+        if self.delay != NotifyAprs.template_args["delay"]["default"]:
+            # Store our locale if not default
+            params['delay'] = "{:.2f}".format(self.delay)
+
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
@@ -726,6 +759,10 @@ class NotifyAprs(NotifyBase):
 
         # All entries after the hostname are additional targets
         results["targets"].extend(NotifyAprs.split_path(results["fullpath"]))
+
+        # Get Delay (if set)
+        if 'delay' in results['qsd'] and len(results['qsd']['delay']):
+            results['delay'] = NotifyAprs.unquote(results['qsd']['delay'])
 
         # Support the 'to' variable so that we can support rooms this way too
         # The 'to' makes it easier to use yaml configuration
