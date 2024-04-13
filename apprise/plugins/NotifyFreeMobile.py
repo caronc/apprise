@@ -30,7 +30,7 @@
 #   1. Visit https://mobile.free.fr/
 
 # the URL will look something like this:
-#      https://smsapi.free-mobile.fr/sendmsg?msg=content
+#      https://smsapi.free-mobile.fr/sendmsg
 #
 
 import requests
@@ -132,10 +132,6 @@ class NotifyFreeMobile(NotifyBase):
         payload = {
             'user': self.user,
             'pass': self.password,
-        }
-
-        # Our Message
-        params = {
             'msg': body
         }
 
@@ -150,7 +146,6 @@ class NotifyFreeMobile(NotifyBase):
             r = requests.post(
                 self.notify_url,
                 data=dumps(payload).encode('utf-8'),
-                params=params,
                 headers=headers,
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
