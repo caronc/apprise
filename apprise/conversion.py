@@ -58,7 +58,8 @@ def markdown_to_html(content):
     """
     Converts specified content from markdown to HTML.
     """
-    return markdown(content, extensions=['nl2br', 'tables'])
+    return markdown(content, extensions=[
+        'markdown.extensions.nl2br', 'markdown.extensions.tables'])
 
 
 def text_to_html(content):
