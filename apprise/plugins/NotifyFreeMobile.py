@@ -126,6 +126,7 @@ class NotifyFreeMobile(NotifyBase):
         # prepare our headers
         headers = {
             'User-Agent': self.app_id,
+            'Content-Type': 'application/json',
         }
 
         # Prepare our payload
