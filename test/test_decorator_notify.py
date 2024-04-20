@@ -62,6 +62,16 @@ def test_notify_simple_decoration():
     def my_inline_notify_wrapper(
             body, title, notify_type, attach, *args, **kwargs):
 
+        # Test our body (always present)
+        assert isinstance(body, str)
+
+        # Ensure content is of type utf-8
+        assert isinstance(body.encode('utf-8'), bytes)
+
+        if attach:
+            # attachment is always of type AppriseAttach
+            assert isinstance(attach, AppriseAttachment)
+
         # Populate our object we can use to validate
         verify_obj.update({
             'body': body,
@@ -98,6 +108,108 @@ def test_notify_simple_decoration():
     assert verify_obj['notify_type'] == common.NotifyType.INFO
     assert isinstance(verify_obj['attach'], AppriseAttachment)
     assert len(verify_obj['attach']) == 2
+
+    # No format was defined
+    assert 'body_format' in verify_obj['kwargs']
+    assert verify_obj['kwargs']['body_format'] is None
+
+    # The meta argument allows us to further parse the URL parameters
+    # specified
+    assert isinstance(verify_obj['kwargs'], dict)
+    assert 'meta' in verify_obj['kwargs']
+    assert isinstance(verify_obj['kwargs']['meta'], dict)
+    assert len(verify_obj['kwargs']['meta']) == 4
+    assert 'tag' in verify_obj['kwargs']['meta']
+
+    assert 'asset' in verify_obj['kwargs']['meta']
+    assert isinstance(verify_obj['kwargs']['meta']['asset'], AppriseAsset)
+
+    assert verify_obj['kwargs']['meta']['schema'] == 'utiltest'
+    assert verify_obj['kwargs']['meta']['url'] == 'utiltest://'
+
+    # Reset our verify object (so it can be populated again)
+    verify_obj = {}
+
+    # Send unicode
+    assert aobj.notify("ツ".encode('utf-8')) is True
+    # Our content was populated after the notify() call
+    assert len(verify_obj) > 0
+    assert verify_obj['body'] == "ツ"  # content comes back as str (utf-8)
+    assert verify_obj['title'] == ''
+    assert verify_obj['notify_type'] == common.NotifyType.INFO
+    assert verify_obj['attach'] is None
+
+    # No format was defined
+    assert 'body_format' in verify_obj['kwargs']
+    assert verify_obj['kwargs']['body_format'] is None
+
+    # The meta argument allows us to further parse the URL parameters
+    # specified
+    assert isinstance(verify_obj['kwargs'], dict)
+    assert 'meta' in verify_obj['kwargs']
+    assert isinstance(verify_obj['kwargs']['meta'], dict)
+    assert len(verify_obj['kwargs']['meta']) == 4
+    assert 'tag' in verify_obj['kwargs']['meta']
+
+    assert 'asset' in verify_obj['kwargs']['meta']
+    assert isinstance(verify_obj['kwargs']['meta']['asset'], AppriseAsset)
+
+    assert verify_obj['kwargs']['meta']['schema'] == 'utiltest'
+    assert verify_obj['kwargs']['meta']['url'] == 'utiltest://'
+
+    # Reset our verify object (so it can be populated again)
+    verify_obj = {}
+
+    # Send utf-8 string
+    assert aobj.notify("ツ") is True
+
+    assert len(verify_obj) > 0
+    assert verify_obj['body'] == "ツ"  # content comes back as str (utf-8)
+    assert verify_obj['title'] == ''
+    assert verify_obj['notify_type'] == common.NotifyType.INFO
+    assert verify_obj['attach'] is None
+
+    # No format was defined
+    assert 'body_format' in verify_obj['kwargs']
+    assert verify_obj['kwargs']['body_format'] is None
+
+    # The meta argument allows us to further parse the URL parameters
+    # specified
+    assert isinstance(verify_obj['kwargs'], dict)
+    assert 'meta' in verify_obj['kwargs']
+    assert isinstance(verify_obj['kwargs']['meta'], dict)
+    assert len(verify_obj['kwargs']['meta']) == 4
+    assert 'tag' in verify_obj['kwargs']['meta']
+
+    assert 'asset' in verify_obj['kwargs']['meta']
+    assert isinstance(verify_obj['kwargs']['meta']['asset'], AppriseAsset)
+
+    assert verify_obj['kwargs']['meta']['schema'] == 'utiltest'
+    assert verify_obj['kwargs']['meta']['url'] == 'utiltest://'
+
+    # Some cases that will fail internal validation:
+    # - No Body
+    assert aobj.notify('') is False
+    # - Title only
+    assert aobj.notify('', title="hello world!") is False
+
+    # Reset our verify object (so it can be populated again)
+    verify_obj = {}
+
+    # No Body but has attachment (valid)
+    assert aobj.notify(
+        '',
+        attach=(
+            join(TEST_VAR_DIR, 'apprise-test.png'),
+        )) is True
+
+    # Our content was populated after the notify() call
+    assert len(verify_obj) > 0
+    assert verify_obj['body'] == ""
+    assert verify_obj['title'] == ""
+    assert verify_obj['notify_type'] == common.NotifyType.INFO
+    assert isinstance(verify_obj['attach'], AppriseAttachment)
+    assert len(verify_obj['attach']) == 1
 
     # No format was defined
     assert 'body_format' in verify_obj['kwargs']
@@ -334,6 +446,8 @@ def test_notify_multi_instance_decoration(tmpdir):
     def my_inline_notify_wrapper(
             body, title, notify_type, attach, meta, *args, **kwargs):
 
+        assert isinstance(body, str)
+
         # Track what is added
         verify_obj.append({
             'body': body,
@@ -373,7 +487,8 @@ def test_notify_multi_instance_decoration(tmpdir):
     # Nothing stored yet in our object
     assert len(verify_obj) == 0
 
-    assert aobj.notify("Hello World", title="My Title") is True
+    # Send utf-8 characters
+    assert aobj.notify("ツ".encode('utf-8'), title="My Title") is True
 
     assert len(verify_obj) == 2
 
@@ -384,7 +499,7 @@ def test_notify_multi_instance_decoration(tmpdir):
 
     # Our content was populated after the notify() call
     obj = verify_obj[0]
-    assert obj['body'] == "Hello World"
+    assert obj['body'] == "ツ"
     assert obj['title'] == "My Title"
     assert obj['notify_type'] == common.NotifyType.INFO
 
@@ -422,7 +537,7 @@ def test_notify_multi_instance_decoration(tmpdir):
 
     # Our content was populated after the notify() call
     obj = verify_obj[1]
-    assert obj['body'] == "Hello World"
+    assert obj['body'] == "ツ"
     assert obj['title'] == "My Title"
     assert obj['notify_type'] == common.NotifyType.INFO
 

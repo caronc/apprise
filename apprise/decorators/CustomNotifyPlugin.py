@@ -55,6 +55,9 @@ class CustomNotifyPlugin(NotifyBase):
     # should be treated differently.
     category = 'custom'
 
+    # Support Attachments
+    attachment_support = True
+
     # Define object templates
     templates = (
         '{schema}://',
