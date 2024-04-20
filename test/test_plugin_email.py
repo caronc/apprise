@@ -2006,3 +2006,45 @@ def test_plugin_host_detection_from_source_email(mock_smtp, mock_smtp_ssl):
     assert len(_to) == 1
     assert _to[0] == 'john@yahoo.ca'
     assert _msg.split('\n')[-3] == 'body'
+
+
+@mock.patch('smtplib.SMTP_SSL')
+@mock.patch('smtplib.SMTP')
+def test_plugin_email_by_ipaddr_1113(mock_smtp, mock_smtp_ssl):
+    """
+    NotifyEmail() GitHub Issue 1113
+    https://github.com/caronc/apprise/issues/1113
+    Email with ip addresses not working
+
+    """
+
+    response = mock.Mock()
+    mock_smtp_ssl.return_value = response
+    mock_smtp.return_value = response
+
+    results = NotifyEmail.parse_url(
+        'mailto://10.0.0.195:25/?to=alerts@example.com&'
+        'from=sender@example.com')
+
+    assert isinstance(results, dict)
+    assert results['user'] is None
+    assert results['password'] is None
+    assert results['host'] == '10.0.0.195'
+    assert results['from_addr'] == 'sender@example.com'
+    assert isinstance(results['targets'], list)
+    assert len(results['targets']) == 1
+    assert results['targets'][0] == 'alerts@example.com'
+    assert results['port'] == 25
+
+    email = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(email, NotifyEmail) is True
+
+    assert len(email.targets) == 1
+    assert (False, 'alerts@example.com') in email.targets
+
+    assert email.from_addr == (False, 'sender@example.com')
+    assert email.user is None
+    assert email.password is None
+    assert email.smtp_host == '10.0.0.195'
+    assert email.port == 25
+    assert email.targets == [(False, 'alerts@example.com')]
