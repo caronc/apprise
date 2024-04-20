@@ -45,7 +45,7 @@ from .NotifyBase import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyFormat, NotifyType
 from ..conversion import convert_between
-from ..utils import is_email, parse_emails, is_hostname
+from ..utils import is_ipaddr, is_email, parse_emails, is_hostname
 from ..AppriseLocale import gettext_lazy as _
 from ..logger import logger
 
@@ -1053,8 +1053,12 @@ class NotifyEmail(NotifyBase):
         # Prepare our target lists
         results['targets'] = []
 
-        if not is_hostname(results['host'], ipv4=False, ipv6=False,
-                           underscore=False):
+        if is_ipaddr(results['host']):
+            # Silently move on and do not disrupt any configuration
+            pass
+
+        elif not is_hostname(results['host'], ipv4=False, ipv6=False,
+                             underscore=False):
 
             if is_email(NotifyEmail.unquote(results['host'])):
                 # Don't lose defined email addresses
