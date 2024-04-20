@@ -340,7 +340,7 @@ def test_plugin_pushover_edge_cases(mock_post):
 
     obj = NotifyPushover(
         user_key=user_key, token=token, targets=devices)
-    assert isinstance(obj, NotifyPushover) is True
+    assert isinstance(obj, NotifyPushover)
     # Our invalid device is ignored
     assert len(obj.targets) == 2
 
@@ -350,7 +350,7 @@ def test_plugin_pushover_edge_cases(mock_post):
         notify_type=apprise.NotifyType.INFO) is True
 
     obj = NotifyPushover(user_key=user_key, token=token)
-    assert isinstance(obj, NotifyPushover) is True
+    assert isinstance(obj, NotifyPushover)
     # Default is to send to all devices, so there will be a
     # device defined here
     assert len(obj.targets) == 1
@@ -362,7 +362,7 @@ def test_plugin_pushover_edge_cases(mock_post):
 
     obj = NotifyPushover(
         user_key=user_key, token=token, targets=set())
-    assert isinstance(obj, NotifyPushover) is True
+    assert isinstance(obj, NotifyPushover)
     # Default is to send to all devices, so there will be a
     # device defined here
     assert len(obj.targets) == 1

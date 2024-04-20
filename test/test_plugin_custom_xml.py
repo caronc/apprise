@@ -260,7 +260,7 @@ def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
     assert results['query'] == 'command'
     assert results['schema'] == 'xml'
     assert results['url'] == 'xml://localhost:8080/command'
-    assert isinstance(results['qsd:'], dict) is True
+    assert isinstance(results['qsd:'], dict)
     assert results['qsd:']['Message'] == 'Body'
     assert results['qsd:']['Key'] == 'value'
     assert results['qsd:'][','] == 'invalid'
@@ -316,7 +316,7 @@ def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
     assert results['query'] == 'command'
     assert results['schema'] == 'xml'
     assert results['url'] == 'xml://localhost:8081/command'
-    assert isinstance(results['qsd:'], dict) is True
+    assert isinstance(results['qsd:'], dict)
     assert results['qsd:']['New'] == 'Value'
 
     instance = NotifyXML(**results)
@@ -364,7 +364,7 @@ def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
     assert results['query'] is None
     assert results['schema'] == 'xmls'
     assert results['url'] == 'xmls://localhost'
-    assert isinstance(results['qsd:'], dict) is True
+    assert isinstance(results['qsd:'], dict)
     assert results['qsd:']['Version'] == ''
     assert results['qsd:']['Message'] == 'Body'
     assert results['qsd:']['Subject'] == 'Title'

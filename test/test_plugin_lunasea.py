@@ -181,7 +181,7 @@ def test_plugin_custom_lunasea_edge_cases(mock_post):
     assert results['query'] is None
     assert results['schema'] == 'lsea'
     assert results['url'] == 'lsea://user:pass@userA,+device1,~~,,'
-    assert isinstance(results['qsd:'], dict) is True
+    assert isinstance(results['qsd:'], dict)
 
     instance = NotifyLunaSea(**results)
     assert isinstance(instance, NotifyLunaSea)
@@ -245,7 +245,7 @@ def test_plugin_custom_lunasea_edge_cases(mock_post):
         results['url'] ==
         'lseas://user:pass@myhost:3222/%40userA%2C%2Bdevice1%2C%7E%7E%2C%2C'
     )
-    assert isinstance(results['qsd:'], dict) is True
+    assert isinstance(results['qsd:'], dict)
 
     instance = NotifyLunaSea(**results)
     assert isinstance(instance, NotifyLunaSea)

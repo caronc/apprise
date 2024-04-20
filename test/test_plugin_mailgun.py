@@ -331,7 +331,7 @@ def test_plugin_mailgun_header_check(mock_post):
     obj = Apprise.instantiate(
         'mailgun://user@localhost.localdomain/{}'.format(apikey))
     assert isinstance(obj, NotifyMailgun)
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj.url(), str)
 
     # No calls made yet
     assert mock_post.call_count == 0
@@ -358,7 +358,7 @@ def test_plugin_mailgun_header_check(mock_post):
         'mailgun://user@localhost.localdomain/'
         '{}?from=Luke%20Skywalker'.format(apikey))
     assert isinstance(obj, NotifyMailgun)
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj.url(), str)
 
     # No calls made yet
     assert mock_post.call_count == 0
@@ -381,7 +381,7 @@ def test_plugin_mailgun_header_check(mock_post):
         'mailgun://user@localhost.localdomain/{}'
         '?from=Luke%20Skywalker<luke@rebels.com>'.format(apikey))
     assert isinstance(obj, NotifyMailgun)
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj.url(), str)
 
     # No calls made yet
     assert mock_post.call_count == 0
@@ -404,7 +404,7 @@ def test_plugin_mailgun_header_check(mock_post):
         'mailgun://user@localhost.localdomain/{}'
         '?from=luke@rebels.com'.format(apikey))
     assert isinstance(obj, NotifyMailgun)
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj.url(), str)
 
     # No calls made yet
     assert mock_post.call_count == 0

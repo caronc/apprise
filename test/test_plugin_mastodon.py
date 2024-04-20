@@ -190,8 +190,8 @@ def test_plugin_mastodon_general(mock_post, mock_get):
     # Instantiate our object
     obj = NotifyMastodon(token=token, host=host)
 
-    assert isinstance(obj, NotifyMastodon) is True
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj, NotifyMastodon)
+    assert isinstance(obj.url(), str)
 
     # apprise room was found
     assert obj.send(body="test") is True
@@ -268,7 +268,7 @@ def test_plugin_mastodon_general(mock_post, mock_get):
 
     results = NotifyMastodon.parse_url(
         'mastodon://{}@{}/@user?visbility=direct'.format(token, host))
-    assert isinstance(results, dict) is True
+    assert isinstance(results, dict)
     assert '@user' in results['targets']
 
     # cause a json parsing issue now

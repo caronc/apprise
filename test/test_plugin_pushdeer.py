@@ -110,8 +110,8 @@ def test_plugin_pushdeer_general(mock_post):
 
     # Variation Initializations
     obj = Apprise.instantiate('pushdeer://localhost/pushKey')
-    assert isinstance(obj, NotifyPushDeer) is True
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj, NotifyPushDeer)
+    assert isinstance(obj.url(), str)
 
     # Send Notification
     assert obj.send(body="test") is True

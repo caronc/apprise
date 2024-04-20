@@ -57,7 +57,7 @@ def test_plugin_syslog_by_url(openlog, syslog):
     assert NotifySyslog.parse_url(None) is None
 
     obj = apprise.Apprise.instantiate('syslog://')
-    assert obj.url().startswith('syslog://user') is True
+    assert obj.url().startswith('syslog://user')
     assert re.search(r'logpid=yes', obj.url()) is not None
     assert re.search(r'logperror=no', obj.url()) is not None
 
@@ -67,7 +67,7 @@ def test_plugin_syslog_by_url(openlog, syslog):
 
     obj = apprise.Apprise.instantiate('syslog://?logpid=no&logperror=yes')
     assert isinstance(obj, NotifySyslog)
-    assert obj.url().startswith('syslog://user') is True
+    assert obj.url().startswith('syslog://user')
     assert re.search(r'logpid=no', obj.url()) is not None
     assert re.search(r'logperror=yes', obj.url()) is not None
 
@@ -80,7 +80,7 @@ def test_plugin_syslog_by_url(openlog, syslog):
 
     obj = apprise.Apprise.instantiate('syslog://_/?facility=local5')
     assert isinstance(obj, NotifySyslog)
-    assert obj.url().startswith('syslog://local5') is True
+    assert obj.url().startswith('syslog://local5')
     assert re.search(r'logpid=yes', obj.url()) is not None
     assert re.search(r'logperror=no', obj.url()) is not None
 
@@ -90,21 +90,21 @@ def test_plugin_syslog_by_url(openlog, syslog):
     # j will cause a search to take place and match to daemon
     obj = apprise.Apprise.instantiate('syslog://_/?facility=d')
     assert isinstance(obj, NotifySyslog)
-    assert obj.url().startswith('syslog://daemon') is True
+    assert obj.url().startswith('syslog://daemon')
     assert re.search(r'logpid=yes', obj.url()) is not None
     assert re.search(r'logperror=no', obj.url()) is not None
 
     # Facility can also be specified on the url as a hostname
     obj = apprise.Apprise.instantiate('syslog://kern?logpid=no&logperror=y')
     assert isinstance(obj, NotifySyslog)
-    assert obj.url().startswith('syslog://kern') is True
+    assert obj.url().startswith('syslog://kern')
     assert re.search(r'logpid=no', obj.url()) is not None
     assert re.search(r'logperror=yes', obj.url()) is not None
 
     # Facilities specified as an argument always over-ride host
     obj = apprise.Apprise.instantiate('syslog://kern?facility=d')
     assert isinstance(obj, NotifySyslog)
-    assert obj.url().startswith('syslog://daemon') is True
+    assert obj.url().startswith('syslog://daemon')
 
 
 @mock.patch('syslog.syslog')
@@ -118,7 +118,7 @@ def test_plugin_syslog_edge_cases(openlog, syslog):
     # Default
     obj = NotifySyslog(facility=None)
     assert isinstance(obj, NotifySyslog)
-    assert obj.url().startswith('syslog://user') is True
+    assert obj.url().startswith('syslog://user')
     assert re.search(r'logpid=yes', obj.url()) is not None
     assert re.search(r'logperror=no', obj.url()) is not None
 

@@ -158,8 +158,8 @@ def test_plugin_twilio_auth(mock_post):
     obj = Apprise.instantiate(
         'twilio://{}:{}@{}/{}'
         .format(account_sid, auth_token, source, dest))
-    assert isinstance(obj, NotifyTwilio) is True
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj, NotifyTwilio)
+    assert isinstance(obj.url(), str)
 
     # Send Notification
     assert obj.send(body=message_contents) is True
@@ -168,8 +168,8 @@ def test_plugin_twilio_auth(mock_post):
     obj = Apprise.instantiate(
         'twilio://{}:{}@{}/{}?apikey={}'
         .format(account_sid, auth_token, source, dest, apikey))
-    assert isinstance(obj, NotifyTwilio) is True
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj, NotifyTwilio)
+    assert isinstance(obj.url(), str)
 
     # Send Notification
     assert obj.send(body=message_contents) is True

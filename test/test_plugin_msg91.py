@@ -163,8 +163,8 @@ def test_plugin_msg91_keywords(mock_post):
     obj = Apprise.instantiate(
         'msg91://{}@{}/{}?:key=value&:mobiles=ignored'
         .format(template, authkey, target))
-    assert isinstance(obj, NotifyMSG91) is True
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj, NotifyMSG91)
+    assert isinstance(obj.url(), str)
 
     # Send Notification
     assert obj.send(body=message_contents) is True
@@ -192,8 +192,8 @@ def test_plugin_msg91_keywords(mock_post):
     # Play with mapping
     obj = Apprise.instantiate(
         'msg91://{}@{}/{}?:body&:type=cat'.format(template, authkey, target))
-    assert isinstance(obj, NotifyMSG91) is True
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj, NotifyMSG91)
+    assert isinstance(obj.url(), str)
 
     # Send Notification
     assert obj.send(body=message_contents) is True

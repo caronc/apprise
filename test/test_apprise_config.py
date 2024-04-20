@@ -189,7 +189,7 @@ def test_apprise_config(tmpdir):
     assert isinstance(ac[0].url(), str)
 
     # pop an entry from our list
-    assert isinstance(ac.pop(0), ConfigBase) is True
+    assert isinstance(ac.pop(0), ConfigBase)
 
     # Determine we have no more configuration entries loaded
     assert len(ac) == 0
@@ -271,19 +271,13 @@ def test_apprise_multi_config_entries(tmpdir):
     assert ac.add(configs=object()) is False
 
     # Try to pop an element out of range
-    try:
+    with pytest.raises(IndexError):
         ac.server_pop(len(ac.servers()))
-        # We should have thrown an exception here
-        assert False
-
-    except IndexError:
-        # We expect to be here
-        assert True
 
     # Pop our elements
     while len(ac.servers()) > 0:
         assert isinstance(
-            ac.server_pop(len(ac.servers()) - 1), NotifyBase) is True
+            ac.server_pop(len(ac.servers()) - 1), NotifyBase)
 
 
 def test_apprise_add_config():
@@ -623,7 +617,7 @@ def test_apprise_config_with_apprise_obj(tmpdir):
 
     # reference index 0 of our list
     ref = a[0]
-    assert isinstance(ref, NotifyBase) is True
+    assert isinstance(ref, NotifyBase)
 
     # Our length is unchanged
     assert len(a) == 5
@@ -632,7 +626,7 @@ def test_apprise_config_with_apprise_obj(tmpdir):
     ref_popped = a.pop(0)
 
     # Verify our response
-    assert isinstance(ref_popped, NotifyBase) is True
+    assert isinstance(ref_popped, NotifyBase)
 
     # Our length drops by 1
     assert len(a) == 4
@@ -642,34 +636,21 @@ def test_apprise_config_with_apprise_obj(tmpdir):
     assert ref == ref_popped
 
     # pop an index out of range
-    try:
+    with pytest.raises(IndexError):
         a.pop(len(a))
-        # We'll thrown an IndexError and not make it this far
-        assert False
-
-    except IndexError:
-        # As expected
-        assert True
 
     # Our length remains unchanged
     assert len(a) == 4
 
     # Reference content out of range
-    try:
+    with pytest.raises(IndexError):
         a[len(a)]
-
-        # We'll thrown an IndexError and not make it this far
-        assert False
-
-    except IndexError:
-        # As expected
-        assert True
 
     # reference index at the end of our list
     ref = a[len(a) - 1]
 
     # Verify our response
-    assert isinstance(ref, NotifyBase) is True
+    assert isinstance(ref, NotifyBase)
 
     # Our length stays the same
     assert len(a) == 4
@@ -678,7 +659,7 @@ def test_apprise_config_with_apprise_obj(tmpdir):
     ref_popped = a.pop(len(a) - 1)
 
     # Verify our response
-    assert isinstance(ref_popped, NotifyBase) is True
+    assert isinstance(ref_popped, NotifyBase)
 
     # Content popped is the same as one referenced by index
     # earlier
@@ -703,13 +684,13 @@ def test_apprise_config_with_apprise_obj(tmpdir):
     ref = a[len(a) - 1]
 
     # Verify our response
-    assert isinstance(ref, NotifyBase) is True
+    assert isinstance(ref, NotifyBase)
 
     # We can pop from the back of the list without a problem too
     ref_popped = a.pop(len(a) - 1)
 
     # Verify our response
-    assert isinstance(ref_popped, NotifyBase) is True
+    assert isinstance(ref_popped, NotifyBase)
 
     # Content popped is the same as one referenced by index
     # earlier
@@ -720,7 +701,7 @@ def test_apprise_config_with_apprise_obj(tmpdir):
 
     # pop our list
     while len(a) > 0:
-        assert isinstance(a.pop(len(a) - 1), NotifyBase) is True
+        assert isinstance(a.pop(len(a) - 1), NotifyBase)
 
 
 def test_recursive_config_inclusion(tmpdir):

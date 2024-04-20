@@ -274,8 +274,8 @@ def test_plugin_reddit_general(mock_post):
 
     # Variation Initializations
     obj = NotifyReddit(**kwargs)
-    assert isinstance(obj, NotifyReddit) is True
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj, NotifyReddit)
+    assert isinstance(obj.url(), str)
 
     # Dynamically pick up on a link
     assert obj.send(body="http://hostname") is True

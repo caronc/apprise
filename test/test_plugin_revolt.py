@@ -319,7 +319,7 @@ def test_plugin_revolt_general(mock_sleep, mock_post):
     assert obj.ratelimit_remaining == 1
 
     # Test that we get a string response
-    assert isinstance(obj.url(), str) is True
+    assert isinstance(obj.url(), str)
 
     # This call includes an image with it's payload:
     assert obj.notify(

@@ -67,7 +67,7 @@ def test_notification_manager_general():
     N_MGR.unload_modules()
     assert bool(N_MGR) is False
     assert len([x for x in iter(N_MGR)]) > 0
-    assert bool(N_MGR) is True
+    assert bool(N_MGR)
 
     N_MGR.unload_modules()
     assert isinstance(N_MGR.plugins(), types.GeneratorType)

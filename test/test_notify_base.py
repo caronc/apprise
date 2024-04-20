@@ -64,15 +64,11 @@ def test_notify_base():
     assert isinstance(nb.url(), str)
     assert str(nb) == nb.url()
 
-    try:
-        nb.send('test message')
-        assert False
-
-    except NotImplementedError:
+    with pytest.raises(NotImplementedError):
         # Each sub-module is that inherits this as a parent is required to
         # over-ride this function. So direct calls to this throws a not
         # implemented error intentionally
-        assert True
+        nb.send('test message')
 
     # Throttle overrides..
     nb = NotifyBase()
@@ -208,13 +204,13 @@ def test_notify_base():
 
     result = NotifyBase.parse_list(
         ',path,?name=Dr%20Disrespect', unquote=False)
-    assert isinstance(result, list) is True
+    assert isinstance(result, list)
     assert len(result) == 2
     assert 'path' in result
     assert '?name=Dr%20Disrespect' in result
 
     result = NotifyBase.parse_list(',path,?name=Dr%20Disrespect', unquote=True)
-    assert isinstance(result, list) is True
+    assert isinstance(result, list)
     assert len(result) == 2
     assert 'path' in result
     assert '?name=Dr Disrespect' in result
@@ -225,7 +221,7 @@ def test_notify_base():
     # eliminates duplicates in addition to unquoting content by default
     result = NotifyBase.parse_list(
         ',%2F,%2F%2F, , , ,%2F%2F%2F, %2F', unquote=True)
-    assert isinstance(result, list) is True
+    assert isinstance(result, list)
     assert len(result) == 3
     assert '/' in result
     assert '//' in result
@@ -238,7 +234,7 @@ def test_notify_base():
 
     result = NotifyBase.parse_phone_no(
         '+1-800-123-1234,(800) 123-4567', unquote=False)
-    assert isinstance(result, list) is True
+    assert isinstance(result, list)
     assert len(result) == 2
     assert '+1-800-123-1234' in result
     assert '(800) 123-4567' in result
@@ -246,7 +242,7 @@ def test_notify_base():
     # %2B == +
     result = NotifyBase.parse_phone_no(
         '%2B1-800-123-1234,%2B1%20800%20123%204567', unquote=True)
-    assert isinstance(result, list) is True
+    assert isinstance(result, list)
     assert len(result) == 2
     assert '+1-800-123-1234' in result
     assert '+1 800 123 4567' in result

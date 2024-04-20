@@ -873,13 +873,13 @@ def test_plugin_fcm_color_manager():
 
     # We will be `true` because we can acquire a color based on what was
     # passed in
-    assert bool(instance) is True
+    assert bool(instance)
 
     # Custom color
     instance = FCMColorManager('#A2B3A4')
     assert isinstance(instance.get(), str)
     assert instance.get() == '#a2b3a4'
-    assert bool(instance) is True
+    assert bool(instance)
     # str() response does not include hashtag
     assert str(instance) == 'a2b3a4'
 
@@ -888,7 +888,7 @@ def test_plugin_fcm_color_manager():
     assert isinstance(instance.get(), str)
     # Hashtag is always part of output
     assert instance.get() == '#a2b3a4'
-    assert bool(instance) is True
+    assert bool(instance)
     # str() response does not include hashtag
     assert str(instance) == 'a2b3a4'
 
@@ -897,7 +897,7 @@ def test_plugin_fcm_color_manager():
     assert isinstance(instance.get(), str)
     # Hashtag is always part of output
     assert instance.get() == '#aacc44'
-    assert bool(instance) is True
+    assert bool(instance)
     # str() response does not include hashtag
     assert str(instance) == 'aacc44'
 
