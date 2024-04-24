@@ -38,7 +38,7 @@ from json import dumps
 
 from .base import NotifyBase
 from ..common import NotifyType
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 
 class NotifyFreeMobile(NotifyBase):

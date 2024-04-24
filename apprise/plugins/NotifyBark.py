@@ -33,12 +33,12 @@ import requests
 import json
 
 from .base import NotifyBase
-from ..URLBase import PrivacyMode
+from ..url import PrivacyMode
 from ..common import NotifyImageSize
 from ..common import NotifyType
 from ..utils import parse_list
 from ..utils import parse_bool
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 
 # Sounds generated off of: https://github.com/Finb/Bark/tree/master/Sounds

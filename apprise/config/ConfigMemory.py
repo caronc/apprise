@@ -26,8 +26,8 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from .ConfigBase import ConfigBase
-from ..AppriseLocale import gettext_lazy as _
+from .base import ConfigBase
+from ..locale import gettext_lazy as _
 
 
 class ConfigMemory(ConfigBase):

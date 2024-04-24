@@ -28,8 +28,8 @@
 
 from itertools import chain
 from importlib import import_module, reload
-from apprise.NotificationManager import NotificationManager
-from apprise.AttachmentManager import AttachmentManager
+from apprise.manager_plugins import NotificationManager
+from apprise.manager_attachment import AttachmentManager
 import sys
 import re
 
@@ -52,19 +52,21 @@ def reload_plugin(name):
 
     A_MGR.unload_modules()
 
-    reload(sys.modules['apprise.attachment.AttachBase'])
-    reload(sys.modules['apprise.AppriseAttachment'])
-    new_apprise_attachment_mod = import_module('apprise.AppriseAttachment')
-    reload(sys.modules['apprise.AttachmentManager'])
+    reload(sys.modules['apprise.apprise_attachment'])
+    reload(sys.modules['apprise.attachment.base'])
+    new_apprise_attachment_mod = import_module('apprise.apprise_attachment')
+    new_apprise_attach_base_mod = import_module('apprise.attachment.base')
+    reload(sys.modules['apprise.manager_attachment'])
 
     module_pyname = '{}.{}'.format(N_MGR.module_name_prefix, name)
     if module_pyname in sys.modules:
         reload(sys.modules[module_pyname])
     new_notify_mod = import_module(module_pyname)
 
-    reload(sys.modules['apprise.NotificationManager'])
-    reload(sys.modules['apprise.Apprise'])
+    reload(sys.modules['apprise.manager_plugins'])
+    reload(sys.modules['apprise.apprise'])
     reload(sys.modules['apprise.utils'])
+    reload(sys.modules['apprise.locale'])
     reload(sys.modules['apprise'])
 
     # Filter our keys
@@ -86,8 +88,8 @@ def reload_plugin(name):
 
     # Detect our Apprise Modules (include helpers)
     apprise_modules = \
-        [k for k in sys.modules.keys()
-         if re.match(r'^(apprise|helpers)(\.|.+)$', k)]
+        sorted([k for k in sys.modules.keys()
+                if re.match(r'^(apprise|helpers)(\.|.+)$', k)], reverse=True)
 
     for entry in A_MGR:
         reload(sys.modules[entry['path']])
@@ -113,6 +115,11 @@ def reload_plugin(name):
                     setattr(
                         apprise_mod, name,
                         getattr(new_apprise_attachment_mod, name))
+
+                elif name == 'AttachBase':
+                    setattr(
+                        apprise_mod, name,
+                        getattr(new_apprise_attach_base_mod, name))
 
                 else:
                     module_pyname = '{}.{}'.format(

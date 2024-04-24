@@ -33,7 +33,7 @@ from json import dumps
 from .base import NotifyBase
 from ..common import NotifyType
 from ..utils import validate_regex
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 # Used to break path apart into list of targets
 TARGET_LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')

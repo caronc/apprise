@@ -28,9 +28,9 @@
 
 import re
 import os
-from .AttachBase import AttachBase
+from .base import AttachBase
 from ..common import ContentLocation
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 
 class AttachFile(AttachBase):

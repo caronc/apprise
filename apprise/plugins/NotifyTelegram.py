@@ -66,8 +66,8 @@ from ..common import NotifyFormat
 from ..utils import parse_bool
 from ..utils import parse_list
 from ..utils import validate_regex
-from ..AppriseLocale import gettext_lazy as _
-from ..attachment.AttachBase import AttachBase
+from ..locale import gettext_lazy as _
+from ..attachment.base import AttachBase
 
 TELEGRAM_IMAGE_XY = NotifyImageSize.XY_256
 

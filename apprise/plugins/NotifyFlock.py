@@ -51,7 +51,7 @@ from ..common import NotifyImageSize
 from ..utils import parse_list
 from ..utils import parse_bool
 from ..utils import validate_regex
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 
 # Extend HTTP Error Messages

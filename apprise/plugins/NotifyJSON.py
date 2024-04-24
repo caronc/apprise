@@ -31,10 +31,10 @@ import base64
 from json import dumps
 
 from .base import NotifyBase
-from ..URLBase import PrivacyMode
+from ..url import PrivacyMode
 from ..common import NotifyImageSize
 from ..common import NotifyType
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 
 class JSONPayloadField:

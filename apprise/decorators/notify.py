@@ -26,7 +26,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from .CustomNotifyPlugin import CustomNotifyPlugin
+from .base import CustomNotifyPlugin
 
 
 def notify(on, name=None):

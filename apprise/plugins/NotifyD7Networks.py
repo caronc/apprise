@@ -45,7 +45,7 @@ from ..utils import is_phone_no
 from ..utils import parse_phone_no
 from ..utils import validate_regex
 from ..utils import parse_bool
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 # Extend HTTP Error Messages
 D7NETWORKS_HTTP_ERROR_MAP = {

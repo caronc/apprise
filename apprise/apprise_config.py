@@ -28,9 +28,9 @@
 
 from . import ConfigBase
 from . import CONFIG_FORMATS
-from .ConfigurationManager import ConfigurationManager
+from .manager_config import ConfigurationManager
 from . import URLBase
-from .AppriseAsset import AppriseAsset
+from .asset import AppriseAsset
 from . import common
 from .utils import GET_SCHEMA_RE
 from .utils import parse_list

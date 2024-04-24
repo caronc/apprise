@@ -27,8 +27,8 @@
 # POSSIBILITY OF SUCH DAMAGE.USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from ..plugins import NotifyBase
-from ..NotificationManager import NotificationManager
+from ..plugins.base import NotifyBase
+from ..manager_plugins import NotificationManager
 from ..utils import URL_DETAILS_RE
 from ..utils import parse_url
 from ..utils import url_assembly

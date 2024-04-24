@@ -44,7 +44,7 @@ from ..utils import validate_regex
 from ..utils import parse_list
 from ..utils import parse_bool
 from ..utils import is_email
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 
 class OneSignalCategory:

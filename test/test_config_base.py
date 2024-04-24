@@ -27,8 +27,8 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import pytest
-from apprise.AppriseAsset import AppriseAsset
-from apprise.config.ConfigBase import ConfigBase
+from apprise import AppriseAsset
+from apprise.config import ConfigBase
 from apprise import Apprise
 from apprise import ConfigFormat
 from inspect import cleandoc

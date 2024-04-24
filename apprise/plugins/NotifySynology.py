@@ -30,9 +30,9 @@ import requests
 from json import dumps
 
 from .base import NotifyBase
-from ..URLBase import PrivacyMode
+from ..url import PrivacyMode
 from ..common import NotifyType
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 # For API Details see:
 # https://kb.synology.com/en-au/DSM/help/Chat/chat_integration

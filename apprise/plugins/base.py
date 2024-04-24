@@ -30,7 +30,7 @@ import asyncio
 import re
 from functools import partial
 
-from ..URLBase import URLBase
+from ..url import URLBase
 from ..common import NotifyType
 from ..utils import parse_bool
 from ..common import NOTIFY_TYPES
@@ -38,8 +38,8 @@ from ..common import NotifyFormat
 from ..common import NOTIFY_FORMATS
 from ..common import OverflowMode
 from ..common import OVERFLOW_MODES
-from ..AppriseLocale import gettext_lazy as _
-from ..AppriseAttachment import AppriseAttachment
+from ..locale import gettext_lazy as _
+from ..apprise_attachment import AppriseAttachment
 
 
 class NotifyBase(URLBase):

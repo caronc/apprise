@@ -33,7 +33,7 @@ from itertools import chain
 
 from .base import NotifyBase
 from ..common import NotifyType
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 from ..common import NotifyImageSize
 from ..utils import parse_list, parse_bool
 from ..utils import validate_regex

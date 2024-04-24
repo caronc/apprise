@@ -48,7 +48,7 @@ from ..common import NotifyFormat
 from ..common import NotifyType
 from ..utils import validate_regex
 from ..utils import parse_list
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 
 class NotifyRevolt(NotifyBase):

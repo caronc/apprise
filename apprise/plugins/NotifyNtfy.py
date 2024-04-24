@@ -45,14 +45,14 @@ from .base import NotifyBase
 from ..common import NotifyFormat
 from ..common import NotifyType
 from ..common import NotifyImageSize
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 from ..utils import parse_list
 from ..utils import parse_bool
 from ..utils import is_hostname
 from ..utils import is_ipaddr
 from ..utils import validate_regex
-from ..URLBase import PrivacyMode
-from ..attachment.AttachBase import AttachBase
+from ..url import PrivacyMode
+from ..attachment.base import AttachBase
 
 
 class NtfyMode:

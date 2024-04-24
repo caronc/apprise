@@ -57,8 +57,8 @@ from ...utils import parse_list
 from ...utils import parse_bool
 from ...utils import dict_full_update
 from ...common import NotifyImageSize
-from ...AppriseAttachment import AppriseAttachment
-from ...AppriseLocale import gettext_lazy as _
+from ...apprise_attachment import AppriseAttachment
+from ...locale import gettext_lazy as _
 from .common import (FCMMode, FCM_MODES)
 from .priority import (FCM_PRIORITIES, FCMPriorityManager)
 from .color import FCMColorManager

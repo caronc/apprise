@@ -35,11 +35,11 @@ from json import dumps
 from json import loads
 
 from .base import NotifyBase
-from ..URLBase import PrivacyMode
+from ..url import PrivacyMode
 from ..utils import parse_bool
 from ..common import NotifyType
 from .. import __version__ as VERSION
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 
 class NotifyEmby(NotifyBase):

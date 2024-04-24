@@ -35,8 +35,8 @@ from ..utils import is_email
 from ..common import NotifyType
 from ..utils import parse_list
 from ..utils import validate_regex
-from ..AppriseLocale import gettext_lazy as _
-from ..attachment.AttachBase import AttachBase
+from ..locale import gettext_lazy as _
+from ..attachment.base import AttachBase
 
 # Flag used as a placeholder to sending to all devices
 PUSHBULLET_SEND_TO_ALL = 'ALL_DEVICES'

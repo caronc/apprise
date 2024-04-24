@@ -39,11 +39,11 @@ from time import sleep
 from datetime import datetime
 from os.path import isfile
 from .base import NotifyBase
-from ..URLBase import PrivacyMode
+from ..url import PrivacyMode
 from ..common import NotifyType
 from ..utils import parse_list
 from ..utils import parse_bool
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 # Default our global support flag
 NOTIFY_MQTT_SUPPORT_ENABLED = False

@@ -29,13 +29,13 @@
 from os.path import dirname
 from os.path import join
 from apprise.decorators import notify
-from apprise.decorators.CustomNotifyPlugin import CustomNotifyPlugin
+from apprise.decorators.base import CustomNotifyPlugin
 from apprise import Apprise
 from apprise import AppriseConfig
 from apprise import AppriseAsset
 from apprise import AppriseAttachment
 from apprise import common
-from apprise.NotificationManager import NotificationManager
+from apprise.manager_plugins import NotificationManager
 
 # Disable logging for a cleaner testing output
 import logging

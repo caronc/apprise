@@ -28,11 +28,11 @@
 
 import re
 import requests
-from .ConfigBase import ConfigBase
+from .base import ConfigBase
 from ..common import ConfigFormat
 from ..common import ContentIncludeMode
-from ..URLBase import PrivacyMode
-from ..AppriseLocale import gettext_lazy as _
+from ..url import PrivacyMode
+from ..locale import gettext_lazy as _
 
 # Support YAML formats
 # text/yaml

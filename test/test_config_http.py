@@ -34,7 +34,7 @@ import requests
 from apprise.common import ConfigFormat
 from apprise.config.ConfigHTTP import ConfigHTTP
 from apprise.plugins import NotifyBase
-from apprise.NotificationManager import NotificationManager
+from apprise.manager_plugins import NotificationManager
 
 # Disable logging for a cleaner testing output
 import logging

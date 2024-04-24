@@ -35,8 +35,8 @@ from xml.sax.saxutils import escape as sax_escape
 from urllib.parse import unquote as _unquote
 from urllib.parse import quote as _quote
 
-from .AppriseLocale import gettext_lazy as _
-from .AppriseAsset import AppriseAsset
+from .locale import gettext_lazy as _
+from .asset import AppriseAsset
 from .utils import urlencode
 from .utils import parse_url
 from .utils import parse_bool

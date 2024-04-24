@@ -33,7 +33,7 @@ from os.path import dirname
 from os.path import isfile
 from os.path import abspath
 from .common import NotifyType
-from .NotificationManager import NotificationManager
+from .manager_plugins import NotificationManager
 
 
 # Grant access to our Notification Manager Singleton

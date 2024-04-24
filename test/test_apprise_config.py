@@ -35,10 +35,10 @@ from apprise import ContentIncludeMode
 from apprise import Apprise
 from apprise import AppriseConfig
 from apprise import AppriseAsset
-from apprise.config.ConfigBase import ConfigBase
+from apprise.config import ConfigBase
 from apprise.plugins import NotifyBase
-from apprise.NotificationManager import NotificationManager
-from apprise.ConfigurationManager import ConfigurationManager
+from apprise.manager_plugins import NotificationManager
+from apprise.manager_config import ConfigurationManager
 
 from apprise.config.ConfigFile import ConfigFile
 

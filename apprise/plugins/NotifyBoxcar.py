@@ -36,13 +36,13 @@ from itertools import chain
 from urllib.parse import urlparse
 
 from .base import NotifyBase
-from ..URLBase import PrivacyMode
+from ..url import PrivacyMode
 from ..utils import parse_bool
 from ..utils import parse_list
 from ..utils import validate_regex
 from ..common import NotifyType
 from ..common import NotifyImageSize
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 # Default to sending to all devices if nothing is specified
 DEFAULT_TAG = '@all'

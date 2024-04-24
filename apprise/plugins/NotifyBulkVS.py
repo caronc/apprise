@@ -36,12 +36,12 @@
 import requests
 import json
 from .base import NotifyBase
-from ..URLBase import PrivacyMode
+from ..url import PrivacyMode
 from ..common import NotifyType
 from ..utils import is_phone_no
 from ..utils import parse_phone_no
 from ..utils import parse_bool
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 
 class NotifyBulkVS(NotifyBase):

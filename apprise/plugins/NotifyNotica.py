@@ -44,10 +44,10 @@ import re
 import requests
 
 from .base import NotifyBase
-from ..URLBase import PrivacyMode
+from ..url import PrivacyMode
 from ..common import NotifyType
 from ..utils import validate_regex
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 
 class NoticaMode:

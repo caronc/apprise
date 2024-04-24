@@ -40,8 +40,8 @@ from ..utils import parse_list
 from ..utils import is_hostname
 from ..utils import is_ipaddr
 from ..utils import parse_bool
-from ..AppriseLocale import gettext_lazy as _
-from ..URLBase import PrivacyMode
+from ..locale import gettext_lazy as _
+from ..url import PrivacyMode
 
 
 class LunaSeaMode:

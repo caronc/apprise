@@ -36,12 +36,12 @@ from json import loads
 from itertools import chain
 
 from .base import NotifyBase
-from ..URLBase import PrivacyMode
+from ..url import PrivacyMode
 from ..common import NotifyFormat
 from ..common import NotifyType
 from ..utils import parse_list
 from ..utils import is_email
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 
 # A workspace can also be interpreted as a team name too!

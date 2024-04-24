@@ -40,9 +40,9 @@ from ..common import NotifyType
 from ..utils import is_phone_no
 from ..utils import validate_regex
 from ..utils import is_email
-from ..URLBase import PrivacyMode
+from ..url import PrivacyMode
 from ..utils import parse_list
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 
 class ThreemaRecipientTypes:

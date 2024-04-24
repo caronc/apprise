@@ -36,8 +36,8 @@ from ..common import NotifyFormat
 from ..conversion import convert_between
 from ..utils import parse_list
 from ..utils import validate_regex
-from ..AppriseLocale import gettext_lazy as _
-from ..attachment.AttachBase import AttachBase
+from ..locale import gettext_lazy as _
+from ..attachment.base import AttachBase
 
 # Flag used as a placeholder to sending to all devices
 PUSHOVER_SEND_TO_ALL = 'ALL_DEVICES'

@@ -86,7 +86,7 @@ from ..utils import is_email
 from ..utils import parse_bool
 from ..utils import parse_list
 from ..utils import validate_regex
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 # Extend HTTP Error Messages
 SLACK_HTTP_ERROR_MAP = {

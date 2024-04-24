@@ -31,10 +31,10 @@ import os
 import requests
 import threading
 from tempfile import NamedTemporaryFile
-from .AttachBase import AttachBase
+from .base import AttachBase
 from ..common import ContentLocation
-from ..URLBase import PrivacyMode
-from ..AppriseLocale import gettext_lazy as _
+from ..url import PrivacyMode
+from ..locale import gettext_lazy as _
 
 
 class AttachHTTP(AttachBase):

@@ -33,18 +33,18 @@ from itertools import chain
 from . import common
 from .conversion import convert_between
 from .utils import is_exclusive_match
-from .NotificationManager import NotificationManager
+from .manager_plugins import NotificationManager
 from .utils import parse_list
 from .utils import parse_urls
 from .utils import cwe312_url
 from .emojis import apply_emojis
 from .logger import logger
-from .AppriseAsset import AppriseAsset
-from .AppriseConfig import AppriseConfig
-from .AppriseAttachment import AppriseAttachment
-from .AppriseLocale import AppriseLocale
-from .config.ConfigBase import ConfigBase
-from .plugins import NotifyBase
+from .asset import AppriseAsset
+from .apprise_config import AppriseConfig
+from .apprise_attachment import AppriseAttachment
+from .locale import AppriseLocale
+from .config.base import ConfigBase
+from .plugins.base import NotifyBase
 
 from . import plugins
 from . import __version__

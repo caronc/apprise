@@ -38,7 +38,7 @@ from json import loads
 from time import time
 
 from .base import NotifyBase
-from ..URLBase import PrivacyMode
+from ..url import PrivacyMode
 from ..common import NotifyType
 from ..common import NotifyImageSize
 from ..common import NotifyFormat
@@ -46,7 +46,7 @@ from ..utils import parse_bool
 from ..utils import parse_list
 from ..utils import is_hostname
 from ..utils import validate_regex
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 # Define default path
 MATRIX_V1_WEBHOOK_PATH = '/api/v1/matrix/hook'

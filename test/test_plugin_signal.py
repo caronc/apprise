@@ -38,7 +38,7 @@ from apprise.plugins.NotifySignalAPI import NotifySignalAPI
 from helpers import AppriseURLTester
 from apprise import AppriseAttachment
 from apprise import NotifyType
-from apprise.config.ConfigBase import ConfigBase
+from apprise.config import ConfigBase
 
 # Disable logging for a cleaner testing output
 import logging

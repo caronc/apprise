@@ -27,9 +27,9 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 from . import URLBase
-from .attachment.AttachBase import AttachBase
-from .AppriseAsset import AppriseAsset
-from .AttachmentManager import AttachmentManager
+from .attachment.base import AttachBase
+from .asset import AppriseAsset
+from .manager_attachment import AttachmentManager
 from .logger import logger
 from .common import ContentLocation
 from .common import CONTENT_LOCATIONS

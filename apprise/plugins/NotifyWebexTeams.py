@@ -67,7 +67,7 @@ from .base import NotifyBase
 from ..common import NotifyType
 from ..common import NotifyFormat
 from ..utils import validate_regex
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 # Extend HTTP Error Messages
 # Based on: https://developer.webex.com/docs/api/basics/rate-limiting

@@ -37,13 +37,13 @@ from requests_oauthlib import OAuth1
 from json import dumps
 from json import loads
 from .base import NotifyBase
-from ..URLBase import PrivacyMode
+from ..url import PrivacyMode
 from ..common import NotifyType
 from ..utils import parse_list
 from ..utils import parse_bool
 from ..utils import validate_regex
-from ..AppriseLocale import gettext_lazy as _
-from ..attachment.AttachBase import AttachBase
+from ..locale import gettext_lazy as _
+from ..attachment.base import AttachBase
 
 IS_USER = re.compile(r'^\s*@?(?P<user>[A-Z0-9_]+)$', re.I)
 

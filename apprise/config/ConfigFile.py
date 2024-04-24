@@ -28,10 +28,10 @@
 
 import re
 import os
-from .ConfigBase import ConfigBase
+from .base import ConfigBase
 from ..common import ConfigFormat
 from ..common import ContentIncludeMode
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 
 class ConfigFile(ConfigBase):

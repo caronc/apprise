@@ -56,8 +56,8 @@ from ..common import NotifyFormat
 from ..common import NotifyType
 from ..utils import parse_bool
 from ..utils import validate_regex
-from ..AppriseLocale import gettext_lazy as _
-from ..attachment.AttachBase import AttachBase
+from ..locale import gettext_lazy as _
+from ..attachment.base import AttachBase
 
 
 # Used to detect user/role IDs

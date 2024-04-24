@@ -36,7 +36,7 @@
 import re
 from ...utils import parse_bool
 from ...common import NotifyType
-from ...AppriseAsset import AppriseAsset
+from ...asset import AppriseAsset
 
 
 class FCMColorManager:

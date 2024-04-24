@@ -49,16 +49,17 @@ from .common import CONTENT_INCLUDE_MODES
 from .common import ContentLocation
 from .common import CONTENT_LOCATIONS
 
-from .URLBase import URLBase
-from .URLBase import PrivacyMode
+from .url import URLBase
+from .url import PrivacyMode
 from .plugins.base import NotifyBase
-from .config.ConfigBase import ConfigBase
-from .attachment.AttachBase import AttachBase
+from .config.base import ConfigBase
+from .attachment.base import AttachBase
 
-from .Apprise import Apprise
-from .AppriseAsset import AppriseAsset
-from .AppriseConfig import AppriseConfig
-from .AppriseAttachment import AppriseAttachment
+from .apprise import Apprise
+from .locale import AppriseLocale
+from .asset import AppriseAsset
+from .apprise_config import AppriseConfig
+from .apprise_attachment import AppriseAttachment
 
 from . import decorators
 
@@ -73,7 +74,7 @@ logging.getLogger(__name__).addHandler(logging.NullHandler())
 __all__ = [
     # Core
     'Apprise', 'AppriseAsset', 'AppriseConfig', 'AppriseAttachment', 'URLBase',
-    'NotifyBase', 'ConfigBase', 'AttachBase',
+    'NotifyBase', 'ConfigBase', 'AttachBase', 'AppriseLocale',
 
     # Reference
     'NotifyType', 'NotifyImageSize', 'NotifyFormat', 'OverflowMode',

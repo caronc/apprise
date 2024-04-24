@@ -67,7 +67,7 @@ from ..utils import parse_list
 from ..utils import validate_regex
 from ..utils import is_email
 from ..utils import remove_suffix
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 # A Valid Bot Name
 VALIDATE_BOTNAME = re.compile(r'(?P<name>[A-Z0-9_-]{1,32})', re.I)

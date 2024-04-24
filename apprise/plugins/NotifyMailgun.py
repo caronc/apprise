@@ -64,7 +64,7 @@ from ..utils import parse_bool
 from ..utils import is_email
 from ..utils import validate_regex
 from ..logger import logger
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 # Provide some known codes Mailgun uses and what they translate to:
 # Based on https://documentation.mailgun.com/en/latest/api-intro.html#errors

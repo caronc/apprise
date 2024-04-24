@@ -66,7 +66,7 @@ from email.utils import formataddr
 from ..utils import validate_regex
 from ..utils import parse_emails
 from ..utils import parse_bool
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 # Provide some known codes SparkPost uses and what they translate to:
 # Based on https://www.sparkpost.com/docs/tech-resources/extended-error-codes/

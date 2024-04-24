@@ -33,15 +33,15 @@ import time
 
 from .. import plugins
 from .. import common
-from ..AppriseAsset import AppriseAsset
-from ..URLBase import URLBase
-from ..ConfigurationManager import ConfigurationManager
+from ..asset import AppriseAsset
+from ..url import URLBase
 from ..utils import GET_SCHEMA_RE
 from ..utils import parse_list
 from ..utils import parse_bool
 from ..utils import parse_urls
 from ..utils import cwe312_url
-from ..NotificationManager import NotificationManager
+from ..manager_config import ConfigurationManager
+from ..manager_plugins import NotificationManager
 
 # Test whether token is valid or not
 VALID_TOKEN = re.compile(

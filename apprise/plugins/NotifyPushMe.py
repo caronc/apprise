@@ -33,7 +33,7 @@ from ..common import NotifyType
 from ..common import NotifyFormat
 from ..utils import validate_regex
 from ..utils import parse_bool
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 
 class NotifyPushMe(NotifyBase):

@@ -32,11 +32,11 @@ from json import dumps
 from itertools import chain
 
 from .base import NotifyBase
-from ..URLBase import PrivacyMode
+from ..url import PrivacyMode
 from ..common import NotifyType
 from ..utils import parse_list
 from ..utils import validate_regex
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 # Used to detect and parse channels
 IS_CHANNEL = re.compile(r'^#?(?P<name>[A-Za-z0-9]+)$')

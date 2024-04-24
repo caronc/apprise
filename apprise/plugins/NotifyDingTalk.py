@@ -35,12 +35,12 @@ import requests
 from json import dumps
 
 from .base import NotifyBase
-from ..URLBase import PrivacyMode
+from ..url import PrivacyMode
 from ..common import NotifyFormat
 from ..common import NotifyType
 from ..utils import parse_list
 from ..utils import validate_regex
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 # Register at https://dingtalk.com
 #   - Download their PC based software as it is the only way you can create

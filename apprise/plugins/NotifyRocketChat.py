@@ -33,13 +33,13 @@ from json import dumps
 from itertools import chain
 
 from .base import NotifyBase
-from ..URLBase import PrivacyMode
+from ..url import PrivacyMode
 from ..common import NotifyImageSize
 from ..common import NotifyFormat
 from ..common import NotifyType
 from ..utils import parse_list
 from ..utils import parse_bool
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 IS_CHANNEL = re.compile(r'^#(?P<name>[A-Za-z0-9_-]+)$')
 IS_USER = re.compile(r'^@(?P<name>[A-Za-z0-9._-]+)$')

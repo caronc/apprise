@@ -30,7 +30,7 @@ from unittest import mock
 
 from apprise.config.ConfigFile import ConfigFile
 from apprise.plugins import NotifyBase
-from apprise.AppriseAsset import AppriseAsset
+from apprise import AppriseAsset
 
 # Disable logging for a cleaner testing output
 import logging

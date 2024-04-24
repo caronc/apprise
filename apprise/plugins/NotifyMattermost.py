@@ -45,7 +45,7 @@ from ..common import NotifyType
 from ..utils import parse_bool
 from ..utils import parse_list
 from ..utils import validate_regex
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 # Some Reference Locations:
 # - https://docs.mattermost.com/developer/webhooks-incoming.html

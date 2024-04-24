@@ -42,7 +42,7 @@ from json import dumps
 from .base import NotifyBase
 from ..common import NotifyType
 from ..utils import validate_regex
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 # Extend HTTP Error Messages
 KUMULOS_HTTP_ERROR_MAP = {

@@ -40,9 +40,9 @@ from ..utils import parse_list
 from ..utils import cwe312_url
 from ..utils import GET_SCHEMA_RE
 from ..logger import logger
-from ..AppriseLocale import gettext_lazy as _
-from ..AppriseLocale import LazyTranslation
-from ..NotificationManager import NotificationManager
+from ..locale import gettext_lazy as _
+from ..locale import LazyTranslation
+from ..manager_plugins import NotificationManager
 
 
 # Grant access to our Notification Manager Singleton

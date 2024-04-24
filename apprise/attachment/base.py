@@ -29,10 +29,10 @@
 import os
 import time
 import mimetypes
-from ..URLBase import URLBase
+from ..url import URLBase
 from ..utils import parse_bool
 from ..common import ContentLocation
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 
 class AttachBase(URLBase):

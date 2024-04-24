@@ -71,8 +71,8 @@ import socket
 import sys
 from itertools import chain
 from .base import NotifyBase
-from ..AppriseLocale import gettext_lazy as _
-from ..URLBase import PrivacyMode
+from ..locale import gettext_lazy as _
+from ..url import PrivacyMode
 from ..common import NotifyType
 from ..utils import is_call_sign
 from ..utils import parse_call_sign

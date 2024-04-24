@@ -61,7 +61,7 @@ def test_apprise_pickle_asset(tmpdir):
 def test_apprise_pickle_locale(tmpdir):
     """pickle: AppriseLocale
     """
-    _locale = AppriseLocale.AppriseLocale()
+    _locale = AppriseLocale()
     serialized = pickle.dumps(_locale)
     new_locale = pickle.loads(serialized)
 

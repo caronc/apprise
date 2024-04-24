@@ -56,7 +56,7 @@ from json import dumps
 from .base import NotifyBase
 from ..common import NotifyType
 from ..utils import validate_regex
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 # Token required as part of the API request
 # Used to prepare our UUID regex matching

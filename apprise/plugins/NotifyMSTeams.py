@@ -89,8 +89,8 @@ from ..utils import parse_bool
 from ..utils import validate_regex
 from ..utils import apply_template
 from ..utils import TemplateType
-from ..AppriseAttachment import AppriseAttachment
-from ..AppriseLocale import gettext_lazy as _
+from ..apprise_attachment import AppriseAttachment
+from ..locale import gettext_lazy as _
 
 
 class NotifyMSTeams(NotifyBase):

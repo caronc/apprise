@@ -32,7 +32,7 @@ import socket
 from .base import NotifyBase
 from ..common import NotifyType
 from ..utils import parse_bool
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 
 class syslog:

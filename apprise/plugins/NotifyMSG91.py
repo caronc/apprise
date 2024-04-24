@@ -43,7 +43,7 @@ from ..common import NotifyType
 from ..utils import is_phone_no
 from ..utils import parse_phone_no, parse_bool
 from ..utils import validate_regex
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 
 class MSG91PayloadField:

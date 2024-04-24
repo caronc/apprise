@@ -36,7 +36,7 @@ from .base import NotifyBase
 from ..common import NotifyType
 from ..utils import parse_list
 from ..utils import validate_regex
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 # Used to detect a Device and Topic
 VALIDATE_DEVICE = re.compile(r'^@(?P<device>[a-z0-9]+)$', re.I)

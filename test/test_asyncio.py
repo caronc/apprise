@@ -31,7 +31,7 @@ import pytest
 from apprise import Apprise
 from apprise import NotifyBase
 from apprise import NotifyFormat
-from apprise.NotificationManager import NotificationManager
+from apprise.manager_plugins import NotificationManager
 
 # Disable logging for a cleaner testing output
 import logging

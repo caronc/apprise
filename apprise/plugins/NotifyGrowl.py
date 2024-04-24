@@ -27,11 +27,11 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 from .base import NotifyBase
-from ..URLBase import PrivacyMode
+from ..url import PrivacyMode
 from ..common import NotifyImageSize
 from ..common import NotifyType
 from ..utils import parse_bool
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 # Default our global support flag
 NOTIFY_GROWL_SUPPORT_ENABLED = False

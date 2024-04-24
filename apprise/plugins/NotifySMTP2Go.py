@@ -56,7 +56,7 @@ from ..utils import parse_emails
 from ..utils import parse_bool
 from ..utils import is_email
 from ..utils import validate_regex
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 SMTP2GO_HTTP_ERROR_MAP = {
     429: 'To many requests.',
