@@ -37,7 +37,7 @@ from json import dumps
 from json import loads
 from time import time
 
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..common import NotifyImageSize

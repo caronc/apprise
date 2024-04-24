@@ -61,7 +61,7 @@
 import re
 import requests
 
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..common import NotifyType
 from ..utils import parse_list
 from ..utils import validate_regex

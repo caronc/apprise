@@ -37,7 +37,7 @@ import requests
 from json import dumps
 from itertools import chain
 
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..common import NotifyType
 from ..common import NotifyImageSize
 from ..utils import validate_regex

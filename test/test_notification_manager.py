@@ -34,7 +34,7 @@ from inspect import cleandoc
 
 from apprise import Apprise
 from apprise.NotificationManager import NotificationManager
-from apprise.plugins.NotifyBase import NotifyBase
+from apprise.plugins import NotifyBase
 
 # Disable logging for a cleaner testing output
 import logging
@@ -346,7 +346,7 @@ def test_notification_manager_decorators(tmpdir):
     #
     # Bare Minimum Valid Object
     #
-    from apprise.plugins.NotifyBase import NotifyBase
+    from apprise.plugins import NotifyBase
     from apprise.common import NotifyType
 
     class NotifyTest(NotifyBase):
@@ -388,7 +388,7 @@ def test_notification_manager_decorators(tmpdir):
     #
     # Bare Minimum Valid Object
     #
-    from apprise.plugins.NotifyBase import NotifyBase
+    from apprise.plugins import NotifyBase
     from apprise.common import NotifyType
 
     class NotifyDifferentName(NotifyBase):

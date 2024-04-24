@@ -44,7 +44,7 @@ from .AppriseConfig import AppriseConfig
 from .AppriseAttachment import AppriseAttachment
 from .AppriseLocale import AppriseLocale
 from .config.ConfigBase import ConfigBase
-from .plugins.NotifyBase import NotifyBase
+from .plugins import NotifyBase
 
 from . import plugins
 from . import __version__

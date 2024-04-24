@@ -41,7 +41,7 @@ from socket import error as SocketError
 from datetime import datetime
 from datetime import timezone
 
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyFormat, NotifyType
 from ..conversion import convert_between

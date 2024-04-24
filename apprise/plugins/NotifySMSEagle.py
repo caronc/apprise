@@ -32,7 +32,7 @@ from json import dumps, loads
 import base64
 from itertools import chain
 
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..common import NotifyType
 from ..utils import validate_regex
 from ..utils import is_phone_no

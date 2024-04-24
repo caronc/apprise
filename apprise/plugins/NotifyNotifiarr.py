@@ -31,7 +31,7 @@ import requests
 from json import dumps
 from itertools import chain
 
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..common import NotifyType
 from ..AppriseLocale import gettext_lazy as _
 from ..common import NotifyImageSize

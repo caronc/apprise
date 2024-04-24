@@ -30,7 +30,7 @@ import pytest
 from datetime import datetime
 from datetime import timedelta
 
-from apprise.plugins.NotifyBase import NotifyBase
+from apprise.plugins import NotifyBase
 from apprise import NotifyType
 from apprise import NotifyImageSize
 from timeit import default_timer

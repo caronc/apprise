@@ -30,7 +30,7 @@ import re
 import requests
 
 from ..common import NotifyType
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..utils import validate_regex
 from ..AppriseLocale import gettext_lazy as _
 

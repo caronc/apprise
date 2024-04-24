@@ -41,7 +41,7 @@ from json import loads
 from json import dumps
 from os.path import basename
 
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..common import NotifyFormat
 from ..common import NotifyType
 from ..common import NotifyImageSize

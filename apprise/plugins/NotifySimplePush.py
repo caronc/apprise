@@ -30,7 +30,7 @@ from os import urandom
 from json import loads
 import requests
 
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..utils import validate_regex

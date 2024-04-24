@@ -38,7 +38,7 @@
 import re
 import requests
 from json import dumps
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..common import NotifyType
 from ..utils import is_phone_no
 from ..utils import parse_phone_no, parse_bool

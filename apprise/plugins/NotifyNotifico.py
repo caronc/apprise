@@ -44,7 +44,7 @@
 import re
 import requests
 
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..common import NotifyType
 from ..utils import parse_bool
 from ..utils import validate_regex

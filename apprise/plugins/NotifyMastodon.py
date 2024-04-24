@@ -33,7 +33,7 @@ from json import dumps, loads
 from datetime import datetime
 from datetime import timezone
 
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyImageSize
 from ..common import NotifyFormat

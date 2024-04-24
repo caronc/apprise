@@ -49,7 +49,7 @@ import base64
 import requests
 from json import dumps
 from email.utils import formataddr
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..common import NotifyType
 from ..common import NotifyFormat
 from ..utils import parse_emails

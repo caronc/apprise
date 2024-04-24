@@ -50,7 +50,7 @@ from datetime import timedelta
 from datetime import datetime
 from datetime import timezone
 
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..common import NotifyImageSize
 from ..common import NotifyFormat
 from ..common import NotifyType

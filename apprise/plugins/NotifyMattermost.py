@@ -39,7 +39,7 @@
 import requests
 from json import dumps
 
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..common import NotifyImageSize
 from ..common import NotifyType
 from ..utils import parse_bool

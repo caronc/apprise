@@ -34,7 +34,7 @@ import hashlib
 from json import dumps
 from json import loads
 
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..URLBase import PrivacyMode
 from ..utils import parse_bool
 from ..common import NotifyType

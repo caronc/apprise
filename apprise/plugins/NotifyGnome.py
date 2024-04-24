@@ -26,7 +26,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..common import NotifyImageSize
 from ..common import NotifyType
 from ..utils import parse_bool

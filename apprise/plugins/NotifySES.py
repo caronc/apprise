@@ -95,7 +95,7 @@ from email.utils import formataddr
 from email.header import Header
 from urllib.parse import quote
 
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyFormat
 from ..common import NotifyType

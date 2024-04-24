@@ -30,7 +30,7 @@ import requests
 import base64
 from json import dumps
 
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyImageSize
 from ..common import NotifyType

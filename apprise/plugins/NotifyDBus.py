@@ -27,7 +27,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import sys
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..common import NotifyImageSize
 from ..common import NotifyType
 from ..utils import parse_bool

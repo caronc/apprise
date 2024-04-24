@@ -35,7 +35,7 @@ import requests
 from json import loads
 from itertools import chain
 
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyFormat
 from ..common import NotifyType

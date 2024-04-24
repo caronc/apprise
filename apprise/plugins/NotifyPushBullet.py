@@ -30,7 +30,7 @@ import requests
 from json import dumps
 from json import loads
 
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..utils import is_email
 from ..common import NotifyType
 from ..utils import parse_list

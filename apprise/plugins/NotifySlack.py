@@ -78,7 +78,7 @@ from json import dumps
 from json import loads
 from time import time
 
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..common import NotifyImageSize
 from ..common import NotifyType
 from ..common import NotifyFormat

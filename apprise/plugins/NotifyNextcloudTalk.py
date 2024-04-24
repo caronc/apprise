@@ -29,7 +29,7 @@
 import requests
 
 from json import dumps
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..utils import parse_list

@@ -33,7 +33,7 @@ from unittest import mock
 import requests
 from apprise.common import ConfigFormat
 from apprise.config.ConfigHTTP import ConfigHTTP
-from apprise.plugins.NotifyBase import NotifyBase
+from apprise.plugins import NotifyBase
 from apprise.NotificationManager import NotificationManager
 
 # Disable logging for a cleaner testing output

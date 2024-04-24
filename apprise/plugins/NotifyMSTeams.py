@@ -81,7 +81,7 @@ import requests
 import json
 from json.decoder import JSONDecodeError
 
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..common import NotifyImageSize
 from ..common import NotifyType
 from ..common import NotifyFormat

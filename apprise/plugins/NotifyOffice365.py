@@ -64,7 +64,7 @@ from datetime import datetime
 from datetime import timedelta
 from json import loads
 from json import dumps
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyFormat
 from ..common import NotifyType

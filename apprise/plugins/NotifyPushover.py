@@ -30,7 +30,7 @@ import re
 import requests
 from itertools import chain
 
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..common import NotifyType
 from ..common import NotifyFormat
 from ..conversion import convert_between

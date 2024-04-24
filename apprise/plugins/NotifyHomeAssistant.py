@@ -34,7 +34,7 @@ from json import dumps
 
 from uuid import uuid4
 
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..utils import validate_regex

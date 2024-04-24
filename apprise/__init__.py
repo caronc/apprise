@@ -51,7 +51,7 @@ from .common import CONTENT_LOCATIONS
 
 from .URLBase import URLBase
 from .URLBase import PrivacyMode
-from .plugins.NotifyBase import NotifyBase
+from .plugins.base import NotifyBase
 from .config.ConfigBase import ConfigBase
 from .attachment.AttachBase import AttachBase
 

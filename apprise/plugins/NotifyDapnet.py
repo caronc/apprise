@@ -51,7 +51,7 @@ from json import dumps
 import requests
 from requests.auth import HTTPBasicAuth
 
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..AppriseLocale import gettext_lazy as _
 from ..URLBase import PrivacyMode
 from ..common import NotifyType

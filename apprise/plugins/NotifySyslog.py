@@ -28,7 +28,7 @@
 
 import syslog
 
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..common import NotifyType
 from ..utils import parse_bool
 from ..AppriseLocale import gettext_lazy as _

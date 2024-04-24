@@ -35,7 +35,7 @@ from hashlib import sha1
 from itertools import chain
 from urllib.parse import urlparse
 
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..URLBase import PrivacyMode
 from ..utils import parse_bool
 from ..utils import parse_list

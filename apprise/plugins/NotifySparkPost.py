@@ -58,7 +58,7 @@ import requests
 import base64
 from json import loads
 from json import dumps
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..common import NotifyType
 from ..common import NotifyFormat
 from ..utils import is_email

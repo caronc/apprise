@@ -38,7 +38,7 @@ import re
 from time import sleep
 from datetime import datetime
 from os.path import isfile
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..URLBase import PrivacyMode
 from ..common import NotifyType
 from ..utils import parse_list

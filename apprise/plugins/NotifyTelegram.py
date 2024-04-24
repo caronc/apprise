@@ -59,7 +59,7 @@ import os
 from json import loads
 from json import dumps
 
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 from ..common import NotifyType
 from ..common import NotifyImageSize
 from ..common import NotifyFormat

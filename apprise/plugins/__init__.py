@@ -30,7 +30,7 @@ import os
 import copy
 
 # Used for testing
-from .NotifyBase import NotifyBase
+from .base import NotifyBase
 
 from ..common import NotifyImageSize
 from ..common import NOTIFY_IMAGE_SIZES
