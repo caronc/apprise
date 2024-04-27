@@ -356,7 +356,7 @@ def test_notification_manager_decorators(tmpdir):
         # The services URL
         service_url = 'https://github.com/caronc/apprise/'
 
-        # All boxcar notifications are secure
+        # Define our protocol
         secure_protocol = 'mytest'
 
         # A URL that takes you to the setup/help of the specific protocol
@@ -382,42 +382,6 @@ def test_notification_manager_decorators(tmpdir):
     del N_MGR['mytest']
     assert 'mytest' not in N_MGR
 
-    # Prepare ourselves a file to work with
-    notify_test = notify_base.join('NotifyNoAlign.py')
-    notify_test.write(cleandoc("""
-    #
-    # Bare Minimum Valid Object
-    #
-    from apprise.plugins import NotifyBase
-    from apprise.common import NotifyType
-
-    class NotifyDifferentName(NotifyBase):
-
-        service_name = 'Unloadable'
-
-        # The services URL
-        service_url = 'https://github.com/caronc/apprise/'
-
-        # All boxcar notifications are secure
-        secure_protocol = 'noload'
-
-        # A URL that takes you to the setup/help of the specific protocol
-        setup_url = 'https://github.com/caronc/apprise/wiki/Notify_mytest'
-
-        # Define object templates
-        templates = (
-            '{schema}://',
-        )
-
-        def __init__(self, **kwargs):
-            super().__init__(**kwargs)
-
-        def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-            return True
-
-        def url(self):
-            return 'mytest://'
-    """))
     assert 'mytest' not in N_MGR
     N_MGR.load_modules(path=str(notify_base))
 
@@ -425,10 +389,6 @@ def test_notification_manager_decorators(tmpdir):
     assert 'mytest' not in N_MGR
     N_MGR.load_modules(path=str(notify_base), force=True)
     assert 'mytest' in N_MGR
-
-    # Could not be loaded because the filename did not align with the class
-    # name.
-    assert 'noload' not in N_MGR
 
     # Double load will test section of code that prevents a notification
     # From reloading if previously already loaded

@@ -28,7 +28,7 @@
 
 import requests
 
-from apprise.plugins.NotifyChantify import NotifyChantify
+from apprise.plugins.chantify import NotifyChantify
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

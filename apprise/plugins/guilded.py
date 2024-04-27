@@ -45,10 +45,11 @@
 #
 
 import re
-from .NotifyDiscord import NotifyDiscord
+# Import namespace so the class won't conflict with the actual Notify object
+from . import discord
 
 
-class NotifyGuilded(NotifyDiscord):
+class NotifyGuilded(discord.NotifyDiscord):
     """
     A wrapper to Guilded Notifications
 

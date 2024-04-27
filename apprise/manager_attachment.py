@@ -26,6 +26,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import re
 from os.path import dirname
 from os.path import abspath
 from os.path import join
@@ -52,3 +53,7 @@ class AttachmentManager(PluginManager):
 
     # The module path to scan
     module_path = join(abspath(dirname(__file__)), _id)
+
+    # For filtering our result set
+    module_filter_re = re.compile(
+        r'^(?P<name>' + fname_prefix + r'(?!Base)[A-Za-z0-9]+)$')

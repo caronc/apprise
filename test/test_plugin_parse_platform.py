@@ -28,7 +28,7 @@
 
 import requests
 
-from apprise.plugins.NotifyParsePlatform import NotifyParsePlatform
+from apprise.plugins.parseplatform import NotifyParsePlatform
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

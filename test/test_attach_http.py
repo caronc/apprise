@@ -34,7 +34,7 @@ import mimetypes
 from os.path import join
 from os.path import dirname
 from os.path import getsize
-from apprise.attachment.AttachHTTP import AttachHTTP
+from apprise.attachment.http import AttachHTTP
 from apprise import Apprise, AppriseAttachment
 from apprise.manager_plugins import NotificationManager
 from apprise.plugins import NotifyBase

@@ -31,7 +31,7 @@ from unittest import mock
 
 import requests
 
-from apprise.plugins.NotifyMailgun import NotifyMailgun
+from apprise.plugins.mailgun import NotifyMailgun
 from helpers import AppriseURLTester
 from apprise import Apprise
 from apprise import AppriseAttachment

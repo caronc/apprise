@@ -28,7 +28,7 @@
 
 import requests
 
-from apprise.plugins.NotifyFreeMobile import NotifyFreeMobile
+from apprise.plugins.freemobile import NotifyFreeMobile
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

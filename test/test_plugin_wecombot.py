@@ -28,7 +28,7 @@
 
 import requests
 
-from apprise.plugins.NotifyWeComBot import NotifyWeComBot
+from apprise.plugins.wecombot import NotifyWeComBot
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

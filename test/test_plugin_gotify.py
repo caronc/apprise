@@ -31,7 +31,7 @@ from unittest import mock
 import pytest
 import requests
 import apprise
-from apprise.plugins.NotifyGotify import GotifyPriority, NotifyGotify
+from apprise.plugins.gotify import GotifyPriority, NotifyGotify
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

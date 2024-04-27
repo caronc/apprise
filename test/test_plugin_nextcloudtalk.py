@@ -30,7 +30,7 @@ from unittest import mock
 from apprise import Apprise
 from apprise import NotifyType
 import requests
-from apprise.plugins.NotifyNextcloudTalk import NotifyNextcloudTalk
+from apprise.plugins.nextcloudtalk import NotifyNextcloudTalk
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

@@ -33,7 +33,7 @@ import pytest
 import requests
 import json
 from apprise import Apprise
-from apprise.plugins.NotifySimplePush import NotifySimplePush
+from apprise.plugins.simplepush import NotifySimplePush
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

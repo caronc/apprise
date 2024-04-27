@@ -33,7 +33,7 @@ import requests
 import apprise
 from apprise import NotifyType
 from helpers import AppriseURLTester
-from apprise.plugins.NotifyJoin import JoinPriority, NotifyJoin
+from apprise.plugins.join import JoinPriority, NotifyJoin
 
 # Disable logging for a cleaner testing output
 import logging

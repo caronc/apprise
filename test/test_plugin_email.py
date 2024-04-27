@@ -42,8 +42,8 @@ from apprise import AttachBase
 from apprise import AppriseAsset
 from apprise.config import ConfigBase
 from apprise import AppriseAttachment
-from apprise.plugins.NotifyEmail import NotifyEmail
-from apprise.plugins import NotifyEmail as NotifyEmailModule
+from apprise.plugins.email import NotifyEmail
+from apprise.plugins import email as NotifyEmailModule
 
 # Disable logging for a cleaner testing output
 logging.disable(logging.CRITICAL)

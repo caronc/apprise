@@ -32,7 +32,7 @@ import pytest
 import requests
 from json import dumps
 
-from apprise.plugins.NotifySinch import NotifySinch
+from apprise.plugins.sinch import NotifySinch
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

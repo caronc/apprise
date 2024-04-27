@@ -36,7 +36,7 @@ from datetime import timezone
 from apprise import Apprise
 from apprise import NotifyType
 from apprise import AppriseAttachment
-from apprise.plugins.NotifyMastodon import NotifyMastodon
+from apprise.plugins.mastodon import NotifyMastodon
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

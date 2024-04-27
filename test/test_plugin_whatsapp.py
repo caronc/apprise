@@ -32,7 +32,7 @@ import requests
 import pytest
 from json import dumps, loads
 from apprise import Apprise
-from apprise.plugins.NotifyWhatsApp import NotifyWhatsApp
+from apprise.plugins.whatsapp import NotifyWhatsApp
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

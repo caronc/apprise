@@ -29,7 +29,7 @@
 import pytest
 import requests
 from apprise import NotifyType
-from apprise.plugins.NotifyRocketChat import NotifyRocketChat
+from apprise.plugins.rocketchat import NotifyRocketChat
 from helpers import AppriseURLTester
 from unittest import mock
 

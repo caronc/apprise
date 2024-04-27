@@ -28,7 +28,7 @@
 
 from unittest import mock
 
-from apprise.config.ConfigFile import ConfigFile
+from apprise.config.file import ConfigFile
 from apprise.plugins import NotifyBase
 from apprise import AppriseAsset
 

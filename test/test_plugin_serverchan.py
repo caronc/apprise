@@ -26,7 +26,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from apprise.plugins.NotifyServerChan import NotifyServerChan
+from apprise.plugins.serverchan import NotifyServerChan
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

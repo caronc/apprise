@@ -32,7 +32,7 @@ from unittest import mock
 
 import requests
 from apprise.common import ConfigFormat
-from apprise.config.ConfigHTTP import ConfigHTTP
+from apprise.config.http import ConfigHTTP
 from apprise.plugins import NotifyBase
 from apprise.manager_plugins import NotificationManager
 

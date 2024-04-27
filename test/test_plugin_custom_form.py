@@ -31,7 +31,7 @@ from unittest import mock
 
 import requests
 
-from apprise.plugins.NotifyForm import NotifyForm
+from apprise.plugins.custom_form import NotifyForm
 from helpers import AppriseURLTester
 from apprise import Apprise
 from apprise import NotifyType

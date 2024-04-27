@@ -34,7 +34,7 @@ from unittest import mock
 from os.path import dirname
 from os.path import join
 from apprise.attachment.base import AttachBase
-from apprise.attachment.AttachFile import AttachFile
+from apprise.attachment.file import AttachFile
 from apprise import AppriseAttachment
 from apprise.common import ContentLocation
 

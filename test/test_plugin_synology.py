@@ -29,7 +29,7 @@
 import requests
 from unittest import mock
 
-from apprise.plugins.NotifySynology import NotifySynology
+from apprise.plugins.synology import NotifySynology
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

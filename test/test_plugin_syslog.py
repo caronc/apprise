@@ -41,7 +41,7 @@ logging.disable(logging.CRITICAL)
 if 'syslog' not in sys.modules:
     pytest.skip("Skipping syslog based tests", allow_module_level=True)
 
-from apprise.plugins.NotifySyslog import NotifySyslog  # noqa E402
+from apprise.plugins.syslog import NotifySyslog  # noqa E402
 
 
 @mock.patch('syslog.syslog')

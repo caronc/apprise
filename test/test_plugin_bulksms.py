@@ -31,7 +31,7 @@ from unittest import mock
 import requests
 from json import loads
 from apprise import Apprise
-from apprise.plugins.NotifyBulkSMS import NotifyBulkSMS
+from apprise.plugins.bulksms import NotifyBulkSMS
 from helpers import AppriseURLTester
 from apprise import NotifyType
 

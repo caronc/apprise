@@ -28,7 +28,7 @@
 
 import requests
 
-from apprise.plugins.NotifyTechulusPush import NotifyTechulusPush
+from apprise.plugins.techuluspush import NotifyTechulusPush
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

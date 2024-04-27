@@ -29,7 +29,7 @@
 from unittest import mock
 import socket
 import apprise
-from apprise.plugins.NotifyAprs import NotifyAprs
+from apprise.plugins.aprs import NotifyAprs
 
 # Disable logging for a cleaner testing output
 import logging

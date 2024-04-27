@@ -35,7 +35,7 @@ from json import dumps
 from apprise import Apprise
 from apprise import AppriseAttachment
 from apprise import NotifyType
-from apprise.plugins.NotifySparkPost import NotifySparkPost
+from apprise.plugins.sparkpost import NotifySparkPost
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

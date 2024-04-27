@@ -34,7 +34,7 @@ from unittest.mock import Mock
 import pytest
 
 import apprise
-from apprise.plugins.NotifyMacOSX import NotifyMacOSX
+from apprise.plugins.macosx import NotifyMacOSX
 from helpers import reload_plugin
 
 
@@ -56,7 +56,7 @@ def pretend_macos(mocker):
     mocker.patch("platform.mac_ver", return_value=('10.8', ('', '', ''), ''))
 
     # Reload plugin module, in order to re-run module-level code.
-    reload_plugin("NotifyMacOSX")
+    reload_plugin("macosx")
 
 
 @pytest.fixture
@@ -71,7 +71,7 @@ def terminal_notifier(mocker, tmp_path):
     os.chmod(notifier_program, 0o755)
 
     # Make the notifier use the temporary file instead of `terminal-notifier`.
-    mocker.patch("apprise.plugins.NotifyMacOSX.NotifyMacOSX.notify_paths",
+    mocker.patch("apprise.plugins.macosx.NotifyMacOSX.notify_paths",
                  (str(notifier_program),))
 
     yield notifier_program
@@ -196,7 +196,7 @@ def test_plugin_macosx_pretend_linux(mocker, pretend_macos):
     # When patching something which has a side effect on the module-level code
     # of a plugin, make sure to reload it.
     mocker.patch("platform.system", return_value="Linux")
-    reload_plugin("NotifyMacOSX")
+    reload_plugin("macosx")
 
     # Our object is disabled.
     obj = apprise.Apprise.instantiate('macosx://', suppress_exceptions=False)
@@ -213,7 +213,7 @@ def test_plugin_macosx_pretend_old_macos(mocker, macos_version):
     # of a plugin, make sure to reload it.
     mocker.patch("platform.mac_ver",
                  return_value=(macos_version, ('', '', ''), ''))
-    reload_plugin("NotifyMacOSX")
+    reload_plugin("macosx")
 
     obj = apprise.Apprise.instantiate('macosx://', suppress_exceptions=False)
     assert obj is None

@@ -38,7 +38,7 @@ from apprise import AppriseAttachment
 from apprise import AppriseAsset
 from apprise import NotifyType
 from apprise import NotifyFormat
-from apprise.plugins.NotifyTelegram import NotifyTelegram
+from apprise.plugins.telegram import NotifyTelegram
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

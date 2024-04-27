@@ -34,7 +34,7 @@ import requests
 from datetime import datetime
 from json import dumps
 from apprise import Apprise
-from apprise.plugins.NotifyOffice365 import NotifyOffice365
+from apprise.plugins.office365 import NotifyOffice365
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

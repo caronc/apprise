@@ -34,7 +34,7 @@ from inspect import cleandoc
 import pytest
 import requests
 from apprise import Apprise
-from apprise.plugins.NotifySignalAPI import NotifySignalAPI
+from apprise.plugins.signal_api import NotifySignalAPI
 from helpers import AppriseURLTester
 from apprise import AppriseAttachment
 from apprise import NotifyType

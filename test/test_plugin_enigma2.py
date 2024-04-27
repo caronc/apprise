@@ -28,7 +28,7 @@
 
 import requests
 
-from apprise.plugins.NotifyEnigma2 import NotifyEnigma2
+from apprise.plugins.enigma2 import NotifyEnigma2
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

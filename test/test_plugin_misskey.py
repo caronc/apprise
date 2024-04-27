@@ -28,7 +28,7 @@
 
 import os
 
-from apprise.plugins.NotifyMisskey import NotifyMisskey
+from apprise.plugins.misskey import NotifyMisskey
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

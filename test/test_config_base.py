@@ -37,7 +37,7 @@ import yaml
 # Disable logging for a cleaner testing output
 import logging
 
-from apprise.plugins.NotifyEmail import NotifyEmail
+from apprise.plugins.email import NotifyEmail
 
 logging.disable(logging.CRITICAL)
 

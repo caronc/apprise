@@ -33,7 +33,7 @@ import requests
 from apprise import Apprise
 from apprise import AppriseAttachment
 from apprise import NotifyType
-from apprise.plugins.NotifySMTP2Go import NotifySMTP2Go
+from apprise.plugins.smtp2go import NotifySMTP2Go
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

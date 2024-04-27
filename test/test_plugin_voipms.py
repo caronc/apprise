@@ -33,7 +33,7 @@ import requests
 from json import dumps
 from apprise import Apprise
 
-from apprise.plugins.NotifyVoipms import NotifyVoipms
+from apprise.plugins.voipms import NotifyVoipms
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

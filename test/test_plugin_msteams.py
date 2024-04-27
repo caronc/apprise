@@ -34,7 +34,7 @@ import pytest
 from apprise import Apprise
 from apprise import AppriseConfig
 from apprise import NotifyType
-from apprise.plugins.NotifyMSTeams import NotifyMSTeams
+from apprise.plugins.msteams import NotifyMSTeams
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

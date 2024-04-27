@@ -29,7 +29,7 @@
 import pytest
 import requests
 
-from apprise.plugins.NotifyKumulos import NotifyKumulos
+from apprise.plugins.kumulos import NotifyKumulos
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

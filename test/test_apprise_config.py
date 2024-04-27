@@ -40,7 +40,7 @@ from apprise.plugins import NotifyBase
 from apprise.manager_plugins import NotificationManager
 from apprise.manager_config import ConfigurationManager
 
-from apprise.config.ConfigFile import ConfigFile
+from apprise.config.file import ConfigFile
 
 # Disable logging for a cleaner testing output
 import logging

@@ -32,7 +32,7 @@ from unittest import mock
 
 import requests
 from apprise import Apprise
-from apprise.plugins.NotifySMSEagle import NotifySMSEagle
+from apprise.plugins.smseagle import NotifySMSEagle
 from helpers import AppriseURLTester
 from apprise import AppriseAttachment
 from apprise import NotifyType

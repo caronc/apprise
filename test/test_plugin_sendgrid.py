@@ -31,7 +31,7 @@ from unittest import mock
 import pytest
 import requests
 
-from apprise.plugins.NotifySendGrid import NotifySendGrid
+from apprise.plugins.sendgrid import NotifySendGrid
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

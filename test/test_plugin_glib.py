@@ -49,7 +49,7 @@ if 'dbus' not in sys.modules:
 
 
 from dbus import DBusException  # noqa E402
-from apprise.plugins.NotifyDBus import DBusUrgency, NotifyDBus  # noqa E402
+from apprise.plugins.dbus import DBusUrgency, NotifyDBus  # noqa E402
 
 
 def setup_glib_environment():
@@ -114,7 +114,7 @@ def setup_glib_environment():
 
     # When patching something which has a side effect on the module-level code
     # of a plugin, make sure to reload it.
-    reload_plugin('NotifyDBus')
+    reload_plugin('dbus')
 
 
 @pytest.fixture
@@ -415,7 +415,7 @@ def test_plugin_dbus_gi_missing(dbus_glib_environment):
 
     # When patching something which has a side effect on the module-level code
     # of a plugin, make sure to reload it.
-    reload_plugin('NotifyDBus')
+    reload_plugin('dbus')
 
     # Create the instance.
     obj = apprise.Apprise.instantiate('glib://', suppress_exceptions=False)
@@ -442,7 +442,7 @@ def test_plugin_dbus_gi_require_version_error(dbus_glib_environment):
 
     # When patching something which has a side effect on the module-level code
     # of a plugin, make sure to reload it.
-    reload_plugin('NotifyDBus')
+    reload_plugin('dbus')
 
     # Create instance.
     obj = apprise.Apprise.instantiate('glib://', suppress_exceptions=False)
@@ -469,7 +469,7 @@ def test_plugin_dbus_module_croaks(mocker, dbus_glib_environment):
 
     # When patching something which has a side effect on the module-level code
     # of a plugin, make sure to reload it.
-    reload_plugin('NotifyDBus')
+    reload_plugin('dbus')
 
     # Verify plugin is not available.
     obj = apprise.Apprise.instantiate('glib://', suppress_exceptions=False)

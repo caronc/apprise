@@ -37,7 +37,7 @@ import socket
 import logging
 logging.disable(logging.CRITICAL)
 
-from apprise.plugins.NotifyRSyslog import NotifyRSyslog  # noqa E402
+from apprise.plugins.rsyslog import NotifyRSyslog  # noqa E402
 
 
 @mock.patch('socket.socket')
