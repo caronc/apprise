@@ -33,7 +33,7 @@ from json import loads
 import requests
 from helpers import AppriseURLTester
 
-from apprise.plugins.NotifyLunaSea import NotifyLunaSea
+from apprise.plugins.lunasea import NotifyLunaSea
 
 # Disable logging for a cleaner testing output
 import logging

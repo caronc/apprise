@@ -32,7 +32,7 @@ from unittest import mock
 import pytest
 import apprise
 from apprise import NotifyBase
-from apprise.plugins.NotifyGrowl import GrowlPriority, NotifyGrowl
+from apprise.plugins.growl import GrowlPriority, NotifyGrowl
 
 try:
     from gntp import errors

@@ -29,7 +29,7 @@
 import requests
 from json import loads
 from unittest import mock
-from apprise.plugins.NotifyD7Networks import NotifyD7Networks
+from apprise.plugins.d7networks import NotifyD7Networks
 from helpers import AppriseURLTester
 from apprise import Apprise
 from apprise import NotifyType

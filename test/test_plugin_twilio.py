@@ -32,7 +32,7 @@ import requests
 import pytest
 from json import dumps
 from apprise import Apprise
-from apprise.plugins.NotifyTwilio import NotifyTwilio
+from apprise.plugins.twilio import NotifyTwilio
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

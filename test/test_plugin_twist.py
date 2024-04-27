@@ -32,7 +32,7 @@ import pytest
 import requests
 from json import dumps
 from apprise import Apprise
-from apprise.plugins.NotifyTwist import NotifyTwist
+from apprise.plugins.twist import NotifyTwist
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

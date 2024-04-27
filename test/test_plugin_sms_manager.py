@@ -30,7 +30,7 @@ from unittest import mock
 
 import requests
 from apprise import Apprise
-from apprise.plugins.NotifySMSManager import NotifySMSManager
+from apprise.plugins.smsmanager import NotifySMSManager
 from helpers import AppriseURLTester
 from apprise import NotifyType
 

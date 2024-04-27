@@ -32,7 +32,7 @@ from unittest import mock
 import pytest
 import requests
 
-from apprise.plugins.NotifyGuilded import NotifyGuilded
+from apprise.plugins.guilded import NotifyGuilded
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

@@ -35,7 +35,7 @@ import requests
 from apprise import Apprise
 from apprise import NotifyType
 from apprise import AppriseAttachment
-from apprise.plugins.NotifySlack import NotifySlack
+from apprise.plugins.slack import NotifySlack
 from helpers import AppriseURLTester
 
 from json import loads, dumps

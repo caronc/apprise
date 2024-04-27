@@ -36,7 +36,7 @@ from unittest.mock import Mock, call, ANY
 import pytest
 
 import apprise
-from apprise.plugins.NotifyGnome import GnomeUrgency, NotifyGnome
+from apprise.plugins.gnome import GnomeUrgency, NotifyGnome
 from helpers import reload_plugin
 
 # Disable logging for a cleaner testing output
@@ -59,7 +59,7 @@ def setup_glib_environment():
         # for the purpose of testing and capture the handling of the
         # library when it is missing
         del sys.modules[gi_name]
-        reload_plugin('NotifyGnome')
+        reload_plugin('gnome')
 
     # We need to fake our gnome environment for testing purposes since
     # the gi library isn't available on CI
@@ -97,7 +97,7 @@ def setup_glib_environment():
 
     # When patching something which has a side effect on the module-level code
     # of a plugin, make sure to reload it.
-    reload_plugin('NotifyGnome')
+    reload_plugin('gnome')
 
 
 @pytest.fixture
@@ -344,7 +344,7 @@ def test_plugin_gnome_gi_croaks():
 
     # When patching something which has a side effect on the module-level code
     # of a plugin, make sure to reload it.
-    reload_plugin('NotifyGnome')
+    reload_plugin('gnome')
 
     # Create instance.
     obj = apprise.Apprise.instantiate('gnome://', suppress_exceptions=False)

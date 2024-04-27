@@ -30,7 +30,7 @@ from unittest import mock
 
 import requests
 import apprise
-from apprise.plugins.NotifyOpsgenie import NotifyOpsgenie, OpsgeniePriority
+from apprise.plugins.opsgenie import NotifyOpsgenie, OpsgeniePriority
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

@@ -27,8 +27,8 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import pytest
-from apprise.AppriseAsset import AppriseAsset
-from apprise.config.ConfigBase import ConfigBase
+from apprise import AppriseAsset
+from apprise.config import ConfigBase
 from apprise import Apprise
 from apprise import ConfigFormat
 from inspect import cleandoc
@@ -37,7 +37,7 @@ import yaml
 # Disable logging for a cleaner testing output
 import logging
 
-from apprise.plugins.NotifyEmail import NotifyEmail
+from apprise.plugins.email import NotifyEmail
 
 logging.disable(logging.CRITICAL)
 

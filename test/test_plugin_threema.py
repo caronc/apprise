@@ -31,7 +31,7 @@ from unittest import mock
 import pytest
 import requests
 
-from apprise.plugins.NotifyThreema import NotifyThreema
+from apprise.plugins.threema import NotifyThreema
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

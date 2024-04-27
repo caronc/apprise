@@ -28,7 +28,7 @@
 
 import pytest
 from unittest import mock
-from apprise.attachment.AttachBase import AttachBase
+from apprise.attachment.base import AttachBase
 
 # Disable logging for a cleaner testing output
 import logging

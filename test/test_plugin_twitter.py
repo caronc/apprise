@@ -39,7 +39,7 @@ import requests
 from apprise import Apprise
 from apprise import NotifyType
 from apprise import AppriseAttachment
-from apprise.plugins.NotifyTwitter import NotifyTwitter
+from apprise.plugins.twitter import NotifyTwitter
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

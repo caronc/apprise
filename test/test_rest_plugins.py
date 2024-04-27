@@ -35,10 +35,10 @@ from string import ascii_uppercase as str_alpha
 from string import digits as str_num
 
 from apprise import NotifyBase
-from apprise.common import NotifyFormat
-from apprise.common import OverflowMode
-from apprise.AppriseAsset import AppriseAsset
-from apprise.Apprise import Apprise
+from apprise import NotifyFormat
+from apprise import OverflowMode
+from apprise import AppriseAsset
+from apprise import Apprise
 
 # Disable logging for a cleaner testing output
 import logging

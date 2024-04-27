@@ -28,7 +28,7 @@
 
 import requests
 
-from apprise.plugins.NotifyFeishu import NotifyFeishu
+from apprise.plugins.feishu import NotifyFeishu
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

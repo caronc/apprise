@@ -29,7 +29,7 @@
 import requests
 import pytest
 from apprise import Apprise
-from apprise.plugins.NotifyGoogleChat import NotifyGoogleChat
+from apprise.plugins.google_chat import NotifyGoogleChat
 from helpers import AppriseURLTester
 from unittest import mock
 from apprise import NotifyType

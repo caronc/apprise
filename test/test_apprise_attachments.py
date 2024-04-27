@@ -34,11 +34,10 @@ from os.path import getsize
 from os.path import join
 from os.path import dirname
 from inspect import cleandoc
-from apprise.Apprise import Apprise
-from apprise.AttachmentManager import AttachmentManager
-from apprise.AppriseAttachment import AppriseAttachment
-from apprise.AppriseAsset import AppriseAsset
-from apprise.attachment.AttachBase import AttachBase
+from apprise import Apprise, AppriseAsset
+from apprise.manager_attachment import AttachmentManager
+from apprise.apprise_attachment import AppriseAttachment
+from apprise.attachment import AttachBase
 from apprise.common import ContentLocation
 
 # Disable logging for a cleaner testing output

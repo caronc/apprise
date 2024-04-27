@@ -28,7 +28,7 @@
 
 import requests
 
-from apprise.plugins.NotifyNotifiarr import NotifyNotifiarr
+from apprise.plugins.notifiarr import NotifyNotifiarr
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

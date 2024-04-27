@@ -28,7 +28,7 @@
 
 import requests
 from apprise import NotifyType
-from apprise.plugins.NotifyXBMC import NotifyXBMC
+from apprise.plugins.xbmc import NotifyXBMC
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

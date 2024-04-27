@@ -27,7 +27,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import requests
-from apprise.plugins.NotifyPopcornNotify import NotifyPopcornNotify
+from apprise.plugins.popcorn_notify import NotifyPopcornNotify
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

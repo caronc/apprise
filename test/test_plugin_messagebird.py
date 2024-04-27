@@ -31,7 +31,7 @@ from unittest import mock
 import pytest
 import requests
 
-from apprise.plugins.NotifyMessageBird import NotifyMessageBird
+from apprise.plugins.messagebird import NotifyMessageBird
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

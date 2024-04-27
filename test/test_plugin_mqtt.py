@@ -35,7 +35,7 @@ from unittest.mock import call, Mock, ANY
 import pytest
 
 import apprise
-from apprise.plugins.NotifyMQTT import NotifyMQTT
+from apprise.plugins.mqtt import NotifyMQTT
 
 # Disable logging for a cleaner testing output
 logging.disable(logging.CRITICAL)

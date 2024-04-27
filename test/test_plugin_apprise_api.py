@@ -28,7 +28,7 @@
 
 import os
 from unittest import mock
-from apprise.plugins.NotifyAppriseAPI import NotifyAppriseAPI
+from apprise.plugins.apprise_api import NotifyAppriseAPI
 from helpers import AppriseURLTester
 import requests
 from apprise import Apprise

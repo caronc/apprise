@@ -34,7 +34,7 @@ import pytest
 import requests
 from apprise import Apprise
 from apprise import AppriseAttachment
-from apprise.plugins.NotifySES import NotifySES
+from apprise.plugins.ses import NotifySES
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

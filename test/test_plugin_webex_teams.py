@@ -27,7 +27,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import requests
-from apprise.plugins.NotifyWebexTeams import NotifyWebexTeams
+from apprise.plugins.webexteams import NotifyWebexTeams
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

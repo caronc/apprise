@@ -30,7 +30,7 @@ from unittest import mock
 
 import requests
 from apprise import Apprise
-from apprise.plugins.NotifyHomeAssistant import NotifyHomeAssistant
+from apprise.plugins.home_assistant import NotifyHomeAssistant
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

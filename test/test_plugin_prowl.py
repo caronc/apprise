@@ -31,7 +31,7 @@ from unittest import mock
 import pytest
 import requests
 import apprise
-from apprise.plugins.NotifyProwl import NotifyProwl, ProwlPriority
+from apprise.plugins.prowl import NotifyProwl, ProwlPriority
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

@@ -31,9 +31,9 @@ import os
 
 import pytest
 
-from apprise.NotificationManager import NotificationManager
-from apprise.ConfigurationManager import ConfigurationManager
-from apprise.AttachmentManager import AttachmentManager
+from apprise.manager_plugins import NotificationManager
+from apprise.manager_config import ConfigurationManager
+from apprise.manager_attachment import AttachmentManager
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'helpers'))
 

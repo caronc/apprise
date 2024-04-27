@@ -40,15 +40,15 @@ import pytest
 import requests
 import json
 from apprise import Apprise
-from apprise.plugins.NotifyFCM import NotifyFCM
+from apprise.plugins.fcm import NotifyFCM
 from helpers import AppriseURLTester
 
 try:
-    from apprise.plugins.NotifyFCM.oauth import GoogleOAuth
-    from apprise.plugins.NotifyFCM.common import FCM_MODES
-    from apprise.plugins.NotifyFCM.priority import (
+    from apprise.plugins.fcm.oauth import GoogleOAuth
+    from apprise.plugins.fcm.common import FCM_MODES
+    from apprise.plugins.fcm.priority import (
         FCMPriorityManager, FCM_PRIORITIES)
-    from apprise.plugins.NotifyFCM.color import FCMColorManager
+    from apprise.plugins.fcm.color import FCMColorManager
     from cryptography.exceptions import UnsupportedAlgorithm
 
 except ImportError:

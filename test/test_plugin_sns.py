@@ -31,7 +31,7 @@ from unittest import mock
 import pytest
 import requests
 from apprise import Apprise
-from apprise.plugins.NotifySNS import NotifySNS
+from apprise.plugins.sns import NotifySNS
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

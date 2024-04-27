@@ -29,7 +29,7 @@
 import pytest
 import requests
 
-from apprise.plugins.NotifyRyver import NotifyRyver
+from apprise.plugins.ryver import NotifyRyver
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

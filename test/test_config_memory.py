@@ -26,7 +26,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from apprise.config.ConfigMemory import ConfigMemory
+from apprise.config.memory import ConfigMemory
 
 # Disable logging for a cleaner testing output
 import logging

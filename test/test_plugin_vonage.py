@@ -32,7 +32,7 @@ import pytest
 import requests
 from json import dumps
 
-from apprise.plugins.NotifyVonage import NotifyVonage
+from apprise.plugins.vonage import NotifyVonage
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

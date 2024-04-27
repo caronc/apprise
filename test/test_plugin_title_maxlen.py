@@ -33,7 +33,7 @@ from inspect import cleandoc
 import pytest
 import requests
 from apprise import Apprise
-from apprise.config.ConfigBase import ConfigBase
+from apprise.config import ConfigBase
 
 # Disable logging for a cleaner testing output
 import logging

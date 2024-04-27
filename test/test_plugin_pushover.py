@@ -32,7 +32,7 @@ from unittest import mock
 import requests
 import pytest
 from json import dumps
-from apprise.plugins.NotifyPushover import PushoverPriority, NotifyPushover
+from apprise.plugins.pushover import PushoverPriority, NotifyPushover
 import apprise
 from helpers import AppriseURLTester
 

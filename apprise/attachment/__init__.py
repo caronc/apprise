@@ -27,8 +27,8 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Used for testing
-from .AttachBase import AttachBase
-from ..AttachmentManager import AttachmentManager
+from .base import AttachBase
+from ..manager_attachment import AttachmentManager
 
 # Initalize our Attachment Manager Singleton
 A_MGR = AttachmentManager()
@@ -36,4 +36,5 @@ A_MGR = AttachmentManager()
 __all__ = [
     # Reference
     'AttachBase',
+    'AttachmentManager',
 ]

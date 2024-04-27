@@ -34,7 +34,7 @@ import requests
 from apprise import Apprise
 from apprise import AppriseAttachment
 from apprise import NotifyType
-from apprise.plugins.NotifyXML import NotifyXML
+from apprise.plugins.custom_xml import NotifyXML
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

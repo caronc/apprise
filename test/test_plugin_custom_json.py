@@ -35,7 +35,7 @@ from apprise import Apprise
 from apprise import AppriseAttachment
 from apprise import NotifyType
 
-from apprise.plugins.NotifyJSON import NotifyJSON
+from apprise.plugins.custom_json import NotifyJSON
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

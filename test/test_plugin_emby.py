@@ -32,7 +32,7 @@ from json import dumps
 from apprise import Apprise
 import requests
 
-from apprise.plugins.NotifyEmby import NotifyEmby
+from apprise.plugins.emby import NotifyEmby
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -86,9 +86,9 @@ def test_plugin_template_urls():
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-@mock.patch('apprise.plugins.NotifyEmby.NotifyEmby.sessions')
-@mock.patch('apprise.plugins.NotifyEmby.NotifyEmby.login')
-@mock.patch('apprise.plugins.NotifyEmby.NotifyEmby.logout')
+@mock.patch('apprise.plugins.emby.NotifyEmby.sessions')
+@mock.patch('apprise.plugins.emby.NotifyEmby.login')
+@mock.patch('apprise.plugins.emby.NotifyEmby.logout')
 @mock.patch('requests.get')
 @mock.patch('requests.post')
 def test_plugin_emby_general(mock_post, mock_get, mock_logout,
@@ -276,8 +276,8 @@ def test_plugin_emby_login(mock_post, mock_get):
     assert obj.access_token == '0000-0000-0000-0000'
 
 
-@mock.patch('apprise.plugins.NotifyEmby.NotifyEmby.login')
-@mock.patch('apprise.plugins.NotifyEmby.NotifyEmby.logout')
+@mock.patch('apprise.plugins.emby.NotifyEmby.login')
+@mock.patch('apprise.plugins.emby.NotifyEmby.logout')
 @mock.patch('requests.get')
 @mock.patch('requests.post')
 def test_plugin_emby_sessions(mock_post, mock_get, mock_logout, mock_login):
@@ -372,7 +372,7 @@ def test_plugin_emby_sessions(mock_post, mock_get, mock_logout, mock_login):
     assert len(sessions) == 0
 
 
-@mock.patch('apprise.plugins.NotifyEmby.NotifyEmby.login')
+@mock.patch('apprise.plugins.emby.NotifyEmby.login')
 @mock.patch('requests.get')
 @mock.patch('requests.post')
 def test_plugin_emby_logout(mock_post, mock_get, mock_login):

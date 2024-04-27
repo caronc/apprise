@@ -31,7 +31,7 @@ from unittest import mock
 import pytest
 import requests
 
-from apprise.plugins.NotifyPushed import NotifyPushed
+from apprise.plugins.pushed import NotifyPushed
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

@@ -31,7 +31,7 @@ from unittest import mock
 
 import requests
 from apprise import NotifyType
-from apprise.plugins.NotifyIFTTT import NotifyIFTTT
+from apprise.plugins.ifttt import NotifyIFTTT
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

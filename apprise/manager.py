@@ -61,6 +61,9 @@ class PluginManager(metaclass=Singleton):
     # The module path to scan
     module_path = join(abspath(dirname(__file__)), _id)
 
+    # For filtering our result when scanning a module
+    module_filter_re = re.compile(r'^(?P<name>((?!_)[A-Za-z0-9]+))$')
+
     # thread safe loading
     _lock = threading.Lock()
 
@@ -177,7 +180,7 @@ class PluginManager(metaclass=Singleton):
             # The .py extension is optional as we support loading directories
             # too
             module_re = re.compile(
-                r'^(?P<name>' + self.fname_prefix + r'[a-z0-9]+)(\.py)?$',
+                r'^(?P<name>(?!base|_)[a-z0-9_]+)(\.py)?$',
                 re.I)
 
             t_start = time.time()
@@ -185,10 +188,6 @@ class PluginManager(metaclass=Singleton):
                 tl_start = time.time()
                 match = module_re.match(f)
                 if not match:
-                    # keep going
-                    continue
-
-                elif match.group('name') == f'{self.fname_prefix}Base':
                     # keep going
                     continue
 
@@ -216,7 +215,47 @@ class PluginManager(metaclass=Singleton):
                         # logging found in import_module and not needed here
                         continue
 
-                if not hasattr(module, module_name):
+                module_class = None
+                for m_class in [obj for obj in dir(module)
+                                if self.module_filter_re.match(obj)]:
+                    # Get our plugin
+                    plugin = getattr(module, m_class)
+                    if not hasattr(plugin, 'app_id'):
+                        # Filter out non-notification modules
+                        logger.trace(
+                            "(%s) import failed; no app_id defined in %s",
+                            self.name, m_class, os.path.join(module_path, f))
+                        continue
+
+                    # Add our plugin name to our module map
+                    self._module_map[module_name] = {
+                        'plugin': set([plugin]),
+                        'module': module,
+                        'path': '{}.{}'.format(
+                            module_name_prefix, module_name),
+                        'native': True,
+                    }
+
+                    fn = getattr(plugin, 'schemas', None)
+                    schemas = set([]) if not callable(fn) else fn(plugin)
+
+                    # map our schema to our plugin
+                    for schema in schemas:
+                        if schema in self._schema_map:
+                            logger.error(
+                                "{} schema ({}) mismatch detected - {} to {}"
+                                .format(self.name, schema, self._schema_map,
+                                        plugin))
+                            continue
+
+                        # Assign plugin
+                        self._schema_map[schema] = plugin
+
+                    # Store our class
+                    module_class = m_class
+                    break
+
+                if not module_class:
                     # Not a library we can load as it doesn't follow the simple
                     # rule that the class must bear the same name as the
                     # notification file itself.
@@ -225,38 +264,6 @@ class PluginManager(metaclass=Singleton):
                         "match found in %s",
                         self.name, module_name, os.path.join(module_path, f))
                     continue
-
-                # Get our plugin
-                plugin = getattr(module, module_name)
-                if not hasattr(plugin, 'app_id'):
-                    # Filter out non-notification modules
-                    logger.trace(
-                        "(%s) import failed; no app_id defined in %s",
-                        self.name, module_name, os.path.join(module_path, f))
-                    continue
-
-                # Add our plugin name to our module map
-                self._module_map[module_name] = {
-                    'plugin': set([plugin]),
-                    'module': module,
-                    'path': '{}.{}'.format(module_name_prefix, module_name),
-                    'native': True,
-                }
-
-                fn = getattr(plugin, 'schemas', None)
-                schemas = set([]) if not callable(fn) else fn(plugin)
-
-                # map our schema to our plugin
-                for schema in schemas:
-                    if schema in self._schema_map:
-                        logger.error(
-                            "{} schema ({}) mismatch detected - {} to {}"
-                            .format(self.name, schema, self._schema_map,
-                                    plugin))
-                        continue
-
-                    # Assign plugin
-                    self._schema_map[schema] = plugin
 
                 logger.trace(
                     '{} {} loaded in {:.6f}s'.format(

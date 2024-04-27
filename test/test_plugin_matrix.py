@@ -33,7 +33,7 @@ import pytest
 from apprise import Apprise, AppriseAsset, AppriseAttachment, NotifyType
 from json import dumps
 
-from apprise.plugins.NotifyMatrix import NotifyMatrix
+from apprise.plugins.matrix import NotifyMatrix
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

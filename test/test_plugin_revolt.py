@@ -33,7 +33,7 @@ from json import dumps
 import pytest
 import requests
 
-from apprise.plugins.NotifyRevolt import NotifyRevolt
+from apprise.plugins.revolt import NotifyRevolt
 from helpers import AppriseURLTester
 from apprise import Apprise
 from apprise import NotifyType

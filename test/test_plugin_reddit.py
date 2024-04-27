@@ -28,7 +28,7 @@
 
 import requests
 
-from apprise.plugins.NotifyReddit import NotifyReddit
+from apprise.plugins.reddit import NotifyReddit
 from helpers import AppriseURLTester
 from unittest import mock
 

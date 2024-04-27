@@ -31,7 +31,7 @@ from unittest import mock
 import pytest
 import requests
 
-from apprise.plugins.NotifyFlock import NotifyFlock
+from apprise.plugins.flock import NotifyFlock
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

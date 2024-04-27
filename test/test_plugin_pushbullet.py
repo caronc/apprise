@@ -34,7 +34,7 @@ import requests
 from json import dumps
 from apprise import Apprise
 from apprise import AppriseAttachment
-from apprise.plugins.NotifyPushBullet import NotifyPushBullet
+from apprise.plugins.pushbullet import NotifyPushBullet
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

@@ -29,7 +29,7 @@
 import pytest
 import requests
 
-from apprise.plugins.NotifyZulip import NotifyZulip
+from apprise.plugins.zulip import NotifyZulip
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

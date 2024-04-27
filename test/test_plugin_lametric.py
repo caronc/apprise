@@ -28,7 +28,7 @@
 
 import pytest
 import requests
-from apprise.plugins.NotifyLametric import NotifyLametric
+from apprise.plugins.lametric import NotifyLametric
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

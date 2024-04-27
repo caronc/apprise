@@ -34,7 +34,7 @@ import pytest
 import requests
 from json import loads
 
-from apprise.plugins.NotifyDiscord import NotifyDiscord
+from apprise.plugins.discord import NotifyDiscord
 from helpers import AppriseURLTester
 from apprise import Apprise
 from apprise import AppriseAttachment

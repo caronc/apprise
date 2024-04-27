@@ -34,7 +34,7 @@ import requests
 import apprise
 from helpers import AppriseURLTester
 
-from apprise.plugins.NotifyNtfy import NtfyPriority, NotifyNtfy
+from apprise.plugins.ntfy import NtfyPriority, NotifyNtfy
 
 # Disable logging for a cleaner testing output
 import logging

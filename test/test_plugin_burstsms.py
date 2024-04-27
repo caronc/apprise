@@ -32,7 +32,7 @@ import pytest
 import requests
 from json import dumps
 
-from apprise.plugins.NotifyBurstSMS import NotifyBurstSMS
+from apprise.plugins.burstsms import NotifyBurstSMS
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

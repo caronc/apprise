@@ -30,7 +30,7 @@ import requests
 from unittest import mock
 import pytest
 
-from apprise.plugins.NotifyPagerTree import NotifyPagerTree
+from apprise.plugins.pagertree import NotifyPagerTree
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

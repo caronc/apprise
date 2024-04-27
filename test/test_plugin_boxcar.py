@@ -29,7 +29,7 @@
 import pytest
 from unittest import mock
 
-from apprise.plugins.NotifyBoxcar import NotifyBoxcar
+from apprise.plugins.boxcar import NotifyBoxcar
 from helpers import AppriseURLTester
 from apprise import NotifyType
 import requests

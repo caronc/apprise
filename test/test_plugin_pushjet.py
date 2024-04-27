@@ -29,7 +29,7 @@
 import pytest
 import requests
 
-from apprise.plugins.NotifyPushjet import NotifyPushjet
+from apprise.plugins.pushjet import NotifyPushjet
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output

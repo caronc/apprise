@@ -30,7 +30,7 @@ import requests
 from unittest import mock
 
 import apprise
-from apprise.plugins.NotifyDapnet import DapnetPriority, NotifyDapnet
+from apprise.plugins.dapnet import DapnetPriority, NotifyDapnet
 from helpers import AppriseURLTester
 from apprise import NotifyType
 

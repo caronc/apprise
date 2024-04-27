@@ -30,7 +30,7 @@ from unittest import mock
 
 import requests
 from apprise import Apprise
-from apprise.plugins.NotifyPushDeer import NotifyPushDeer
+from apprise.plugins.pushdeer import NotifyPushDeer
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
