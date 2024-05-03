@@ -70,6 +70,12 @@ apprise_url_tests = (
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'apprise://localhost/a...a/',
     }),
+    # A valid URL with long Token
+    ('apprise://localhost/%s' % ('a' * 128), {
+        'instance': NotifyAppriseAPI,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'apprise://localhost/a...a/',
+    }),
     # A valid URL with Token (using port)
     ('apprise://localhost:8080/%s' % ('b' * 32), {
         'instance': NotifyAppriseAPI,
