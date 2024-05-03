@@ -123,7 +123,7 @@ class NotifyAppriseAPI(NotifyBase):
             'type': 'string',
             'required': True,
             'private': True,
-            'regex': (r'^[A-Z0-9_-]{1,32}$', 'i'),
+            'regex': (r'^[A-Z0-9_-]{1,128}$', 'i'),
         },
     })
 
