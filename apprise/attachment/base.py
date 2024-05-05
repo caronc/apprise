@@ -333,7 +333,8 @@ class AttachBase(URLBase):
             successful, otherwise None is returned.
         """
 
-        results = URLBase.parse_url(url, verify_host=verify_host)
+        results = URLBase.parse_url(
+            url, verify_host=verify_host, sanitize=False)
 
         if not results:
             # We're done; we failed to parse our url

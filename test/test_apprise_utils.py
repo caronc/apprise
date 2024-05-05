@@ -719,6 +719,38 @@ def test_parse_url_general():
     assert result['qsd+'] == {}
     assert result['qsd:'] == {}
 
+    # Sanitizing
+    result = utils.parse_url(
+        'hTTp://hostname/?+KeY=ValueA&-kEy=ValueB&KEY=Value%20+C&:cOlON=YeS',
+        sanitize=False)
+
+    assert len(result['qsd-']) == 1
+    assert len(result['qsd+']) == 1
+    assert len(result['qsd']) == 4
+    assert len(result['qsd:']) == 1
+
+    assert result['schema'] == 'http'
+    assert result['host'] == 'hostname'
+    assert result['port'] is None
+    assert result['user'] is None
+    assert result['password'] is None
+    assert result['fullpath'] == '/'
+    assert result['path'] == '/'
+    assert result['query'] is None
+    assert result['url'] == 'http://hostname/'
+    assert '+KeY' in result['qsd']
+    assert '-kEy' in result['qsd']
+    assert ':cOlON' in result['qsd']
+    assert result['qsd:']['cOlON'] == 'YeS'
+    assert 'key' not in result['qsd']
+    assert 'KeY' in result['qsd+']
+    assert result['qsd+']['KeY'] == 'ValueA'
+    assert 'kEy' in result['qsd-']
+    assert result['qsd-']['kEy'] == 'ValueB'
+    assert result['qsd']['KEY'] == 'Value +C'
+    assert result['qsd']['+KeY'] == result['qsd+']['KeY']
+    assert result['qsd']['-kEy'] == result['qsd-']['kEy']
+
 
 def test_parse_url_simple():
     "utils: parse_url() testing """

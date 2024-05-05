@@ -190,7 +190,7 @@ def test_attach_http(mock_get, mock_post):
 
     # Test custom url get parameters
     results = AttachHTTP.parse_url(
-        'http://user:pass@localhost/apprise.gif?dl=1&cache=300')
+        'http://user:pass@localhost/apprise.gif?DL=1&cache=300')
     assert isinstance(results, dict)
     attachment = AttachHTTP(**results)
     assert isinstance(attachment.url(), str) is True
@@ -200,11 +200,15 @@ def test_attach_http(mock_get, mock_post):
     assert attachment
     assert mock_get.call_count == 1
     assert 'params' in mock_get.call_args_list[0][1]
-    assert 'dl' in mock_get.call_args_list[0][1]['params']
+    assert 'DL' in mock_get.call_args_list[0][1]['params']
 
     # Verify that arguments that are reserved for apprise are not
     # passed along
     assert 'cache' not in mock_get.call_args_list[0][1]['params']
+
+    with mock.patch('os.unlink', side_effect=OSError()):
+        # Test invalidation with exception thrown
+        attachment.invalidate()
 
     results = AttachHTTP.parse_url(
         'http://user:pass@localhost/apprise.gif?+key=value&cache=True')
