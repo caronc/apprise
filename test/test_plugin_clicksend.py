@@ -62,6 +62,10 @@ apprise_url_tests = (
         # valid number - no batch
         'instance': NotifyClickSend,
     }),
+    ('clicksend://user@{}?batch=no&key=abc123'.format('3' * 14), {
+        # valid number - no batch
+        'instance': NotifyClickSend,
+    }),
     ('clicksend://user:pass@{}'.format('3' * 14), {
         'instance': NotifyClickSend,
         # throw a bizzare code forcing us to fail to look it up

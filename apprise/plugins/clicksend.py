@@ -88,7 +88,7 @@ class NotifyClickSend(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{user}:{password}@{targets}',
+        '{schema}://{user}:{apikey}@{targets}',
     )
 
     # Define our template tokens
@@ -98,11 +98,12 @@ class NotifyClickSend(NotifyBase):
             'type': 'string',
             'required': True,
         },
-        'password': {
-            'name': _('Password'),
+        'apikey': {
+            'name': _('API Key'),
             'type': 'string',
             'private': True,
             'required': True,
+            'map_to': 'password',
         },
         'target_phone': {
             'name': _('Target Phone No'),
@@ -122,6 +123,9 @@ class NotifyClickSend(NotifyBase):
     template_args = dict(NotifyBase.template_args, **{
         'to': {
             'alias_of': 'targets',
+        },
+        'key': {
+            'alias_of': 'apikey',
         },
         'batch': {
             'name': _('Batch Mode'),
@@ -318,6 +322,12 @@ class NotifyClickSend(NotifyBase):
         # Get Batch Mode Flag
         results['batch'] = \
             parse_bool(results['qsd'].get('batch', False))
+
+        # API Key
+        if 'key' in results['qsd'] and len(results['qsd']['key']):
+            # Extract the API Key from an argument
+            results['password'] = \
+                NotifyClickSend.unquote(results['qsd']['key'])
 
         # Support the 'to' variable so that we can support rooms this way too
         # The 'to' makes it easier to use yaml configuration
