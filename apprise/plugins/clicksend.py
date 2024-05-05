@@ -41,7 +41,6 @@
 #
 import requests
 from json import dumps
-from base64 import b64encode
 
 from .base import NotifyBase
 from ..url import PrivacyMode
@@ -174,9 +173,6 @@ class NotifyClickSend(NotifyBase):
         headers = {
             'User-Agent': self.app_id,
             'Content-Type': 'application/json; charset=utf-8',
-            'Authorization': 'Basic {}'.format(
-                b64encode('{}:{}'.format(
-                    self.user, self.password).encode('utf-8'))),
         }
 
         # error tracking (used for function return)
@@ -208,6 +204,7 @@ class NotifyClickSend(NotifyBase):
                 r = requests.post(
                     self.notify_url,
                     data=dumps(payload),
+                    auth=(self.user, self.password),
                     headers=headers,
                     verify=self.verify_certificate,
                     timeout=self.request_timeout,
