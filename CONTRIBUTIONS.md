@@ -33,3 +33,9 @@ The contributors have been listed in chronological order:
 
 * Kate Ward <https://kate.pet>
   * 6th Feb 2024 - Add Revolt Support
+
+* Han Wang <freddie.wanah@gmail.com>
+  * Apr 2024 - Refactored test cases
+
+* Toni Wells <@isometimescode>
+  * May 2024 - Fixed token length with apprise://
