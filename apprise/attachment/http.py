@@ -296,8 +296,7 @@ class AttachHTTP(AttachBase):
         """
         Tidy memory if open
         """
-        with self._lock:
-            self.invalidate()
+        self.invalidate()
 
     def url(self, privacy=False, *args, **kwargs):
         """
