@@ -296,8 +296,7 @@ class AttachHTTP(AttachBase):
         """
         Tidy memory if open
         """
-        with self._lock:
-            self.invalidate()
+        self.invalidate()
 
     def url(self, privacy=False, *args, **kwargs):
         """
@@ -363,8 +362,7 @@ class AttachHTTP(AttachBase):
         us to re-instantiate this object.
 
         """
-        results = AttachBase.parse_url(url)
-
+        results = AttachBase.parse_url(url, sanitize=False)
         if not results:
             # We're done early as we couldn't load the results
             return results

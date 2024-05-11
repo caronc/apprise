@@ -541,7 +541,7 @@ def tidy_path(path):
     return path
 
 
-def parse_qsd(qs, simple=False, plus_to_space=False):
+def parse_qsd(qs, simple=False, plus_to_space=False, sanitize=True):
     """
     Query String Dictionary Builder
 
@@ -568,6 +568,8 @@ def parse_qsd(qs, simple=False, plus_to_space=False):
     per normal URL Encoded defininition. Normal URL parsing applies
     this, but `+` is very actively used character with passwords,
     api keys, tokens, etc.  So Apprise does not do this by default.
+
+    if sanitize is set to False, then kwargs are not placed into lowercase
     """
 
     # Our return result set:
@@ -608,7 +610,7 @@ def parse_qsd(qs, simple=False, plus_to_space=False):
 
         # Always Query String Dictionary (qsd) for every entry we have
         # content is always made lowercase for easy indexing
-        result['qsd'][key.lower().strip()] = val
+        result['qsd'][key.lower().strip() if sanitize else key] = val
 
         if simple:
             # move along
@@ -636,7 +638,7 @@ def parse_qsd(qs, simple=False, plus_to_space=False):
 
 
 def parse_url(url, default_schema='http', verify_host=True, strict_port=False,
-              simple=False, plus_to_space=False):
+              simple=False, plus_to_space=False, sanitize=True):
     """A function that greatly simplifies the parsing of a url
     specified by the end user.
 
@@ -691,6 +693,8 @@ def parse_url(url, default_schema='http', verify_host=True, strict_port=False,
 
      If the URL can't be parsed then None is returned
 
+     If sanitize is set to False, then kwargs are not placed in lowercase
+     and wrapping whitespace is not removed
     """
 
     if not isinstance(url, str):
@@ -750,7 +754,8 @@ def parse_url(url, default_schema='http', verify_host=True, strict_port=False,
     # while ensuring that all keys are lowercase
     if qsdata:
         result.update(parse_qsd(
-            qsdata, simple=simple, plus_to_space=plus_to_space))
+            qsdata, simple=simple, plus_to_space=plus_to_space,
+            sanitize=sanitize))
 
     # Now do a proper extraction of data; http:// is just substitued in place
     # to allow urlparse() to function as expected, we'll swap this back to the
