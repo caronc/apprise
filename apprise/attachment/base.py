@@ -315,7 +315,7 @@ class AttachBase(URLBase):
             "download() is implimented by the child class.")
 
     @staticmethod
-    def parse_url(url, verify_host=True, mimetype_db=None):
+    def parse_url(url, verify_host=True, mimetype_db=None, sanitize=True):
         """Parses the URL and returns it broken apart into a dictionary.
 
         This is very specific and customized for Apprise.
@@ -334,7 +334,7 @@ class AttachBase(URLBase):
         """
 
         results = URLBase.parse_url(
-            url, verify_host=verify_host, sanitize=False)
+            url, verify_host=verify_host, sanitize=sanitize)
 
         if not results:
             # We're done; we failed to parse our url

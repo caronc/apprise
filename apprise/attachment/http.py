@@ -363,8 +363,7 @@ class AttachHTTP(AttachBase):
         us to re-instantiate this object.
 
         """
-        results = AttachBase.parse_url(url)
-
+        results = AttachBase.parse_url(url, sanitize=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
