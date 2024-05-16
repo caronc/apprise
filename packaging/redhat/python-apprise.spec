@@ -49,9 +49,10 @@ NextcloudTalk, Notica, Notifiarr, Notifico, ntfy, Office365, OneSignal,
 Opsgenie, PagerDuty, PagerTree, ParsePlatform, PopcornNotify, Prowl, Pushalot,
 PushBullet, Pushjet, PushMe, Pushover, PushSafer, Pushy, PushDeer, Revolt,
 Reddit, Rocket.Chat, RSyslog, SendGrid, ServerChan, Signal, SimplePush, Sinch,
-Slack, SMSEagle, SMS Manager, SMTP2Go, SparkPost, Super Toasty, Streamlabs,
-Stride, Synology Chat, Syslog, Techulus Push, Telegram, Threema Gateway, Twilio,
-Twitter, Twist, XBMC, Voipms, Vonage, WeCom Bot, WhatsApp, Webex Teams}
+Slack, SMSEagle, SMS Manager, SMTP2Go, SparkPost, Splunk, Super Toasty,
+Streamlabs, Stride, Synology Chat, Syslog, Techulus Push, Telegram, Threema
+Gateway, Twilio, Twitter, Twist, XBMC, VictorOps, Voipms, Vonage, WeCom Bot,
+WhatsApp, Webex Teams}
 
 Name:           python-%{pypi_name}
 Version:        1.8.0

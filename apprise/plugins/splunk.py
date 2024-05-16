@@ -52,6 +52,9 @@ class SplunkAction:
     # Use mapping (specify :key=arg to over-ride)
     MAP = 'map'
 
+    # Creates a timeline event but does not trigger an incident
+    INFO = 'info'
+
     # Triggers a warning (possibly causing incident) in all cases
     WARNING = 'warning'
 
@@ -59,7 +62,7 @@ class SplunkAction:
     CRITICAL = 'critical'
 
     # Acknowldege entity_id provided in all cases
-    ACKNOWLEDGE = 'acknowledge'
+    ACKNOWLEDGE = 'acknowledgement'
 
     # Recovery entity_id provided in all cases
     RECOVERY = 'recovery'
@@ -71,6 +74,7 @@ class SplunkAction:
 # Define our Splunk Actions
 SPLUNK_ACTIONS = (
     SplunkAction.MAP,
+    SplunkAction.INFO,
     SplunkAction.ACKNOWLEDGE,
     SplunkAction.WARNING,
     SplunkAction.RECOVERY,
@@ -118,7 +122,7 @@ class NotifySplunk(NotifyBase):
     service_name = _('Splunk On-Call')
 
     # The services URL
-    service_url = 'https://www.splunk.com/'
+    service_url = 'https://www.splunk.com/en_us/products/on-call.html'
 
     # The default secure protocol
     secure_protocol = ('splunk', 'victorops')
@@ -184,6 +188,9 @@ class NotifySplunk(NotifyBase):
             'alias_of': 'apikey',
         },
         'routing_key': {
+            'alias_of': 'routing_key',
+        },
+        'route': {
             'alias_of': 'routing_key',
         },
         'entity_id': {
@@ -293,6 +300,10 @@ class NotifySplunk(NotifyBase):
         elif self.action == SplunkAction.ACKNOWLEDGE:
             # Always Acknowledge
             message_type = SplunkMessageType.ACKNOWLEDGEMENT
+
+        elif self.action == SplunkAction.INFO:
+            # Creates a timeline event but does not trigger an incident
+            message_type = SplunkMessageType.INFO
 
         elif self.action == SplunkAction.CRITICAL:
             # Always create Incident
@@ -431,6 +442,10 @@ class NotifySplunk(NotifyBase):
                 and len(results['qsd']['routing_key']):
             results['routing_key'] = \
                 NotifySplunk.unquote(results['qsd']['routing_key'])
+
+        elif 'route' in results['qsd'] and len(results['qsd']['route']):
+            results['routing_key'] = \
+                NotifySplunk.unquote(results['qsd']['route'])
 
         else:
             results['routing_key'] = NotifySplunk.unquote(results['user'])
