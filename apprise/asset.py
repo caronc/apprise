@@ -70,6 +70,9 @@ class AppriseAsset:
         NotifyType.WARNING: '#CACF29',
     }
 
+    # The default color to return if a mapping isn't found in our table above
+    default_html_color = '#888888'
+
     # Ascii Notification
     ascii_notify_map = {
         NotifyType.INFO: '[i]',
@@ -78,8 +81,8 @@ class AppriseAsset:
         NotifyType.WARNING: '[~]',
     }
 
-    # The default color to return if a mapping isn't found in our table above
-    default_html_color = '#888888'
+    # The default ascii to return if a mapping isn't found in our table above
+    default_ascii_chars = '[?]'
 
     # The default image extension to use
     default_extension = '.png'
@@ -223,9 +226,8 @@ class AppriseAsset:
         Returns an ascii representation based on passed in notify type
 
         """
-
         # look our response up
-        return self.ascii_notify_map.get(notify_type, self.default_html_color)
+        return self.ascii_notify_map.get(notify_type, self.default_ascii_chars)
 
     def image_url(self, notify_type, image_size, logo=False, extension=None):
         """

@@ -962,6 +962,18 @@ def test_apprise_asset(tmpdir):
         # The exception we expect since dict is not supported
         a.color(NotifyType.INFO, dict)
 
+    # Test our ASCII mappings
+    assert a.ascii('invalid') == '[?]'
+    assert a.ascii(NotifyType.INFO) == '[i]'
+    assert a.ascii(NotifyType.SUCCESS) == '[+]'
+    assert a.ascii(NotifyType.WARNING) == '[~]'
+    assert a.ascii(NotifyType.FAILURE) == '[!]'
+
+    # Invalid Type
+    with pytest.raises(ValueError):
+        # The exception we expect since dict is not supported
+        a.color(NotifyType.INFO, dict)
+
     assert a.image_url(NotifyType.INFO, NotifyImageSize.XY_256) == \
         'http://localhost/dark/info-256x256.png'
 

@@ -364,6 +364,17 @@ class NotifyBase(URLBase):
             color_type=color_type,
         )
 
+    def ascii(self, notify_type):
+        """
+        Returns the ascii characters associated with the notify_type
+        """
+        if notify_type not in NOTIFY_TYPES:
+            return None
+
+        return self.asset.ascii(
+            notify_type=notify_type,
+        )
+
     def notify(self, *args, **kwargs):
         """
         Performs notification

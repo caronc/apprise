@@ -154,6 +154,13 @@ def test_notify_base():
     assert isinstance(
         nb.color(notify_type=NotifyType.INFO, color_type=tuple), tuple)
 
+    # Ascii Handling
+    assert nb.ascii(notify_type='invalid') is None
+    assert nb.ascii(NotifyType.INFO) == '[i]'
+    assert nb.ascii(NotifyType.SUCCESS) == '[+]'
+    assert nb.ascii(NotifyType.WARNING) == '[~]'
+    assert nb.ascii(NotifyType.FAILURE) == '[!]'
+
     # Create an object
     nb = NotifyBase()
     # Force an image size since the default doesn't have one
