@@ -36,7 +36,7 @@ from os.path import dirname
 from os.path import join
 from apprise import cli
 from apprise import NotifyBase
-from apprise.manager_plugins import NotificationManager
+from apprise import NotificationManager
 from click.testing import CliRunner
 from apprise.utils import environ
 from apprise.locale import gettext_lazy as _

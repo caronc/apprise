@@ -35,7 +35,7 @@ from os.path import join
 from os.path import dirname
 from inspect import cleandoc
 from apprise import Apprise, AppriseAsset
-from apprise.manager_attachment import AttachmentManager
+from apprise import AttachmentManager
 from apprise.apprise_attachment import AppriseAttachment
 from apprise.attachment import AttachBase
 from apprise.common import ContentLocation

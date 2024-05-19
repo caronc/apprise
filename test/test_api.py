@@ -51,7 +51,7 @@ from apprise import PrivacyMode
 from apprise.locale import LazyTranslation
 from apprise.locale import gettext_lazy as _
 
-from apprise.manager_plugins import NotificationManager
+from apprise import NotificationManager
 from apprise.utils import parse_list
 from helpers import OuterEventLoop
 import inspect

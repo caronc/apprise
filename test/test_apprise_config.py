@@ -37,8 +37,8 @@ from apprise import AppriseConfig
 from apprise import AppriseAsset
 from apprise.config import ConfigBase
 from apprise.plugins import NotifyBase
-from apprise.manager_plugins import NotificationManager
-from apprise.manager_config import ConfigurationManager
+from apprise import NotificationManager
+from apprise import ConfigurationManager
 
 from apprise.config.file import ConfigFile
 

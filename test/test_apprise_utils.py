@@ -33,7 +33,7 @@ from inspect import cleandoc
 from urllib.parse import unquote
 
 from apprise import utils
-from apprise.manager_plugins import NotificationManager
+from apprise import NotificationManager
 
 # Disable logging for a cleaner testing output
 import logging

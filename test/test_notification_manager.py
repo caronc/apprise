@@ -33,7 +33,7 @@ import threading
 from inspect import cleandoc
 
 from apprise import Apprise
-from apprise.manager_plugins import NotificationManager
+from apprise import NotificationManager
 from apprise.plugins import NotifyBase
 
 # Disable logging for a cleaner testing output

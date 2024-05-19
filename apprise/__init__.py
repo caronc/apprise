@@ -60,7 +60,9 @@ from .locale import AppriseLocale
 from .asset import AppriseAsset
 from .apprise_config import AppriseConfig
 from .apprise_attachment import AppriseAttachment
-
+from .manager_attachment import AttachmentManager
+from .manager_config import ConfigurationManager
+from .manager_plugins import NotificationManager
 from . import decorators
 
 # Inherit our logging with our additional entries added to it
@@ -83,6 +85,9 @@ __all__ = [
     'ContentIncludeMode', 'CONTENT_INCLUDE_MODES',
     'ContentLocation', 'CONTENT_LOCATIONS',
     'PrivacyMode',
+
+    # Managers
+    'NotificationManager', 'ConfigurationManager', 'AttachmentManager',
 
     # Decorator
     'decorators',

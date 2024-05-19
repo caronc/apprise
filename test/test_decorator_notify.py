@@ -35,7 +35,7 @@ from apprise import AppriseConfig
 from apprise import AppriseAsset
 from apprise import AppriseAttachment
 from apprise import common
-from apprise.manager_plugins import NotificationManager
+from apprise import NotificationManager
 
 # Disable logging for a cleaner testing output
 import logging

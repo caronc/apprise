@@ -28,8 +28,8 @@
 
 from itertools import chain
 from importlib import import_module, reload
-from apprise.manager_plugins import NotificationManager
-from apprise.manager_attachment import AttachmentManager
+from apprise import NotificationManager
+from apprise import AttachmentManager
 import sys
 import re
 
