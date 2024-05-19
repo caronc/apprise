@@ -5,7 +5,7 @@
 
 ## New Service Completion Status
 <!-- This section is only applicable if you're adding a new service -->
-* [ ] apprise/plugins/Notify<!--ServiceName goes here-->.py
+* [ ] apprise/plugins/<!--new plugin name -->.py
 * [ ] KEYWORDS
     - add new service into this file (alphabetically).
 * [ ] README.md
