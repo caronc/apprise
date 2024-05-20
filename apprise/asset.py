@@ -27,6 +27,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import re
+import gzip
 from uuid import uuid4
 from os.path import join
 from os.path import dirname
@@ -141,6 +142,9 @@ class AppriseAsset:
 
     # Defines the encoding of the content passed into Apprise
     encoding = 'utf-8'
+
+    # Allow for persistent storage
+    persistent_storage = True
 
     # For more detail see CWE-312 @
     #    https://cwe.mitre.org/data/definitions/312.html
