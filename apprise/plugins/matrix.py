@@ -293,6 +293,9 @@ class NotifyMatrix(NotifyBase):
         # This gets initialized after a login/registration
         self.access_token = None
 
+        # This gets incremented for each request made against the v3 API
+        self.transaction_id = 0
+
         # Place an image inline with the message body
         self.include_image = include_image
 
@@ -612,8 +615,10 @@ class NotifyMatrix(NotifyBase):
 
             # Build our path
             if self.version == MatrixVersion.V3:
-                path = '/rooms/{}/send/m.room.message/0'.format(
-                    NotifyMatrix.quote(room_id))
+                path = '/rooms/{}/send/m.room.message/{}'.format(
+                    NotifyMatrix.quote(room_id),
+                    self.transaction_id,
+                )
 
             else:
                 path = '/rooms/{}/send/m.room.message'.format(
@@ -685,6 +690,12 @@ class NotifyMatrix(NotifyBase):
             method = 'PUT' if self.version == MatrixVersion.V3 else 'POST'
             postokay, response = self._fetch(
                 path, payload=payload, method=method)
+
+            # Increment the transaction ID to avoid future messages being
+            # recognized as retransmissions and ignored
+            if self.version == MatrixVersion.V3:
+                self.transaction_id += 1
+
             if not postokay:
                 # Notify our user
                 self.logger.warning(
