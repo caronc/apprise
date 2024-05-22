@@ -603,9 +603,6 @@ class NotifySlack(NotifyBase):
                             channel if channel[0] == '#' \
                             else '#{}'.format(channel)
 
-                # Store the valid and massaged payload that is recognizable by
-                # slack. This list is used for sending attachments later.
-                attach_channel_list.append(payload['channel'])
 
             response = self._send(url, payload)
             if not response:
@@ -613,10 +610,15 @@ class NotifySlack(NotifyBase):
                 has_error = True
                 continue
 
+            # Store the valid and massaged payload that is recognizable by
+            # slack. This list is used for sending attachments later.
+            attach_channel_list.append(response['channel'])
+
             self.logger.info(
                 'Sent Slack notification{}.'.format(
                     ' to {}'.format(channel)
                     if channel is not None else ''))
+            self.logger.info('Channel return {}.'.format(response.get('channel')))
 
         if attach and self.attachment_support and \
                 self.mode is SlackMode.BOT and attach_channel_list:
@@ -635,20 +637,55 @@ class NotifySlack(NotifyBase):
                     'Posting Slack attachment {}'.format(
                         attachment.url(privacy=True)))
 
-                # Prepare API Upload Payload
-                _payload = {
+                # Get the URL to which to upload the file.
+                # https://api.slack.com/methods/files.getUploadURLExternal
+                _params = {
                     'filename': attachment.name,
-                    'channels': ','.join(attach_channel_list)
+                    'length': len(attachment),
                 }
-
-                # Our URL
-                _url = self.api_url.format('files.upload')
-
-                response = self._send(_url, _payload, attach=attachment)
-                if not (response and response.get('file') and
-                        response['file'].get('url_private')):
-                    # We failed to post our attachments, take an early exit
+                _url = self.api_url.format('files.getUploadURLExternal')
+                response = self._send(_url, {}, http_method='GET', params=_params)
+                if not (response and response.get('file_id') and response.get('upload_url')):
+                    self.logger.error('Could retrieve file upload URL.')
+                    # We failed to get an upload URL, take an early exit
                     return False
+
+                file_id = response.get('file_id')
+                upload_url = response.get('upload_url')
+                
+                # Upload file
+                response = self._send(upload_url, {}, attach=attachment)
+                if not (response):
+                    self.logger.error('Failed to upload file.')
+                    # We failed to upload the file, take an early exit
+                    return False
+
+                # Send file to channels
+                # https://api.slack.com/methods/files.completeUploadExternal
+                for channel_id in attach_channel_list:
+                    _payload = {
+                        'files': [{
+                            "id": file_id,
+                            "title": attachment.name,
+                        }],
+                        'channel_id': channel_id
+                    }
+                    _url = self.api_url.format('files.completeUploadExternal')
+                    response = self._send(_url, _payload)
+                    # Expected response
+                    # {
+                    #     "ok": true,
+                    #     "files": [
+                    #         {
+                    #             "id": "F123ABC456",
+                    #             "title": "slack-test"
+                    #         }
+                    #     ]
+                    # }
+                    if not (response and response.get('files')):
+                        self.logger.error('Failed to send file to channel.')
+                        # We failed to send the file to the channel, take an early exit
+                        return False
 
         return not has_error
 
@@ -808,7 +845,7 @@ class NotifySlack(NotifyBase):
 
         return user_id
 
-    def _send(self, url, payload, attach=None, **kwargs):
+    def _send(self, url, payload, attach=None, http_method='post', params=None, **kwargs):
         """
         Wrapper to the requests (post) object
         """
@@ -842,13 +879,15 @@ class NotifySlack(NotifyBase):
             if attach:
                 files = {'file': (attach.name, open(attach.path, 'rb'))}
 
-            r = requests.post(
+            r = requests.request(
+                http_method,
                 url,
                 data=payload if attach else dumps(payload),
                 headers=headers,
                 files=files,
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
+                params=params if params else None,
             )
 
             # Posts return a JSON string
@@ -869,7 +908,10 @@ class NotifySlack(NotifyBase):
             #
             # The text 'ok' is returned if this is a Webhook request
             # So the below captures that as well.
-            status_okay = (response and response.get('ok', False)) \
+            status_okay = (
+                    (response and response.get('ok', False)) or 
+                    (b'OK' in r.content)
+                ) \
                 if self.mode is SlackMode.BOT else r.content == b'ok'
 
             if r.status_code != requests.codes.ok or not status_okay:
@@ -879,7 +921,7 @@ class NotifySlack(NotifyBase):
                         r.status_code, SLACK_HTTP_ERROR_MAP)
 
                 self.logger.warning(
-                    'Failed to send {}to Slack: '
+                    'Failed to send {} to Slack: '
                     '{}{}error={}.'.format(
                         attach.name if attach else '',
                         status_str,
@@ -982,7 +1024,7 @@ class NotifySlack(NotifyBase):
                 files['file'][1].close()
 
         # Return the response for processing
-        return response
+        return response or r.content
 
     def url(self, privacy=False, *args, **kwargs):
         """
