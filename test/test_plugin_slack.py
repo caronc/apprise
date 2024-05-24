@@ -451,18 +451,18 @@ def test_plugin_slack_oauth_access_token(mock_request):
     # Test Email Lookup
 
 
-@mock.patch('requests.post')
-def test_plugin_slack_webhook_mode(mock_post):
+@mock.patch('requests.request')
+def test_plugin_slack_webhook_mode(mock_request):
     """
     NotifySlack() Webhook Mode Tests
 
     """
 
     # Prepare Mock
-    mock_post.return_value = requests.Request()
-    mock_post.return_value.status_code = requests.codes.ok
-    mock_post.return_value.content = b'ok'
-    mock_post.return_value.text = 'ok'
+    mock_request.return_value = requests.Request()
+    mock_request.return_value.status_code = requests.codes.ok
+    mock_request.return_value.content = b'ok'
+    mock_request.return_value.text = 'ok'
 
     # Initialize some generic (but valid) tokens
     token_a = 'A' * 9
@@ -496,9 +496,9 @@ def test_plugin_slack_webhook_mode(mock_post):
         body='body', title='title', notify_type=NotifyType.INFO) is True
 
 
-@mock.patch('requests.post')
+@mock.patch('requests.request')
 @mock.patch('requests.get')
-def test_plugin_slack_send_by_email(mock_get, mock_post):
+def test_plugin_slack_send_by_email(mock_get, mock_request):
     """
     NotifySlack() Send by Email Tests
 
@@ -518,7 +518,7 @@ def test_plugin_slack_send_by_email(mock_get, mock_post):
     request.status_code = requests.codes.ok
 
     # Prepare Mock
-    mock_post.return_value = request
+    mock_request.return_value = request
     mock_get.return_value = request
 
     # Variation Initializations
@@ -527,7 +527,7 @@ def test_plugin_slack_send_by_email(mock_get, mock_post):
     assert isinstance(obj.url(), str) is True
 
     # No calls made yet
-    assert mock_post.call_count == 0
+    assert mock_request.call_count == 0
     assert mock_get.call_count == 0
 
     # Send our notification
@@ -537,18 +537,18 @@ def test_plugin_slack_send_by_email(mock_get, mock_post):
     # 2 calls were made, one to perform an email lookup, the second
     # was the notification itself
     assert mock_get.call_count == 1
-    assert mock_post.call_count == 1
+    assert mock_request.call_count == 1
     assert mock_get.call_args_list[0][0][0] == \
         'https://slack.com/api/users.lookupByEmail'
-    assert mock_post.call_args_list[0][0][0] == \
+    assert mock_request.call_args_list[0][0][1] == \
         'https://slack.com/api/chat.postMessage'
 
     # Reset our mock object
-    mock_post.reset_mock()
+    mock_request.reset_mock()
     mock_get.reset_mock()
 
     # Prepare Mock
-    mock_post.return_value = request
+    mock_request.return_value = request
     mock_get.return_value = request
 
     # Send our notification again (cached copy of user id associated with
@@ -557,8 +557,8 @@ def test_plugin_slack_send_by_email(mock_get, mock_post):
         body='body', title='title', notify_type=NotifyType.INFO) is True
 
     assert mock_get.call_count == 0
-    assert mock_post.call_count == 1
-    assert mock_post.call_args_list[0][0][0] == \
+    assert mock_request.call_count == 1
+    assert mock_request.call_args_list[0][0][1] == \
         'https://slack.com/api/chat.postMessage'
 
     #
@@ -570,11 +570,11 @@ def test_plugin_slack_send_by_email(mock_get, mock_post):
     })
 
     # Reset our mock object
-    mock_post.reset_mock()
+    mock_request.reset_mock()
     mock_get.reset_mock()
 
     # Prepare Mock
-    mock_post.return_value = request
+    mock_request.return_value = request
     mock_get.return_value = request
 
     # Variation Initializations
@@ -583,7 +583,7 @@ def test_plugin_slack_send_by_email(mock_get, mock_post):
     assert isinstance(obj.url(), str) is True
 
     # No calls made yet
-    assert mock_post.call_count == 0
+    assert mock_request.call_count == 0
     assert mock_get.call_count == 0
 
     # Send our notification; it will fail because we failed to look up
@@ -594,7 +594,7 @@ def test_plugin_slack_send_by_email(mock_get, mock_post):
     # We would have failed to look up the email, therefore we wouldn't have
     # even bothered to attempt to send the notification
     assert mock_get.call_count == 1
-    assert mock_post.call_count == 0
+    assert mock_request.call_count == 0
     assert mock_get.call_args_list[0][0][0] == \
         'https://slack.com/api/users.lookupByEmail'
 
@@ -604,11 +604,11 @@ def test_plugin_slack_send_by_email(mock_get, mock_post):
     request.content = '}'
 
     # Reset our mock object
-    mock_post.reset_mock()
+    mock_request.reset_mock()
     mock_get.reset_mock()
 
     # Prepare Mock
-    mock_post.return_value = request
+    mock_request.return_value = request
     mock_get.return_value = request
 
     # Variation Initializations
@@ -617,7 +617,7 @@ def test_plugin_slack_send_by_email(mock_get, mock_post):
     assert isinstance(obj.url(), str) is True
 
     # No calls made yet
-    assert mock_post.call_count == 0
+    assert mock_request.call_count == 0
     assert mock_get.call_count == 0
 
     # Send our notification; it will fail because we failed to look up
@@ -628,7 +628,7 @@ def test_plugin_slack_send_by_email(mock_get, mock_post):
     # We would have failed to look up the email, therefore we wouldn't have
     # even bothered to attempt to send the notification
     assert mock_get.call_count == 1
-    assert mock_post.call_count == 0
+    assert mock_request.call_count == 0
     assert mock_get.call_args_list[0][0][0] == \
         'https://slack.com/api/users.lookupByEmail'
 
@@ -638,11 +638,11 @@ def test_plugin_slack_send_by_email(mock_get, mock_post):
     request.content = '}'
 
     # Reset our mock object
-    mock_post.reset_mock()
+    mock_request.reset_mock()
     mock_get.reset_mock()
 
     # Prepare Mock
-    mock_post.return_value = request
+    mock_request.return_value = request
     mock_get.return_value = request
 
     # Variation Initializations
@@ -651,7 +651,7 @@ def test_plugin_slack_send_by_email(mock_get, mock_post):
     assert isinstance(obj.url(), str) is True
 
     # No calls made yet
-    assert mock_post.call_count == 0
+    assert mock_request.call_count == 0
     assert mock_get.call_count == 0
 
     # Send our notification; it will fail because we failed to look up
@@ -662,7 +662,7 @@ def test_plugin_slack_send_by_email(mock_get, mock_post):
     # We would have failed to look up the email, therefore we wouldn't have
     # even bothered to attempt to send the notification
     assert mock_get.call_count == 1
-    assert mock_post.call_count == 0
+    assert mock_request.call_count == 0
     assert mock_get.call_args_list[0][0][0] == \
         'https://slack.com/api/users.lookupByEmail'
 
@@ -681,11 +681,11 @@ def test_plugin_slack_send_by_email(mock_get, mock_post):
     request.status_code = requests.codes.ok
 
     # Reset our mock object
-    mock_post.reset_mock()
+    mock_request.reset_mock()
     mock_get.reset_mock()
 
     # Prepare Mock
-    mock_post.return_value = request
+    mock_request.return_value = request
     mock_get.side_effect = requests.ConnectionError(
         0, 'requests.ConnectionError() not handled')
 
@@ -695,7 +695,7 @@ def test_plugin_slack_send_by_email(mock_get, mock_post):
     assert isinstance(obj.url(), str) is True
 
     # No calls made yet
-    assert mock_post.call_count == 0
+    assert mock_request.call_count == 0
     assert mock_get.call_count == 0
 
     # Send our notification; it will fail because we failed to look up
@@ -706,14 +706,14 @@ def test_plugin_slack_send_by_email(mock_get, mock_post):
     # We would have failed to look up the email, therefore we wouldn't have
     # even bothered to attempt to send the notification
     assert mock_get.call_count == 1
-    assert mock_post.call_count == 0
+    assert mock_request.call_count == 0
     assert mock_get.call_args_list[0][0][0] == \
         'https://slack.com/api/users.lookupByEmail'
 
 
-@mock.patch('requests.post')
+@mock.patch('requests.request')
 @mock.patch('requests.get')
-def test_plugin_slack_markdown(mock_get, mock_post):
+def test_plugin_slack_markdown(mock_get, mock_request):
     """
     NotifySlack() Markdown tests
 
@@ -724,7 +724,7 @@ def test_plugin_slack_markdown(mock_get, mock_post):
     request.status_code = requests.codes.ok
 
     # Prepare Mock
-    mock_post.return_value = request
+    mock_request.return_value = request
     mock_get.return_value = request
 
     # Variation Initializations
@@ -753,12 +753,12 @@ def test_plugin_slack_markdown(mock_get, mock_post):
     # We would have failed to look up the email, therefore we wouldn't have
     # even bothered to attempt to send the notification
     assert mock_get.call_count == 0
-    assert mock_post.call_count == 1
-    assert mock_post.call_args_list[0][0][0] == \
+    assert mock_request.call_count == 1
+    assert mock_request.call_args_list[0][0][1] == \
         'https://hooks.slack.com/services/T1JJ3T3L2/A1BRTD4JD/' \
         'TIiajkdnlazkcOXrIdevi7FQ'
 
-    data = loads(mock_post.call_args_list[0][1]['data'])
+    data = loads(mock_request.call_args_list[0][1]['data'])
     assert data['attachments'][0]['text'] == \
         "Here is a <https://slack.com|Slack Link> we want to support as part "\
         "of it's\nmarkdown.\n\nThis one has arguments we want to preserve:"\
@@ -768,8 +768,8 @@ def test_plugin_slack_markdown(mock_get, mock_post):
         "\n\nChannel Testing\n<!channelA>\n<!channelA|Description>"
 
 
-@mock.patch('requests.post')
-def test_plugin_slack_single_thread_reply(mock_post):
+@mock.patch('requests.request')
+def test_plugin_slack_single_thread_reply(mock_request):
     """
     NotifySlack() Send Notification as a Reply
 
@@ -789,7 +789,7 @@ def test_plugin_slack_single_thread_reply(mock_post):
     request.status_code = requests.codes.ok
 
     # Prepare Mock
-    mock_post.return_value = request
+    mock_request.return_value = request
 
     # Variation Initializations
     obj = NotifySlack(access_token=token, targets=[f'#general:{thread_id}'])
@@ -797,22 +797,22 @@ def test_plugin_slack_single_thread_reply(mock_post):
     assert isinstance(obj.url(), str) is True
 
     # No calls made yet
-    assert mock_post.call_count == 0
+    assert mock_request.call_count == 0
 
     # Send our notification
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO) is True
 
     # Post was made
-    assert mock_post.call_count == 1
-    assert mock_post.call_args_list[0][0][0] == \
+    assert mock_request.call_count == 1
+    assert mock_request.call_args_list[0][0][1] == \
         'https://slack.com/api/chat.postMessage'
-    assert loads(mock_post.call_args_list[0][1]['data']).get("thread_ts") \
+    assert loads(mock_request.call_args_list[0][1]['data']).get("thread_ts") \
         == str(thread_id)
 
 
-@mock.patch('requests.post')
-def test_plugin_slack_multiple_thread_reply(mock_post):
+@mock.patch('requests.request')
+def test_plugin_slack_multiple_thread_reply(mock_request):
     """
     NotifySlack() Send Notification to multiple channels as Reply
 
@@ -832,7 +832,7 @@ def test_plugin_slack_multiple_thread_reply(mock_post):
     request.status_code = requests.codes.ok
 
     # Prepare Mock
-    mock_post.return_value = request
+    mock_request.return_value = request
 
     # Variation Initializations
     obj = NotifySlack(access_token=token,
@@ -843,17 +843,17 @@ def test_plugin_slack_multiple_thread_reply(mock_post):
     assert isinstance(obj.url(), str) is True
 
     # No calls made yet
-    assert mock_post.call_count == 0
+    assert mock_request.call_count == 0
 
     # Send our notification
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO) is True
 
     # Post was made
-    assert mock_post.call_count == 2
-    assert mock_post.call_args_list[0][0][0] == \
+    assert mock_request.call_count == 2
+    assert mock_request.call_args_list[0][0][1] == \
         'https://slack.com/api/chat.postMessage'
-    assert loads(mock_post.call_args_list[0][1]['data']).get("thread_ts") \
+    assert loads(mock_request.call_args_list[0][1]['data']).get("thread_ts") \
         == str(thread_id_1)
-    assert loads(mock_post.call_args_list[1][1]['data']).get("thread_ts") \
+    assert loads(mock_request.call_args_list[1][1]['data']).get("thread_ts") \
         == str(thread_id_2)
