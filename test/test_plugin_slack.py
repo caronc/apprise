@@ -49,14 +49,6 @@ TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), 'var')
 
 # Our Testing URLs
 apprise_url_tests = (
-    ('slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#channel', {
-        # No username specified; this is still okay as we sub in
-        # default; The one invalid channel is skipped when sending a message
-        'instance': NotifySlack,
-        # don't include an image by default
-        'include_image': False,
-        'requests_response_text': 'ok'
-    }),
     ('slack://', {
         'instance': TypeError,
     }),
@@ -82,6 +74,14 @@ apprise_url_tests = (
             'ok': False,
             'message': 'Bad Channel',
         },
+    }),
+    ('slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#channel', {
+        # No username specified; this is still okay as we sub in
+        # default; The one invalid channel is skipped when sending a message
+        'instance': NotifySlack,
+        # don't include an image by default
+        'include_image': False,
+        'requests_response_text': 'ok'
     }),
     ('slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/+id/@id/', {
         # + encoded id,
