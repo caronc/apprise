@@ -49,6 +49,14 @@ TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), 'var')
 
 # Our Testing URLs
 apprise_url_tests = (
+    ('slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#channel', {
+        # No username specified; this is still okay as we sub in
+        # default; The one invalid channel is skipped when sending a message
+        'instance': NotifySlack,
+        # don't include an image by default
+        'include_image': False,
+        'requests_response_text': 'ok'
+    }),
     ('slack://', {
         'instance': TypeError,
     }),
@@ -74,14 +82,6 @@ apprise_url_tests = (
             'ok': False,
             'message': 'Bad Channel',
         },
-    }),
-    ('slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#channel', {
-        # No username specified; this is still okay as we sub in
-        # default; The one invalid channel is skipped when sending a message
-        'instance': NotifySlack,
-        # don't include an image by default
-        'include_image': False,
-        'requests_response_text': 'ok'
     }),
     ('slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/+id/@id/', {
         # + encoded id,
@@ -289,8 +289,8 @@ def test_plugin_slack_urls():
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-@mock.patch('requests.post')
-def test_plugin_slack_oauth_access_token(mock_post):
+@mock.patch('requests.request')
+def test_plugin_slack_oauth_access_token(mock_request):
     """
     NotifySlack() OAuth Access Token Tests
 
@@ -299,17 +299,13 @@ def test_plugin_slack_oauth_access_token(mock_post):
     # Generate an invalid bot token
     token = 'xo-invalid'
 
-    request = mock.Mock()
-    request.content = dumps({
+    response = mock.Mock()
+    response.content = dumps({
         'ok': True,
         'message': '',
-
-        # Attachment support
-        'file': {
-            'url_private': 'http://localhost',
-        }
+        'channel': 'C123456',
     })
-    request.status_code = requests.codes.ok
+    response.status_code = requests.codes.ok
 
     # We'll fail to validate the access_token
     with pytest.raises(TypeError):
@@ -319,8 +315,7 @@ def test_plugin_slack_oauth_access_token(mock_post):
     token = 'xoxb-1234-1234-abc124'
 
     # Prepare Mock
-    mock_post.return_value = request
-
+    mock_request.return_value = response
     # Variation Initializations
     obj = NotifySlack(access_token=token, targets='#apprise')
     assert isinstance(obj, NotifySlack) is True
@@ -330,7 +325,35 @@ def test_plugin_slack_oauth_access_token(mock_post):
     assert obj.send(body="test") is True
 
     # Test Valid Attachment
-    mock_post.reset_mock()
+    mock_request.reset_mock()
+    mock_request.side_effect = [
+        response,
+        mock.Mock(**{
+            'content': dumps({
+                "ok": True,
+                "upload_url": "https://files.slack.com/upload/v1/ABC123",
+                "file_id": "F123ABC456"
+            }),
+            'status_code': requests.codes.ok
+        }),
+        mock.Mock(**{
+            'content': b'OK - 123',
+            'status_code': requests.codes.ok
+        }),
+        mock.Mock(**{
+            'content': dumps({
+                "ok": True,
+                "files": [
+                    {
+                        "id": "F123ABC456",
+                        "title": "slack-test"
+                    }
+                ]
+            }),
+            'status_code': requests.codes.ok
+        }),
+    ]
+
 
     path = os.path.join(TEST_VAR_DIR, 'apprise-test.gif')
     attach = AppriseAttachment(path)
@@ -338,30 +361,42 @@ def test_plugin_slack_oauth_access_token(mock_post):
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=attach) is True
 
-    assert mock_post.call_count == 2
-    assert mock_post.call_args_list[0][0][0] == \
+    assert mock_request.call_count == 4
+    assert mock_request.call_args_list[0][0][0] == \
+        'post'
+    assert mock_request.call_args_list[0][0][1] == \
         'https://slack.com/api/chat.postMessage'
-    assert mock_post.call_args_list[1][0][0] == \
-        'https://slack.com/api/files.upload'
+    assert mock_request.call_args_list[1][0][0] == \
+        'get'
+    assert mock_request.call_args_list[1][0][1] == \
+        'https://slack.com/api/files.getUploadURLExternal'
+    assert mock_request.call_args_list[2][0][0] == \
+        'post'
+    assert mock_request.call_args_list[2][0][1] == \
+        'https://files.slack.com/upload/v1/ABC123'
+    assert mock_request.call_args_list[3][0][0] == \
+        'post'
+    assert mock_request.call_args_list[3][0][1] == \
+        'https://slack.com/api/files.completeUploadExternal'
 
     # Test a valid attachment that throws an Connection Error
-    mock_post.return_value = None
-    mock_post.side_effect = (request, requests.ConnectionError(
+    mock_request.return_value = None
+    mock_request.side_effect = (response, requests.ConnectionError(
         0, 'requests.ConnectionError() not handled'))
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=attach) is False
 
     # Test a valid attachment that throws an OSError
-    mock_post.return_value = None
-    mock_post.side_effect = (request, OSError(0, 'OSError'))
+    mock_request.return_value = None
+    mock_request.side_effect = (response, OSError(0, 'OSError'))
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=attach) is False
 
     # Reset our mock object back to how it was
-    mock_post.return_value = request
-    mock_post.side_effect = None
+    mock_request.return_value = response
+    mock_request.side_effect = None
 
     # Test invalid attachment
     path = os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
@@ -370,13 +405,16 @@ def test_plugin_slack_oauth_access_token(mock_post):
         attach=path) is False
 
     # Test case where expected return attachment payload is invalid
-    request.content = dumps({
-        'ok': True,
-        'message': '',
-
-        # Attachment support
-        'file': None
-    })
+    mock_request.reset_mock()
+    mock_request.side_effect = [
+        response,
+        mock.Mock(**{
+            'content': dumps({
+                "ok": False,
+            }),
+            'status_code': requests.codes.internal_server_error
+        }),
+    ]
     path = os.path.join(TEST_VAR_DIR, 'apprise-test.gif')
     attach = AppriseAttachment(path)
     # We'll fail because of the bad 'file' response
@@ -386,12 +424,15 @@ def test_plugin_slack_oauth_access_token(mock_post):
 
     # Slack requests pay close attention to the response to determine
     # if things go well... this is not a good JSON response:
-    request.content = '{'
+    response.content = '{'
+    mock_request.reset_mock()
+    mock_request.return_value = response
+    mock_request.side_effect = None
 
     # As a result, we'll fail to send our notification
     assert obj.send(body="test", attach=attach) is False
 
-    request.content = dumps({
+    response.content = dumps({
         'ok': False,
         'message': 'We failed',
     })
@@ -401,8 +442,8 @@ def test_plugin_slack_oauth_access_token(mock_post):
     assert obj.send(body="test", attach=attach) is False
 
     # Handle exceptions reading our attachment from disk (should it happen)
-    mock_post.side_effect = OSError("Attachment Error")
-    mock_post.return_value = None
+    mock_request.side_effect = OSError("Attachment Error")
+    mock_request.return_value = None
 
     # We'll fail now because of an internal exception
     assert obj.send(body="test") is False

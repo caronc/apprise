@@ -115,7 +115,8 @@ class AppriseURLTester:
 
     @mock.patch('requests.get')
     @mock.patch('requests.post')
-    def run(self, url, meta, mock_post, mock_get):
+    @mock.patch('requests.request')
+    def run(self, url, meta, mock_request, mock_post, mock_get):
         """
         Run a specific test
         """
@@ -150,6 +151,7 @@ class AppriseURLTester:
         robj.content = u''
         mock_get.return_value = robj
         mock_post.return_value = robj
+        mock_request.return_value = robj
 
         try:
             # We can now instantiate our object:
@@ -276,7 +278,8 @@ class AppriseURLTester:
     @mock.patch('requests.put')
     @mock.patch('requests.delete')
     @mock.patch('requests.patch')
-    def __notify(self, url, obj, meta, asset, mock_patch, mock_del, mock_put,
+    @mock.patch('requests.request')
+    def __notify(self, url, obj, meta, asset, mock_request, mock_patch, mock_del, mock_put,
                  mock_head, mock_post, mock_get):
         """
         Perform notification testing against object specified
@@ -342,6 +345,7 @@ class AppriseURLTester:
         mock_patch.return_value = robj
         mock_del.return_value = robj
         mock_put.return_value = robj
+        mock_request.return_value = robj
 
         if test_requests_exceptions is False:
             # Handle our default response
@@ -351,6 +355,7 @@ class AppriseURLTester:
             mock_post.return_value.status_code = requests_response_code
             mock_get.return_value.status_code = requests_response_code
             mock_patch.return_value.status_code = requests_response_code
+            mock_request.return_value.status_code = requests_response_code
 
             # Handle our default text response
             mock_get.return_value.content = requests_response_content
@@ -359,6 +364,7 @@ class AppriseURLTester:
             mock_put.return_value.content = requests_response_content
             mock_head.return_value.content = requests_response_content
             mock_patch.return_value.content = requests_response_content
+            mock_request.return_value.content = requests_response_content
 
             mock_get.return_value.text = requests_response_text
             mock_post.return_value.text = requests_response_text
@@ -366,6 +372,7 @@ class AppriseURLTester:
             mock_del.return_value.text = requests_response_text
             mock_head.return_value.text = requests_response_text
             mock_patch.return_value.text = requests_response_text
+            mock_request.return_value.text = requests_response_text
 
             # Ensure there is no side effect set
             mock_post.side_effect = None
@@ -374,6 +381,7 @@ class AppriseURLTester:
             mock_head.side_effect = None
             mock_get.side_effect = None
             mock_patch.side_effect = None
+            mock_request.side_effect = None
 
         else:
             # Handle exception testing; first we turn the boolean flag
@@ -532,6 +540,7 @@ class AppriseURLTester:
                     mock_put.side_effect = _exception
                     mock_get.side_effect = _exception
                     mock_patch.side_effect = _exception
+                    mock_request.side_effect = _exception
 
                     try:
                         assert obj.notify(
@@ -577,6 +586,7 @@ class AppriseURLTester:
                     mock_head.side_effect = _exception
                     mock_get.side_effect = _exception
                     mock_patch.side_effect = _exception
+                    mock_request.side_effect = _exception
 
                     try:
                         assert obj.notify(

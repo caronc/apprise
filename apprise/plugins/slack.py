@@ -611,7 +611,8 @@ class NotifySlack(NotifyBase):
 
             # Store the valid and massaged payload that is recognizable by
             # slack. This list is used for sending attachments later.
-            attach_channel_list.append(response['channel'])
+            if response.get('channel'):
+                attach_channel_list.append(response.get('channel'))
 
             self.logger.info(
                 'Sent Slack notification{}.'.format(
@@ -649,7 +650,7 @@ class NotifySlack(NotifyBase):
                 }
                 _url = self.api_url.format('files.getUploadURLExternal')
                 response = self._send(
-                    _url, {}, http_method='GET', params=_params
+                    _url, {}, http_method='get', params=_params
                 )
                 if not (
                     response and response.get('file_id')
@@ -925,14 +926,15 @@ class NotifySlack(NotifyBase):
             # }
             status_okay = False
             if self.mode is SlackMode.BOT:
-                status_okay = response and response.get('ok', False)
+                status_okay = (
+                    (response and response.get('ok', False)) or
+                    # Responses for file uploads look like this
+                    # 'OK - <file length>'
+                    (r.content and isinstance(r.content, bytes) and b'OK' in r.content)
+                )
             elif r.content == b'ok':
                 # The text 'ok' is returned if this is a Webhook request
                 # So the below captures that as well.
-                status_okay = True
-            elif b'OK' in r.content:
-                # Responses for file uploads look like this
-                # 'OK - <file length>'
                 status_okay = True
 
             if r.status_code != requests.codes.ok or not status_okay:
