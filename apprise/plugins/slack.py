@@ -661,10 +661,6 @@ class NotifySlack(NotifyBase):
 
                 # Upload file
                 response = self._send(upload_url, {}, attach=attachment)
-                if not response:
-                    self.logger.error('Failed to upload file.')
-                    # We failed to upload the file, take an early exit
-                    return False
 
                 # Send file to channels
                 # https://api.slack.com/methods/files.completeUploadExternal
@@ -1009,7 +1005,7 @@ class NotifySlack(NotifyBase):
                 files['file'][1].close()
 
         # Return the response for processing
-        return response or r.content
+        return response
 
     def url(self, privacy=False, *args, **kwargs):
         """
