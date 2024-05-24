@@ -131,10 +131,6 @@ apprise_url_tests = (
         'requests_response_text': {
             'ok': True,
             'message': '',
-            # support attachments
-            'file': {
-                'url_private': 'http://localhost/',
-            },
         },
     }),
     # Test blocks mode
@@ -170,10 +166,6 @@ apprise_url_tests = (
         'requests_response_text': {
             'ok': True,
             'message': '',
-            # support attachments
-            'file': {
-                'url_private': 'http://localhost/',
-            },
         },
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'slack://test@x...4/nuxref/',
@@ -184,10 +176,6 @@ apprise_url_tests = (
         'requests_response_text': {
             'ok': True,
             'message': '',
-            # support attachments
-            'file': {
-                'url_private': 'http://localhost/',
-            },
         },
         # We fail because of the empty channel #$ and #-
         'notify_response': False,
