@@ -609,8 +609,8 @@ class NotifySlack(NotifyBase):
                 has_error = True
                 continue
 
-            # Store the valid and massaged payload that is recognizable by
-            # slack. This list is used for sending attachments later.
+            # Store the valid channel or chat ID (for DMs) that will
+            # be accepted by Slack's attachment method later.
             if response.get('channel'):
                 attach_channel_list.append(response.get('channel'))
 
@@ -618,10 +618,6 @@ class NotifySlack(NotifyBase):
                 'Sent Slack notification{}.'.format(
                     ' to {}'.format(channel)
                     if channel is not None else ''))
-            self.logger.info(
-                'Channel return {}.'
-                .format(response.get('channel'))
-            )
 
         if (
             attach and self.attachment_support and
