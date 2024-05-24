@@ -354,7 +354,6 @@ def test_plugin_slack_oauth_access_token(mock_request):
         }),
     ]
 
-
     path = os.path.join(TEST_VAR_DIR, 'apprise-test.gif')
     attach = AppriseAttachment(path)
     assert obj.notify(

@@ -930,7 +930,11 @@ class NotifySlack(NotifyBase):
                     (response and response.get('ok', False)) or
                     # Responses for file uploads look like this
                     # 'OK - <file length>'
-                    (r.content and isinstance(r.content, bytes) and b'OK' in r.content)
+                    (
+                        r.content and 
+                        isinstance(r.content, bytes) and 
+                        b'OK' in r.content
+                    )
                 )
             elif r.content == b'ok':
                 # The text 'ok' is returned if this is a Webhook request
