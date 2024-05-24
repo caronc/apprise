@@ -299,13 +299,13 @@ def test_plugin_slack_oauth_access_token(mock_request):
     # Generate an invalid bot token
     token = 'xo-invalid'
 
-    response = mock.Mock()
-    response.content = dumps({
+    request = mock.Mock()
+    request.content = dumps({
         'ok': True,
         'message': '',
         'channel': 'C123456',
     })
-    response.status_code = requests.codes.ok
+    request.status_code = requests.codes.ok
 
     # We'll fail to validate the access_token
     with pytest.raises(TypeError):
@@ -315,7 +315,7 @@ def test_plugin_slack_oauth_access_token(mock_request):
     token = 'xoxb-1234-1234-abc124'
 
     # Prepare Mock
-    mock_request.return_value = response
+    mock_request.return_value = request
     # Variation Initializations
     obj = NotifySlack(access_token=token, targets='#apprise')
     assert isinstance(obj, NotifySlack) is True
@@ -327,7 +327,7 @@ def test_plugin_slack_oauth_access_token(mock_request):
     # Test Valid Attachment
     mock_request.reset_mock()
     mock_request.side_effect = [
-        response,
+        request,
         mock.Mock(**{
             'content': dumps({
                 "ok": True,
@@ -380,7 +380,7 @@ def test_plugin_slack_oauth_access_token(mock_request):
 
     # Test a valid attachment that throws an Connection Error
     mock_request.return_value = None
-    mock_request.side_effect = (response, requests.ConnectionError(
+    mock_request.side_effect = (request, requests.ConnectionError(
         0, 'requests.ConnectionError() not handled'))
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
@@ -388,13 +388,13 @@ def test_plugin_slack_oauth_access_token(mock_request):
 
     # Test a valid attachment that throws an OSError
     mock_request.return_value = None
-    mock_request.side_effect = (response, OSError(0, 'OSError'))
+    mock_request.side_effect = (request, OSError(0, 'OSError'))
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=attach) is False
 
     # Reset our mock object back to how it was
-    mock_request.return_value = response
+    mock_request.return_value = request
     mock_request.side_effect = None
 
     # Test invalid attachment
@@ -406,7 +406,7 @@ def test_plugin_slack_oauth_access_token(mock_request):
     # Test case where expected return attachment payload is invalid
     mock_request.reset_mock()
     mock_request.side_effect = [
-        response,
+        request,
         mock.Mock(**{
             'content': dumps({
                 "ok": False,
@@ -423,15 +423,15 @@ def test_plugin_slack_oauth_access_token(mock_request):
 
     # Slack requests pay close attention to the response to determine
     # if things go well... this is not a good JSON response:
-    response.content = '{'
+    request.content = '{'
     mock_request.reset_mock()
-    mock_request.return_value = response
+    mock_request.return_value = request
     mock_request.side_effect = None
 
     # As a result, we'll fail to send our notification
     assert obj.send(body="test", attach=attach) is False
 
-    response.content = dumps({
+    request.content = dumps({
         'ok': False,
         'message': 'We failed',
     })
