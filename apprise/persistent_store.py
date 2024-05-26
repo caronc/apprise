@@ -29,13 +29,188 @@ import glob
 import tempfile
 import json
 import platform
+from datetime import datetime, timezone, timedelta
 from .asset import AppriseAsset
+import hashlib
 from .logger import logger
+
+# Used for writing/reading time stored in cache file
+EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+
+class PersistentStoreMode:
+    # Flush occasionally to disk and always after object is
+    # closed.
+    AUTO = 'auto'
+
+    # Always flush every change to disk after it's saved
+    FORCE = 'force'
+
+    # memory based store only
+    NEVER = 'memory'
+
+
+PERSISTENT_STORE_MODES = (
+    PersistentStoreMode.AUTO,
+    PersistentStoreMode.FORCE,
+    PersistentStoreMode.NEVER,
+)
+
+
+class CacheObject:
+
+    def __init__(self, value=None, expires=None):
+        """
+        Tracks our objects and associates a time limit with them
+        """
+
+        self.__value = value
+        self.__class_name = value.__class__.__name__
+        self.__expires = None
+        self.__value = value
+        self.set_expiry(expires)
+
+    def set_expiry(self, expires=None):
+        """
+        Sets a new expirty
+        """
+
+        if isinstance(expires, (float, int)):
+            self.__expires = \
+                datetime.now(tz=timezone.utc) + timedelta(seconds=expires)
+
+        elif isinstance(expires, datetime):
+            self.__expires = expires.astimezone(timezone.utc)
+
+        elif expires is None:
+            # Accepted - no expiry
+            self.__expires = None
+
+        else:  # Unsupported
+            raise AttributeError(
+                f"An invalid expiry time ({expires} was specified")
+
+    def __assign__(self, value):
+        """
+        Assigns a value without altering it's expiry
+        """
+        self.__value = value
+        self.__class_name = value.__class__.__name__
+
+    def __bool__(self):
+        """
+        Returns True it the object hasn't expired, and False if it has
+        """
+        if self.__expires is None:
+            # No Expiry
+            return True
+
+        # Calculate if we've expired or not
+        return self.__expires >= datetime.now(tz=timezone.utc)
+
+    def md5(self):
+        """
+        Our checksum to track the validity of our data
+        """
+        return hashlib.md5(
+            str(self).encode('utf-8'), usedforsecurity=False).hexdigest()
+
+    def json(self):
+        """
+        Returns our preparable json object
+        """
+        return {
+            'v': self.__value,
+            'x': (self.__expires - EPOCH).total_seconds()
+            if self.__expires else None,
+            'c': self.__class_name,
+            'm': self.md5()[:6],
+        }
+
+    @staticmethod
+    def instantiate(content, verify=True):
+        """
+        Loads back data read in and returns a CacheObject or None if it could
+        not be loaded. You can pass in the contents of CacheObject.json() and
+        you'll receive a copy assuming the md5 checks okay
+
+        """
+        try:
+            value = content['v']
+            expires = content['x']
+            if expires is not None:
+                expires = datetime.fromtimestamp(expires, timezone.utc)
+
+            # Acquire some useful integrity objects
+            class_name = content.get('c', '')
+            if not isinstance(class_name, str):
+                raise TypeError('Class name not expected string')
+            md5sum = content.get('m', '')
+            if not isinstance(md5sum, str):
+                raise TypeError('MD5SUM not expected string')
+
+        except (TypeError, KeyError) as e:
+            logger.trace(f'CacheObject could not be parsed from {content}')
+            logger.trace('CacheObject exception: %s' % str(e))
+            return None
+
+        if class_name in ('datetime', 'FakeDatetime'):
+            # Note: FakeDatetime comes from our test cases so that we can still
+            #       verify this code execute sokay
+
+            # Convert our object back to a datetime object
+            value = datetime.fromisoformat(value)
+
+        # Initialize our object
+        try:
+            co = CacheObject(value, expires)
+
+        except AttributeError:
+            logger.trace(f'CacheObject could not be initialied from {content}')
+
+        if verify and co.md5()[:6] != md5sum:
+            # Our object was tampered with
+            logger.debug(f'Tampering detected with cache entry {co}')
+            del co
+            return None
+
+        return co
+
+    def __eq__(self, other):
+        """
+        Handles equality == flag
+        """
+        return self and self.__value == other
+
+    def __str__(self):
+        """
+        string output of our data
+        """
+        return f'{self.__class_name}:{self.__value} expires: ' +\
+            'never' or self.__expires.isoformat()
+
+
+class CacheJSONEncoder(json.JSONEncoder):
+    """
+    A JSON Encoder for handling each of our cache objects
+    """
+
+    def default(self, entry):
+        if isinstance(entry, datetime):
+            return entry.isoformat()
+
+        if isinstance(entry, CacheObject):
+            return entry.json()
+        return super().default(entry)
 
 
 class PersistentStore:
     """
     An object to make working with persistent storage easier
+
+    read() and write() are used for direct file i/o
+
+    set(), get() are used for caching
     """
 
     # The maximum file-size we will allow the persistent store to grow to
@@ -63,7 +238,7 @@ class PersistentStore:
     #    equal
     __valid_token = re.compile(r'[a-z0-9][a-z0-9._=]*', re.I)
 
-    def __init__(self, namespace, path=None, asset=None):
+    def __init__(self, namespace, path=None, method=None, asset=None):
         """
         Provide the namespace to work within. namespaces can only contain
         alpha-numeric characters with the exception of '-' (dash), '_'
@@ -89,6 +264,21 @@ class PersistentStore:
         # Assign our asset
         self.asset = \
             asset if isinstance(asset, AppriseAsset) else AppriseAsset()
+
+        if method is None:
+            # Store Default
+            self.method = PERSISTENT_STORE_MODES[0]
+
+        elif method not in PERSISTENT_STORE_MODES:
+            raise AttributeError(
+                f"Persistent Storage mode ({method}) provided is"
+                " invalid")
+
+        # Tracks when we have content to flush
+        self.__dirty = False
+
+        # Store our method
+        self.method = method
 
         # Prepare our path
         if path is None:
@@ -251,7 +441,7 @@ class PersistentStore:
 
         return self._cache.get(key, default)
 
-    def set(self, key, value, lazy=True):
+    def set(self, key, value, expires=None, lazy=True):
         """
         Cache reference
         """
@@ -276,7 +466,14 @@ class PersistentStore:
         # Store our new cache
         self._cache[key] = value
 
-        return self.__save_cache()
+        # Set our dirty flag
+        self.__dirty = True
+
+        if self.method == PersistentStoreMode.FORCE:
+            # Flush changes to disk
+            return self.__save_cache()
+
+        return True
 
     def __load_cache(self):
         """
@@ -308,12 +505,19 @@ class PersistentStore:
             logger.debug('Persistent Storage Exception: %s' % str(e))
             return False
 
+        # Ensure our dirty flag is set to False
+        self.__dirty = False
         return True
 
     def __save_cache(self):
         """
         Save's our cache
         """
+
+        if self.__dirty is False:
+            # Nothing further to do
+            logger.trace('Persistent cache consistent with memory map')
+            return True
 
         # Ensure our path exists
         try:
@@ -402,7 +606,8 @@ class PersistentStore:
         with gzip.open(ntf.name, 'wb') as f:
             # Write our content to disk
             f.write(json.dumps(
-                self._cache, separators=(',', ':')).encode(self.encoding))
+                self._cache, skipkeys=True, separators=(',', ':'),
+                cls=CacheJSONEncoder).encode(self.encoding))
 
         try:
             os.unlink(cache_file_backup)
@@ -459,6 +664,8 @@ class PersistentStore:
             return False
 
         logger.trace('Persistent cache generated for ', cache_file)
+        # Ensure our dirty flag is set to False
+        self.__dirty = False
         return True
 
     def size(self, lazy=True):
@@ -498,6 +705,15 @@ class PersistentStore:
 
         return self.__size
 
+    def __del__(self):
+        """
+        Deconstruction of our object
+        """
+
+        if self.method == PersistentStoreMode.AUTO:
+            # Flush changes to disk
+            self.__save_cache()
+
     def __delitem__(self, key):
         """
         Remove a cache entry by it's key
@@ -505,13 +721,17 @@ class PersistentStore:
         try:
             # Store our new cache
             del self._cache[key]
+            # Set our dirty flag
+            self.__dirty = True
 
         except KeyError:
             # Nothing to do
             raise
 
-        # Flush change
-        self.__save_cache()
+        if self.method == PersistentStoreMode.FORCE:
+            # Flush changes to disk
+            self.__save_cache()
+
         return
 
     def __contains__(self, key):

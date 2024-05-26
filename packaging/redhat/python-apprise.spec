@@ -107,6 +107,7 @@ BuildRequires: python%{python3_pkgversion}-requests-oauthlib
 BuildRequires: python%{python3_pkgversion}-click >= 5.0
 BuildRequires: python%{python3_pkgversion}-markdown
 BuildRequires: python%{python3_pkgversion}-yaml
+BuildRequires: python%{python3_pkgversion}-freezegun
 BuildRequires: python%{python3_pkgversion}-babel
 BuildRequires: python%{python3_pkgversion}-cryptography
 BuildRequires: python%{python3_pkgversion}-certifi

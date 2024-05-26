@@ -27,7 +27,6 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import re
-import gzip
 from uuid import uuid4
 from os.path import join
 from os.path import dirname

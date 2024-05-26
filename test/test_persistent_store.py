@@ -28,9 +28,13 @@
 
 import os
 import pytest
+import json
+from freezegun import freeze_time
 from unittest import mock
 from apprise import AppriseAsset
-from apprise.persistent_store import PersistentStore
+from datetime import datetime, timedelta
+from apprise.persistent_store import (
+    CacheJSONEncoder, CacheObject, PersistentStore, PersistentStoreMode)
 
 # Disable logging for a cleaner testing output
 import logging
@@ -86,7 +90,7 @@ def test_persistent_storage_init(tmpdir):
         PersistentStore(namespace="%", path=str(tmpdir), asset=asset)
 
 
-def test_persistent_storage(tmpdir):
+def test_persistent_storage_force_method(tmpdir):
     """
     Persistent Storage General Testing
 
@@ -96,7 +100,9 @@ def test_persistent_storage(tmpdir):
 
     namespace = 'abc'
     # Create ourselves an attachment object
-    pc = PersistentStore(namespace=namespace, path=str(tmpdir), asset=asset)
+    pc = PersistentStore(
+        namespace=namespace, path=str(tmpdir),
+        method=PersistentStoreMode.FORCE, asset=asset)
 
     assert pc.size() == 0
 
@@ -139,7 +145,9 @@ def test_persistent_storage(tmpdir):
     del pc
 
     # Re-initialize it
-    pc = PersistentStore(namespace=namespace, path=str(tmpdir), asset=asset)
+    pc = PersistentStore(
+        namespace=namespace, path=str(tmpdir),
+        method=PersistentStoreMode.FORCE, asset=asset)
 
     # Our key is persistent and available right away
     assert pc.get('key') == 'value'
@@ -171,3 +179,75 @@ def test_persistent_storage_cache_io_errors(tmpdir):
 
         with pytest.raises(KeyError):
             pc['key']
+
+
+def test_persistent_storage_cache_object(tmpdir):
+    """
+    Test our cache object
+    """
+
+    # A cache object
+    c = CacheObject(123)
+    assert c
+
+    # A cache object that expires in 30 seconds from now
+    c = CacheObject(123, 30)
+    assert c
+    with freeze_time(datetime.now() + timedelta(seconds=31)):
+        # Our object has expired
+        assert not c
+
+    # Freeze our time for accurate testing:
+    with freeze_time(datetime(2024, 5, 26, 12, 0, 0, 0)):
+
+        # freeze_gun doesn't support non-naive timezones
+        EPOCH = datetime(1970, 1, 1)
+
+        # test all of our supported types
+        for entry in ('string', 123, 1.2222, datetime.now(), None, False,
+                      True):
+            # Create a cache object that expires tomorrow
+            c = CacheObject(entry, datetime.now() + timedelta(days=1))
+
+            # Verify our content hasn't expired
+            assert c
+
+            # Verify we can dump our object
+            result = json.loads(json.dumps(
+                c, separators=(',', ':'), cls=CacheJSONEncoder))
+
+            # Instantiate our object
+            cc = CacheObject.instantiate(result)
+            assert cc.json() == c.json()
+
+        assert CacheObject.instantiate(None) is None
+        assert CacheObject.instantiate({}) is None
+
+        # Bad data
+        assert CacheObject.instantiate({
+            'v': 123,
+            'x': datetime.now(),
+            'c': 'int'}) is None
+
+        assert CacheObject.instantiate({
+            'v': 123,
+            'x': (datetime.now() - EPOCH).total_seconds(),
+            'c': object}) is None
+
+        assert CacheObject.instantiate({
+            'v': 123,
+            'x': (datetime.now() - EPOCH).total_seconds(),
+            'm': object}) is None
+
+        obj = CacheObject.instantiate({
+            'v': 123,
+            'x': (datetime.now() - EPOCH).total_seconds(),
+            'c': 'int'}, verify=False)
+        assert isinstance(obj, CacheObject)
+        assert obj == 123
+
+        # no MD5SUM and verify is set to true
+        assert CacheObject.instantiate({
+            'v': 123,
+            'x': (datetime.now() - EPOCH).total_seconds(),
+            'c': 'int'}, verify=True) is None

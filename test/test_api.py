@@ -527,7 +527,7 @@ def apprise_test(do_notify):
     assert len(a) == 0
 
 
-def test_apprise_pretty_print(tmpdir):
+def test_apprise_pretty_print():
     """
     API: Apprise() Pretty Print tests
 
@@ -724,7 +724,7 @@ def apprise_tagging_test(mock_post, mock_get, do_notify):
         tag=[(object, ), ]) is None
 
 
-def test_apprise_schemas(tmpdir):
+def test_apprise_schemas():
     """
     API: Apprise().schema() tests
 
@@ -831,7 +831,91 @@ def test_apprise_urlbase_object():
     assert base.url().startswith('http://user@127.0.0.1/path/')
 
 
-def test_apprise_notify_formats(tmpdir):
+def test_apprise_unique_id():
+    """
+    API: Apprise() Input Formats tests
+
+    """
+
+    # Default testing
+    obj1 = Apprise.instantiate('json://user@127.0.0.1/path')
+    obj2 = Apprise.instantiate('json://user@127.0.0.1/path/?arg=')
+
+    assert obj1.url_identifier == obj2.url_identifier
+    assert obj1.url_id() == obj2.url_id()
+    # Second call leverages lazy reference (so it's much faster
+    assert obj1.url_id() == obj2.url_id()
+    # Disable Lazy Setting
+    assert obj1.url_id(lazy=False) == obj2.url_id(lazy=False)
+
+    # A variation such as providing a password or altering the path makes the
+    # url_id() different:
+    obj2 = Apprise.instantiate('json://user@127.0.0.1/path2/?arg=')  # path
+    assert obj1.url_id() != obj2.url_id()
+    obj2 = Apprise.instantiate(
+        'jsons://user@127.0.0.1/path/?arg=')  # secure flag
+    assert obj1.url_id() != obj2.url_id()
+    obj2 = Apprise.instantiate(
+        'json://user2@127.0.0.1/path/?arg=')  # user
+    assert obj1.url_id() != obj2.url_id()
+    obj2 = Apprise.instantiate(
+        'json://user@127.0.0.1:8080/path/?arg=')  # port
+    assert obj1.url_id() != obj2.url_id()
+    obj2 = Apprise.instantiate(
+        'json://user:pass@127.0.0.1/path/?arg=')  # password
+    assert obj1.url_id() != obj2.url_id()
+
+    # Leverage salt setting
+    obj2 = Apprise.instantiate('json://user@127.0.0.1/path/?salt=abcd')
+    assert obj1.url_id() != obj2.url_id()
+
+    # same salt value produces a match again
+    obj1 = Apprise.instantiate('json://user@127.0.0.1/path/?salt=abcd')
+    assert obj1.url_id() == obj2.url_id()
+
+    # setting URL Identifier to False disables the generator
+    url = 'json://user@127.0.0.1/path/?arg'
+    obj = Apprise.instantiate(url)
+    obj.url_identifier = False
+    # No generation takes place
+    assert obj.url_id() is None
+
+    # Dictionary Testing
+    #
+    obj.url_identifier = {'abc': '123', 'def': b'\0', 'hij': 42, 'klm': object}
+    # call uses cached value (from above)
+    assert obj.url_id() is None
+    # Tests dictionary key generation
+    assert obj.url_id(lazy=False) is not None
+
+    # List/Set/Tuple Testing
+    #
+    obj1 = Apprise.instantiate(url)
+    obj1.url_identifier = ['123', b'\0', 42, object]
+    # Tests dictionary key generation
+    assert obj1.url_id() is not None
+
+    obj2 = Apprise.instantiate(url)
+    obj2.url_identifier = ('123', b'\0', 42, object)
+    assert obj2.url_id() is not None
+    assert obj2.url_id() == obj2.url_id()
+
+    obj3 = Apprise.instantiate(url)
+    obj3.url_identifier = set(['123', b'\0', 42, object])
+    assert obj3.url_id() is not None
+
+    obj = Apprise.instantiate(url)
+    obj.url_identifier = b'test'
+    assert obj.url_id() is not None
+
+    # Testing Garbage
+    for x in (31, object, 43.1):
+        obj = Apprise.instantiate(url)
+        obj.url_identifier = x
+        assert obj.url_id() is not None
+
+
+def test_apprise_notify_formats():
     """
     API: Apprise() Input Formats tests
 
@@ -1571,7 +1655,7 @@ def test_apprise_details_plugin_verification():
         # NotifyBase parameters:
         'format', 'overflow', 'emojis',
         # URLBase parameters:
-        'verify', 'cto', 'rto',
+        'verify', 'cto', 'rto', 'salt',
     ])
 
     # Valid Schema Entries:
@@ -1877,7 +1961,7 @@ def test_apprise_details_plugin_verification():
 @mock.patch('asyncio.gather', wraps=asyncio.gather)
 @mock.patch('concurrent.futures.ThreadPoolExecutor',
             wraps=concurrent.futures.ThreadPoolExecutor)
-def test_apprise_async_mode(mock_threadpool, mock_gather, mock_post, tmpdir):
+def test_apprise_async_mode(mock_threadpool, mock_gather, mock_post):
     """
     API: Apprise() async_mode tests
 
