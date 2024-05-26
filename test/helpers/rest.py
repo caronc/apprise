@@ -279,8 +279,20 @@ class AppriseURLTester:
     @mock.patch('requests.delete')
     @mock.patch('requests.patch')
     @mock.patch('requests.request')
-    def __notify(self, url, obj, meta, asset, mock_request, mock_patch, mock_del, mock_put,
-                 mock_head, mock_post, mock_get):
+    def __notify(
+        self,
+        url,
+        obj,
+        meta,
+        asset,
+        mock_request,
+        mock_patch,
+        mock_del,
+        mock_put,
+        mock_head,
+        mock_post,
+        mock_get
+    ):
         """
         Perform notification testing against object specified
         """

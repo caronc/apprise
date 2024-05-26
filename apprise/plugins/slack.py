@@ -923,8 +923,8 @@ class NotifySlack(NotifyBase):
                     # Responses for file uploads look like this
                     # 'OK - <file length>'
                     (
-                        r.content and 
-                        isinstance(r.content, bytes) and 
+                        r.content and
+                        isinstance(r.content, bytes) and
                         b'OK' in r.content
                     )
                 )
