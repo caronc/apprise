@@ -619,10 +619,8 @@ class NotifySlack(NotifyBase):
                     ' to {}'.format(channel)
                     if channel is not None else ''))
 
-        if (
-            attach and self.attachment_support and
-            self.mode is SlackMode.BOT and attach_channel_list
-        ):
+        if attach and self.attachment_support and \
+                self.mode is SlackMode.BOT and attach_channel_list:
             # Send our attachments (can only be done in bot mode)
             for attachment in attach:
 
@@ -848,15 +846,8 @@ class NotifySlack(NotifyBase):
 
         return user_id
 
-    def _send(
-            self,
-            url,
-            payload,
-            attach=None,
-            http_method='post',
-            params=None,
-            **kwargs
-    ):
+    def _send(self, url, payload, attach=None, http_method='post', params=None,
+              **kwargs):
         """
         Wrapper to the requests (post) object
         """
@@ -940,9 +931,9 @@ class NotifySlack(NotifyBase):
                         r.status_code, SLACK_HTTP_ERROR_MAP)
 
                 self.logger.warning(
-                    'Failed to send {} to Slack: '
+                    'Failed to send{} to Slack: '
                     '{}{}error={}.'.format(
-                        attach.name if attach else '',
+                        (' ' + attach.name) if attach else '',
                         status_str,
                         ', ' if status_str else '',
                         r.status_code))
