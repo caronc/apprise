@@ -176,6 +176,22 @@ class CacheObject:
 
         return co
 
+    @property
+    def value(self):
+        """
+        Returns our value
+        """
+        return self.__value
+
+    @property
+    def expiry(self):
+        """
+        Returns the number of seconds from now the object will expiry
+        """
+        return None if self.__expires is None else \
+            (self.__expires - datetime.now(tz=timezone.utc))\
+            .total_seconds()
+
     def __eq__(self, other):
         """
         Handles equality == flag
@@ -284,9 +300,9 @@ class PersistentStore:
         if path is None:
             path = os.path.join(
                 os.path.normpath(
-                    os.path.expandvars('%APPDATA%/Apprise')
+                    os.path.expandvars('%APPDATA%/Apprise/ps/')
                     if platform.system() == 'Windows'
-                    else os.path.expanduser('~/.local/share/apprise')),
+                    else os.path.expanduser('~/.local/share/apprise/ps/')),
                 namespace)
 
         else:
@@ -429,17 +445,8 @@ class PersistentStore:
         if self._cache is None and not self.__load_cache():
             return default
 
-        if lazy:
-            try:
-                prev = self[key]
-                # Return our index
-                return prev
-
-            except KeyError:
-                # Nothing for lazy fetch retrieval
-                pass
-
-        return self._cache.get(key, default)
+        return self._cache[key].value \
+            if key in self._cache and self._cache[key] else default
 
     def set(self, key, value, expires=None, lazy=True):
         """
@@ -455,8 +462,8 @@ class PersistentStore:
         # Fetch our cache value
         if lazy:
             try:
-                prev = self[key]
-                if prev == value:
+                prev = self._cache[key].value
+                if prev == value and self._cache[key].expiry == expires:
                     # We're done
                     return True
 
@@ -464,16 +471,29 @@ class PersistentStore:
                 pass
 
         # Store our new cache
-        self._cache[key] = value
+        self._cache[key] = CacheObject(value, expires)
 
         # Set our dirty flag
         self.__dirty = True
 
         if self.method == PersistentStoreMode.FORCE:
             # Flush changes to disk
-            return self.__save_cache()
+            return self.flush()
 
         return True
+
+    def prune(self):
+        """
+        Eliminates expired cache entries
+        """
+        change = False
+        for key in list(self._cache.keys()):
+            if not self._cache:
+                del self._cache[key]
+                if not change:
+                    change = True
+
+        return change
 
     def __load_cache(self):
         """
@@ -481,10 +501,20 @@ class PersistentStore:
         """
         # Prepare our cache file
         cache_file = os.path.join(self.__base_path, self.cache_file)
+        self.__dirty = False
         try:
             with gzip.open(cache_file, 'rb') as f:
-                # Write our content to disk
-                self._cache = json.loads(f.read().decode(self.encoding))
+                # Read our content from disk
+                self._cache = {}
+                for k, v in json.loads(f.read().decode(self.encoding)).items():
+                    co = CacheObject.instantiate(v)
+                    if co:
+                        # Verify our object before assigning it
+                        self._cache[k] = co
+
+                    elif not self.__dirty:
+                        # Track changes from our loadset
+                        self.__dirty = True
 
         except (UnicodeDecodeError, json.decoder.JSONDecodeError):
             # Let users known there was a problem
@@ -506,22 +536,21 @@ class PersistentStore:
             return False
 
         # Ensure our dirty flag is set to False
-        self.__dirty = False
         return True
 
-    def __save_cache(self):
+    def flush(self, force=False):
         """
         Save's our cache
         """
 
-        if self.__dirty is False:
+        if not force and self.__dirty is False:
             # Nothing further to do
             logger.trace('Persistent cache consistent with memory map')
             return True
 
         # Ensure our path exists
         try:
-            os.makedirs(self.__base_path, exist_ok=True)
+            os.makedirs(self.__base_path, mode=0o770, exist_ok=True)
 
         except OSError:
             # Permission error
@@ -531,7 +560,7 @@ class PersistentStore:
 
         # Ensure our path exists
         try:
-            os.makedirs(self.__temp_path, exist_ok=True)
+            os.makedirs(self.__temp_path, mode=0o770, exist_ok=True)
 
         except OSError:
             # Permission error
@@ -589,7 +618,7 @@ class PersistentStore:
                     pass
 
                 try:
-                    ntf.unlink(ntf.name)
+                    os.unlink(ntf.name)
                     logger.trace(
                         'Persistent temporary file removed: ', ntf.name)
 
@@ -606,7 +635,7 @@ class PersistentStore:
         with gzip.open(ntf.name, 'wb') as f:
             # Write our content to disk
             f.write(json.dumps(
-                self._cache, skipkeys=True, separators=(',', ':'),
+                self._cache, separators=(',', ':'),
                 cls=CacheJSONEncoder).encode(self.encoding))
 
         try:
@@ -712,7 +741,7 @@ class PersistentStore:
 
         if self.method == PersistentStoreMode.AUTO:
             # Flush changes to disk
-            self.__save_cache()
+            self.flush()
 
     def __delitem__(self, key):
         """
@@ -730,18 +759,20 @@ class PersistentStore:
 
         if self.method == PersistentStoreMode.FORCE:
             # Flush changes to disk
-            self.__save_cache()
+            self.flush()
 
         return
 
     def __contains__(self, key):
         """
-        Verify if our storage contains the key specified or not
+        Verify if our storage contains the key specified or not.
+        In additiont to this, if the content is expired, it is considered
+        to be not contained in the storage.
         """
         if self._cache is None and not self.__load_cache():
-            raise KeyError()
+            return False
 
-        return key in self._cache
+        return key in self._cache and self._cache[key]
 
     def __setitem__(self, key, value):
         """

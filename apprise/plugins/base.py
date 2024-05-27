@@ -39,6 +39,7 @@ from ..common import NOTIFY_FORMATS
 from ..common import OverflowMode
 from ..common import OVERFLOW_MODES
 from ..locale import gettext_lazy as _
+from ..persistent_store import PersistentStore, PersistentStoreMode
 from ..apprise_attachment import AppriseAttachment
 
 
@@ -135,6 +136,10 @@ class NotifyBase(URLBase):
 
     # Default Overflow Mode
     overflow_mode = OverflowMode.UPSTREAM
+
+    # Our default is to no not use persistent storage beyond in-memory
+    # reference
+    persistent_store = PersistentStoreMode.NEVER
 
     # Default Emoji Interpretation
     interpret_emojis = False
@@ -300,6 +305,9 @@ class NotifyBase(URLBase):
 
             # Provide override
             self.overflow_mode = overflow
+
+        # Our Persistent Storage object is initialized on demand
+        self.__store = None
 
     def image_url(self, notify_type, logo=False, extension=None,
                   image_size=None):
@@ -798,3 +806,30 @@ class NotifyBase(URLBase):
         should return the same set of results that parse_url() does.
         """
         return None
+
+    def __persistent_store_init(self):
+        """
+        Initialize our Peristent Storage
+        """
+        self.__store = PersistentStore(
+            namespace=self.url_id(),
+            method=self.persistent_store,
+            asset=self.asset)
+
+    def set(self, key, value, expires=None):
+        """
+        Set a value associated to the cache key
+        """
+        if self.__store is None:
+            self.__persistent_store_init()
+
+        return self.__store.set(key, value, expires)
+
+    def get(self, key, default=None):
+        """
+        Returns the value associated with the specified cache key
+        """
+        if self.__store is None:
+            self.__persistent_store_init()
+
+        return self.__store.get(key, default)

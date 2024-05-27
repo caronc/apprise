@@ -29,6 +29,7 @@
 import os
 import pytest
 import json
+import gzip
 from freezegun import freeze_time
 from unittest import mock
 from apprise import AppriseAsset
@@ -90,7 +91,7 @@ def test_persistent_storage_init(tmpdir):
         PersistentStore(namespace="%", path=str(tmpdir), asset=asset)
 
 
-def test_persistent_storage_force_method(tmpdir):
+def test_persistent_storage_general(tmpdir):
     """
     Persistent Storage General Testing
 
@@ -101,8 +102,33 @@ def test_persistent_storage_force_method(tmpdir):
     namespace = 'abc'
     # Create ourselves an attachment object
     pc = PersistentStore(
+        namespace=namespace, path=str(tmpdir), asset=asset)
+
+    # Expiry testing
+    assert pc.set('key', 'value', datetime.now() + timedelta(hours=1))
+    # 10 seconds in the future
+    assert pc.set('key', 'value', 10)
+
+    with pytest.raises(AttributeError):
+        assert pc.set('key', 'value', 'invalid')
+
+
+def test_persistent_storage_force_method(tmpdir):
+    """
+    Persistent Storage Forced Write Testing
+
+    """
+    # Our asset objecet
+    asset = AppriseAsset(persistent_storage=True)
+
+    namespace = 'abc'
+    # Create ourselves an attachment object
+    pc = PersistentStore(
         namespace=namespace, path=str(tmpdir),
         method=PersistentStoreMode.FORCE, asset=asset)
+
+    # Reference path
+    path = os.path.join(str(tmpdir), namespace)
 
     assert pc.size() == 0
 
@@ -118,17 +144,27 @@ def test_persistent_storage_force_method(tmpdir):
     # bypasses all of the write overhead
     assert pc.set('key', 'value')
 
+    path_content = os.listdir(path)
+    assert len(path_content) == 2
+
+    # Assignments (causes another disk write)
+    pc['key'] = 'value2'
+
     # Now our key is set
     assert 'key' in pc
-    assert pc.get('key') == 'value'
+    assert pc.get('key') == 'value2'
 
     # A directory was created identified by the namespace
     assert len(os.listdir(str(tmpdir))) == 1
     assert namespace in os.listdir(str(tmpdir))
 
-    path = os.path.join(str(tmpdir), namespace)
     path_content = os.listdir(path)
-    assert len(path_content) == 2
+    assert len(path_content) == 3
+
+    # Another write doesn't change the file count
+    pc['key'] = 'value3'
+    path_content = os.listdir(path)
+    assert len(path_content) == 3
 
     # Our temporary directory used for all file handling in this namespace
     assert '.tmp' in path_content
@@ -150,13 +186,115 @@ def test_persistent_storage_force_method(tmpdir):
         method=PersistentStoreMode.FORCE, asset=asset)
 
     # Our key is persistent and available right away
-    assert pc.get('key') == 'value'
+    assert pc.get('key') == 'value3'
     assert 'key' in pc
 
     # Remove our item
     del pc['key']
     assert pc.size() == 0
     assert 'key' not in pc
+
+    # Test different corrupt values for loading content
+
+
+def test_persistent_storage_corruption_handling(tmpdir):
+    """
+    Test corrupting handling of storage
+    """
+
+    # Our asset objecet
+    asset = AppriseAsset(persistent_storage=True)
+
+    # Namespace
+    namespace = 'abc123'
+
+    # Initialize it
+    pc = PersistentStore(
+        namespace=namespace, path=str(tmpdir),
+        method=PersistentStoreMode.FORCE, asset=asset)
+
+    cache_file = os.path.join(
+        str(tmpdir), namespace, PersistentStore.cache_file)
+    assert not os.path.isfile(cache_file)
+
+    # Store our key
+    pc['mykey'] = 42
+    assert os.path.isfile(cache_file)
+
+    with gzip.open(cache_file, 'rb') as f:
+        # Read our content from disk
+        json.loads(f.read().decode('utf-8'))
+
+    # Remove object
+    del pc
+
+    # Corrupt the file
+    with open(cache_file, 'wb') as f:
+        f.write(b'{')
+
+    pc = PersistentStore(
+        namespace=namespace, path=str(tmpdir),
+        method=PersistentStoreMode.FORCE, asset=asset)
+
+    # File is corrupted
+    assert 'mykey' not in pc
+    pc['mykey'] = 42
+    del pc
+
+    # File is corrected now
+    pc = PersistentStore(
+        namespace=namespace, path=str(tmpdir),
+        method=PersistentStoreMode.FORCE, asset=asset)
+
+    assert 'mykey' in pc
+
+    # Corrupt the file again
+    with gzip.open(cache_file, 'wb') as f:
+        # Bad JSON File
+        f.write(b'{')
+
+    pc = PersistentStore(
+        namespace=namespace, path=str(tmpdir),
+        method=PersistentStoreMode.FORCE, asset=asset)
+
+    # File is corrupted
+    assert 'mykey' not in pc
+    pc['mykey'] = 42
+    del pc
+
+    # File is corrected now
+    pc = PersistentStore(
+        namespace=namespace, path=str(tmpdir),
+        method=PersistentStoreMode.FORCE, asset=asset)
+
+    assert 'mykey' in pc
+
+    with mock.patch('os.makedirs', side_effect=OSError()):
+        assert pc.flush(force=True) is False
+
+    with mock.patch('os.makedirs', side_effect=(None, OSError())):
+        assert pc.flush(force=True) is False
+
+    # Remove the last entry
+    del pc['mykey']
+    with mock.patch('os.rename', side_effect=OSError()):
+        with mock.patch('os.unlink', side_effect=OSError()):
+            assert pc.flush(force=True)
+
+    # Create another entry
+    pc['mykey'] = 42
+    with mock.patch('tempfile.NamedTemporaryFile', side_effect=OSError()):
+        assert not pc.flush(force=True)
+
+    # Temporary file cleanup failure
+    with mock.patch('tempfile._TemporaryFileWrapper.close',
+                    side_effect=OSError()):
+        assert not pc.flush(force=True)
+
+    with mock.patch('tempfile._TemporaryFileWrapper.close',
+                    side_effect=(OSError(), None)):
+        with mock.patch('os.unlink', side_effect=(OSError())):
+            assert not pc.flush(force=True)
 
 
 def test_persistent_storage_cache_io_errors(tmpdir):
