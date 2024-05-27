@@ -67,9 +67,6 @@ class NotifySFR(NotifyBase):
     # The default protocol
     protocol = 'sfr'
 
-    # The default secure protocol
-    secure_protocol = 'sfrs'
-
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_sfr'
 
@@ -115,16 +112,24 @@ class NotifySFR(NotifyBase):
     # Define our template arguments
     template_args = dict(
         NotifyBase.template_args, **{
+            'lang': {
+                'name': _('Language'),
+                'type': 'string',
+                'default': 'fr_FR',
+                'required': True,
+            },
+            'sender': {
+                'name': _('Sender Name'),
+                'type': 'string',
+                'required': True,
+                'default': '',
+            },
             'media': {
                 'name': _('Media Type'),
                 'type': 'string',
-                'required': False,
+                'required': True,
+                'default': 'SMSUnicode',
                 'values': ['SMS', 'SMSLong', 'SMSUnicode', 'SMSUnicodeLong'],
-            },
-            'from': {
-                'name': _('Sender Name'),
-                'type': 'string',
-                'required': False,
             },
             'timeout': {
                 'name': _('Timeout'),
@@ -132,16 +137,10 @@ class NotifySFR(NotifyBase):
                 'default': 2880,
                 'required': False,
             },
-            'ttsVoice': {
+            'tts_voice': {
                 'name': _('TTS Voice'),
                 'type': 'string',
                 'default': 'claire08s',
-                'required': False,
-            },
-            'lang': {
-                'name': _('Language'),
-                'type': 'string',
-                'default': 'fr_FR',
                 'required': False,
             },
         },
@@ -149,7 +148,8 @@ class NotifySFR(NotifyBase):
 
     def __init__(
         self, user: str, password: str, space_id: str,
-        to: str, **kwargs: Any,
+        to: str, lang="fr_FR", sender='', media='SMSUnicode', timeout=2880,
+        tts_voice='claire08s', **kwargs: Any,
     ) -> None:
         """
         Initialize SFR Object
@@ -188,11 +188,11 @@ class NotifySFR(NotifyBase):
 
         # self.space_id = kwargs.get('space_id', -1)
         # self.to = kwargs.get('to', '')
-        self.media = kwargs.get('media')
-        self.sender = kwargs.get('from')
-        self.timeout = kwargs.get('timeout')
-        self.tts_voice = kwargs.get('ttsVoice')
-        self.lang = kwargs.get('lang')
+        self.media = media
+        self.sender = sender
+        self.timeout = timeout
+        self.tts_voice = tts_voice
+        self.lang = lang
 
     def _format_params(self, body: str, title: str = '') -> dict[str, str]:
         """
@@ -210,7 +210,7 @@ class NotifySFR(NotifyBase):
 
         single_message = {
             'media': self.media,         # Can be 'SMSLong', 'SMS'
-            'textMsg': body,    # Content of the message
+            'textMsg': body,             # Content of the message
             'to': self.to,               # Receiver's phone number
             'from': self.sender,         # Optional, default to ''
             'timeout': self.timeout,     # Optional, default 2880 minutes
@@ -353,11 +353,12 @@ class NotifySFR(NotifyBase):
             'MessagesUnitairesWS/addSingleCall'
 
         # Extract additional parameters
-        results['from'] = results.get('qsd', {}).get('from', '')
-        results['timeout'] = int(results.get('qsd', {}).get('timeout', 2880))
-        results['ttsVoice'] = results.get('qsd', {}).get(
-            'ttsVoice', 'claire08s')
-        results['lang'] = results.get('qsd', {}).get('lang', 'fr_FR')
-        results['media'] = results.get('qsd', {}).get('media', 'SMSUnicode')
+        qsd = results.get('qsd', {})
+        results['sender'] = NotifySFR.unquote(qsd.get('from', ''))
+        results['timeout'] = int(qsd.get('timeout', 2880))
+        results['tts_voice'] = NotifySFR.unquote(
+            qsd.get('ttsVoice', 'claire08s'))
+        results['lang'] = NotifySFR.unquote(qsd.get('lang', 'fr_FR'))
+        results['media'] = NotifySFR.unquote(qsd.get('media', 'SMSUnicode'))
 
         return results

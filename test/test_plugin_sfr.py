@@ -151,6 +151,7 @@ def test_plugin_sfr_notification_ok(mock_post):
     assert results['space_id'] == '11111111'
     assert results['to'] == '0000000000'
     assert results['media'] == 'SMSLong'
+    assert results['sender'] == ''
 
     instance = NotifySFR(**results)
     assert isinstance(instance, NotifySFR)
@@ -191,7 +192,7 @@ def test_plugin_sfr_notification_ko(mock_post):
     assert results['space_id'] == '11111111'
     assert results['to'] == '8888888888'
     assert results['media'] == 'SMS'
-    assert results['from'] == ''
+    assert results['sender'] == ''
     assert results['timeout'] == 30
 
     instance = NotifySFR(**results)
@@ -259,7 +260,7 @@ def test_plugin_sfr_failure(mock_post):
         NotifySFR(
             user=None,
             password="service_password",
-            space_id="space_id",
+            space_id=int('8' * 10),
             to="to",
         )
 
@@ -268,7 +269,7 @@ def test_plugin_sfr_failure(mock_post):
         NotifySFR(
             user="service_id",
             password=None,
-            space_id="space_id",
+            space_id=int('8' * 10),
             to="to",
         )
 
@@ -286,6 +287,6 @@ def test_plugin_sfr_failure(mock_post):
         NotifySFR(
             user="service_id",
             password="service_password",
-            space_id="space_id",
+            space_id=int('8' * 10),
             to=None,
         )
