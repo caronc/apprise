@@ -213,9 +213,8 @@ class NotifySFR(NotifyBase):
             'textMsg': body,    # Content of the message
             'to': self.to,               # Receiver's phone number
             'from': self.sender,         # Optional, default to ''
-            # 'timeout': self.timeout,     # Optional, default 2880 minutes
-            # 'ttsVoice': self.tts_voice,  # Optional, default to French voice
-            # 'mailSubject': title,        # Optional, for mail notifications
+            'timeout': self.timeout,     # Optional, default 2880 minutes
+            'ttsVoice': self.tts_voice,  # Optional, default to French voice
         }
 
         # Construct the content of the singleMessage
