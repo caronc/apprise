@@ -182,7 +182,7 @@ def test_plugin_sfr_notification_ko(mock_post):
 
     # Test "real" parameters
     results = NotifySFR.parse_url(
-        'sfr://{}:other_fjv&8password@{}/{}?from=MyApp&timeout=30'.format(
+        'sfr://{}:other_fjv&8password@{}/{}?timeout=30&media=SMS'.format(
             '4' * 6, '1' * 8, '8' * 10))
 
     assert isinstance(results, dict)
@@ -191,7 +191,7 @@ def test_plugin_sfr_notification_ko(mock_post):
     assert results['space_id'] == '11111111'
     assert results['to'] == '8888888888'
     assert results['media'] == 'SMS'
-    assert results['from'] == 'MyApp'
+    assert results['from'] == ''
     assert results['timeout'] == 30
 
     instance = NotifySFR(**results)
@@ -230,7 +230,7 @@ def test_plugin_sfr_notification_exceptions(mock_post):
     assert results['password'] == 'str0*fn_ppw0rd'
     assert results['space_id'] == '9993384'
     assert results['to'] == '+33959290404'
-    assert results['media'] == 'SMS'
+    assert results['media'] == 'SMSUnicode'
     assert results['timeout'] == 2880
 
     instance = NotifySFR(**results)
