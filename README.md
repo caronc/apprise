@@ -116,7 +116,7 @@ The table below identifies the services this tool supports and some example serv
 | [Ryver](https://github.com/caronc/apprise/wiki/Notify_ryver) | ryver://  | (TCP) 443   | ryver://Organization/Token<br />ryver://botname@Organization/Token
 | [SendGrid](https://github.com/caronc/apprise/wiki/Notify_sendgrid) | sendgrid://  | (TCP) 443   | sendgrid://APIToken:FromEmail/<br />sendgrid://APIToken:FromEmail/ToEmail<br />sendgrid://APIToken:FromEmail/ToEmail1/ToEmail2/ToEmailN/
 | [ServerChan](https://github.com/caronc/apprise/wiki/Notify_serverchan) | schan://   | (TCP) 443    | schan://sendkey/
-| [Sfr](https://github.com/caronc/apprise/wiki/Notify_sfr) | sfr://   | (TCP) 443    | sfr://\<serviceId\>:\<servicePassword\>@\<spaceId\>/\<phoneNumber\>?param=value
+| [Sfr](https://github.com/caronc/apprise/wiki/Notify_sfr) | sfr://   | (TCP) 443    | sfr://\<serviceId\>:\<servicePassword\>@\<spaceId\>/\<phoneNumber\>?param=value 
 | [Signal API](https://github.com/caronc/apprise/wiki/Notify_signal) | signal://  or signals:// | (TCP) 80 or 443  | signal://hostname:port/FromPhoneNo<br/>signal://hostname:port/FromPhoneNo/ToPhoneNo<br/>signal://hostname:port/FromPhoneNo/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
 | [SimplePush](https://github.com/caronc/apprise/wiki/Notify_simplepush) | spush://   | (TCP) 443    | spush://apikey<br />spush://salt:password@apikey<br />spush://apikey?event=Apprise
 | [Slack](https://github.com/caronc/apprise/wiki/Notify_slack) | slack://  | (TCP) 443   | slack://TokenA/TokenB/TokenC/<br />slack://TokenA/TokenB/TokenC/Channel<br />slack://botname@TokenA/TokenB/TokenC/Channel<br />slack://user@TokenA/TokenB/TokenC/Channel1/Channel2/ChannelN
