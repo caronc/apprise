@@ -280,6 +280,40 @@ class NotifySlack(NotifyBase):
         },
     })
 
+    # Formatting requirements are defined here:
+    # https://api.slack.com/docs/message-formatting
+    _re_formatting_map = {
+        # New lines must become the string version
+        r'\r\*\n': '\\n',
+        # Escape other special characters
+        r'&': '&amp;',
+        r'<': '&lt;',
+        r'>': '&gt;',
+    }
+
+    # To notify a channel, one uses <!channel|channel>
+    _re_channel_support = re.compile(
+        r'(?P<match>(?:<|\&lt;)?[ \t]*'
+        r'!(?P<channel>[^| \n]+)'
+        r'(?:[ \t]*\|[ \t]*(?:(?P<val>[^\n]+?)[ \t]*)?(?:>|\&gt;)'
+        r'|(?:>|\&gt;)))', re.IGNORECASE)
+
+    # To notify a user by their ID, one uses <@U6TTX1F9R>
+    _re_user_id_support = re.compile(
+        r'(?P<match>(?:<|\&lt;)?[ \t]*'
+        r'@(?P<userid>[^| \n]+)'
+        r'(?:[ \t]*\|[ \t]*(?:(?P<val>[^\n]+?)[ \t]*)?(?:>|\&gt;)'
+        r'|(?:>|\&gt;)))', re.IGNORECASE)
+
+    # The markdown in slack isn't [desc](url), it's <url|desc>
+    #
+    # To accomodate this, we need to ensure we don't escape URLs that match
+    _re_url_support = re.compile(
+        r'(?P<match>(?:<|\&lt;)?[ \t]*'
+        r'(?P<url>(?:https?|mailto)://[^| \n]+)'
+        r'(?:[ \t]*\|[ \t]*(?:(?P<val>[^\n]+?)[ \t]*)?(?:>|\&gt;)'
+        r'|(?:>|\&gt;)))', re.IGNORECASE)
+
     def __init__(self, access_token=None, token_a=None, token_b=None,
                  token_c=None, targets=None, include_image=True,
                  include_footer=True, use_blocks=None, **kwargs):
@@ -344,39 +378,11 @@ class NotifySlack(NotifyBase):
                 None if self.mode is SlackMode.WEBHOOK
                 else self.default_notification_channel)
 
-        # Formatting requirements are defined here:
-        # https://api.slack.com/docs/message-formatting
-        self._re_formatting_map = {
-            # New lines must become the string version
-            r'\r\*\n': '\\n',
-            # Escape other special characters
-            r'&': '&amp;',
-            r'<': '&lt;',
-            r'>': '&gt;',
-        }
-
-        # To notify a channel, one uses <!channel|channel>
-        self._re_channel_support = re.compile(
-            r'(?P<match>(?:<|\&lt;)?[ \t]*'
-            r'!(?P<channel>[^| \n]+)'
-            r'(?:[ \t]*\|[ \t]*(?:(?P<val>[^\n]+?)[ \t]*)?(?:>|\&gt;)'
-            r'|(?:>|\&gt;)))', re.IGNORECASE)
-
-        # The markdown in slack isn't [desc](url), it's <url|desc>
-        #
-        # To accomodate this, we need to ensure we don't escape URLs that match
-        self._re_url_support = re.compile(
-            r'(?P<match>(?:<|\&lt;)?[ \t]*'
-            r'(?P<url>(?:https?|mailto)://[^| \n]+)'
-            r'(?:[ \t]*\|[ \t]*(?:(?P<val>[^\n]+?)[ \t]*)?(?:>|\&gt;)'
-            r'|(?:>|\&gt;)))', re.IGNORECASE)
-
         # Iterate over above list and store content accordingly
         self._re_formatting_rules = re.compile(
             r'(' + '|'.join(self._re_formatting_map.keys()) + r')',
             re.IGNORECASE,
         )
-
         # Place a thumbnail image inline with the message body
         self.include_image = include_image
 
@@ -475,6 +481,20 @@ class NotifySlack(NotifyBase):
                         '<!{channel}|{desc}>'.format(
                             channel=channel, desc=desc)
                         if desc else '<!{channel}>'.format(channel=channel),
+                        body,
+                        re.IGNORECASE)
+
+                # Support <@userid|desc>, <@channel> entries
+                for match in self._re_user_id_support.findall(body):
+                    # Swap back any ampersands previously updaated
+                    user = match[1].strip()
+                    desc = match[2].strip()
+
+                    # Update our string
+                    body = re.sub(
+                        re.escape(match[0]),
+                        '<@{user}|{desc}>'.format(user=user, desc=desc)
+                        if desc else '<@{user}>'.format(user=user),
                         body,
                         re.IGNORECASE)
 
