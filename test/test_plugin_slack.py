@@ -731,6 +731,10 @@ def test_plugin_slack_markdown(mock_get, mock_request):
     Channel Testing
     <!channelA>
     <!channelA|Description>
+
+    User ID Testing
+    <@U1ZQL9N3Y>
+    <@U1ZQL9N3Y|heheh>
     """)
 
     # Send our notification
@@ -752,7 +756,8 @@ def test_plugin_slack_markdown(mock_get, mock_request):
         "\n   <https://slack.com?arg=val&arg2=val2|Slack Link>.\n"\
         "We also want to be able to support <https://slack.com> "\
         "links without the\ndescription."\
-        "\n\nChannel Testing\n<!channelA>\n<!channelA|Description>"
+        "\n\nChannel Testing\n<!channelA>\n<!channelA|Description>\n\n"\
+        "User ID Testing\n<@U1ZQL9N3Y>\n<@U1ZQL9N3Y|heheh>"
 
 
 @mock.patch('requests.request')
