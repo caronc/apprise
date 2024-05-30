@@ -43,13 +43,12 @@
 
 import requests
 import json
-from typing import Any
-from urllib.parse import unquote
 
 from .base import NotifyBase
 from ..common import NotifyType
 from ..locale import gettext_lazy as _
 from ..utils import is_phone_no
+from ..utils import parse_phone_no
 from ..url import PrivacyMode
 
 
@@ -76,9 +75,16 @@ class NotifySFR(NotifyBase):
         'MessagesUnitairesWS/addSingleCall'  # this is the actual api call
     )
 
+    # The maximum length of the body
+    body_maxlen = 160
+
+    # A title can not be used for SMS Messages.  Setting this to zero will
+    # cause any title (if defined) to get placed into the message body.
+    title_maxlen = 0
+
     # Define object templates
     templates = (
-        '{schema}://{user}:{password}@{space_id}/{to}',
+        '{schema}://{user}:{password}@{space_id}/{targets}',
     )
 
     # Define our tokens
@@ -98,15 +104,21 @@ class NotifySFR(NotifyBase):
             'space_id': {
                 'name': _('Space ID'),
                 'type': 'string',
+                'private': True,
                 'required': True,
             },
-            'to': {
+            'target': {
                 'name': _('Recipient Phone Number'),
                 'type': 'string',
-                'required': True,
                 'regex': (r'^\+?[0-9\s)(+-]+$', 'i'),
+                'map_to': 'targets',
             },
-        },
+            'targets': {
+                'name': _('Targets'),
+                'type': 'list:string',
+                'required': True,
+            },
+        }
     )
 
     # Define our template arguments
@@ -124,6 +136,9 @@ class NotifySFR(NotifyBase):
                 'required': True,
                 'default': '',
             },
+            'from': {
+                'alias_of': 'sender'
+            },
             'media': {
                 'name': _('Media Type'),
                 'type': 'string',
@@ -137,28 +152,24 @@ class NotifySFR(NotifyBase):
                 'default': 2880,
                 'required': False,
             },
-            'tts_voice': {
+            'voice': {
                 'name': _('TTS Voice'),
                 'type': 'string',
                 'default': 'claire08s',
                 'required': False,
             },
-        },
+            'to': {
+                'alias_of': 'targets',
+            },
+        }
     )
 
-    def __init__(
-        self, user: str, password: str, space_id: str,
-        to: str, lang="fr_FR", sender='', media='SMSUnicode', timeout=2880,
-        tts_voice='claire08s', **kwargs: Any,
-    ) -> None:
+    def __init__(self, space_id=None, targets=None, lang=None, sender=None,
+                 media=None, timeout=None, tts_voice=None, **kwargs):
         """
         Initialize SFR Object
         """
         super().__init__(**kwargs)
-
-        # Initialize your SFR-specific attributes
-        self.user = user
-        self.password = password
 
         if not (self.user and self.password):
             msg = 'A SFR user (serviceId) and password (servicePassword) ' \
@@ -167,147 +178,168 @@ class NotifySFR(NotifyBase):
             raise TypeError(msg)
 
         self.space_id = space_id
-        if not (self.space_id):
-            msg = 'A SFR spaceId ' \
-                  'is required.'
+        if not self.space_id:
+            msg = 'A SFR Space ID is required.'
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        self.to = to
-        if not (self.to):
-            msg = 'A receiver phone number ' \
-                  'is required.'
-            self.logger.warning(msg)
-            raise TypeError(msg)
+        self.tts_voice = tts_voice \
+            if tts_voice else self.template_args['voice']['default']
+        self.lang = lang \
+            if lang else self.template_args['lang']['default']
+        self.media = media \
+            if media else self.template_args['media']['default']
+        self.sender = sender \
+            if sender else self.template_args['sender']['default']
 
-        if not is_phone_no(self.to):
-            msg = 'An invalid SFR Source Phone No ' \
-                  '({}) was provided.'.format(to)
-            self.logger.warning(msg)
-            raise TypeError(msg)
+        # Set our Time to Live Flag
+        self.timeout = self.template_args['timeout']['default']
+        try:
+            self.timeout = int(timeout)
 
-        # self.space_id = kwargs.get('space_id', -1)
-        # self.to = kwargs.get('to', '')
-        self.media = media
-        self.sender = sender
-        self.timeout = timeout
-        self.tts_voice = tts_voice
-        self.lang = lang
+        except (ValueError, TypeError):
+            # Do nothing
+            pass
 
-    def _format_params(self, body: str, title: str = '') -> dict[str, str]:
+        # Parse our targets
+        self.targets = list()
+
+        for target in parse_phone_no(targets):
+            # Validate targets and drop bad ones:
+            result = is_phone_no(target)
+            if not result:
+                self.logger.warning(
+                    'Dropped invalid phone # '
+                    '({}) specified.'.format(target),
+                )
+                continue
+
+            # store valid phone number
+            self.targets.append(result['full'])
+
+        return
+
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
-        Generate paramameter format
+        Perform the SFR notification
         """
+
+        if not len(self.targets):
+            # We have nothing to notify; we're done
+            self.logger.warning('There are no SFR targets to notify')
+            return False
+
+        # error tracking (used for function return)
+        has_error = False
+
+        # Create a copy of the targets list
+        targets = list(self.targets)
 
         # Construct the authentication JSON
-        auth_creds = {
+        auth_payload = json.dumps({
             'serviceId': self.user,
             'servicePassword': self.password,
             'spaceId': self.space_id,
             'lang': self.lang,
-        }
-        authenticate = json.dumps(auth_creds)
+        })
 
-        single_message = {
+        base_payload = {
             'media': self.media,         # Can be 'SMSLong', 'SMS'
             'textMsg': body,             # Content of the message
-            'to': self.to,               # Receiver's phone number
+            'to': None,                  # Receiver's phone number (set below)
             'from': self.sender,         # Optional, default to ''
             'timeout': self.timeout,     # Optional, default 2880 minutes
             'ttsVoice': self.tts_voice,  # Optional, default to French voice
         }
 
-        # Construct the content of the singleMessage
-        # ensure_ascii to keep the unicode characters
-        single_message = json.dumps(single_message, ensure_ascii=False)
+        while len(targets):
+            # Get our target to notify
+            target = targets.pop(0)
 
-        # Return the parameters for the AddSingleCall
-        return {'authenticate': authenticate,
-                'messageUnitaire': single_message}
-
-    def send(
-        self, body: str, title: str = '',
-        notify_type: NotifyType = NotifyType.INFO, **kwargs: Any,
-    ) -> bool:
-        """
-        Perform the SFR notification
-        """
-        params = self._format_params(body, title)
-
-        try:
-            response = requests.post(
-                self.notify_url,
-                params=params,
-            )
+            # Prepare our target phone no
+            base_payload['to'] = target
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
 
-            # Check if the request was successfull
-            if response.status_code not in (
-                    requests.codes.ok,
-                    requests.codes.no_content,
-            ):
+            # Finalize our payload
+            payload = {
+                'authenticate': auth_payload,
+                'messageUnitaire': json.dumps(base_payload, ensure_ascii=False)
+            }
 
-                # We had a problem
-                error_code = \
-                    NotifyBase.http_response_code_lookup(response.status_code)
+            # Some Debug Logging
+            self.logger.debug('SFR POST URL: {} (cert_verify={})'.format(
+                self.notify_url, self.verify_certificate))
+            self.logger.debug('SFR Payload: {}' .format(payload))
 
-                self.logger.warning(
-                    'Failed to get SFR notification: '
-                    '{}{}error={}.'.format(
-                        error_code, ', ' if error_code else '',
-                        response.status_code,
-                    ),
+            try:
+                r = requests.post(
+                    self.notify_url,
+                    params=payload,
+                    verify=self.verify_certificate,
+                    timeout=self.request_timeout,
                 )
-                # Return; we're done
-                return False
-            else:
 
-                if not response.content:
-                    return False
-                # We need to actually check if the sucess flag is returned
-                # Since SFR send back a status_code==200 even if the
-                # authentication failed, or a parameter is not correctly
-                # formatted
-                r = response.json()
-                if r.get('success', ''):
-                    self.logger.info('Sent SFR notification.')
-                else:
-                    self.logger.error(
-                        'Could not send SFR Notification.'
-                        'success: {}, reason: {}'.format(
-                            r.get('success', False), r.get(
-                                'errorCode', "UNKOWN ERROR"),
-                        ),
-                    )
+                try:
+                    content = json.loads(r.content)
 
-                    # Return; we're done
-                    return False
+                except (AttributeError, TypeError, ValueError):
+                    # ValueError = r.content is Unparsable
+                    # TypeError = r.content is None
+                    # AttributeError = r is None
+                    content = {}
 
-        except requests.RequestException as e:
-            self.logger.warning(
-                'A Connection error occurred sending SFR '
-                'notification.',
-            )
-            self.logger.debug('Socket Exception: %s' % str(e))
+                # Check if the request was successfull
+                if r.status_code not in (
+                        requests.codes.ok,
+                        requests.codes.no_content,
+                ) and not content.get('success', False):
+                    # We had a problem
+                    status_str = \
+                        NotifySFR.http_response_code_lookup(
+                            r.status_code)
 
-            # Return; we're done
-            return False
+                    self.logger.warning(
+                        'Failed to send SFR notification to {}: '
+                        '{}{}error={}.'.format(
+                            target,
+                            status_str,
+                            ', ' if status_str else '',
+                            r.status_code))
 
-        return True
+                    self.logger.debug(
+                        'Response Details:\r\n{}'.format(r.content))
 
-    def url(self, privacy: bool = False, *args: Any, **kwargs: Any) -> str:
+                    # Mark our failure
+                    has_error = True
+                    continue
+
+                self.logger.info(
+                    'Sent SFR notification to %s.' % target)
+
+            except requests.RequestException as e:
+                self.logger.warning(
+                    'A Connection error occurred sending SFR:%s '
+                    'notification.' % target
+                )
+                self.logger.debug('Socket Exception: %s' % str(e))
+
+                # Mark our failure
+                has_error = True
+                continue
+
+        return not has_error
+
+    def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
         """
         # Define any URL parameters
         params = {
-            # 'to': self.to,
-            # 'space_id': self.space_id,
             'from': self.sender,
-            'timeout': self.timeout,
-            'ttsVoice': self.tts_voice,
+            'timeout': str(self.timeout),
+            'voice': self.tts_voice,
             'lang': self.lang,
             'media': self.media,
         }
@@ -315,7 +347,7 @@ class NotifySFR(NotifyBase):
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        return '{schema}://{user}:{password}@{space_id}/{to}?{params}'.format(
+        return '{schema}://{user}:{password}@{sid}/{targets}?{params}'.format(
             schema=self.secure_protocol if self.secure else self.protocol,
             user=self.user,
             password=self.pprint(
@@ -324,13 +356,14 @@ class NotifySFR(NotifyBase):
                 mode=PrivacyMode.Secret,
                 safe='',
             ),
-            space_id=self.space_id,
-            to=self.to,
+            sid=self.space_id,
+            targets='/'.join(
+                [NotifySFR.quote(x, safe='') for x in self.targets]),
             params=self.urlencode(params),
         )
 
     @staticmethod
-    def parse_url(url: str) -> dict[str, Any]:
+    def parse_url(url):
         """
         Parse the URL and return arguments required to initialize this plugin
         """
@@ -346,19 +379,22 @@ class NotifySFR(NotifyBase):
             return results
 
         # Extract user and password
-        results['space_id'] = results.get('host', '')
-        results['to'] = unquote(results.get('query', ''))
-        results['host'] = \
-            'www.dmc.sfr-sh.fr/DmcWS/1.5.8/JsonService/' \
-            'MessagesUnitairesWS/addSingleCall'
+        results['space_id'] = results.get('host')
+        results['targets'] = NotifySFR.split_path(results['fullpath'])
 
         # Extract additional parameters
         qsd = results.get('qsd', {})
-        results['sender'] = NotifySFR.unquote(qsd.get('from', ''))
-        results['timeout'] = int(qsd.get('timeout', 2880))
-        results['tts_voice'] = NotifySFR.unquote(
-            qsd.get('ttsVoice', 'claire08s'))
-        results['lang'] = NotifySFR.unquote(qsd.get('lang', 'fr_FR'))
-        results['media'] = NotifySFR.unquote(qsd.get('media', 'SMSUnicode'))
+        results['sender'] = \
+            NotifySFR.unquote(qsd.get('sender', qsd.get('from')))
+        results['timeout'] = NotifySFR.unquote(qsd.get('timeout'))
+        results['tts_voice'] = NotifySFR.unquote(qsd.get('voice'))
+        results['lang'] = NotifySFR.unquote(qsd.get('lang'))
+        results['media'] = NotifySFR.unquote(qsd.get('media'))
+
+        # Support the 'to' variable so that we can support rooms this way too
+        # The 'to' makes it easier to use yaml configuration
+        if 'to' in results['qsd'] and len(results['qsd']['to']):
+            results['targets'] += \
+                NotifySFR.parse_phone_no(results['qsd']['to'])
 
         return results

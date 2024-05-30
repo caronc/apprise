@@ -29,13 +29,17 @@
 from unittest import mock
 import pytest
 import requests
-
+import json
 from apprise.plugins.sfr import NotifySFR
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
 import logging
 logging.disable(logging.CRITICAL)
+
+SFR_GOOD_RESPONSE = json.dumps({
+    "success": True
+})
 
 # Our Testing URLs
 apprise_url_tests = (
@@ -60,7 +64,7 @@ apprise_url_tests = (
     ('sfr://:service_password@%s/', {
         'instance': TypeError,
     }),
-    ('sfr://:service_password@%s/to', {
+    ('sfr://:service_password@%s/{}'.format(3*13), {
         'instance': TypeError,
     }),
     ('sfr://:service_password@space_id/to?media=TEST', {
@@ -91,28 +95,34 @@ apprise_url_tests = (
     ('sfr://service_id:service_password@{}/{}?from=MyApp&timeout=30'.format(
         '0' * 8, '0' * 10), {
         'instance': NotifySFR,
-        'requests_response_code': requests.codes.ok,
+        # Our response expected server response
+        'requests_response_text': SFR_GOOD_RESPONSE,
     }),
     ('sfr://srv_id:srv_pwd@{}/{}?ttsVoice=laura8k&lang=en_US'.format(
         '0' * 8, '0' * 10), {
         'instance': NotifySFR,
-        'requests_response_code': requests.codes.ok,
+        # Our response expected server response
+        'requests_response_text': SFR_GOOD_RESPONSE,
     }),
     ('sfr://service_id:service_password@{}/{}?media=SMSLong'.format(
         '0' * 8, '0' * 10), {
         'instance': NotifySFR,
-        'requests_response_code': requests.codes.ok,
+        # Our response expected server response
+        'requests_response_text': SFR_GOOD_RESPONSE,
     }),
     ('sfr://service_id:service_password@{}/{}?media=SMS'.format(
         '0' * 8, '0' * 10), {
         'instance': NotifySFR,
-        'requests_response_code': requests.codes.ok,
+        # Our response expected server response
+        'requests_response_text': SFR_GOOD_RESPONSE,
     }),
     ('sfr://service_id:service_password@{}/{}'.format(
         '0' * 8, '0' * 10), {
         'instance': NotifySFR,
         # force a failure
         'response': False,
+        # Our response expected server response
+        'requests_response_text': SFR_GOOD_RESPONSE,
         'requests_response_code': requests.codes.internal_server_error,
     }),
 )
@@ -151,7 +161,7 @@ def test_plugin_sfr_notification_ok(mock_post):
     assert results['space_id'] == '11111111'
     assert results['to'] == '0000000000'
     assert results['media'] == 'SMSLong'
-    assert results['sender'] == ''
+    assert results['targets'] == ''
 
     instance = NotifySFR(**results)
     assert isinstance(instance, NotifySFR)
@@ -192,7 +202,7 @@ def test_plugin_sfr_notification_ko(mock_post):
     assert results['space_id'] == '11111111'
     assert results['to'] == '8888888888'
     assert results['media'] == 'SMS'
-    assert results['sender'] == ''
+    assert results['targets'] == ''
     assert results['timeout'] == 30
 
     instance = NotifySFR(**results)
