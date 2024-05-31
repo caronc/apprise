@@ -428,7 +428,94 @@ def test_plugin_sfr_notification_exceptions(mock_post):
     assert isinstance(instance.space_id, str)
 
     response = instance.send(body="test")
-    # Must return False since errorcode is 5XX
+    # Must return False
+    assert response is False
+    assert mock_post.call_count == 1
+
+    # Test invalid content returned by requests
+    mock_post.reset_mock()
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b'Invalid JSON Content'
+    mock_post.return_value = response
+
+    # Test "real" parameters
+    results = NotifySFR.parse_url(
+        'sfr://{}:str0*fn_ppw0rd@{}/{}'.format(
+            "404ghwo89144", '9993384', '0959290404'))
+
+    assert isinstance(results, dict)
+    assert results['user'] == '404ghwo89144'
+    assert results['password'] == 'str0*fn_ppw0rd'
+    assert results['space_id'] == '9993384'
+    assert results['targets'] == ['0959290404']
+    assert results['media'] == ''
+    assert results['timeout'] == ''
+    assert results['lang'] == ''
+    assert results['sender'] == ''
+
+    instance = NotifySFR(**results)
+    assert isinstance(instance, NotifySFR)
+    assert len(instance) == 1
+    assert instance.lang == 'fr_FR'
+    assert instance.sender == ''
+    assert instance.media == 'SMSUnicode'
+    assert isinstance(instance.targets, list)
+    assert instance.timeout == 2880
+    assert instance.voice == 'claire08s'
+    assert isinstance(instance.space_id, str)
+
+    response = instance.send(body="test")
+    # Must return False
+    assert response is False
+    assert mock_post.call_count == 1
+
+
+@mock.patch(
+    'requests.post',
+    side_effect=requests.RequestException("Connection error"),
+)
+def test_plugin_sfr_notification_exceptions_requests(mock_post):
+    """
+    NotifySFR() Notifications requests exceptions
+    """
+    # Test requests socket error return
+    mock_post.reset_mock()
+    # Prepare Mock
+    # Create a mock response object
+    response = mock.Mock()
+    response.status_code = requests.codes.internal_server_error
+    response.content = b'Invalid content'
+    mock_post.return_value = response
+
+    # Test "real" parameters
+    results = NotifySFR.parse_url(
+        'sfr://{}:str0*fn_ppw0rd@{}/{}'.format(
+            "404ghwo89144", '9993384', '0959290404'))
+
+    assert isinstance(results, dict)
+    assert results['user'] == '404ghwo89144'
+    assert results['password'] == 'str0*fn_ppw0rd'
+    assert results['space_id'] == '9993384'
+    assert results['targets'] == ['0959290404']
+    assert results['media'] == ''
+    assert results['timeout'] == ''
+    assert results['lang'] == ''
+    assert results['sender'] == ''
+
+    instance = NotifySFR(**results)
+    assert isinstance(instance, NotifySFR)
+    assert len(instance) == 1
+    assert instance.lang == 'fr_FR'
+    assert instance.sender == ''
+    assert instance.media == 'SMSUnicode'
+    assert isinstance(instance.targets, list)
+    assert instance.timeout == 2880
+    assert instance.voice == 'claire08s'
+    assert isinstance(instance.space_id, str)
+
+    response = instance.send(body="test")
+    # Must return False do to requests error
     assert response is False
     assert mock_post.call_count == 1
 

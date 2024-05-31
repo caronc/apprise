@@ -199,7 +199,8 @@ class NotifySFR(NotifyBase):
             self.timeout = int(timeout)
 
         except (ValueError, TypeError):
-            # Do nothing
+            # set default timeout
+            self.timeout = 2880
             pass
 
         # Parse our targets
@@ -217,22 +218,19 @@ class NotifySFR(NotifyBase):
 
             # store valid phone number
             self.targets.append(result['full'])
+
         if not self.targets:
             msg = ('No receiver phone number has been provided. Please '
                    'provide as least one valid phone number.')
             self.logger.warning(msg)
             raise TypeError(msg)
+
         return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform the SFR notification
         """
-
-        if not len(self.targets):
-            # We have nothing to notify; we're done
-            self.logger.warning('There are no SFR targets to notify')
-            return False
 
         # error tracking (used for function return)
         has_error = False
