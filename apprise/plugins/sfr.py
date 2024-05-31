@@ -156,6 +156,7 @@ class NotifySFR(NotifyBase):
                 'name': _('TTS Voice'),
                 'type': 'string',
                 'default': 'claire08s',
+                'values': ['claire08s', 'laura8k'],
                 'required': False,
             },
             'to': {
@@ -165,7 +166,7 @@ class NotifySFR(NotifyBase):
     )
 
     def __init__(self, space_id=None, targets=None, lang=None, sender=None,
-                 media=None, timeout=None, tts_voice=None, **kwargs):
+                 media=None, timeout=None, voice=None, **kwargs):
         """
         Initialize SFR Object
         """
@@ -183,8 +184,8 @@ class NotifySFR(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        self.tts_voice = tts_voice \
-            if tts_voice else self.template_args['voice']['default']
+        self.voice = voice \
+            if voice else self.template_args['voice']['default']
         self.lang = lang \
             if lang else self.template_args['lang']['default']
         self.media = media \
@@ -216,7 +217,11 @@ class NotifySFR(NotifyBase):
 
             # store valid phone number
             self.targets.append(result['full'])
-
+        if not self.targets:
+            msg = ('No receiver phone number has been provided. Please '
+                   'provide as least one valid phone number.')
+            self.logger.warning(msg)
+            raise TypeError(msg)
         return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
@@ -249,7 +254,7 @@ class NotifySFR(NotifyBase):
             'to': None,                  # Receiver's phone number (set below)
             'from': self.sender,         # Optional, default to ''
             'timeout': self.timeout,     # Optional, default 2880 minutes
-            'ttsVoice': self.tts_voice,  # Optional, default to French voice
+            'ttsVoice': self.voice,  # Optional, default to French voice
         }
 
         while len(targets):
@@ -265,7 +270,7 @@ class NotifySFR(NotifyBase):
             # Finalize our payload
             payload = {
                 'authenticate': auth_payload,
-                'messageUnitaire': json.dumps(base_payload, ensure_ascii=False)
+                'messageUnitaire': json.dumps(base_payload, ensure_ascii=True)
             }
 
             # Some Debug Logging
@@ -294,7 +299,7 @@ class NotifySFR(NotifyBase):
                 if r.status_code not in (
                         requests.codes.ok,
                         requests.codes.no_content,
-                ) and not content.get('success', False):
+                ):
                     # We had a problem
                     status_str = \
                         NotifySFR.http_response_code_lookup(
@@ -310,6 +315,22 @@ class NotifySFR(NotifyBase):
 
                     self.logger.debug(
                         'Response Details:\r\n{}'.format(r.content))
+
+                    # Mark our failure
+                    has_error = True
+                    continue
+
+                # SFR returns a code 200 even if the authentication fails
+                # It then indicates in the content['success'] field the
+                # Actual state of the transaction
+                if not content.get('success', False):
+                    self.logger.warning(
+                        'SFR Notification to {} was not sent by the server: '
+                        'server_error={}, fatal={}.'.format(
+                            target,
+                            content.get('errorCode', 'UNKNOWN'),
+                            content.get('fatal', 'True'),
+                        ))
 
                     # Mark our failure
                     has_error = True
@@ -339,7 +360,7 @@ class NotifySFR(NotifyBase):
         params = {
             'from': self.sender,
             'timeout': str(self.timeout),
-            'voice': self.tts_voice,
+            'voice': self.voice,
             'lang': self.lang,
             'media': self.media,
         }
@@ -361,6 +382,12 @@ class NotifySFR(NotifyBase):
                 [NotifySFR.quote(x, safe='') for x in self.targets]),
             params=self.urlencode(params),
         )
+
+    def __len__(self):
+        """
+        Returns the number of targets associated with this notification
+        """
+        return len(self.targets)
 
     @staticmethod
     def parse_url(url):
@@ -387,7 +414,7 @@ class NotifySFR(NotifyBase):
         results['sender'] = \
             NotifySFR.unquote(qsd.get('sender', qsd.get('from')))
         results['timeout'] = NotifySFR.unquote(qsd.get('timeout'))
-        results['tts_voice'] = NotifySFR.unquote(qsd.get('voice'))
+        results['voice'] = NotifySFR.unquote(qsd.get('voice'))
         results['lang'] = NotifySFR.unquote(qsd.get('lang'))
         results['media'] = NotifySFR.unquote(qsd.get('media'))
 
