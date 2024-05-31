@@ -280,6 +280,40 @@ class NotifySlack(NotifyBase):
         },
     })
 
+    # Formatting requirements are defined here:
+    # https://api.slack.com/docs/message-formatting
+    _re_formatting_map = {
+        # New lines must become the string version
+        r'\r\*\n': '\\n',
+        # Escape other special characters
+        r'&': '&amp;',
+        r'<': '&lt;',
+        r'>': '&gt;',
+    }
+
+    # To notify a channel, one uses <!channel|channel>
+    _re_channel_support = re.compile(
+        r'(?P<match>(?:<|\&lt;)?[ \t]*'
+        r'!(?P<channel>[^| \n]+)'
+        r'(?:[ \t]*\|[ \t]*(?:(?P<val>[^\n]+?)[ \t]*)?(?:>|\&gt;)'
+        r'|(?:>|\&gt;)))', re.IGNORECASE)
+
+    # To notify a user by their ID, one uses <@U6TTX1F9R>
+    _re_user_id_support = re.compile(
+        r'(?P<match>(?:<|\&lt;)?[ \t]*'
+        r'@(?P<userid>[^| \n]+)'
+        r'(?:[ \t]*\|[ \t]*(?:(?P<val>[^\n]+?)[ \t]*)?(?:>|\&gt;)'
+        r'|(?:>|\&gt;)))', re.IGNORECASE)
+
+    # The markdown in slack isn't [desc](url), it's <url|desc>
+    #
+    # To accomodate this, we need to ensure we don't escape URLs that match
+    _re_url_support = re.compile(
+        r'(?P<match>(?:<|\&lt;)?[ \t]*'
+        r'(?P<url>(?:https?|mailto)://[^| \n]+)'
+        r'(?:[ \t]*\|[ \t]*(?:(?P<val>[^\n]+?)[ \t]*)?(?:>|\&gt;)'
+        r'|(?:>|\&gt;)))', re.IGNORECASE)
+
     def __init__(self, access_token=None, token_a=None, token_b=None,
                  token_c=None, targets=None, include_image=True,
                  include_footer=True, use_blocks=None, **kwargs):
@@ -344,39 +378,11 @@ class NotifySlack(NotifyBase):
                 None if self.mode is SlackMode.WEBHOOK
                 else self.default_notification_channel)
 
-        # Formatting requirements are defined here:
-        # https://api.slack.com/docs/message-formatting
-        self._re_formatting_map = {
-            # New lines must become the string version
-            r'\r\*\n': '\\n',
-            # Escape other special characters
-            r'&': '&amp;',
-            r'<': '&lt;',
-            r'>': '&gt;',
-        }
-
-        # To notify a channel, one uses <!channel|channel>
-        self._re_channel_support = re.compile(
-            r'(?P<match>(?:<|\&lt;)?[ \t]*'
-            r'!(?P<channel>[^| \n]+)'
-            r'(?:[ \t]*\|[ \t]*(?:(?P<val>[^\n]+?)[ \t]*)?(?:>|\&gt;)'
-            r'|(?:>|\&gt;)))', re.IGNORECASE)
-
-        # The markdown in slack isn't [desc](url), it's <url|desc>
-        #
-        # To accomodate this, we need to ensure we don't escape URLs that match
-        self._re_url_support = re.compile(
-            r'(?P<match>(?:<|\&lt;)?[ \t]*'
-            r'(?P<url>(?:https?|mailto)://[^| \n]+)'
-            r'(?:[ \t]*\|[ \t]*(?:(?P<val>[^\n]+?)[ \t]*)?(?:>|\&gt;)'
-            r'|(?:>|\&gt;)))', re.IGNORECASE)
-
         # Iterate over above list and store content accordingly
         self._re_formatting_rules = re.compile(
             r'(' + '|'.join(self._re_formatting_map.keys()) + r')',
             re.IGNORECASE,
         )
-
         # Place a thumbnail image inline with the message body
         self.include_image = include_image
 
@@ -475,6 +481,20 @@ class NotifySlack(NotifyBase):
                         '<!{channel}|{desc}>'.format(
                             channel=channel, desc=desc)
                         if desc else '<!{channel}>'.format(channel=channel),
+                        body,
+                        re.IGNORECASE)
+
+                # Support <@userid|desc>, <@channel> entries
+                for match in self._re_user_id_support.findall(body):
+                    # Swap back any ampersands previously updaated
+                    user = match[1].strip()
+                    desc = match[2].strip()
+
+                    # Update our string
+                    body = re.sub(
+                        re.escape(match[0]),
+                        '<@{user}|{desc}>'.format(user=user, desc=desc)
+                        if desc else '<@{user}>'.format(user=user),
                         body,
                         re.IGNORECASE)
 
@@ -603,15 +623,16 @@ class NotifySlack(NotifyBase):
                             channel if channel[0] == '#' \
                             else '#{}'.format(channel)
 
-                # Store the valid and massaged payload that is recognizable by
-                # slack. This list is used for sending attachments later.
-                attach_channel_list.append(payload['channel'])
-
             response = self._send(url, payload)
             if not response:
                 # Handle any error
                 has_error = True
                 continue
+
+            # Store the valid channel or chat ID (for DMs) that will
+            # be accepted by Slack's attachment method later.
+            if response.get('channel'):
+                attach_channel_list.append(response.get('channel'))
 
             self.logger.info(
                 'Sent Slack notification{}.'.format(
@@ -635,20 +656,57 @@ class NotifySlack(NotifyBase):
                     'Posting Slack attachment {}'.format(
                         attachment.url(privacy=True)))
 
-                # Prepare API Upload Payload
-                _payload = {
+                # Get the URL to which to upload the file.
+                # https://api.slack.com/methods/files.getUploadURLExternal
+                _params = {
                     'filename': attachment.name,
-                    'channels': ','.join(attach_channel_list)
+                    'length': len(attachment),
                 }
-
-                # Our URL
-                _url = self.api_url.format('files.upload')
-
-                response = self._send(_url, _payload, attach=attachment)
-                if not (response and response.get('file') and
-                        response['file'].get('url_private')):
-                    # We failed to post our attachments, take an early exit
+                _url = self.api_url.format('files.getUploadURLExternal')
+                response = self._send(
+                    _url, {}, http_method='get', params=_params
+                )
+                if not (
+                    response and response.get('file_id')
+                    and response.get('upload_url')
+                ):
+                    self.logger.error('Could retrieve file upload URL.')
+                    # We failed to get an upload URL, take an early exit
                     return False
+
+                file_id = response.get('file_id')
+                upload_url = response.get('upload_url')
+
+                # Upload file
+                response = self._send(upload_url, {}, attach=attachment)
+
+                # Send file to channels
+                # https://api.slack.com/methods/files.completeUploadExternal
+                for channel_id in attach_channel_list:
+                    _payload = {
+                        'files': [{
+                            "id": file_id,
+                            "title": attachment.name,
+                        }],
+                        'channel_id': channel_id
+                    }
+                    _url = self.api_url.format('files.completeUploadExternal')
+                    response = self._send(_url, _payload)
+                    # Expected response
+                    # {
+                    #     "ok": true,
+                    #     "files": [
+                    #         {
+                    #             "id": "F123ABC456",
+                    #             "title": "slack-test"
+                    #         }
+                    #     ]
+                    # }
+                    if not (response and response.get('files')):
+                        self.logger.error('Failed to send file to channel.')
+                        # We failed to send the file to the channel,
+                        # take an early exit
+                        return False
 
         return not has_error
 
@@ -808,7 +866,8 @@ class NotifySlack(NotifyBase):
 
         return user_id
 
-    def _send(self, url, payload, attach=None, **kwargs):
+    def _send(self, url, payload, attach=None, http_method='post', params=None,
+              **kwargs):
         """
         Wrapper to the requests (post) object
         """
@@ -842,13 +901,15 @@ class NotifySlack(NotifyBase):
             if attach:
                 files = {'file': (attach.name, open(attach.path, 'rb'))}
 
-            r = requests.post(
+            r = requests.request(
+                http_method,
                 url,
                 data=payload if attach else dumps(payload),
                 headers=headers,
                 files=files,
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
+                params=params if params else None,
             )
 
             # Posts return a JSON string
@@ -866,11 +927,22 @@ class NotifySlack(NotifyBase):
             #   'ok': False,
             #   'error': 'not_in_channel',
             # }
-            #
-            # The text 'ok' is returned if this is a Webhook request
-            # So the below captures that as well.
-            status_okay = (response and response.get('ok', False)) \
-                if self.mode is SlackMode.BOT else r.content == b'ok'
+            status_okay = False
+            if self.mode is SlackMode.BOT:
+                status_okay = (
+                    (response and response.get('ok', False)) or
+                    # Responses for file uploads look like this
+                    # 'OK - <file length>'
+                    (
+                        r.content and
+                        isinstance(r.content, bytes) and
+                        b'OK' in r.content
+                    )
+                )
+            elif r.content == b'ok':
+                # The text 'ok' is returned if this is a Webhook request
+                # So the below captures that as well.
+                status_okay = True
 
             if r.status_code != requests.codes.ok or not status_okay:
                 # We had a problem
@@ -879,9 +951,9 @@ class NotifySlack(NotifyBase):
                         r.status_code, SLACK_HTTP_ERROR_MAP)
 
                 self.logger.warning(
-                    'Failed to send {}to Slack: '
+                    'Failed to send{} to Slack: '
                     '{}{}error={}.'.format(
-                        attach.name if attach else '',
+                        (' ' + attach.name) if attach else '',
                         status_str,
                         ', ' if status_str else '',
                         r.status_code))
@@ -913,53 +985,15 @@ class NotifySlack(NotifyBase):
             #   "username": "Apprise"
             # }
 
-            # File Attachment Responses look like this
+            # files.completeUploadExternal responses look like this:
             # {
-            #   "file": {
-            #     "channels": [],
-            #     "comments_count": 0,
-            #     "created": 1573617523,
-            #     "display_as_bot": false,
-            #     "editable": false,
-            #     "external_type": "",
-            #     "filetype": "png",
-            #     "groups": [],
-            #     "has_rich_preview": false,
-            #     "id": "FQJJLDAHM",
-            #     "image_exif_rotation": 1,
-            #     "ims": [],
-            #     "is_external": false,
-            #     "is_public": false,
-            #     "is_starred": false,
-            #     "mimetype": "image/png",
-            #     "mode": "hosted",
-            #     "name": "apprise-test.png",
-            #     "original_h": 640,
-            #     "original_w": 640,
-            #     "permalink": "https://{name}.slack.com/files/...
-            #     "permalink_public": "https://slack-files.com/...
-            #     "pretty_type": "PNG",
-            #     "public_url_shared": false,
-            #     "shares": {},
-            #     "size": 238810,
-            #     "thumb_160": "https://files.slack.com/files-tmb/...
-            #     "thumb_360": "https://files.slack.com/files-tmb/...
-            #     "thumb_360_h": 360,
-            #     "thumb_360_w": 360,
-            #     "thumb_480": "https://files.slack.com/files-tmb/...
-            #     "thumb_480_h": 480,
-            #     "thumb_480_w": 480,
-            #     "thumb_64": "https://files.slack.com/files-tmb/...
-            #     "thumb_80": "https://files.slack.com/files-tmb/...
-            #     "thumb_tiny": abcd...
-            #     "timestamp": 1573617523,
-            #     "title": "apprise-test",
-            #     "url_private": "https://files.slack.com/files-pri/...
-            #     "url_private_download": "https://files.slack.com/files-...
-            #     "user": "UADKLLMJT",
-            #     "username": ""
-            #   },
-            #   "ok": true
+            #     "ok": true,
+            #     "files": [
+            #         {
+            #             "id": "F123ABC456",
+            #             "title": "slack-test"
+            #         }
+            #     ]
             # }
         except requests.RequestException as e:
             self.logger.warning(
