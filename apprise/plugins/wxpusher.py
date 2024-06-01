@@ -25,11 +25,15 @@
 # CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
-
+#
 # Sign-up at https://wxpusher.zjiecode.com/
 #
-# Login and acquire your Token
-#
+# Login and acquire your App Token
+#   - Open the backend of the application:
+#         https://wxpusher.zjiecode.com/admin/
+#   - Find the appToken menu from the left menu bar, here you can reset the
+#     appToken, please note that after resetting, the old appToken will be
+#     invalid immediately and the call interface will fail.
 import re
 import json
 import requests
@@ -85,7 +89,7 @@ class NotifyWxPusher(NotifyBase):
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_wxpusher'
 
     # WxPusher notification endpoint
-    notify_url = 'http://wxpusher.zjiecode.com/api/send/message'
+    notify_url = 'https://wxpusher.zjiecode.com/api/send/message'
 
     # Define object templates
     templates = (
@@ -296,13 +300,6 @@ class NotifyWxPusher(NotifyBase):
                  for x in self._invalid_targets])),
             params=NotifyWxPusher.urlencode(params))
 
-    def __len__(self):
-        """
-        Returns the number of targets associated with this notification
-        """
-        targets = len(self._users) + len(self._topics)
-        return targets if targets > 0 else 1
-
     @staticmethod
     def parse_url(url):
         """
@@ -324,6 +321,12 @@ class NotifyWxPusher(NotifyBase):
             # Extract the App token from an argument
             results['token'] = \
                 NotifyWxPusher.unquote(results['qsd']['token'])
+            # Any host entry defined is actually part of the path
+            # store it's element (if defined)
+            if results['host']:
+                results['targets'].append(
+                    NotifyWxPusher.split_path(results['host']))
+
         else:
             # The hostname is our source number
             results['token'] = NotifyWxPusher.unquote(results['host'])
