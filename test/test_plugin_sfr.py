@@ -111,7 +111,7 @@ apprise_url_tests = (
         'instance': NotifySFR,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': (
-            'sfr://service_id:****@000/0000000000?'
+            'sfr://service_id:****@0...0/0000000000?'
             'from=MyApp&timeout=30&voice=claire08s&'
             'lang=fr_FR&media=SMSUnicode&format=text'
             '&overflow=upstream&rto=4.0&cto=4.0&verify=yes'),
@@ -124,7 +124,7 @@ apprise_url_tests = (
         'instance': NotifySFR,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': (
-            'sfr://service_id:****@000/0000000000?'
+            'sfr://service_id:****@0...0/0000000000?'
             'from=&timeout=2880&voice=laura8k&'
             'lang=en_US&media=SMSUnicode&format=text'
             '&overflow=upstream&rto=4.0&cto=4.0&verify=yes'),
@@ -137,7 +137,7 @@ apprise_url_tests = (
         'instance': NotifySFR,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': (
-            'sfr://service_id:****@000/0000000000?'
+            'sfr://service_id:****@0...0/0000000000?'
             'from=&timeout=2880&voice=claire08s&'
             'lang=fr_FR&media=SMS&format=text'
             '&overflow=upstream&rto=4.0&cto=4.0&verify=yes'),
@@ -150,7 +150,7 @@ apprise_url_tests = (
         'instance': NotifySFR,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': (
-            'sfr://service_id:****@000/0000000000?'
+            'sfr://service_id:****@0...0/0000000000?'
             'from=&timeout=2880&voice=claire08s&'
             'lang=fr_FR&media=SMSUnicode&format=text'
             '&overflow=upstream&rto=4.0&cto=4.0&verify=yes'),

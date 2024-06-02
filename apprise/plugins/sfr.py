@@ -58,7 +58,7 @@ class NotifySFR(NotifyBase):
     """
 
     # The default descriptive name associated with the Notification
-    service_name = _('SFR Notification')
+    service_name = _('Société Française du Radiotéléphone')
 
     # The services URL
     service_url = 'https://www.sfr.fr/'
@@ -247,12 +247,18 @@ class NotifySFR(NotifyBase):
         })
 
         base_payload = {
-            'media': self.media,         # Can be 'SMSLong', 'SMS'
-            'textMsg': body,             # Content of the message
-            'to': None,                  # Receiver's phone number (set below)
-            'from': self.sender,         # Optional, default to ''
-            'timeout': self.timeout,     # Optional, default 2880 minutes
-            'ttsVoice': self.voice,  # Optional, default to French voice
+            # Can be 'SMS', 'SMSLong', 'SMSUnicode', or 'SMSUnicodeLong'
+            'media': self.media,
+            # Content of the message
+            'textMsg': body,
+            # Receiver's phone number (set below)
+            'to': None,
+            # Optional, default to ''
+            'from': self.sender,
+            # Optional, default 2880 minutes
+            'timeout': self.timeout,
+            # Optional, default to French voice
+            'ttsVoice': self.voice,
         }
 
         while len(targets):
@@ -375,7 +381,7 @@ class NotifySFR(NotifyBase):
                 mode=PrivacyMode.Secret,
                 safe='',
             ),
-            sid=self.space_id,
+            sid=self.pprint(self.space_id, privacy, safe=''),
             targets='/'.join(
                 [NotifySFR.quote(x, safe='') for x in self.targets]),
             params=self.urlencode(params),
