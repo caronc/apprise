@@ -30,6 +30,7 @@ import sys
 import os
 
 import pytest
+import mimetypes
 
 from apprise import NotificationManager
 from apprise import ConfigurationManager
@@ -43,6 +44,16 @@ N_MGR = NotificationManager()
 C_MGR = ConfigurationManager()
 # Grant access to our Attachment Manager Singleton
 A_MGR = AttachmentManager()
+
+
+@pytest.fixture(scope="function", autouse=True)
+def mimetypes_always_available():
+    """
+    A pytest session fixture which ensures mimetypes is set correctly
+    pointing to our temporary mime.types file
+    """
+    files = (os.path.join(os.path.dirname(__file__), 'var', 'mime.types'), )
+    mimetypes.init(files=files)
 
 
 @pytest.fixture(scope="function", autouse=True)
