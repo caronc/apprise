@@ -284,9 +284,6 @@ def test_apprise_attachment_truncate(mock_get):
     # Add ourselves an object set to truncate
     ap_obj.add('json://localhost/?method=GET&overflow=truncate')
 
-    # Add ourselves a second object without truncate
-    ap_obj.add('json://localhost/?method=GET&overflow=upstream')
-
     # Create ourselves an attachment object
     aa = AppriseAttachment()
 
@@ -304,15 +301,36 @@ def test_apprise_attachment_truncate(mock_get):
     assert mock_get.call_count == 0
     assert ap_obj.notify(body='body', title='title', attach=aa)
 
-    assert mock_get.call_count == 2
+    assert mock_get.call_count == 1
 
     # Our first item was truncated, so only 1 attachment
     details = mock_get.call_args_list[0]
     dataset = json.loads(details[1]['data'])
     assert len(dataset['attachments']) == 1
 
-    # Our second item was not truncated, so all attachments
-    details = mock_get.call_args_list[1]
+    # Reset our object
+    mock_get.reset_mock()
+
+    # our Apprise Object
+    ap_obj = Apprise()
+
+    # Add ourselves an object set to upstream
+    ap_obj.add('json://localhost/?method=GET&overflow=upstream')
+
+    # Create ourselves an attachment object
+    aa = AppriseAttachment()
+
+    # Add 2 attachments
+    assert aa.add(join(TEST_VAR_DIR, 'apprise-test.gif'))
+    assert aa.add(join(TEST_VAR_DIR, 'apprise-test.png'))
+
+    assert mock_get.call_count == 0
+    assert ap_obj.notify(body='body', title='title', attach=aa)
+
+    assert mock_get.call_count == 1
+
+    # Our item was not truncated, so all attachments
+    details = mock_get.call_args_list[0]
     dataset = json.loads(details[1]['data'])
     assert len(dataset['attachments']) == 2
 

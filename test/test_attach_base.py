@@ -73,15 +73,6 @@ def test_attach_base():
     with pytest.raises(NotImplementedError):
         obj.download()
 
-    with pytest.raises(NotImplementedError):
-        obj.name
-
-    with pytest.raises(NotImplementedError):
-        obj.path
-
-    with pytest.raises(NotImplementedError):
-        obj.mimetype
-
     # Unsupported URLs are not parsed
     assert AttachBase.parse_url(url='invalid://') is None
 

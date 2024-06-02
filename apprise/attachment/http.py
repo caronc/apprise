@@ -352,7 +352,7 @@ class AttachHTTP(AttachBase):
             port='' if self.port is None or self.port == default_port
                  else ':{}'.format(self.port),
             fullpath=self.quote(self.fullpath, safe='/'),
-            params=self.urlencode(params),
+            params=self.urlencode(params, safe='/'),
         )
 
     @staticmethod

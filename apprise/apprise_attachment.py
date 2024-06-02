@@ -142,13 +142,8 @@ class AppriseAttachment:
             # prepare default asset
             asset = self.asset
 
-        if isinstance(attachments, AttachBase):
-            # Go ahead and just add our attachments into our list
-            self.attachments.append(attachments)
-            return True
-
-        elif isinstance(attachments, str):
-            # Save our path
+        if isinstance(attachments, (AttachBase, str)):
+            # store our instance
             attachments = (attachments, )
 
         elif not isinstance(attachments, (tuple, set, list)):
