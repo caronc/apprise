@@ -26,6 +26,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import re
 import os
 import json
 from unittest import mock
@@ -571,3 +572,47 @@ def test_plugin_ntfy_config_files(mock_post, mock_get):
     assert len([x for x in aobj.find(tag='ntfy_invalid')]) == 1
     assert next(aobj.find(tag='ntfy_invalid')).priority == \
         NtfyPriority.NORMAL
+
+
+@mock.patch('requests.post')
+def test_plugin_ntfy_message_to_attach(mock_post):
+    """
+    NotifyNtfy() large messages converted into attachments
+
+    """
+
+    # Prepare Mock return object
+    response = mock.Mock()
+    response.content = GOOD_RESPONSE_TEXT
+    response.status_code = requests.codes.ok
+    mock_post.return_value = response
+
+    # Create a very, very big message
+    title = 'My Title'
+    body = 'b' * NotifyNtfy.ntfy_json_upstream_size_limit
+
+    for fmt in apprise.NOTIFY_FORMATS:
+
+        # Prepare our object
+        obj = apprise.Apprise.instantiate(
+            'ntfy://user:pass@localhost:8080/topic?format={}'.format(fmt))
+
+        # Our content will actually transfer as an attachment
+        assert obj.notify(title=title, body=body)
+        assert mock_post.call_count == 1
+
+        assert mock_post.call_args_list[0][0][0] == \
+            'http://localhost:8080/topic'
+
+        response = mock_post.call_args_list[0][1]
+        assert 'data' in response
+        assert response['data'].decode('utf-8').startswith(title)
+        assert response['data'].decode('utf-8').endswith(body)
+        assert 'params' in response
+        assert 'filename' in response['params']
+        # Our filename is automatically generated (with .txt)
+        assert re.match(
+            r'^[a-z0-9-]+\.txt$', response['params']['filename'], re.I)
+
+        # Reset our mock object
+        mock_post.reset_mock()

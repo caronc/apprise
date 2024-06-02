@@ -53,6 +53,7 @@ from ..utils import is_ipaddr
 from ..utils import validate_regex
 from ..url import PrivacyMode
 from ..attachment.base import AttachBase
+from ..attachment.memory import AttachMemory
 
 
 class NtfyMode:
@@ -171,6 +172,20 @@ class NotifyNtfy(NotifyBase):
 
     # Support attachments
     attachment_support = True
+
+    # Maximum title length
+    title_maxlen = 200
+
+    # Maximum body length
+    body_maxlen = 7800
+
+    # Message size calculates title and body together
+    overflow_amalgamate_title = True
+
+    # Defines the number of bytes our JSON object can not exceed in size or we
+    # know the upstream server will reject it.  We convert these into
+    # attachments
+    ntfy_json_upstream_size_limit = 8000
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_256
@@ -504,7 +519,7 @@ class NotifyNtfy(NotifyBase):
             # Prepare our Header
             virt_payload['filename'] = attach.name
 
-            with open(attach.path, 'rb') as fp:
+            with attach as fp:
                 data = fp.read()
 
         if image_url:
@@ -538,18 +553,39 @@ class NotifyNtfy(NotifyBase):
         self.logger.debug('ntfy POST URL: %s (cert_verify=%r)' % (
             notify_url, self.verify_certificate,
         ))
-        self.logger.debug('ntfy Payload: %s' % str(virt_payload))
-        self.logger.debug('ntfy Headers: %s' % str(headers))
-
-        # Always call throttle before any remote server i/o is made
-        self.throttle()
 
         # Default response type
         response = None
 
         if not attach:
             data = dumps(data)
+            if len(data) > self.ntfy_json_upstream_size_limit:
+                # Convert to an attachment
 
+                if self.notify_format == NotifyFormat.MARKDOWN:
+                    mimetype = 'text/markdown'
+
+                elif self.notify_format == NotifyFormat.TEXT:
+                    mimetype = 'text/plain'
+
+                else:  # self.notify_format == NotifyFormat.HTML:
+                    mimetype = 'text/html'
+
+                attach = AttachMemory(
+                    mimetype=mimetype,
+                    content='{title}{body}'.format(
+                        title=title + '\n' if title else '', body=body))
+
+                # Recursively send the message body as an attachment instead
+                return self._send(
+                    topic=topic, body='', title='', attach=attach,
+                    image_url=image_url, **kwargs)
+
+        self.logger.debug('ntfy Payload: %s' % str(virt_payload))
+        self.logger.debug('ntfy Headers: %s' % str(headers))
+
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
         try:
             r = requests.post(
                 notify_url,

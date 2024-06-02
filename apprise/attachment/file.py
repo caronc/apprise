@@ -78,7 +78,8 @@ class AttachFile(AttachBase):
 
         return 'file://{path}{params}'.format(
             path=self.quote(self.dirty_path),
-            params='?{}'.format(self.urlencode(params)) if params else '',
+            params='?{}'.format(self.urlencode(params, safe='/'))
+            if params else '',
         )
 
     def download(self, **kwargs):

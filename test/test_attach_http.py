@@ -229,7 +229,7 @@ def test_attach_http(mock_get, mock_post):
     attachment = AttachHTTP(**results)
     assert isinstance(attachment.url(), str) is True
     # both mime and name over-ridden
-    assert re.search(r'[?&]mime=image%2Fjpeg', attachment.url())
+    assert re.search(r'[?&]mime=image/jpeg', attachment.url())
     assert re.search(r'[?&]name=usethis.jpg', attachment.url())
     # No Content-Disposition; so we use filename from path
     assert attachment.name == 'usethis.jpg'

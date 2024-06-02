@@ -148,6 +148,9 @@ class AttachBase(URLBase):
         # Absolute path to attachment
         self.download_path = None
 
+        # Track open file pointers
+        self.__pointers = set()
+
         # Set our cache flag; it can be True, False, None, or a (positive)
         # integer... nothing else
         if cache is not None:
@@ -226,14 +229,13 @@ class AttachBase(URLBase):
         Content is cached once determied to prevent overhead of future
         calls.
         """
+        if not self.exists():
+            # we could not obtain our attachment
+            return None
 
         if self._mimetype:
             # return our pre-calculated cached content
             return self._mimetype
-
-        if not self.exists():
-            # we could not obtain our attachment
-            return None
 
         if not self.detected_mimetype:
             # guess_type() returns: (type, encoding) and sets type to None
@@ -258,6 +260,9 @@ class AttachBase(URLBase):
         Simply returns true if the object has downloaded and stored the
         attachment AND the attachment has not expired.
         """
+        if self.location == ContentLocation.INACCESSIBLE:
+            # our content is inaccessible
+            return False
 
         cache = self.template_args['cache']['default'] \
             if self.cache is None else self.cache
@@ -295,6 +300,11 @@ class AttachBase(URLBase):
           - download_path: Must contain a absolute path to content
           - detected_mimetype: Should identify mimetype of content
         """
+
+        # Remove all open pointers
+        while self.__pointers:
+            self.__pointers.pop().close()
+
         self.detected_name = None
         self.download_path = None
         self.detected_mimetype = None
@@ -313,6 +323,26 @@ class AttachBase(URLBase):
         """
         raise NotImplementedError(
             "download() is implimented by the child class.")
+
+    def open(self, mode='rb'):
+        """
+        return our file pointer and track it (we'll auto close later
+        """
+        pointer = open(self.path, mode=mode)
+        self.__pointers.add(pointer)
+        return pointer
+
+    def __enter__(self):
+        """
+        support with keyword
+        """
+        return self.open()
+
+    def __exit__(self, value_type, value, traceback):
+        """
+        stub to do nothing; but support exit of with statement gracefully
+        """
+        return
 
     @staticmethod
     def parse_url(url, verify_host=True, mimetype_db=None, sanitize=True):
@@ -376,3 +406,9 @@ class AttachBase(URLBase):
         True is returned if our content was downloaded correctly.
         """
         return True if self.path else False
+
+    def __del__(self):
+        """
+        Perform any house cleaning
+        """
+        self.invalidate()

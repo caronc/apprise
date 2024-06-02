@@ -204,8 +204,7 @@ def test_attach_file():
     assert response.path == path
     assert response.name == 'test.jpeg'
     assert response.mimetype == 'image/jpeg'
-    # We will match on mime type now  (%2F = /)
-    assert re.search(r'[?&]mime=image%2Fjpeg', response.url(), re.I)
+    assert re.search(r'[?&]mime=image/jpeg', response.url(), re.I)
     assert re.search(r'[?&]name=test\.jpeg', response.url(), re.I)
 
     # Test hosted configuration and that we can't add a valid file
