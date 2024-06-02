@@ -1162,33 +1162,53 @@ def test_plugin_matrix_transaction_ids_api_v3(mock_post, mock_get, mock_put):
     mock_get.return_value = response
     mock_put.return_value = response
 
-    notifications_to_send = [10, 1]
-    mock_post_offset = mock_put_counter = 0
+    batch = [10, 1, 5]
 
-    for logins, notifications in enumerate(notifications_to_send, start=1):
+    for notifications in batch:
         # Instantiate our object
         obj = Apprise.instantiate('matrix://user:pass@localhost/#general?v=3')
 
-        for txnId in range(notifications):
+        # Performs a login
+        assert obj.notify(
+            body='body', title='title', notify_type=NotifyType.INFO
+        ) is True
+        assert mock_get.call_count == 0
+        assert mock_post.call_count == 2
+        assert mock_post.call_args_list[0][0][0] == \
+            'http://localhost/_matrix/client/v3/login'
+        assert mock_post.call_args_list[1][0][0] == \
+            'http://localhost/_matrix/client/v3/join/%23general%3Alocalhost'
+        assert mock_put.call_count == 1
+        assert mock_put.call_args_list[0][0][0] == \
+            'http://localhost/_matrix/client/v3/rooms/' + \
+            '%21abc123%3Alocalhost/send/m.room.message/0'
+
+        for no, _ in enumerate(range(notifications), start=1):
+            # Clean our slate
+            mock_post.reset_mock()
+            mock_get.reset_mock()
+            mock_put.reset_mock()
+
             assert obj.notify(
                 body='body', title='title', notify_type=NotifyType.INFO
             ) is True
 
-            # Test our call count
-            assert mock_put.call_count == mock_put_counter + 1
-            # Login & join must happen only once per session
-            assert mock_post.call_count == mock_post_offset + (2 * logins)
-            assert mock_post.call_args_list[0][0][0] == \
-                'http://localhost/_matrix/client/v3/login'
-            assert mock_post.call_args_list[1][0][0] == \
-                'http://localhost/_matrix/client/v3/join/' + \
-                '%23general%3Alocalhost'
-            assert mock_put.call_args_list[txnId][0][0] == \
+            assert mock_get.call_count == 0
+            assert mock_post.call_count == 0
+            assert mock_put.call_count == 1
+            assert mock_put.call_args_list[0][0][0] == \
                 'http://localhost/_matrix/client/v3/rooms/' + \
-                f'%21abc123%3Alocalhost/send/m.room.message/{txnId}'
+                f'%21abc123%3Alocalhost/send/m.room.message/{no}'
 
-            mock_put_counter = mock_put.call_count
+        mock_post.reset_mock()
+        mock_get.reset_mock()
+        mock_put.reset_mock()
 
         # Force a object removal (thus a logout call)
         del obj
-        mock_post_offset += 1
+        assert mock_get.call_count == 0
+        assert mock_post.call_count == 1
+        assert mock_post.call_args_list[0][0][0] == \
+            'http://localhost/_matrix/client/v3/logout'
+        mock_post.reset_mock()
+        assert mock_put.call_count == 0
