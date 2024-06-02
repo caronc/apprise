@@ -139,7 +139,7 @@ class NotifyBase(URLBase):
 
     # Our default is to no not use persistent storage beyond in-memory
     # reference
-    persistent_store = PersistentStoreMode.NEVER
+    persistent_store = PersistentStoreMode.MEMORY
 
     # Default Emoji Interpretation
     interpret_emojis = False

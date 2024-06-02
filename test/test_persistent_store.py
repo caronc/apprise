@@ -27,13 +27,14 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import os
+import sys
 import pytest
 import json
 import gzip
 from freezegun import freeze_time
 from unittest import mock
 from apprise import AppriseAsset
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from apprise.persistent_store import (
     CacheJSONEncoder, CacheObject, PersistentStore, PersistentStoreMode)
 
@@ -319,6 +320,24 @@ def test_persistent_storage_cache_io_errors(tmpdir):
             pc['key']
 
 
+@pytest.mark.skipif(sys.version_info >= (3, 7),
+                    reason="Requires Python 3.0 to 3.6")
+def test_persistent_storage_cache_object_py36(tmpdir):
+    """
+    Test our cache object in python 3.6 (freezegun has
+    less options)
+    """
+
+    ref = datetime.now(tz=timezone.utc)
+    expires = ref + timedelta(days=1)
+    # Create a cache object that expires tomorrow
+    c = CacheObject('abcd', expires=expires)
+    assert c.expires == expires
+    assert c.expires_sec > 0.0
+
+
+@pytest.mark.skipif(sys.version_info < (3, 7),
+                    reason="Requires Python 3.7 or higher")
 def test_persistent_storage_cache_object(tmpdir):
     """
     Test our cache object

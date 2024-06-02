@@ -47,19 +47,19 @@ class PersistentStoreMode:
     FORCE = 'force'
 
     # memory based store only
-    NEVER = 'memory'
+    MEMORY = 'memory'
 
 
 PERSISTENT_STORE_MODES = (
     PersistentStoreMode.AUTO,
     PersistentStoreMode.FORCE,
-    PersistentStoreMode.NEVER,
+    PersistentStoreMode.MEMORY,
 )
 
 
 class CacheObject:
 
-    def __init__(self, value=None, expires=None):
+    def __init__(self, value=None, expires=False, persistent=True):
         """
         Tracks our objects and associates a time limit with them
         """
@@ -67,8 +67,24 @@ class CacheObject:
         self.__value = value
         self.__class_name = value.__class__.__name__
         self.__expires = None
+        if expires:
+            self.set_expiry(expires)
+
+        # Whether or not we persist this object to disk or not
+        self.__persistent = persistent
+
+    def set(self, value, expires=None, persistent=None):
+        """
+        Sets fields on demand, if set to none, then they are left as is
+        """
+
         self.__value = value
-        self.set_expiry(expires)
+        self.__class_name = value.__class__.__name__
+        if expires is not None:
+            self.set_expiry(expires)
+
+        if persistent is not None:
+            self.__persistent = persistent
 
     def set_expiry(self, expires=None):
         """
@@ -108,12 +124,17 @@ class CacheObject:
         # Calculate if we've expired or not
         return self.__expires >= datetime.now(tz=timezone.utc)
 
-    def md5(self):
+    def sha1(self):
         """
         Our checksum to track the validity of our data
         """
-        return hashlib.md5(
-            str(self).encode('utf-8'), usedforsecurity=False).hexdigest()
+        try:
+            return hashlib.sha1(
+                str(self).encode('utf-8'), usedforsecurity=False).hexdigest()
+
+        except TypeError:
+            # Python v3.6 - usedforsecurity flag does not work
+            return hashlib.sha1(str(self).encode('utf-8')).hexdigest()
 
     def json(self):
         """
@@ -124,15 +145,15 @@ class CacheObject:
             'x': (self.__expires - EPOCH).total_seconds()
             if self.__expires else None,
             'c': self.__class_name,
-            'm': self.md5()[:6],
+            'm': self.sha1()[:6],
         }
 
     @staticmethod
-    def instantiate(content, verify=True):
+    def instantiate(content, persistent=True, verify=True):
         """
         Loads back data read in and returns a CacheObject or None if it could
         not be loaded. You can pass in the contents of CacheObject.json() and
-        you'll receive a copy assuming the md5 checks okay
+        you'll receive a copy assuming the sha1 checks okay
 
         """
         try:
@@ -145,9 +166,10 @@ class CacheObject:
             class_name = content.get('c', '')
             if not isinstance(class_name, str):
                 raise TypeError('Class name not expected string')
-            md5sum = content.get('m', '')
-            if not isinstance(md5sum, str):
-                raise TypeError('MD5SUM not expected string')
+
+            sha1sum = content.get('m', '')
+            if not isinstance(sha1sum, str):
+                raise TypeError('SHA1SUM not expected string')
 
         except (TypeError, KeyError) as e:
             logger.trace(f'CacheObject could not be parsed from {content}')
@@ -156,19 +178,19 @@ class CacheObject:
 
         if class_name in ('datetime', 'FakeDatetime'):
             # Note: FakeDatetime comes from our test cases so that we can still
-            #       verify this code execute sokay
+            #       verify this code execute okay
 
             # Convert our object back to a datetime object
             value = datetime.fromisoformat(value)
 
         # Initialize our object
         try:
-            co = CacheObject(value, expires)
+            co = CacheObject(value, expires, persistent=persistent)
 
         except AttributeError:
             logger.trace(f'CacheObject could not be initialied from {content}')
 
-        if verify and co.md5()[:6] != md5sum:
+        if verify and co.sha1()[:6] != sha1sum:
             # Our object was tampered with
             logger.debug(f'Tampering detected with cache entry {co}')
             del co
@@ -184,13 +206,27 @@ class CacheObject:
         return self.__value
 
     @property
-    def expiry(self):
+    def persistent(self):
         """
-        Returns the number of seconds from now the object will expiry
+        Returns our persistent value
+        """
+        return True if self.__persistent else False
+
+    @property
+    def expires_sec(self):
+        """
+        Returns the number of seconds from now the object will expire
         """
         return None if self.__expires is None else \
             (self.__expires - datetime.now(tz=timezone.utc))\
             .total_seconds()
+
+    @property
+    def expires(self):
+        """
+        Returns the datetime the object will expire
+        """
+        return self.__expires
 
     def __eq__(self, other):
         """
@@ -254,6 +290,9 @@ class PersistentStore:
     #    equal
     __valid_token = re.compile(r'[a-z0-9][a-z0-9._=]*', re.I)
 
+    # Reference only
+    __not_found_ref = (None, None)
+
     def __init__(self, namespace, path=None, method=None, asset=None):
         """
         Provide the namespace to work within. namespaces can only contain
@@ -267,6 +306,9 @@ class PersistentStore:
         The asset object contains switches to additionally control the
         operation of this object.
         """
+        # Initalize our method so __del__() calls don't go bad on the
+        # error checking below
+        self.method = None
 
         # Populated only once and after size() is called
         self.__exclude_size_list = None
@@ -281,9 +323,13 @@ class PersistentStore:
         self.asset = \
             asset if isinstance(asset, AppriseAsset) else AppriseAsset()
 
-        if method is None:
+        if method is None and self.asset.persistent_storage:
             # Store Default
             self.method = PERSISTENT_STORE_MODES[0]
+
+        elif not self.asset.persistent_storage:
+            # Memory only
+            self.method = PersistentStoreMode.MEMORY
 
         elif method not in PERSISTENT_STORE_MODES:
             raise AttributeError(
@@ -413,7 +459,10 @@ class PersistentStore:
 
     def open(self, key=None, mode="rb", encoding=None):
         """
-        Returns an iterator to our our
+        Returns an iterator to our our file within our namespace identified
+        by the key provided.
+
+        If no key is provided, then the default is used
         """
 
         if not self.asset.persistent_storage:
@@ -439,8 +488,6 @@ class PersistentStore:
         """
         Fetches from cache
         """
-        if not self.asset.persistent_storage:
-            return default
 
         if self._cache is None and not self.__load_cache():
             return default
@@ -448,7 +495,7 @@ class PersistentStore:
         return self._cache[key].value \
             if key in self._cache and self._cache[key] else default
 
-    def set(self, key, value, expires=None, lazy=True):
+    def set(self, key, value, expires=None, persistent=True, lazy=True):
         """
         Cache reference
         """
@@ -463,7 +510,7 @@ class PersistentStore:
         if lazy:
             try:
                 prev = self._cache[key].value
-                if prev == value and self._cache[key].expiry == expires:
+                if prev == value and self._cache[key].expires == expires:
                     # We're done
                     return True
 
@@ -471,12 +518,12 @@ class PersistentStore:
                 pass
 
         # Store our new cache
-        self._cache[key] = CacheObject(value, expires)
+        self._cache[key] = CacheObject(value, expires, persistent=persistent)
 
         # Set our dirty flag
-        self.__dirty = True
+        self.__dirty = persistent
 
-        if self.method == PersistentStoreMode.FORCE:
+        if self.__dirty and self.method == PersistentStoreMode.FORCE:
             # Flush changes to disk
             return self.flush()
 
@@ -486,12 +533,25 @@ class PersistentStore:
         """
         Eliminates expired cache entries
         """
+        if self._cache is None and not self.__load_cache():
+            return False
+
         change = False
         for key in list(self._cache.keys()):
             if not self._cache:
-                del self._cache[key]
-                if not change:
+
+                if not change and self._cache[key].persistent:
+                    # track change only if content was persistent
                     change = True
+
+                    # Set our dirty flag
+                    self.__dirty = True
+
+                del self._cache[key]
+
+        if self.__dirty and self.method == PersistentStoreMode.FORCE:
+            # Flush changes to disk
+            return self.flush()
 
         return change
 
@@ -499,9 +559,17 @@ class PersistentStore:
         """
         Loads our cache
         """
+
+        # Prepare our dirty flag
+        self.__dirty = False
+
+        if self.method == PersistentStoreMode.MEMORY:
+            # Nothing further to do
+            self._cache = {}
+            return True
+
         # Prepare our cache file
         cache_file = os.path.join(self.__base_path, self.cache_file)
-        self.__dirty = False
         try:
             with gzip.open(cache_file, 'rb') as f:
                 # Read our content from disk
@@ -542,6 +610,10 @@ class PersistentStore:
         """
         Save's our cache
         """
+
+        if self._cache is None:
+            # nothing to do
+            return True
 
         if not force and self.__dirty is False:
             # Nothing further to do
@@ -635,7 +707,8 @@ class PersistentStore:
         with gzip.open(ntf.name, 'wb') as f:
             # Write our content to disk
             f.write(json.dumps(
-                self._cache, separators=(',', ':'),
+                {k: v for k, v in self._cache.items() if v and v.persistent},
+                separators=(',', ':'),
                 cls=CacheJSONEncoder).encode(self.encoding))
 
         try:
@@ -747,17 +820,22 @@ class PersistentStore:
         """
         Remove a cache entry by it's key
         """
+        if self._cache is None and not self.__load_cache():
+            raise KeyError
+
         try:
+            if self._cache[key].persistent:
+                # Set our dirty flag in advance
+                self.__dirty = True
+
             # Store our new cache
             del self._cache[key]
-            # Set our dirty flag
-            self.__dirty = True
 
         except KeyError:
             # Nothing to do
             raise
 
-        if self.method == PersistentStoreMode.FORCE:
+        if self.__dirty and self.method == PersistentStoreMode.FORCE:
             # Flush changes to disk
             self.flush()
 
@@ -776,10 +854,26 @@ class PersistentStore:
 
     def __setitem__(self, key, value):
         """
-        Sets a cache value
+        Sets a cache value without disrupting existing settings in place
         """
-        if not self.set(key, value):
+
+        if self._cache is None and not self.__load_cache():
+            return False
+
+        if key not in self._cache and not self.set(key, value):
             raise OSError("Could not set cache")
+
+        else:
+            # Update our value
+            self._cache[key].set(value)
+
+            if self._cache[key].persistent:
+                # Set our dirty flag in advance
+                self.__dirty = True
+
+        if self.__dirty and self.method == PersistentStoreMode.FORCE:
+            # Flush changes to disk
+            self.flush()
 
         return
 
@@ -787,9 +881,8 @@ class PersistentStore:
         """
         Returns the indexed value
         """
-        NOT_FOUND = (None, None)
-        result = self.get(key, default=NOT_FOUND, lazy=False)
-        if result is NOT_FOUND:
+        result = self.get(key, default=self.__not_found_ref, lazy=False)
+        if result is self.__not_found_ref:
             raise KeyError()
 
         return result
