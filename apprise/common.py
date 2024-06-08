@@ -187,6 +187,26 @@ CONTENT_LOCATIONS = (
     ContentLocation.INACCESSIBLE,
 )
 
+
+class PersistentStoreMode:
+    # Allow persistent storage; write on demand
+    AUTO = 'auto'
+
+    # Always flush every change to disk after it's saved. This has higher i/o
+    # but enforces disk reflects what was set immediately
+    FLUSH = 'flush'
+
+    # memory based store only
+    MEMORY = 'memory'
+
+
+PERSISTENT_STORE_MODES = (
+    PersistentStoreMode.AUTO,
+    PersistentStoreMode.FLUSH,
+    PersistentStoreMode.MEMORY,
+)
+
+
 # This is a reserved tag that is automatically assigned to every
 # Notification Plugin
 MATCH_ALL_TAG = 'all'

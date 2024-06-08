@@ -1158,6 +1158,9 @@ def test_apprise_asset(tmpdir):
         extension='.test') == \
         'http://localhost/default/info-256x256.test'
 
+    a = AppriseAsset(plugin_paths=('/tmp',))
+    assert a.plugin_paths == ('/tmp', )
+
 
 def test_apprise_disabled_plugins():
     """

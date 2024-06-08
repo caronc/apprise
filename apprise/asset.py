@@ -33,6 +33,7 @@ from os.path import dirname
 from os.path import isfile
 from os.path import abspath
 from .common import NotifyType
+from .common import PersistentStoreMode
 from .manager_plugins import NotificationManager
 
 
@@ -142,9 +143,6 @@ class AppriseAsset:
     # Defines the encoding of the content passed into Apprise
     encoding = 'utf-8'
 
-    # Allow for persistent storage
-    persistent_storage = True
-
     # For more detail see CWE-312 @
     #    https://cwe.mitre.org/data/definitions/312.html
     #
@@ -160,6 +158,13 @@ class AppriseAsset:
     # By default, no paths are scanned.
     __plugin_paths = []
 
+    # Optionally set the location of the persistent storage
+    # By default there is no path and thus persistent storage is not used
+    __storage_path = None
+
+    # Set storage to auto
+    __storage_mode = PersistentStoreMode.AUTO
+
     # All internal/system flags are prefixed with an underscore (_)
     # These can only be initialized using Python libraries and are not picked
     # up from (yaml) configuration files (if set)
@@ -174,7 +179,8 @@ class AppriseAsset:
     # A unique identifer we can use to associate our calling source
     _uid = str(uuid4())
 
-    def __init__(self, plugin_paths=None, **kwargs):
+    def __init__(self, plugin_paths=None, storage_path=None,
+                 storage_mode=None, **kwargs):
         """
         Asset Initialization
 
@@ -190,7 +196,16 @@ class AppriseAsset:
 
         if plugin_paths:
             # Load any decorated modules if defined
+            self.__plugin_paths = plugin_paths
             N_MGR.module_detection(plugin_paths)
+
+        if storage_path:
+            # Define our persistent storage path
+            self.__storage_path = storage_path
+
+        if storage_mode:
+            # Define how our persistent storage behaves
+            self.__storage_mode = storage_mode
 
     def color(self, notify_type, color_type=None):
         """
@@ -359,3 +374,25 @@ class AppriseAsset:
 
         """
         return int(value.lstrip('#'), 16)
+
+    @property
+    def plugin_paths(self):
+        """
+        Return the plugin paths defined
+        """
+        return self.__plugin_paths
+
+    @property
+    def storage_path(self):
+        """
+        Return the persistent storage path defined
+        """
+        return self.__storage_path
+
+    @property
+    def storage_mode(self):
+        """
+        Return the persistent storage path defined
+        """
+
+        return self.__storage_mode

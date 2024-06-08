@@ -48,6 +48,8 @@ from .common import ContentIncludeMode
 from .common import CONTENT_INCLUDE_MODES
 from .common import ContentLocation
 from .common import CONTENT_LOCATIONS
+from .common import PersistentStoreMode
+from .common import PERSISTENT_STORE_MODES
 
 from .url import URLBase
 from .url import PrivacyMode
@@ -84,6 +86,7 @@ __all__ = [
     'ConfigFormat', 'CONFIG_FORMATS',
     'ContentIncludeMode', 'CONTENT_INCLUDE_MODES',
     'ContentLocation', 'CONTENT_LOCATIONS',
+    'PersistentStoreMode', 'PERSISTENT_STORE_MODES',
     'PrivacyMode',
 
     # Managers

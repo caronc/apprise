@@ -26,6 +26,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import sys
 import re
 from .logger import logger
 import time
@@ -429,15 +430,20 @@ class URLBase:
         if lazy and self.__url_identifier is not False:
             return self.__url_identifier
 
+        # Python v3.8 introduces usedforsecurity argument
+        kwargs = {'usedforsecurity': False} \
+            if sys.version_info >= (3, 8) else {}
+
         if self.url_identifier is False:
             # Disabled
             self.__url_identifier = None
 
         elif self.url_identifier in (None, True):
+
             # Prepare our object
             engine = hash_engine(
                 self.url_identifier_salt + self.schema.encode(
-                    self.asset.encoding), usedforsecurity=False)
+                    self.asset.encoding), **kwargs)
 
             # We want to treat `None` differently then a blank entry
             engine.update(
@@ -462,21 +468,19 @@ class URLBase:
         elif isinstance(self.url_identifier, str):
             self.__url_identifier = hash_engine(
                 self.url_identifier_salt + self.url_identifier.encode(
-                    self.asset.encoding),
-                usedforsecurity=False).hexdigest()
+                    self.asset.encoding), **kwargs).hexdigest()
 
         elif isinstance(self.url_identifier, bytes):
             self.__url_identifier = hash_engine(
                 self.url_identifier_salt + self.url_identifier,
-                usedforsecurity=False).hexdigest()
+                **kwargs).hexdigest()
 
         elif isinstance(self.url_identifier, (list, tuple, set)):
             self.__url_identifier = hash_engine(
                 self.url_identifier_salt + b''.join([
                     (x if isinstance(x, bytes)
                      else str(x).encode(self.asset.encoding))
-                    for x in self.url_identifier]),
-                usedforsecurity=False).hexdigest()
+                    for x in self.url_identifier]), **kwargs).hexdigest()
 
         elif isinstance(self.url_identifier, dict):
             self.__url_identifier = hash_engine(
@@ -484,13 +488,13 @@ class URLBase:
                     (x if isinstance(x, bytes)
                      else str(x).encode(self.asset.encoding))
                     for x in self.url_identifier.values()]),
-                usedforsecurity=False).hexdigest()
+                **kwargs).hexdigest()
 
         else:
             self.__url_identifier = hash_engine(
                 self.url_identifier_salt + str(
                     self.url_identifier).encode(self.asset.encoding),
-                usedforsecurity=False).hexdigest()
+                **kwargs).hexdigest()
 
         return self.__url_identifier
 

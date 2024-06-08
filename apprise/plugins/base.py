@@ -38,8 +38,9 @@ from ..common import NotifyFormat
 from ..common import NOTIFY_FORMATS
 from ..common import OverflowMode
 from ..common import OVERFLOW_MODES
+from ..common import PersistentStoreMode
 from ..locale import gettext_lazy as _
-from ..persistent_store import PersistentStore, PersistentStoreMode
+from ..persistent_store import PersistentStore
 from ..apprise_attachment import AppriseAttachment
 
 
@@ -139,7 +140,7 @@ class NotifyBase(URLBase):
 
     # Our default is to no not use persistent storage beyond in-memory
     # reference
-    persistent_store = PersistentStoreMode.MEMORY
+    storage_mode = PersistentStoreMode.MEMORY
 
     # Default Emoji Interpretation
     interpret_emojis = False
@@ -273,6 +274,9 @@ class NotifyBase(URLBase):
         # are turned off (no user over-rides allowed)
         #
 
+        # Our Persistent Storage object is initialized on demand
+        self.__store = None
+
         # Take a default
         self.interpret_emojis = self.asset.interpret_emojis
         if 'emojis' in kwargs:
@@ -305,9 +309,6 @@ class NotifyBase(URLBase):
 
             # Provide override
             self.overflow_mode = overflow
-
-        # Our Persistent Storage object is initialized on demand
-        self.__store = None
 
     def image_url(self, notify_type, logo=False, extension=None,
                   image_size=None):
@@ -811,19 +812,23 @@ class NotifyBase(URLBase):
         """
         Initialize our Peristent Storage
         """
+
+        # A persistent store is always initialized; at worst it's for caching
+        # memory key/value pairs
         self.__store = PersistentStore(
             namespace=self.url_id(),
-            method=self.persistent_store,
-            asset=self.asset)
+            path=self.asset.storage_path,
+            mode=self.asset.storage_mode)
 
-    def set(self, key, value, expires=None):
+    def set(self, key, value, expires=None, persistent=True, lazy=True):
         """
         Set a value associated to the cache key
         """
         if self.__store is None:
             self.__persistent_store_init()
 
-        return self.__store.set(key, value, expires)
+        return self.__store.set(
+            key, value, expires=expires, persistent=persistent, lazy=lazy)
 
     def get(self, key, default=None):
         """

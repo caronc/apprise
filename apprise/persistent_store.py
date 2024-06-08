@@ -25,36 +25,18 @@
 import os
 import re
 import gzip
+import base64
 import glob
 import tempfile
 import json
-import platform
+import binascii
 from datetime import datetime, timezone, timedelta
-from .asset import AppriseAsset
 import hashlib
+from .common import PersistentStoreMode, PERSISTENT_STORE_MODES
+from .utils import path_decode
 from .logger import logger
-
 # Used for writing/reading time stored in cache file
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
-
-
-class PersistentStoreMode:
-    # Flush occasionally to disk and always after object is
-    # closed.
-    AUTO = 'auto'
-
-    # Always flush every change to disk after it's saved
-    FORCE = 'force'
-
-    # memory based store only
-    MEMORY = 'memory'
-
-
-PERSISTENT_STORE_MODES = (
-    PersistentStoreMode.AUTO,
-    PersistentStoreMode.FORCE,
-    PersistentStoreMode.MEMORY,
-)
 
 
 class CacheObject:
@@ -67,15 +49,23 @@ class CacheObject:
         self.__value = value
         self.__class_name = value.__class__.__name__
         self.__expires = None
+
         if expires:
             self.set_expiry(expires)
 
         # Whether or not we persist this object to disk or not
-        self.__persistent = persistent
+        self.__persistent = True if persistent else False
 
     def set(self, value, expires=None, persistent=None):
         """
         Sets fields on demand, if set to none, then they are left as is
+
+        The intent of set is that it allows you to set a new a value
+        and optionally alter meta information against it.
+
+        If expires or persistent isn't specified then their previous values
+        are used.
+
         """
 
         self.__value = value
@@ -84,45 +74,31 @@ class CacheObject:
             self.set_expiry(expires)
 
         if persistent is not None:
-            self.__persistent = persistent
+            self.__persistent = True if persistent else False
 
     def set_expiry(self, expires=None):
         """
         Sets a new expirty
         """
 
-        if isinstance(expires, (float, int)):
-            self.__expires = \
-                datetime.now(tz=timezone.utc) + timedelta(seconds=expires)
-
-        elif isinstance(expires, datetime):
+        if isinstance(expires, datetime):
             self.__expires = expires.astimezone(timezone.utc)
 
-        elif expires is None:
+        elif expires in (None, False):
             # Accepted - no expiry
             self.__expires = None
+
+        elif expires is True:
+            # Force expiry to now
+            self.__expires = datetime.now(tz=timezone.utc)
+
+        elif isinstance(expires, (float, int)):
+            self.__expires = \
+                datetime.now(tz=timezone.utc) + timedelta(seconds=expires)
 
         else:  # Unsupported
             raise AttributeError(
                 f"An invalid expiry time ({expires} was specified")
-
-    def __assign__(self, value):
-        """
-        Assigns a value without altering it's expiry
-        """
-        self.__value = value
-        self.__class_name = value.__class__.__name__
-
-    def __bool__(self):
-        """
-        Returns True it the object hasn't expired, and False if it has
-        """
-        if self.__expires is None:
-            # No Expiry
-            return True
-
-        # Calculate if we've expired or not
-        return self.__expires >= datetime.now(tz=timezone.utc)
 
     def sha1(self):
         """
@@ -133,7 +109,7 @@ class CacheObject:
                 str(self).encode('utf-8'), usedforsecurity=False).hexdigest()
 
         except TypeError:
-            # Python v3.6 - usedforsecurity flag does not work
+            # Python <= v3.7 - usedforsecurity flag does not work
             return hashlib.sha1(str(self).encode('utf-8')).hexdigest()
 
     def json(self):
@@ -145,7 +121,7 @@ class CacheObject:
             'x': (self.__expires - EPOCH).total_seconds()
             if self.__expires else None,
             'c': self.__class_name,
-            'm': self.sha1()[:6],
+            '!': self.sha1()[:6],
         }
 
     @staticmethod
@@ -167,7 +143,7 @@ class CacheObject:
             if not isinstance(class_name, str):
                 raise TypeError('Class name not expected string')
 
-            sha1sum = content.get('m', '')
+            sha1sum = content.get('!', '')
             if not isinstance(sha1sum, str):
                 raise TypeError('SHA1SUM not expected string')
 
@@ -176,20 +152,33 @@ class CacheObject:
             logger.trace('CacheObject exception: %s' % str(e))
             return None
 
-        if class_name in ('datetime', 'FakeDatetime'):
+        if class_name == 'datetime':
             # Note: FakeDatetime comes from our test cases so that we can still
-            #       verify this code execute okay
+            #       verify this code execute okay.
 
-            # Convert our object back to a datetime object
-            value = datetime.fromisoformat(value)
+            try:
+                # Convert our object back to a datetime object
+                value = datetime.fromisoformat(value)
+
+            except (TypeError, ValueError):
+                # TypeError is thrown if content is not string
+                # ValueError is thrown if the string is not a valid format
+                logger.trace(
+                    f'CacheObject (dt) corrupted loading from {content}')
+                return None
+
+        elif class_name == 'bytes':
+            try:
+                # Convert our object back to a bytes
+                value = base64.b64decode(value)
+
+            except binascii.Error:
+                logger.trace(
+                    f'CacheObject (bin) corrupted loading from {content}')
+                return None
 
         # Initialize our object
-        try:
-            co = CacheObject(value, expires, persistent=persistent)
-
-        except AttributeError:
-            logger.trace(f'CacheObject could not be initialied from {content}')
-
+        co = CacheObject(value, expires, persistent=persistent)
         if verify and co.sha1()[:6] != sha1sum:
             # Our object was tampered with
             logger.debug(f'Tampering detected with cache entry {co}')
@@ -210,16 +199,7 @@ class CacheObject:
         """
         Returns our persistent value
         """
-        return True if self.__persistent else False
-
-    @property
-    def expires_sec(self):
-        """
-        Returns the number of seconds from now the object will expire
-        """
-        return None if self.__expires is None else \
-            (self.__expires - datetime.now(tz=timezone.utc))\
-            .total_seconds()
+        return self.__persistent
 
     @property
     def expires(self):
@@ -228,18 +208,44 @@ class CacheObject:
         """
         return self.__expires
 
+    @property
+    def expires_sec(self):
+        """
+        Returns the number of seconds from now the object will expire
+        """
+
+        return None if self.__expires is None else max(
+            0.0, (self.__expires - datetime.now(tz=timezone.utc))
+            .total_seconds())
+
+    def __bool__(self):
+        """
+        Returns True it the object hasn't expired, and False if it has
+        """
+        if self.__expires is None:
+            # No Expiry
+            return True
+
+        # Calculate if we've expired or not
+        return self.__expires > datetime.now(tz=timezone.utc)
+
     def __eq__(self, other):
         """
         Handles equality == flag
         """
-        return self and self.__value == other
+        if isinstance(other, CacheObject):
+            return str(self) == str(other)
+
+        return self.__value == other
 
     def __str__(self):
         """
         string output of our data
         """
-        return f'{self.__class_name}:{self.__value} expires: ' +\
-            'never' or self.__expires.isoformat()
+        persistent = '+' if self.persistent else '-'
+        return f'{self.__class_name}:{persistent}:{self.__value} expires: ' +\
+            ('never' if self.__expires is None
+             else self.__expires.isoformat())
 
 
 class CacheJSONEncoder(json.JSONEncoder):
@@ -251,8 +257,12 @@ class CacheJSONEncoder(json.JSONEncoder):
         if isinstance(entry, datetime):
             return entry.isoformat()
 
-        if isinstance(entry, CacheObject):
+        elif isinstance(entry, CacheObject):
             return entry.json()
+
+        elif isinstance(entry, bytes):
+            return base64.b64encode(entry).decode('utf-8')
+
         return super().default(entry)
 
 
@@ -293,22 +303,19 @@ class PersistentStore:
     # Reference only
     __not_found_ref = (None, None)
 
-    def __init__(self, namespace, path=None, method=None, asset=None):
+    def __init__(self, namespace, path, mode=None):
         """
         Provide the namespace to work within. namespaces can only contain
         alpha-numeric characters with the exception of '-' (dash), '_'
         (underscore), and '.' (period). The namespace must be be relative
         to the current URL being controlled.
-
-        The path identifies the base persistent store directory content is
-        referenced to/from.
-
-        The asset object contains switches to additionally control the
-        operation of this object.
         """
-        # Initalize our method so __del__() calls don't go bad on the
+        # Initalize our mode so __del__() calls don't go bad on the
         # error checking below
-        self.method = None
+        self.__mode = None
+
+        # Track open file pointers
+        self.__pointers = set()
 
         # Populated only once and after size() is called
         self.__exclude_size_list = None
@@ -319,47 +326,34 @@ class PersistentStore:
                 f"Persistent Storage namespace ({namespace}) provided is"
                 " invalid")
 
-        # Assign our asset
-        self.asset = \
-            asset if isinstance(asset, AppriseAsset) else AppriseAsset()
+        if isinstance(path, str):
+            # A storage path has been defined
+            if mode is None:
+                # Store Default if no mode was provided along side of it
+                mode = PERSISTENT_STORE_MODES[0]
 
-        if method is None and self.asset.persistent_storage:
-            # Store Default
-            self.method = PERSISTENT_STORE_MODES[0]
+            # Store our information
+            self.__base_path = os.path.join(path_decode(path), namespace)
+            self.__temp_path = os.path.join(self.__base_path, self.temp_dir)
 
-        elif not self.asset.persistent_storage:
-            # Memory only
-            self.method = PersistentStoreMode.MEMORY
+        else:  # If no storage path is provide we set our mode to MEMORY
+            mode = PersistentStoreMode.MEMORY
+            self.__base_path = None
+            self.__temp_path = None
 
-        elif method not in PERSISTENT_STORE_MODES:
+        if mode not in PERSISTENT_STORE_MODES:
             raise AttributeError(
-                f"Persistent Storage mode ({method}) provided is"
-                " invalid")
+                f"Persistent Storage mode ({mode}) provided is invalid")
+
+        # Store our mode
+        self.__mode = mode
 
         # Tracks when we have content to flush
         self.__dirty = False
 
-        # Store our method
-        self.method = method
-
-        # Prepare our path
-        if path is None:
-            path = os.path.join(
-                os.path.normpath(
-                    os.path.expandvars('%APPDATA%/Apprise/ps/')
-                    if platform.system() == 'Windows'
-                    else os.path.expanduser('~/.local/share/apprise/ps/')),
-                namespace)
-
-        else:
-            self.__base_path = os.path.normpath(os.path.expanduser(path))
-
-        # Our directories
-        self.__base_path = os.path.join(path, namespace)
-        self.__temp_path = os.path.join(self.__base_path, self.temp_dir)
-
         # A caching value to track persistent storage disk size
         self.__size = None
+        self.__files = {}
 
         # Internal Cache
         self._cache = None
@@ -376,7 +370,8 @@ class PersistentStore:
             raise AttributeError(
                 f"Persistent Storage key ({key} provided is invalid")
 
-        if not self.asset.persistent_storage:
+        if not self.__mode == PersistentStoreMode.MEMORY:
+            # Nothing further can be done
             return None
 
         # generate our filename
@@ -399,8 +394,9 @@ class PersistentStore:
         filesize limit.
         """
 
-        if not self.asset.persistent_storage:
-            return False
+        if not self.__mode == PersistentStoreMode.MEMORY:
+            # Nothing further can be done
+            return None
 
         if key is None:
             key = self.base_key
@@ -465,7 +461,8 @@ class PersistentStore:
         If no key is provided, then the default is used
         """
 
-        if not self.asset.persistent_storage:
+        if not self.__mode == PersistentStoreMode.MEMORY:
+            # Nothing further can be done
             return None
 
         if key is None:
@@ -482,7 +479,9 @@ class PersistentStore:
             key = self.base_key
 
         io_file = os.path.join(self.__base_path, f"{key}.dat")
-        return open(io_file, mode=mode, encoding=encoding)
+        pointer = open(io_file, mode=mode, encoding=encoding)
+        self.__pointers.add(pointer)
+        return pointer
 
     def get(self, key, default=None, lazy=True):
         """
@@ -500,22 +499,18 @@ class PersistentStore:
         Cache reference
         """
 
-        if not self.asset.persistent_storage:
-            return False
-
         if self._cache is None and not self.__load_cache():
             return False
 
+        cache = CacheObject(value, expires, persistent=persistent)
         # Fetch our cache value
-        if lazy:
-            try:
-                prev = self._cache[key].value
-                if prev == value and self._cache[key].expires == expires:
-                    # We're done
-                    return True
+        try:
+            if lazy and cache == self._cache[key]:
+                # We're done; nothing further to do
+                return True
 
-            except KeyError:
-                pass
+        except KeyError:
+            pass
 
         # Store our new cache
         self._cache[key] = CacheObject(value, expires, persistent=persistent)
@@ -523,11 +518,18 @@ class PersistentStore:
         # Set our dirty flag
         self.__dirty = persistent
 
-        if self.__dirty and self.method == PersistentStoreMode.FORCE:
+        if self.__dirty and self.__mode == PersistentStoreMode.FLUSH:
             # Flush changes to disk
-            return self.flush()
+            return self.flush(sync=True)
 
         return True
+
+    def clean(self):
+        """
+        Eliminates all cached content
+        """
+        if self._cache is None and not self.__load_cache():
+            return False
 
     def prune(self):
         """
@@ -549,9 +551,9 @@ class PersistentStore:
 
                 del self._cache[key]
 
-        if self.__dirty and self.method == PersistentStoreMode.FORCE:
+        if self.__dirty and self.__mode == PersistentStoreMode.FLUSH:
             # Flush changes to disk
-            return self.flush()
+            return self.flush(sync=True)
 
         return change
 
@@ -563,7 +565,7 @@ class PersistentStore:
         # Prepare our dirty flag
         self.__dirty = False
 
-        if self.method == PersistentStoreMode.MEMORY:
+        if self.__mode == PersistentStoreMode.MEMORY:
             # Nothing further to do
             self._cache = {}
             return True
@@ -606,18 +608,18 @@ class PersistentStore:
         # Ensure our dirty flag is set to False
         return True
 
-    def flush(self, force=False):
+    def flush(self, sync=False, force=False):
         """
         Save's our cache
         """
 
-        if self._cache is None:
+        if self._cache is None or self.__mode == PersistentStoreMode.MEMORY:
             # nothing to do
             return True
 
-        if not force and self.__dirty is False:
+        elif not force and self.__dirty is False:
             # Nothing further to do
-            logger.trace('Persistent cache consistent with memory map')
+            logger.trace('Persistent cache is consistent with memory map')
             return True
 
         # Ensure our path exists
@@ -626,8 +628,9 @@ class PersistentStore:
 
         except OSError:
             # Permission error
-            logger.error('Could not create persistent store directory {}'
-                         .format(self.__base_path))
+            logger.error(
+                'Could not create persistent store directory %s',
+                self.__base_path)
             return False
 
         # Ensure our path exists
@@ -636,12 +639,14 @@ class PersistentStore:
 
         except OSError:
             # Permission error
-            logger.error('Could not create persistent store directory {}'
-                         .format(self.__temp_path))
+            logger.error(
+                'Could not create persistent store directory %s',
+                self.__temp_path)
             return False
 
         # Unset our size lazy setting
         self.__size = None
+        self.__files.clear()
 
         # Prepare our cache file
         cache_file = os.path.join(self.__base_path, self.cache_file)
@@ -678,7 +683,7 @@ class PersistentStore:
 
         except OSError as e:
             logger.error(
-                'Persistent temporary directory inaccessible: ',
+                'Persistent temporary directory inaccessible: %s',
                 self.__temp_path)
             logger.debug('Persistent Storage Exception: %s' % str(e))
 
@@ -692,18 +697,19 @@ class PersistentStore:
                 try:
                     os.unlink(ntf.name)
                     logger.trace(
-                        'Persistent temporary file removed: ', ntf.name)
+                        'Persistent temporary file removed: %s', ntf.name)
 
                 except OSError as e:
                     logger.error(
-                        'Persistent temporary file removal failed: ', ntf.name)
+                        'Persistent temporary file removal failed: %s',
+                        ntf.name)
                     logger.debug(
                         'Persistent Storage Exception: %s' % str(e))
 
             # Early Exit
             return False
 
-        # update our content currently saved to disk
+        # write our content currently saved to disk to our temporary file
         with gzip.open(ntf.name, 'wb') as f:
             # Write our content to disk
             f.write(json.dumps(
@@ -711,77 +717,132 @@ class PersistentStore:
                 separators=(',', ':'),
                 cls=CacheJSONEncoder).encode(self.encoding))
 
+        # Remove our old backup of our cache file if it exists
         try:
             os.unlink(cache_file_backup)
             logger.trace(
-                'Persistent cache backup file removed: ', cache_file_backup)
+                'Persistent cache backup file removed: %s', cache_file_backup)
 
-        except OSError:
+        except FileNotFoundError:
             # No worries at all
             pass
 
-        try:
-            os.rename(cache_file, cache_file_backup)
-            logger.trace(
-                'Persistent cache file backed up: ', cache_file_backup)
-
         except OSError as e:
-            if os.path.isfile(cache_file):
-                logger.warning(
-                    'Persistent cache file backup failed: ', ntf.name)
-                logger.debug('Persistent Storage Exception: %s' % str(e))
-
-                # Clean-up if posible
-                try:
-                    os.unlink(ntf.name)
-                    logger.trace(
-                        'Persistent temporary file removed: ', ntf.name)
-
-                except OSError:
-                    pass
-
-                return False
-
-        try:
-            # Rename our file over the original
-            os.rename(ntf.name, cache_file)
-            logger.trace(
-                'Persistent temporary file installed successfully: ',
-                cache_file)
-
-        except OSError:
-            # This isn't good... we couldn't put our new file in place
-            logger.error(
-                'Could not write persistent content to ', cache_file)
+            logger.warning(
+                'Persistent cache file backup removal failed: %s', cache_file)
+            logger.debug('Persistent Storage Exception: %s' % str(e))
 
             # Clean-up if posible
             try:
                 os.unlink(ntf.name)
                 logger.trace(
-                    'Persistent temporary file removed: ', ntf.name)
+                    'Persistent temporary file removed: %s', ntf.name)
 
             except OSError:
                 pass
 
             return False
 
-        logger.trace('Persistent cache generated for ', cache_file)
+        # Create a backup of our existing cache file
+        try:
+            os.rename(cache_file, cache_file_backup)
+            logger.trace(
+                'Persistent cache file backed up: %s', cache_file_backup)
+
+        except FileNotFoundError:
+            # No worries at all; a previous configuration file simply did not
+            # exist
+            pass
+
+        except OSError as e:
+            logger.warning(
+                'Persistent cache file backup failed: %s', ntf.name)
+            logger.debug('Persistent Storage Exception: %s' % str(e))
+
+            # Clean-up if posible
+            try:
+                os.unlink(ntf.name)
+                logger.trace(
+                    'Persistent temporary file removed: %s', ntf.name)
+
+            except OSError:
+                pass
+
+            return False
+
+        try:
+            # Rename our file over the original
+            os.rename(ntf.name, cache_file)
+            logger.trace(
+                'Persistent temporary file installed successfully: %s',
+                cache_file)
+
+        except OSError:
+            # This isn't good... we couldn't put our new file in place
+            logger.error(
+                'Could not write persistent content to %s', cache_file)
+
+            # Roll our old backup file back in place
+            try:
+                os.rename(cache_file_backup, cache_file)
+                logger.trace(
+                    'Restoring original persistent cache file: %s',
+                    cache_file_backup)
+
+            except OSError as e:
+                logger.warning(
+                    'Persistent cache file restoration failed: %s', cache_file)
+                logger.debug('Persistent Storage Exception: %s' % str(e))
+
+            # Clean-up if posible
+            try:
+                os.unlink(ntf.name)
+                logger.trace(
+                    'Persistent temporary file removed: %s', ntf.name)
+
+            except OSError:
+                pass
+
+            # Clean-up if posible
+            try:
+                os.unlink(ntf.name)
+                logger.trace(
+                    'Persistent temporary file removed: %s', ntf.name)
+
+            except OSError:
+                pass
+
+            return False
+
+        logger.trace('Persistent cache generated for %s', cache_file)
+
         # Ensure our dirty flag is set to False
         self.__dirty = False
+
+        if sync:
+            # Flush our content to disk
+            os.sync()
+
         return True
 
-    def size(self, lazy=True):
+    def files(self, exclude_temp_files=True, lazy=True):
         """
-        Returns the total size of the persistent storage in bytes
+        Returns the total files
         """
 
-        if not self.asset.persistent_storage:
-            return 0
+        if lazy and exclude_temp_files in self.__files:
+            # Take an early exit with our cached results
+            return self.__files[exclude_temp_files]
 
-        if lazy and self.__size:
-            return self.__size
+        elif self.__mode == PersistentStoreMode.MEMORY:
+            # Take an early exit
+            # exclude_temp_files is our cache switch and can be either True
+            # or False.  For the below, we just set both cases and set them up
+            # as an empty record
+            self.__files.update({True: [], False: []})
+            return []
 
-        if self.__exclude_size_list is None:
+        if not lazy or self.__exclude_size_list is None:
             # A list of criteria that should be excluded from the size count
             self.__exclude_size_list = (
                 # Exclude backup cache file from count
@@ -791,15 +852,48 @@ class PersistentStore:
                 re.compile(re.escape(self.__temp_path) + r'[/\\].+'),
             )
 
-        # Get a list of files (file paths) in the given directory
+        try:
+            if exclude_temp_files:
+                self.__files[exclude_temp_files] = \
+                    [path for path in glob.glob(
+                        self.__base_path + '/**/*', recursive=True)
+                        if next((False for p in self.__exclude_size_list
+                                 if p.match(path)), True)]
+
+            else:  # No exclusion list applied
+                self.__files[exclude_temp_files] = \
+                    [path for path in glob.glob(
+                        self.__base_path + '/**/*', recursive=True)]
+
+        except (OSError, IOError):
+            # We can't access the directory or it does not exist
+            pass
+
+        return self.__files[exclude_temp_files]
+
+    def size(self, exclude_temp_files=True, lazy=True):
+        """
+        Returns the total size of the persistent storage in bytes
+        """
+
+        if lazy and self.__size is not None:
+            # Take an early exit
+            return self.__size
+
+        elif self.__mode == PersistentStoreMode.MEMORY:
+            # Take an early exit
+            self.__size = 0
+            return self.__size
+
+        # Initialize our size to zero
         self.__size = 0
 
+        # Get a list of files (file paths) in the given directory
         try:
             self.__size += sum(
-                [os.stat(path).st_size for path in filter(os.path.isfile,
-                 glob.glob(self.__base_path + '/**/*', recursive=True))
-                 if next((False for p in self.__exclude_size_list
-                          if p.match(path)), True)])
+                [os.stat(path).st_size for path in filter(
+                    os.path.isfile, self.files(
+                        exclude_temp_files=exclude_temp_files, lazy=lazy))])
 
         except (OSError, IOError):
             # We can't access the directory or it does not exist
@@ -812,7 +906,11 @@ class PersistentStore:
         Deconstruction of our object
         """
 
-        if self.method == PersistentStoreMode.AUTO:
+        # close all open pointers
+        while self.__pointers:
+            self.__pointers.pop().close()
+
+        if self.__mode == PersistentStoreMode.AUTO:
             # Flush changes to disk
             self.flush()
 
@@ -835,9 +933,9 @@ class PersistentStore:
             # Nothing to do
             raise
 
-        if self.__dirty and self.method == PersistentStoreMode.FORCE:
+        if self.__dirty and self.__mode == PersistentStoreMode.FLUSH:
             # Flush changes to disk
-            self.flush()
+            self.flush(sync=True)
 
         return
 
@@ -871,9 +969,9 @@ class PersistentStore:
                 # Set our dirty flag in advance
                 self.__dirty = True
 
-        if self.__dirty and self.method == PersistentStoreMode.FORCE:
+        if self.__dirty and self.__mode == PersistentStoreMode.FLUSH:
             # Flush changes to disk
-            self.flush()
+            self.flush(sync=True)
 
         return
 
@@ -881,6 +979,10 @@ class PersistentStore:
         """
         Returns the indexed value
         """
+
+        if self._cache is None and not self.__load_cache():
+            raise KeyError()
+
         result = self.get(key, default=self.__not_found_ref, lazy=False)
         if result is self.__not_found_ref:
             raise KeyError()

@@ -27,14 +27,12 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import os
-import sys
 import pytest
 import json
 import gzip
-from freezegun import freeze_time
 from unittest import mock
-from apprise import AppriseAsset
 from datetime import datetime, timedelta, timezone
+from apprise.asset import AppriseAsset
 from apprise.persistent_store import (
     CacheJSONEncoder, CacheObject, PersistentStore, PersistentStoreMode)
 
@@ -43,53 +41,69 @@ import logging
 logging.disable(logging.CRITICAL)
 
 
+def test_persistent_storage_asset(tmpdir):
+    """
+    Tests the Apprise Asset Object when setting the Persistent Store
+    """
+
+    asset = AppriseAsset(storage_path=str(tmpdir))
+    assert asset.storage_path == str(tmpdir)
+    assert asset.storage_mode is PersistentStoreMode.AUTO
+
+    # If there is no storage path, we're always set to memory
+    asset = AppriseAsset(
+        storage_path=None, storage_mode=PersistentStoreMode.MEMORY)
+    assert asset.storage_path is None
+    assert asset.storage_mode is PersistentStoreMode.MEMORY
+
+
 def test_disabled_persistent_storage(tmpdir):
     """
     Persistent Storage General Testing
 
     """
-    # Our asset objecet
-    asset = AppriseAsset(persistent_storage=False)
-
     # Create ourselves an attachment object
-    pc = PersistentStore(namespace='abc', path=str(tmpdir), asset=asset)
+    pc = PersistentStore(namespace='abc', path=str(tmpdir))
     assert pc.read() is None
-    assert pc.write('data') is False
+    assert pc.write('data') is None
     assert pc.get('key') is None
-    assert pc.set('key', 'value') is False
+    assert pc.set('key', 'value')
+    assert pc.get('key') == 'value'
 
     # After all of the above, nothing was done to the directory
     assert len(os.listdir(str(tmpdir))) == 0
+
+    with pytest.raises(AttributeError):
+        # invalid persistent store specified
+        PersistentStore(
+            namespace='abc', path=str(tmpdir), mode='garbage')
 
 
 def test_persistent_storage_init(tmpdir):
     """
     Test storage initialization
     """
-    # Our asset objecet
-    asset = AppriseAsset(persistent_storage=True)
+    with pytest.raises(AttributeError):
+        PersistentStore(namespace="", path=str(tmpdir))
+    with pytest.raises(AttributeError):
+        PersistentStore(namespace=None, path=str(tmpdir))
 
     with pytest.raises(AttributeError):
-        PersistentStore(namespace="", path=str(tmpdir), asset=asset)
+        PersistentStore(namespace="_", path=str(tmpdir))
     with pytest.raises(AttributeError):
-        PersistentStore(namespace=None, path=str(tmpdir), asset=asset)
+        PersistentStore(namespace=".", path=str(tmpdir))
+    with pytest.raises(AttributeError):
+        PersistentStore(namespace="-", path=str(tmpdir))
 
     with pytest.raises(AttributeError):
-        PersistentStore(namespace="_", path=str(tmpdir), asset=asset)
+        PersistentStore(namespace="_abc", path=str(tmpdir))
     with pytest.raises(AttributeError):
-        PersistentStore(namespace=".", path=str(tmpdir), asset=asset)
+        PersistentStore(namespace=".abc", path=str(tmpdir))
     with pytest.raises(AttributeError):
-        PersistentStore(namespace="-", path=str(tmpdir), asset=asset)
+        PersistentStore(namespace="-abc", path=str(tmpdir))
 
     with pytest.raises(AttributeError):
-        PersistentStore(namespace="_abc", path=str(tmpdir), asset=asset)
-    with pytest.raises(AttributeError):
-        PersistentStore(namespace=".abc", path=str(tmpdir), asset=asset)
-    with pytest.raises(AttributeError):
-        PersistentStore(namespace="-abc", path=str(tmpdir), asset=asset)
-
-    with pytest.raises(AttributeError):
-        PersistentStore(namespace="%", path=str(tmpdir), asset=asset)
+        PersistentStore(namespace="%", path=str(tmpdir))
 
 
 def test_persistent_storage_general(tmpdir):
@@ -97,41 +111,53 @@ def test_persistent_storage_general(tmpdir):
     Persistent Storage General Testing
 
     """
-    # Our asset objecet
-    asset = AppriseAsset(persistent_storage=True)
-
     namespace = 'abc'
     # Create ourselves an attachment object
     pc = PersistentStore(
-        namespace=namespace, path=str(tmpdir), asset=asset)
+        namespace=namespace, path=str(tmpdir))
+
+    # Get our path associated with our Persistent Store
+    assert pc.path == os.path.join(str(tmpdir), 'abc')
 
     # Expiry testing
     assert pc.set('key', 'value', datetime.now() + timedelta(hours=1))
-    # 10 seconds in the future
-    assert pc.set('key', 'value', 10)
+    # i min in the future
+    assert pc.set('key', 'value', 60)
 
     with pytest.raises(AttributeError):
         assert pc.set('key', 'value', 'invalid')
 
+    pc = PersistentStore(
+        namespace=namespace, path=str(tmpdir))
 
-def test_persistent_storage_force_method(tmpdir):
+    # Our key is still valid and we load it from disk
+    assert pc.get('key') == 'value'
+    assert pc['key'] == 'value'
+
+    pc = PersistentStore(
+        namespace=namespace, path=str(tmpdir))
+
+    with pytest.raises(KeyError):
+        # The below
+        pc['unassigned_key']
+
+
+def test_persistent_storage_flush_mode(tmpdir):
     """
     Persistent Storage Forced Write Testing
 
     """
-    # Our asset objecet
-    asset = AppriseAsset(persistent_storage=True)
-
     namespace = 'abc'
     # Create ourselves an attachment object
     pc = PersistentStore(
         namespace=namespace, path=str(tmpdir),
-        method=PersistentStoreMode.FORCE, asset=asset)
+        mode=PersistentStoreMode.FLUSH)
 
     # Reference path
     path = os.path.join(str(tmpdir), namespace)
 
     assert pc.size() == 0
+    assert pc.files() == []
 
     # Key is not set yet
     assert pc.get('key') is None
@@ -140,6 +166,10 @@ def test_persistent_storage_force_method(tmpdir):
     # Verify our data is set
     assert pc.set('key', 'value')
     assert pc.size() > 0
+    assert len(pc.files()) > 0
+
+    # Second call uses Lazy cache
+    assert len(pc.files()) > 0
 
     # Setting the same value again uses a lazy mode and
     # bypasses all of the write overhead
@@ -150,6 +180,29 @@ def test_persistent_storage_force_method(tmpdir):
 
     # Assignments (causes another disk write)
     pc['key'] = 'value2'
+
+    # Setting the same value and explictly marking the field as not being
+    # perisistent
+    pc.set('key-xx', 'abc123', persistent=False)
+    # Changing it's value doesn't alter the persistent flag
+    pc['key-xx'] = 'def678'
+    # Setting it twice
+    pc['key-xx'] = 'def678'
+
+    # Our retrievals
+    assert pc['key-xx'] == 'def678'
+    assert pc.get('key-xx') == 'def678'
+
+    # But on the destruction of our object, it is not available again
+    del pc
+    # Create ourselves an attachment object
+    pc = PersistentStore(
+        namespace=namespace, path=str(tmpdir),
+        mode=PersistentStoreMode.FLUSH)
+
+    assert pc.get('key-xx') is None
+    with pytest.raises(KeyError):
+        pc['key-xx']
 
     # Now our key is set
     assert 'key' in pc
@@ -184,7 +237,7 @@ def test_persistent_storage_force_method(tmpdir):
     # Re-initialize it
     pc = PersistentStore(
         namespace=namespace, path=str(tmpdir),
-        method=PersistentStoreMode.FORCE, asset=asset)
+        mode=PersistentStoreMode.FLUSH)
 
     # Our key is persistent and available right away
     assert pc.get('key') == 'value3'
@@ -203,16 +256,13 @@ def test_persistent_storage_corruption_handling(tmpdir):
     Test corrupting handling of storage
     """
 
-    # Our asset objecet
-    asset = AppriseAsset(persistent_storage=True)
-
     # Namespace
-    namespace = 'abc123'
+    namespace = 'def456'
 
     # Initialize it
     pc = PersistentStore(
         namespace=namespace, path=str(tmpdir),
-        method=PersistentStoreMode.FORCE, asset=asset)
+        mode=PersistentStoreMode.FLUSH)
 
     cache_file = os.path.join(
         str(tmpdir), namespace, PersistentStore.cache_file)
@@ -235,7 +285,7 @@ def test_persistent_storage_corruption_handling(tmpdir):
 
     pc = PersistentStore(
         namespace=namespace, path=str(tmpdir),
-        method=PersistentStoreMode.FORCE, asset=asset)
+        mode=PersistentStoreMode.FLUSH)
 
     # File is corrupted
     assert 'mykey' not in pc
@@ -245,7 +295,7 @@ def test_persistent_storage_corruption_handling(tmpdir):
     # File is corrected now
     pc = PersistentStore(
         namespace=namespace, path=str(tmpdir),
-        method=PersistentStoreMode.FORCE, asset=asset)
+        mode=PersistentStoreMode.FLUSH)
 
     assert 'mykey' in pc
 
@@ -256,7 +306,7 @@ def test_persistent_storage_corruption_handling(tmpdir):
 
     pc = PersistentStore(
         namespace=namespace, path=str(tmpdir),
-        method=PersistentStoreMode.FORCE, asset=asset)
+        mode=PersistentStoreMode.FLUSH)
 
     # File is corrupted
     assert 'mykey' not in pc
@@ -266,7 +316,7 @@ def test_persistent_storage_corruption_handling(tmpdir):
     # File is corrected now
     pc = PersistentStore(
         namespace=namespace, path=str(tmpdir),
-        method=PersistentStoreMode.FORCE, asset=asset)
+        mode=PersistentStoreMode.FLUSH)
 
     assert 'mykey' in pc
 
@@ -297,21 +347,19 @@ def test_persistent_storage_corruption_handling(tmpdir):
         with mock.patch('os.unlink', side_effect=(OSError())):
             assert not pc.flush(force=True)
 
+    del pc
+
 
 def test_persistent_storage_cache_io_errors(tmpdir):
     """
     Test persistent storage when there is a variety of disk issues
     """
 
-    # Our asset objecet
-    asset = AppriseAsset(persistent_storage=True)
-
     # Namespace
     namespace = 'abc123'
 
     with mock.patch('gzip.open', side_effect=OSError()):
-        pc = PersistentStore(
-            namespace=namespace, path=str(tmpdir), asset=asset)
+        pc = PersistentStore(namespace=namespace, path=str(tmpdir))
 
         # Falls to default
         assert pc.get('key') is None
@@ -320,91 +368,177 @@ def test_persistent_storage_cache_io_errors(tmpdir):
             pc['key']
 
 
-@pytest.mark.skipif(sys.version_info >= (3, 7),
-                    reason="Requires Python 3.0 to 3.6")
-def test_persistent_storage_cache_object_py36(tmpdir):
+def test_persistent_storage_cache_object(tmpdir):
     """
-    Test our cache object in python 3.6 (freezegun has
-    less options)
+    General testing of a CacheObject
     """
+    # A cache object
+    c = CacheObject(123)
 
     ref = datetime.now(tz=timezone.utc)
     expires = ref + timedelta(days=1)
     # Create a cache object that expires tomorrow
     c = CacheObject('abcd', expires=expires)
     assert c.expires == expires
-    assert c.expires_sec > 0.0
+    assert c.expires_sec > 86390.0 and c.expires_sec <= 86400.0
+    assert bool(c) is True
+    assert 'never' not in str(c)
+    assert 'str:+:abcd' in str(c)
 
+    #
+    # Testing CacheObject.set()
+    #
+    c.set(123)
+    assert 'never' not in str(c)
+    assert 'int:+:123' in str(c)
+    sha1 = c.sha1()
+    assert isinstance(sha1, str)
 
-@pytest.mark.skipif(sys.version_info < (3, 7),
-                    reason="Requires Python 3.7 or higher")
-def test_persistent_storage_cache_object(tmpdir):
-    """
-    Test our cache object
-    """
+    c.set(124)
+    assert 'never' not in str(c)
+    assert 'int:+:124' in str(c)
+    assert c.sha1() != sha1
 
-    # A cache object
-    c = CacheObject(123)
-    assert c
+    c.set(123)
+    # sha is the same again if we set the value back
+    assert c.sha1() == sha1
 
-    # A cache object that expires in 30 seconds from now
-    c = CacheObject(123, 30)
-    assert c
-    with freeze_time(datetime.now() + timedelta(seconds=31)):
-        # Our object has expired
-        assert not c
+    c.set(124)
+    assert isinstance(c.sha1(), str)
+    assert c.value == 124
+    assert bool(c) is True
+    c.set(124, expires=False, persistent=False)
+    assert bool(c) is True
+    assert c.expires is None
+    assert c.expires_sec is None
+    c.set(124, expires=True)
+    # we're expired now
+    assert bool(c) is False
 
-    # Freeze our time for accurate testing:
-    with freeze_time(datetime(2024, 5, 26, 12, 0, 0, 0)):
+    #
+    # Testing CacheObject equality (==)
+    #
+    a = CacheObject('abc')
+    b = CacheObject('abc')
 
-        # freeze_gun doesn't support non-naive timezones
-        EPOCH = datetime(1970, 1, 1)
+    assert a == b
+    assert a == 'abc'
+    assert b == 'abc'
 
-        # test all of our supported types
-        for entry in ('string', 123, 1.2222, datetime.now(), None, False,
-                      True):
-            # Create a cache object that expires tomorrow
-            c = CacheObject(entry, datetime.now() + timedelta(days=1))
+    # Equality is no longer a thing
+    b = CacheObject('abc', 30)
+    assert a != b
+    # however we can look at the value inside
+    assert a == b.value
 
-            # Verify our content hasn't expired
-            assert c
+    b = CacheObject('abc', persistent=False)
+    a = CacheObject('abc', persistent=True)
+    # Persistent flag matters
+    assert a != b
+    # however we can look at the value inside
+    assert a == b.value
+    b = CacheObject('abc', persistent=True)
+    assert a == b
 
-            # Verify we can dump our object
-            result = json.loads(json.dumps(
-                c, separators=(',', ':'), cls=CacheJSONEncoder))
+    # Epoch
+    EPOCH = datetime(1970, 1, 1)
 
-            # Instantiate our object
-            cc = CacheObject.instantiate(result)
-            assert cc.json() == c.json()
+    # test all of our supported types
+    for entry in ('string', 123, 1.2222, datetime.now(), None, False,
+                  True, b'\0'):
+        # Create a cache object that expires tomorrow
+        c = CacheObject(entry, datetime.now() + timedelta(days=1))
 
-        assert CacheObject.instantiate(None) is None
-        assert CacheObject.instantiate({}) is None
+        # Verify our content hasn't expired
+        assert c
 
-        # Bad data
-        assert CacheObject.instantiate({
-            'v': 123,
-            'x': datetime.now(),
-            'c': 'int'}) is None
+        # Verify we can dump our object
+        result = json.loads(json.dumps(
+            c, separators=(',', ':'), cls=CacheJSONEncoder))
 
-        assert CacheObject.instantiate({
-            'v': 123,
-            'x': (datetime.now() - EPOCH).total_seconds(),
-            'c': object}) is None
+        # Instantiate our object
+        cc = CacheObject.instantiate(result)
+        assert cc.json() == c.json()
 
-        assert CacheObject.instantiate({
-            'v': 123,
-            'x': (datetime.now() - EPOCH).total_seconds(),
-            'm': object}) is None
+    # Test our JSON Encoder against items we don't support
+    with pytest.raises(TypeError):
+        json.loads(json.dumps(
+            object(), separators=(',', ':'), cls=CacheJSONEncoder))
 
-        obj = CacheObject.instantiate({
-            'v': 123,
-            'x': (datetime.now() - EPOCH).total_seconds(),
-            'c': 'int'}, verify=False)
-        assert isinstance(obj, CacheObject)
-        assert obj == 123
+    assert CacheObject.instantiate(None) is None
+    assert CacheObject.instantiate({}) is None
 
-        # no MD5SUM and verify is set to true
-        assert CacheObject.instantiate({
-            'v': 123,
-            'x': (datetime.now() - EPOCH).total_seconds(),
-            'c': 'int'}, verify=True) is None
+    # Bad data
+    assert CacheObject.instantiate({
+        'v': 123,
+        'x': datetime.now(),
+        'c': 'int'}) is None
+
+    # object type is not supported
+    assert CacheObject.instantiate({
+        'v': 123,
+        'x': (datetime.now() - EPOCH).total_seconds(),
+        'c': object}) is None
+
+    obj = CacheObject.instantiate({
+        'v': 123,
+        'x': (datetime.now() - EPOCH).total_seconds(),
+        'c': 'int'}, verify=False)
+    assert isinstance(obj, CacheObject)
+    assert obj.value == 123
+
+    # no SHA1SUM and verify is set to true; our checksum will fail
+    assert CacheObject.instantiate({
+        'v': 123,
+        'x': (datetime.now() - EPOCH).total_seconds(),
+        'c': 'int'}, verify=True) is None
+
+    # We can't instantiate our object if the expiry value is bad
+    assert CacheObject.instantiate({
+        'v': 123,
+        'x': 'garbage',
+        'c': 'int'}, verify=False) is None
+
+    # We need a valid sha1 sum too
+    assert CacheObject.instantiate({
+        'v': 123,
+        'x': (datetime.now() - EPOCH).total_seconds(),
+        'c': 'int',
+        # Expecting a valid sha string
+        '!': 1.0}, verify=False) is None
+
+    # Our Bytes Object with corruption
+    assert CacheObject.instantiate({
+        'v': 'garbage',
+        'x': (datetime.now() - EPOCH).total_seconds(),
+        'c': 'bytes'}, verify=False) is None
+
+    obj = CacheObject.instantiate({
+        'v': 'AA==',
+        'x': (datetime.now() - EPOCH).total_seconds(),
+        'c': 'bytes'}, verify=False)
+    assert isinstance(obj, CacheObject)
+    assert obj.value == b'\0'
+
+    # Test our datetime objects
+    obj = CacheObject.instantiate({
+        'v': '2024-06-08T01:50:01.587267',
+        'x': (datetime.now() - EPOCH).total_seconds(),
+        'c': 'datetime'}, verify=False)
+    assert isinstance(obj, CacheObject)
+    assert obj.value == datetime(2024, 6, 8, 1, 50, 1, 587267)
+
+    # A corrupt datetime object
+    assert CacheObject.instantiate({
+        'v': 'garbage',
+        'x': (datetime.now() - EPOCH).total_seconds(),
+        'c': 'datetime'}, verify=False) is None
+
+    # Partial data gets us partial output
+    obj = CacheObject.instantiate({
+        'v': '2024-06-08',
+        'x': (datetime.now() - EPOCH).total_seconds(),
+        'c': 'datetime'}, verify=False)
+    assert isinstance(obj, CacheObject)
+    assert obj.value.strftime('%Y-%m-%d') == \
+        datetime(2024, 6, 8).strftime('%Y-%m-%d')
