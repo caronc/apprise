@@ -62,10 +62,11 @@ def test_disabled_persistent_storage(tmpdir):
     Persistent Storage General Testing
 
     """
-    # Create ourselves an attachment object
-    pc = PersistentStore(namespace='abc', path=str(tmpdir))
+    # Create ourselves an attachment object set in Memory Mode only
+    pc = PersistentStore(
+        namespace='abc', path=str(tmpdir), mode=PersistentStoreMode.MEMORY)
     assert pc.read() is None
-    assert pc.write('data') is None
+    assert pc.write('data') is False
     assert pc.get('key') is None
     assert pc.set('key', 'value')
     assert pc.get('key') == 'value'
@@ -113,8 +114,17 @@ def test_persistent_storage_general(tmpdir):
     """
     namespace = 'abc'
     # Create ourselves an attachment object
+    pc = PersistentStore()
+
+    # Default mode when a path is not provided
+    assert pc.mode == PersistentStoreMode.MEMORY
+
+    # Create ourselves an attachment object
     pc = PersistentStore(
         namespace=namespace, path=str(tmpdir))
+
+    # Default mode when a path is provided
+    assert pc.mode == PersistentStoreMode.AUTO
 
     # Get our path associated with our Persistent Store
     assert pc.path == os.path.join(str(tmpdir), 'abc')
@@ -157,26 +167,32 @@ def test_persistent_storage_flush_mode(tmpdir):
     path = os.path.join(str(tmpdir), namespace)
 
     assert pc.size() == 0
-    assert pc.files() == []
+    assert list(pc.files()) == []
 
     # Key is not set yet
     assert pc.get('key') is None
+    assert len(pc.keys()) == 0
     assert 'key' not in pc
 
     # Verify our data is set
     assert pc.set('key', 'value')
+    assert len(pc.keys()) == 1
+    assert 'key' in list(pc.keys())
+
     assert pc.size() > 0
-    assert len(pc.files()) > 0
+    assert len(pc.files()) == 1
 
     # Second call uses Lazy cache
-    assert len(pc.files()) > 0
+    # Just our cache file
+    assert len(pc.files()) == 1
 
     # Setting the same value again uses a lazy mode and
     # bypasses all of the write overhead
     assert pc.set('key', 'value')
 
     path_content = os.listdir(path)
-    assert len(path_content) == 2
+    # var, cache.psdata, and .tmp
+    assert len(path_content) == 3
 
     # Assignments (causes another disk write)
     pc['key'] = 'value2'
@@ -213,19 +229,19 @@ def test_persistent_storage_flush_mode(tmpdir):
     assert namespace in os.listdir(str(tmpdir))
 
     path_content = os.listdir(path)
-    assert len(path_content) == 3
+    assert len(path_content) == 4
 
     # Another write doesn't change the file count
     pc['key'] = 'value3'
     path_content = os.listdir(path)
-    assert len(path_content) == 3
+    assert len(path_content) == 4
 
     # Our temporary directory used for all file handling in this namespace
     assert '.tmp' in path_content
     # Our cache file
-    assert PersistentStore.cache_file in path_content
+    assert os.path.basename(pc.cache_file) in path_content
 
-    path = os.path.join(path, '.tmp')
+    path = os.path.join(pc.path, '.tmp')
     path_content = os.listdir(path)
 
     # We always do our best to clean any temporary files up
@@ -264,8 +280,7 @@ def test_persistent_storage_corruption_handling(tmpdir):
         namespace=namespace, path=str(tmpdir),
         mode=PersistentStoreMode.FLUSH)
 
-    cache_file = os.path.join(
-        str(tmpdir), namespace, PersistentStore.cache_file)
+    cache_file = pc.cache_file
     assert not os.path.isfile(cache_file)
 
     # Store our key
@@ -313,24 +328,26 @@ def test_persistent_storage_corruption_handling(tmpdir):
     pc['mykey'] = 42
     del pc
 
-    # File is corrected now
+    with mock.patch('os.makedirs', side_effect=OSError()):
+        pc = PersistentStore(
+            namespace=namespace, path=str(tmpdir),
+            mode=PersistentStoreMode.FLUSH)
+
+        # Directory initialization failed so we fall back to memory mode
+        assert pc.mode == PersistentStoreMode.MEMORY
+
+    # directory initialization okay
     pc = PersistentStore(
         namespace=namespace, path=str(tmpdir),
         mode=PersistentStoreMode.FLUSH)
 
     assert 'mykey' in pc
 
-    with mock.patch('os.makedirs', side_effect=OSError()):
-        assert pc.flush(force=True) is False
-
-    with mock.patch('os.makedirs', side_effect=(None, OSError())):
-        assert pc.flush(force=True) is False
-
     # Remove the last entry
     del pc['mykey']
     with mock.patch('os.rename', side_effect=OSError()):
         with mock.patch('os.unlink', side_effect=OSError()):
-            assert pc.flush(force=True)
+            assert not pc.flush(force=True)
 
     # Create another entry
     pc['mykey'] = 42
@@ -366,6 +383,35 @@ def test_persistent_storage_cache_io_errors(tmpdir):
 
         with pytest.raises(KeyError):
             pc['key']
+
+
+def test_persistent_custom_io(tmpdir):
+    """
+    Test reading and writing custom files
+    """
+
+    # Initialize it for memory only
+    pc = PersistentStore()
+
+    with pytest.raises(AttributeError):
+        pc.open('!invalid#-Key')
+
+    # We can't open the file as it does not exist
+    with pytest.raises(FileNotFoundError):
+        pc.open('valid-key')
+
+    with pytest.raises(AttributeError):
+        # Bad data
+        pc.open(1234)
+
+    with pytest.raises(FileNotFoundError):
+        with pc.open('key') as fd:
+            pass
+
+    pc = PersistentStore(str(tmpdir))
+    with pc.open('key', 'wb') as fd:
+        fd.write(b'test')
+        fd.close()
 
 
 def test_persistent_storage_cache_object(tmpdir):
@@ -443,9 +489,9 @@ def test_persistent_storage_cache_object(tmpdir):
     # Epoch
     EPOCH = datetime(1970, 1, 1)
 
-    # test all of our supported types
-    for entry in ('string', 123, 1.2222, datetime.now(), None, False,
-                  True, b'\0'):
+    # test all of our supported types (also test time naive and aware times)
+    for entry in ('string', 123, 1.2222, datetime.now(),
+                  datetime.now(tz=timezone.utc), None, False, True, b'\0'):
         # Create a cache object that expires tomorrow
         c = CacheObject(entry, datetime.now() + timedelta(days=1))
 
@@ -533,12 +579,3 @@ def test_persistent_storage_cache_object(tmpdir):
         'v': 'garbage',
         'x': (datetime.now() - EPOCH).total_seconds(),
         'c': 'datetime'}, verify=False) is None
-
-    # Partial data gets us partial output
-    obj = CacheObject.instantiate({
-        'v': '2024-06-08',
-        'x': (datetime.now() - EPOCH).total_seconds(),
-        'c': 'datetime'}, verify=False)
-    assert isinstance(obj, CacheObject)
-    assert obj.value.strftime('%Y-%m-%d') == \
-        datetime(2024, 6, 8).strftime('%Y-%m-%d')

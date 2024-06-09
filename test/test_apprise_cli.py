@@ -695,8 +695,8 @@ def test_apprise_cli_persistent_storage(tmpdir):
         def send(self, **kwargs):
 
             # Test our persistent settings
-            self.set('key', 'value')
-            assert self.get('key') == 'value'
+            self.store.set('key', 'value')
+            assert self.store.get('key') == 'value'
 
             # Pretend everything is okay
             return True

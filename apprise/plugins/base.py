@@ -808,33 +808,27 @@ class NotifyBase(URLBase):
         """
         return None
 
-    def __persistent_store_init(self):
+    @property
+    def store(self):
         """
-        Initialize our Peristent Storage
-        """
+        Returns a pointer to our persistent store for use.
 
-        # A persistent store is always initialized; at worst it's for caching
-        # memory key/value pairs
-        self.__store = PersistentStore(
-            namespace=self.url_id(),
-            path=self.asset.storage_path,
-            mode=self.asset.storage_mode)
+          The best use cases are:
+           self.store.get('key')
+           self.store.set('key', 'value')
 
-    def set(self, key, value, expires=None, persistent=True, lazy=True):
-        """
-        Set a value associated to the cache key
+          You can also access the keys this way:
+           self.store['key']
+
+          And clear them:
+           del self.store['key']
+
         """
         if self.__store is None:
-            self.__persistent_store_init()
+            # Initialize our persistent store for use
+            self.__store = PersistentStore(
+                namespace=self.url_id(),
+                path=self.asset.storage_path,
+                mode=self.asset.storage_mode)
 
-        return self.__store.set(
-            key, value, expires=expires, persistent=persistent, lazy=lazy)
-
-    def get(self, key, default=None):
-        """
-        Returns the value associated with the specified cache key
-        """
-        if self.__store is None:
-            self.__persistent_store_init()
-
-        return self.__store.get(key, default)
+        return self.__store

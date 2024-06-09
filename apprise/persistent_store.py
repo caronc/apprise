@@ -35,8 +35,13 @@ import hashlib
 from .common import PersistentStoreMode, PERSISTENT_STORE_MODES
 from .utils import path_decode
 from .logger import logger
+
 # Used for writing/reading time stored in cache file
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+# isoformat is spelled out for compatibility with Python v3.6
+AWARE_DATE_ISO_FORMAT = '%Y-%m-%dT%H:%M:%S.%f%z'
+NAIVE_DATE_ISO_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
 
 
 class CacheObject:
@@ -116,11 +121,14 @@ class CacheObject:
         """
         Returns our preparable json object
         """
+
         return {
             'v': self.__value,
             'x': (self.__expires - EPOCH).total_seconds()
             if self.__expires else None,
-            'c': self.__class_name,
+            'c': self.__class_name if not isinstance(self.__value, datetime)
+            else (
+                'aware_datetime' if self.__value.tzinfo else 'naive_datetime'),
             '!': self.sha1()[:6],
         }
 
@@ -152,13 +160,13 @@ class CacheObject:
             logger.trace('CacheObject exception: %s' % str(e))
             return None
 
-        if class_name == 'datetime':
-            # Note: FakeDatetime comes from our test cases so that we can still
-            #       verify this code execute okay.
-
+        if class_name in ('aware_datetime', 'naive_datetime', 'datetime'):
+            # If datetime is detected, it will fall under the naive category
+            iso_format = AWARE_DATE_ISO_FORMAT \
+                if class_name[0] == 'a' else NAIVE_DATE_ISO_FORMAT
             try:
-                # Convert our object back to a datetime object
-                value = datetime.fromisoformat(value)
+                # Python v3.6 Support
+                value = datetime.strptime(value, iso_format)
 
             except (TypeError, ValueError):
                 # TypeError is thrown if content is not string
@@ -245,7 +253,7 @@ class CacheObject:
         persistent = '+' if self.persistent else '-'
         return f'{self.__class_name}:{persistent}:{self.__value} expires: ' +\
             ('never' if self.__expires is None
-             else self.__expires.isoformat())
+             else self.__expires.strftime(NAIVE_DATE_ISO_FORMAT))
 
 
 class CacheJSONEncoder(json.JSONEncoder):
@@ -255,7 +263,9 @@ class CacheJSONEncoder(json.JSONEncoder):
 
     def default(self, entry):
         if isinstance(entry, datetime):
-            return entry.isoformat()
+            return entry.strftime(
+                AWARE_DATE_ISO_FORMAT if entry.tzinfo is not None
+                else NAIVE_DATE_ISO_FORMAT)
 
         elif isinstance(entry, CacheObject):
             return entry.json()
@@ -286,24 +296,30 @@ class PersistentStore:
     base_key = 'default'
 
     # Directory to store cache
-    cache_file = '_cache.dat'
-
-    # backup cache file (prior to being removed completely)
-    cache_file_backup = '_cache.bak'
+    __cache_key = 'cache'
 
     # Our Temporary working directory
     temp_dir = '.tmp'
 
-    # Used to verify the token specified is valid
+    # The directory our persistent store content gets placed in
+    data_dir = 'var'
+
+    # Our Persistent Store File Extension
+    __extension = '.psdata'
+
+    # Identify our backup file extension
+    __backup_extension = '._psbak'
+
+    # Used to verify the key specified is valid
     #  - must start with an alpha_numeric
     #  - following optional characters can include period, underscore and
     #    equal
-    __valid_token = re.compile(r'[a-z0-9][a-z0-9._=]*', re.I)
+    __valid_key = re.compile(r'[a-z0-9][a-z0-9._-]*', re.I)
 
     # Reference only
     __not_found_ref = (None, None)
 
-    def __init__(self, namespace, path, mode=None):
+    def __init__(self, path=None, namespace='default', mode=None):
         """
         Provide the namespace to work within. namespaces can only contain
         alpha-numeric characters with the exception of '-' (dash), '_'
@@ -314,14 +330,11 @@ class PersistentStore:
         # error checking below
         self.__mode = None
 
-        # Track open file pointers
-        self.__pointers = set()
-
         # Populated only once and after size() is called
-        self.__exclude_size_list = None
+        self.__exclude_list = None
 
         if not isinstance(namespace, str) \
-                or not self.__valid_token.match(namespace):
+                or not self.__valid_key.match(namespace):
             raise AttributeError(
                 f"Persistent Storage namespace ({namespace}) provided is"
                 " invalid")
@@ -335,11 +348,13 @@ class PersistentStore:
             # Store our information
             self.__base_path = os.path.join(path_decode(path), namespace)
             self.__temp_path = os.path.join(self.__base_path, self.temp_dir)
+            self.__data_path = os.path.join(self.__base_path, self.data_dir)
 
         else:  # If no storage path is provide we set our mode to MEMORY
             mode = PersistentStoreMode.MEMORY
             self.__base_path = None
             self.__temp_path = None
+            self.__data_path = None
 
         if mode not in PERSISTENT_STORE_MODES:
             raise AttributeError(
@@ -358,6 +373,51 @@ class PersistentStore:
         # Internal Cache
         self._cache = None
 
+        if self.__mode != PersistentStoreMode.MEMORY:
+            # Ensure our path exists
+            try:
+                os.makedirs(self.__base_path, mode=0o770, exist_ok=True)
+
+            except (OSError, IOError) as e:
+                # Permission error
+                logger.debug(
+                    'Could not create persistent store directory %s',
+                    self.__base_path)
+                logger.debug('Persistent Storage Exception: %s' % str(e))
+
+                # Mode changed back to MEMORY
+                self.__mode = PersistentStoreMode.MEMORY
+
+            # Ensure our path exists
+            try:
+                os.makedirs(self.__temp_path, mode=0o770, exist_ok=True)
+
+            except (OSError, IOError) as e:
+                # Permission error
+                logger.debug(
+                    'Could not create persistent store directory %s',
+                    self.__temp_path)
+                logger.debug('Persistent Storage Exception: %s' % str(e))
+
+                # Mode changed back to MEMORY
+                self.__mode = PersistentStoreMode.MEMORY
+
+            try:
+                os.makedirs(self.__data_path, mode=0o770, exist_ok=True)
+
+            except (OSError, IOError) as e:
+                # Permission error
+                logger.debug(
+                    'Could not create persistent store directory %s',
+                    self.__data_path)
+                logger.debug('Persistent Storage Exception: %s' % str(e))
+
+                # Mode changed back to MEMORY
+                self.__mode = PersistentStoreMode.MEMORY
+                if self.__mode is PersistentStoreMode.MEMORY:
+                    logger.warning(
+                        'The persistent storage could not be initialized')
+
     def read(self, key=None):
         """
         Returns the content of the persistent store object
@@ -366,11 +426,11 @@ class PersistentStore:
         if key is None:
             key = self.base_key
 
-        elif not isinstance(key, str) or not self.__valid_token.match(key):
+        elif not isinstance(key, str) or not self.__valid_key.match(key):
             raise AttributeError(
                 f"Persistent Storage key ({key} provided is invalid")
 
-        if not self.__mode == PersistentStoreMode.MEMORY:
+        if self.__mode == PersistentStoreMode.MEMORY:
             # Nothing further can be done
             return None
 
@@ -394,28 +454,43 @@ class PersistentStore:
         filesize limit.
         """
 
-        if not self.__mode == PersistentStoreMode.MEMORY:
-            # Nothing further can be done
-            return None
-
         if key is None:
             key = self.base_key
 
-        elif not isinstance(key, str) or not self.__valid_token.match(key):
+        elif not isinstance(key, str) or not self.__valid_key.match(key):
             raise AttributeError(
                 f"Persistent Storage key ({key} provided is invalid")
 
-        # generate our filename
-        io_file = os.path.join(self.__base_path, f"{key}.dat")
+        if self.__mode == PersistentStoreMode.MEMORY:
+            # Nothing further can be done
+            return False
 
-        if (len(data) + self.size(exclude=key)) > self.max_file_size:
+        # generate our filename based on the key provided
+        io_file = os.path.join(self.__data_path, f"{key}{self.__extension}")
+
+        # Calculate the files current filesize
+        try:
+            prev_size = os.stat(io_file).st_size
+
+        except FileNotFoundError:
+            # No worries, no size to accomodate
+            prev_size = 0
+
+        except (OSError, IOError) as e:
+            logger.warning('Could not write with persistent key: %s', key)
+            logger.debug('Persistent Storage Exception: %s' % str(e))
+            return False
+
+        if self.max_file_size > 0 and (
+                len(data) + self.size() - prev_size) > self.max_file_size:
             # The content to store is to large
-            logger.error(
-                'Content exceeds allowable maximum file length '
+            logger.warning(
+                'Persistent content exceeds allowable maximum file length '
                 '({}KB): {}'.format(
                     int(self.max_file_size / 1024), self.url(privacy=True)))
             return False
 
+        # Create a temporary file to write our content into
         # ntf = NamedTemporaryFile
         ntf = None
         try:
@@ -426,34 +501,171 @@ class PersistentStore:
             # Write our content
             ntf.write(data)
 
-        except (OSError, IOError):
+            # Close our file
+            ntf.close()
+
+            # Log our progress
+            logger.trace('Wrote %d bytes of data to persistent key: %s', len(
+                data), ntf.name)
+
+        except (OSError, IOError) as e:
             # We can't access the file or it does not exist
+            logger.warning('Could not write to persistent key: %s', key)
+            logger.debug('Persistent Storage Exception: %s' % str(e))
             if ntf:
+
                 try:
                     ntf.close()
                 except Exception:
-                    logger.trace(
-                        f'Could not close() persistent content {ntf.name}')
                     pass
 
                 try:
-                    ntf.unlink(ntf.name)
+                    os.unlink(ntf.name)
+                    logger.trace(
+                        'Removed temporary file: %s', ntf.name)
 
-                except Exception:
-                    logger.error(
-                        f'Could not remove persistent content {ntf.name}')
+                except FileNotFoundError:
+                    # no worries
+                    pass
 
+                except (OSError, IOError) as e:
+                    logger.warning(
+                        'Failed to remove persistent backup file: %s',
+                        ntf.name)
+                    logger.debug('Persistent Storage Exception: %s' % str(e))
+
+            return False
+
+        # Return our final move
+        if not self.__move(ntf.name, io_file):
+            # Attempt to restore things as they were
+            try:
+                os.unlink(ntf.name)
+                logger.trace(
+                    'Removed temporary file: %s', ntf.name)
+
+            except FileNotFoundError:
+                # Not a problem
+                pass
+
+            except (OSError, IOError) as e:
+                logger.warning(
+                    'Could not remove temporary file: %s', ntf.name)
+                logger.debug('Persistent Storage Exception: %s' % str(e))
+            return False
+
+        # Content installed
+        return True
+
+    def __move(self, src, dst, keep_backup=True):
+        """
+        Moves the new file in place and handles the old if it exists already
+        If the transaction fails in any way, the old file is swapped back.
+
+        Function returns True if successful and False if not.
+        """
+
+        # A temporary backup of the file we want to move in place
+        dst_backup = dst[:-len(self.__backup_extension)] + \
+            self.__backup_extension
+
+        #
+        # Backup the old file (if it exists) allowing us to have a restore
+        # point in the event of a failure
+        #
+        try:
+            # make sure the file isn't already present; if it is; remove it
+            os.unlink(dst_backup)
+            logger.trace(
+                'Removed previous persistent backup file: %s', dst_backup)
+
+        except FileNotFoundError:
+            # Not a problem
+            pass
+
+        except (OSError, IOError) as e:
+            logger.warning(
+                'Could not previous persistent data backup: %s', dst_backup)
+            logger.debug('Persistent Storage Exception: %s' % str(e))
             return False
 
         try:
-            # Set our file
-            os.rename(ntf.name, os.path.join(self.path, io_file))
+            # Back our file up so we have a fallback
+            os.rename(dst, dst_backup)
+            logger.trace(
+                'Persistent storage backup file created: %s', dst_backup)
 
-        except (OSError, IOError):
+        except FileNotFoundError:
+            # Not a problem; this is a brand new file we're writing
+            # There is nothing to backup
+            pass
+
+        except (OSError, IOError) as e:
+            # This isn't good... we couldn't put our new file in place
+            logger.warning(
+                'Could not install persistent content %s -> %s',
+                dst, os.path.basename(dst_backup))
+            logger.debug('Persistent Storage Exception: %s' % str(e))
+            return False
+
+        #
+        # Now place the new file
+        #
+        try:
+            os.rename(src, dst)
+            logger.trace('Persistent file installed: %s', dst)
+
+        except (OSError, IOError) as e:
+            # This isn't good... we couldn't put our new file in place
+            # Begin fall-back process before leaving the funtion
+            logger.warning(
+                'Could not install persistent content %s -> %s',
+                src, os.path.basename(dst))
+            logger.debug('Persistent Storage Exception: %s' % str(e))
+            try:
+                # Restore our old backup (if it exists)
+                os.rename(dst_backup, dst)
+                logger.trace(
+                    'Restoring original persistent content: %s', dst)
+
+            except FileNotFoundError:
+                # Not a problem
+                pass
+
+            except OSError as e:
+                logger.warning(
+                    'Failed to restore original persistent file: %s', dst)
+                logger.debug('Persistent Storage Exception: %s' % str(e))
 
             return False
 
-    def open(self, key=None, mode="rb", encoding=None):
+        if not keep_backup:
+            #
+            # Remove old backup file we do not wish to keep around
+            #
+            try:
+                # make sure the file isn't already present; if it is; remove it
+                os.unlink(dst_backup)
+                logger.trace(
+                    'Removed persistent backup file: %s', dst_backup)
+
+            except FileNotFoundError:
+                # Very strange; likely a racing condition somewhere else, but
+                # we should not fail as a result due to our expectations
+                # having been met.  We will create a log entry though..
+                logger.debug(
+                    'A persistent storage disk/io write race '
+                    'condition was detected')
+
+            except (OSError, IOError) as e:
+                logger.warning(
+                    'Failed to remove persistent backup file: %s', dst_backup)
+                logger.debug('Persistent Storage Exception: %s' % str(e))
+
+        return True
+
+    def open(self, key=None, mode='r', buffering=-1, encoding=None,
+             errors=None, newline=None, closefd=True, opener=None):
         """
         Returns an iterator to our our file within our namespace identified
         by the key provided.
@@ -461,27 +673,24 @@ class PersistentStore:
         If no key is provided, then the default is used
         """
 
-        if not self.__mode == PersistentStoreMode.MEMORY:
-            # Nothing further can be done
-            return None
-
         if key is None:
             key = self.base_key
 
-        elif not isinstance(key, str) or not self.__valid_token.match(key):
+        elif not isinstance(key, str) or not self.__valid_key.match(key):
             raise AttributeError(
                 f"Persistent Storage key ({key} provided is invalid")
 
-        if encoding is None:
-            encoding = self.encoding
+        if self.__mode == PersistentStoreMode.MEMORY:
+            # Nothing further can be done
+            raise FileNotFoundError()
 
         if key is None:
             key = self.base_key
 
-        io_file = os.path.join(self.__base_path, f"{key}.dat")
-        pointer = open(io_file, mode=mode, encoding=encoding)
-        self.__pointers.add(pointer)
-        return pointer
+        io_file = os.path.join(self.__data_path, f"{key}{self.__extension}")
+        return open(
+            io_file, mode=mode, buffering=buffering, encoding=encoding,
+            errors=errors, newline=newline, closefd=closefd, opener=opener)
 
     def get(self, key, default=None, lazy=True):
         """
@@ -524,12 +733,43 @@ class PersistentStore:
 
         return True
 
-    def clean(self):
+    def clear(self, *args, all=False):
         """
-        Eliminates all cached content
+        Remove one or more cache entry by it's key
+
+            e.g: clear('key')
+                 clear('key1', 'key2', key-12')
+
+        Or clear everything:
+                 clear(all=True)
         """
         if self._cache is None and not self.__load_cache():
             return False
+
+        if not all:
+            for arg in args:
+
+                try:
+                    del self._cache['key']
+
+                    # Set our dirty flag (if not set already)
+                    self.__dirty = True
+
+                except KeyError:
+                    pass
+
+        elif self._cache:
+            # Request to remove everything and there is something to remove
+
+            # Set our dirty flag (if not set already)
+            self.__dirty = True
+
+            # Reset our object
+            self._cache.clear()
+
+        if self.__dirty and self.__mode == PersistentStoreMode.FLUSH:
+            # Flush changes to disk
+            return self.flush(sync=True)
 
     def prune(self):
         """
@@ -571,7 +811,7 @@ class PersistentStore:
             return True
 
         # Prepare our cache file
-        cache_file = os.path.join(self.__base_path, self.cache_file)
+        cache_file = self.cache_file
         try:
             with gzip.open(cache_file, 'rb') as f:
                 # Read our content from disk
@@ -597,7 +837,7 @@ class PersistentStore:
             # No problem; no cache to load
             self._cache = {}
 
-        except OSError as e:
+        except (OSError, IOError) as e:
             # We failed (likely a permission issue)
             logger.warning(
                 'Could not load persistent cache for namespace %s',
@@ -608,7 +848,7 @@ class PersistentStore:
         # Ensure our dirty flag is set to False
         return True
 
-    def flush(self, sync=False, force=False):
+    def flush(self, sync=None, force=False):
         """
         Save's our cache
         """
@@ -622,55 +862,61 @@ class PersistentStore:
             logger.trace('Persistent cache is consistent with memory map')
             return True
 
-        # Ensure our path exists
-        try:
-            os.makedirs(self.__base_path, mode=0o770, exist_ok=True)
-
-        except OSError:
-            # Permission error
-            logger.error(
-                'Could not create persistent store directory %s',
-                self.__base_path)
-            return False
-
-        # Ensure our path exists
-        try:
-            os.makedirs(self.__temp_path, mode=0o770, exist_ok=True)
-
-        except OSError:
-            # Permission error
-            logger.error(
-                'Could not create persistent store directory %s',
-                self.__temp_path)
-            return False
+        if sync is None:
+            # Default based on Store Mode
+            sync = False if self.__mode == PersistentStoreMode.AUTO else True
 
         # Unset our size lazy setting
         self.__size = None
         self.__files.clear()
 
         # Prepare our cache file
-        cache_file = os.path.join(self.__base_path, self.cache_file)
-        cache_file_backup = os.path.join(
-            self.__base_path, self.cache_file_backup)
-
+        cache_file = self.cache_file
         if not self._cache:
-            # We're deleting the file only
-            try:
-                os.unlink(f'{cache_file_backup}')
-
-            except OSError:
-                # No worries at all
-                pass
+            #
+            # We're deleting the cache file s there are no entries left in it
+            #
+            backup_file = cache_file[:-len(self.__backup_extension)] + \
+                self.__backup_extension
 
             try:
-                os.rename(f'{cache_file}', f'{cache_file_backup}')
+                os.unlink(backup_file)
+                logger.trace(
+                    'Removed previous persistent cache backup: %s',
+                    backup_file)
 
-            except OSError:
-                # No worries at all
+            except FileNotFoundError:
+                # Not a problem
                 pass
+
+            except (OSError, IOError) as e:
+                logger.warning(
+                    'Could not remove persistent cache backup: %s',
+                    backup_file)
+                logger.debug('Persistent Storage Exception: %s' % str(e))
+
+            try:
+                os.rename(cache_file, backup_file)
+                logger.trace(
+                    'Persistent cache backup file created: %s',
+                    backup_file)
+
+            except FileNotFoundError:
+                # Not a problem
+                pass
+
+            except (OSError, IOError) as e:
+                # This isn't good... we couldn't put our new file in place
+                logger.warning(
+                    'Could not remove persistent cache file: %s',
+                    cache_file)
+                logger.debug('Persistent Storage Exception: %s' % str(e))
+                return False
             return True
 
-        # We're not deleting
+        #
+        # If we get here, we need to update our file based cache
+        #
 
         # ntf = NamedTemporaryFile
         ntf = None
@@ -717,104 +963,21 @@ class PersistentStore:
                 separators=(',', ':'),
                 cls=CacheJSONEncoder).encode(self.encoding))
 
-        # Remove our old backup of our cache file if it exists
-        try:
-            os.unlink(cache_file_backup)
-            logger.trace(
-                'Persistent cache backup file removed: %s', cache_file_backup)
-
-        except FileNotFoundError:
-            # No worries at all
-            pass
-
-        except OSError as e:
-            logger.warning(
-                'Persistent cache file backup removal failed: %s', cache_file)
-            logger.debug('Persistent Storage Exception: %s' % str(e))
-
-            # Clean-up if posible
+        if not self.__move(ntf.name, cache_file):
+            # Attempt to restore things as they were
             try:
                 os.unlink(ntf.name)
-                logger.trace(
-                    'Persistent temporary file removed: %s', ntf.name)
+                logger.trace('Removed temporary file: %s', ntf.name)
 
-            except OSError:
+            except FileNotFoundError:
+                # Not a problem
                 pass
 
-            return False
-
-        # Create a backup of our existing cache file
-        try:
-            os.rename(cache_file, cache_file_backup)
-            logger.trace(
-                'Persistent cache file backed up: %s', cache_file_backup)
-
-        except FileNotFoundError:
-            # No worries at all; a previous configuration file simply did not
-            # exist
-            pass
-
-        except OSError as e:
-            logger.warning(
-                'Persistent cache file backup failed: %s', ntf.name)
-            logger.debug('Persistent Storage Exception: %s' % str(e))
-
-            # Clean-up if posible
-            try:
-                os.unlink(ntf.name)
-                logger.trace(
-                    'Persistent temporary file removed: %s', ntf.name)
-
-            except OSError:
-                pass
-
-            return False
-
-        try:
-            # Rename our file over the original
-            os.rename(ntf.name, cache_file)
-            logger.trace(
-                'Persistent temporary file installed successfully: %s',
-                cache_file)
-
-        except OSError:
-            # This isn't good... we couldn't put our new file in place
-            logger.error(
-                'Could not write persistent content to %s', cache_file)
-
-            # Roll our old backup file back in place
-            try:
-                os.rename(cache_file_backup, cache_file)
-                logger.trace(
-                    'Restoring original persistent cache file: %s',
-                    cache_file_backup)
-
-            except OSError as e:
+            except (OSError, IOError) as e:
                 logger.warning(
-                    'Persistent cache file restoration failed: %s', cache_file)
+                    'Could not remove temporary file: %s', ntf.name)
                 logger.debug('Persistent Storage Exception: %s' % str(e))
-
-            # Clean-up if posible
-            try:
-                os.unlink(ntf.name)
-                logger.trace(
-                    'Persistent temporary file removed: %s', ntf.name)
-
-            except OSError:
-                pass
-
-            # Clean-up if posible
-            try:
-                os.unlink(ntf.name)
-                logger.trace(
-                    'Persistent temporary file removed: %s', ntf.name)
-
-            except OSError:
-                pass
-
             return False
-
-        logger.trace('Persistent cache generated for %s', cache_file)
 
         # Ensure our dirty flag is set to False
         self.__dirty = False
@@ -825,53 +988,60 @@ class PersistentStore:
 
         return True
 
-    def files(self, exclude_temp_files=True, lazy=True):
+    def files(self, exclude=True, lazy=True):
         """
         Returns the total files
         """
 
-        if lazy and exclude_temp_files in self.__files:
+        if lazy and exclude in self.__files:
             # Take an early exit with our cached results
-            return self.__files[exclude_temp_files]
+            return self.__files[exclude]
 
         elif self.__mode == PersistentStoreMode.MEMORY:
             # Take an early exit
-            # exclude_temp_files is our cache switch and can be either True
-            # or False.  For the below, we just set both cases and set them up
-            # as an empty record
+            # exclude is our cache switch and can be either True or False.
+            # For the below, we just set both cases and set them up as an
+            # empty record
             self.__files.update({True: [], False: []})
             return []
 
-        if not lazy or self.__exclude_size_list is None:
+        if not lazy or self.__exclude_list is None:
             # A list of criteria that should be excluded from the size count
-            self.__exclude_size_list = (
+            self.__exclude_list = (
                 # Exclude backup cache file from count
                 re.compile(re.escape(os.path.join(
-                    self.__base_path, self.cache_file_backup))),
+                    self.__base_path,
+                    f'{self.__cache_key}{self.__backup_extension}'))),
+
                 # Exclude temporary files
                 re.compile(re.escape(self.__temp_path) + r'[/\\].+'),
+
+                # Exclude custom backup persistent files
+                re.compile(
+                    re.escape(self.__data_path) + r'[/\\].+' + re.escape(
+                        self.__backup_extension)),
             )
 
         try:
-            if exclude_temp_files:
-                self.__files[exclude_temp_files] = \
-                    [path for path in glob.glob(
-                        self.__base_path + '/**/*', recursive=True)
-                        if next((False for p in self.__exclude_size_list
+            if exclude:
+                self.__files[exclude] = \
+                    [path for path in filter(os.path.isfile, glob.glob(
+                        self.__base_path + '/**/*', recursive=True))
+                        if next((False for p in self.__exclude_list
                                  if p.match(path)), True)]
 
             else:  # No exclusion list applied
-                self.__files[exclude_temp_files] = \
-                    [path for path in glob.glob(
-                        self.__base_path + '/**/*', recursive=True)]
+                self.__files[exclude] = \
+                    [path for path in filter(os.path.isfile, glob.glob(
+                        self.__base_path + '/**/*', recursive=True))]
 
         except (OSError, IOError):
             # We can't access the directory or it does not exist
             pass
 
-        return self.__files[exclude_temp_files]
+        return self.__files[exclude]
 
-    def size(self, exclude_temp_files=True, lazy=True):
+    def size(self, exclude=True, lazy=True):
         """
         Returns the total size of the persistent storage in bytes
         """
@@ -885,15 +1055,11 @@ class PersistentStore:
             self.__size = 0
             return self.__size
 
-        # Initialize our size to zero
-        self.__size = 0
-
         # Get a list of files (file paths) in the given directory
         try:
-            self.__size += sum(
-                [os.stat(path).st_size for path in filter(
-                    os.path.isfile, self.files(
-                        exclude_temp_files=exclude_temp_files, lazy=lazy))])
+            self.__size = sum(
+                [os.stat(path).st_size for path in
+                    self.files(exclude=exclude, lazy=lazy)])
 
         except (OSError, IOError):
             # We can't access the directory or it does not exist
@@ -905,10 +1071,6 @@ class PersistentStore:
         """
         Deconstruction of our object
         """
-
-        # close all open pointers
-        while self.__pointers:
-            self.__pointers.pop().close()
 
         if self.__mode == PersistentStoreMode.AUTO:
             # Flush changes to disk
@@ -989,9 +1151,145 @@ class PersistentStore:
 
         return result
 
+    def keys(self):
+        """
+        Returns our keys
+        """
+        return self._cache.keys()
+
+    def clean(self, *args, all=None, temp=None, cache=None, validate=True):
+        """
+        Manages our file space and tidys it up
+
+        clean('key', 'key2')
+        clean(all=True)
+        clean(temp=True, cache=True)
+        """
+
+        # Our failure flag
+        has_error = False
+
+        valid_key_re = re.compile(
+            r'^(?P<key>.+)(' +
+            re.escape(self.__backup_extension) +
+            r'|' + re.escape(self.__extension) + r')$', re.I)
+
+        # Default asignments
+        if all is None and not (len(args) or temp or cache):
+            all = True
+        if temp is None:
+            temp = True if all else False
+        if cache is None:
+            cache = True if all else False
+
+        for path in self.files(exclude=False):
+
+            # Some information we use to validate the actions of our clean()
+            # call. This is so we don't remove anything we shouldn't
+            base = os.path.dirname(path)
+            fname = os.path.basename(path)
+
+            # Clean printable path details
+            ppath = os.path.join(os.path.dirname(base), fname)
+
+            if base == self.__base_path and cache:
+                # We're handling a cache file (hopefully)
+                result = valid_key_re.match(fname)
+                key = None if not result else (
+                    result['key'] if self.__valid_key.match(result['key'])
+                    else None)
+
+                if validate and key is None:
+                    # we're set to validate and a non-valid file was found
+                    logger.debug(
+                        'Persistent File cleanup ignoring file: %s', path)
+                    continue
+
+                elif key != self.__cache_key:
+                    # We're not dealing with a cache key
+                    logger.debug(
+                        'Persistent File cleanup ignoring file: %s', path)
+                    continue
+
+                #
+                # We should proceed with removing the file if we get here
+                #
+
+            elif base == self.__data_path and (args or all):
+                # We're handling a file found in our custom data path
+                result = valid_key_re.match(fname)
+                key = None if not result else (
+                    result['key'] if self.__valid_key.match(result['key'])
+                    else None)
+
+                if validate and key is None:
+                    # we're set to validate and a non-valid file was found
+                    logger.debug(
+                        'Persistent File cleanup ignoring file: %s', path)
+                    continue
+
+                elif not all or (key is None or key not in args):
+                    # no match found
+                    logger.debug(
+                        'Persistent File cleanup ignoring file: %s', path)
+                    continue
+
+                #
+                # We should proceed with removing the file if we get here
+                #
+
+            elif base == self.__temp_path and temp:
+                #
+                # This directory is a temporary path and nothing in here needs
+                # to be further verified. Proceed with the removing of the file
+                #
+                pass
+
+            else:
+                # No match; move on
+                logger.debug('Persistent File cleanup ignoring file: %s', path)
+                continue
+
+            try:
+                os.unlink(path)
+                logger.info('Removed persistent file: %s', ppath)
+
+            except FileNotFoundError:
+                # no worries
+                pass
+
+            except (OSError, IOError) as e:
+                has_error = True
+                logger.error(
+                    'Failed to remove persistent file: %s', ppath)
+                logger.debug('Persistent Storage Exception: %s' % str(e))
+
+        # Reset our reference variables
+        self.__size = None
+        self.__files = {}
+
+        return not has_error
+
+    @property
+    def cache_file(self):
+        """
+        Returns the full path to the namespace directory
+        """
+        return os.path.join(
+            self.__base_path,
+            f'{self.__cache_key}{self.__extension}',
+        )
+
     @property
     def path(self):
         """
         Returns the full path to the namespace directory
         """
         return self.__base_path
+
+    @property
+    def mode(self):
+        """
+        Returns the full path to the namespace directory
+        """
+        return self.__mode
