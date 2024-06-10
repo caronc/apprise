@@ -40,6 +40,9 @@ from apprise.persistent_store import (
 import logging
 logging.disable(logging.CRITICAL)
 
+# Attachment Directory
+TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), 'var')
+
 
 def test_persistent_storage_asset(tmpdir):
     """
@@ -66,6 +69,10 @@ def test_disabled_persistent_storage(tmpdir):
     pc = PersistentStore(
         namespace='abc', path=str(tmpdir), mode=PersistentStoreMode.MEMORY)
     assert pc.read() is None
+    assert pc.read('mykey') is None
+    with pytest.raises(AttributeError):
+        # Invalid key specified
+        pc.read('!invalid')
     assert pc.write('data') is False
     assert pc.get('key') is None
     assert pc.set('key', 'value')
@@ -264,7 +271,82 @@ def test_persistent_storage_flush_mode(tmpdir):
     assert pc.size() == 0
     assert 'key' not in pc
 
-    # Test different corrupt values for loading content
+    assert pc.write('data') is True
+    assert pc.read() == b'data'
+    assert pc.write(b'data') is True
+    assert pc.read() == b'data'
+
+    assert pc.read('default') == b'data'
+    assert pc.write('data2', key='mykey') is True
+    assert pc.read('mykey') == b'data2'
+
+    # We can selectively delete our key
+    assert pc.delete('mykey')
+    assert pc.read('mykey') is None
+    # Other keys are not touched
+    assert pc.read('default') == b'data'
+    assert pc.read() == b'data'
+    # Full purge
+    assert pc.delete()
+    assert pc.read('mykey') is None
+    assert pc.read() is None
+
+    # Practice with files
+    with open(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'), 'rb') as fd:
+        assert pc.write(fd, key='mykey', compress=False) is True
+
+        # Read our content back
+        fd.seek(0)
+        assert pc.read('mykey', compress=False) == fd.read()
+
+    with open(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'), 'rb') as fd:
+        assert pc.write(fd, key='mykey', compress=True) is True
+
+        # Read our content back; content will be compressed
+        fd.seek(0)
+        assert pc.read('mykey', compress=True) == fd.read()
+
+    class Foobar:
+        def read(*args, **kwargs):
+            return 42
+
+    foobar = Foobar()
+    # read() returns a non string/bin
+    with pytest.raises(AttributeError):
+        pc.write(foobar, key='foobar', compress=True)
+    assert pc.read('foobar') is None
+
+    class Foobar:
+        def read(*args, **kwargs):
+            return 'good'
+
+    foobar = Foobar()
+    # read() returns a string so the below write works
+    assert pc.write(foobar, key='foobar', compress=True)
+    assert pc.read('foobar') == b'good'
+    pc.delete()
+
+    class Foobar:
+        def read(*args, **kwargs):
+            # Throw an exception
+            raise TypeError()
+
+    foobar = Foobar()
+    # read() returns a non string/bin
+    with pytest.raises(AttributeError):
+        pc.write(foobar, key='foobar', compress=True)
+    assert pc.read('foobar') is None
+
+    # Set our max_file_size
+    _prev_max_file_size = pc.max_file_size
+    pc.max_file_size = 1
+    assert pc.delete()
+
+    assert pc.write('data') is False
+    assert pc.read() is None
+
+    # Restore setting
+    pc.max_file_size = _prev_max_file_size
 
 
 def test_persistent_storage_corruption_handling(tmpdir):
@@ -407,6 +489,15 @@ def test_persistent_custom_io(tmpdir):
     with pytest.raises(FileNotFoundError):
         with pc.open('key') as fd:
             pass
+
+    with pytest.raises(AttributeError):
+        pc.write(1234)
+
+    with pytest.raises(AttributeError):
+        pc.write(None)
+
+    with pytest.raises(AttributeError):
+        pc.write(True)
 
     pc = PersistentStore(str(tmpdir))
     with pc.open('key', 'wb') as fd:

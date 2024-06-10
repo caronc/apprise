@@ -414,44 +414,39 @@ class PersistentStore:
 
                 # Mode changed back to MEMORY
                 self.__mode = PersistentStoreMode.MEMORY
-                if self.__mode is PersistentStoreMode.MEMORY:
-                    logger.warning(
-                        'The persistent storage could not be initialized')
 
-    def read(self, key=None):
+            if self.__mode is PersistentStoreMode.MEMORY:
+                logger.warning(
+                    'The persistent storage could not be initialized')
+
+    def read(self, key=None, compress=True):
         """
         Returns the content of the persistent store object
+
+        Content is always returned as a byte object
         """
-
-        if key is None:
-            key = self.base_key
-
-        elif not isinstance(key, str) or not self.__valid_key.match(key):
-            raise AttributeError(
-                f"Persistent Storage key ({key} provided is invalid")
-
-        if self.__mode == PersistentStoreMode.MEMORY:
-            # Nothing further can be done
-            return None
-
-        # generate our filename
-        io_file = os.path.join(self.__base_path, f"{key}.dat")
-
         try:
-            with open(io_file, mode="rb") as fd:
+            with self.open(key, mode="rb", compress=compress) as fd:
                 return fd.read(self.max_file_size)
 
-        except (OSError, IOError):
-            # We can't access the file or it does not exist
+        except FileNotFoundError:
+            # No problem
             pass
+
+        except (OSError, UnicodeDecodeError, IOError) as e:
+            # We can't access the file or it does not exist
+            logger.warning('Could not read with persistent key: %s', key)
+            logger.debug('Persistent Storage Exception: %s' % str(e))
 
         # return none
         return None
 
-    def write(self, data, key=None):
+    def write(self, data, key=None, compress=True):
         """
         Writes the content to the persistent store if it doesn't exceed our
         filesize limit.
+
+        Content is always written as a byte object
         """
 
         if key is None:
@@ -460,6 +455,31 @@ class PersistentStore:
         elif not isinstance(key, str) or not self.__valid_key.match(key):
             raise AttributeError(
                 f"Persistent Storage key ({key} provided is invalid")
+
+        if not isinstance(data, (bytes, str)):
+            # One last check, we will accept read() objets with the expectation
+            # it will return a binary dataset
+            if not (hasattr(data, 'read') and callable(getattr(data, 'read'))):
+                raise AttributeError(
+                    "Invalid data type {} provided to Persistent Storage"
+                    .format(type(data)))
+
+            try:
+                # Read in our data
+                data = data.read()
+                if not isinstance(data, (bytes, str)):
+                    raise AttributeError(
+                        "Invalid data type {} provided to Persistent Storage"
+                        .format(type(data)))
+
+            except Exception as e:
+                logger.warning(
+                    'Could read() from potential iostream with persistent '
+                    'key: %s', key)
+                logger.debug('Persistent Storage Exception: %s' % str(e))
+                raise AttributeError(
+                    "Invalid data type {} provided to Persistent Storage"
+                    .format(type(data)))
 
         if self.__mode == PersistentStoreMode.MEMORY:
             # Nothing further can be done
@@ -481,39 +501,42 @@ class PersistentStore:
             logger.debug('Persistent Storage Exception: %s' % str(e))
             return False
 
-        if self.max_file_size > 0 and (
-                len(data) + self.size() - prev_size) > self.max_file_size:
-            # The content to store is to large
-            logger.warning(
-                'Persistent content exceeds allowable maximum file length '
-                '({}KB): {}'.format(
-                    int(self.max_file_size / 1024), self.url(privacy=True)))
-            return False
-
         # Create a temporary file to write our content into
         # ntf = NamedTemporaryFile
         ntf = None
+        new_file_size = 0
         try:
-            ntf = tempfile.NamedTemporaryFile(
-                mode="w+", encoding=self.encoding, dir=self.__temp_path,
-                delete=False)
+            if isinstance(data, str):
+                data = data.encode(self.encoding)
 
-            # Write our content
-            ntf.write(data)
+            ntf = tempfile.NamedTemporaryFile(
+                mode="wb", dir=self.__temp_path,
+                delete=False)
 
             # Close our file
             ntf.close()
 
-            # Log our progress
-            logger.trace('Wrote %d bytes of data to persistent key: %s', len(
-                data), ntf.name)
+            # Pointer to our open call
+            _open = open if not compress else gzip.open
 
-        except (OSError, IOError) as e:
+            with _open(ntf.name, mode='wb') as fd:
+                # Write our content
+                fd.write(data)
+
+            # Get our file size
+            new_file_size = os.stat(ntf.name).st_size
+
+            # Log our progress
+            logger.trace(
+                'Wrote %d bytes of data to persistent key: %s',
+                new_file_size, key)
+
+        except (OSError, UnicodeEncodeError, IOError) as e:
             # We can't access the file or it does not exist
             logger.warning('Could not write to persistent key: %s', key)
             logger.debug('Persistent Storage Exception: %s' % str(e))
-            if ntf:
 
+            if ntf:
                 try:
                     ntf.close()
                 except Exception:
@@ -521,8 +544,7 @@ class PersistentStore:
 
                 try:
                     os.unlink(ntf.name)
-                    logger.trace(
-                        'Removed temporary file: %s', ntf.name)
+                    logger.trace('Removed temporary file: %s', ntf.name)
 
                 except FileNotFoundError:
                     # no worries
@@ -534,6 +556,16 @@ class PersistentStore:
                         ntf.name)
                     logger.debug('Persistent Storage Exception: %s' % str(e))
 
+            return False
+
+        if self.max_file_size > 0 and (
+                new_file_size + self.size() - prev_size) > self.max_file_size:
+            # The content to store is to large
+            logger.warning(
+                'Persistent content exceeds allowable maximum file length '
+                '({}KB); provide {}KB'.format(
+                    int(self.max_file_size / 1024),
+                    int(new_file_size / 1024)))
             return False
 
         # Return our final move
@@ -553,6 +585,10 @@ class PersistentStore:
                     'Could not remove temporary file: %s', ntf.name)
                 logger.debug('Persistent Storage Exception: %s' % str(e))
             return False
+
+        # Reset our reference variables
+        self.__size = None
+        self.__files.clear()
 
         # Content installed
         return True
@@ -665,7 +701,8 @@ class PersistentStore:
         return True
 
     def open(self, key=None, mode='r', buffering=-1, encoding=None,
-             errors=None, newline=None, closefd=True, opener=None):
+             errors=None, newline=None, closefd=True, opener=None,
+             compress=False, compresslevel=9):
         """
         Returns an iterator to our our file within our namespace identified
         by the key provided.
@@ -690,7 +727,10 @@ class PersistentStore:
         io_file = os.path.join(self.__data_path, f"{key}{self.__extension}")
         return open(
             io_file, mode=mode, buffering=buffering, encoding=encoding,
-            errors=errors, newline=newline, closefd=closefd, opener=opener)
+            errors=errors, newline=newline, closefd=closefd, opener=opener) \
+            if not compress else gzip.open(
+                io_file, compresslevel=compresslevel, encoding=encoding,
+                errors=errors, newline=newline)
 
     def get(self, key, default=None, lazy=True):
         """
@@ -1157,13 +1197,13 @@ class PersistentStore:
         """
         return self._cache.keys()
 
-    def clean(self, *args, all=None, temp=None, cache=None, validate=True):
+    def delete(self, *args, all=None, temp=None, cache=None, validate=True):
         """
         Manages our file space and tidys it up
 
-        clean('key', 'key2')
-        clean(all=True)
-        clean(temp=True, cache=True)
+        delete('key', 'key2')
+        delete(all=True)
+        delete(temp=True, cache=True)
         """
 
         # Our failure flag
@@ -1175,8 +1215,8 @@ class PersistentStore:
             r'|' + re.escape(self.__extension) + r')$', re.I)
 
         # Default asignments
-        if all is None and not (len(args) or temp or cache):
-            all = True
+        if all is None:
+            all = True if not (len(args) or temp or cache) else False
         if temp is None:
             temp = True if all else False
         if cache is None:
@@ -1228,7 +1268,7 @@ class PersistentStore:
                         'Persistent File cleanup ignoring file: %s', path)
                     continue
 
-                elif not all or (key is None or key not in args):
+                elif not all and (key is None or key not in args):
                     # no match found
                     logger.debug(
                         'Persistent File cleanup ignoring file: %s', path)
@@ -1266,7 +1306,7 @@ class PersistentStore:
 
         # Reset our reference variables
         self.__size = None
-        self.__files = {}
+        self.__files.clear()
 
         return not has_error
 
