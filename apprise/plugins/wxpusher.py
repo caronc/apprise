@@ -199,7 +199,8 @@ class NotifyWxPusher(NotifyBase):
         # Prepare our headers
         headers = {
             'User-Agent': self.app_id,
-            'Content-Type': 'application/json; charset=utf-8',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
         }
 
         # Prepare our payload
@@ -213,7 +214,7 @@ class NotifyWxPusher(NotifyBase):
 
             # unsupported at this time
             'verifyPay': False,
-            'verifyPayType': 0,
+            # 'verifyPayType': 0,
             'url': None,
         }
 
