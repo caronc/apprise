@@ -26,6 +26,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import time
 import os
 import pytest
 import json
@@ -78,6 +79,32 @@ def test_disabled_persistent_storage(tmpdir):
     assert pc.set('key', 'value')
     assert pc.get('key') == 'value'
 
+    assert pc.set('key2', 'value')
+    pc.clear('key', 'key-not-previously-set')
+    assert pc.get('key2') == 'value'
+    assert pc.get('key') is None
+
+    # Set it again
+    assert pc.set('key', 'another-value')
+    # Clears all
+    pc.clear()
+    assert pc.get('key2') is None
+    assert pc.get('key') is None
+    # A second call to clear on an already empty cache set
+    pc.clear()
+
+    # No dirty flag is set as ther is nothing to write to disk
+    pc.set('not-persistent', 'value', persistent=False)
+    del pc['not-persistent']
+    with pytest.raises(KeyError):
+        # Can't delete it twice
+        del pc['not-persistent']
+
+    # A Persistent key
+    pc.set('persistent', 'value')
+    # Removes it and sets/clears the dirty flag
+    del pc['persistent']
+
     # After all of the above, nothing was done to the directory
     assert len(os.listdir(str(tmpdir))) == 0
 
@@ -126,6 +153,16 @@ def test_persistent_storage_general(tmpdir):
     # Default mode when a path is not provided
     assert pc.mode == PersistentStoreMode.MEMORY
 
+    assert pc.size() == 0
+    assert pc.files() == []
+    assert pc.files(exclude=True, lazy=False) == []
+    assert pc.files(exclude=False, lazy=False) == []
+    pc.set('key', 'value')
+    # There is no disk size utilized
+    assert pc.size() == 0
+    assert pc.files(exclude=True, lazy=False) == []
+    assert pc.files(exclude=False, lazy=False) == []
+
     # Create ourselves an attachment object
     pc = PersistentStore(
         namespace=namespace, path=str(tmpdir))
@@ -157,6 +194,47 @@ def test_persistent_storage_general(tmpdir):
     with pytest.raises(KeyError):
         # The below
         pc['unassigned_key']
+
+
+def test_persistent_storage_auto_mode(tmpdir):
+    """
+    Persistent Storage Auto Write Testing
+
+    """
+    namespace = 'abc'
+    # Create ourselves an attachment object
+    pc = PersistentStore(
+        namespace=namespace, path=str(tmpdir),
+        mode=PersistentStoreMode.AUTO)
+
+    pc.write(b'test')
+    with mock.patch('os.unlink', side_effect=FileNotFoundError()):
+        assert pc.delete(all=True) is True
+
+    # Create a temporary file we can delete
+    with open(os.path.join(pc.path, pc.temp_dir, 'test.file'), 'wb') as fd:
+        fd.write(b'data')
+
+    # Delete just the temporary files
+    assert pc.delete(temp=True) is True
+
+    # Delete just the temporary files
+    # Create a cache entry and delete it
+    assert pc.set('key', 'value') is True
+    pc.write(b'test')
+    assert pc.delete(cache=True) is True
+    # Verify our data entry wasn't removed
+    assert pc.read() == b'test'
+    # But our cache was
+    assert pc.get('key') is None
+
+    # A reverse of the above... create a cache an data variable and
+    # Clear the data; make sure our cache is still there
+    assert pc.set('key', 'value') is True
+    pc.write(b'test', key='iokey') is True
+    assert pc.delete('iokey') is True
+    assert pc.get('key') == 'value'
+    assert pc.read('iokey') is None
 
 
 def test_persistent_storage_flush_mode(tmpdir):
@@ -198,7 +276,7 @@ def test_persistent_storage_flush_mode(tmpdir):
     assert pc.set('key', 'value')
 
     path_content = os.listdir(path)
-    # var, cache.psdata, and .tmp
+    # var, cache.psdata, and tmp
     assert len(path_content) == 3
 
     # Assignments (causes another disk write)
@@ -244,11 +322,11 @@ def test_persistent_storage_flush_mode(tmpdir):
     assert len(path_content) == 4
 
     # Our temporary directory used for all file handling in this namespace
-    assert '.tmp' in path_content
+    assert pc.temp_dir in path_content
     # Our cache file
     assert os.path.basename(pc.cache_file) in path_content
 
-    path = os.path.join(pc.path, '.tmp')
+    path = os.path.join(pc.path, pc.temp_dir)
     path_content = os.listdir(path)
 
     # We always do our best to clean any temporary files up
@@ -348,6 +426,104 @@ def test_persistent_storage_flush_mode(tmpdir):
     # Restore setting
     pc.max_file_size = _prev_max_file_size
 
+    # Reset
+    pc.delete()
+
+    assert pc.write('data')
+    # Corrupt our data
+    data = pc.read(compress=False)[:20] + pc.read(compress=False)[:10]
+    pc.write(data, compress=False)
+
+    # Now we'll get an exception reading back the corrupted data
+    assert pc.read() is None
+
+    # Keep in mind though the data is still there; operator should write
+    # and read the way they expect to and things will work out fine
+    # This test just proves that Apprise Peresistent storage still
+    # gracefully handles bad data
+    assert pc.read(compress=False) == data
+
+    # No key exists also returns None
+    assert pc.read('no-key-exists') is None
+
+    pc.write(b'test')
+    pc['key'] = 'value'
+    with mock.patch('os.unlink', side_effect=FileNotFoundError()):
+        assert pc.delete(all=True) is True
+    with mock.patch('os.unlink', side_effect=OSError()):
+        assert pc.delete(all=True) is False
+
+    # Create a temporary file we can delete
+    tmp_file = os.path.join(pc.path, pc.temp_dir, 'test.file')
+    with open(tmp_file, 'wb') as fd:
+        fd.write(b'data')
+
+    assert pc.set('key', 'value') is True
+    pc.write(b'test', key='iokey') is True
+    # Delete just the temporary files
+    assert pc.delete(temp=True) is True
+    assert os.path.exists(tmp_file) is False
+    # our other entries are untouched
+    assert pc.get('key') == 'value'
+    assert pc.read('iokey') == b'test'
+
+    # Delete just the temporary files
+    # Create a cache entry and delete it
+    assert pc.set('key', 'value') is True
+    pc.write(b'test')
+    assert pc.delete(cache=True) is True
+    # Verify our data entry wasn't removed
+    assert pc.read() == b'test'
+    # But our cache was
+    assert pc.get('key') is None
+
+    # A reverse of the above... create a cache an data variable and
+    # Clear the data; make sure our cache is still there
+    assert pc.set('key', 'value') is True
+    pc.write(b'test', key='iokey') is True
+    assert pc.delete('iokey') is True
+    assert pc.get('key') == 'value'
+    assert pc.read('iokey') is None
+
+    # Create some custom files
+    cust1_file = os.path.join(pc.path, 'test.file')
+    cust2_file = os.path.join(pc.path, pc.data_dir, 'test.file')
+    with open(cust1_file, 'wb') as fd:
+        fd.write(b'data')
+    with open(cust2_file, 'wb') as fd:
+        fd.write(b'data')
+
+    # Even after a full flush our files will exist
+    assert pc.delete()
+    assert os.path.exists(cust1_file) is True
+    assert os.path.exists(cust2_file) is True
+
+    # However, if we turn off validate, we do a full sweep because these
+    # unknown files are lingering in our directory space
+    assert pc.delete(validate=False)
+    assert os.path.exists(cust1_file) is False
+    assert os.path.exists(cust2_file) is False
+
+    pc['key'] = 'value'
+    pc['key2'] = 'value2'
+    assert 'key' in pc
+    assert 'key2' in pc
+    pc.clear('key')
+    assert 'key' not in pc
+    assert 'key2' in pc
+
+    # Set expired content
+    pc.set(
+        'expired', 'expired-content',
+        expires=datetime.now() - timedelta(days=1))
+
+    # It's actually there... but it's expired so our persistent
+    # storage is behaving as it should
+    assert 'expired' not in pc
+    assert pc.get('expired') is None
+    # Prune our content
+    pc.prune()
+
 
 def test_persistent_storage_corruption_handling(tmpdir):
     """
@@ -405,6 +581,11 @@ def test_persistent_storage_corruption_handling(tmpdir):
         namespace=namespace, path=str(tmpdir),
         mode=PersistentStoreMode.FLUSH)
 
+    # Test our force flush
+    pc.flush(force=True)
+    # double call
+    pc.flush(force=True)
+
     # File is corrupted
     assert 'mykey' not in pc
     pc['mykey'] = 42
@@ -436,26 +617,52 @@ def test_persistent_storage_corruption_handling(tmpdir):
     with mock.patch('tempfile.NamedTemporaryFile', side_effect=OSError()):
         assert not pc.flush(force=True)
 
-    # Temporary file cleanup failure
-    with mock.patch('tempfile._TemporaryFileWrapper.close',
-                    side_effect=OSError()):
-        assert not pc.flush(force=True)
+        # Temporary file cleanup failure
+        with mock.patch('tempfile._TemporaryFileWrapper.close',
+                        side_effect=OSError()):
+            assert not pc.flush(force=True)
 
     with mock.patch('tempfile._TemporaryFileWrapper.close',
                     side_effect=(OSError(), None)):
         with mock.patch('os.unlink', side_effect=(OSError())):
             assert not pc.flush(force=True)
 
+    with mock.patch(
+            'tempfile._TemporaryFileWrapper.close', side_effect=OSError()):
+        assert not pc.flush(force=True)
+
+    with mock.patch(
+            'tempfile._TemporaryFileWrapper.close',
+            side_effect=(OSError(), None)):
+        with mock.patch('os.unlink', side_effect=OSError()):
+            assert not pc.flush(force=True)
+
+    with mock.patch(
+            'tempfile._TemporaryFileWrapper.close',
+            side_effect=(OSError(), None)):
+        with mock.patch('os.unlink', side_effect=FileNotFoundError()):
+            assert not pc.flush(force=True)
+
     del pc
 
+    # directory initialization okay
+    pc = PersistentStore(
+        namespace=namespace, path=str(tmpdir),
+        mode=PersistentStoreMode.FLUSH)
 
-def test_persistent_storage_cache_io_errors(tmpdir):
-    """
-    Test persistent storage when there is a variety of disk issues
-    """
+    # Allows us to play with encoding errors
+    pc.encoding = 'ascii'
 
-    # Namespace
-    namespace = 'abc123'
+    # Handle write() calls
+    with mock.patch('os.stat', side_effect=OSError()):
+        # We fail to fetch the filesize of our old file causing us to fail
+        assert pc.write('abcd') is False
+
+    # ボールト translates to vault (no bad word here) :)
+    data = "ボールト"
+
+    # We'll have encoding issues
+    assert pc.write(data) is False
 
     with mock.patch('gzip.open', side_effect=OSError()):
         pc = PersistentStore(namespace=namespace, path=str(tmpdir))
@@ -463,8 +670,157 @@ def test_persistent_storage_cache_io_errors(tmpdir):
         # Falls to default
         assert pc.get('key') is None
 
+        pc = PersistentStore(namespace=namespace, path=str(tmpdir))
+        with pytest.raises(OSError):
+            pc['key'] = 'value'
+
+        pc = PersistentStore(namespace=namespace, path=str(tmpdir))
         with pytest.raises(KeyError):
             pc['key']
+
+        pc = PersistentStore(namespace=namespace, path=str(tmpdir))
+        with pytest.raises(KeyError):
+            del pc['key']
+
+        pc = PersistentStore(namespace=namespace, path=str(tmpdir))
+        # Fails to set key
+        assert pc.set('key', 'value') is False
+
+        pc = PersistentStore(namespace=namespace, path=str(tmpdir))
+        # Fails to clear
+        assert pc.clear() is False
+
+        pc = PersistentStore(namespace=namespace, path=str(tmpdir))
+        # Fails to prune
+        assert pc.prune() is False
+
+    # Set some expired content
+    pc.set(
+        'key', 'value', persistent=False,
+        expires=datetime.now() - timedelta(days=1))
+    pc.set(
+        'key2', 'value2', persistent=True,
+        expires=datetime.now() - timedelta(days=1))
+
+    # Set some un-expired content
+    pc.set('key3', 'value3', persistent=True)
+    pc.set('key4', 'value4', persistent=False)
+    assert pc.prune() is True
+
+    # Second call has no change made
+    assert pc.prune() is False
+
+    # Reset
+    pc.delete()
+
+    # directory initialization okay
+    pc = PersistentStore(
+        namespace=namespace, path=str(tmpdir),
+        mode=PersistentStoreMode.FLUSH)
+
+    # Write some content that expires almost immediately
+    pc.set(
+        'key1', 'value', persistent=True,
+        expires=datetime.now() + timedelta(seconds=1))
+    pc.set(
+        'key2', 'value', persistent=True,
+        expires=datetime.now() + timedelta(seconds=1))
+    pc.set(
+        'key3', 'value', persistent=True,
+        expires=datetime.now() + timedelta(seconds=1))
+    pc.flush()
+
+    # Wait out our expiry
+    time.sleep(1.3)
+
+    # now initialize our storage again
+    pc = PersistentStore(
+        namespace=namespace, path=str(tmpdir),
+        mode=PersistentStoreMode.FLUSH)
+
+    # This triggers our __load_cache() which reads in a value
+    # determined to have already been expired
+    assert 'key1' not in pc
+    assert 'key2' not in pc
+    assert 'key3' not in pc
+
+    # Sweep
+    pc.delete()
+    pc.set('key', 'value')
+    pc.set('key2', 'value2')
+    pc.write('more-content')
+    # Flush our content to disk
+    pc.flush()
+
+    # Ideally we'd use os.stat below, but it is called inside a list
+    # comprehension block and mock doesn't appear to throw the exception
+    # there.  So this is a bit of a cheat, but it works
+    with mock.patch('builtins.sum', side_effect=OSError()):
+        assert pc.size(exclude=True, lazy=False) == 0
+        assert pc.size(exclude=False, lazy=False) == 0
+
+    pc = PersistentStore(namespace=namespace, path=str(tmpdir))
+    with mock.patch('glob.glob', side_effect=OSError()):
+        assert pc.files(exclude=True, lazy=False) == []
+        assert pc.files(exclude=False, lazy=False) == []
+
+    pc = PersistentStore(
+        namespace=namespace, path=str(tmpdir),
+        mode=PersistentStoreMode.FLUSH)
+
+    # Causes an initialization
+    pc['abc'] = 1
+    with mock.patch('os.unlink', side_effect=OSError()):
+        # Now we can't set data
+        with pytest.raises(OSError):
+            pc['new-key'] = 'value'
+        # However keys that alrady exist don't get caught in check
+        # and therefore won't throw
+        pc['abc'] = 'value'
+
+    #
+    # Handles flush() when the queue is empty
+    #
+    pc.clear()
+    with mock.patch('os.unlink', side_effect=OSError()):
+        # We can't remove backup cache file
+        assert pc.flush(force=True) is False
+
+    with mock.patch('os.unlink', side_effect=FileNotFoundError()):
+        # FileNotFound is not an issue
+        assert pc.flush(force=True) is True
+
+    with mock.patch('os.rename', side_effect=OSError()):
+        # We can't create a backup
+        assert pc.flush(force=True) is False
+
+    with mock.patch('os.rename', side_effect=FileNotFoundError()):
+        # FileNotFound is not an issue
+        assert pc.flush(force=True) is True
+
+    # Flush any previous cache and data
+    pc.delete()
+
+    #
+    # Handles flush() cases where is data to write
+    #
+
+    # Create a key
+    pc.set('abc', 'a-test-value')
+    with mock.patch(
+            'os.unlink', side_effect=(OSError(), None)):
+        # We failed to move our content in place
+        assert pc.flush(force=True) is False
+
+    with mock.patch(
+            'os.unlink', side_effect=(OSError(), FileNotFoundError())):
+        # We failed to move our content in place
+        assert pc.flush(force=True) is False
+
+    with mock.patch(
+            'os.unlink', side_effect=(OSError(), OSError())):
+        # We failed to move our content in place
+        assert pc.flush(force=True) is False
 
 
 def test_persistent_custom_io(tmpdir):
@@ -473,7 +829,7 @@ def test_persistent_custom_io(tmpdir):
     """
 
     # Initialize it for memory only
-    pc = PersistentStore()
+    pc = PersistentStore(path=str(tmpdir))
 
     with pytest.raises(AttributeError):
         pc.open('!invalid#-Key')
@@ -503,6 +859,73 @@ def test_persistent_custom_io(tmpdir):
     with pc.open('key', 'wb') as fd:
         fd.write(b'test')
         fd.close()
+
+    with pytest.raises(AttributeError):
+        pc.write(b'data', key='!invalid#-Key')
+
+    pc.delete()
+    with mock.patch('os.unlink', side_effect=OSError()):
+        # Write our data and the __move() will fail under the hood
+        assert pc.write(b'test') is False
+
+    pc.delete()
+    with mock.patch('os.rename', side_effect=OSError()):
+        # Write our data and the __move() will fail under the hood
+        assert pc.write(b'test') is False
+
+    pc.delete()
+    with mock.patch('os.unlink', side_effect=(OSError(), FileNotFoundError())):
+        # Write our data and the __move() will fail under the hood
+        assert pc.write(b'test') is False
+
+    pc.delete()
+    with mock.patch('os.unlink', side_effect=(OSError(), None)):
+        # Write our data and the __move() will fail under the hood
+        assert pc.write(b'test') is False
+
+    pc.delete()
+    with mock.patch('os.unlink', side_effect=(OSError(), OSError())):
+        # Write our data and the __move() will fail under the hood
+        assert pc.write(b'test') is False
+
+    pc.delete()
+    with mock.patch('os.rename', side_effect=(None, OSError(), None)):
+        assert pc.write(b'test') is False
+
+    with mock.patch('os.rename', side_effect=(None, OSError(), OSError())):
+        assert pc.write(b'test') is False
+
+    with mock.patch('os.rename', side_effect=(
+            None, OSError(), FileNotFoundError())):
+        assert pc.write(b'test') is False
+
+    pc.delete()
+    with mock.patch('os.rename', side_effect=(None, None, None, OSError())):
+        # not enough reason to fail
+        assert pc.write(b'test') is True
+
+    with mock.patch('os.stat', side_effect=OSError()):
+        with mock.patch('os.close', side_effect=(None, OSError())):
+            assert pc.write(b'test') is False
+
+    pc.delete()
+    with mock.patch(
+            'tempfile._TemporaryFileWrapper.close', side_effect=OSError()):
+        assert pc.write(b'test') is False
+
+    pc.delete()
+    with mock.patch(
+            'tempfile._TemporaryFileWrapper.close',
+            side_effect=(OSError(), None)):
+        with mock.patch('os.unlink', side_effect=OSError()):
+            assert pc.write(b'test') is False
+
+    pc.delete()
+    with mock.patch(
+            'tempfile._TemporaryFileWrapper.close',
+            side_effect=(OSError(), None)):
+        with mock.patch('os.unlink', side_effect=FileNotFoundError()):
+            assert pc.write(b'test') is False
 
 
 def test_persistent_storage_cache_object(tmpdir):

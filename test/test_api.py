@@ -234,10 +234,6 @@ def apprise_test(do_notify):
             # We fail whenever we're initialized
             raise TypeError()
 
-        def url(self, **kwargs):
-            # Support URL
-            return ''
-
         @staticmethod
         def parse_url(url, *args, **kwargs):
             # always parseable
@@ -247,10 +243,6 @@ def apprise_test(do_notify):
         def __init__(self, **kwargs):
             super().__init__(
                 notify_format=NotifyFormat.HTML, **kwargs)
-
-        def url(self, **kwargs):
-            # Support URL
-            return ''
 
         def send(self, **kwargs):
             # Pretend everything is okay
@@ -347,10 +339,6 @@ def apprise_test(do_notify):
             # Pretend everything is okay (async)
             raise TypeError()
 
-        def url(self, **kwargs):
-            # Support URL
-            return ''
-
     class RuntimeNotification(NotifyBase):
         def notify(self, **kwargs):
             # Pretend everything is okay
@@ -359,10 +347,6 @@ def apprise_test(do_notify):
         async def async_notify(self, **kwargs):
             # Pretend everything is okay (async)
             raise TypeError()
-
-        def url(self, **kwargs):
-            # Support URL
-            return ''
 
     class FailNotification(NotifyBase):
 
@@ -373,10 +357,6 @@ def apprise_test(do_notify):
         async def async_notify(self, **kwargs):
             # Pretend everything is okay (async)
             raise TypeError()
-
-        def url(self, **kwargs):
-            # Support URL
-            return ''
 
     # Store our bad notification in our schema map
     N_MGR['throw'] = ThrowNotification
@@ -409,10 +389,6 @@ def apprise_test(do_notify):
             # Pretend everything is okay
             raise TypeError()
 
-        def url(self, **kwargs):
-            # Support URL
-            return ''
-
     N_MGR.unload_modules()
     N_MGR['throw'] = ThrowInstantiateNotification
 
@@ -439,6 +415,30 @@ def apprise_test(do_notify):
     # Reset our object
     a.clear()
     assert len(a) == 0
+
+    # Test our salt used for our persistent storage
+    plugin = a.instantiate('good://localhost?salt=abc123')
+    assert isinstance(plugin, NotifyBase)
+    assert plugin.url_identifier_salt == b'abc123'
+    assert plugin.url_id(lazy=False)
+
+    asset = AppriseAsset(encoding='ascii')
+    plugin = a.instantiate('good://localhost?salt=ボールト"', asset=asset)
+    assert isinstance(plugin, NotifyBase)
+    # Encoding error makes our information ignored; we'll log it and
+    # keep our original value
+    assert plugin.url_identifier_salt == URLBase.url_identifier_salt
+    assert plugin.url_id(lazy=False)
+
+    # Support those who may set a value afterwards as a string
+    assert isinstance(plugin, NotifyBase)
+    plugin = a.instantiate('good://localhost', asset=asset)
+    # should be a byte object, but we accomodate string for ease..
+    plugin.url_identifier_salt = \
+        (chr(40960) + u'abcd' + chr(1972)).encode('utf-8')
+    assert plugin.url_id(lazy=False)
+    # We could not generate the salt due to the encoding
+    assert 'salt' not in plugin.url()
 
     # Instantiate a bad object
     plugin = a.instantiate(object, tag="bad_object")
@@ -830,6 +830,19 @@ def test_apprise_urlbase_object():
     assert base.request_url == 'http://127.0.0.1/path/'
     assert base.url().startswith('http://user@127.0.0.1/path/')
 
+    # Generic initialization
+    base = URLBase(**{'schema': ''})
+    assert base.request_timeout == (4.0, 4.0)
+    assert base.request_auth is None
+    assert base.request_url == 'http:///'
+    assert base.url().startswith('http:///')
+
+    base = URLBase()
+    assert base.request_timeout == (4.0, 4.0)
+    assert base.request_auth is None
+    assert base.request_url == 'http:///'
+    assert base.url().startswith('http:///')
+
 
 def test_apprise_unique_id():
     """
@@ -908,6 +921,10 @@ def test_apprise_unique_id():
     obj.url_identifier = b'test'
     assert obj.url_id() is not None
 
+    obj = Apprise.instantiate(url)
+    obj.url_identifier = 'test'
+    assert obj.url_id() is not None
+
     # Testing Garbage
     for x in (31, object, 43.1):
         obj = Apprise.instantiate(url)
@@ -939,12 +956,7 @@ def test_apprise_notify_formats():
             # Pretend everything is okay
             return True
 
-        def url(self, **kwargs):
-            # Support URL
-            return ''
-
     class HtmlNotification(NotifyBase):
-
         # set our default notification format
         notify_format = NotifyFormat.HTML
 
@@ -955,12 +967,7 @@ def test_apprise_notify_formats():
             # Pretend everything is okay
             return True
 
-        def url(self, **kwargs):
-            # Support URL
-            return ''
-
     class MarkDownNotification(NotifyBase):
-
         # set our default notification format
         notify_format = NotifyFormat.MARKDOWN
 
@@ -970,10 +977,6 @@ def test_apprise_notify_formats():
         def notify(self, **kwargs):
             # Pretend everything is okay
             return True
-
-        def url(self, **kwargs):
-            # Support URL
-            return ''
 
     # Store our notifications into our schema map
     N_MGR['text'] = TextNotification
@@ -1183,10 +1186,6 @@ def test_apprise_disabled_plugins():
         # in the next part of the testing
         service_name = 'na01'
 
-        def url(self, **kwargs):
-            # Support URL
-            return ''
-
         def notify(self, **kwargs):
             # Pretend everything is okay (so we don't break other tests)
             return True
@@ -1207,10 +1206,6 @@ def test_apprise_disabled_plugins():
 
             # enable state changes **AFTER** we initialize
             self.enabled = False
-
-        def url(self, **kwargs):
-            # Support URL
-            return ''
 
         def notify(self, **kwargs):
             # Pretend everything is okay (so we don't break other tests)
@@ -1265,10 +1260,6 @@ def test_apprise_disabled_plugins():
         # we'll use this as a key to make our service easier to find
         # in the next part of the testing
         service_name = 'good'
-
-        def url(self, **kwargs):
-            # Support URL
-            return ''
 
         def send(self, **kwargs):
             # Pretend everything is okay (so we don't break other tests)
@@ -1402,10 +1393,6 @@ def test_apprise_details():
             }
         })
 
-        def url(self, **kwargs):
-            # Support URL
-            return ''
-
         def send(self, **kwargs):
             # Pretend everything is okay (so we don't break other tests)
             return True
@@ -1427,10 +1414,6 @@ def test_apprise_details():
             ],
             'packages_recommended': 'django',
         }
-
-        def url(self, **kwargs):
-            # Support URL
-            return ''
 
         def send(self, **kwargs):
             # Pretend everything is okay (so we don't break other tests)
@@ -1458,10 +1441,6 @@ def test_apprise_details():
             ]
         }
 
-        def url(self, **kwargs):
-            # Support URL
-            return ''
-
         def send(self, **kwargs):
             # Pretend everything is okay (so we don't break other tests)
             return True
@@ -1484,10 +1463,6 @@ def test_apprise_details():
             'packages_recommended': 'cryptography <= 3.4'
         }
 
-        def url(self, **kwargs):
-            # Support URL
-            return ''
-
         def send(self, **kwargs):
             # Pretend everything is okay (so we don't break other tests)
             return True
@@ -1503,10 +1478,6 @@ def test_apprise_details():
 
         # This is the same as saying there are no requirements
         requirements = None
-
-        def url(self, **kwargs):
-            # Support URL
-            return ''
 
         def send(self, **kwargs):
             # Pretend everything is okay (so we don't break other tests)
@@ -1525,10 +1496,6 @@ def test_apprise_details():
             # We can set a string value as well (it does not have to be a list)
             'packages_recommended': 'cryptography <= 3.4'
         }
-
-        def url(self, **kwargs):
-            # Support URL
-            return ''
 
         def send(self, **kwargs):
             # Pretend everything is okay (so we don't break other tests)

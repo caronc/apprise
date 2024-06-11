@@ -113,8 +113,7 @@ apprise_url_tests = (
         'privacy_url': (
             'sfr://service_id:****@0...0/0000000000?'
             'from=MyApp&timeout=30&voice=claire08s&'
-            'lang=fr_FR&media=SMSUnicode&format=text'
-            '&overflow=upstream&rto=4.0&cto=4.0&verify=yes'),
+            'lang=fr_FR&media=SMSUnicode'),
         # Our response expected server response
         'requests_response_text': SFR_GOOD_RESPONSE,
     }),
@@ -126,8 +125,7 @@ apprise_url_tests = (
         'privacy_url': (
             'sfr://service_id:****@0...0/0000000000?'
             'from=&timeout=2880&voice=laura8k&'
-            'lang=en_US&media=SMSUnicode&format=text'
-            '&overflow=upstream&rto=4.0&cto=4.0&verify=yes'),
+            'lang=en_US&media=SMSUnicode'),
         # Our response expected server response
         'requests_response_text': SFR_GOOD_RESPONSE,
     }),
@@ -139,8 +137,7 @@ apprise_url_tests = (
         'privacy_url': (
             'sfr://service_id:****@0...0/0000000000?'
             'from=&timeout=2880&voice=claire08s&'
-            'lang=fr_FR&media=SMS&format=text'
-            '&overflow=upstream&rto=4.0&cto=4.0&verify=yes'),
+            'lang=fr_FR&media=SMS'),
         # Our response expected server response
         'requests_response_text': SFR_GOOD_RESPONSE,
     }),
@@ -152,8 +149,7 @@ apprise_url_tests = (
         'privacy_url': (
             'sfr://service_id:****@0...0/0000000000?'
             'from=&timeout=2880&voice=claire08s&'
-            'lang=fr_FR&media=SMSUnicode&format=text'
-            '&overflow=upstream&rto=4.0&cto=4.0&verify=yes'),
+            'lang=fr_FR&media=SMSUnicode'),
         # Our failed notification expected server response
         'requests_response_text': SFR_BAD_RESPONSE,
         'requests_response_code': requests.codes.ok,

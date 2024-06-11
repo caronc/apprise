@@ -25,6 +25,7 @@
 import os
 import re
 import gzip
+import zlib
 import base64
 import glob
 import tempfile
@@ -114,7 +115,7 @@ class CacheObject:
                 str(self).encode('utf-8'), usedforsecurity=False).hexdigest()
 
         except TypeError:
-            # Python <= v3.7 - usedforsecurity flag does not work
+            # Python <= v3.8 - usedforsecurity flag does not work
             return hashlib.sha1(str(self).encode('utf-8')).hexdigest()
 
     def json(self):
@@ -299,7 +300,7 @@ class PersistentStore:
     __cache_key = 'cache'
 
     # Our Temporary working directory
-    temp_dir = '.tmp'
+    temp_dir = 'tmp'
 
     # The directory our persistent store content gets placed in
     data_dir = 'var'
@@ -367,8 +368,8 @@ class PersistentStore:
         self.__dirty = False
 
         # A caching value to track persistent storage disk size
-        self.__size = None
-        self.__files = {}
+        self.__cache_size = None
+        self.__cache_files = {}
 
         # Internal Cache
         self._cache = None
@@ -433,7 +434,8 @@ class PersistentStore:
             # No problem
             pass
 
-        except (OSError, UnicodeDecodeError, IOError) as e:
+        except (OSError, zlib.error, EOFError, UnicodeDecodeError,
+                IOError) as e:
             # We can't access the file or it does not exist
             logger.warning('Could not read with persistent key: %s', key)
             logger.debug('Persistent Storage Exception: %s' % str(e))
@@ -547,7 +549,7 @@ class PersistentStore:
                     logger.trace('Removed temporary file: %s', ntf.name)
 
                 except FileNotFoundError:
-                    # no worries
+                    # no worries; we were removing it anyway
                     pass
 
                 except (OSError, IOError) as e:
@@ -577,7 +579,7 @@ class PersistentStore:
                     'Removed temporary file: %s', ntf.name)
 
             except FileNotFoundError:
-                # Not a problem
+                # no worries; we were removing it anyway
                 pass
 
             except (OSError, IOError) as e:
@@ -586,14 +588,14 @@ class PersistentStore:
                 logger.debug('Persistent Storage Exception: %s' % str(e))
             return False
 
-        # Reset our reference variables
-        self.__size = None
-        self.__files.clear()
+        # Resetour reference variables
+        self.__cache_size = None
+        self.__cache_files.clear()
 
         # Content installed
         return True
 
-    def __move(self, src, dst, keep_backup=True):
+    def __move(self, src, dst):
         """
         Moves the new file in place and handles the old if it exists already
         If the transaction fails in any way, the old file is swapped back.
@@ -616,7 +618,7 @@ class PersistentStore:
                 'Removed previous persistent backup file: %s', dst_backup)
 
         except FileNotFoundError:
-            # Not a problem
+            # no worries; we were removing it anyway
             pass
 
         except (OSError, IOError) as e:
@@ -668,35 +670,12 @@ class PersistentStore:
                 # Not a problem
                 pass
 
-            except OSError as e:
+            except (OSError, IOError) as e:
                 logger.warning(
                     'Failed to restore original persistent file: %s', dst)
                 logger.debug('Persistent Storage Exception: %s' % str(e))
 
             return False
-
-        if not keep_backup:
-            #
-            # Remove old backup file we do not wish to keep around
-            #
-            try:
-                # make sure the file isn't already present; if it is; remove it
-                os.unlink(dst_backup)
-                logger.trace(
-                    'Removed persistent backup file: %s', dst_backup)
-
-            except FileNotFoundError:
-                # Very strange; likely a racing condition somewhere else, but
-                # we should not fail as a result due to our expectations
-                # having been met.  We will create a log entry though..
-                logger.debug(
-                    'A persistent storage disk/io write race '
-                    'condition was detected')
-
-            except (OSError, IOError) as e:
-                logger.warning(
-                    'Failed to remove persistent backup file: %s', dst_backup)
-                logger.debug('Persistent Storage Exception: %s' % str(e))
 
         return True
 
@@ -720,9 +699,6 @@ class PersistentStore:
         if self.__mode == PersistentStoreMode.MEMORY:
             # Nothing further can be done
             raise FileNotFoundError()
-
-        if key is None:
-            key = self.base_key
 
         io_file = os.path.join(self.__data_path, f"{key}{self.__extension}")
         return open(
@@ -769,11 +745,11 @@ class PersistentStore:
 
         if self.__dirty and self.__mode == PersistentStoreMode.FLUSH:
             # Flush changes to disk
-            return self.flush(sync=True)
+            return self.flush()
 
         return True
 
-    def clear(self, *args, all=False):
+    def clear(self, *args):
         """
         Remove one or more cache entry by it's key
 
@@ -781,12 +757,12 @@ class PersistentStore:
                  clear('key1', 'key2', key-12')
 
         Or clear everything:
-                 clear(all=True)
+                 clear()
         """
         if self._cache is None and not self.__load_cache():
             return False
 
-        if not all:
+        if args:
             for arg in args:
 
                 try:
@@ -809,7 +785,7 @@ class PersistentStore:
 
         if self.__dirty and self.__mode == PersistentStoreMode.FLUSH:
             # Flush changes to disk
-            return self.flush(sync=True)
+            return self.flush()
 
     def prune(self):
         """
@@ -820,8 +796,8 @@ class PersistentStore:
 
         change = False
         for key in list(self._cache.keys()):
-            if not self._cache:
-
+            if key not in self:
+                # It's identified as being expired
                 if not change and self._cache[key].persistent:
                     # track change only if content was persistent
                     change = True
@@ -833,7 +809,7 @@ class PersistentStore:
 
         if self.__dirty and self.__mode == PersistentStoreMode.FLUSH:
             # Flush changes to disk
-            return self.flush(sync=True)
+            return self.flush()
 
         return change
 
@@ -854,7 +830,7 @@ class PersistentStore:
         cache_file = self.cache_file
         try:
             with gzip.open(cache_file, 'rb') as f:
-                # Read our content from disk
+                # Read our ontent from disk
                 self._cache = {}
                 for k, v in json.loads(f.read().decode(self.encoding)).items():
                     co = CacheObject.instantiate(v)
@@ -866,12 +842,14 @@ class PersistentStore:
                         # Track changes from our loadset
                         self.__dirty = True
 
-        except (UnicodeDecodeError, json.decoder.JSONDecodeError):
+        except (UnicodeDecodeError, json.decoder.JSONDecodeError, zlib.error,
+                EOFError):
             # Let users known there was a problem
             self._cache = {}
             logger.warning(
-                'Corrupted access persistent cache content'
-                f' {cache_file}')
+                'Corrupted access persistent cache content: %s',
+                cache_file)
+            return False
 
         except FileNotFoundError:
             # No problem; no cache to load
@@ -888,9 +866,9 @@ class PersistentStore:
         # Ensure our dirty flag is set to False
         return True
 
-    def flush(self, sync=None, force=False):
+    def flush(self, force=False):
         """
-        Save's our cache
+        Save's our cache to disk
         """
 
         if self._cache is None or self.__mode == PersistentStoreMode.MEMORY:
@@ -902,13 +880,9 @@ class PersistentStore:
             logger.trace('Persistent cache is consistent with memory map')
             return True
 
-        if sync is None:
-            # Default based on Store Mode
-            sync = False if self.__mode == PersistentStoreMode.AUTO else True
-
         # Unset our size lazy setting
-        self.__size = None
-        self.__files.clear()
+        self.__cache_size = None
+        self.__cache_files.clear()
 
         # Prepare our cache file
         cache_file = self.cache_file
@@ -926,7 +900,7 @@ class PersistentStore:
                     backup_file)
 
             except FileNotFoundError:
-                # Not a problem
+                # no worries; we were removing it anyway
                 pass
 
             except (OSError, IOError) as e:
@@ -934,6 +908,7 @@ class PersistentStore:
                     'Could not remove persistent cache backup: %s',
                     backup_file)
                 logger.debug('Persistent Storage Exception: %s' % str(e))
+                return False
 
             try:
                 os.rename(cache_file, backup_file)
@@ -942,7 +917,7 @@ class PersistentStore:
                     backup_file)
 
             except FileNotFoundError:
-                # Not a problem
+                # Not a problem; do not create a log entry
                 pass
 
             except (OSError, IOError) as e:
@@ -985,7 +960,11 @@ class PersistentStore:
                     logger.trace(
                         'Persistent temporary file removed: %s', ntf.name)
 
-                except OSError as e:
+                except FileNotFoundError:
+                    # no worries; we were removing it anyway
+                    pass
+
+                except (OSError, IOError) as e:
                     logger.error(
                         'Persistent temporary file removal failed: %s',
                         ntf.name)
@@ -1010,7 +989,7 @@ class PersistentStore:
                 logger.trace('Removed temporary file: %s', ntf.name)
 
             except FileNotFoundError:
-                # Not a problem
+                # no worries; we were removing it anyway
                 pass
 
             except (OSError, IOError) as e:
@@ -1022,10 +1001,6 @@ class PersistentStore:
         # Ensure our dirty flag is set to False
         self.__dirty = False
 
-        if sync:
-            # Flush our content to disk
-            os.sync()
-
         return True
 
     def files(self, exclude=True, lazy=True):
@@ -1033,16 +1008,16 @@ class PersistentStore:
         Returns the total files
         """
 
-        if lazy and exclude in self.__files:
+        if lazy and exclude in self.__cache_files:
             # Take an early exit with our cached results
-            return self.__files[exclude]
+            return self.__cache_files[exclude]
 
         elif self.__mode == PersistentStoreMode.MEMORY:
             # Take an early exit
             # exclude is our cache switch and can be either True or False.
             # For the below, we just set both cases and set them up as an
             # empty record
-            self.__files.update({True: [], False: []})
+            self.__cache_files.update({True: [], False: []})
             return []
 
         if not lazy or self.__exclude_list is None:
@@ -1064,48 +1039,49 @@ class PersistentStore:
 
         try:
             if exclude:
-                self.__files[exclude] = \
+                self.__cache_files[exclude] = \
                     [path for path in filter(os.path.isfile, glob.glob(
                         self.__base_path + '/**/*', recursive=True))
                         if next((False for p in self.__exclude_list
                                  if p.match(path)), True)]
 
             else:  # No exclusion list applied
-                self.__files[exclude] = \
+                self.__cache_files[exclude] = \
                     [path for path in filter(os.path.isfile, glob.glob(
                         self.__base_path + '/**/*', recursive=True))]
 
         except (OSError, IOError):
             # We can't access the directory or it does not exist
+            self.__cache_files[exclude] = []
             pass
 
-        return self.__files[exclude]
+        return self.__cache_files[exclude]
 
     def size(self, exclude=True, lazy=True):
         """
         Returns the total size of the persistent storage in bytes
         """
 
-        if lazy and self.__size is not None:
+        if lazy and self.__cache_size is not None:
             # Take an early exit
-            return self.__size
+            return self.__cache_size
 
         elif self.__mode == PersistentStoreMode.MEMORY:
             # Take an early exit
-            self.__size = 0
-            return self.__size
+            self.__cache_size = 0
+            return self.__cache_size
 
         # Get a list of files (file paths) in the given directory
         try:
-            self.__size = sum(
+            self.__cache_size = sum(
                 [os.stat(path).st_size for path in
                     self.files(exclude=exclude, lazy=lazy)])
 
         except (OSError, IOError):
             # We can't access the directory or it does not exist
-            pass
+            self.__cache_size = 0
 
-        return self.__size
+        return self.__cache_size
 
     def __del__(self):
         """
@@ -1137,7 +1113,7 @@ class PersistentStore:
 
         if self.__dirty and self.__mode == PersistentStoreMode.FLUSH:
             # Flush changes to disk
-            self.flush(sync=True)
+            self.flush()
 
         return
 
@@ -1158,7 +1134,7 @@ class PersistentStore:
         """
 
         if self._cache is None and not self.__load_cache():
-            return False
+            raise OSError("Could not set cache")
 
         if key not in self._cache and not self.set(key, value):
             raise OSError("Could not set cache")
@@ -1173,7 +1149,7 @@ class PersistentStore:
 
         if self.__dirty and self.__mode == PersistentStoreMode.FLUSH:
             # Flush changes to disk
-            self.flush(sync=True)
+            self.flush()
 
         return
 
@@ -1222,6 +1198,12 @@ class PersistentStore:
         if cache is None:
             cache = True if all else False
 
+        if cache and self._cache:
+            # Reset our object
+            self._cache.clear()
+            # Reset dirt flag
+            self.__dirty = False
+
         for path in self.files(exclude=False):
 
             # Some information we use to validate the actions of our clean()
@@ -1239,13 +1221,7 @@ class PersistentStore:
                     result['key'] if self.__valid_key.match(result['key'])
                     else None)
 
-                if validate and key is None:
-                    # we're set to validate and a non-valid file was found
-                    logger.debug(
-                        'Persistent File cleanup ignoring file: %s', path)
-                    continue
-
-                elif key != self.__cache_key:
+                if validate and key != self.__cache_key:
                     # We're not dealing with a cache key
                     logger.debug(
                         'Persistent File cleanup ignoring file: %s', path)
@@ -1295,7 +1271,7 @@ class PersistentStore:
                 logger.info('Removed persistent file: %s', ppath)
 
             except FileNotFoundError:
-                # no worries
+                # no worries; we were removing it anyway
                 pass
 
             except (OSError, IOError) as e:
@@ -1305,8 +1281,8 @@ class PersistentStore:
                 logger.debug('Persistent Storage Exception: %s' % str(e))
 
         # Reset our reference variables
-        self.__size = None
-        self.__files.clear()
+        self.__cache_size = None
+        self.__cache_files.clear()
 
         return not has_error
 

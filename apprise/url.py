@@ -235,13 +235,9 @@ class URLBase:
 
         # Secure Mode
         self.secure = kwargs.get('secure', None)
-        try:
-            if not isinstance(self.secure, bool):
-                # Attempt to detect
-                self.secure = self.schema[-1] == 's'
-
-        except (TypeError, IndexError):
-            self.secure = False
+        if not isinstance(self.secure, bool):
+            # Attempt to detect
+            self.secure = self.schema[-1:] == 's'
 
         self.host = URLBase.unquote(kwargs.get('host'))
         self.port = kwargs.get('port')
@@ -293,10 +289,10 @@ class URLBase:
                 self.url_identifier_salt = \
                     kwargs.get('salt').encode(self.asset.encoding)
 
-            except (TypeError, ValueError):
+            except (UnicodeEncodeError, TypeError, ValueError):
                 self.logger.warning(
                     'Invalid Unique URL Identifier Salt value (salt) was '
-                    'specified {}'.format(kwargs.get('cto')))
+                    'specified {}'.format(kwargs.get('salt')))
 
         if 'tag' in kwargs:
             # We want to associate some tags with our notification service.
@@ -378,7 +374,7 @@ class URLBase:
 
         default_port = 443 if self.secure else 80
 
-        return '{schema}://{auth}{hostname}{port}{fullpath}?{params}'.format(
+        return '{schema}://{auth}{hostname}{port}{fullpath}{params}'.format(
             schema='https' if self.secure else 'http',
             auth=auth,
             # never encode hostname since we're expecting it to be a valid one
@@ -387,7 +383,7 @@ class URLBase:
                  else ':{}'.format(self.port),
             fullpath=URLBase.quote(self.fullpath, safe='/')
             if self.fullpath else '/',
-            params=URLBase.urlencode(params),
+            params=('?' + URLBase.urlencode(params) if params else ''),
         )
 
     def url_id(self, lazy=True, hash_engine=hashlib.sha1):
@@ -430,9 +426,9 @@ class URLBase:
         if lazy and self.__url_identifier is not False:
             return self.__url_identifier
 
-        # Python v3.8 introduces usedforsecurity argument
+        # Python v3.9 introduces usedforsecurity argument
         kwargs = {'usedforsecurity': False} \
-            if sys.version_info >= (3, 8) else {}
+            if sys.version_info >= (3, 9) else {}
 
         if self.url_identifier is False:
             # Disabled
@@ -812,14 +808,32 @@ class URLBase:
         this class.
         """
 
-        return {
-            # The socket read timeout
-            'rto': str(self.socket_read_timeout),
-            # The request/socket connect timeout
-            'cto': str(self.socket_connect_timeout),
-            # Certificate verification
-            'verify': 'yes' if self.verify_certificate else 'no',
-        }
+        # parameters are only provided on demand to keep the URL short
+        params = {}
+
+        # The socket read timeout
+        if self.socket_read_timeout != URLBase.socket_read_timeout:
+            params['rto'] = str(self.socket_read_timeout)
+
+        # The request/socket connect timeout
+        if self.socket_connect_timeout != URLBase.socket_connect_timeout:
+            params['cto'] = str(self.socket_connect_timeout)
+
+        # Certificate verification
+        if self.verify_certificate != URLBase.verify_certificate:
+            params['verify'] = 'yes' if self.verify_certificate else 'no'
+
+        # Persistent Data Salt
+        if self.url_identifier_salt != URLBase.url_identifier_salt:
+            try:
+                params['salt'] = \
+                    self.url_identifier_salt.decode(self.asset.encoding)
+
+            except UnicodeDecodeError:
+                # Bad data; don't pass it along
+                pass
+
+        return params
 
     @staticmethod
     def post_process_parse_url_results(results):
