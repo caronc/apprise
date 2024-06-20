@@ -880,22 +880,53 @@ def test_apprise_unique_id():
 
     # Leverage salt setting
     obj2 = Apprise.instantiate('json://user@127.0.0.1/path/?salt=abcd')
-    assert obj1.url_id() != obj2.url_id()
+    assert obj1.url_id(lazy=False) != obj2.url_id(lazy=False)
 
     # same salt value produces a match again
     obj1 = Apprise.instantiate('json://user@127.0.0.1/path/?salt=abcd')
     assert obj1.url_id() == obj2.url_id()
 
+    # We'll add a good notification to our list
+    class TesNoURLID(NotifyBase):
+        """
+        This class is just sets a use case where we don't return a
+         url_identifier
+        """
+
+        # we'll use this as a key to make our service easier to find
+        # in the next part of the testing
+        service_name = 'nourl'
+
+        _url_identifier = False
+
+        def send(self, **kwargs):
+            # Pretend everything is okay (so we don't break other tests)
+            return True
+
+        @staticmethod
+        def parse_url(url):
+            return NotifyBase.parse_url(url, verify_host=False)
+
+        @property
+        def url_identifier(self):
+            """
+            No URL Identifier
+            """
+            return self._url_identifier
+
+    N_MGR['nourl'] = TesNoURLID
+
     # setting URL Identifier to False disables the generator
-    url = 'json://user@127.0.0.1/path/?arg'
+    url = 'nourl://'
     obj = Apprise.instantiate(url)
-    obj.url_identifier = False
     # No generation takes place
     assert obj.url_id() is None
 
+    #
     # Dictionary Testing
     #
-    obj.url_identifier = {'abc': '123', 'def': b'\0', 'hij': 42, 'klm': object}
+    obj._url_identifier = {
+        'abc': '123', 'def': b'\0', 'hij': 42, 'klm': object}
     # call uses cached value (from above)
     assert obj.url_id() is None
     # Tests dictionary key generation
@@ -904,31 +935,31 @@ def test_apprise_unique_id():
     # List/Set/Tuple Testing
     #
     obj1 = Apprise.instantiate(url)
-    obj1.url_identifier = ['123', b'\0', 42, object]
+    obj1._url_identifier = ['123', b'\0', 42, object]
     # Tests dictionary key generation
     assert obj1.url_id() is not None
 
     obj2 = Apprise.instantiate(url)
-    obj2.url_identifier = ('123', b'\0', 42, object)
+    obj2._url_identifier = ('123', b'\0', 42, object)
     assert obj2.url_id() is not None
     assert obj2.url_id() == obj2.url_id()
 
     obj3 = Apprise.instantiate(url)
-    obj3.url_identifier = set(['123', b'\0', 42, object])
+    obj3._url_identifier = set(['123', b'\0', 42, object])
     assert obj3.url_id() is not None
 
     obj = Apprise.instantiate(url)
-    obj.url_identifier = b'test'
+    obj._url_identifier = b'test'
     assert obj.url_id() is not None
 
     obj = Apprise.instantiate(url)
-    obj.url_identifier = 'test'
+    obj._url_identifier = 'test'
     assert obj.url_id() is not None
 
     # Testing Garbage
     for x in (31, object, 43.1):
         obj = Apprise.instantiate(url)
-        obj.url_identifier = x
+        obj._url_identifier = x
         assert obj.url_id() is not None
 
 

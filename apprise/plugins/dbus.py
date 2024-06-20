@@ -412,6 +412,15 @@ class NotifyDBus(NotifyBase):
             params=NotifyDBus.urlencode(params),
         )
 
+    @property
+    def url_identifier(self):
+        """
+        Returns all of the identifiers that make this URL unique from
+        another simliar one. Targets or end points should never be identified
+        here.
+        """
+        return self.schema
+
     @staticmethod
     def parse_url(url):
         """

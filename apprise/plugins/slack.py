@@ -326,6 +326,7 @@ class NotifySlack(NotifyBase):
         self.mode = SlackMode.BOT if access_token else SlackMode.WEBHOOK
 
         if self.mode is SlackMode.WEBHOOK:
+            self.access_token = None
             self.token_a = validate_regex(
                 token_a, *self.template_tokens['token_a']['regex'])
             if not self.token_a:
@@ -350,6 +351,9 @@ class NotifySlack(NotifyBase):
                 self.logger.warning(msg)
                 raise TypeError(msg)
         else:
+            self.token_a = None
+            self.token_b = None
+            self.token_c = None
             self.access_token = validate_regex(
                 access_token, *self.template_tokens['access_token']['regex'])
             if not self.access_token:
@@ -1017,6 +1021,18 @@ class NotifySlack(NotifyBase):
 
         # Return the response for processing
         return response
+
+    @property
+    def url_identifier(self):
+        """
+        Returns all of the identifiers that make this URL unique from
+        another simliar one. Targets or end points should never be identified
+        here.
+        """
+        return (
+            self.secure_protocol, self.token_a, self.token_b, self.token_c,
+            self.access_token,
+        )
 
     def url(self, privacy=False, *args, **kwargs):
         """

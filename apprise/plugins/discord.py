@@ -607,6 +607,15 @@ class NotifyDiscord(NotifyBase):
             params=NotifyDiscord.urlencode(params),
         )
 
+    @property
+    def url_identifier(self):
+        """
+        Returns all of the identifiers that make this URL unique from
+        another simliar one. Targets or end points should never be identified
+        here.
+        """
+        return (self.secure_protocol, self.webhook_id, self.webhook_token)
+
     @staticmethod
     def parse_url(url):
         """

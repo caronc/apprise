@@ -154,6 +154,9 @@ def test_plugin_aprs_urls(mock_create_connection):
     # We still instantiate
     assert isinstance(instance, NotifyAprs)
 
+    # Test that we generate ourselves a unique id
+    assert instance.url_id() == '81b567c5c4df946e2925cf68f4c76778cfca13df'
+
     # We still load our bad entries
     assert instance.url(privacy=True).startswith(
         "aprs://DF1JSL-15:****@A...I/A...A?")

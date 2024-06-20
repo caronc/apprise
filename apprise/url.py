@@ -294,6 +294,11 @@ class URLBase:
                     'Invalid Unique URL Identifier Salt value (salt) was '
                     'specified {}'.format(kwargs.get('salt')))
 
+        # Store our Timeout Variables
+        if 'cache' in kwargs and not parse_bool(kwargs.get('cache', True)):
+            # Enforce the disabling of cache (ortherwise defaults are use)
+            self.__url_identifier = False
+
         if 'tag' in kwargs:
             # We want to associate some tags with our notification service.
             # the code below gets the 'tag' argument if defined, otherwise

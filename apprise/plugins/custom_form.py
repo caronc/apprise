@@ -272,62 +272,6 @@ class NotifyForm(NotifyBase):
 
         return
 
-    def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
-
-        # Define any URL parameters
-        params = {
-            'method': self.method,
-        }
-
-        # Extend our parameters
-        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
-
-        # Append our headers into our parameters
-        params.update({'+{}'.format(k): v for k, v in self.headers.items()})
-
-        # Append our GET params into our parameters
-        params.update({'-{}'.format(k): v for k, v in self.params.items()})
-
-        # Append our payload extra's into our parameters
-        params.update(
-            {':{}'.format(k): v for k, v in self.payload_extras.items()})
-        params.update(
-            {':{}'.format(k): v for k, v in self.payload_overrides.items()})
-
-        if self.attach_as != self.attach_as_default:
-            # Provide Attach-As extension details
-            params['attach-as'] = self.attach_as
-
-        # Determine Authentication
-        auth = ''
-        if self.user and self.password:
-            auth = '{user}:{password}@'.format(
-                user=NotifyForm.quote(self.user, safe=''),
-                password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
-            )
-        elif self.user:
-            auth = '{user}@'.format(
-                user=NotifyForm.quote(self.user, safe=''),
-            )
-
-        default_port = 443 if self.secure else 80
-
-        return '{schema}://{auth}{hostname}{port}{fullpath}?{params}'.format(
-            schema=self.secure_protocol if self.secure else self.protocol,
-            auth=auth,
-            # never encode hostname since we're expecting it to be a valid one
-            hostname=self.host,
-            port='' if self.port is None or self.port == default_port
-                 else ':{}'.format(self.port),
-            fullpath=NotifyForm.quote(self.fullpath, safe='/')
-            if self.fullpath else '/',
-            params=NotifyForm.urlencode(params),
-        )
-
     def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
              **kwargs):
         """
@@ -485,6 +429,76 @@ class NotifyForm(NotifyBase):
                 file[1][1].close()
 
         return True
+
+    @property
+    def url_identifier(self):
+        """
+        Returns all of the identifiers that make this URL unique from
+        another simliar one. Targets or end points should never be identified
+        here.
+        """
+        return (
+            self.secure_protocol if self.secure else self.protocol,
+            self.user, self.password, self.host,
+            self.port if self.port else (443 if self.secure else 80),
+            self.fullpath.rstrip('/'),
+        )
+
+    def url(self, privacy=False, *args, **kwargs):
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
+
+        # Define any URL parameters
+        params = {
+            'method': self.method,
+        }
+
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+
+        # Append our headers into our parameters
+        params.update({'+{}'.format(k): v for k, v in self.headers.items()})
+
+        # Append our GET params into our parameters
+        params.update({'-{}'.format(k): v for k, v in self.params.items()})
+
+        # Append our payload extra's into our parameters
+        params.update(
+            {':{}'.format(k): v for k, v in self.payload_extras.items()})
+        params.update(
+            {':{}'.format(k): v for k, v in self.payload_overrides.items()})
+
+        if self.attach_as != self.attach_as_default:
+            # Provide Attach-As extension details
+            params['attach-as'] = self.attach_as
+
+        # Determine Authentication
+        auth = ''
+        if self.user and self.password:
+            auth = '{user}:{password}@'.format(
+                user=NotifyForm.quote(self.user, safe=''),
+                password=self.pprint(
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
+            )
+        elif self.user:
+            auth = '{user}@'.format(
+                user=NotifyForm.quote(self.user, safe=''),
+            )
+
+        default_port = 443 if self.secure else 80
+
+        return '{schema}://{auth}{hostname}{port}{fullpath}?{params}'.format(
+            schema=self.secure_protocol if self.secure else self.protocol,
+            auth=auth,
+            # never encode hostname since we're expecting it to be a valid one
+            hostname=self.host,
+            port='' if self.port is None or self.port == default_port
+                 else ':{}'.format(self.port),
+            fullpath=NotifyForm.quote(self.fullpath, safe='/')
+            if self.fullpath else '/',
+            params=NotifyForm.urlencode(params),
+        )
 
     @staticmethod
     def parse_url(url):
