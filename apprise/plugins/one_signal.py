@@ -40,6 +40,7 @@ from itertools import chain
 from .base import NotifyBase
 from ..common import NotifyType
 from ..common import NotifyImageSize
+from ..common import NOT_REQUIRED
 from ..utils import validate_regex
 from ..utils import parse_list
 from ..utils import parse_bool
@@ -183,6 +184,14 @@ class NotifyOneSignal(NotifyBase):
         }
     )
 
+    # Support Template Dynamic Variables (Substitutions)
+    template_kwargs = {
+        "template_data": {
+            "name": _("Template Data"),
+            "prefix": "+",
+        },
+    }
+
     def __init__(
         self,
         app,
@@ -190,6 +199,7 @@ class NotifyOneSignal(NotifyBase):
         targets=None,
         include_image=True,
         template=None,
+        template_data=None,
         subtitle=None,
         language=None,
         batch=False,
@@ -233,6 +243,9 @@ class NotifyOneSignal(NotifyBase):
 
         # Assign our template (if defined)
         self.template_id = template
+
+        # Now our dynamic template data (if defined)
+        self.template_data = template_data if isinstance(template_data, dict) else {}
 
         # Assign our subtitle (if defined)
         self.subtitle = subtitle
@@ -312,12 +325,6 @@ class NotifyOneSignal(NotifyBase):
 
         payload = {
             "app_id": self.app,
-            "headings": {
-                self.language: title if title else self.app_desc,
-            },
-            "contents": {
-                self.language: body,
-            },
             # Sending true wakes your app from background to run custom native
             # code (Apple interprets this as content-available=1).
             # Note: Not applicable if the app is in the "force-quit" state
@@ -325,6 +332,10 @@ class NotifyOneSignal(NotifyBase):
             #      prevent displaying a visible notification.
             "content_available": True,
         }
+        if title is not NOT_REQUIRED:
+            payload["headings"] = {self.language: title if title else self.app_desc}
+        if body is not NOT_REQUIRED:
+            payload["contents"] = {self.language: body}
 
         if self.subtitle:
             payload.update(
@@ -337,6 +348,9 @@ class NotifyOneSignal(NotifyBase):
 
         if self.template_id:
             payload["template_id"] = self.template_id
+
+        if self.template_data:
+            payload["custom_data"] = self.template_data
 
         # Acquire our large_icon image URL (if set)
         image_url = None if not self.include_image else self.image_url(notify_type)
@@ -432,6 +446,9 @@ class NotifyOneSignal(NotifyBase):
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+
+        # Append our template_data into our parameter list
+        params.update({"+{}".format(k): v for k, v in self.template_data.items()})
 
         return "{schema}://{tp_id}{app}@{apikey}/{targets}?{params}".format(
             schema=self.secure_protocol,
@@ -560,5 +577,8 @@ class NotifyOneSignal(NotifyBase):
 
         if "lang" in results["qsd"] and len(results["qsd"]["lang"]):
             results["language"] = NotifyOneSignal.unquote(results["qsd"]["lang"])
+
+        # Add any template substitutions
+        results["template_data"] = results["qsd+"]
 
         return results

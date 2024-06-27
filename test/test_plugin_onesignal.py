@@ -155,6 +155,20 @@ apprise_url_tests = (
         },
     ),
     (
+        "onesignal://templateid:appid@apikey/playerid?+par1=1",
+        {
+            # Test Template ID with kwargs
+            "instance": NotifyOneSignal,
+        },
+    ),
+    (
+        "onesignal://templateid:appid@apikey/playerid?+par1=1&+par2=qqww",
+        {
+            # Test Template ID with multiple kwargs
+            "instance": NotifyOneSignal,
+        },
+    ),
+    (
         "onesignal://appid@apikey/#segment/playerid/",
         {
             "instance": NotifyOneSignal,

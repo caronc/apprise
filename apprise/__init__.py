@@ -36,6 +36,7 @@ __status__ = "Production"
 
 from .common import NotifyType
 from .common import NOTIFY_TYPES
+from .common import NOT_REQUIRED
 from .common import NotifyImageSize
 from .common import NOTIFY_IMAGE_SIZES
 from .common import NotifyFormat
@@ -100,6 +101,7 @@ __all__ = [
     "ContentLocation",
     "CONTENT_LOCATIONS",
     "PrivacyMode",
+    "NOT_REQUIRED",
     # Managers
     "NotificationManager",
     "ConfigurationManager",
