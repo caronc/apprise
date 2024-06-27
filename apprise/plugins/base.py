@@ -33,6 +33,7 @@ from functools import partial
 from ..url import URLBase
 from ..common import NotifyType
 from ..utils import parse_bool
+from ..common import NOT_REQUIRED
 from ..common import NOTIFY_TYPES
 from ..common import NotifyFormat
 from ..common import NOTIFY_FORMATS
@@ -529,8 +530,10 @@ class NotifyBase(URLBase):
         response = list()
 
         # tidy
-        title = "" if not title else title.strip()
-        body = "" if not body else body.rstrip()
+        if title is not NOT_REQUIRED:
+            title = "" if not title else title.strip()
+        if body is not NOT_REQUIRED:
+            body = "" if not body else body.rstrip()
 
         if overflow is None:
             # default
