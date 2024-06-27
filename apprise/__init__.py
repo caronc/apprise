@@ -26,13 +26,13 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-__title__ = 'Apprise'
-__version__ = '1.8.0'
-__author__ = 'Chris Caron'
-__license__ = 'BSD'
-__copywrite__ = 'Copyright (C) 2024 Chris Caron <lead2gold@gmail.com>'
-__email__ = 'lead2gold@gmail.com'
-__status__ = 'Production'
+__title__ = "Apprise"
+__version__ = "1.9.0"
+__author__ = "Chris Caron"
+__license__ = "BSD"
+__copywrite__ = "Copyright (C) 2024 Chris Caron <lead2gold@gmail.com>"
+__email__ = "lead2gold@gmail.com"
+__status__ = "Production"
 
 from .common import NotifyType
 from .common import NOTIFY_TYPES
@@ -75,23 +75,39 @@ logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 __all__ = [
     # Core
-    'Apprise', 'AppriseAsset', 'AppriseConfig', 'AppriseAttachment', 'URLBase',
-    'NotifyBase', 'ConfigBase', 'AttachBase', 'AppriseLocale',
-
+    "Apprise",
+    "AppriseAsset",
+    "AppriseConfig",
+    "AppriseAttachment",
+    "URLBase",
+    "NotifyBase",
+    "ConfigBase",
+    "AttachBase",
+    "AppriseLocale",
     # Reference
-    'NotifyType', 'NotifyImageSize', 'NotifyFormat', 'OverflowMode',
-    'NOTIFY_TYPES', 'NOTIFY_IMAGE_SIZES', 'NOTIFY_FORMATS', 'OVERFLOW_MODES',
-    'ConfigFormat', 'CONFIG_FORMATS',
-    'ContentIncludeMode', 'CONTENT_INCLUDE_MODES',
-    'ContentLocation', 'CONTENT_LOCATIONS',
-    'PrivacyMode',
-
+    "NotifyType",
+    "NotifyImageSize",
+    "NotifyFormat",
+    "OverflowMode",
+    "NOTIFY_TYPES",
+    "NOTIFY_IMAGE_SIZES",
+    "NOTIFY_FORMATS",
+    "OVERFLOW_MODES",
+    "ConfigFormat",
+    "CONFIG_FORMATS",
+    "ContentIncludeMode",
+    "CONTENT_INCLUDE_MODES",
+    "ContentLocation",
+    "CONTENT_LOCATIONS",
+    "PrivacyMode",
     # Managers
-    'NotificationManager', 'ConfigurationManager', 'AttachmentManager',
-
+    "NotificationManager",
+    "ConfigurationManager",
+    "AttachmentManager",
     # Decorator
-    'decorators',
-
+    "decorators",
     # Logging
-    'logging', 'logger', 'LogCapture',
+    "logging",
+    "logger",
+    "LogCapture",
 ]
