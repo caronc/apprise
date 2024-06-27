@@ -32,91 +32,146 @@ from apprise import Apprise
 
 # Disable logging for a cleaner testing output
 import logging
+
 logging.disable(logging.CRITICAL)
 
 # Our Testing URLs
 apprise_url_tests = (
-    ('onesignal://', {
-        # We failed to identify any valid authentication
-        'instance': TypeError,
-    }),
-    ('onesignal://:@/', {
-        # We failed to identify any valid authentication
-        'instance': TypeError,
-    }),
-    ('onesignal://apikey/', {
-        # no app id specified
-        'instance': TypeError,
-    }),
-    ('onesignal://appid@%20%20/', {
-        # invalid apikey
-        'instance': TypeError,
-    }),
-    ('onesignal://appid@apikey/playerid/?lang=X', {
-        # invalid language id (must be 2 characters)
-        'instance': TypeError,
-    }),
-    ('onesignal://appid@apikey/', {
-        # No targets specified; we will initialize but not notify anything
-        'instance': NotifyOneSignal,
-        'notify_response': False,
-    }),
-    ('onesignal://appid@apikey/playerid', {
-        # Valid playerid
-        'instance': NotifyOneSignal,
-        'privacy_url': 'onesignal://a...d@a...y/playerid',
-    }),
-    ('onesignal://appid@apikey/player', {
-        # Valid player id
-        'instance': NotifyOneSignal,
-        # don't include an image by default
-        'include_image': False,
-    }),
-    ('onesignal://appid@apikey/@user?image=no', {
-        # Valid userid, no image
-        'instance': NotifyOneSignal,
-    }),
-    ('onesignal://appid@apikey/user@email.com/#seg/player/@user/%20/a', {
-        # Valid email, valid playerid, valid user, invalid entry (%20),
-        # and too short of an entry (a)
-        'instance': NotifyOneSignal,
-    }),
-    ('onesignal://appid@apikey?to=#segment,playerid', {
-        # Test to=
-        'instance': NotifyOneSignal,
-    }),
-    ('onesignal://appid@apikey/#segment/@user/?batch=yes', {
-        # Test batch=
-        'instance': NotifyOneSignal,
-    }),
-    ('onesignal://appid@apikey/#segment/@user/?batch=no', {
-        # Test batch=
-        'instance': NotifyOneSignal,
-    }),
-    ('onesignal://templateid:appid@apikey/playerid', {
-        # Test Template ID
-        'instance': NotifyOneSignal,
-    }),
-    ('onesignal://appid@apikey/playerid/?lang=es&subtitle=Sub', {
-        # Test Language and Subtitle Over-ride
-        'instance': NotifyOneSignal,
-    }),
-    ('onesignal://?apikey=abc&template=tp&app=123&to=playerid', {
-        # Test Kwargs
-        'instance': NotifyOneSignal,
-    }),
-    ('onesignal://appid@apikey/#segment/playerid/', {
-        'instance': NotifyOneSignal,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('onesignal://appid@apikey/#segment/playerid/', {
-        'instance': NotifyOneSignal,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
+    (
+        "onesignal://",
+        {
+            # We failed to identify any valid authentication
+            "instance": TypeError,
+        },
+    ),
+    (
+        "onesignal://:@/",
+        {
+            # We failed to identify any valid authentication
+            "instance": TypeError,
+        },
+    ),
+    (
+        "onesignal://apikey/",
+        {
+            # no app id specified
+            "instance": TypeError,
+        },
+    ),
+    (
+        "onesignal://appid@%20%20/",
+        {
+            # invalid apikey
+            "instance": TypeError,
+        },
+    ),
+    (
+        "onesignal://appid@apikey/playerid/?lang=X",
+        {
+            # invalid language id (must be 2 characters)
+            "instance": TypeError,
+        },
+    ),
+    (
+        "onesignal://appid@apikey/",
+        {
+            # No targets specified; we will initialize but not notify anything
+            "instance": NotifyOneSignal,
+            "notify_response": False,
+        },
+    ),
+    (
+        "onesignal://appid@apikey/playerid",
+        {
+            # Valid playerid
+            "instance": NotifyOneSignal,
+            "privacy_url": "onesignal://a...d@a...y/playerid",
+        },
+    ),
+    (
+        "onesignal://appid@apikey/player",
+        {
+            # Valid player id
+            "instance": NotifyOneSignal,
+            # don't include an image by default
+            "include_image": False,
+        },
+    ),
+    (
+        "onesignal://appid@apikey/@user?image=no",
+        {
+            # Valid userid, no image
+            "instance": NotifyOneSignal,
+        },
+    ),
+    (
+        "onesignal://appid@apikey/user@email.com/#seg/player/@user/%20/a",
+        {
+            # Valid email, valid playerid, valid user, invalid entry (%20),
+            # and too short of an entry (a)
+            "instance": NotifyOneSignal,
+        },
+    ),
+    (
+        "onesignal://appid@apikey?to=#segment,playerid",
+        {
+            # Test to=
+            "instance": NotifyOneSignal,
+        },
+    ),
+    (
+        "onesignal://appid@apikey/#segment/@user/?batch=yes",
+        {
+            # Test batch=
+            "instance": NotifyOneSignal,
+        },
+    ),
+    (
+        "onesignal://appid@apikey/#segment/@user/?batch=no",
+        {
+            # Test batch=
+            "instance": NotifyOneSignal,
+        },
+    ),
+    (
+        "onesignal://templateid:appid@apikey/playerid",
+        {
+            # Test Template ID
+            "instance": NotifyOneSignal,
+        },
+    ),
+    (
+        "onesignal://appid@apikey/playerid/?lang=es&subtitle=Sub",
+        {
+            # Test Language and Subtitle Over-ride
+            "instance": NotifyOneSignal,
+        },
+    ),
+    (
+        "onesignal://?apikey=abc&template=tp&app=123&to=playerid",
+        {
+            # Test Kwargs
+            "instance": NotifyOneSignal,
+        },
+    ),
+    (
+        "onesignal://appid@apikey/#segment/playerid/",
+        {
+            "instance": NotifyOneSignal,
+            # throw a bizzare code forcing us to fail to look it up
+            "response": False,
+            "requests_response_code": 999,
+        },
+    ),
+    (
+        "onesignal://appid@apikey/#segment/playerid/",
+        {
+            "instance": NotifyOneSignal,
+            # Throws a series of connection and transfer exceptions when this flag
+            # is set and tests that we gracfully handle them
+            "test_requests_exceptions": True,
+        },
+    ),
 )
 
 
@@ -136,8 +191,8 @@ def test_plugin_onesignal_edge_cases():
 
     """
     obj = Apprise.instantiate(
-        'onesignal://appid@apikey/#segment/@user/playerid/user@email.com'
-        '/?batch=yes')
+        "onesignal://appid@apikey/#segment/@user/playerid/user@email.com" "/?batch=yes"
+    )
     # Validate that it loaded okay
     assert isinstance(obj, NotifyOneSignal)
 
@@ -149,7 +204,8 @@ def test_plugin_onesignal_edge_cases():
     # Users
     #
     obj = Apprise.instantiate(
-        'onesignal://appid@apikey/@user1/@user2/@user3/@user4/?batch=yes')
+        "onesignal://appid@apikey/@user1/@user2/@user3/@user4/?batch=yes"
+    )
     assert isinstance(obj, NotifyOneSignal)
 
     # We can lump these together - no problem
@@ -157,7 +213,8 @@ def test_plugin_onesignal_edge_cases():
 
     # Same query, but no batch mode set
     obj = Apprise.instantiate(
-        'onesignal://appid@apikey/@user1/@user2/@user3/@user4/?batch=no')
+        "onesignal://appid@apikey/@user1/@user2/@user3/@user4/?batch=no"
+    )
     assert isinstance(obj, NotifyOneSignal)
 
     # Individual queries
@@ -167,7 +224,8 @@ def test_plugin_onesignal_edge_cases():
     # Segments
     #
     obj = Apprise.instantiate(
-        'onesignal://appid@apikey/#segment1/#seg2/#seg3/#seg4/?batch=yes')
+        "onesignal://appid@apikey/#segment1/#seg2/#seg3/#seg4/?batch=yes"
+    )
     assert isinstance(obj, NotifyOneSignal)
 
     # We can lump these together - no problem
@@ -175,7 +233,8 @@ def test_plugin_onesignal_edge_cases():
 
     # Same query, but no batch mode set
     obj = Apprise.instantiate(
-        'onesignal://appid@apikey/#segment1/#seg2/#seg3/#seg4/?batch=no')
+        "onesignal://appid@apikey/#segment1/#seg2/#seg3/#seg4/?batch=no"
+    )
     assert isinstance(obj, NotifyOneSignal)
 
     # Individual queries
@@ -184,16 +243,14 @@ def test_plugin_onesignal_edge_cases():
     #
     # Player ID's
     #
-    obj = Apprise.instantiate(
-        'onesignal://appid@apikey/pid1/pid2/pid3/pid4/?batch=yes')
+    obj = Apprise.instantiate("onesignal://appid@apikey/pid1/pid2/pid3/pid4/?batch=yes")
     assert isinstance(obj, NotifyOneSignal)
 
     # We can lump these together - no problem
     assert len(obj) == 1
 
     # Same query, but no batch mode set
-    obj = Apprise.instantiate(
-        'onesignal://appid@apikey/pid1/pid2/pid3/pid4/?batch=no')
+    obj = Apprise.instantiate("onesignal://appid@apikey/pid1/pid2/pid3/pid4/?batch=no")
     assert isinstance(obj, NotifyOneSignal)
 
     # Individual queries
@@ -202,9 +259,10 @@ def test_plugin_onesignal_edge_cases():
     #
     # Emails
     #
-    emails = ('abc@yahoo.ca', 'def@yahoo.ca', 'ghi@yahoo.ca', 'jkl@yahoo.ca')
+    emails = ("abc@yahoo.ca", "def@yahoo.ca", "ghi@yahoo.ca", "jkl@yahoo.ca")
     obj = Apprise.instantiate(
-        'onesignal://appid@apikey/{}/?batch=yes'.format('/'.join(emails)))
+        "onesignal://appid@apikey/{}/?batch=yes".format("/".join(emails))
+    )
     assert isinstance(obj, NotifyOneSignal)
 
     # We can lump these together - no problem
@@ -212,7 +270,8 @@ def test_plugin_onesignal_edge_cases():
 
     # Same query, but no batch mode set
     obj = Apprise.instantiate(
-        'onesignal://appid@apikey/{}/?batch=no'.format('/'.join(emails)))
+        "onesignal://appid@apikey/{}/?batch=no".format("/".join(emails))
+    )
     assert isinstance(obj, NotifyOneSignal)
 
     # Individual queries
@@ -221,25 +280,23 @@ def test_plugin_onesignal_edge_cases():
     #
     # Mixed
     #
-    emails = ('abc@yahoo.ca', 'def@yahoo.ca', 'ghi@yahoo.ca', 'jkl@yahoo.ca')
-    users = ('@user1', '@user2', '@user3', '@user4')
-    players = ('player1', 'player2', 'player3', 'player4')
-    segments = ('#seg1', '#seg2', '#seg3', '#seg4')
+    emails = ("abc@yahoo.ca", "def@yahoo.ca", "ghi@yahoo.ca", "jkl@yahoo.ca")
+    users = ("@user1", "@user2", "@user3", "@user4")
+    players = ("player1", "player2", "player3", "player4")
+    segments = ("#seg1", "#seg2", "#seg3", "#seg4")
 
-    path = '{}/{}/{}/{}'.format(
-        '/'.join(emails), '/'.join(users),
-        '/'.join(players), '/'.join(segments))
+    path = "{}/{}/{}/{}".format(
+        "/".join(emails), "/".join(users), "/".join(players), "/".join(segments)
+    )
 
-    obj = Apprise.instantiate(
-        'onesignal://appid@apikey/{}/?batch=yes'.format(path))
+    obj = Apprise.instantiate("onesignal://appid@apikey/{}/?batch=yes".format(path))
     assert isinstance(obj, NotifyOneSignal)
 
     # We can lump these together - no problem
     assert len(obj) == 4
 
     # Same query, but no batch mode set
-    obj = Apprise.instantiate(
-        'onesignal://appid@apikey/{}/?batch=no'.format(path))
+    obj = Apprise.instantiate("onesignal://appid@apikey/{}/?batch=no".format(path))
     assert isinstance(obj, NotifyOneSignal)
 
     # Individual queries
