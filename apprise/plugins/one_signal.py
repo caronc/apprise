@@ -85,7 +85,7 @@ class NotifyOneSignal(NotifyBase):
     setup_url = "https://github.com/caronc/apprise/wiki/Notify_onesignal"
 
     # Notification
-    notify_url = "https://onesignal.com/api/v1/notifications"
+    notify_url = "https://api.onesignal.com/notifications"
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_72
