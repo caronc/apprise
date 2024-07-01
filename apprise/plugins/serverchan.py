@@ -74,7 +74,7 @@ class NotifyServerChan(NotifyBase):
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'^[a-z0-9]+$', 'i'),
+            'regex': (r'^[a-z0-9-]+$', 'i'),
         },
     })
 
