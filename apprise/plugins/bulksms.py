@@ -269,7 +269,7 @@ class NotifyBulkSMS(NotifyBase):
             'to': None,
             'body': body,
             'routingGroup': self.route,
-            'encoding': BulkSMSEncoding.UNICODE \
+            'encoding': BulkSMSEncoding.UNICODE
             if self.unicode else BulkSMSEncoding.TEXT,
             # Options are NONE, ALL and ERRORS
             'deliveryReports': "ERRORS"

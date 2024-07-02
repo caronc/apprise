@@ -938,7 +938,7 @@ class NotifyLametric(NotifyBase):
                         LAMETRIC_IS_APP_TOKEN.match(results['password'])) and
 
                     # Scan for app_ flags
-                    next((f for f in results.keys() \
+                    next((f for f in results.keys()
                           if f.startswith('app_')), None) is None) \
                 else LametricMode.CLOUD
 

@@ -116,7 +116,7 @@ def test_plugin_threema():
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-@ mock.patch('requests.post')
+@mock.patch('requests.post')
 def test_plugin_threema_edge_cases(mock_post):
     """
     NotifyThreema() Edge Cases

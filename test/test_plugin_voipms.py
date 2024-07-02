@@ -170,7 +170,7 @@ def test_plugin_voipms():
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-@ mock.patch('requests.get')
+@mock.patch('requests.get')
 def test_plugin_voipms_edge_cases(mock_get):
     """
     NotifyVoipms() Edge Cases

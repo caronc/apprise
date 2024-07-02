@@ -96,7 +96,7 @@ apprise_url_tests = (
         },
 
         # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'o365://t...t:user@example.com/a...h/' \
+        'privacy_url': 'o365://t...t:user@example.com/a...h/'
                        '****/email1%40test.ca/'}),
     # test our arguments
     ('o365://_/?oauth_id={cid}&oauth_secret={secret}&tenant={tenant}'
@@ -117,7 +117,7 @@ apprise_url_tests = (
             },
 
             # Our expected url(privacy=True) startswith() response:
-            'privacy_url': 'o365://t...t:user@example.com/a...h/' \
+            'privacy_url': 'o365://t...t:user@example.com/a...h/'
                            '****/email1%40test.ca/'}),
     # Test invalid JSON (no tenant defaults to email domain)
     ('o365://{tenant}:{aid}/{cid}/{secret}/{targets}'.format(
