@@ -656,6 +656,26 @@ class NotifyNtfy(NotifyBase):
 
         return False, response
 
+    @property
+    def url_identifier(self):
+        """
+        Returns all of the identifiers that make this URL unique from
+        another simliar one. Targets or end points should never be identified
+        here.
+        """
+
+        kwargs = [
+            self.secure_protocol if self.secure else self.protocol,
+            self.host,
+            self.port if self.port else (443 if self.secure else 80),
+        ]
+
+        if self.auth == NtfyAuth.BASIC:
+            kwargs.extend([self.user, self.password])
+
+        elif self.token:  # NtfyAuth.TOKEN also
+            kwargs.append(self.token)
+
     def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.

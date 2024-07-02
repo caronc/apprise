@@ -354,6 +354,15 @@ class NotifyD7Networks(NotifyBase):
                 [NotifyD7Networks.quote(x, safe='') for x in self.targets]),
             params=NotifyD7Networks.urlencode(params))
 
+    @property
+    def url_identifier(self):
+        """
+        Returns all of the identifiers that make this URL unique from
+        another simliar one. Targets or end points should never be identified
+        here.
+        """
+        return (self.secure_protocol, self.token)
+
     def __len__(self):
         """
         Returns the number of targets associated with this notification

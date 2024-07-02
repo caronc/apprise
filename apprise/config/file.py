@@ -29,6 +29,7 @@
 import re
 import os
 from .base import ConfigBase
+from ..utils import path_decode
 from ..common import ConfigFormat
 from ..common import ContentIncludeMode
 from ..locale import gettext_lazy as _
@@ -59,7 +60,10 @@ class ConfigFile(ConfigBase):
         super().__init__(**kwargs)
 
         # Store our file path as it was set
-        self.path = os.path.abspath(os.path.expanduser(path))
+        self.path = path_decode(path)
+
+        # Track the file as it was saved
+        self.__original_path = os.path.normpath(path)
 
         # Update the config path to be relative to our file we just loaded
         self.config_path = os.path.dirname(self.path)
@@ -89,7 +93,7 @@ class ConfigFile(ConfigBase):
             params['format'] = self.config_format
 
         return 'file://{path}{params}'.format(
-            path=self.quote(self.path),
+            path=self.quote(self.__original_path),
             params='?{}'.format(self.urlencode(params)) if params else '',
         )
 

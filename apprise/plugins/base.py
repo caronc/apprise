@@ -38,7 +38,9 @@ from ..common import NotifyFormat
 from ..common import NOTIFY_FORMATS
 from ..common import OverflowMode
 from ..common import OVERFLOW_MODES
+from ..common import PersistentStoreMode
 from ..locale import gettext_lazy as _
+from ..persistent_store import PersistentStore
 from ..apprise_attachment import AppriseAttachment
 
 
@@ -135,6 +137,10 @@ class NotifyBase(URLBase):
 
     # Default Overflow Mode
     overflow_mode = OverflowMode.UPSTREAM
+
+    # Our default is to no not use persistent storage beyond in-memory
+    # reference
+    storage_mode = PersistentStoreMode.MEMORY
 
     # Default Emoji Interpretation
     interpret_emojis = False
@@ -267,6 +273,9 @@ class NotifyBase(URLBase):
         # If asset emoji value is set to a default of False, then all emoji's
         # are turned off (no user over-rides allowed)
         #
+
+        # Our Persistent Storage object is initialized on demand
+        self.__store = None
 
         # Take a default
         self.interpret_emojis = self.asset.interpret_emojis
@@ -798,3 +807,28 @@ class NotifyBase(URLBase):
         should return the same set of results that parse_url() does.
         """
         return None
+
+    @property
+    def store(self):
+        """
+        Returns a pointer to our persistent store for use.
+
+          The best use cases are:
+           self.store.get('key')
+           self.store.set('key', 'value')
+
+          You can also access the keys this way:
+           self.store['key']
+
+          And clear them:
+           del self.store['key']
+
+        """
+        if self.__store is None:
+            # Initialize our persistent store for use
+            self.__store = PersistentStore(
+                namespace=self.url_id(),
+                path=self.asset.storage_path,
+                mode=self.asset.storage_mode)
+
+        return self.__store

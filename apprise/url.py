@@ -26,9 +26,11 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import sys
 import re
 from .logger import logger
 import time
+import hashlib
 from datetime import datetime
 from xml.sax.saxutils import escape as sax_escape
 
@@ -103,6 +105,19 @@ class URLBase:
     # server to send a response.
     socket_read_timeout = 4.0
 
+    # A salt value to help force a common Apprise URL to appear more unique
+    # than an alike one with the exact same credentials. This object must be
+    # an encoded byte object. This ties into the url_id() calculations
+    url_identifier_salt = b''
+
+    # provide the information required to allow for unique id generation when
+    # calling url_id()
+    url_identifier = None
+
+    # Tracks the last generated url_id() to prevent regeneration; initializes
+    # to False and is set thereafter
+    __url_identifier = False
+
     # Handle
     # Maintain a set of tags to associate with this specific notification
     tags = set()
@@ -166,6 +181,20 @@ class URLBase:
             # different value.
             '_lookup_default': 'socket_connect_timeout',
         },
+        'salt': {
+            'name': _('Unique URL Identifier Salt'),
+            'type': 'string',
+            # Provide a default
+            'default': '',
+            # look up default using the following parent class value at
+            # runtime. The variable name identified here (in this case
+            # socket_connect_timeout) is checked and it's result is placed
+            # over-top of  the 'default'. This is done because once a parent
+            # class inherits this one, the overflow_mode already set as a
+            # default 'could' be potentially over-ridden and changed to a
+            # different value.
+            '_lookup_default': 'url_identifier_salt',
+        },
     }
 
     # kwargs are dynamically built because a prefix causes us to parse the
@@ -185,6 +214,8 @@ class URLBase:
 
     template_kwargs = {}
 
+    # Internal Values
+
     def __init__(self, asset=None, **kwargs):
         """
         Initialize some general logging and common server arguments that will
@@ -199,15 +230,14 @@ class URLBase:
         # Certificate Verification (for SSL calls); default to being enabled
         self.verify_certificate = parse_bool(kwargs.get('verify', True))
 
+        # Schema
+        self.schema = kwargs.get('schema', 'unknown').lower()
+
         # Secure Mode
         self.secure = kwargs.get('secure', None)
-        try:
-            if not isinstance(self.secure, bool):
-                # Attempt to detect
-                self.secure = kwargs.get('schema', '')[-1].lower() == 's'
-
-        except (TypeError, IndexError):
-            self.secure = False
+        if not isinstance(self.secure, bool):
+            # Attempt to detect
+            self.secure = self.schema[-1:] == 's'
 
         self.host = URLBase.unquote(kwargs.get('host'))
         self.port = kwargs.get('port')
@@ -253,6 +283,21 @@ class URLBase:
                 self.logger.warning(
                     'Invalid socket connect timeout (cto) was specified {}'
                     .format(kwargs.get('cto')))
+
+        if 'salt' in kwargs:
+            try:
+                self.url_identifier_salt = \
+                    kwargs.get('salt').encode(self.asset.encoding)
+
+            except (UnicodeEncodeError, TypeError, ValueError):
+                self.logger.warning(
+                    'Invalid Unique URL Identifier Salt value (salt) was '
+                    'specified {}'.format(kwargs.get('salt')))
+
+        # Store our Timeout Variables
+        if 'cache' in kwargs and not parse_bool(kwargs.get('cache', True)):
+            # Enforce the disabling of cache (ortherwise defaults are use)
+            self.__url_identifier = False
 
         if 'tag' in kwargs:
             # We want to associate some tags with our notification service.
@@ -334,7 +379,7 @@ class URLBase:
 
         default_port = 443 if self.secure else 80
 
-        return '{schema}://{auth}{hostname}{port}{fullpath}?{params}'.format(
+        return '{schema}://{auth}{hostname}{port}{fullpath}{params}'.format(
             schema='https' if self.secure else 'http',
             auth=auth,
             # never encode hostname since we're expecting it to be a valid one
@@ -343,8 +388,116 @@ class URLBase:
                  else ':{}'.format(self.port),
             fullpath=URLBase.quote(self.fullpath, safe='/')
             if self.fullpath else '/',
-            params=URLBase.urlencode(params),
+            params=('?' + URLBase.urlencode(params) if params else ''),
         )
+
+    def url_id(self, lazy=True, hash_engine=hashlib.sha1):
+        """
+        Returns a unique URL identifier that representing the Apprise URL
+        itself. The url_id is always a sha1 string or None if it can't
+        be generated.
+
+        The idea is to only build the ID based on the credentials or specific
+        elements relative to the URL itself. The URL ID should never factor in
+        (or else it's a bug) the following:
+          - any targets defined
+          - all GET parameters options with the exception of:
+             - salt      : explicitly specifying a unique constraint to create
+                          a Unique URL ID Salt (salt) for the URL in question.
+
+             GET parameters like ?image=false&avatar=no should have no bearing
+             in the uniqueness of the Apprise URL Identifier.
+
+             Consider plugins where some get parameters completely change
+             how the entire upstream comunication works such as slack:// and
+             matrix:// which has a mode. In these circumstances, they should
+             be considered in he unique generation.
+
+        The intention of this function is to help align Apprise URLs that are
+        common with one another and therefore can share the same persistent
+        storage even when subtle changes are made to them.
+
+        In the event you defined 2 exactly same URLs and you intentionally
+        want the to use a completely different persistent storage location,
+        adding salt=<anything> to your GET parameter list is all that is
+        required.
+
+        Hence the following would all return the same URL Identifier:
+             json://abc/def/ghi?image=no
+             json://abc/def/ghi/?test=yes&image=yes
+
+        """
+
+        if lazy and self.__url_identifier is not False:
+            return self.__url_identifier
+
+        # Python v3.9 introduces usedforsecurity argument
+        kwargs = {'usedforsecurity': False} \
+            if sys.version_info >= (3, 9) else {}
+
+        if self.url_identifier is False:
+            # Disabled
+            self.__url_identifier = None
+
+        elif self.url_identifier in (None, True):
+
+            # Prepare our object
+            engine = hash_engine(
+                self.url_identifier_salt + self.schema.encode(
+                    self.asset.encoding), **kwargs)
+
+            # We want to treat `None` differently then a blank entry
+            engine.update(
+                b'\0' if self.password is None
+                else self.password.encode(self.asset.encoding))
+            engine.update(
+                b'\0' if self.user is None
+                else self.user.encode(self.asset.encoding))
+            engine.update(
+                b'\0' if not self.host
+                else self.host.encode(self.asset.encoding))
+            engine.update(
+                b'\0' if self.port is None
+                else f'{self.port}'.encode(self.asset.encoding))
+            engine.update(
+                self.fullpath.rstrip('/').encode(self.asset.encoding))
+            engine.update(b's' if self.secure else b'i')
+
+            # Save our generated content
+            self.__url_identifier = engine.hexdigest()
+
+        elif isinstance(self.url_identifier, str):
+            self.__url_identifier = hash_engine(
+                self.url_identifier_salt + self.url_identifier.encode(
+                    self.asset.encoding), **kwargs).hexdigest()
+
+        elif isinstance(self.url_identifier, bytes):
+            self.__url_identifier = hash_engine(
+                self.url_identifier_salt + self.url_identifier,
+                **kwargs).hexdigest()
+
+        elif isinstance(self.url_identifier, (list, tuple, set)):
+            self.__url_identifier = hash_engine(
+                self.url_identifier_salt + b''.join([
+                    (x if isinstance(x, bytes)
+                     else str(x).encode(self.asset.encoding))
+                    for x in self.url_identifier]), **kwargs).hexdigest()
+
+        elif isinstance(self.url_identifier, dict):
+            self.__url_identifier = hash_engine(
+                self.url_identifier_salt + b''.join([
+                    (x if isinstance(x, bytes)
+                     else str(x).encode(self.asset.encoding))
+                    for x in self.url_identifier.values()]),
+                **kwargs).hexdigest()
+
+        else:
+            self.__url_identifier = hash_engine(
+                self.url_identifier_salt + str(
+                    self.url_identifier).encode(self.asset.encoding),
+                **kwargs).hexdigest()
+
+        return self.__url_identifier
 
     def __contains__(self, tags):
         """
@@ -660,14 +813,32 @@ class URLBase:
         this class.
         """
 
-        return {
-            # The socket read timeout
-            'rto': str(self.socket_read_timeout),
-            # The request/socket connect timeout
-            'cto': str(self.socket_connect_timeout),
-            # Certificate verification
-            'verify': 'yes' if self.verify_certificate else 'no',
-        }
+        # parameters are only provided on demand to keep the URL short
+        params = {}
+
+        # The socket read timeout
+        if self.socket_read_timeout != URLBase.socket_read_timeout:
+            params['rto'] = str(self.socket_read_timeout)
+
+        # The request/socket connect timeout
+        if self.socket_connect_timeout != URLBase.socket_connect_timeout:
+            params['cto'] = str(self.socket_connect_timeout)
+
+        # Certificate verification
+        if self.verify_certificate != URLBase.verify_certificate:
+            params['verify'] = 'yes' if self.verify_certificate else 'no'
+
+        # Persistent Data Salt
+        if self.url_identifier_salt != URLBase.url_identifier_salt:
+            try:
+                params['salt'] = \
+                    self.url_identifier_salt.decode(self.asset.encoding)
+
+            except UnicodeDecodeError:
+                # Bad data; don't pass it along
+                pass
+
+        return params
 
     @staticmethod
     def post_process_parse_url_results(results):
@@ -728,6 +899,10 @@ class URLBase:
                 if presults:
                     # Store our Password
                     results['password'] = presults['user']
+
+            # Store our URL ID as a byte
+            if 'salt' in results['qsd']:
+                results['salt'] = results['qsd']['salt']
 
             # Store our socket read timeout if specified
             if 'rto' in results['qsd']:
