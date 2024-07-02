@@ -223,7 +223,7 @@ class PluginManager(metaclass=Singleton):
                     if not hasattr(plugin, 'app_id'):
                         # Filter out non-notification modules
                         logger.trace(
-                            "(%s) import failed; no app_id defined in %s",
+                            "(%s.%s) import failed; no app_id defined in %s",
                             self.name, m_class, os.path.join(module_path, f))
                         continue
 
