@@ -376,7 +376,7 @@ def test_plugin_sns_aws_topic_handling(mock_post):
         # Multi-Topic
         'sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnl/us-east-1/TopicA/TopicB/'
         # Topic-Mix
-        'sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkce/us-west-2/' \
+        'sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkce/us-west-2/'
         '12223334444/TopicA'])
 
     # CreateTopic fails

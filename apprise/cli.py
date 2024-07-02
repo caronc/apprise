@@ -121,7 +121,7 @@ if platform.system() == 'Windows':
         # Global Support
         #
 
-        # C:\ProgramData\Apprise\
+        # C:\ProgramData\Apprise
         expandvars('%ALLUSERSPROFILE%\\Apprise\\apprise'),
         expandvars('%ALLUSERSPROFILE%\\Apprise\\apprise.conf'),
         expandvars('%ALLUSERSPROFILE%\\Apprise\\apprise.yml'),
