@@ -27,9 +27,11 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import requests
-
+from unittest import mock
 from apprise.plugins.notifiarr import NotifyNotifiarr
 from helpers import AppriseURLTester
+from json import loads
+from inspect import cleandoc
 
 # Disable logging for a cleaner testing output
 import logging
@@ -51,12 +53,6 @@ apprise_url_tests = (
 
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'notifiarr://a...y',
-    }),
-    ('notifiarr://apikey/1234/?discord_user=invalid', {
-        'instance': TypeError,
-    }),
-    ('notifiarr://apikey/1234/?discord_role=invalid', {
-        'instance': TypeError,
     }),
     ('notifiarr://apikey/1234/?event=invalid', {
         'instance': TypeError,
@@ -131,11 +127,6 @@ apprise_url_tests = (
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'notifiarr://m...y/#123/#325',
     }),
-    ('notifiarr://12/?key=myapikey&discord_user=23'
-     '&discord_role=12&event=123', {
-         'instance': NotifyNotifiarr,
-         # Our expected url(privacy=True) startswith() response:
-         'privacy_url': 'notifiarr://m...y/#12'}),
     ('notifiarr://apikey/123/', {
         'instance': NotifyNotifiarr,
     }),
@@ -160,7 +151,7 @@ apprise_url_tests = (
 )
 
 
-def test_plugin_custom_notifiarr_urls():
+def test_plugin_notifiarr_urls():
     """
     NotifyNotifiarr() Apprise URLs
 
@@ -168,3 +159,64 @@ def test_plugin_custom_notifiarr_urls():
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+@mock.patch('requests.post')
+def test_plugin_notifiarr_notifications(mock_post):
+    """
+    NotifyNotifiarr() Notifications/Ping Support
+
+    """
+
+    # Test our header parsing when not lead with a header
+    body = cleandoc("""
+    # Heading
+    @everyone and @admin, wake and meet our new user <@123> and <@987>;
+    Attention Roles: <@&456> and <@&765>
+     """)
+
+    # Prepare a good response
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+
+    # Prepare Mock return object
+    mock_post.return_value = response
+
+    results = NotifyNotifiarr.parse_url('notifiarr://apikey/12345')
+
+    instance = NotifyNotifiarr(**results)
+    assert isinstance(instance, NotifyNotifiarr)
+
+    response = instance.send(body=body)
+    assert response is True
+    assert mock_post.call_count == 1
+
+    details = mock_post.call_args_list[0]
+    assert details[0][0] == \
+        'https://notifiarr.com/api/v1/notification/apprise'
+
+    payload = loads(details[1]['data'])
+
+    # First role and first user stored
+    assert payload == {
+        'source': 'Apprise',
+        'type': 'info',
+        'notification': {'update': False, 'name': 'Apprise', 'event': ''},
+        'discord': {
+            'color': '#3AA3E3', 'ping': {
+                # Only supports 1 entry each; so first one is parsed
+                'pingUser': '123',
+                'pingRole': '456',
+            },
+            'text': {
+                'title': '',
+                'content': '👉 @everyone @admin <@123> <@987> <@&456> <@&765>',
+                'description':
+                    '# Heading\n@everyone and @admin, wake and meet our new '
+                    'user <@123> and <@987>;\nAttention Roles: <@&456> and '
+                    '<@&765>\n ',
+                    'footer': 'Apprise Notifications',
+            },
+            'ids': {'channel': 12345},
+        },
+    }
