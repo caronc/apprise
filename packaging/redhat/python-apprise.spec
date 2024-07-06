@@ -61,25 +61,6 @@ Summary:        A simple wrapper to many popular notification services used toda
 License:        BSD
 URL:            https://github.com/caronc/%{pypi_name}
 Source0:        %{url}/archive/v%{version}/%{pypi_name}-%{version}.tar.gz
-
-# RHEL/Rocky 8 ship with Click v6.7 which does not support the .stdout
-# directive used in the unit testing.  This patch just makes it so our package
-# continues to be compatible with these linux distributions
-Patch0:         %{pypi_name}-click67-support.patch
-
-# RHEL/Rocky 8 ship with Pytest v3.4.2 which does not support the
-# session_mocker fixture.  This patch removes the session_mocker
-# Patch thanks to Andreas Motl and his PR:
-#   - https://github.com/caronc/apprise/pull/763
-Patch1:         %{pypi_name}-pytest-session_mocker-removal.patch
-
-# RHEL/Rocky 8 ship with Pytest v3.4.2 which does not support the
-# tmp_path fixture.  This patch removes the macos testing as it
-# leverages this unavailabe fixture.
-# At the end of the day, the macos testing it is not needed by a
-# RHEL/Fedora environment anyway for obvious reasons.
-Patch2:         %{pypi_name}-no-macosx-testing.patch
-
 BuildArch:      noarch
 
 %description %{common_description}
@@ -119,18 +100,7 @@ Requires: python%{python3_pkgversion}-certifi
 Requires: python%{python3_pkgversion}-yaml
 Recommends: python%{python3_pkgversion}-paho-mqtt
 
-%if 0%{?rhel} && 0%{?rhel} <= 8
-BuildRequires: python%{python3_pkgversion}-dataclasses
-Requires: python%{python3_pkgversion}-dataclasses
-%endif
-
 %if %{with tests}
-%if 0%{?rhel} >= 9
-# Do not import python3-mock
-%else
-# python-mock switched to unittest.mock
-BuildRequires: python%{python3_pkgversion}-mock
-%endif
 BuildRequires: python%{python3_pkgversion}-pytest
 BuildRequires: python%{python3_pkgversion}-pytest-mock
 BuildRequires: python%{python3_pkgversion}-pytest-runner
@@ -142,14 +112,6 @@ BuildRequires: python%{python3_pkgversion}-pytest-xdist
 
 %prep
 %setup -q -n %{pypi_name}-%{version}
-%if 0%{?rhel} && 0%{?rhel} <= 8
-# Rocky/RHEL 8 click v6.7 unit testing support
-%patch0 -p1
-# Rocky/RHEL 8 Drop session_mocker support
-%patch1 -p1
-# Rocky/RHEL 8 Lose MacOSX Testing
-%patch2 -p1
-%endif
 
 # 2023.08.27: This test fails for some uknown reason only during the test
 # section of this RPM, but works completley fine under all other circumstances.
@@ -160,14 +122,6 @@ BuildRequires: python%{python3_pkgversion}-pytest-xdist
 # 2023.08.27: rawhide does not install translationfiles for some reason
 # at this time; remove failing test until this is resolved
 %{__rm} test/test_apprise_translations.py
-
-%if 0%{?rhel} >= 9
-# Do nothing
-%else
-# CentOS 8.x requires python-mock (cororlates with import ab)ve
-find test -type f -name '*.py' -exec \
-   sed -i -e 's|^from unittest import mock|import mock|g' {} \;
-%endif
 
 %build
 %py3_build

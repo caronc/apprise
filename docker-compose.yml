@@ -1,12 +1,5 @@
 version: "3.3"
 services:
-  test.py36:
-    build:
-      context: .
-      dockerfile: Dockerfile.py36
-    volumes:
-      - ./:/apprise
-
   test.py310:
     build:
       context: .
@@ -75,20 +68,20 @@ services:
 # Other Testing
 #
 # Connect to web and create a new project using the manage script
-# -> docker-compose run --rm test.py36 bash
+# -> docker-compose run --rm test.py311 bash
 # bin/apprise -
 # bin/checkdone.sh
 #
 # Run a set of tests for just a certain section
-#  docker-compose run --rm test.py36 bin/test.sh fcm
+#  docker-compose run --rm test.py311 bin/test.sh fcm
 #
-# Or just run all the tests in python 3.6
-#  docker-compose run --rm test.py36 bin/test.sh
+# Or just run all the tests in python 3.11
+#  docker-compose run --rm test.py311 bin/test.sh
 #
 # Want to run the whole test suite:
 #
 # [ -f .coverage ] && rm -f .coverage
-# docker-compose run --rm test.py36 coverage run --append -m pytest -vv
+# docker-compose run --rm test.py311 coverage run --append -m pytest -vv
 # docker-compose run --rm test.py310 coverage run --append -m pytest -vv
 #
 # # Now produce a report
@@ -98,8 +91,6 @@ services:
 # RPM Building
 #
 
-# el8
-#  - docker-compose run --rm rpmbuild.el8 build-rpm.sh
 # el9
 #  - docker-compose run --rm rpmbuild.el9 build-rpm.sh
 # f39 (Fedora)
