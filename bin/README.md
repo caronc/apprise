@@ -52,9 +52,6 @@ export PATH="$(pwd)/bin:$PATH"
 
 Apprise is also packaged for Redhat/Fedora as an RPM. To verify this processs works correctly an additional tool called `build-rpm.sh` is provided.  It's best tested using the Docker environments:
    ```bash
-   # To test with el8; do the following:
-   docker-compose run --rm rpmbuild.el8 build-rpm.sh
-
    # To test with el9; do the following:
    docker-compose run --rm rpmbuild.el9 build-rpm.sh
 

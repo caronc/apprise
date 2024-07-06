@@ -1523,7 +1523,7 @@ def environ(*remove, **update):
             locale.setlocale(locale.LC_ALL, loc_orig)
 
         except locale.Error:
-            # Thrown in py3.6
+            # Handle this case
             pass
 
 
