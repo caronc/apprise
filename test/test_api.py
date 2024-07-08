@@ -41,6 +41,7 @@ from os.path import join
 from apprise import Apprise
 from apprise import AppriseAsset
 from apprise import AppriseAttachment
+from apprise import NOT_REQUIRED
 from apprise import NotifyBase
 from apprise import NotifyType
 from apprise import NotifyFormat
@@ -297,6 +298,14 @@ def apprise_test(do_notify):
     assert do_notify(a, title=None, body=None) is False
     assert do_notify(a, title="", body=None) is False
     assert do_notify(a, title=None, body="") is False
+    # By default, most services do not support explicit NOT_REQUIRED in the body or title
+    assert do_notify(a, title=None, body=NOT_REQUIRED) is False
+    assert do_notify(a, title="a", body=NOT_REQUIRED) is False
+    assert do_notify(a, title="", body=NOT_REQUIRED) is False
+    assert do_notify(a, title=NOT_REQUIRED, body=None) is False
+    assert do_notify(a, title=NOT_REQUIRED, body="a") is False
+    assert do_notify(a, title=NOT_REQUIRED, body="") is False
+    assert do_notify(a, title=NOT_REQUIRED, body=NOT_REQUIRED) is False
 
     assert do_notify(a, title=5, body=b"bytes") is False
     assert do_notify(a, title=b"bytes", body=10) is False
