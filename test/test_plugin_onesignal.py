@@ -26,9 +26,13 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from unittest import mock
+import requests
+
 from apprise.plugins.one_signal import NotifyOneSignal
 from helpers import AppriseURLTester
 from apprise import Apprise
+from apprise import NOT_REQUIRED
 
 # Disable logging for a cleaner testing output
 import logging
@@ -315,3 +319,31 @@ def test_plugin_onesignal_edge_cases():
 
     # Individual queries
     assert len(obj) == 16
+
+
+@mock.patch("requests.post")
+def test_plugin_onesignal_not_required(mock_post):
+    mock_post.return_value.status_code = requests.codes.ok
+    a = Apprise()
+    # Test with template first, if passing NOT_REQUIRED should succeed
+    a.add("onesignal://template_id:app_id@access_token/account_id")
+    assert a.notify(title=NOT_REQUIRED, body=NOT_REQUIRED) is True
+    assert a.notify(title=NOT_REQUIRED, body="a") is True
+    assert a.notify(title="a", body=NOT_REQUIRED) is True
+    assert a.notify(title="a", body="b") is True
+    # Check old behaviour: success if title is not provided and body is not required
+    assert a.notify(title="", body=NOT_REQUIRED) is True
+    assert a.notify(title=None, body=NOT_REQUIRED) is True
+    # Fails because of no body provided
+    assert a.notify(title=NOT_REQUIRED, body="") is False
+    assert a.notify(title=NOT_REQUIRED, body=None) is False
+
+    a = Apprise()
+    # Test without template
+    a.add("onesignal://app_id@access_token/account_id")
+    # Fails because something is not provided but expected because there is not template_id
+    assert a.notify(title=NOT_REQUIRED, body=NOT_REQUIRED) is False
+    assert a.notify(title=NOT_REQUIRED, body="a") is False
+    assert a.notify(title="a", body=NOT_REQUIRED) is False
+    # Succeeds because both are provided
+    assert a.notify(title="a", body="b") is True
