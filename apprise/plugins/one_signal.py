@@ -192,6 +192,9 @@ class NotifyOneSignal(NotifyBase):
         },
     }
 
+    body_required = False
+    title_required = False
+
     def __init__(
         self,
         app,
@@ -313,6 +316,16 @@ class NotifyOneSignal(NotifyBase):
         """
         Perform OneSignal Notification
         """
+
+        if not self.template_id:
+            if title is NOT_REQUIRED:
+                raise ValueError(
+                    "Title is required for OneSignal notifications, if there is no template id provided"
+                )
+            if body is NOT_REQUIRED:
+                raise ValueError(
+                    "Body is required for OneSignal notifications, if there is no template id provided"
+                )
 
         headers = {
             "User-Agent": self.app_id,

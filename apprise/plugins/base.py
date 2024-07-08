@@ -248,6 +248,9 @@ class NotifyBase(URLBase):
     #  restrictions and that of body_maxlen
     overflow_amalgamate_title = False
 
+    body_required = True
+    title_required = True
+
     def __init__(self, **kwargs):
         """
         Initialize some general configuration that will keep things consistent
@@ -528,6 +531,11 @@ class NotifyBase(URLBase):
         """
 
         response = list()
+
+        if title is NOT_REQUIRED and self.__class__.title_required:
+            raise TypeError("Title is required")
+        if body is NOT_REQUIRED and self.__class__.body_required:
+            raise TypeError("Body is required")
 
         # tidy
         if title is not NOT_REQUIRED:
