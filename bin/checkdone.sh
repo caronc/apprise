@@ -70,7 +70,7 @@ which coverage &>/dev/null
    exit 1
 
 echo "Performing PEP8 check..."
-LANG=C.UTF-8 PYTHONPATH=$PYTHONPATH flake8 . --show-source --statistics
+LANG=C.UTF-8 PYTHONPATH=$PYTHONPATH flake8 apprise --show-source --statistics
 if [ $? -ne 0 ]; then
    echo "PEP8 check failed"
    exit 1
