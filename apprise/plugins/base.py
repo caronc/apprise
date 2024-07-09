@@ -171,10 +171,11 @@ class NotifyBase(URLBase):
                 "default": overflow_mode,
                 # look up default using the following parent class value at
                 # runtime. The variable name identified here (in this case
-                # overflow_mode) is checked and it's result is placed over-top of
-                # the 'default'. This is done because once a parent class inherits
-                # this one, the overflow_mode already set as a default 'could' be
-                # potentially over-ridden and changed to a different value.
+                # overflow_mode) is checked and it's result is placed over-top
+                # of the 'default'. This is done because once a parent class
+                # inherits this one, the overflow_mode already set as a default
+                # 'could' be potentially over-ridden and changed.
+                # to a different value
                 "_lookup_default": "overflow_mode",
             },
             "format": {
@@ -308,7 +309,9 @@ class NotifyBase(URLBase):
             # Provide override
             self.overflow_mode = overflow
 
-    def image_url(self, notify_type, logo=False, extension=None, image_size=None):
+    def image_url(
+        self, notify_type, logo=False, extension=None, image_size=None
+    ):
         """
         Returns Image URL if possible
         """
@@ -474,7 +477,8 @@ class NotifyBase(URLBase):
             # attachments, there is nothing further to do here, just move
             # along.
             msg = (
-                f"{self.service_name} does not support attachments; " " service skipped"
+                f"{self.service_name} does not support attachments; "
+                " service skipped"
             )
             self.logger.warning(msg)
             raise TypeError(msg)
@@ -509,7 +513,9 @@ class NotifyBase(URLBase):
                 body_format=body_format,
             )
 
-    def _apply_overflow(self, body, title=None, overflow=None, body_format=None):
+    def _apply_overflow(
+        self, body, title=None, overflow=None, body_format=None
+    ):
         """
         Takes the message body and title as input.  This function then
         applies any defined overflow restrictions associated with the
@@ -550,11 +556,14 @@ class NotifyBase(URLBase):
         if self.title_maxlen <= 0 and len(title) > 0:
             if self.notify_format == NotifyFormat.HTML:
                 # Content is appended to body as html
-                body = "<{open_tag}>{title}</{close_tag}>" "<br />\r\n{body}".format(
-                    open_tag=self.default_html_tag_id,
-                    title=title,
-                    close_tag=self.default_html_tag_id,
-                    body=body,
+                body = (
+                    "<{open_tag}>{title}</{close_tag}>"
+                    "<br />\r\n{body}".format(
+                        open_tag=self.default_html_tag_id,
+                        title=title,
+                        close_tag=self.default_html_tag_id,
+                        body=body,
+                    )
                 )
 
             elif (
@@ -619,7 +628,9 @@ class NotifyBase(URLBase):
             and (self.body_maxlen - overflow_buffer) >= title_maxlen
         ):
             body_maxlen = (
-                self.body_maxlen if not title else (self.body_maxlen - title_maxlen)
+                self.body_maxlen
+                if not title
+                else (self.body_maxlen - title_maxlen)
             ) - overflow_buffer
         else:
             # status quo
@@ -673,17 +684,20 @@ class NotifyBase(URLBase):
                 and (
                     (
                         self.overflow_amalgamate_title
-                        and body_maxlen >= self.overflow_display_count_threshold
+                        and body_maxlen
+                        >= self.overflow_display_count_threshold
                     )
                     or (
                         not self.overflow_amalgamate_title
-                        and title_maxlen > self.overflow_display_count_threshold
+                        and title_maxlen
+                        > self.overflow_display_count_threshold
                     )
                 )
                 and (
                     title_maxlen
                     > (self.overflow_max_display_count_width + overflow_buffer)
-                    and self.title_maxlen >= self.overflow_display_count_threshold
+                    and self.title_maxlen
+                    >= self.overflow_display_count_threshold
                 )
             )
 
@@ -707,20 +721,31 @@ class NotifyBase(URLBase):
                     overflow_display_count_width
                     <= self.overflow_max_display_count_width
                 ):
-                    if len(title) > title_maxlen - overflow_display_count_width:
+                    if (
+                        len(title)
+                        > title_maxlen - overflow_display_count_width
+                    ):
                         # Truncate our title further
-                        title = title[: title_maxlen - overflow_display_count_width]
+                        title = title[
+                            : title_maxlen - overflow_display_count_width
+                        ]
 
                 else:  # Way to many messages to display
                     show_counter = False
 
             response = [
                 {
-                    "body": body[i : i + body_maxlen].lstrip("\r\n\x0b\x0c").rstrip(),
+                    "body": body[i : i + body_maxlen]
+                    .lstrip("\r\n\x0b\x0c")
+                    .rstrip(),
                     "title": title
-                    + ("" if not show_counter else template.format(idx, count)),
+                    + (
+                        "" if not show_counter else template.format(idx, count)
+                    ),
                 }
-                for idx, i in enumerate(range(0, len(body), body_maxlen), start=1)
+                for idx, i in enumerate(
+                    range(0, len(body), body_maxlen), start=1
+                )
             ]
 
         else:  # Display title once and move on
@@ -774,7 +799,9 @@ class NotifyBase(URLBase):
         Should preform the actual notification itself.
 
         """
-        raise NotImplementedError("send() is not implimented by the child class.")
+        raise NotImplementedError(
+            "send() is not implimented by the child class."
+        )
 
     def url_parameters(self, *args, **kwargs):
         """
@@ -834,7 +861,9 @@ class NotifyBase(URLBase):
             results["overflow"] = results["qsd"].get("overflow")
             if results["overflow"] not in OVERFLOW_MODES:
                 URLBase.logger.warning(
-                    "Unsupported overflow specified {}".format(results["overflow"])
+                    "Unsupported overflow specified {}".format(
+                        results["overflow"]
+                    )
                 )
                 del results["overflow"]
 

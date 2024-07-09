@@ -217,15 +217,18 @@ class NotifyOneSignal(NotifyBase):
         # The apikey associated with the account
         self.apikey = validate_regex(apikey)
         if not self.apikey:
-            msg = "An invalid OneSignal API key " "({}) was specified.".format(apikey)
+            msg = "An invalid OneSignal API key " "({}) was specified.".format(
+                apikey
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # The App ID associated with the account
         self.app = validate_regex(app)
         if not self.app:
-            msg = "An invalid OneSignal Application ID " "({}) was specified.".format(
-                app
+            msg = (
+                "An invalid OneSignal Application ID "
+                "({}) was specified.".format(app)
             )
             self.logger.warning(msg)
             raise TypeError(msg)
@@ -248,7 +251,9 @@ class NotifyOneSignal(NotifyBase):
         self.template_id = template
 
         # Now our dynamic template data (if defined)
-        self.template_data = template_data if isinstance(template_data, dict) else {}
+        self.template_data = (
+            template_data if isinstance(template_data, dict) else {}
+        )
 
         # Assign our subtitle (if defined)
         self.subtitle = subtitle
@@ -261,7 +266,9 @@ class NotifyOneSignal(NotifyBase):
         )
 
         if not self.language or len(self.language) != 2:
-            msg = "An invalid OneSignal Language ({}) was specified.".format(language)
+            msg = "An invalid OneSignal Language ({}) was specified.".format(
+                language
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -296,7 +303,9 @@ class NotifyOneSignal(NotifyBase):
 
             result = is_email(target)
             if result:
-                self.targets[OneSignalCategory.EMAIL].append(result["full_email"])
+                self.targets[OneSignalCategory.EMAIL].append(
+                    result["full_email"]
+                )
                 self.logger.debug(
                     "Detected OneSignal Email: %s"
                     % self.targets[OneSignalCategory.EMAIL][-1]
@@ -320,11 +329,13 @@ class NotifyOneSignal(NotifyBase):
         if not self.template_id:
             if title is NOT_REQUIRED:
                 raise ValueError(
-                    "Title is required for OneSignal notifications, if there is no template id provided"
+                    "Title is required for OneSignal notifications, "
+                    "if there is no template id provided"
                 )
             if body is NOT_REQUIRED:
                 raise ValueError(
-                    "Body is required for OneSignal notifications, if there is no template id provided"
+                    "Body is required for OneSignal notifications, "
+                    "if there is no template id provided"
                 )
 
         headers = {
@@ -346,7 +357,9 @@ class NotifyOneSignal(NotifyBase):
             "content_available": True,
         }
         if title is not NOT_REQUIRED:
-            payload["headings"] = {self.language: title if title else self.app_desc}
+            payload["headings"] = {
+                self.language: title if title else self.app_desc
+            }
         if body is not NOT_REQUIRED:
             payload["contents"] = {self.language: body}
 
@@ -366,7 +379,9 @@ class NotifyOneSignal(NotifyBase):
             payload["custom_data"] = self.template_data
 
         # Acquire our large_icon image URL (if set)
-        image_url = None if not self.include_image else self.image_url(notify_type)
+        image_url = (
+            None if not self.include_image else self.image_url(notify_type)
+        )
         if image_url:
             payload["large_icon"] = image_url
 
@@ -419,7 +434,9 @@ class NotifyOneSignal(NotifyBase):
                         self.logger.warning(
                             "Failed to send OneSignal notification: "
                             "{}{}error={}.".format(
-                                status_str, ", " if status_str else "", r.status_code
+                                status_str,
+                                ", " if status_str else "",
+                                r.status_code,
                             )
                         )
 
@@ -432,7 +449,8 @@ class NotifyOneSignal(NotifyBase):
 
                 except requests.RequestException as e:
                     self.logger.warning(
-                        "A Connection error occurred sending OneSignal " "notification."
+                        "A Connection error occurred sending OneSignal "
+                        "notification."
                     )
                     self.logger.debug("Socket Exception: %s", str(e))
 
@@ -461,13 +479,17 @@ class NotifyOneSignal(NotifyBase):
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Append our template_data into our parameter list
-        params.update({"+{}".format(k): v for k, v in self.template_data.items()})
+        params.update(
+            {"+{}".format(k): v for k, v in self.template_data.items()}
+        )
 
         return "{schema}://{tp_id}{app}@{apikey}/{targets}?{params}".format(
             schema=self.secure_protocol,
-            tp_id="{}:".format(self.pprint(self.template_id, privacy, safe=""))
-            if self.template_id
-            else "",
+            tp_id=(
+                "{}:".format(self.pprint(self.template_id, privacy, safe=""))
+                if self.template_id
+                else ""
+            ),
             app=self.pprint(self.app, privacy, safe=""),
             apikey=self.pprint(self.apikey, privacy, safe=""),
             targets="/".join(
@@ -495,9 +517,9 @@ class NotifyOneSignal(NotifyBase):
                     [
                         NotifyOneSignal.quote(
                             "{}{}".format(
-                                NotifyOneSignal.template_tokens["target_segment"][
-                                    "prefix"
-                                ],
+                                NotifyOneSignal.template_tokens[
+                                    "target_segment"
+                                ]["prefix"],
                                 x,
                             ),
                             safe="",
@@ -574,22 +596,32 @@ class NotifyOneSignal(NotifyBase):
 
         # The 'to' makes it easier to use yaml configuration
         if "to" in results["qsd"] and len(results["qsd"]["to"]):
-            results["targets"] += NotifyOneSignal.parse_list(results["qsd"]["to"])
+            results["targets"] += NotifyOneSignal.parse_list(
+                results["qsd"]["to"]
+            )
 
         if "app" in results["qsd"] and len(results["qsd"]["app"]):
             results["app"] = NotifyOneSignal.unquote(results["qsd"]["app"])
 
         if "apikey" in results["qsd"] and len(results["qsd"]["apikey"]):
-            results["apikey"] = NotifyOneSignal.unquote(results["qsd"]["apikey"])
+            results["apikey"] = NotifyOneSignal.unquote(
+                results["qsd"]["apikey"]
+            )
 
         if "template" in results["qsd"] and len(results["qsd"]["template"]):
-            results["template"] = NotifyOneSignal.unquote(results["qsd"]["template"])
+            results["template"] = NotifyOneSignal.unquote(
+                results["qsd"]["template"]
+            )
 
         if "subtitle" in results["qsd"] and len(results["qsd"]["subtitle"]):
-            results["subtitle"] = NotifyOneSignal.unquote(results["qsd"]["subtitle"])
+            results["subtitle"] = NotifyOneSignal.unquote(
+                results["qsd"]["subtitle"]
+            )
 
         if "lang" in results["qsd"] and len(results["qsd"]["lang"]):
-            results["language"] = NotifyOneSignal.unquote(results["qsd"]["lang"])
+            results["language"] = NotifyOneSignal.unquote(
+                results["qsd"]["lang"]
+            )
 
         # Add any template substitutions
         results["template_data"] = results["qsd+"]

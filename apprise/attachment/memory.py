@@ -41,17 +41,23 @@ class AttachMemory(AttachBase):
     """
 
     # The default descriptive name associated with the service
-    service_name = _('Memory')
+    service_name = _("Memory")
 
     # The default protocol
-    protocol = 'memory'
+    protocol = "memory"
 
     # Content is local to the same location as the apprise instance
     # being called (server-side)
     location = ContentLocation.LOCAL
 
-    def __init__(self, content=None, name=None, mimetype=None,
-                 encoding='utf-8', **kwargs):
+    def __init__(
+        self,
+        content=None,
+        name=None,
+        mimetype=None,
+        encoding="utf-8",
+        **kwargs
+    ):
         """
         Initialize Memory Based Attachment Object
 
@@ -66,15 +72,16 @@ class AttachMemory(AttachBase):
         elif isinstance(content, str):
             content = content.encode(encoding)
             if mimetype is None:
-                mimetype = 'text/plain'
+                mimetype = "text/plain"
 
             if not name:
                 # Generate a unique filename
-                name = str(uuid.uuid4()) + '.txt'
+                name = str(uuid.uuid4()) + ".txt"
 
         elif not isinstance(content, bytes):
             raise TypeError(
-                'Provided content for memory attachment is invalid')
+                "Provided content for memory attachment is invalid"
+            )
 
         # Store our content
         if content:
@@ -82,11 +89,11 @@ class AttachMemory(AttachBase):
 
         if mimetype is None:
             # Default mimetype
-            mimetype = 'application/octet-stream'
+            mimetype = "application/octet-stream"
 
         if not name:
             # Generate a unique filename
-            name = str(uuid.uuid4()) + '.dat'
+            name = str(uuid.uuid4()) + ".dat"
 
         # Initialize our base object
         super().__init__(name=name, mimetype=mimetype, **kwargs)
@@ -100,12 +107,12 @@ class AttachMemory(AttachBase):
 
         # Define any URL parameters
         params = {
-            'mime': self._mimetype,
+            "mime": self._mimetype,
         }
 
-        return 'memory://{name}?{params}'.format(
+        return "memory://{name}?{params}".format(
             name=self.quote(self._name),
-            params=self.urlencode(params, safe='/')
+            params=self.urlencode(params, safe="/"),
         )
 
     def open(self, *args, **kwargs):
@@ -136,9 +143,11 @@ class AttachMemory(AttachBase):
         if self.max_file_size > 0 and len(self) > self.max_file_size:
             # The content to attach is to large
             self.logger.error(
-                'Content exceeds allowable maximum memory size '
-                '({}KB): {}'.format(
-                    int(self.max_file_size / 1024), self.url(privacy=True)))
+                "Content exceeds allowable maximum memory size "
+                "({}KB): {}".format(
+                    int(self.max_file_size / 1024), self.url(privacy=True)
+                )
+            )
 
             # Return False (signifying a failure)
             return False
@@ -157,11 +166,16 @@ class AttachMemory(AttachBase):
         over-ride exists() call
         """
         size = len(self)
-        return True if self.location != ContentLocation.INACCESSIBLE \
-            and size > 0 and (
-                self.max_file_size <= 0 or
-                (self.max_file_size > 0 and size <= self.max_file_size)) \
+        return (
+            True
+            if self.location != ContentLocation.INACCESSIBLE
+            and size > 0
+            and (
+                self.max_file_size <= 0
+                or (self.max_file_size > 0 and size <= self.max_file_size)
+            )
             else False
+        )
 
     @staticmethod
     def parse_url(url):
@@ -176,13 +190,14 @@ class AttachMemory(AttachBase):
             # We're done early; it's not a good URL
             return results
 
-        if 'name' not in results:
+        if "name" not in results:
             # Allow fall-back to be from URL
-            match = re.match(r'memory://(?P<path>[^?]+)(\?.*)?', url, re.I)
+            match = re.match(r"memory://(?P<path>[^?]+)(\?.*)?", url, re.I)
             if match:
                 # Store our filename only (ignore any defined paths)
-                results['name'] = \
-                    os.path.basename(AttachMemory.unquote(match.group('path')))
+                results["name"] = os.path.basename(
+                    AttachMemory.unquote(match.group("path"))
+                )
         return results
 
     @property
