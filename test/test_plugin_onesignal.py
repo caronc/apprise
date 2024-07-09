@@ -173,6 +173,27 @@ apprise_url_tests = (
         },
     ),
     (
+        "onesignal://templateid:appid@apikey/playerid?:d1=a",
+        {
+            # Test Attachment data
+            "instance": NotifyOneSignal,
+        },
+    ),
+    (
+        "onesignal://templateid:appid@apikey/playerid?:d1=a&:d2=b",
+        {
+            # Test Attachment data
+            "instance": NotifyOneSignal,
+        },
+    ),
+    (
+        "onesignal://templateid:appid@apikey/playerid?:d1=a&:d2=b&+par1=1",
+        {
+            # Test Attachment data and template data simultaneously
+            "instance": NotifyOneSignal,
+        },
+    ),
+    (
         "onesignal://appid@apikey/#segment/playerid/",
         {
             "instance": NotifyOneSignal,
@@ -209,7 +230,8 @@ def test_plugin_onesignal_edge_cases():
 
     """
     obj = Apprise.instantiate(
-        "onesignal://appid@apikey/#segment/@user/playerid/user@email.com" "/?batch=yes"
+        "onesignal://appid@apikey/#segment/@user/playerid/user@email.com"
+        "/?batch=yes"
     )
     # Validate that it loaded okay
     assert isinstance(obj, NotifyOneSignal)
@@ -261,14 +283,18 @@ def test_plugin_onesignal_edge_cases():
     #
     # Player ID's
     #
-    obj = Apprise.instantiate("onesignal://appid@apikey/pid1/pid2/pid3/pid4/?batch=yes")
+    obj = Apprise.instantiate(
+        "onesignal://appid@apikey/pid1/pid2/pid3/pid4/?batch=yes"
+    )
     assert isinstance(obj, NotifyOneSignal)
 
     # We can lump these together - no problem
     assert len(obj) == 1
 
     # Same query, but no batch mode set
-    obj = Apprise.instantiate("onesignal://appid@apikey/pid1/pid2/pid3/pid4/?batch=no")
+    obj = Apprise.instantiate(
+        "onesignal://appid@apikey/pid1/pid2/pid3/pid4/?batch=no"
+    )
     assert isinstance(obj, NotifyOneSignal)
 
     # Individual queries
@@ -304,17 +330,24 @@ def test_plugin_onesignal_edge_cases():
     segments = ("#seg1", "#seg2", "#seg3", "#seg4")
 
     path = "{}/{}/{}/{}".format(
-        "/".join(emails), "/".join(users), "/".join(players), "/".join(segments)
+        "/".join(emails),
+        "/".join(users),
+        "/".join(players),
+        "/".join(segments),
     )
 
-    obj = Apprise.instantiate("onesignal://appid@apikey/{}/?batch=yes".format(path))
+    obj = Apprise.instantiate(
+        "onesignal://appid@apikey/{}/?batch=yes".format(path)
+    )
     assert isinstance(obj, NotifyOneSignal)
 
     # We can lump these together - no problem
     assert len(obj) == 4
 
     # Same query, but no batch mode set
-    obj = Apprise.instantiate("onesignal://appid@apikey/{}/?batch=no".format(path))
+    obj = Apprise.instantiate(
+        "onesignal://appid@apikey/{}/?batch=no".format(path)
+    )
     assert isinstance(obj, NotifyOneSignal)
 
     # Individual queries
