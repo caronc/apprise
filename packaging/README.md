@@ -2,12 +2,12 @@
 This directory contains any supporting files to grant usage of Apprise in various distributions.
 
 ### RPM Based Packages
-* [EPEL](https://fedoraproject.org/wiki/EPEL) based distributions are only supported if they are of v8 or higher. This includes:
-   * Red Hat 8.x (or higher)
-   * Scientific OS 8.x (or higher)
-   * Oracle Linux 8.x (or higher)
-   * Rocky Linux 8.x (or higher)
-   * Alma Linux 8.x (or higher)
+* [EPEL](https://fedoraproject.org/wiki/EPEL) based distributions are only supported if they are of v9 or higher. This includes:
+   * Red Hat 9.x (or higher)
+   * Scientific OS 9.x (or higher)
+   * Oracle Linux 9.x (or higher)
+   * Rocky Linux 9.x (or higher)
+   * Alma Linux 9.x (or higher)
    * Fedora 29 (or higher)
 
 Provided you are connected to the [EPEL repositories](https://fedoraproject.org/wiki/EPEL), the following will just work for you:

@@ -49,10 +49,6 @@ jobs:
             python-version: "3.11"
 
           # Test more available versions of CPython on Linux.
-          - os: "ubuntu-20.04"
-            # v3.6 (exclusively referenced) is not supported by GitHub anymore)
-            # v3.6.8 is fixed since it is the version CentOS/Rocky/RedHat v8 uses
-            python-version: "3.6.8"
           - os: "ubuntu-latest"
             python-version: "3.7"
           - os: "ubuntu-latest"

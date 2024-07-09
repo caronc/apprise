@@ -38,7 +38,7 @@ jobs:
       # items within the `services` section of `docker-compose.yml`.
       matrix:
         target: [
-          "rpmbuild.el8",
+          "rpmbuild.el9",
         ]
 
     defaults:

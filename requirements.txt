@@ -1,8 +1,7 @@
-# Root certificate authority bundle.
+# Root certificate authority bundle
 certifi
 
-# Application dependencies.
-dataclasses; python_version<"3.7"
+# Application dependencies
 requests
 requests-oauthlib
 click >= 5.0

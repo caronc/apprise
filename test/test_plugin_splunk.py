@@ -66,13 +66,13 @@ apprise_url_tests = (
         'instance': NotifySplunk,
     }),
     # Support legacy URL
-    ('https://alert.victorops.com/integrations/generic/20131114/' \
+    ('https://alert.victorops.com/integrations/generic/20131114/'
      'alert/apikey/routing_key', {
          # We're good
          'instance': NotifySplunk,
      }),
     # Support legacy URL (with entity id provided)
-    ('https://alert.victorops.com/integrations/generic/20131114/' \
+    ('https://alert.victorops.com/integrations/generic/20131114/'
      'alert/apikey/routing_key/entity_id', {
          # We're good
          'instance': NotifySplunk,

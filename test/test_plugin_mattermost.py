@@ -66,10 +66,10 @@ apprise_url_tests = (
     ('mmost://localhost/3ccdd113474722377935511fc85d3dd4'
      '?to=test&image=True', {
          'instance': NotifyMattermost}),
-    ('mmost://localhost/3ccdd113474722377935511fc85d3dd4' \
+    ('mmost://localhost/3ccdd113474722377935511fc85d3dd4'
      '?to=test&image=False', {
          'instance': NotifyMattermost}),
-    ('mmost://localhost/3ccdd113474722377935511fc85d3dd4' \
+    ('mmost://localhost/3ccdd113474722377935511fc85d3dd4'
      '?to=test&image=True', {
          'instance': NotifyMattermost,
          # don't include an image by default
