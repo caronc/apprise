@@ -190,6 +190,10 @@ class NotifyOneSignal(NotifyBase):
             "name": _("Template Data"),
             "prefix": "+",
         },
+        "onesignal_data": {
+            "name": _("Additional Data"),
+            "prefix": ":",
+        },
     }
 
     body_required = False
@@ -203,6 +207,7 @@ class NotifyOneSignal(NotifyBase):
         include_image=True,
         template=None,
         template_data=None,
+        onesignal_data=None,
         subtitle=None,
         language=None,
         batch=False,
@@ -253,6 +258,11 @@ class NotifyOneSignal(NotifyBase):
         # Now our dynamic template data (if defined)
         self.template_data = (
             template_data if isinstance(template_data, dict) else {}
+        )
+
+        # Adding OneSignal data
+        self.onesignal_data = (
+            onesignal_data if isinstance(onesignal_data, dict) else {}
         )
 
         # Assign our subtitle (if defined)
@@ -378,6 +388,9 @@ class NotifyOneSignal(NotifyBase):
         if self.template_data:
             payload["custom_data"] = self.template_data
 
+        if self.onesignal_data:
+            payload["data"] = self.onesignal_data
+
         # Acquire our large_icon image URL (if set)
         image_url = (
             None if not self.include_image else self.image_url(notify_type)
@@ -481,6 +494,11 @@ class NotifyOneSignal(NotifyBase):
         # Append our template_data into our parameter list
         params.update(
             {"+{}".format(k): v for k, v in self.template_data.items()}
+        )
+
+        # Append onesignal attachment data into our parameter list
+        params.update(
+            {":{}".format(k): v for k, v in self.onesignal_data.items()}
         )
 
         return "{schema}://{tp_id}{app}@{apikey}/{targets}?{params}".format(
@@ -625,5 +643,7 @@ class NotifyOneSignal(NotifyBase):
 
         # Add any template substitutions
         results["template_data"] = results["qsd+"]
+        # Add any template substitutions
+        results["onesignal_data"] = results["qsd:"]
 
         return results
