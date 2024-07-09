@@ -42,11 +42,9 @@ from ..url import PrivacyMode
 from ..locale import gettext_lazy as _
 
 
-GROUP_REGEX = re.compile(
-    r'^\s*(\#|\%35)(?P<group>[a-z0-9_-]+)', re.I)
+GROUP_REGEX = re.compile(r"^\s*(\#|\%35)(?P<group>[a-z0-9_-]+)", re.I)
 
-CONTACT_REGEX = re.compile(
-    r'^\s*(\@|\%40)?(?P<contact>[a-z0-9_-]+)', re.I)
+CONTACT_REGEX = re.compile(r"^\s*(\@|\%40)?(?P<contact>[a-z0-9_-]+)", re.I)
 
 
 # Priorities
@@ -62,10 +60,10 @@ SMSEAGLE_PRIORITIES = (
 
 SMSEAGLE_PRIORITY_MAP = {
     # short for 'normal'
-    'normal': SMSEaglePriority.NORMAL,
+    "normal": SMSEaglePriority.NORMAL,
     # short for 'high'
-    '+': SMSEaglePriority.HIGH,
-    'high': SMSEaglePriority.HIGH,
+    "+": SMSEaglePriority.HIGH,
+    "high": SMSEaglePriority.HIGH,
 }
 
 
@@ -73,9 +71,10 @@ class SMSEagleCategory:
     """
     We define the different category types that we can notify via SMS Eagle
     """
-    PHONE = 'phone'
-    GROUP = 'group'
-    CONTACT = 'contact'
+
+    PHONE = "phone"
+    GROUP = "group"
+    CONTACT = "contact"
 
 
 SMSEAGLE_CATEGORIES = (
@@ -91,22 +90,22 @@ class NotifySMSEagle(NotifyBase):
     """
 
     # The default descriptive name associated with the Notification
-    service_name = 'SMS Eagle'
+    service_name = "SMS Eagle"
 
     # The services URL
-    service_url = 'https://smseagle.eu'
+    service_url = "https://smseagle.eu"
 
     # The default protocol
-    protocol = 'smseagle'
+    protocol = "smseagle"
 
     # The default protocol
-    secure_protocol = 'smseagles'
+    secure_protocol = "smseagles"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_smseagle'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_smseagle"
 
     # The path we send our notification to
-    notify_path = '/jsonrpc/sms'
+    notify_path = "/jsonrpc/sms"
 
     # Support attachments
     attachment_support = True
@@ -124,94 +123,109 @@ class NotifySMSEagle(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{token}@{host}/{targets}',
-        '{schema}://{token}@{host}:{port}/{targets}',
+        "{schema}://{token}@{host}/{targets}",
+        "{schema}://{token}@{host}:{port}/{targets}",
     )
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'host': {
-            'name': _('Hostname'),
-            'type': 'string',
-            'required': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "host": {
+                "name": _("Hostname"),
+                "type": "string",
+                "required": True,
+            },
+            "port": {
+                "name": _("Port"),
+                "type": "int",
+                "min": 1,
+                "max": 65535,
+            },
+            "token": {
+                "name": _("Access Token"),
+                "type": "string",
+                "required": True,
+            },
+            "target_phone": {
+                "name": _("Target Phone No"),
+                "type": "string",
+                "prefix": "+",
+                "regex": (r"^[0-9\s)(+-]+$", "i"),
+                "map_to": "targets",
+            },
+            "target_group": {
+                "name": _("Target Group ID"),
+                "type": "string",
+                "prefix": "#",
+                "regex": (r"^[a-z0-9_-]+$", "i"),
+                "map_to": "targets",
+            },
+            "target_contact": {
+                "name": _("Target Contact"),
+                "type": "string",
+                "prefix": "@",
+                "regex": (r"^[a-z0-9_-]+$", "i"),
+                "map_to": "targets",
+            },
+            "targets": {
+                "name": _("Targets"),
+                "type": "list:string",
+                "required": True,
+            },
         },
-        'port': {
-            'name': _('Port'),
-            'type': 'int',
-            'min': 1,
-            'max': 65535,
-        },
-        'token': {
-            'name': _('Access Token'),
-            'type': 'string',
-            'required': True,
-        },
-        'target_phone': {
-            'name': _('Target Phone No'),
-            'type': 'string',
-            'prefix': '+',
-            'regex': (r'^[0-9\s)(+-]+$', 'i'),
-            'map_to': 'targets',
-        },
-        'target_group': {
-            'name': _('Target Group ID'),
-            'type': 'string',
-            'prefix': '#',
-            'regex': (r'^[a-z0-9_-]+$', 'i'),
-            'map_to': 'targets',
-        },
-        'target_contact': {
-            'name': _('Target Contact'),
-            'type': 'string',
-            'prefix': '@',
-            'regex': (r'^[a-z0-9_-]+$', 'i'),
-            'map_to': 'targets',
-        },
-        'targets': {
-            'name': _('Targets'),
-            'type': 'list:string',
-            'required': True,
-        }
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'to': {
-            'alias_of': 'targets',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "to": {
+                "alias_of": "targets",
+            },
+            "token": {
+                "alias_of": "token",
+            },
+            "batch": {
+                "name": _("Batch Mode"),
+                "type": "bool",
+                "default": False,
+            },
+            "status": {
+                "name": _("Show Status"),
+                "type": "bool",
+                "default": False,
+            },
+            "test": {
+                "name": _("Test Only"),
+                "type": "bool",
+                "default": False,
+            },
+            "flash": {
+                "name": _("Flash"),
+                "type": "bool",
+                "default": False,
+            },
+            "priority": {
+                "name": _("Priority"),
+                "type": "choice:int",
+                "values": SMSEAGLE_PRIORITIES,
+                "default": SMSEaglePriority.NORMAL,
+            },
         },
-        'token': {
-            'alias_of': 'token',
-        },
-        'batch': {
-            'name': _('Batch Mode'),
-            'type': 'bool',
-            'default': False,
-        },
-        'status': {
-            'name': _('Show Status'),
-            'type': 'bool',
-            'default': False,
-        },
-        'test': {
-            'name': _('Test Only'),
-            'type': 'bool',
-            'default': False,
-        },
-        'flash': {
-            'name': _('Flash'),
-            'type': 'bool',
-            'default': False,
-        },
-        'priority': {
-            'name': _('Priority'),
-            'type': 'choice:int',
-            'values': SMSEAGLE_PRIORITIES,
-            'default': SMSEaglePriority.NORMAL,
-        },
-    })
+    )
 
-    def __init__(self, token=None, targets=None, priority=None, batch=False,
-                 status=False, flash=False, test=False, **kwargs):
+    def __init__(
+        self,
+        token=None,
+        targets=None,
+        priority=None,
+        batch=False,
+        status=False,
+        flash=False,
+        test=False,
+        **kwargs,
+    ):
         """
         Initialize SMSEagle Object
         """
@@ -240,9 +254,11 @@ class NotifySMSEagle(NotifyBase):
         # We always use a token if provided
         self.token = validate_regex(self.user if not token else token)
         if not self.token:
-            msg = \
-                'An invalid SMSEagle Access Token ({}) was specified.'.format(
-                    self.user if not token else token)
+            msg = (
+                "An invalid SMSEagle Access Token ({}) was specified.".format(
+                    self.user if not token else token
+                )
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -257,7 +273,7 @@ class NotifySMSEagle(NotifyBase):
 
         except TypeError:
             # NoneType means use Default; this is an okay exception
-            self.priority = self.template_args['priority']['default']
+            self.priority = self.template_args["priority"]["default"]
 
         except ValueError:
             # Input is a string; attempt to get the lookup from our
@@ -268,24 +284,38 @@ class NotifySMSEagle(NotifyBase):
             # low, lo, l (for low);
             # normal, norma, norm, nor, no, n (for normal)
             # ... etc
-            result = next((key for key in SMSEAGLE_PRIORITY_MAP.keys()
-                          if key.startswith(priority)), None) \
-                if priority else None
+            result = (
+                next(
+                    (
+                        key
+                        for key in SMSEAGLE_PRIORITY_MAP.keys()
+                        if key.startswith(priority)
+                    ),
+                    None,
+                )
+                if priority
+                else None
+            )
 
             # Now test to see if we got a match
             if not result:
-                msg = 'An invalid SMSEagle priority ' \
-                      '({}) was specified.'.format(priority)
+                msg = (
+                    "An invalid SMSEagle priority "
+                    "({}) was specified.".format(priority)
+                )
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
             # store our successfully looked up priority
             self.priority = SMSEAGLE_PRIORITY_MAP[result]
 
-        if self.priority is not None and \
-                self.priority not in SMSEAGLE_PRIORITY_MAP.values():
-            msg = 'An invalid SMSEagle priority ' \
-                  '({}) was specified.'.format(priority)
+        if (
+            self.priority is not None
+            and self.priority not in SMSEAGLE_PRIORITY_MAP.values()
+        ):
+            msg = "An invalid SMSEagle priority " "({}) was specified.".format(
+                priority
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -297,42 +327,52 @@ class NotifySMSEagle(NotifyBase):
             if result:
                 # store valid phone number
                 self.target_phones.append(
-                    '{}{}'.format(
-                        '' if target[0] != '+' else '+', result['full']))
+                    "{}{}".format(
+                        "" if target[0] != "+" else "+", result["full"]
+                    )
+                )
                 continue
 
             result = GROUP_REGEX.match(target)
             if result:
                 # Just store group information
-                self.target_groups.append(result.group('group'))
+                self.target_groups.append(result.group("group"))
                 continue
 
             result = CONTACT_REGEX.match(target)
             if result:
                 # Just store contact information
-                self.target_contacts.append(result.group('contact'))
+                self.target_contacts.append(result.group("contact"))
                 continue
 
             self.logger.warning(
-                'Dropped invalid phone/group/contact '
-                '({}) specified.'.format(target),
+                "Dropped invalid phone/group/contact "
+                "({}) specified.".format(target),
             )
             self.invalid_targets.append(target)
             continue
 
         return
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
-             **kwargs):
+    def send(
+        self,
+        body,
+        title="",
+        notify_type=NotifyType.INFO,
+        attach=None,
+        **kwargs,
+    ):
         """
         Perform SMSEagle Notification
         """
 
-        if not self.target_groups and not self.target_phones \
-                and not self.target_contacts:
+        if (
+            not self.target_groups
+            and not self.target_phones
+            and not self.target_contacts
+        ):
             # There were no services to notify
-            self.logger.warning(
-                'There were no SMSEagle targets to notify.')
+            self.logger.warning("There were no SMSEagle targets to notify.")
             return False
 
         # error tracking (used for function return)
@@ -345,75 +385,77 @@ class NotifySMSEagle(NotifyBase):
                 if not attachment:
                     # We could not access the attachment
                     self.logger.error(
-                        'Could not access attachment {}.'.format(
-                            attachment.url(privacy=True)))
+                        "Could not access attachment {}.".format(
+                            attachment.url(privacy=True)
+                        )
+                    )
                     return False
 
-                if not re.match(r'^image/.*', attachment.mimetype, re.I):
+                if not re.match(r"^image/.*", attachment.mimetype, re.I):
                     # Only support images at this time
                     self.logger.warning(
-                        'Ignoring unsupported SMSEagle attachment {}.'.format(
-                            attachment.url(privacy=True)))
+                        "Ignoring unsupported SMSEagle attachment {}.".format(
+                            attachment.url(privacy=True)
+                        )
+                    )
                     continue
 
                 try:
-                    with open(attachment.path, 'rb') as f:
+                    with open(attachment.path, "rb") as f:
                         # Prepare our Attachment in Base64
-                        attachments.append({
-                            'content_type': attachment.mimetype,
-                            'content': base64.b64encode(
-                                f.read()).decode('utf-8'),
-                        })
+                        attachments.append(
+                            {
+                                "content_type": attachment.mimetype,
+                                "content": base64.b64encode(f.read()).decode(
+                                    "utf-8"
+                                ),
+                            }
+                        )
 
                 except (OSError, IOError) as e:
                     self.logger.warning(
-                        'An I/O error occurred while reading {}.'.format(
-                            attachment.name if attachment else 'attachment'))
-                    self.logger.debug('I/O Exception: %s' % str(e))
+                        "An I/O error occurred while reading {}.".format(
+                            attachment.name if attachment else "attachment"
+                        )
+                    )
+                    self.logger.debug("I/O Exception: %s" % str(e))
                     return False
 
         # Prepare our headers
         headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/json',
+            "User-Agent": self.app_id,
+            "Content-Type": "application/json",
         }
 
         # Prepare our payload
         params_template = {
             # Our Access Token
-            'access_token': self.token,
-
+            "access_token": self.token,
             # The message to send (populated below)
             "message": None,
-
             # 0 = normal priority, 1 = high priority
             "highpriority": self.priority,
-
             # Support unicode characters
             "unicode": 1,
-
             # sms or mms (if attachment)
-            "message_type": 'sms',
-
+            "message_type": "sms",
             # Response Types:
             #  simple: format response as simple object with one result field
             #  extended: format response as extended JSON object
-            "responsetype": 'extended',
-
+            "responsetype": "extended",
             # SMS will be sent as flash message (1 = yes, 0 = no)
             "flash": 1 if self.flash else 0,
-
             # Message Simulation
             "test": 1 if self.test else 0,
         }
 
         # Set our schema
-        schema = 'https' if self.secure else 'http'
+        schema = "https" if self.secure else "http"
 
         # Construct our URL
-        notify_url = '%s://%s' % (schema, self.host)
+        notify_url = "%s://%s" % (schema, self.host)
         if isinstance(self.port, int):
-            notify_url += ':%d' % self.port
+            notify_url += ":%d" % self.port
         notify_url += self.notify_path
 
         # Send in batches if identified to do so
@@ -422,15 +464,15 @@ class NotifySMSEagle(NotifyBase):
         notify_by = {
             SMSEagleCategory.PHONE: {
                 "method": "sms.send_sms",
-                'target': 'to',
+                "target": "to",
             },
             SMSEagleCategory.GROUP: {
                 "method": "sms.send_togroup",
-                'target': 'groupname',
+                "target": "groupname",
             },
             SMSEagleCategory.CONTACT: {
                 "method": "sms.send_tocontact",
-                'target': 'contactname',
+                "target": "contactname",
             },
         }
 
@@ -440,35 +482,45 @@ class NotifySMSEagle(NotifyBase):
         for category in SMSEAGLE_CATEGORIES:
             # Create a copy of our template
             payload = {
-                'method': notify_by[category]['method'],
-                'params': {
-                    notify_by[category]['target']: None,
+                "method": notify_by[category]["method"],
+                "params": {
+                    notify_by[category]["target"]: None,
                 },
             }
 
             # Apply Template
-            payload['params'].update(params_template)
+            payload["params"].update(params_template)
 
             # Set our Message
             payload["params"]["message"] = "{}{}".format(
-                '' if not self.status else '{} '.format(
-                    self.asset.ascii(notify_type)), body)
+                (
+                    ""
+                    if not self.status
+                    else "{} ".format(self.asset.ascii(notify_type))
+                ),
+                body,
+            )
 
             if attachments:
                 # Store our attachments
-                payload['params']['message_type'] = 'mms'
-                payload['params']['attachments'] = attachments
+                payload["params"]["message_type"] = "mms"
+                payload["params"]["attachments"] = attachments
 
-            targets = getattr(self, 'target_{}s'.format(category))
+            targets = getattr(self, "target_{}s".format(category))
             for index in range(0, len(targets), batch_size):
                 # Prepare our recipients
-                payload['params'][notify_by[category]['target']] = \
-                    ','.join(targets[index:index + batch_size])
+                payload["params"][notify_by[category]["target"]] = ",".join(
+                    targets[index : index + batch_size]
+                )
 
-                self.logger.debug('SMSEagle POST URL: %s (cert_verify=%r)' % (
-                    notify_url, self.verify_certificate,
-                ))
-                self.logger.debug('SMSEagle Payload: %s' % str(payload))
+                self.logger.debug(
+                    "SMSEagle POST URL: %s (cert_verify=%r)"
+                    % (
+                        notify_url,
+                        self.verify_certificate,
+                    )
+                )
+                self.logger.debug("SMSEagle Payload: %s" % str(payload))
 
                 # Always call throttle before any remote server i/o is made
                 self.throttle()
@@ -485,7 +537,7 @@ class NotifySMSEagle(NotifyBase):
                         content = loads(r.content)
 
                         # Store our status
-                        status_str = str(content['result'])
+                        status_str = str(content["result"])
 
                     except (AttributeError, TypeError, ValueError, KeyError):
                         # ValueError = r.content is Unparsable
@@ -503,39 +555,58 @@ class NotifySMSEagle(NotifyBase):
                     # The below code handles both cases only only fails if a
                     # non-ok value was returned
 
-                    if r.status_code not in (
-                            requests.codes.ok, requests.codes.created) or \
-                            not isinstance(content.get('result'),
-                                           (dict, list)) or \
-                            (isinstance(content.get('result'), dict) and
-                             content['result'].get('status') != 'ok') or \
-                            (isinstance(content.get('result'), list) and
-                             next((True for entry in content.get('result')
-                                   if isinstance(entry, dict) and
-                                   entry.get('status') != 'ok'), False
-                                  )  # pragma: no cover
-                             ):
+                    if (
+                        r.status_code
+                        not in (requests.codes.ok, requests.codes.created)
+                        or not isinstance(content.get("result"), (dict, list))
+                        or (
+                            isinstance(content.get("result"), dict)
+                            and content["result"].get("status") != "ok"
+                        )
+                        or (
+                            isinstance(content.get("result"), list)
+                            and next(
+                                (
+                                    True
+                                    for entry in content.get("result")
+                                    if isinstance(entry, dict)
+                                    and entry.get("status") != "ok"
+                                ),
+                                False,
+                            )  # pragma: no cover
+                        )
+                    ):
 
                         # We had a problem
-                        status_str = content.get('result') \
-                            if content.get('result') else \
-                            NotifySMSEagle.http_response_code_lookup(
-                            r.status_code)
+                        status_str = (
+                            content.get("result")
+                            if content.get("result")
+                            else NotifySMSEagle.http_response_code_lookup(
+                                r.status_code
+                            )
+                        )
 
                         self.logger.warning(
-                            'Failed to send {} {} SMSEagle {} notification: '
-                            '{}{}error={}.'.format(
-                                len(targets[index:index + batch_size]),
-                                'to {}'.format(targets[index])
-                                if batch_size == 1 else '(s)',
+                            "Failed to send {} {} SMSEagle {} notification: "
+                            "{}{}error={}.".format(
+                                len(targets[index : index + batch_size]),
+                                (
+                                    "to {}".format(targets[index])
+                                    if batch_size == 1
+                                    else "(s)"
+                                ),
                                 category,
                                 status_str,
-                                ', ' if status_str else '',
-                                r.status_code))
+                                ", " if status_str else "",
+                                r.status_code,
+                            )
+                        )
 
                         self.logger.debug(
-                            'Response {} Details:\r\n{}'.format(
-                                category.upper(), r.content))
+                            "Response {} Details:\r\n{}".format(
+                                category.upper(), r.content
+                            )
+                        )
 
                         # Mark our failure
                         has_error = True
@@ -543,20 +614,25 @@ class NotifySMSEagle(NotifyBase):
 
                     else:
                         self.logger.info(
-                            'Sent {} SMSEagle {} notification{}.'
-                            .format(
-                                len(targets[index:index + batch_size]),
+                            "Sent {} SMSEagle {} notification{}.".format(
+                                len(targets[index : index + batch_size]),
                                 category,
-                                ' to {}'.format(targets[index])
-                                if batch_size == 1 else '(s)',
-                            ))
+                                (
+                                    " to {}".format(targets[index])
+                                    if batch_size == 1
+                                    else "(s)"
+                                ),
+                            )
+                        )
 
                 except requests.RequestException as e:
                     self.logger.warning(
-                        'A Connection error occured sending {} SMSEagle '
-                        '{} notification(s).'.format(
-                            len(targets[index:index + batch_size]), category))
-                    self.logger.debug('Socket Exception: %s' % str(e))
+                        "A Connection error occured sending {} SMSEagle "
+                        "{} notification(s).".format(
+                            len(targets[index : index + batch_size]), category
+                        )
+                    )
+                    self.logger.debug("Socket Exception: %s" % str(e))
 
                     # Mark our failure
                     has_error = True
@@ -571,45 +647,57 @@ class NotifySMSEagle(NotifyBase):
 
         # Define any URL parameters
         params = {
-            'batch': 'yes' if self.batch else 'no',
-            'status': 'yes' if self.status else 'no',
-            'flash': 'yes' if self.flash else 'no',
-            'test': 'yes' if self.test else 'no',
+            "batch": "yes" if self.batch else "no",
+            "status": "yes" if self.status else "no",
+            "flash": "yes" if self.flash else "no",
+            "test": "yes" if self.test else "no",
         }
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        default_priority = self.template_args['priority']['default']
+        default_priority = self.template_args["priority"]["default"]
         if self.priority is not None:
             # Store our priority; but only if it was specified
-            params['priority'] = \
-                next((key for key, value in SMSEAGLE_PRIORITY_MAP.items()
-                      if value == self.priority),
-                     default_priority)  # pragma: no cover
+            params["priority"] = next(
+                (
+                    key
+                    for key, value in SMSEAGLE_PRIORITY_MAP.items()
+                    if value == self.priority
+                ),
+                default_priority,
+            )  # pragma: no cover
 
         # Default port handling
         default_port = 443 if self.secure else 80
 
-        return '{schema}://{token}@{hostname}{port}/{targets}?{params}'.format(
+        return "{schema}://{token}@{hostname}{port}/{targets}?{params}".format(
             schema=self.secure_protocol if self.secure else self.protocol,
             token=self.pprint(
-                self.token, privacy, mode=PrivacyMode.Secret, safe=''),
+                self.token, privacy, mode=PrivacyMode.Secret, safe=""
+            ),
             # never encode hostname since we're expecting it to be a valid one
             hostname=self.host,
-            port='' if self.port is None or self.port == default_port
-                 else ':{}'.format(self.port),
-            targets='/'.join(
-                [NotifySMSEagle.quote(x, safe='#@') for x in chain(
-                    # Pass phones directly as is
-                    self.target_phones,
-                    # Contacts
-                    ['@{}'.format(x) for x in self.target_contacts],
-                    # Groups
-                    ['#{}'.format(x) for x in self.target_groups],
-                    # Pass along the same invalid entries as were provided
-                    self.invalid_targets,
-                )]),
+            port=(
+                ""
+                if self.port is None or self.port == default_port
+                else ":{}".format(self.port)
+            ),
+            targets="/".join(
+                [
+                    NotifySMSEagle.quote(x, safe="#@")
+                    for x in chain(
+                        # Pass phones directly as is
+                        self.target_phones,
+                        # Contacts
+                        ["@{}".format(x) for x in self.target_contacts],
+                        # Groups
+                        ["#{}".format(x) for x in self.target_groups],
+                        # Pass along the same invalid entries as were provided
+                        self.invalid_targets,
+                    )
+                ]
+            ),
             params=NotifySMSEagle.urlencode(params),
         )
 
@@ -626,14 +714,18 @@ class NotifySMSEagle(NotifyBase):
             # a single batch)
             total_targets = 0
             for c in SMSEAGLE_CATEGORIES:
-                targets = len(getattr(self, f'target_{c}s'))
-                total_targets += int(targets / batch_size) + \
-                    (1 if targets % batch_size else 0)
+                targets = len(getattr(self, f"target_{c}s"))
+                total_targets += int(targets / batch_size) + (
+                    1 if targets % batch_size else 0
+                )
             return total_targets
 
         # Normal batch count; just count the targets
-        return len(self.target_phones) + len(self.target_contacts) + \
-            len(self.target_groups)
+        return (
+            len(self.target_phones)
+            + len(self.target_contacts)
+            + len(self.target_groups)
+        )
 
     @staticmethod
     def parse_url(url):
@@ -650,40 +742,37 @@ class NotifySMSEagle(NotifyBase):
 
         # Get our entries; split_path() looks after unquoting content for us
         # by default
-        results['targets'] = \
-            NotifySMSEagle.split_path(results['fullpath'])
+        results["targets"] = NotifySMSEagle.split_path(results["fullpath"])
 
-        if 'token' in results['qsd'] and len(results['qsd']['token']):
-            results['token'] = NotifySMSEagle.unquote(results['qsd']['token'])
+        if "token" in results["qsd"] and len(results["qsd"]["token"]):
+            results["token"] = NotifySMSEagle.unquote(results["qsd"]["token"])
 
-        elif not results['password'] and results['user']:
-            results['token'] = NotifySMSEagle.unquote(results['user'])
+        elif not results["password"] and results["user"]:
+            results["token"] = NotifySMSEagle.unquote(results["user"])
 
         # Support the 'to' variable so that we can support targets this way too
         # The 'to' makes it easier to use yaml configuration
-        if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'] += \
-                NotifySMSEagle.parse_phone_no(results['qsd']['to'])
+        if "to" in results["qsd"] and len(results["qsd"]["to"]):
+            results["targets"] += NotifySMSEagle.parse_phone_no(
+                results["qsd"]["to"]
+            )
 
         # Get Batch Mode Flag
-        results['batch'] = \
-            parse_bool(results['qsd'].get('batch', False))
+        results["batch"] = parse_bool(results["qsd"].get("batch", False))
 
         # Get Flash Mode Flag
-        results['flash'] = \
-            parse_bool(results['qsd'].get('flash', False))
+        results["flash"] = parse_bool(results["qsd"].get("flash", False))
 
         # Get Test Mode Flag
-        results['test'] = \
-            parse_bool(results['qsd'].get('test', False))
+        results["test"] = parse_bool(results["qsd"].get("test", False))
 
         # Get status switch
-        results['status'] = \
-            parse_bool(results['qsd'].get('status', False))
+        results["status"] = parse_bool(results["qsd"].get("status", False))
 
         # Get priority
-        if 'priority' in results['qsd'] and len(results['qsd']['priority']):
-            results['priority'] = \
-                NotifySMSEagle.unquote(results['qsd']['priority'])
+        if "priority" in results["qsd"] and len(results["qsd"]["priority"]):
+            results["priority"] = NotifySMSEagle.unquote(
+                results["qsd"]["priority"]
+            )
 
         return results
