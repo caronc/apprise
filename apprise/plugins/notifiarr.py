@@ -37,6 +37,7 @@ from ..locale import gettext_lazy as _
 from ..common import NotifyImageSize
 from ..utils import parse_list, parse_bool
 from ..utils import validate_regex
+from .discord import USER_ROLE_DETECTION_RE
 
 # Used to break path apart into list of channels
 CHANNEL_LIST_DELIM = re.compile(r'[ \t\r\n,#\\/]+')
@@ -118,14 +119,6 @@ class NotifyNotifiarr(NotifyBase):
         'apikey': {
             'alias_of': 'apikey',
         },
-        'discord_user': {
-            'name': _('Ping Discord User'),
-            'type': 'int',
-        },
-        'discord_role': {
-            'name': _('Ping Discord Role'),
-            'type': 'int',
-        },
         'event': {
             'name': _('Discord Event ID'),
             'type': 'int',
@@ -149,7 +142,6 @@ class NotifyNotifiarr(NotifyBase):
     })
 
     def __init__(self, apikey=None, include_image=None,
-                 discord_user=None, discord_role=None,
                  event=None, targets=None, source=None, **kwargs):
         """
         Initialize Notifiarr Object
@@ -171,30 +163,6 @@ class NotifyNotifiarr(NotifyBase):
         self.include_image = include_image \
             if isinstance(include_image, bool) \
             else self.template_args['image']['default']
-
-        # Set up our user if specified
-        self.discord_user = 0
-        if discord_user:
-            try:
-                self.discord_user = int(discord_user)
-
-            except (ValueError, TypeError):
-                msg = 'An invalid Notifiarr User ID ' \
-                      '({}) was specified.'.format(discord_user)
-                self.logger.warning(msg)
-                raise TypeError(msg)
-
-        # Set up our role if specified
-        self.discord_role = 0
-        if discord_role:
-            try:
-                self.discord_role = int(discord_role)
-
-            except (ValueError, TypeError):
-                msg = 'An invalid Notifiarr Role ID ' \
-                      '({}) was specified.'.format(discord_role)
-                self.logger.warning(msg)
-                raise TypeError(msg)
 
         # Prepare our source (if set)
         self.source = validate_regex(source)
@@ -244,12 +212,6 @@ class NotifyNotifiarr(NotifyBase):
         if self.source:
             params['source'] = self.source
 
-        if self.discord_user:
-            params['discord_user'] = self.discord_user
-
-        if self.discord_role:
-            params['discord_role'] = self.discord_role
-
         if self.event:
             params['event'] = self.event
 
@@ -287,6 +249,29 @@ class NotifyNotifiarr(NotifyBase):
         # Acquire image_url
         image_url = self.image_url(notify_type)
 
+        # Define our mentions
+        mentions = {
+            'pingUser': [],
+            'pingRole': [],
+            'content': [],
+        }
+
+        # parse for user id's <@123> and role IDs <@&456>
+        results = USER_ROLE_DETECTION_RE.findall(body)
+        if results:
+            for (is_role, no, value) in results:
+                if value:
+                    # @everybody, @admin, etc - unsupported
+                    mentions['content'].append(f'@{value}')
+
+                elif is_role:
+                    mentions['pingRole'].append(no)
+                    mentions['content'].append(f'<@&{no}>')
+
+                else:  # is_user
+                    mentions['pingUser'].append(no)
+                    mentions['content'].append(f'<@{no}>')
+
         for idx, channel in enumerate(self.targets['channels']):
             # prepare Notifiarr Object
             payload = {
@@ -301,14 +286,17 @@ class NotifyNotifiarr(NotifyBase):
                 'discord': {
                     'color': self.color(notify_type),
                     'ping': {
-                        'pingUser': self.discord_user
-                        if not idx and self.discord_user else 0,
-                        'pingRole': self.discord_role
-                        if not idx and self.discord_role else 0,
+                        # Only 1 user is supported, so truncate the rest
+                        'pingUser': 0 if not mentions['pingUser']
+                        else mentions['pingUser'][0],
+                        # Only 1 role is supported, so truncate the rest
+                        'pingRole': 0 if not mentions['pingRole']
+                        else mentions['pingRole'][0],
                     },
                     'text': {
                         'title': title,
-                        'content': '',
+                        'content': '' if not mentions['content']
+                        else '👉 ' + ' '.join(mentions['content']),
                         'description': body,
                         'footer': self.app_desc,
                     },
@@ -409,17 +397,6 @@ class NotifyNotifiarr(NotifyBase):
 
         # Get channels
         results['targets'] = NotifyNotifiarr.split_path(results['fullpath'])
-
-        if 'discord_user' in results['qsd'] and \
-                len(results['qsd']['discord_user']):
-            results['discord_user'] = \
-                NotifyNotifiarr.unquote(
-                    results['qsd']['discord_user'])
-
-        if 'discord_role' in results['qsd'] and \
-                len(results['qsd']['discord_role']):
-            results['discord_role'] = \
-                NotifyNotifiarr.unquote(results['qsd']['discord_role'])
 
         if 'event' in results['qsd'] and \
                 len(results['qsd']['event']):
