@@ -323,7 +323,7 @@ class NotifyStreamlabs(NotifyBase):
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occured sending Streamlabs '
+                    'A Connection error occurred sending Streamlabs '
                     'alert.'
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))
@@ -368,7 +368,7 @@ class NotifyStreamlabs(NotifyBase):
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occured sending Streamlabs '
+                    'A Connection error occurred sending Streamlabs '
                     'donation.'
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))
