@@ -44,7 +44,8 @@ from ..manager_config import ConfigurationManager
 from ..manager_plugins import NotificationManager
 
 # Test whether token is valid or not
-VALID_TOKEN = re.compile(r"(?P<token>[a-z0-9][a-z0-9_]+)", re.I)
+VALID_TOKEN = re.compile(
+    r'(?P<token>[a-z0-9][a-z0-9_]+)', re.I)
 
 # Grant access to our Notification Manager Singleton
 N_MGR = NotificationManager()
@@ -59,7 +60,7 @@ class ConfigBase(URLBase):
     """
 
     # The Default Encoding to use if not otherwise detected
-    encoding = "utf-8"
+    encoding = 'utf-8'
 
     # The default expected configuration format unless otherwise
     # detected by the sub-modules
@@ -81,9 +82,8 @@ class ConfigBase(URLBase):
     # the config path manages the handling of relative include
     config_path = os.getcwd()
 
-    def __init__(
-        self, cache=True, recursion=0, insecure_includes=False, **kwargs
-    ):
+    def __init__(self, cache=True, recursion=0, insecure_includes=False,
+                 **kwargs):
         """
         Initialize some general logging and common server arguments that will
         keep things consistent when working with the configurations that
@@ -140,19 +140,19 @@ class ConfigBase(URLBase):
         # Initialize our insecure_includes flag
         self.insecure_includes = insecure_includes
 
-        if "encoding" in kwargs:
+        if 'encoding' in kwargs:
             # Store the encoding
-            self.encoding = kwargs.get("encoding")
+            self.encoding = kwargs.get('encoding')
 
-        if "format" in kwargs and isinstance(kwargs["format"], str):
+        if 'format' in kwargs \
+                and isinstance(kwargs['format'], str):
             # Store the enforced config format
-            self.config_format = kwargs.get("format").lower()
+            self.config_format = kwargs.get('format').lower()
 
             if self.config_format not in common.CONFIG_FORMATS:
                 # Simple error checking
-                err = "An invalid config format ({}) was specified.".format(
-                    self.config_format
-                )
+                err = 'An invalid config format ({}) was specified.'.format(
+                    self.config_format)
                 self.logger.warning(err)
                 raise TypeError(err)
 
@@ -160,14 +160,13 @@ class ConfigBase(URLBase):
         try:
             self.cache = cache if isinstance(cache, bool) else int(cache)
             if self.cache < 0:
-                err = "A negative cache value ({}) was specified.".format(
-                    cache
-                )
+                err = 'A negative cache value ({}) was specified.'.format(
+                    cache)
                 self.logger.warning(err)
                 raise TypeError(err)
 
         except (ValueError, TypeError):
-            err = "An invalid cache value ({}) was specified.".format(cache)
+            err = 'An invalid cache value ({}) was specified.'.format(cache)
             self.logger.warning(err)
             raise TypeError(err)
 
@@ -200,14 +199,12 @@ class ConfigBase(URLBase):
 
         # Our Configuration format uses a default if one wasn't one detected
         # or enfored.
-        config_format = (
-            self.default_config_format
-            if self.config_format is None
-            else self.config_format
-        )
+        config_format = \
+            self.default_config_format \
+            if self.config_format is None else self.config_format
 
         # Dynamically load our parse_ function based on our config format
-        fn = getattr(ConfigBase, "config_parse_{}".format(config_format))
+        fn = getattr(ConfigBase, 'config_parse_{}'.format(config_format))
 
         # Initialize our asset object
         asset = asset if isinstance(asset, AppriseAsset) else self.asset
@@ -227,29 +224,27 @@ class ConfigBase(URLBase):
                 schema = GET_SCHEMA_RE.match(url)
                 if schema is None:
                     # Plan B is to assume we're dealing with a file
-                    schema = "file"
+                    schema = 'file'
                     if not os.path.isabs(url):
                         # We're dealing with a relative path; prepend
                         # our current config path
                         url = os.path.join(self.config_path, url)
 
-                    url = "{}://{}".format(schema, URLBase.quote(url))
+                    url = '{}://{}'.format(schema, URLBase.quote(url))
 
                 else:
                     # Ensure our schema is always in lower case
-                    schema = schema.group("schema").lower()
+                    schema = schema.group('schema').lower()
 
                     # Some basic validation
                     if schema not in C_MGR:
                         ConfigBase.logger.warning(
-                            "Unsupported include schema {}.".format(schema)
-                        )
+                            'Unsupported include schema {}.'.format(schema))
                         continue
 
                 # CWE-312 (Secure Logging) Handling
-                loggable_url = (
-                    url if not asset.secure_logging else cwe312_url(url)
-                )
+                loggable_url = url if not asset.secure_logging \
+                    else cwe312_url(url)
 
                 # Parse our url details of the server object as dictionary
                 # containing all of the information parsed from our URL
@@ -257,86 +252,76 @@ class ConfigBase(URLBase):
                 if not results:
                     # Failed to parse the server URL
                     self.logger.warning(
-                        "Unparseable include URL {}".format(loggable_url)
-                    )
+                        'Unparseable include URL {}'.format(loggable_url))
                     continue
 
                 # Handle cross inclusion based on allow_cross_includes rules
-                if (
-                    C_MGR[schema].allow_cross_includes
-                    == common.ContentIncludeMode.STRICT
-                    and schema not in self.schemas()
-                    and not self.insecure_includes
-                ) or C_MGR[
-                    schema
-                ].allow_cross_includes == common.ContentIncludeMode.NEVER:
+                if (C_MGR[schema].allow_cross_includes ==
+                        common.ContentIncludeMode.STRICT
+                        and schema not in self.schemas()
+                        and not self.insecure_includes) or C_MGR[schema] \
+                        .allow_cross_includes == \
+                        common.ContentIncludeMode.NEVER:
 
                     # Prevent the loading if insecure base protocols
                     ConfigBase.logger.warning(
-                        "Including {}:// based configuration is prohibited. "
-                        "Ignoring URL {}".format(schema, loggable_url)
-                    )
+                        'Including {}:// based configuration is prohibited. '
+                        'Ignoring URL {}'.format(schema, loggable_url))
                     continue
 
                 # Prepare our Asset Object
-                results["asset"] = asset
+                results['asset'] = asset
 
                 # No cache is required because we're just lumping this in
                 # and associating it with the cache value we've already
                 # declared (prior to our recursion)
-                results["cache"] = False
+                results['cache'] = False
 
                 # Recursion can never be parsed from the URL; we decrement
                 # it one level
-                results["recursion"] = self.recursion - 1
+                results['recursion'] = self.recursion - 1
 
                 # Insecure Includes flag can never be parsed from the URL
-                results["insecure_includes"] = self.insecure_includes
+                results['insecure_includes'] = self.insecure_includes
 
                 try:
                     # Attempt to create an instance of our plugin using the
                     # parsed URL information
-                    cfg_plugin = C_MGR[results["schema"]](**results)
+                    cfg_plugin = C_MGR[results['schema']](**results)
 
                 except Exception as e:
                     # the arguments are invalid or can not be used.
                     self.logger.warning(
-                        "Could not load include URL: {}".format(loggable_url)
-                    )
-                    self.logger.debug("Loading Exception: {}".format(str(e)))
+                        'Could not load include URL: {}'.format(loggable_url))
+                    self.logger.debug('Loading Exception: {}'.format(str(e)))
                     continue
 
                 # if we reach here, we can now add this servers found
                 # in this configuration file to our list
-                self._cached_servers.extend(cfg_plugin.servers(asset=asset))
+                self._cached_servers.extend(
+                    cfg_plugin.servers(asset=asset))
 
                 # We no longer need our configuration object
                 del cfg_plugin
 
             else:
                 # CWE-312 (Secure Logging) Handling
-                loggable_url = (
-                    url if not asset.secure_logging else cwe312_url(url)
-                )
+                loggable_url = url if not asset.secure_logging \
+                    else cwe312_url(url)
 
                 self.logger.debug(
-                    "Recursion limit reached; ignoring Include URL: %s",
-                    loggable_url,
-                )
+                    'Recursion limit reached; ignoring Include URL: %s',
+                    loggable_url)
 
         if self._cached_servers:
             self.logger.info(
-                "Loaded {} entries from {}".format(
+                'Loaded {} entries from {}'.format(
                     len(self._cached_servers),
-                    self.url(privacy=asset.secure_logging),
-                )
-            )
+                    self.url(privacy=asset.secure_logging)))
         else:
             self.logger.warning(
-                "Failed to load Apprise configuration from {}".format(
-                    self.url(privacy=asset.secure_logging)
-                )
-            )
+                'Failed to load Apprise configuration from {}'.format(
+                    self.url(privacy=asset.secure_logging)))
 
         # Set the time our content was cached at
         self._cached_time = time.time()
@@ -445,8 +430,7 @@ class ConfigBase(URLBase):
             group_tags[tag] |= _expand(set([tag]))
             if not group_tags[tag]:
                 ConfigBase.logger.warning(
-                    "The group {} has no tags assigned to it".format(tag)
-                )
+                    'The group {} has no tags assigned to it'.format(tag))
                 del group_tags[tag]
 
     @staticmethod
@@ -475,28 +459,28 @@ class ConfigBase(URLBase):
             return results
 
         # Allow overriding the default config format
-        if "format" in results["qsd"]:
-            results["format"] = results["qsd"].get("format")
-            if results["format"] not in common.CONFIG_FORMATS:
+        if 'format' in results['qsd']:
+            results['format'] = results['qsd'].get('format')
+            if results['format'] not in common.CONFIG_FORMATS:
                 URLBase.logger.warning(
-                    "Unsupported format specified {}".format(results["format"])
-                )
-                del results["format"]
+                    'Unsupported format specified {}'.format(
+                        results['format']))
+                del results['format']
 
         # Defines the encoding of the payload
-        if "encoding" in results["qsd"]:
-            results["encoding"] = results["qsd"].get("encoding")
+        if 'encoding' in results['qsd']:
+            results['encoding'] = results['qsd'].get('encoding')
 
         # Our cache value
-        if "cache" in results["qsd"]:
+        if 'cache' in results['qsd']:
             # First try to get it's integer value
             try:
-                results["cache"] = int(results["qsd"]["cache"])
+                results['cache'] = int(results['qsd']['cache'])
 
             except (ValueError, TypeError):
                 # No problem, it just isn't an integer; now treat it as a bool
                 # instead:
-                results["cache"] = parse_bool(results["qsd"]["cache"])
+                results['cache'] = parse_bool(results['qsd']['cache'])
 
         return results
 
@@ -522,19 +506,18 @@ class ConfigBase(URLBase):
 
         # Define what a valid line should look like
         valid_line_re = re.compile(
-            r"^\s*(?P<line>([;#]+(?P<comment>.*))|"
-            r"(?P<text>((?P<tag>[ \t,a-z0-9_-]+)=)?[a-z0-9]+://.*)|"
-            r"((?P<yaml>[a-z0-9]+):.*))?$",
-            re.I,
-        )
+            r'^\s*(?P<line>([;#]+(?P<comment>.*))|'
+            r'(?P<text>((?P<tag>[ \t,a-z0-9_-]+)=)?[a-z0-9]+://.*)|'
+            r'((?P<yaml>[a-z0-9]+):.*))?$', re.I)
 
         try:
             # split our content up to read line by line
-            content = re.split(r"\r*\n", content)
+            content = re.split(r'\r*\n', content)
 
         except TypeError:
             # content was not expected string type
-            ConfigBase.logger.error("Invalid Apprise configuration specified.")
+            ConfigBase.logger.error(
+                'Invalid Apprise configuration specified.')
             return None
 
         # By default set our return value to None since we don't know
@@ -549,27 +532,24 @@ class ConfigBase(URLBase):
             if not result:
                 # Invalid syntax
                 ConfigBase.logger.error(
-                    "Undetectable Apprise configuration found "
-                    "based on line {}.".format(line)
-                )
+                    'Undetectable Apprise configuration found '
+                    'based on line {}.'.format(line))
                 # Take an early exit
                 return None
 
             # Attempt to detect configuration
-            if result.group("yaml"):
+            if result.group('yaml'):
                 config_format = common.ConfigFormat.YAML
                 ConfigBase.logger.debug(
-                    "Detected YAML configuration "
-                    "based on line {}.".format(line)
-                )
+                    'Detected YAML configuration '
+                    'based on line {}.'.format(line))
                 break
 
-            elif result.group("text"):
+            elif result.group('text'):
                 config_format = common.ConfigFormat.TEXT
                 ConfigBase.logger.debug(
-                    "Detected TEXT configuration "
-                    "based on line {}.".format(line)
-                )
+                    'Detected TEXT configuration '
+                    'based on line {}.'.format(line))
                 break
 
             # If we reach here, we have a comment entry
@@ -592,20 +572,18 @@ class ConfigBase(URLBase):
 
             if not config_format:
                 # We couldn't detect configuration
-                ConfigBase.logger.error("Could not detect configuration")
+                ConfigBase.logger.error('Could not detect configuration')
                 return (list(), list())
 
         if config_format not in common.CONFIG_FORMATS:
             # Invalid configuration type specified
             ConfigBase.logger.error(
-                "An invalid configuration format ({}) was specified".format(
-                    config_format
-                )
-            )
+                'An invalid configuration format ({}) was specified'.format(
+                    config_format))
             return (list(), list())
 
         # Dynamically load our parse_ function based on our config format
-        fn = getattr(ConfigBase, "config_parse_{}".format(config_format))
+        fn = getattr(ConfigBase, 'config_parse_{}'.format(config_format))
 
         # Execute our config parse function which always returns a list
         return fn(content=content, asset=asset)
@@ -662,22 +640,19 @@ class ConfigBase(URLBase):
 
         # Define what a valid line should look like
         valid_line_re = re.compile(
-            r"^\s*(?P<line>([;#]+(?P<comment>.*))|"
-            r"(\s*(?P<tags>[a-z0-9, \t_-]+)\s*=|=)?\s*"
-            r"((?P<url>[a-z0-9]{1,12}://.*)|(?P<assign>[a-z0-9, \t_-]+))|"
-            r"include\s+(?P<config>.+))?\s*$",
-            re.I,
-        )
+            r'^\s*(?P<line>([;#]+(?P<comment>.*))|'
+            r'(\s*(?P<tags>[a-z0-9, \t_-]+)\s*=|=)?\s*'
+            r'((?P<url>[a-z0-9]{1,12}://.*)|(?P<assign>[a-z0-9, \t_-]+))|'
+            r'include\s+(?P<config>.+))?\s*$', re.I)
 
         try:
             # split our content up to read line by line
-            content = re.split(r"\r*\n", content)
+            content = re.split(r'\r*\n', content)
 
         except TypeError:
             # content was not expected string type
             ConfigBase.logger.error(
-                "Invalid Apprise TEXT based configuration specified."
-            )
+                'Invalid Apprise TEXT based configuration specified.')
             return (list(), list())
 
         for line, entry in enumerate(content, start=1):
@@ -685,9 +660,8 @@ class ConfigBase(URLBase):
             if not result:
                 # Invalid syntax
                 ConfigBase.logger.error(
-                    "Invalid Apprise TEXT configuration format found "
-                    "{} on line {}.".format(entry, line)
-                )
+                    'Invalid Apprise TEXT configuration format found '
+                    '{} on line {}.'.format(entry, line))
 
                 # Assume this is a file we shouldn't be parsing. It's owner
                 # can read the error printed to screen and take action
@@ -695,11 +669,10 @@ class ConfigBase(URLBase):
                 return (list(), list())
 
             # Retrieve our line
-            url, assign, config = (
-                result.group("url"),
-                result.group("assign"),
-                result.group("config"),
-            )
+            url, assign, config = \
+                result.group('url'), \
+                result.group('assign'), \
+                result.group('config')
 
             if not (url or config or assign):
                 # Comment/empty line; do nothing
@@ -707,27 +680,27 @@ class ConfigBase(URLBase):
 
             if config:
                 # CWE-312 (Secure Logging) Handling
-                loggable_url = (
-                    config if not asset.secure_logging else cwe312_url(config)
-                )
+                loggable_url = config if not asset.secure_logging \
+                    else cwe312_url(config)
 
-                ConfigBase.logger.debug("Include URL: {}".format(loggable_url))
+                ConfigBase.logger.debug(
+                    'Include URL: {}'.format(loggable_url))
 
                 # Store our include line
                 configs.append(config.strip())
                 continue
 
             # CWE-312 (Secure Logging) Handling
-            loggable_url = url if not asset.secure_logging else cwe312_url(url)
+            loggable_url = url if not asset.secure_logging \
+                else cwe312_url(url)
 
             if assign:
-                groups = set(parse_list(result.group("tags"), cast=str))
+                groups = set(parse_list(result.group('tags'), cast=str))
                 if not groups:
                     # no tags were assigned
                     ConfigBase.logger.warning(
-                        "Unparseable tag assignment - no group(s) "
-                        "on line {}".format(line)
-                    )
+                        'Unparseable tag assignment - no group(s) '
+                        'on line {}'.format(line))
                     continue
 
                 # Get our tags
@@ -735,9 +708,8 @@ class ConfigBase(URLBase):
                 if not tags:
                     # no tags were assigned
                     ConfigBase.logger.warning(
-                        "Unparseable tag assignment - no tag(s) to assign "
-                        "on line {}".format(line)
-                    )
+                        'Unparseable tag assignment - no tag(s) to assign '
+                        'on line {}'.format(line))
                     continue
 
                 # Update our tag group map
@@ -751,30 +723,27 @@ class ConfigBase(URLBase):
 
             # Acquire our url tokens
             results = plugins.url_to_dict(
-                url, secure_logging=asset.secure_logging
-            )
+                url, secure_logging=asset.secure_logging)
             if results is None:
                 # Failed to parse the server URL
                 ConfigBase.logger.warning(
-                    "Unparseable URL {} on line {}.".format(loggable_url, line)
-                )
+                    'Unparseable URL {} on line {}.'.format(
+                        loggable_url, line))
                 continue
 
             # Build a list of tags to associate with the newly added
             # notifications if any were set
-            results["tag"] = set(parse_list(result.group("tags"), cast=str))
+            results['tag'] = set(parse_list(result.group('tags'), cast=str))
 
             # Set our Asset Object
-            results["asset"] = asset
+            results['asset'] = asset
 
             # Store our preloaded entries
-            preloaded.append(
-                {
-                    "results": results,
-                    "line": line,
-                    "loggable_url": loggable_url,
-                }
-            )
+            preloaded.append({
+                'results': results,
+                'line': line,
+                'loggable_url': loggable_url,
+            })
 
         #
         # Normalize Tag Groups
@@ -787,7 +756,7 @@ class ConfigBase(URLBase):
         #
         for entry in preloaded:
             # Point to our results entry for easier reference below
-            results = entry["results"]
+            results = entry['results']
 
             #
             # Apply our tag groups if they're defined
@@ -795,30 +764,26 @@ class ConfigBase(URLBase):
             for group, tags in group_tags.items():
                 # Detect if anything assigned to this tag also maps back to a
                 # group.  If so we want to add the group to our list
-                if next(
-                    (True for tag in results["tag"] if tag in tags), False
-                ):
-                    results["tag"].add(group)
+                if next((True for tag in results['tag']
+                         if tag in tags), False):
+                    results['tag'].add(group)
 
             try:
                 # Attempt to create an instance of our plugin using the
                 # parsed URL information
-                plugin = N_MGR[results["schema"]](**results)
+                plugin = N_MGR[results['schema']](**results)
 
                 # Create log entry of loaded URL
                 ConfigBase.logger.debug(
-                    "Loaded URL: %s",
-                    plugin.url(privacy=results["asset"].secure_logging),
-                )
+                    'Loaded URL: %s', plugin.url(
+                        privacy=results['asset'].secure_logging))
 
             except Exception as e:
                 # the arguments are invalid or can not be used.
                 ConfigBase.logger.warning(
-                    "Could not load URL {} on line {}.".format(
-                        entry["loggable_url"], entry["line"]
-                    )
-                )
-                ConfigBase.logger.debug("Loading Exception: %s" % str(e))
+                    'Could not load URL {} on line {}.'.format(
+                        entry['loggable_url'], entry['line']))
+                ConfigBase.logger.debug('Loading Exception: %s' % str(e))
                 continue
 
             # if we reach here, we successfully loaded our data
@@ -859,68 +824,60 @@ class ConfigBase(URLBase):
             # Load our data (safely)
             result = yaml.load(content, Loader=yaml.SafeLoader)
 
-        except (
-            AttributeError,
-            yaml.parser.ParserError,
-            yaml.error.MarkedYAMLError,
-        ) as e:
+        except (AttributeError,
+                yaml.parser.ParserError,
+                yaml.error.MarkedYAMLError) as e:
             # Invalid content
-            ConfigBase.logger.error("Invalid Apprise YAML data specified.")
+            ConfigBase.logger.error(
+                'Invalid Apprise YAML data specified.')
             ConfigBase.logger.debug(
-                "YAML Exception:{}{}".format(os.linesep, e)
-            )
+                'YAML Exception:{}{}'.format(os.linesep, e))
             return (list(), list())
 
         if not isinstance(result, dict):
             # Invalid content
             ConfigBase.logger.error(
-                "Invalid Apprise YAML based configuration specified."
-            )
+                'Invalid Apprise YAML based configuration specified.')
             return (list(), list())
 
         # YAML Version
-        version = result.get("version", 1)
+        version = result.get('version', 1)
         if version != 1:
             # Invalid syntax
             ConfigBase.logger.error(
-                "Invalid Apprise YAML version specified {}.".format(version)
-            )
+                'Invalid Apprise YAML version specified {}.'.format(version))
             return (list(), list())
 
         #
         # global asset object
         #
         asset = asset if isinstance(asset, AppriseAsset) else AppriseAsset()
-        tokens = result.get("asset", None)
+        tokens = result.get('asset', None)
         if tokens and isinstance(tokens, dict):
             for k, v in tokens.items():
 
-                if k.startswith("_") or k.endswith("_"):
+                if k.startswith('_') or k.endswith('_'):
                     # Entries are considered reserved if they start or end
                     # with an underscore
                     ConfigBase.logger.warning(
-                        'Ignored asset key "{}".'.format(k)
-                    )
+                        'Ignored asset key "{}".'.format(k))
                     continue
 
-                if not (
-                    hasattr(asset, k)
-                    and isinstance(getattr(asset, k), (bool, str))
-                ):
+                if not (hasattr(asset, k) and
+                        isinstance(getattr(asset, k),
+                                   (bool, str))):
 
                     # We can't set a function or non-string set value
                     ConfigBase.logger.warning(
-                        'Invalid asset key "{}".'.format(k)
-                    )
+                        'Invalid asset key "{}".'.format(k))
                     continue
 
                 if v is None:
                     # Convert to an empty string
-                    v = ""
+                    v = ''
 
-                if isinstance(v, (bool, str)) and isinstance(
-                    getattr(asset, k), bool
-                ):
+                if (isinstance(v, (bool, str))
+                        and isinstance(getattr(asset, k), bool)):
 
                     # If the object in the Asset is a boolean, then
                     # we want to convert the specified string to
@@ -934,15 +891,14 @@ class ConfigBase(URLBase):
                 else:
                     # we must set strings with a string
                     ConfigBase.logger.warning(
-                        'Invalid asset value to "{}".'.format(k)
-                    )
+                        'Invalid asset value to "{}".'.format(k))
                     continue
         #
         # global tag root directive
         #
         global_tags = set()
 
-        tags = result.get("tag", None)
+        tags = result.get('tag', None)
         if tags and isinstance(tags, (list, tuple, str)):
             # Store any preset tags
             global_tags = set(parse_list(tags, cast=str))
@@ -950,7 +906,7 @@ class ConfigBase(URLBase):
         #
         # groups root directive
         #
-        groups = result.get("groups", None)
+        groups = result.get('groups', None)
         if isinstance(groups, dict):
             #
             # Dictionary
@@ -986,10 +942,8 @@ class ConfigBase(URLBase):
             for no, entry in enumerate(groups):
                 if not isinstance(entry, dict):
                     ConfigBase.logger.warning(
-                        "No assignment for group {}, entry #{}".format(
-                            entry, no + 1
-                        )
-                    )
+                        'No assignment for group {}, entry #{}'.format(
+                            entry, no + 1))
                     continue
 
                 for _groups, tags in entry.items():
@@ -1016,7 +970,7 @@ class ConfigBase(URLBase):
 
         # include root directive
         #
-        includes = result.get("include", None)
+        includes = result.get('include', None)
         if isinstance(includes, str):
             # Support a single inline string or multiple ones separated by a
             # comma and/or space
@@ -1041,7 +995,7 @@ class ConfigBase(URLBase):
         #
         # urls root directive
         #
-        urls = result.get("urls", None)
+        urls = result.get('urls', None)
         if not isinstance(urls, (list, tuple)):
             # Not a problem; we simply have no urls
             urls = list()
@@ -1054,7 +1008,8 @@ class ConfigBase(URLBase):
             results = list()
 
             # CWE-312 (Secure Logging) Handling
-            loggable_url = url if not asset.secure_logging else cwe312_url(url)
+            loggable_url = url if not asset.secure_logging \
+                else cwe312_url(url)
 
             if isinstance(url, str):
                 # We're just a simple URL string...
@@ -1064,23 +1019,18 @@ class ConfigBase(URLBase):
                     # config file at least has something to take action
                     # with.
                     ConfigBase.logger.warning(
-                        "Invalid URL {}, entry #{}".format(
-                            loggable_url, no + 1
-                        )
-                    )
+                        'Invalid URL {}, entry #{}'.format(
+                            loggable_url, no + 1))
                     continue
 
                 # We found a valid schema worthy of tracking; store it's
                 # details:
                 _results = plugins.url_to_dict(
-                    url, secure_logging=asset.secure_logging
-                )
+                    url, secure_logging=asset.secure_logging)
                 if _results is None:
                     ConfigBase.logger.warning(
-                        "Unparseable URL {}, entry #{}".format(
-                            loggable_url, no + 1
-                        )
-                    )
+                        'Unparseable URL {}, entry #{}'.format(
+                            loggable_url, no + 1))
                     continue
 
                 # add our results to our global set
@@ -1107,13 +1057,12 @@ class ConfigBase(URLBase):
                         # config file at least has something to take action
                         # with.
                         ConfigBase.logger.warning(
-                            "Ignored entry {} found under urls, "
-                            "entry #{}".format(key, no + 1)
-                        )
+                            'Ignored entry {} found under urls, entry #{}'
+                            .format(key, no + 1))
                         continue
 
                     # Store our schema
-                    schema = _schema.group("schema").lower()
+                    schema = _schema.group('schema').lower()
 
                     # Store our URL and Schema Regex
                     _url = key
@@ -1121,18 +1070,16 @@ class ConfigBase(URLBase):
                 if _url is None:
                     # the loop above failed to match anything
                     ConfigBase.logger.warning(
-                        "Unsupported URL, entry #{}".format(no + 1)
-                    )
+                        'Unsupported URL, entry #{}'.format(no + 1))
                     continue
 
                 _results = plugins.url_to_dict(
-                    _url, secure_logging=asset.secure_logging
-                )
+                    _url, secure_logging=asset.secure_logging)
                 if _results is None:
                     # Setup dictionary
                     _results = {
                         # Minimum requirements
-                        "schema": schema,
+                        'schema': schema,
                     }
 
                 if isinstance(tokens, (list, tuple, set)):
@@ -1148,14 +1095,13 @@ class ConfigBase(URLBase):
                             _url, tokens = next(iter(url.items()))
 
                             # Tags you just can't over-ride
-                            if "schema" in entries:
-                                del entries["schema"]
+                            if 'schema' in entries:
+                                del entries['schema']
 
                             # support our special tokens (if they're present)
                             if schema in N_MGR:
                                 entries = ConfigBase._special_token_handler(
-                                    schema, entries
-                                )
+                                    schema, entries)
 
                             # Extend our dictionary with our new entries
                             r.update(entries)
@@ -1167,8 +1113,7 @@ class ConfigBase(URLBase):
                     # support our special tokens (if they're present)
                     if schema in N_MGR:
                         tokens = ConfigBase._special_token_handler(
-                            schema, tokens
-                        )
+                            schema, tokens)
 
                     # Copy ourselves a template of our parsed URL as a base to
                     # work with
@@ -1187,8 +1132,7 @@ class ConfigBase(URLBase):
             else:
                 # Unsupported
                 ConfigBase.logger.warning(
-                    "Unsupported Apprise YAML entry #{}".format(no + 1)
-                )
+                    'Unsupported Apprise YAML entry #{}'.format(no + 1))
                 continue
 
             # Track our entries
@@ -1201,28 +1145,24 @@ class ConfigBase(URLBase):
                 # Grab our first item
                 _results = results.pop(0)
 
-                if _results["schema"] not in N_MGR:
+                if _results['schema'] not in N_MGR:
                     # the arguments are invalid or can not be used.
                     ConfigBase.logger.warning(
-                        "An invalid Apprise schema ({}) in YAML configuration "
-                        "entry #{}, item #{}".format(
-                            _results["schema"], no + 1, entry
-                        )
-                    )
+                        'An invalid Apprise schema ({}) in YAML configuration '
+                        'entry #{}, item #{}'
+                        .format(_results['schema'], no + 1, entry))
                     continue
 
                 # tag is a special keyword that is managed by Apprise object.
                 # The below ensures our tags are set correctly
-                if "tag" in _results:
+                if 'tag' in _results:
                     # Tidy our list up
-                    _results["tag"] = (
-                        set(parse_list(_results["tag"], cast=str))
-                        | global_tags
-                    )
+                    _results['tag'] = set(
+                        parse_list(_results['tag'], cast=str)) | global_tags
 
                 else:
                     # Just use the global settings
-                    _results["tag"] = global_tags
+                    _results['tag'] = global_tags
 
                 for key in list(_results.keys()):
                     # Strip out any tokens we know that we can't accept and
@@ -1230,41 +1170,29 @@ class ConfigBase(URLBase):
                     match = VALID_TOKEN.match(key)
                     if not match:
                         ConfigBase.logger.warning(
-                            "Ignoring invalid token ({}) found in YAML "
-                            "configuration entry #{}, item #{}".format(
-                                key, no + 1, entry
-                            )
-                        )
+                            'Ignoring invalid token ({}) found in YAML '
+                            'configuration entry #{}, item #{}'
+                            .format(key, no + 1, entry))
                         del _results[key]
 
                 ConfigBase.logger.trace(
-                    "URL #{}: {} unpacked as:{}{}".format(
-                        no + 1,
-                        url,
-                        os.linesep,
-                        os.linesep.join(
-                            [
-                                '{}="{}"'.format(k, a)
-                                for k, a in _results.items()
-                            ]
-                        ),
-                    )
-                )
+                    'URL #{}: {} unpacked as:{}{}'
+                    .format(no + 1, url, os.linesep, os.linesep.join(
+                        ['{}="{}"'.format(k, a)
+                         for k, a in _results.items()])))
 
                 # Prepare our Asset Object
-                _results["asset"] = asset
+                _results['asset'] = asset
 
                 # Handle post processing of result set
                 _results = URLBase.post_process_parse_url_results(_results)
 
                 # Store our preloaded entries
-                preloaded.append(
-                    {
-                        "results": _results,
-                        "entry": no + 1,
-                        "item": entry,
-                    }
-                )
+                preloaded.append({
+                    'results': _results,
+                    'entry': no + 1,
+                    'item': entry,
+                })
 
         #
         # Normalize Tag Groups
@@ -1277,7 +1205,7 @@ class ConfigBase(URLBase):
         #
         for entry in preloaded:
             # Point to our results entry for easier reference below
-            results = entry["results"]
+            results = entry['results']
 
             #
             # Apply our tag groups if they're defined
@@ -1285,30 +1213,28 @@ class ConfigBase(URLBase):
             for group, tags in group_tags.items():
                 # Detect if anything assigned to this tag also maps back to a
                 # group.  If so we want to add the group to our list
-                if next(
-                    (True for tag in results["tag"] if tag in tags), False
-                ):
-                    results["tag"].add(group)
+                if next((True for tag in results['tag']
+                         if tag in tags), False):
+                    results['tag'].add(group)
 
             # Now we generate our plugin
             try:
                 # Attempt to create an instance of our plugin using the
                 # parsed URL information
-                plugin = N_MGR[results["schema"]](**results)
+                plugin = N_MGR[results['schema']](**results)
 
                 # Create log entry of loaded URL
                 ConfigBase.logger.debug(
-                    "Loaded URL: %s",
-                    plugin.url(privacy=results["asset"].secure_logging),
-                )
+                    'Loaded URL: %s', plugin.url(
+                        privacy=results['asset'].secure_logging))
 
             except Exception as e:
                 # the arguments are invalid or can not be used.
                 ConfigBase.logger.warning(
-                    "Could not load Apprise YAML configuration "
-                    "entry #{}, item #{}".format(entry["entry"], entry["item"])
-                )
-                ConfigBase.logger.debug("Loading Exception: %s" % str(e))
+                    'Could not load Apprise YAML configuration '
+                    'entry #{}, item #{}'
+                    .format(entry['entry'], entry['item']))
+                ConfigBase.logger.debug('Loading Exception: %s' % str(e))
                 continue
 
             # if we reach here, we successfully loaded our data
@@ -1351,14 +1277,12 @@ class ConfigBase(URLBase):
         for kw, meta in N_MGR[schema].template_kwargs.items():
 
             # Determine our prefix:
-            prefix = meta.get("prefix", "+")
+            prefix = meta.get('prefix', '+')
 
             # Detect any matches
-            matches = {
-                k[1:]: str(v)
-                for k, v in tokens.items()
-                if k.startswith(prefix)
-            }
+            matches = \
+                {k[1:]: str(v) for k, v in tokens.items()
+                 if k.startswith(prefix)}
 
             if not matches:
                 # we're done with this entry
@@ -1369,9 +1293,8 @@ class ConfigBase(URLBase):
                 tokens[kw] = dict()
 
             # strip out processed tokens
-            tokens = {
-                k: v for k, v in tokens.items() if not k.startswith(prefix)
-            }
+            tokens = {k: v for k, v in tokens.items()
+                      if not k.startswith(prefix)}
 
             # Update our entries
             tokens[kw].update(matches)
@@ -1398,36 +1321,38 @@ class ConfigBase(URLBase):
 
         for key in list(tokens.keys()):
 
-            if key not in class_templates["args"]:
+            if key not in class_templates['args']:
                 # No need to handle non-arg entries
                 continue
 
             # get our `map_to` and/or 'alias_of' value (if it exists)
-            map_to = class_templates["args"][key].get(
-                "alias_of", class_templates["args"][key].get("map_to", "")
-            )
+            map_to = class_templates['args'][key].get(
+                'alias_of', class_templates['args'][key].get('map_to', ''))
 
             if map_to == key:
                 # We're already good as we are now
                 continue
 
-            if map_to in class_templates["tokens"]:
-                meta = class_templates["tokens"][map_to]
+            if map_to in class_templates['tokens']:
+                meta = class_templates['tokens'][map_to]
 
             else:
-                meta = class_templates["args"].get(
-                    map_to, class_templates["args"][key]
-                )
+                meta = class_templates['args'].get(
+                    map_to, class_templates['args'][key])
 
             # Perform a translation/mapping if our code reaches here
             value = tokens[key]
             del tokens[key]
 
             # Detect if we're dealign with a list or not
-            is_list = re.search(r"^list:.*", meta.get("type"), re.IGNORECASE)
+            is_list = re.search(
+                r'^list:.*',
+                meta.get('type'),
+                re.IGNORECASE)
 
             if map_to not in tokens:
-                tokens[map_to] = [] if is_list else meta.get("default")
+                tokens[map_to] = [] if is_list \
+                    else meta.get('default')
 
             elif is_list and not isinstance(tokens.get(map_to), list):
                 # Convert ourselves to a list if we aren't already
@@ -1435,8 +1360,10 @@ class ConfigBase(URLBase):
 
             # Type Conversion
             if re.search(
-                r"^(choice:)?string", meta.get("type"), re.IGNORECASE
-            ) and not isinstance(value, str):
+                    r'^(choice:)?string',
+                    meta.get('type'),
+                    re.IGNORECASE) \
+                    and not isinstance(value, str):
 
                 # Ensure our format is as expected
                 value = str(value)
@@ -1444,7 +1371,7 @@ class ConfigBase(URLBase):
             # Apply any further translations if required (absolute map)
             # This is the case when an arg maps to a token which further
             # maps to a different function arg on the class constructor
-            abs_map = meta.get("map_to", map_to)
+            abs_map = meta.get('map_to', map_to)
 
             # Set our token as how it was provided by the configuration
             if isinstance(tokens.get(map_to), list):

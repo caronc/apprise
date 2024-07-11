@@ -48,7 +48,6 @@ class LunaSeaMode:
     """
     Define LunaSea Notification Modes
     """
-
     # App posts upstream to the developer API on LunaSea's website
     CLOUD = "cloud"
 
@@ -68,142 +67,126 @@ class NotifyLunaSea(NotifyBase):
     """
 
     # The default descriptive name associated with the Notification
-    service_name = "LunaSea"
+    service_name = 'LunaSea'
 
     # The services URL
-    service_url = "https://luasea.app"
+    service_url = 'https://luasea.app'
 
     # The default insecure protocol
-    protocol = ("lunasea", "lsea")
+    protocol = ('lunasea', 'lsea')
 
     # The default secure protocol
-    secure_protocol = ("lunaseas", "lseas")
+    secure_protocol = ('lunaseas', 'lseas')
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_lunasea"
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_lunasea'
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_256
 
     # LunaSea Notification Details
-    cloud_notify_url = "https://notify.lunasea.app"
-    notify_user_path = "/v1/custom/user/{}"
-    notify_device_path = "/v1/custom/device/{}"
+    cloud_notify_url = 'https://notify.lunasea.app'
+    notify_user_path = '/v1/custom/user/{}'
+    notify_device_path = '/v1/custom/device/{}'
 
     # if our hostname matches the following we automatically enforce
     # cloud mode
-    __auto_cloud_host = re.compile(r"(notify\.)?lunasea\.app", re.IGNORECASE)
+    __auto_cloud_host = re.compile(r'(notify\.)?lunasea\.app', re.IGNORECASE)
 
     # Define object templates
     templates = (
-        "{schema}://{targets}",
-        "{schema}://{host}/{targets}",
-        "{schema}://{host}:{port}/{targets}",
-        "{schema}://{user}@{host}/{targets}",
-        "{schema}://{user}@{host}:{port}/{targets}",
-        "{schema}://{user}:{password}@{host}/{targets}",
-        "{schema}://{user}:{password}@{host}:{port}/{targets}",
+        '{schema}://{targets}',
+        '{schema}://{host}/{targets}',
+        '{schema}://{host}:{port}/{targets}',
+        '{schema}://{user}@{host}/{targets}',
+        '{schema}://{user}@{host}:{port}/{targets}',
+        '{schema}://{user}:{password}@{host}/{targets}',
+        '{schema}://{user}:{password}@{host}:{port}/{targets}',
     )
 
     # Define our template tokens
-    template_tokens = dict(
-        NotifyBase.template_tokens,
-        **{
-            "host": {
-                "name": _("Hostname"),
-                "type": "string",
-            },
-            "port": {
-                "name": _("Port"),
-                "type": "int",
-                "min": 1,
-                "max": 65535,
-            },
-            "user": {
-                "name": _("Username"),
-                "type": "string",
-            },
-            "password": {
-                "name": _("Password"),
-                "type": "string",
-                "private": True,
-            },
-            "token": {
-                "name": _("Token"),
-                "type": "string",
-                "private": True,
-            },
-            "target_user": {
-                "name": _("Target User"),
-                "type": "string",
-                "prefix": "@",
-                "map_to": "targets",
-            },
-            "target_device": {
-                "name": _("Target Device"),
-                "type": "string",
-                "prefix": "+",
-                "map_to": "targets",
-            },
-            "targets": {
-                "name": _("Targets"),
-                "type": "list:string",
-                "required": True,
-            },
-        }
-    )
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'host': {
+            'name': _('Hostname'),
+            'type': 'string',
+        },
+        'port': {
+            'name': _('Port'),
+            'type': 'int',
+            'min': 1,
+            'max': 65535,
+        },
+        'user': {
+            'name': _('Username'),
+            'type': 'string',
+        },
+        'password': {
+            'name': _('Password'),
+            'type': 'string',
+            'private': True,
+        },
+        'token': {
+            'name': _('Token'),
+            'type': 'string',
+            'private': True,
+        },
+        'target_user': {
+            'name': _('Target User'),
+            'type': 'string',
+            'prefix': '@',
+            'map_to': 'targets',
+        },
+        'target_device': {
+            'name': _('Target Device'),
+            'type': 'string',
+            'prefix': '+',
+            'map_to': 'targets',
+        },
+        'targets': {
+            'name': _('Targets'),
+            'type': 'list:string',
+            'required': True,
+        },
+    })
 
     # Define our template arguments
-    template_args = dict(
-        NotifyBase.template_args,
-        **{
-            "to": {
-                "alias_of": "targets",
-            },
-            "image": {
-                "name": _("Include Image"),
-                "type": "bool",
-                "default": False,
-                "map_to": "include_image",
-            },
-            "mode": {
-                "name": _("Mode"),
-                "type": "choice:string",
-                "values": LUNASEA_MODES,
-                "default": LunaSeaMode.PRIVATE,
-            },
-        }
-    )
+    template_args = dict(NotifyBase.template_args, **{
+        'to': {
+            'alias_of': 'targets',
+        },
+        'image': {
+            'name': _('Include Image'),
+            'type': 'bool',
+            'default': False,
+            'map_to': 'include_image',
+        },
+        'mode': {
+            'name': _('Mode'),
+            'type': 'choice:string',
+            'values': LUNASEA_MODES,
+            'default': LunaSeaMode.PRIVATE,
+        },
+    })
 
-    def __init__(
-        self,
-        targets=None,
-        mode=None,
-        token=None,
-        include_image=False,
-        **kwargs
-    ):
+    def __init__(self, targets=None, mode=None, token=None,
+                 include_image=False, **kwargs):
         """
         Initialize LunaSea Object
         """
         super().__init__(**kwargs)
 
         # Show image associated with notification
-        self.include_image = (
-            self.template_args["image"]["default"]
-            if include_image is None
-            else include_image
-        )
+        self.include_image = \
+            self.template_args['image']['default'] \
+            if include_image is None else include_image
 
         # Prepare our mode
-        self.mode = (
-            mode.strip().lower()
-            if isinstance(mode, str)
-            else self.template_args["mode"]["default"]
-        )
+        self.mode = mode.strip().lower() \
+            if isinstance(mode, str) \
+            else self.template_args['mode']['default']
 
         if self.mode not in LUNASEA_MODES:
-            msg = "An invalid LunaSea mode ({}) was specified.".format(mode)
+            msg = 'An invalid LunaSea mode ({}) was specified.'.format(mode)
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -211,26 +194,25 @@ class NotifyLunaSea(NotifyBase):
         for target in parse_list(targets):
             if len(target) < 4:
                 self.logger.warning(
-                    "A specified target ({}) is invalid and will be "
-                    "ignored".format(target)
-                )
+                    'A specified target ({}) is invalid and will be '
+                    'ignored'.format(target))
                 continue
 
-            if target[0] == "+":
+            if target[0] == '+':
                 # Device
-                self.targets.append(("+", target[1:]))
+                self.targets.append(('+', target[1:]))
 
-            elif target[0] == "@":
+            elif target[0] == '@':
                 # User
-                self.targets.append(("@", target[1:]))
+                self.targets.append(('@', target[1:]))
 
             else:
                 # User
-                self.targets.append(("@", target))
+                self.targets.append(('@', target))
 
         return
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform LunaSea Notification
         """
@@ -240,29 +222,28 @@ class NotifyLunaSea(NotifyBase):
 
         if not len(self.targets):
             # We have nothing to notify; we're done
-            self.logger.warning("There are no LunaSea targets to notify")
+            self.logger.warning('There are no LunaSea targets to notify')
             return False
 
         # Prepare our headers
         headers = {
-            "User-Agent": self.app_id,
-            "Content-Type": "application/json",
-            "Accept": "application/json",
+            'User-Agent': self.app_id,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
         }
 
         # prepare payload
         payload = {
-            "title": title if title else self.app_desc,
-            "body": body,
+            'title': title if title else self.app_desc,
+            'body': body,
         }
 
         # Acquire image_url
-        image_url = (
-            None if not self.include_image else self.image_url(notify_type)
-        )
+        image_url = None if not self.include_image \
+            else self.image_url(notify_type)
 
         if image_url:
-            payload["image"] = image_url
+            payload['image'] = image_url
 
         # Prepare our Authentication (if defined)
         if self.user and self.password:
@@ -278,31 +259,27 @@ class NotifyLunaSea(NotifyBase):
 
         else:
             # Local Hosting
-            schema = "https" if self.secure else "http"
+            schema = 'https' if self.secure else 'http'
 
-            notify_url = "%s://%s" % (schema, self.host)
+            notify_url = '%s://%s' % (schema, self.host)
             if isinstance(self.port, int):
-                notify_url += ":%d" % self.port
+                notify_url += ':%d' % self.port
 
         # Create a copy of the targets list
         targets = list(self.targets)
         while len(targets):
             target = targets.pop(0)
 
-            if target[0] == "+":
+            if target[0] == '+':
                 url = notify_url + self.notify_device_path.format(target[1])
 
             else:
                 url = notify_url + self.notify_user_path.format(target[1])
 
-            self.logger.debug(
-                "LunaSea POST URL: %s (cert_verify=%r)"
-                % (
-                    url,
-                    self.verify_certificate,
-                )
-            )
-            self.logger.debug("LunaSea Payload: %s" % str(payload))
+            self.logger.debug('LunaSea POST URL: %s (cert_verify=%r)' % (
+                url, self.verify_certificate,
+            ))
+            self.logger.debug('LunaSea Payload: %s' % str(payload))
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -318,26 +295,20 @@ class NotifyLunaSea(NotifyBase):
                 )
 
                 if r.status_code not in (
-                    requests.codes.ok,
-                    requests.codes.no_content,
-                ):
+                        requests.codes.ok, requests.codes.no_content):
                     # We had a problem
-                    status_str = NotifyLunaSea.http_response_code_lookup(
-                        r.status_code
-                    )
+                    status_str = \
+                        NotifyLunaSea.http_response_code_lookup(r.status_code)
 
                     self.logger.warning(
-                        "Failed to deliver payload to LunaSea:"
-                        "{}{}error={}.".format(
+                        'Failed to deliver payload to LunaSea:'
+                        '{}{}error={}.'.format(
                             status_str,
-                            ", " if status_str else "",
-                            r.status_code,
-                        )
-                    )
+                            ', ' if status_str else '',
+                            r.status_code))
 
                     self.logger.debug(
-                        "Response Details:\r\n{}".format(r.content)
-                    )
+                        'Response Details:\r\n{}'.format(r.content))
 
                     has_error = True
 
@@ -346,9 +317,8 @@ class NotifyLunaSea(NotifyBase):
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    "A Connection error occurred communicating with LunaSea."
-                )
-                self.logger.debug("Socket Exception: %s" % str(e))
+                    'A Connection error occurred communicating with LunaSea.')
+                self.logger.debug('Socket Exception: %s' % str(e))
 
                 has_error = True
 
@@ -360,61 +330,49 @@ class NotifyLunaSea(NotifyBase):
         """
 
         params = {
-            "mode": self.mode,
-            "image": "yes" if self.include_image else "no",
+            'mode': self.mode,
+            'image': 'yes' if self.include_image else 'no',
         }
 
         # Our URL parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        auth = ""
+        auth = ''
         if self.user and self.password:
-            auth = "{user}:{password}@".format(
-                user=NotifyLunaSea.quote(self.user, safe=""),
+            auth = '{user}:{password}@'.format(
+                user=NotifyLunaSea.quote(self.user, safe=''),
                 password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=""
-                ),
+                    self.password, privacy, mode=PrivacyMode.Secret,
+                    safe=''),
             )
         elif self.user:
-            auth = "{user}@".format(
-                user=NotifyLunaSea.quote(self.user, safe=""),
+            auth = '{user}@'.format(
+                user=NotifyLunaSea.quote(self.user, safe=''),
             )
 
         if self.mode == LunaSeaMode.PRIVATE:
             default_port = 443 if self.secure else 80
-            return "{schema}://{auth}{host}{port}/{targets}?{params}".format(
-                schema=(
-                    self.secure_protocol[0]
-                    if self.secure
-                    else self.protocol[0]
-                ),
+            return '{schema}://{auth}{host}{port}/{targets}?{params}'.format(
+                schema=self.secure_protocol[0]
+                if self.secure else self.protocol[0],
                 auth=auth,
                 host=self.host,
-                port=(
-                    ""
-                    if self.port is None or self.port == default_port
-                    else ":{}".format(self.port)
-                ),
-                targets="/".join(
-                    [
-                        NotifyLunaSea.quote(x[0] + x[1], safe="@+")
-                        for x in self.targets
-                    ]
-                ),
-                params=NotifyLunaSea.urlencode(params),
+                port='' if self.port is None or self.port == default_port
+                else ':{}'.format(self.port),
+                targets='/'.join(
+                    [NotifyLunaSea.quote(x[0] + x[1], safe='@+')
+                     for x in self.targets]),
+                params=NotifyLunaSea.urlencode(params)
             )
 
         else:  # Cloud mode
-            return "{schema}://{auth}{targets}?{params}".format(
+            return '{schema}://{auth}{targets}?{params}'.format(
                 schema=self.protocol[0],
                 auth=auth,
-                targets="/".join(
-                    [
-                        NotifyLunaSea.quote(x[0] + x[1], safe="@+")
-                        for x in self.targets
-                    ]
-                ),
-                params=NotifyLunaSea.urlencode(params),
+                targets='/'.join(
+                    [NotifyLunaSea.quote(x[0] + x[1], safe='@+')
+                     for x in self.targets]),
+                params=NotifyLunaSea.urlencode(params)
             )
 
     def __len__(self):
@@ -437,26 +395,21 @@ class NotifyLunaSea(NotifyBase):
             return results
 
         # Fetch our targets
-        results["targets"] = NotifyLunaSea.split_path(results["fullpath"])
+        results['targets'] = NotifyLunaSea.split_path(results['fullpath'])
 
         # Boolean to include an image or not
-        results["include_image"] = parse_bool(
-            results["qsd"].get(
-                "image", NotifyLunaSea.template_args["image"]["default"]
-            )
-        )
+        results['include_image'] = parse_bool(results['qsd'].get(
+            'image', NotifyLunaSea.template_args['image']['default']))
 
         # The 'to' makes it easier to use yaml configuration
-        if "to" in results["qsd"] and len(results["qsd"]["to"]):
-            results["targets"] += NotifyLunaSea.parse_list(
-                results["qsd"]["to"]
-            )
+        if 'to' in results['qsd'] and len(results['qsd']['to']):
+            results['targets'] += \
+                NotifyLunaSea.parse_list(results['qsd']['to'])
 
         # Mode override
-        if "mode" in results["qsd"] and results["qsd"]["mode"]:
-            results["mode"] = NotifyLunaSea.unquote(
-                results["qsd"]["mode"].strip().lower()
-            )
+        if 'mode' in results['qsd'] and results['qsd']['mode']:
+            results['mode'] = NotifyLunaSea.unquote(
+                results['qsd']['mode'].strip().lower())
 
         else:
             # We can try to detect the mode based on the validity of the
@@ -464,30 +417,23 @@ class NotifyLunaSea(NotifyBase):
             #
             # This isn't a surfire way to do things though; it's best to
             # specify the mode= flag
-            results["mode"] = (
-                LunaSeaMode.PRIVATE
-                if (
-                    (
-                        is_hostname(results["host"])
-                        or is_ipaddr(results["host"])
-                    )
-                    and results["targets"]
-                )
+            results['mode'] = LunaSeaMode.PRIVATE \
+                if ((is_hostname(results['host'])
+                    or is_ipaddr(results['host'])) and results['targets']) \
                 else LunaSeaMode.CLOUD
-            )
 
-        if results["mode"] == LunaSeaMode.CLOUD:
+        if results['mode'] == LunaSeaMode.CLOUD:
             # Store first entry as it can be a topic too in this case
             # But only if we also rule it out not being the words
             # lunasea.app itself, something that starts wiht an non-alpha
             # numeric character:
-            if not NotifyLunaSea.__auto_cloud_host.search(results["host"]):
+            if not NotifyLunaSea.__auto_cloud_host.search(results['host']):
                 # Add it to the front of the list for consistency
-                results["targets"].insert(0, results["host"])
+                results['targets'].insert(0, results['host'])
 
-        elif results["mode"] == LunaSeaMode.PRIVATE and not (
-            is_hostname(results["host"] or is_ipaddr(results["host"]))
-        ):
+        elif results['mode'] == LunaSeaMode.PRIVATE and \
+                not (is_hostname(results['host'] or
+                     is_ipaddr(results['host']))):
             # Invalid Host for LunaSeaMode.PRIVATE
             return None
 

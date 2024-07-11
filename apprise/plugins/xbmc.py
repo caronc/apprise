@@ -43,15 +43,15 @@ class NotifyXBMC(NotifyBase):
     """
 
     # The default descriptive name associated with the Notification
-    service_name = "Kodi/XBMC"
+    service_name = 'Kodi/XBMC'
 
     # The services URL
-    service_url = "http://kodi.tv/"
+    service_url = 'http://kodi.tv/'
 
-    xbmc_protocol = "xbmc"
-    xbmc_secure_protocol = "xbmcs"
-    kodi_protocol = "kodi"
-    kodi_secure_protocol = "kodis"
+    xbmc_protocol = 'xbmc'
+    xbmc_secure_protocol = 'xbmcs'
+    kodi_protocol = 'kodi'
+    kodi_secure_protocol = 'kodis'
 
     # The default protocols
     protocol = (xbmc_protocol, kodi_protocol)
@@ -60,7 +60,7 @@ class NotifyXBMC(NotifyBase):
     secure_protocol = (xbmc_secure_protocol, kodi_secure_protocol)
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_kodi"
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_kodi'
 
     # Disable throttle rate for XBMC/KODI requests since they are normally
     # local anyway
@@ -84,57 +84,51 @@ class NotifyXBMC(NotifyBase):
 
     # Define object templates
     templates = (
-        "{schema}://{host}",
-        "{schema}://{host}:{port}",
-        "{schema}://{user}:{password}@{host}",
-        "{schema}://{user}:{password}@{host}:{port}",
+        '{schema}://{host}',
+        '{schema}://{host}:{port}',
+        '{schema}://{user}:{password}@{host}',
+        '{schema}://{user}:{password}@{host}:{port}',
     )
 
     # Define our tokens
-    template_tokens = dict(
-        NotifyBase.template_tokens,
-        **{
-            "host": {
-                "name": _("Hostname"),
-                "type": "string",
-                "required": True,
-            },
-            "port": {
-                "name": _("Port"),
-                "type": "int",
-                "min": 1,
-                "max": 65535,
-            },
-            "user": {
-                "name": _("Username"),
-                "type": "string",
-            },
-            "password": {
-                "name": _("Password"),
-                "type": "string",
-                "private": True,
-            },
-        }
-    )
+    template_tokens = dict(NotifyBase.template_tokens, **{
+        'host': {
+            'name': _('Hostname'),
+            'type': 'string',
+            'required': True,
+        },
+        'port': {
+            'name': _('Port'),
+            'type': 'int',
+            'min': 1,
+            'max': 65535,
+        },
+        'user': {
+            'name': _('Username'),
+            'type': 'string',
+        },
+        'password': {
+            'name': _('Password'),
+            'type': 'string',
+            'private': True,
+        },
+    })
 
     # Define our template arguments
-    template_args = dict(
-        NotifyBase.template_args,
-        **{
-            "duration": {
-                "name": _("Duration"),
-                "type": "int",
-                "min": 1,
-                "default": 12,
-            },
-            "image": {
-                "name": _("Include Image"),
-                "type": "bool",
-                "default": True,
-                "map_to": "include_image",
-            },
-        }
-    )
+    template_args = dict(NotifyBase.template_args, **{
+        'duration': {
+            'name': _('Duration'),
+            'type': 'int',
+            'min': 1,
+            'default': 12,
+        },
+        'image': {
+            'name': _('Include Image'),
+            'type': 'bool',
+            'default': True,
+            'map_to': 'include_image',
+        },
+    })
 
     def __init__(self, include_image=True, duration=None, **kwargs):
         """
@@ -143,26 +137,21 @@ class NotifyXBMC(NotifyBase):
         super().__init__(**kwargs)
 
         # Number of seconds to display notification for
-        self.duration = (
-            self.template_args["duration"]["default"]
-            if not (
-                isinstance(duration, int)
-                and self.template_args["duration"]["min"] > 0
-            )
-            else duration
-        )
+        self.duration = self.template_args['duration']['default'] \
+            if not (isinstance(duration, int) and
+                    self.template_args['duration']['min'] > 0) else duration
 
         # Build our schema
-        self.schema = "https" if self.secure else "http"
+        self.schema = 'https' if self.secure else 'http'
 
         # Prepare the default header
         self.headers = {
-            "User-Agent": self.app_id,
-            "Content-Type": "application/json",
+            'User-Agent': self.app_id,
+            'Content-Type': 'application/json'
         }
 
         # Default protocol
-        self.protocol = kwargs.get("protocol", self.xbmc_remote_protocol)
+        self.protocol = kwargs.get('protocol', self.xbmc_remote_protocol)
 
         # Track whether or not we want to send an image with our notification
         # or not.
@@ -177,33 +166,32 @@ class NotifyXBMC(NotifyBase):
 
         # prepare JSON Object
         payload = {
-            "jsonrpc": "2.0",
-            "method": "GUI.ShowNotification",
-            "params": {
-                "title": title,
-                "message": body,
+            'jsonrpc': '2.0',
+            'method': 'GUI.ShowNotification',
+            'params': {
+                'title': title,
+                'message': body,
                 # displaytime is defined in microseconds so we need to just
                 # do some simple math
-                "displaytime": int(self.duration * 1000),
+                'displaytime': int(self.duration * 1000),
             },
-            "id": 1,
+            'id': 1,
         }
 
         # Acquire our image url if configured to do so
-        image_url = (
-            None if not self.include_image else self.image_url(notify_type)
-        )
+        image_url = None if not self.include_image else \
+            self.image_url(notify_type)
 
         if image_url:
-            payload["params"]["image"] = image_url
+            payload['params']['image'] = image_url
             if notify_type is NotifyType.FAILURE:
-                payload["type"] = "error"
+                payload['type'] = 'error'
 
             elif notify_type is NotifyType.WARNING:
-                payload["type"] = "warning"
+                payload['type'] = 'warning'
 
             else:
-                payload["type"] = "info"
+                payload['type'] = 'info'
 
         return (self.headers, dumps(payload))
 
@@ -216,29 +204,28 @@ class NotifyXBMC(NotifyBase):
 
         # prepare JSON Object
         payload = {
-            "jsonrpc": "2.0",
-            "method": "GUI.ShowNotification",
-            "params": {
-                "title": title,
-                "message": body,
+            'jsonrpc': '2.0',
+            'method': 'GUI.ShowNotification',
+            'params': {
+                'title': title,
+                'message': body,
                 # displaytime is defined in microseconds so we need to just
                 # do some simple math
-                "displaytime": int(self.duration * 1000),
+                'displaytime': int(self.duration * 1000),
             },
-            "id": 1,
+            'id': 1,
         }
 
         # Include our logo if configured to do so
-        image_url = (
-            None if not self.include_image else self.image_url(notify_type)
-        )
+        image_url = None if not self.include_image \
+            else self.image_url(notify_type)
 
         if image_url:
-            payload["params"]["image"] = image_url
+            payload['params']['image'] = image_url
 
         return (self.headers, dumps(payload))
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform XBMC/KODI Notification
         """
@@ -246,33 +233,27 @@ class NotifyXBMC(NotifyBase):
         if self.protocol == self.xbmc_remote_protocol:
             # XBMC v2.0
             (headers, payload) = self._payload_20(
-                title, body, notify_type, **kwargs
-            )
+                title, body, notify_type, **kwargs)
 
         else:
             # KODI v6.0
             (headers, payload) = self._payload_60(
-                title, body, notify_type, **kwargs
-            )
+                title, body, notify_type, **kwargs)
 
         auth = None
         if self.user:
             auth = (self.user, self.password)
 
-        url = "%s://%s" % (self.schema, self.host)
+        url = '%s://%s' % (self.schema, self.host)
         if self.port:
-            url += ":%d" % self.port
+            url += ':%d' % self.port
 
-        url += "/jsonrpc"
+        url += '/jsonrpc'
 
-        self.logger.debug(
-            "XBMC/KODI POST URL: %s (cert_verify=%r)"
-            % (
-                url,
-                self.verify_certificate,
-            )
-        )
-        self.logger.debug("XBMC/KODI Payload: %s" % str(payload))
+        self.logger.debug('XBMC/KODI POST URL: %s (cert_verify=%r)' % (
+            url, self.verify_certificate,
+        ))
+        self.logger.debug('XBMC/KODI Payload: %s' % str(payload))
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -288,31 +269,30 @@ class NotifyXBMC(NotifyBase):
             )
             if r.status_code != requests.codes.ok:
                 # We had a problem
-                status_str = NotifyXBMC.http_response_code_lookup(
-                    r.status_code
-                )
+                status_str = \
+                    NotifyXBMC.http_response_code_lookup(r.status_code)
 
                 self.logger.warning(
-                    "Failed to send XBMC/KODI notification: "
-                    "{}{}error={}.".format(
-                        status_str, ", " if status_str else "", r.status_code
-                    )
-                )
+                    'Failed to send XBMC/KODI notification: '
+                    '{}{}error={}.'.format(
+                        status_str,
+                        ', ' if status_str else '',
+                        r.status_code))
 
-                self.logger.debug("Response Details:\r\n{}".format(r.content))
+                self.logger.debug('Response Details:\r\n{}'.format(r.content))
 
                 # Return; we're done
                 return False
 
             else:
-                self.logger.info("Sent XBMC/KODI notification.")
+                self.logger.info('Sent XBMC/KODI notification.')
 
         except requests.RequestException as e:
             self.logger.warning(
-                "A Connection error occurred sending XBMC/KODI "
-                "notification."
+                'A Connection error occurred sending XBMC/KODI '
+                'notification.'
             )
-            self.logger.debug("Socket Exception: %s" % str(e))
+            self.logger.debug('Socket Exception: %s' % str(e))
 
             # Return; we're done
             return False
@@ -326,47 +306,40 @@ class NotifyXBMC(NotifyBase):
 
         # Define any URL parameters
         params = {
-            "image": "yes" if self.include_image else "no",
-            "duration": str(self.duration),
+            'image': 'yes' if self.include_image else 'no',
+            'duration': str(self.duration),
         }
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Determine Authentication
-        auth = ""
+        auth = ''
         if self.user and self.password:
-            auth = "{user}:{password}@".format(
-                user=NotifyXBMC.quote(self.user, safe=""),
+            auth = '{user}:{password}@'.format(
+                user=NotifyXBMC.quote(self.user, safe=''),
                 password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=""
-                ),
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
             )
         elif self.user:
-            auth = "{user}@".format(
-                user=NotifyXBMC.quote(self.user, safe=""),
+            auth = '{user}@'.format(
+                user=NotifyXBMC.quote(self.user, safe=''),
             )
 
-        default_schema = (
-            self.xbmc_protocol
-            if (self.protocol <= self.xbmc_remote_protocol)
-            else self.kodi_protocol
-        )
+        default_schema = self.xbmc_protocol if (
+            self.protocol <= self.xbmc_remote_protocol) else self.kodi_protocol
         default_port = 443 if self.secure else self.xbmc_default_port
         if self.secure:
             # Append 's' to schema
-            default_schema += "s"
+            default_schema += 's'
 
-        return "{schema}://{auth}{hostname}{port}/?{params}".format(
+        return '{schema}://{auth}{hostname}{port}/?{params}'.format(
             schema=default_schema,
             auth=auth,
             # never encode hostname since we're expecting it to be a valid one
             hostname=self.host,
-            port=(
-                ""
-                if not self.port or self.port == default_port
-                else ":{}".format(self.port)
-            ),
+            port='' if not self.port or self.port == default_port
+                 else ':{}'.format(self.port),
             params=NotifyXBMC.urlencode(params),
         )
 
@@ -384,26 +357,25 @@ class NotifyXBMC(NotifyBase):
 
         # We want to set our protocol depending on whether we're using XBMC
         # or KODI
-        if results.get("schema", "").startswith("xbmc"):
+        if results.get('schema', '').startswith('xbmc'):
             # XBMC Support
-            results["protocol"] = NotifyXBMC.xbmc_remote_protocol
+            results['protocol'] = NotifyXBMC.xbmc_remote_protocol
 
             # Assign Default XBMC Port
-            if not results["port"]:
-                results["port"] = NotifyXBMC.xbmc_default_port
+            if not results['port']:
+                results['port'] = NotifyXBMC.xbmc_default_port
 
         else:
             # KODI Support
-            results["protocol"] = NotifyXBMC.kodi_remote_protocol
+            results['protocol'] = NotifyXBMC.kodi_remote_protocol
 
         # Include images with our message
-        results["include_image"] = parse_bool(
-            results["qsd"].get("image", True)
-        )
+        results['include_image'] = \
+            parse_bool(results['qsd'].get('image', True))
 
         # Set duration
         try:
-            results["duration"] = abs(int(results["qsd"].get("duration")))
+            results['duration'] = abs(int(results['qsd'].get('duration')))
 
         except (TypeError, ValueError):
             # Not a valid integer; ignore entry

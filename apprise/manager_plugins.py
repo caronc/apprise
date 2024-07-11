@@ -40,21 +40,21 @@ class NotificationManager(PluginManager):
     """
 
     # Description (used for logging)
-    name = "Notification Plugin"
+    name = 'Notification Plugin'
 
     # Filename Prefix to filter on
-    fname_prefix = "Notify"
+    fname_prefix = 'Notify'
 
     # Memory Space
-    _id = "plugins"
+    _id = 'plugins'
 
     # Our Module Python path name
-    module_name_prefix = f"apprise.{_id}"
+    module_name_prefix = f'apprise.{_id}'
 
     # The module path to scan
     module_path = join(abspath(dirname(__file__)), _id)
 
     # For filtering our result set
     module_filter_re = re.compile(
-        r"^(?P<name>" + fname_prefix + r"(?!Base|ImageSize|Type)[A-Za-z0-9]+)$"
-    )
+        r'^(?P<name>' + fname_prefix +
+        r'(?!Base|ImageSize|Type)[A-Za-z0-9]+)$')
