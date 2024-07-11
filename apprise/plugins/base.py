@@ -62,7 +62,7 @@ class NotifyBase(URLBase):
     #  native: Is a native plugin written/stored in `apprise/plugins/Notify*`
     #  custom: Is a custom plugin written/stored in a users plugin directory
     #          that they loaded at execution time.
-    category = "native"
+    category = 'native'
 
     # Some plugins may require additional packages above what is provided
     # already by Apprise.
@@ -82,7 +82,8 @@ class NotifyBase(URLBase):
         #  from apprise.AppriseLocale import gettext_lazy as _
         #
         # 'details': _('My detailed requirements')
-        "details": None,
+        'details': None,
+
         # Define any required packages needed for the plugin to run.  This is
         # an array of strings that simply look like lines residing in a
         # `requirements.txt` file...
@@ -91,15 +92,17 @@ class NotifyBase(URLBase):
         # 'packages_required': [
         #   'cryptography < 3.4`,
         # ]
-        "packages_required": [],
+        'packages_required': [],
+
         # Recommended packages identify packages that are not required to make
         # your plugin work, but would improve it's use or grant it access to
         # full functionality (that might otherwise be limited).
+
         # Similar to `packages_required`, you would identify each entry in
         # the array as you would in a `requirements.txt` file.
         #
         #   - Do not re-provide entries already in the `packages_required`
-        "packages_recommended": [],
+        'packages_recommended': [],
     }
 
     # The services URL
@@ -154,51 +157,48 @@ class NotifyBase(URLBase):
     # titles, by default apprise tries to give a plesant view and convert the
     # title so that it can be placed into the body. The default is to just
     # use a <b> tag.  The below causes the <b>title</b> to get generated:
-    default_html_tag_id = "b"
+    default_html_tag_id = 'b'
 
     # Here is where we define all of the arguments we accept on the url
     # such as: schema://whatever/?overflow=upstream&format=text
     # These act the same way as tokens except they are optional and/or
     # have default values set if mandatory. This rule must be followed
-    template_args = dict(
-        URLBase.template_args,
-        **{
-            "overflow": {
-                "name": _("Overflow Mode"),
-                "type": "choice:string",
-                "values": OVERFLOW_MODES,
-                # Provide a default
-                "default": overflow_mode,
-                # look up default using the following parent class value at
-                # runtime. The variable name identified here (in this case
-                # overflow_mode) is checked and it's result is placed over-top of
-                # the 'default'. This is done because once a parent class inherits
-                # this one, the overflow_mode already set as a default 'could' be
-                # potentially over-ridden and changed to a different value.
-                "_lookup_default": "overflow_mode",
-            },
-            "format": {
-                "name": _("Notify Format"),
-                "type": "choice:string",
-                "values": NOTIFY_FORMATS,
-                # Provide a default
-                "default": notify_format,
-                # look up default using the following parent class value at
-                # runtime.
-                "_lookup_default": "notify_format",
-            },
-            "emojis": {
-                "name": _("Interpret Emojis"),
-                # SSL Certificate Authority Verification
-                "type": "bool",
-                # Provide a default
-                "default": interpret_emojis,
-                # look up default using the following parent class value at
-                # runtime.
-                "_lookup_default": "interpret_emojis",
-            },
+    template_args = dict(URLBase.template_args, **{
+        'overflow': {
+            'name': _('Overflow Mode'),
+            'type': 'choice:string',
+            'values': OVERFLOW_MODES,
+            # Provide a default
+            'default': overflow_mode,
+            # look up default using the following parent class value at
+            # runtime. The variable name identified here (in this case
+            # overflow_mode) is checked and it's result is placed over-top of
+            # the 'default'. This is done because once a parent class inherits
+            # this one, the overflow_mode already set as a default 'could' be
+            # potentially over-ridden and changed to a different value.
+            '_lookup_default': 'overflow_mode',
         },
-    )
+        'format': {
+            'name': _('Notify Format'),
+            'type': 'choice:string',
+            'values': NOTIFY_FORMATS,
+            # Provide a default
+            'default': notify_format,
+            # look up default using the following parent class value at
+            # runtime.
+            '_lookup_default': 'notify_format',
+        },
+        'emojis': {
+            'name': _('Interpret Emojis'),
+            # SSL Certificate Authority Verification
+            'type': 'bool',
+            # Provide a default
+            'default': interpret_emojis,
+            # look up default using the following parent class value at
+            # runtime.
+            '_lookup_default': 'interpret_emojis',
+        },
+    })
 
     #
     # Overflow Defaults / Configuration applicable to SPLIT mode only
@@ -274,41 +274,39 @@ class NotifyBase(URLBase):
 
         # Take a default
         self.interpret_emojis = self.asset.interpret_emojis
-        if "emojis" in kwargs:
+        if 'emojis' in kwargs:
             # possibly over-ride default
-            self.interpret_emojis = (
-                True
-                if self.interpret_emojis in (None, True)
-                and parse_bool(
-                    kwargs.get("emojis", False),
-                    default=NotifyBase.template_args["emojis"]["default"],
-                )
+            self.interpret_emojis = True if self.interpret_emojis \
+                in (None, True) and \
+                parse_bool(
+                    kwargs.get('emojis', False),
+                    default=NotifyBase.template_args['emojis']['default']) \
                 else False
-            )
 
-        if "format" in kwargs:
+        if 'format' in kwargs:
             # Store the specified format if specified
-            notify_format = kwargs.get("format", "")
+            notify_format = kwargs.get('format', '')
             if notify_format.lower() not in NOTIFY_FORMATS:
-                msg = "Invalid notification format {}".format(notify_format)
+                msg = 'Invalid notification format {}'.format(notify_format)
                 self.logger.error(msg)
                 raise TypeError(msg)
 
             # Provide override
             self.notify_format = notify_format
 
-        if "overflow" in kwargs:
+        if 'overflow' in kwargs:
             # Store the specified format if specified
-            overflow = kwargs.get("overflow", "")
+            overflow = kwargs.get('overflow', '')
             if overflow.lower() not in OVERFLOW_MODES:
-                msg = "Invalid overflow method {}".format(overflow)
+                msg = 'Invalid overflow method {}'.format(overflow)
                 self.logger.error(msg)
                 raise TypeError(msg)
 
             # Provide override
             self.overflow_mode = overflow
 
-    def image_url(self, notify_type, logo=False, extension=None, image_size=None):
+    def image_url(self, notify_type, logo=False, extension=None,
+                  image_size=None):
         """
         Returns Image URL if possible
         """
@@ -426,16 +424,9 @@ class NotifyBase(URLBase):
             the_cors = (do_send(**kwargs2) for kwargs2 in send_calls)
             return all(await asyncio.gather(*the_cors))
 
-    def _build_send_calls(
-        self,
-        body=None,
-        title=None,
-        notify_type=NotifyType.INFO,
-        overflow=None,
-        attach=None,
-        body_format=None,
-        **kwargs,
-    ):
+    def _build_send_calls(self, body=None, title=None,
+                          notify_type=NotifyType.INFO, overflow=None,
+                          attach=None, body_format=None, **kwargs):
         """
         Get a list of dictionaries that can be used to call send() or
         (in the future) async_send().
@@ -457,7 +448,7 @@ class NotifyBase(URLBase):
                 raise
 
             # Handle situations where the body is None
-            body = "" if not body else body
+            body = '' if not body else body
 
         elif not (body or attach):
             # If there is not an attachment at the very least, a body must be
@@ -473,14 +464,13 @@ class NotifyBase(URLBase):
             # Knowing this, if the plugin itself doesn't support sending
             # attachments, there is nothing further to do here, just move
             # along.
-            msg = (
-                f"{self.service_name} does not support attachments; " " service skipped"
-            )
+            msg = f"{self.service_name} does not support attachments; " \
+                " service skipped"
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Handle situations where the title is None
-        title = "" if not title else title
+        title = '' if not title else title
 
         # Truncate flag set with attachments ensures that only 1
         # attachment passes through. In the event there could be many
@@ -497,19 +487,18 @@ class NotifyBase(URLBase):
 
         # Apply our overflow (if defined)
         for chunk in self._apply_overflow(
-            body=body, title=title, overflow=overflow, body_format=body_format
-        ):
+                body=body, title=title, overflow=overflow,
+                body_format=body_format):
 
             # Send notification
             yield dict(
-                body=chunk["body"],
-                title=chunk["title"],
-                notify_type=notify_type,
-                attach=_attach,
-                body_format=body_format,
+                body=chunk['body'], title=chunk['title'],
+                notify_type=notify_type, attach=_attach,
+                body_format=body_format
             )
 
-    def _apply_overflow(self, body, title=None, overflow=None, body_format=None):
+    def _apply_overflow(self, body, title=None, overflow=None,
+                        body_format=None):
         """
         Takes the message body and title as input.  This function then
         applies any defined overflow restrictions associated with the
@@ -550,48 +539,44 @@ class NotifyBase(URLBase):
         if self.title_maxlen <= 0 and len(title) > 0:
             if self.notify_format == NotifyFormat.HTML:
                 # Content is appended to body as html
-                body = "<{open_tag}>{title}</{close_tag}>" "<br />\r\n{body}".format(
-                    open_tag=self.default_html_tag_id,
-                    title=title,
-                    close_tag=self.default_html_tag_id,
-                    body=body,
-                )
+                body = '<{open_tag}>{title}</{close_tag}>' \
+                    '<br />\r\n{body}'.format(
+                        open_tag=self.default_html_tag_id,
+                        title=title,
+                        close_tag=self.default_html_tag_id,
+                        body=body)
 
-            elif (
-                self.notify_format == NotifyFormat.MARKDOWN
-                and body_format == NotifyFormat.TEXT
-            ):
+            elif self.notify_format == NotifyFormat.MARKDOWN and \
+                    body_format == NotifyFormat.TEXT:
                 # Content is appended to body as markdown
-                title = title.lstrip("\r\n \t\v\f#-")
+                title = title.lstrip('\r\n \t\v\f#-')
                 if title:
                     # Content is appended to body as text
-                    body = "# {}\r\n{}".format(title, body)
+                    body = '# {}\r\n{}'.format(title, body)
 
             else:
                 # Content is appended to body as text
-                body = "{}\r\n{}".format(title, body)
+                body = '{}\r\n{}'.format(title, body)
 
-            title = ""
+            title = ''
 
         # Enforce the line count first always
         if self.body_max_line_count > 0:
             # Limit results to just the first 2 line otherwise
             # there is just to much content to display
-            body = re.split(r"\r*\n", body)
-            body = "\r\n".join(body[0 : self.body_max_line_count])
+            body = re.split(r'\r*\n', body)
+            body = '\r\n'.join(body[0:self.body_max_line_count])
 
         if overflow == OverflowMode.UPSTREAM:
             # Nothing more to do
-            response.append({"body": body, "title": title})
+            response.append({'body': body, 'title': title})
             return response
 
         # a value of '2' allows for the \r\n that is applied when
         # amalgamating the title
-        overflow_buffer = (
-            max(2, self.overflow_buffer)
-            if (self.title_maxlen == 0 and len(title))
+        overflow_buffer = max(2, self.overflow_buffer) \
+            if (self.title_maxlen == 0 and len(title)) \
             else self.overflow_buffer
-        )
 
         #
         # If we reach here in our code, then we're using TRUNCATE, or SPLIT
@@ -600,58 +585,44 @@ class NotifyBase(URLBase):
 
         # Handle situations where our body and title are amalamated into one
         # calculation
-        title_maxlen = (
-            self.title_maxlen
-            if not self.overflow_amalgamate_title
-            else min(
-                len(title) + self.overflow_max_display_count_width,
-                self.title_maxlen,
-                self.body_maxlen,
-            )
-        )
+        title_maxlen = self.title_maxlen \
+            if not self.overflow_amalgamate_title \
+            else min(len(title) + self.overflow_max_display_count_width,
+                     self.title_maxlen, self.body_maxlen)
 
         if len(title) > title_maxlen:
             # Truncate our Title
             title = title[:title_maxlen].rstrip()
 
-        if (
-            self.overflow_amalgamate_title
-            and (self.body_maxlen - overflow_buffer) >= title_maxlen
-        ):
-            body_maxlen = (
-                self.body_maxlen if not title else (self.body_maxlen - title_maxlen)
-            ) - overflow_buffer
+        if self.overflow_amalgamate_title and (
+                self.body_maxlen - overflow_buffer) >= title_maxlen:
+            body_maxlen = (self.body_maxlen if not title else (
+                self.body_maxlen - title_maxlen)) - overflow_buffer
         else:
             # status quo
-            body_maxlen = (
-                self.body_maxlen
-                if not self.overflow_amalgamate_title
-                else (self.body_maxlen - overflow_buffer)
-            )
+            body_maxlen = self.body_maxlen \
+                if not self.overflow_amalgamate_title else \
+                (self.body_maxlen - overflow_buffer)
 
         if body_maxlen > 0 and len(body) <= body_maxlen:
-            response.append({"body": body, "title": title})
+            response.append({'body': body, 'title': title})
             return response
 
         if overflow == OverflowMode.TRUNCATE:
             # Truncate our body and return
-            response.append(
-                {
-                    "body": body[:body_maxlen].lstrip("\r\n\x0b\x0c").rstrip(),
-                    "title": title,
-                }
-            )
+            response.append({
+                'body': body[:body_maxlen].lstrip('\r\n\x0b\x0c').rstrip(),
+                'title': title,
+            })
             # For truncate mode, we're done now
             return response
 
         if self.overflow_display_title_once is None:
             # Detect if we only display our title once or not:
-            overflow_display_title_once = (
-                True
-                if self.overflow_amalgamate_title
-                and body_maxlen < self.overflow_display_count_threshold
+            overflow_display_title_once = \
+                True if self.overflow_amalgamate_title and \
+                body_maxlen < self.overflow_display_count_threshold \
                 else False
-            )
         else:
             # Take on defined value
 
@@ -661,81 +632,63 @@ class NotifyBase(URLBase):
         # For here, we want to split the message as many times as we have to
         # in order to fit it within the designated limits.
         if not overflow_display_title_once and not (
-            # edge case that can occur when overflow_display_title_once is
-            # forced off, but no body exists
-            self.overflow_amalgamate_title
-            and body_maxlen <= 0
-        ):
+                # edge case that can occur when overflow_display_title_once is
+                # forced off, but no body exists
+                self.overflow_amalgamate_title and body_maxlen <= 0):
 
-            show_counter = (
-                title
-                and len(body) > body_maxlen
-                and (
-                    (
-                        self.overflow_amalgamate_title
-                        and body_maxlen >= self.overflow_display_count_threshold
-                    )
-                    or (
-                        not self.overflow_amalgamate_title
-                        and title_maxlen > self.overflow_display_count_threshold
-                    )
-                )
-                and (
-                    title_maxlen
-                    > (self.overflow_max_display_count_width + overflow_buffer)
-                    and self.title_maxlen >= self.overflow_display_count_threshold
-                )
-            )
+            show_counter = title and len(body) > body_maxlen and \
+                ((self.overflow_amalgamate_title and
+                  body_maxlen >= self.overflow_display_count_threshold) or
+                 (not self.overflow_amalgamate_title and
+                  title_maxlen > self.overflow_display_count_threshold)) and (
+                title_maxlen > (self.overflow_max_display_count_width +
+                                overflow_buffer) and
+                self.title_maxlen >= self.overflow_display_count_threshold)
 
             count = 0
-            template = ""
+            template = ''
             if show_counter:
                 # introduce padding
                 body_maxlen -= overflow_buffer
 
-                count = int(len(body) / body_maxlen) + (
-                    1 if len(body) % body_maxlen else 0
-                )
+                count = int(len(body) / body_maxlen) \
+                    + (1 if len(body) % body_maxlen else 0)
 
                 # Detect padding and prepare template
                 digits = len(str(count))
-                template = " [{:0%d}/{:0%d}]" % (digits, digits)
+                template = ' [{:0%d}/{:0%d}]' % (digits, digits)
 
                 # Update our counter
                 overflow_display_count_width = 4 + (digits * 2)
-                if (
-                    overflow_display_count_width
-                    <= self.overflow_max_display_count_width
-                ):
-                    if len(title) > title_maxlen - overflow_display_count_width:
+                if overflow_display_count_width <= \
+                        self.overflow_max_display_count_width:
+                    if len(title) > \
+                            title_maxlen - overflow_display_count_width:
                         # Truncate our title further
-                        title = title[: title_maxlen - overflow_display_count_width]
+                        title = title[:title_maxlen -
+                                      overflow_display_count_width]
 
                 else:  # Way to many messages to display
                     show_counter = False
 
-            response = [
-                {
-                    "body": body[i : i + body_maxlen].lstrip("\r\n\x0b\x0c").rstrip(),
-                    "title": title
-                    + ("" if not show_counter else template.format(idx, count)),
-                }
-                for idx, i in enumerate(range(0, len(body), body_maxlen), start=1)
-            ]
+            response = [{
+                'body': body[i: i + body_maxlen]
+                .lstrip('\r\n\x0b\x0c').rstrip(),
+                'title': title + (
+                    '' if not show_counter else
+                    template.format(idx, count))} for idx, i in
+                enumerate(range(0, len(body), body_maxlen), start=1)]
 
-        else:  # Display title once and move on
+        else:   # Display title once and move on
             response = []
             try:
                 i = range(0, len(body), body_maxlen)[0]
 
-                response.append(
-                    {
-                        "body": body[i : i + body_maxlen]
-                        .lstrip("\r\n\x0b\x0c")
-                        .rstrip(),
-                        "title": title,
-                    }
-                )
+                response.append({
+                    'body': body[i: i + body_maxlen]
+                    .lstrip('\r\n\x0b\x0c').rstrip(),
+                    'title': title,
+                })
 
             except (ValueError, IndexError):
                 # IndexError:
@@ -746,35 +699,31 @@ class NotifyBase(URLBase):
                 #    so large)
 
                 # No worries; send title along
-                response.append(
-                    {
-                        "body": "",
-                        "title": title,
-                    }
-                )
+                response.append({
+                    'body': '',
+                    'title': title,
+                })
 
                 # Ensure our start is set properly
                 body_maxlen = 0
 
             # Now re-calculate based on the increased length
             for i in range(body_maxlen, len(body), self.body_maxlen):
-                response.append(
-                    {
-                        "body": body[i : i + self.body_maxlen]
-                        .lstrip("\r\n\x0b\x0c")
-                        .rstrip(),
-                        "title": "",
-                    }
-                )
+                response.append({
+                    'body': body[i: i + self.body_maxlen]
+                    .lstrip('\r\n\x0b\x0c').rstrip(),
+                    'title': '',
+                })
 
         return response
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Should preform the actual notification itself.
 
         """
-        raise NotImplementedError("send() is not implimented by the child class.")
+        raise NotImplementedError(
+            "send() is not implimented by the child class.")
 
     def url_parameters(self, *args, **kwargs):
         """
@@ -784,8 +733,8 @@ class NotifyBase(URLBase):
         """
 
         params = {
-            "format": self.notify_format,
-            "overflow": self.overflow_mode,
+            'format': self.notify_format,
+            'overflow': self.overflow_mode,
         }
 
         params.update(super().url_parameters(*args, **kwargs))
@@ -813,34 +762,33 @@ class NotifyBase(URLBase):
             successful, otherwise None is returned.
         """
         results = URLBase.parse_url(
-            url, verify_host=verify_host, plus_to_space=plus_to_space
-        )
+            url, verify_host=verify_host, plus_to_space=plus_to_space)
 
         if not results:
             # We're done; we failed to parse our url
             return results
 
         # Allow overriding the default format
-        if "format" in results["qsd"]:
-            results["format"] = results["qsd"].get("format")
-            if results["format"] not in NOTIFY_FORMATS:
+        if 'format' in results['qsd']:
+            results['format'] = results['qsd'].get('format')
+            if results['format'] not in NOTIFY_FORMATS:
                 URLBase.logger.warning(
-                    "Unsupported format specified {}".format(results["format"])
-                )
-                del results["format"]
+                    'Unsupported format specified {}'.format(
+                        results['format']))
+                del results['format']
 
         # Allow overriding the default overflow
-        if "overflow" in results["qsd"]:
-            results["overflow"] = results["qsd"].get("overflow")
-            if results["overflow"] not in OVERFLOW_MODES:
+        if 'overflow' in results['qsd']:
+            results['overflow'] = results['qsd'].get('overflow')
+            if results['overflow'] not in OVERFLOW_MODES:
                 URLBase.logger.warning(
-                    "Unsupported overflow specified {}".format(results["overflow"])
-                )
-                del results["overflow"]
+                    'Unsupported overflow specified {}'.format(
+                        results['overflow']))
+                del results['overflow']
 
         # Allow emoji's override
-        if "emojis" in results["qsd"]:
-            results["emojis"] = parse_bool(results["qsd"].get("emojis"))
+        if 'emojis' in results['qsd']:
+            results['emojis'] = parse_bool(results['qsd'].get('emojis'))
 
         return results
 

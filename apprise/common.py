@@ -32,11 +32,10 @@ class NotifyType:
     A simple mapping of notification types most commonly used with
     all types of logging and notification services.
     """
-
-    INFO = "info"
-    SUCCESS = "success"
-    WARNING = "warning"
-    FAILURE = "failure"
+    INFO = 'info'
+    SUCCESS = 'success'
+    WARNING = 'warning'
+    FAILURE = 'failure'
 
 
 NOTIFY_TYPES = (
@@ -52,11 +51,10 @@ class NotifyImageSize:
     A list of pre-defined image sizes to make it easier to work with defined
     plugins.
     """
-
-    XY_32 = "32x32"
-    XY_72 = "72x72"
-    XY_128 = "128x128"
-    XY_256 = "256x256"
+    XY_32 = '32x32'
+    XY_72 = '72x72'
+    XY_128 = '128x128'
+    XY_256 = '256x256'
 
 
 NOTIFY_IMAGE_SIZES = (
@@ -72,10 +70,9 @@ class NotifyFormat:
     A list of pre-defined text message formats that can be passed via the
     apprise library.
     """
-
-    TEXT = "text"
-    HTML = "html"
-    MARKDOWN = "markdown"
+    TEXT = 'text'
+    HTML = 'html'
+    MARKDOWN = 'markdown'
 
 
 NOTIFY_FORMATS = (
@@ -94,15 +91,15 @@ class OverflowMode:
     # Send the data as is; untouched.  Let the upstream server decide how the
     # content is handled.  Some upstream services might gracefully handle this
     # with expected intentions; others might not.
-    UPSTREAM = "upstream"
+    UPSTREAM = 'upstream'
 
     # Always truncate the text when it exceeds the maximum message size and
     # send it anyway
-    TRUNCATE = "truncate"
+    TRUNCATE = 'truncate'
 
     # Split the message into multiple smaller messages that fit within the
     # limits of what is expected.  The smaller messages are sent
-    SPLIT = "split"
+    SPLIT = 'split'
 
 
 # Define our modes so we can verify if we need to
@@ -122,11 +119,11 @@ class ConfigFormat:
     # A text based configuration. This consists of a list of URLs delimited by
     # a new line.  pound/hashtag (#) or semi-colon (;) can be used as comment
     # characters.
-    TEXT = "text"
+    TEXT = 'text'
 
     # YAML files allow a more rich of an experience when settig up your
     # apprise configuration files.
-    YAML = "yaml"
+    YAML = 'yaml'
 
 
 # Define our configuration formats mostly used for verification
@@ -141,18 +138,17 @@ class ContentIncludeMode:
     The different Content inclusion modes.  All content based plugins will
     have one of these associated with it.
     """
-
     # - Content inclusion of same type only; hence a file:// can include
     #   a file://
     # - Cross file inclusion is not allowed unless insecure_includes (a flag)
     #   is set to True. In these cases STRICT acts as type ALWAYS
-    STRICT = "strict"
+    STRICT = 'strict'
 
     # This content type can never be included
-    NEVER = "never"
+    NEVER = 'never'
 
     # This content can always be included
-    ALWAYS = "always"
+    ALWAYS = 'always'
 
 
 CONTENT_INCLUDE_MODES = (
@@ -175,15 +171,14 @@ class ContentLocation:
     Obviously local uses of apprise can access both local and remote
     type files.
     """
-
     # Content is located locally (on the same server as apprise)
-    LOCAL = "local"
+    LOCAL = 'local'
 
     # Content is located in a remote location
-    HOSTED = "hosted"
+    HOSTED = 'hosted'
 
     # Content is inaccessible
-    INACCESSIBLE = "n/a"
+    INACCESSIBLE = 'n/a'
 
 
 CONTENT_LOCATIONS = (
@@ -194,10 +189,10 @@ CONTENT_LOCATIONS = (
 
 # This is a reserved tag that is automatically assigned to every
 # Notification Plugin
-MATCH_ALL_TAG = "all"
+MATCH_ALL_TAG = 'all'
 
 # Will cause notification to trigger under any circumstance even if an
 # exclusive tagging was provided.
-MATCH_ALWAYS_TAG = "always"
+MATCH_ALWAYS_TAG = 'always'
 
 NOT_REQUIRED = object()
