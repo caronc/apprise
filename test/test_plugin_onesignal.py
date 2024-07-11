@@ -36,7 +36,6 @@ from apprise import NOT_REQUIRED
 
 # Disable logging for a cleaner testing output
 import logging
-
 logging.disable(logging.CRITICAL)
 
 # Our Testing URLs
@@ -244,8 +243,7 @@ def test_plugin_onesignal_edge_cases():
     # Users
     #
     obj = Apprise.instantiate(
-        "onesignal://appid@apikey/@user1/@user2/@user3/@user4/?batch=yes"
-    )
+        'onesignal://appid@apikey/@user1/@user2/@user3/@user4/?batch=yes')
     assert isinstance(obj, NotifyOneSignal)
 
     # We can lump these together - no problem
@@ -253,8 +251,7 @@ def test_plugin_onesignal_edge_cases():
 
     # Same query, but no batch mode set
     obj = Apprise.instantiate(
-        "onesignal://appid@apikey/@user1/@user2/@user3/@user4/?batch=no"
-    )
+        'onesignal://appid@apikey/@user1/@user2/@user3/@user4/?batch=no')
     assert isinstance(obj, NotifyOneSignal)
 
     # Individual queries
@@ -264,8 +261,7 @@ def test_plugin_onesignal_edge_cases():
     # Segments
     #
     obj = Apprise.instantiate(
-        "onesignal://appid@apikey/#segment1/#seg2/#seg3/#seg4/?batch=yes"
-    )
+        'onesignal://appid@apikey/#segment1/#seg2/#seg3/#seg4/?batch=yes')
     assert isinstance(obj, NotifyOneSignal)
 
     # We can lump these together - no problem
@@ -273,8 +269,7 @@ def test_plugin_onesignal_edge_cases():
 
     # Same query, but no batch mode set
     obj = Apprise.instantiate(
-        "onesignal://appid@apikey/#segment1/#seg2/#seg3/#seg4/?batch=no"
-    )
+        'onesignal://appid@apikey/#segment1/#seg2/#seg3/#seg4/?batch=no')
     assert isinstance(obj, NotifyOneSignal)
 
     # Individual queries
@@ -284,8 +279,7 @@ def test_plugin_onesignal_edge_cases():
     # Player ID's
     #
     obj = Apprise.instantiate(
-        "onesignal://appid@apikey/pid1/pid2/pid3/pid4/?batch=yes"
-    )
+        'onesignal://appid@apikey/pid1/pid2/pid3/pid4/?batch=yes')
     assert isinstance(obj, NotifyOneSignal)
 
     # We can lump these together - no problem
@@ -293,8 +287,7 @@ def test_plugin_onesignal_edge_cases():
 
     # Same query, but no batch mode set
     obj = Apprise.instantiate(
-        "onesignal://appid@apikey/pid1/pid2/pid3/pid4/?batch=no"
-    )
+        'onesignal://appid@apikey/pid1/pid2/pid3/pid4/?batch=no')
     assert isinstance(obj, NotifyOneSignal)
 
     # Individual queries
@@ -303,10 +296,9 @@ def test_plugin_onesignal_edge_cases():
     #
     # Emails
     #
-    emails = ("abc@yahoo.ca", "def@yahoo.ca", "ghi@yahoo.ca", "jkl@yahoo.ca")
+    emails = ('abc@yahoo.ca', 'def@yahoo.ca', 'ghi@yahoo.ca', 'jkl@yahoo.ca')
     obj = Apprise.instantiate(
-        "onesignal://appid@apikey/{}/?batch=yes".format("/".join(emails))
-    )
+        'onesignal://appid@apikey/{}/?batch=yes'.format('/'.join(emails)))
     assert isinstance(obj, NotifyOneSignal)
 
     # We can lump these together - no problem
@@ -314,8 +306,7 @@ def test_plugin_onesignal_edge_cases():
 
     # Same query, but no batch mode set
     obj = Apprise.instantiate(
-        "onesignal://appid@apikey/{}/?batch=no".format("/".join(emails))
-    )
+        'onesignal://appid@apikey/{}/?batch=no'.format('/'.join(emails)))
     assert isinstance(obj, NotifyOneSignal)
 
     # Individual queries
@@ -324,21 +315,17 @@ def test_plugin_onesignal_edge_cases():
     #
     # Mixed
     #
-    emails = ("abc@yahoo.ca", "def@yahoo.ca", "ghi@yahoo.ca", "jkl@yahoo.ca")
-    users = ("@user1", "@user2", "@user3", "@user4")
-    players = ("player1", "player2", "player3", "player4")
-    segments = ("#seg1", "#seg2", "#seg3", "#seg4")
+    emails = ('abc@yahoo.ca', 'def@yahoo.ca', 'ghi@yahoo.ca', 'jkl@yahoo.ca')
+    users = ('@user1', '@user2', '@user3', '@user4')
+    players = ('player1', 'player2', 'player3', 'player4')
+    segments = ('#seg1', '#seg2', '#seg3', '#seg4')
 
-    path = "{}/{}/{}/{}".format(
-        "/".join(emails),
-        "/".join(users),
-        "/".join(players),
-        "/".join(segments),
-    )
+    path = '{}/{}/{}/{}'.format(
+        '/'.join(emails), '/'.join(users),
+        '/'.join(players), '/'.join(segments))
 
     obj = Apprise.instantiate(
-        "onesignal://appid@apikey/{}/?batch=yes".format(path)
-    )
+        'onesignal://appid@apikey/{}/?batch=yes'.format(path))
     assert isinstance(obj, NotifyOneSignal)
 
     # We can lump these together - no problem
@@ -346,8 +333,7 @@ def test_plugin_onesignal_edge_cases():
 
     # Same query, but no batch mode set
     obj = Apprise.instantiate(
-        "onesignal://appid@apikey/{}/?batch=no".format(path)
-    )
+        'onesignal://appid@apikey/{}/?batch=no'.format(path))
     assert isinstance(obj, NotifyOneSignal)
 
     # Individual queries
