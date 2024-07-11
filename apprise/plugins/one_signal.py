@@ -245,7 +245,9 @@ class NotifyOneSignal(NotifyBase):
         self.template_id = template
 
         # Now our dynamic template data (if defined)
-        self.template_data = template_data if isinstance(template_data, dict) else {}
+        self.template_data = template_data if isinstance(
+            template_data, dict
+        ) else {}
 
         # Adding OneSignal data
         self.onesignal_data = (
@@ -318,11 +320,13 @@ class NotifyOneSignal(NotifyBase):
         if not self.template_id:
             if title is NOT_REQUIRED:
                 raise ValueError(
-                    "Title is required for OneSignal notifications, if there is no template id provided"
+                    "Title is required for OneSignal notifications, "
+                    "if there is no template id provided"
                 )
             if body is NOT_REQUIRED:
                 raise ValueError(
-                    "Body is required for OneSignal notifications, if there is no template id provided"
+                    "Body is required for OneSignal notifications, "
+                    "if there is no template id provided"
                 )
 
         headers = {
@@ -344,7 +348,9 @@ class NotifyOneSignal(NotifyBase):
             'content_available': True,
         }
         if title is not NOT_REQUIRED:
-            payload["headings"] = {self.language: title if title else self.app_desc}
+            payload["headings"] = {
+                self.language: title if title else self.app_desc
+            }
         if body is not NOT_REQUIRED:
             payload["contents"] = {self.language: body}
 
@@ -454,7 +460,9 @@ class NotifyOneSignal(NotifyBase):
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Append our template_data into our parameter list
-        params.update({"+{}".format(k): v for k, v in self.template_data.items()})
+        params.update(
+            {"+{}".format(k): v for k, v in self.template_data.items()}
+        )
 
         # Append onesignal attachment data into our parameter list
         params.update(
