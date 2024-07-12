@@ -161,6 +161,12 @@ class NotifyOneSignal(NotifyBase):
             'type': 'bool',
             'default': False,
         },
+        'contents': {
+            'name': _('Enable Contents'),
+            'type': 'bool',
+            'default': True,
+            'map_to': 'use_contents',
+        },
         'template': {
             'alias_of': 'template',
         },
@@ -175,9 +181,17 @@ class NotifyOneSignal(NotifyBase):
         },
     })
 
+    # Define our token control
+    template_kwargs = {
+        'custom': {
+            'name': _('Custom Data'),
+            'prefix': ':',
+        },
+    }
+
     def __init__(self, app, apikey, targets=None, include_image=True,
-                 template=None, subtitle=None, language=None, batch=False,
-                 **kwargs):
+                 template=None, subtitle=None, language=None, batch=None,
+                 use_contents=None, custom=None, **kwargs):
         """
         Initialize OneSignal
 
@@ -201,7 +215,14 @@ class NotifyOneSignal(NotifyBase):
             raise TypeError(msg)
 
         # Prepare Batch Mode Flag
-        self.batch_size = self.default_batch_size if batch else 1
+        self.batch_size = self.default_batch_size if (
+            batch if batch is not None else
+            self.template_args['batch']['default']) else 1
+
+        # Prepare Use Contents Flag
+        self.use_contents = True if (
+            use_contents if use_contents is not None else
+            self.template_args['contents']['default']) else False
 
         # Place a thumbnail image inline with the message body
         self.include_image = include_image
@@ -273,6 +294,16 @@ class NotifyOneSignal(NotifyBase):
                     'Detected OneSignal Player ID: %s' %
                     self.targets[OneSignalCategory.PLAYER][-1])
 
+        # Custom Data
+        self.custom_data = {}
+        if isinstance(custom, dict):
+            self.custom_data.update(custom)
+
+        elif custom:
+            msg = 'The specified OneSignal Custom Data ' \
+                  '({}) are not identified as a dictionary.'.format(custom)
+            self.logger.warning(msg)
+            raise TypeError(msg)
         return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
@@ -291,14 +322,9 @@ class NotifyOneSignal(NotifyBase):
 
         payload = {
             'app_id': self.app,
-
-            'headings': {
-                self.language: title if title else self.app_desc,
-            },
             'contents': {
                 self.language: body,
             },
-
             # Sending true wakes your app from background to run custom native
             # code (Apple interprets this as content-available=1).
             # Note: Not applicable if the app is in the "force-quit" state
@@ -307,15 +333,33 @@ class NotifyOneSignal(NotifyBase):
             'content_available': True,
         }
 
+        if self.template_id:
+            # Store template information
+            payload['template_id'] = self.template_id
+
+            if not self.use_contents:
+                # Only if a template is defined can contents be removed
+                del payload['contents']
+
+        # Set our data if defined
+        if self.custom_data:
+            payload.update({
+                'data': self.custom_data,
+            })
+
+        if title:
+            # Display our title if defined
+            payload.update({
+                'headings': {
+                    self.language: title,
+                }})
+
         if self.subtitle:
             payload.update({
                 'subtitle': {
                     self.language: self.subtitle,
                 },
             })
-
-        if self.template_id:
-            payload['template_id'] = self.template_id
 
         # Acquire our large_icon image URL (if set)
         image_url = None if not self.include_image \
@@ -406,6 +450,13 @@ class NotifyOneSignal(NotifyBase):
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
+        # Save our template data
+        params.update(
+            {':{}'.format(k): v for k, v in self.custom_data.items()})
+
+        if self.use_contents != self.template_args['contents']['default']:
+            params['contents'] = 'yes' if self.use_contents else 'no'
+
         return '{schema}://{tp_id}{app}@{apikey}/{targets}?{params}'.format(
             schema=self.secure_protocol,
             tp_id='{}:'.format(
@@ -485,6 +536,13 @@ class NotifyOneSignal(NotifyBase):
                     'batch',
                     NotifyOneSignal.template_args['batch']['default']))
 
+        # Get Use Contents Boolean (if set)
+        results['use_contents'] = \
+            parse_bool(
+                results['qsd'].get(
+                    'contents',
+                    NotifyOneSignal.template_args['contents']['default']))
+
         # The API Key is stored in the hostname
         results['apikey'] = NotifyOneSignal.unquote(results['host'])
 
@@ -515,5 +573,8 @@ class NotifyOneSignal(NotifyBase):
         if 'lang' in results['qsd'] and len(results['qsd']['lang']):
             results['language'] = \
                 NotifyOneSignal.unquote(results['qsd']['lang'])
+
+        # Store our custom data
+        results['custom'] = results['qsd:']
 
         return results

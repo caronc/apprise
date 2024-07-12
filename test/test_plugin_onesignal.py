@@ -26,6 +26,9 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from json import loads
+from unittest import mock
+import requests
 from apprise.plugins.one_signal import NotifyOneSignal
 from helpers import AppriseURLTester
 from apprise import Apprise
@@ -105,6 +108,11 @@ apprise_url_tests = (
         # Test Kwargs
         'instance': NotifyOneSignal,
     }),
+    ('onesignal://?apikey=abc&template=tp&app=123&to=playerid&body=no'
+     '&:key1=val1&key2=val2', {
+         # Test Kwargs
+         'instance': NotifyOneSignal,
+     }),
     ('onesignal://appid@apikey/#segment/playerid/', {
         'instance': NotifyOneSignal,
         # throw a bizzare code forcing us to fail to look it up
@@ -244,3 +252,94 @@ def test_plugin_onesignal_edge_cases():
 
     # Individual queries
     assert len(obj) == 16
+
+
+@mock.patch('requests.post')
+def test_plugin_onesignal_notifications(mock_post):
+    """
+    OneSignal() Notifications Support
+
+    """
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    # Load URL with Template
+    instance = Apprise.instantiate(
+        'onesignal://templateid:appid@apikey/@user/?:key1=value1')
+
+    # Validate that it loaded okay
+    assert isinstance(instance, NotifyOneSignal)
+
+    response = instance.notify("hello world")
+    assert response is True
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://onesignal.com/api/v1/notifications'
+
+    details = mock_post.call_args_list[0]
+    payload = loads(details[1]['data'])
+
+    assert payload == {
+        'app_id': 'appid',
+        'contents': {'en': 'hello world'},
+        'content_available': True,
+        'template_id': 'templateid',
+        'data': {'key1': 'value1'},
+        'large_icon': 'https://github.com/caronc/apprise'
+        '/raw/master/apprise/assets/themes/default/apprise-info-72x72.png',
+        'small_icon': 'https://github.com/caronc/apprise'
+        '/raw/master/apprise/assets/themes/default/apprise-info-32x32.png',
+        'include_external_user_ids': ['@user']}
+
+    mock_post.reset_mock()
+
+    # Load URL with Template and disable body
+    instance = Apprise.instantiate(
+        'onesignal://templateid:appid@apikey/@user/?contents=no')
+
+    # Validate that it loaded okay
+    assert isinstance(instance, NotifyOneSignal)
+
+    response = instance.notify("hello world")
+    assert response is True
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://onesignal.com/api/v1/notifications'
+
+    details = mock_post.call_args_list[0]
+    payload = loads(details[1]['data'])
+
+    assert payload == {
+        'app_id': 'appid',
+        'content_available': True,
+        'template_id': 'templateid',
+        'large_icon': 'https://github.com/caronc/apprise'
+        '/raw/master/apprise/assets/themes/default/apprise-info-72x72.png',
+        'small_icon': 'https://github.com/caronc/apprise'
+        '/raw/master/apprise/assets/themes/default/apprise-info-32x32.png',
+        'include_external_user_ids': ['@user']}
+
+    # Now set a title
+    mock_post.reset_mock()
+
+    response = instance.notify("hello world", title="mytitle")
+
+    assert response is True
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://onesignal.com/api/v1/notifications'
+
+    details = mock_post.call_args_list[0]
+    payload = loads(details[1]['data'])
+
+    assert payload == {
+        'app_id': 'appid',
+        'headings': {'en': 'mytitle'},
+        'content_available': True,
+        'template_id': 'templateid',
+        'large_icon': 'https://github.com/caronc/apprise'
+        '/raw/master/apprise/assets/themes/default/apprise-info-72x72.png',
+        'small_icon': 'https://github.com/caronc/apprise'
+        '/raw/master/apprise/assets/themes/default/apprise-info-32x32.png',
+        'include_external_user_ids': ['@user']}
