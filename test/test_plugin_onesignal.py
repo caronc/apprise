@@ -110,7 +110,12 @@ apprise_url_tests = (
         'instance': NotifyOneSignal,
     }),
     ('onesignal://?apikey=abc&template=tp&app=123&to=playerid&body=no'
-     '&:key1=val1&key2=val2', {
+     '&:key1=val1&:key2=val2', {
+         # Test Kwargs
+         'instance': NotifyOneSignal,
+     }),
+    ('onesignal://?apikey=abc&template=tp&app=123&to=playerid&body=no'
+     '&+key1=val1&+key2=val2', {
          # Test Kwargs
          'instance': NotifyOneSignal,
      }),
@@ -259,6 +264,11 @@ def test_plugin_onesignal_edge_cases():
         NotifyOneSignal(
             app='appid', apikey='key', targets=['@user'], custom='not-a-dict')
 
+    # postback must be a dictionary
+    with pytest.raises(TypeError):
+        NotifyOneSignal(
+            app='appid', apikey='key', targets=['@user'], postback='not-a-dict')
+
 
 @mock.patch('requests.post')
 def test_plugin_onesignal_notifications(mock_post):
@@ -272,7 +282,7 @@ def test_plugin_onesignal_notifications(mock_post):
 
     # Load URL with Template
     instance = Apprise.instantiate(
-        'onesignal://templateid:appid@apikey/@user/?:key1=value1')
+        'onesignal://templateid:appid@apikey/@user/?:key1=value1&+key3=value3')
 
     # Validate that it loaded okay
     assert isinstance(instance, NotifyOneSignal)
@@ -291,7 +301,8 @@ def test_plugin_onesignal_notifications(mock_post):
         'contents': {'en': 'hello world'},
         'content_available': True,
         'template_id': 'templateid',
-        'data': {'key1': 'value1'},
+        'custom_data': {'key1': 'value1'},
+        'data': {'key3': 'value3'},
         'large_icon': 'https://github.com/caronc/apprise'
         '/raw/master/apprise/assets/themes/default/apprise-info-72x72.png',
         'small_icon': 'https://github.com/caronc/apprise'

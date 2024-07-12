@@ -187,11 +187,15 @@ class NotifyOneSignal(NotifyBase):
             'name': _('Custom Data'),
             'prefix': ':',
         },
+        'postback': {
+            'name': _('Postback Data'),
+            'prefix': '+',
+        },
     }
 
     def __init__(self, app, apikey, targets=None, include_image=True,
                  template=None, subtitle=None, language=None, batch=None,
-                 use_contents=None, custom=None, **kwargs):
+                 use_contents=None, custom=None, postback=None, **kwargs):
         """
         Initialize OneSignal
 
@@ -298,10 +302,19 @@ class NotifyOneSignal(NotifyBase):
         self.custom_data = {}
         if isinstance(custom, dict):
             self.custom_data.update(custom)
-
         elif custom:
             msg = 'The specified OneSignal Custom Data ' \
                   '({}) are not identified as a dictionary.'.format(custom)
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
+        # Postback Data
+        self.postback_data = {}
+        if isinstance(postback, dict):
+            self.postback_data.update(postback)
+        elif postback:
+            msg = 'The specified OneSignal Postback Data ' \
+                  '({}) are not identified as a dictionary.'.format(postback)
             self.logger.warning(msg)
             raise TypeError(msg)
         return
@@ -344,7 +357,13 @@ class NotifyOneSignal(NotifyBase):
         # Set our data if defined
         if self.custom_data:
             payload.update({
-                'data': self.custom_data,
+                'custom_data': self.custom_data,
+            })
+
+        # Set our postback data if defined
+        if self.postback_data:
+            payload.update({
+                'data': self.postback_data,
             })
 
         if title:
@@ -453,6 +472,10 @@ class NotifyOneSignal(NotifyBase):
         # Save our template data
         params.update(
             {':{}'.format(k): v for k, v in self.custom_data.items()})
+
+        # Save our postback data
+        params.update(
+            {'+{}'.format(k): v for k, v in self.postback_data.items()})
 
         if self.use_contents != self.template_args['contents']['default']:
             params['contents'] = 'yes' if self.use_contents else 'no'
@@ -576,5 +599,8 @@ class NotifyOneSignal(NotifyBase):
 
         # Store our custom data
         results['custom'] = results['qsd:']
+
+        # Store our postback data
+        results['postback'] = results['qsd+']
 
         return results
