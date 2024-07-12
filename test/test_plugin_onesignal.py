@@ -28,6 +28,7 @@
 
 from json import loads
 from unittest import mock
+import pytest
 import requests
 from apprise.plugins.one_signal import NotifyOneSignal
 from helpers import AppriseURLTester
@@ -252,6 +253,11 @@ def test_plugin_onesignal_edge_cases():
 
     # Individual queries
     assert len(obj) == 16
+
+    # custom must be a dictionary
+    with pytest.raises(TypeError):
+        NotifyOneSignal(
+            app='appid', apikey='key', targets=['@user'], custom='not-a-dict')
 
 
 @mock.patch('requests.post')
