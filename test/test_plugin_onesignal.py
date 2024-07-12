@@ -291,7 +291,7 @@ def test_plugin_onesignal_notifications(mock_post):
     assert response is True
     assert mock_post.call_count == 1
     assert mock_post.call_args_list[0][0][0] == \
-        'https://onesignal.com/api/v1/notifications'
+        'https://api.onesignal.com/notifications'
 
     details = mock_post.call_args_list[0]
     payload = loads(details[1]['data'])
@@ -322,7 +322,7 @@ def test_plugin_onesignal_notifications(mock_post):
     assert response is True
     assert mock_post.call_count == 1
     assert mock_post.call_args_list[0][0][0] == \
-        'https://onesignal.com/api/v1/notifications'
+        'https://api.onesignal.com/notifications'
 
     details = mock_post.call_args_list[0]
     payload = loads(details[1]['data'])
@@ -345,7 +345,7 @@ def test_plugin_onesignal_notifications(mock_post):
     assert response is True
     assert mock_post.call_count == 1
     assert mock_post.call_args_list[0][0][0] == \
-        'https://onesignal.com/api/v1/notifications'
+        'https://api.onesignal.com/notifications'
 
     details = mock_post.call_args_list[0]
     payload = loads(details[1]['data'])
