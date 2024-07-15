@@ -145,7 +145,7 @@ def test_conversion_html_to_text():
 </body>
 </html>
      """
-    ) == "TEST Hi! How are you? red font link you wanted."
+    ) == "---\nTEST\n  Hi!\n  How are you?\n  red font link you wanted."
 
     with pytest.raises(TypeError):
         # Invalid input
