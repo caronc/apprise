@@ -158,7 +158,7 @@ red font link you wanted."
         """) == "FROM: apprise-test@mydomain.yyy\n---\nHi!\n \
 How are you?\n red font link you wanted."
 
-    # Special case on HR if text is sorrunded by HR tags 
+    # Special case on HR if text is sorrunded by HR tags
     # its created a dict element
     assert to_html("""
         <html>
