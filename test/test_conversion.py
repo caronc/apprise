@@ -127,6 +127,25 @@ def test_conversion_html_to_text():
     # If you give nothing, you get nothing in return
     assert to_html("") == ""
 
+    assert to_html(
+        """
+<html>
+<head></head>
+<body>
+<p>
+   <hr/><b>TEST</b>
+    <p>
+       Hi!<br/>
+       How are you?<br/>
+       <font color="#FF0000">red font</font> <a href="http://www.python.org">link</a> you wanted.
+    </p>
+</p>
+<br/>
+</body>
+</html>
+     """
+    ) == "TEST Hi! How are you? red font link you wanted."
+
     with pytest.raises(TypeError):
         # Invalid input
         assert to_html(None)
