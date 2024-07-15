@@ -137,7 +137,8 @@ def test_conversion_html_to_text():
     <p>
        Hi!<br/>
        How are you?<br/>
-       <font color="#FF0000">red font</font> <a href="http://www.python.org">link</a> you wanted.
+       <font color="#FF0000">red font</font>
+       <a href="http://www.python.org">link</a> you wanted.
     </p>
 </p>
 <br/>
