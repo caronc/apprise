@@ -127,25 +127,44 @@ def test_conversion_html_to_text():
     # If you give nothing, you get nothing in return
     assert to_html("") == ""
 
+    # Special case on HR tag
     assert to_html(
-        """
-<html>
+"""<html>
+    <head></head>
+    <body>
+        <p><b>FROM: </b>apprise-test@mydomain.yyy<apprise-test@mydomain.yyy></p>
+        Hi!<br/>
+        How are you?<br/>
+        <font color=3D"#FF0000">red font</font> <a href=3D"http://www.python.org">link</a> you wanted.<br/>
+    </body>
+</html>"""
+    ) == "FROM: apprise-test@mydomain.yyy\nHi!\n How are you?\n red font link you wanted."
+
+    assert to_html(
+"""<html>
+    <head></head>
+    <body>
+        <p><hr><b>FROM: </b>apprise-test@mydomain.yyy<apprise-test@mydomain.yyy><hr></p>
+        Hi!<br/>
+        How are you?<br/>
+        <font color=3D"#FF0000">red font</font> <a href=3D"http://www.python.org">link</a> you wanted.<br/>
+    </body>
+</html>"""
+    ) == "---\nFROM: apprise-test@mydomain.yyy\n---\nHi!\n How are you?\n red font link you wanted."
+
+    assert to_html(
+"""<html>
 <head></head>
 <body>
-<p>
-   <hr/><b>TEST</b>
     <p>
-       Hi!<br/>
-       How are you?<br/>
-       <font color="#FF0000">red font</font>
-       <a href="http://www.python.org">link</a> you wanted.
+        <hr><b>TEST</b><hr>
     </p>
-</p>
-<br/>
+    Hi!<br/>
+    How are you?<br/>
+    <font color=3D"#FF0000">red font</font> <a href=3D"http://www.python.org">link</a> you wanted.<br/>
 </body>
-</html>
-     """
-    ) == "TEST\n  Hi!\n  How are you?\n  red font link you wanted.\n---"
+</html>"""
+    ) == "---\nTEST\n---\nHi!\n How are you?\n red font link you wanted."
 
     with pytest.raises(TypeError):
         # Invalid input
