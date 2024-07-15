@@ -147,6 +147,23 @@ red font link you wanted."
         <html>
             <head></head>
             <body>
+                <p><b>FROM: </b>apprise-test@mydomain.yyy
+                    <apprise-test@mydomain.yyy><hr></p>
+                Hi!<br/>
+                How are you?<br/>
+<font color=3D"#FF0000">red font</font>
+<a href=3D"http://www.python.org">link</a> you wanted.<br/>
+            </body>
+        </html>
+        """) == "FROM: apprise-test@mydomain.yyy\n---\nHi!\n \
+How are you?\n red font link you wanted."
+
+    # Special case on HR if text is sorrunded by HR tags 
+    # its created a dict element
+    assert to_html("""
+        <html>
+            <head></head>
+            <body>
                 <p><hr><b>FROM: </b>apprise-test@mydomain.yyy
                     <apprise-test@mydomain.yyy><hr></p>
                 Hi!<br/>
