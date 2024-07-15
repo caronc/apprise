@@ -1,0 +1,144 @@
+name: Tests
+
+on:
+
+  # On which repository actions to trigger the build.
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+  # Allow job to be triggered manually.
+  workflow_dispatch:
+
+# Cancel in-progress jobs when pushing to the same branch.
+concurrency:
+  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+
+  tests:
+
+    runs-on: ${{ matrix.os }}
+    strategy:
+
+      # Run all jobs to completion (false), or cancel
+      # all jobs once the first one fails (true).
+      fail-fast: true
+
+      # Define a minimal test matrix, it will be
+      # expanded using subsequent `include` items.
+      matrix:
+        os: ["ubuntu-latest"]
+        python-version: ["3.11"]
+        bare: [false]
+
+        include:
+
+          # Within the `bare` environment, `all-plugin-requirements.txt` will NOT be
+          # installed, to verify the application also works without those dependencies.
+          - os: "ubuntu-latest"
+            python-version: "3.11"
+            bare: true
+
+          # Let's save resources and only build a single slot on macOS- and Windows.
+          - os: "macos-latest"
+            python-version: "3.11"
+          - os: "windows-latest"
+            python-version: "3.11"
+
+          # Test more available versions of CPython on Linux.
+          - os: "ubuntu-latest"
+            python-version: "3.7"
+          - os: "ubuntu-latest"
+            python-version: "3.8"
+          - os: "ubuntu-latest"
+            python-version: "3.9"
+          - os: "ubuntu-latest"
+            python-version: "3.10"
+          - os: "ubuntu-latest"
+            python-version: "3.11"
+          - os: "ubuntu-latest"
+            python-version: "3.12"
+
+    defaults:
+      run:
+        shell: bash
+
+    env:
+      OS: ${{ matrix.os }}
+      PYTHON: ${{ matrix.python-version }}
+      BARE: ${{ matrix.bare }}
+
+    name: Python ${{ matrix.python-version }} on ${{ matrix.os }} ${{ matrix.bare && '(bare)' || '' }}
+    steps:
+
+    - name: Acquire sources
+      uses: actions/checkout@v3
+
+    - name: Install prerequisites (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install libdbus-1-dev
+
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        architecture: x64
+        cache: 'pip'
+        cache-dependency-path: |
+          setup.py
+          requirements.txt
+          dev-requirements.txt
+          all-plugin-requirements.txt
+          win-requirements.txt
+
+    - name: Install project dependencies (Baseline)
+      run: |
+        pip install wheel
+        pip install -r requirements.txt -r dev-requirements.txt
+
+    - name: Install project dependencies (All plugins)
+      if: matrix.bare != true
+      run: |
+        pip install -r all-plugin-requirements.txt
+        
+    - name: Install project dependencies (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        pip install -r win-requirements.txt || true
+
+    # Install package in editable mode,
+    # and run project-specific tasks.
+    - name: Setup project
+      run: |
+        python -m pip install --upgrade pip setuptools wheel
+        pip install --editable=.
+        python setup.py compile_catalog
+
+    # For saving resources, code style checking is
+    # only invoked within the `bare` environment.
+    - name: Check code style
+      if: matrix.bare == true
+      run: |
+        flake8 . --count --show-source --statistics
+
+    - name: Run tests
+      run: |
+        coverage run -m pytest
+
+    - name: Process coverage data
+      run: |
+        coverage combine
+        coverage xml
+        coverage report
+
+    - name: Upload coverage data
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./coverage.xml
+        fail_ci_if_error: false
+        token: ${{ secrets.CODECOV_TOKEN }}
