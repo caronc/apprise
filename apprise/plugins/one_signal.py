@@ -300,8 +300,9 @@ class NotifyOneSignal(NotifyBase):
 
         # Custom Data
         self.custom_data = {}
-        if isinstance(custom, dict):
+        if custom and isinstance(custom, dict):
             self.custom_data.update(custom)
+
         elif custom:
             msg = 'The specified OneSignal Custom Data ' \
                   '({}) are not identified as a dictionary.'.format(custom)
@@ -310,8 +311,9 @@ class NotifyOneSignal(NotifyBase):
 
         # Postback Data
         self.postback_data = {}
-        if isinstance(postback, dict):
+        if postback and isinstance(postback, dict):
             self.postback_data.update(postback)
+
         elif postback:
             msg = 'The specified OneSignal Postback Data ' \
                   '({}) are not identified as a dictionary.'.format(postback)

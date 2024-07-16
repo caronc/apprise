@@ -267,7 +267,8 @@ def test_plugin_onesignal_edge_cases():
     # postback must be a dictionary
     with pytest.raises(TypeError):
         NotifyOneSignal(
-            app='appid', apikey='key', targets=['@user'], postback='not-a-dict')
+            app='appid', apikey='key', targets=['@user'],
+            custom=[], postback='not-a-dict')
 
 
 @mock.patch('requests.post')
