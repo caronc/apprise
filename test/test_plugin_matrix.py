@@ -258,18 +258,21 @@ def test_plugin_matrix_general(mock_post, mock_get, mock_put):
     assert isinstance(obj.url(), str)
     # Registration successful
     assert obj.send(body="test") is True
+    del obj
 
     obj = NotifyMatrix(host='host', user='user', targets='#abcd')
     assert isinstance(obj, NotifyMatrix)
     assert isinstance(obj.url(), str)
     # Registration successful
     assert obj.send(body="test") is True
+    del obj
 
     obj = NotifyMatrix(host='host', password='passwd', targets='#abcd')
     assert isinstance(obj, NotifyMatrix)
     assert isinstance(obj.url(), str)
     # A username gets automatically generated in these cases
     assert obj.send(body="test") is True
+    del obj
 
     obj = NotifyMatrix(
         host='host', user='user', password='passwd', targets='#abcd')
@@ -277,6 +280,7 @@ def test_plugin_matrix_general(mock_post, mock_get, mock_put):
     assert isinstance(obj, NotifyMatrix)
     # Registration Successful
     assert obj.send(body="test") is True
+    del obj
 
     # Test sending other format types
     kwargs = NotifyMatrix.parse_url(
@@ -286,6 +290,7 @@ def test_plugin_matrix_general(mock_post, mock_get, mock_put):
     assert isinstance(obj, NotifyMatrix)
     assert obj.send(body="test") is True
     assert obj.send(title="title", body="test") is True
+    del obj
 
     kwargs = NotifyMatrix.parse_url(
         'matrix://user:passwd@hostname/#abcd/#abcd:localhost?format=markdown')
@@ -294,6 +299,7 @@ def test_plugin_matrix_general(mock_post, mock_get, mock_put):
     assert isinstance(obj, NotifyMatrix)
     assert obj.send(body="test") is True
     assert obj.send(title="title", body="test") is True
+    del obj
 
     kwargs = NotifyMatrix.parse_url(
         'matrix://user:passwd@hostname/#abcd/!abcd:localhost?format=text')
@@ -302,6 +308,7 @@ def test_plugin_matrix_general(mock_post, mock_get, mock_put):
     assert isinstance(obj, NotifyMatrix) is True
     obj.send(body="test") is True
     obj.send(title="title", body="test") is True
+    del obj
 
     # Test notice type notifications
     kwargs = NotifyMatrix.parse_url(
@@ -316,7 +323,7 @@ def test_plugin_matrix_general(mock_post, mock_get, mock_put):
         # invalid message type specified
         kwargs = NotifyMatrix.parse_url(
             'matrix://user:passwd@hostname/#abcd?msgtype=invalid')
-        obj = NotifyMatrix(**kwargs)
+        NotifyMatrix(**kwargs)
 
     # Force a failed login
     ro = response_obj.copy()
@@ -326,17 +333,20 @@ def test_plugin_matrix_general(mock_post, mock_get, mock_put):
 
     # Fails because we couldn't register because of 404 errors
     assert obj.send(body="test") is False
+    del obj
 
     obj = NotifyMatrix(host='host', user='test', targets='#abcd')
     assert isinstance(obj, NotifyMatrix) is True
     # Fails because we still couldn't register
     assert obj.send(user='test', password='passwd', body="test") is False
+    del obj
 
     obj = NotifyMatrix(
         host='host', user='test', password='passwd', targets='#abcd')
     assert isinstance(obj, NotifyMatrix) is True
     # Fails because we still couldn't register
     assert obj.send(body="test") is False
+    del obj
 
     obj = NotifyMatrix(host='host', password='passwd', targets='#abcd')
     # Fails because we still couldn't register
@@ -365,6 +375,7 @@ def test_plugin_matrix_general(mock_post, mock_get, mock_put):
     # Fall back to original template
     request.content = dumps(response_obj)
     request.status_code = requests.codes.ok
+    del obj
 
     obj = NotifyMatrix(host='host', targets=None)
     assert isinstance(obj, NotifyMatrix) is True
@@ -382,6 +393,7 @@ def test_plugin_matrix_general(mock_post, mock_get, mock_put):
     # our room list is empty so we'll have retrieved the joined_list
     # as our backup
     assert obj.send(user='test', password='passwd', body="test") is True
+    del obj
 
 
 @mock.patch('requests.put')
@@ -430,6 +442,7 @@ def test_plugin_matrix_fetch(mock_post, mock_get, mock_put):
     assert isinstance(obj, NotifyMatrix) is True
     # We would hve failed to send our image notification
     assert obj.send(user='test', password='passwd', body="test") is False
+    del obj
 
     # Do the same query with no images to fetch
     asset = AppriseAsset(image_path_mask=False, image_url_mask=False)
@@ -438,6 +451,7 @@ def test_plugin_matrix_fetch(mock_post, mock_get, mock_put):
     assert isinstance(obj, NotifyMatrix) is True
     # We would hve failed to send our notification
     assert obj.send(user='test', password='passwd', body="test") is False
+    del obj
 
     response_obj = {
         # Registration
@@ -489,6 +503,7 @@ def test_plugin_matrix_fetch(mock_post, mock_get, mock_put):
     })
     code, response = obj._fetch('/retry/apprise/unit/test')
     assert code is False
+    del obj
 
 
 @mock.patch('requests.put')
@@ -550,6 +565,7 @@ def test_plugin_matrix_auth(mock_post, mock_get, mock_put):
     # Our registration will fail now
     assert obj._register() is False
     assert obj.access_token is None
+    del obj
 
     # So will login
     obj = NotifyMatrix(host='host', user='user', password='password')
@@ -585,6 +601,7 @@ def test_plugin_matrix_auth(mock_post, mock_get, mock_put):
     # code in the response, then we return a True
     assert obj._logout() is True
     assert obj.access_token is None
+    del obj
 
 
 @mock.patch('requests.put')
@@ -673,6 +690,7 @@ def test_plugin_matrix_rooms(mock_post, mock_get, mock_put):
     assert obj._room_join('abc123:localhost') is None
     obj._room_cache = {}
     assert obj._room_join('#abc123:localhost') is None
+    del obj
 
     # Room creation
     request.status_code = requests.codes.ok
@@ -717,6 +735,7 @@ def test_plugin_matrix_rooms(mock_post, mock_get, mock_put):
     obj._room_cache = {}
     # This causes us to look up a channel ID if we get a ROOM_IN_USE response
     assert obj._room_create('#abc123:localhost') is None
+    del obj
 
     # Room detection
     request.status_code = requests.codes.ok
@@ -744,6 +763,7 @@ def test_plugin_matrix_rooms(mock_post, mock_get, mock_put):
     response = obj._joined_rooms()
     assert isinstance(response, list) is True
     assert len(response) == 0
+    del obj
 
     # Room id lookup
     request.status_code = requests.codes.ok
@@ -842,6 +862,7 @@ def test_plugin_matrix_image_errors(mock_post, mock_get, mock_put):
     # Notification was successful, however we could not post image and since
     # we had post errors (of any kind) we still report a failure.
     assert obj.notify('test', 'test') is False
+    del obj
 
     obj = NotifyMatrix(host='host', include_image=False, version='2')
     assert isinstance(obj, NotifyMatrix) is True
@@ -881,6 +902,7 @@ def test_plugin_matrix_image_errors(mock_post, mock_get, mock_put):
     assert obj.access_token is None
 
     assert obj.notify('test', 'test') is True
+    del obj
 
     obj = NotifyMatrix(host='host', include_image=False)
     assert isinstance(obj, NotifyMatrix) is True
@@ -1206,6 +1228,7 @@ def test_plugin_matrix_transaction_ids_api_v3(mock_post, mock_get, mock_put):
 
         # Force a object removal (thus a logout call)
         del obj
+
         assert mock_get.call_count == 0
         assert mock_post.call_count == 1
         assert mock_post.call_args_list[0][0][0] == \
