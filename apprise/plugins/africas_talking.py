@@ -30,6 +30,7 @@
 #  https://account.africastalking.com/
 #  From here... acquire your APIKey
 #
+# API Details: https://developers.africastalking.com/docs/sms/sending/bulk
 import requests
 
 from .base import NotifyBase
@@ -39,6 +40,28 @@ from ..utils import parse_bool
 from ..utils import parse_phone_no
 from ..utils import validate_regex
 from ..locale import gettext_lazy as _
+
+
+class AfricasTalkingSMSMode:
+    """
+    Africas Talking SMS Mode
+    """
+    # BulkSMS Mode
+    BULKSMS = 'bulksms'
+
+    # Premium Mode
+    PREMIUM = 'premium'
+
+    # Sandbox Mode
+    SANDBOX = 'sandbox'
+
+
+# Define the types in a list for validation purposes
+AFRICAS_TALKING_SMS_MODES = (
+    AfricasTalkingSMSMode.BULKSMS,
+    AfricasTalkingSMSMode.PREMIUM,
+    AfricasTalkingSMSMode.SANDBOX,
+)
 
 
 # Extend HTTP Error Messages
@@ -77,8 +100,15 @@ class NotifyAfricasTalking(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_africas_talking'
 
-    # Africas Talking API Request
-    notify_url = 'https://api.sandbox.africastalking.com/version1/messaging'
+    # Africas Talking API Request URLs
+    notify_url = {
+        AfricasTalkingSMSMode.BULKSMS:
+        'https://api.africastalking.com/version1/messaging',
+        AfricasTalkingSMSMode.PREMIUM:
+        'https://content.africastalking.com/version1/messaging',
+        AfricasTalkingSMSMode.SANDBOX:
+        'https://api.sandbox.africastalking.com/version1/messaging',
+    }
 
     # The maximum allowable characters allowed in the title per message
     title_maxlen = 0
@@ -130,7 +160,8 @@ class NotifyAfricasTalking(NotifyBase):
             'alias_of': 'apikey',
         },
         'from': {
-            'name': _('From Phone No'),
+            # Your registered short code or alphanumeric
+            'name': _('From'),
             'type': 'string',
             'default': 'AFRICASTKNG',
             'map_to': 'sender',
@@ -140,10 +171,16 @@ class NotifyAfricasTalking(NotifyBase):
             'type': 'bool',
             'default': False,
         },
+        'mode': {
+            'name': _('SMS Mode'),
+            'type': 'choice:string',
+            'values': AFRICAS_TALKING_SMS_MODES,
+            'default': AFRICAS_TALKING_SMS_MODES[0],
+        },
     })
 
     def __init__(self, appuser, apikey, targets=None, sender=None, batch=None,
-                 **kwargs):
+                 mode=None, **kwargs):
         """
         Initialize Africas Talking Object
         """
@@ -172,6 +209,22 @@ class NotifyAfricasTalking(NotifyBase):
         # Prepare Batch Mode Flag
         self.batch = self.template_args['batch']['default'] \
             if batch is None else batch
+
+        self.mode = self.template_args['mode']['default'] \
+            if not isinstance(mode, str) else mode.lower()
+
+        if isinstance(mode, str) and mode:
+            self.mode = next(
+                (a for a in AFRICAS_TALKING_SMS_MODES if a.startswith(
+                    mode.lower())), None)
+
+            if self.mode not in AFRICAS_TALKING_SMS_MODES:
+                msg = 'The Africas Talking mode specified ({}) is invalid.'\
+                    .format(mode)
+                self.logger.warning(msg)
+                raise TypeError(msg)
+        else:
+            self.mode = self.template_args['mode']['default']
 
         # Parse our targets
         self.targets = list()
@@ -226,9 +279,12 @@ class NotifyAfricasTalking(NotifyBase):
                 'message': body,
             }
 
+            # Acquire our URL
+            notify_url = self.notify_url[self.mode]
+
             self.logger.debug(
                 'Africas Talking POST URL: %s (cert_verify=%r)' % (
-                    self.notify_url, self.verify_certificate))
+                    notify_url, self.verify_certificate))
             self.logger.debug('Africas Talking Payload: %s' % str(payload))
 
             # Printable target detail
@@ -240,7 +296,7 @@ class NotifyAfricasTalking(NotifyBase):
             self.throttle()
             try:
                 r = requests.post(
-                    self.notify_url,
+                    notify_url,
                     data=payload,
                     headers=headers,
                     verify=self.verify_certificate,
@@ -311,6 +367,10 @@ class NotifyAfricasTalking(NotifyBase):
         if self.sender != self.template_args['from']['default']:
             # Set our sender if it was set
             params['from'] = self.sender
+
+        if self.mode != self.template_args['mode']['default']:
+            # Set our mode
+            params['mode'] = self.mode
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
@@ -386,6 +446,11 @@ class NotifyAfricasTalking(NotifyBase):
         if 'to' in results['qsd'] and len(results['qsd']['to']):
             results['targets'] += \
                 NotifyAfricasTalking.parse_phone_no(results['qsd']['to'])
+
+        # Get our Mode
+        if 'mode' in results['qsd'] and len(results['qsd']['mode']):
+            results['mode'] = \
+                NotifyAfricasTalking.unquote(results['qsd']['mode'])
 
         # Get Batch Mode Flag
         results['batch'] = \

@@ -70,6 +70,17 @@ apprise_url_tests = (
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'atalk://user@a...y/+44444444444',
     }),
+    ('atalk://user@apikey/+{}?mode=invalid'.format('4' * 11), {
+        'instance': TypeError
+    }),
+    ('atalk://user@apikey/+{}?mode=s'.format('4' * 11), {
+        # S will match the sandbox
+        'instance': NotifyAfricasTalking,
+    }),
+    ('atalk://user@apikey/+{}?mode=PREM'.format('4' * 11), {
+        # PREM will match premium (not case sensitive)
+        'instance': NotifyAfricasTalking,
+    }),
     ('atalk://{}?apikey=key&user=user&from=FROMUSER'.format('1' * 11), {
         # use get args to acomplish the same thing
         'instance': NotifyAfricasTalking,
