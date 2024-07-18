@@ -246,7 +246,21 @@ class NotifyAfricasTalking(NotifyBase):
                     verify=self.verify_certificate,
                     timeout=self.request_timeout,
                 )
-                if r.status_code != requests.codes.ok:
+                # Sample response
+                # {
+                #     "SMSMessageData": {
+                #         "Message": "Sent to 1/1 Total Cost: KES 0.8000",
+                #         "Recipients": [{
+                #             "statusCode": 101,
+                #             "number": "+254711XXXYYY",
+                #             "status": "Success",
+                #             "cost": "KES 0.8000",
+                #             "messageId": "ATPid_SampleTxnId123"
+                #         }]
+                #     }
+                # }
+
+                if r.status_code not in (100, 101, 102, requests.codes.ok):
                     # We had a problem
                     status_str = \
                         NotifyAfricasTalking.http_response_code_lookup(
