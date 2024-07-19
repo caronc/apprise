@@ -361,3 +361,29 @@ def test_plugin_onesignal_notifications(mock_post):
         'small_icon': 'https://github.com/caronc/apprise'
         '/raw/master/apprise/assets/themes/default/apprise-info-32x32.png',
         'include_external_user_ids': ['@user']}
+
+    # Test without decoding parameters
+    instance = Apprise.instantiate(
+        'onesignal://templateid:appid@apikey/@user/?:par=b64:eyJhIjoxLCJiIjoyfQ==&decode=no')
+    assert isinstance(instance, NotifyOneSignal) and instance.custom_data == {"par": "b64:eyJhIjoxLCJiIjoyfQ=="}
+
+    # Now same with loading parameters
+    instance = Apprise.instantiate(
+        'onesignal://templateid:appid@apikey/@user/?:par=b64:eyJhIjoxLCJiIjoyfQ==&decode=yes')
+    assert isinstance(instance, NotifyOneSignal) and instance.custom_data == {"par": {"a": 1, "b": 2}}
+
+    # Now same with not-base64 parameters
+    instance = Apprise.instantiate(
+        'onesignal://templateid:appid@apikey/@user/?:par=eyJhIjoxLCJiIjoyfQ==&:par2=123&decode=yes')
+    assert isinstance(instance, NotifyOneSignal) and instance.custom_data == {
+        "par": "eyJhIjoxLCJiIjoyfQ==", "par2": "123"
+    }
+
+    # Test incorrect base64 parameters. Second one has incorrect padding
+    url = 'onesignal://templateid:appid@apikey/@user/?:par=b64:1234=&:par2=b64:eyJhIjoxLCJiIjoyfQ&:par3=b64:eyJhIjoxLCJiIjoyfQ==&decode=yes'
+    instance = Apprise.instantiate(url)
+    assert isinstance(instance, NotifyOneSignal) and instance.custom_data == {
+        "par": "b64:1234=",
+        "par2": "b64:eyJhIjoxLCJiIjoyfQ",
+        "par3": {"a": 1, "b": 2}
+    }
