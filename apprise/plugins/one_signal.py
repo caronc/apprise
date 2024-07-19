@@ -203,7 +203,8 @@ class NotifyOneSignal(NotifyBase):
 
     def __init__(self, app, apikey, targets=None, include_image=True,
                  template=None, subtitle=None, language=None, batch=None,
-                 use_contents=None, decode_tpl_args=None, custom=None, postback=None, **kwargs):
+                 use_contents=None, decode_tpl_args=None,
+                 custom=None, postback=None, **kwargs):
         """
         Initialize OneSignal
 
@@ -501,8 +502,10 @@ class NotifyOneSignal(NotifyBase):
         if self.use_contents != self.template_args['contents']['default']:
             params['contents'] = 'yes' if self.use_contents else 'no'
 
-        if self.decode_tpl_args != self.template_args['decode']['default'] or needs_decoding:
-            params['decode'] = 'yes' if self.decode_tpl_args or needs_decoding else 'no'
+        if (self.decode_tpl_args != self.template_args['decode']['default']
+                or needs_decoding):
+            params['decode'] = 'yes' if (self.decode_tpl_args or
+                                         needs_decoding) else 'no'
 
         return '{schema}://{tp_id}{app}@{apikey}/{targets}?{params}'.format(
             schema=self.secure_protocol,
