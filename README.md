@@ -131,7 +131,8 @@ The table below identifies the services this tool supports and some example serv
 | [XBMC](https://github.com/caronc/apprise/wiki/Notify_xbmc) | xbmc:// or xbmcs://    | (TCP) 8080 or 443   | xbmc://hostname<br />xbmc://user@hostname<br />xbmc://user:password@hostname:port
 | [Webex Teams (Cisco)](https://github.com/caronc/apprise/wiki/Notify_wxteams) | wxteams://  | (TCP) 443   | wxteams://Token
 | [WeCom Bot](https://github.com/caronc/apprise/wiki/Notify_wecombot) | wecombot://  | (TCP) 443   | wecombot://BotKey
-| [WhatsApp](https://github.com/caronc/apprise/wiki/Notify_whatsapp) | whatsapp://  | (TCP) 443   | whatsapp://AccessToken@FromPhoneID/ToPhoneNo<br/> whatsapp://Template:AccessToken@FromPhoneID/ToPhoneNo
+| [WhatsApp](https://github.com/caronc/apprise/wiki/Notify_whatsapp) | whatsapp://  | (TCP) 443   | whatsapp://AccessToken@FromPhoneID/ToPhoneNo<br/>whatsapp://Template:AccessToken@FromPhoneID/ToPhoneNo
+| [WxPusher](https://github.com/caronc/apprise/wiki/Notify_wxpusher) | wxpusher://  | (TCP) 443   | wxpusher://AppToken@UserID1/UserID2/UserIDN<br/>wxpusher://AppToken@Topic1/Topic2/Topic3<br/>wxpusher://AppToken@UserID1/Topic1/
 | [Zulip Chat](https://github.com/caronc/apprise/wiki/Notify_zulip) | zulip://  | (TCP) 443   | zulip://botname@Organization/Token<br />zulip://botname@Organization/Token/Stream<br />zulip://botname@Organization/Token/Email
 
 ## SMS Notifications
