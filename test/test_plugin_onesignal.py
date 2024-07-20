@@ -364,23 +364,50 @@ def test_plugin_onesignal_notifications(mock_post):
 
     # Test without decoding parameters
     instance = Apprise.instantiate(
-        'onesignal://templateid:appid@apikey/@user/?:par=b64:eyJhIjoxLCJiIjoyfQ==&decode=no')
-    assert isinstance(instance, NotifyOneSignal) and instance.custom_data == {"par": "b64:eyJhIjoxLCJiIjoyfQ=="}
+        'onesignal://templateid:appid@apikey/@user/'
+        '?:par=b64:eyJhIjoxLCJiIjoyfQ==&decode=no')
+    assert isinstance(instance, NotifyOneSignal) and \
+        instance.custom_data == {"par": "b64:eyJhIjoxLCJiIjoyfQ=="}
 
     # Now same with loading parameters
     instance = Apprise.instantiate(
-        'onesignal://templateid:appid@apikey/@user/?:par=b64:eyJhIjoxLCJiIjoyfQ==&decode=yes')
-    assert isinstance(instance, NotifyOneSignal) and instance.custom_data == {"par": {"a": 1, "b": 2}}
+        'onesignal://templateid:appid@apikey/@user/'
+        '?:par=b64:eyJhIjoxLCJiIjoyfQ==&decode=yes')
+    assert isinstance(instance, NotifyOneSignal) and \
+        instance.custom_data == {"par": {"a": 1, "b": 2}}
+
+    # Test bad data in general
+    instance = Apprise.instantiate(
+        'onesignal://templateid:appid@apikey/@user/'
+        '?:par=garbage1&decode=yes')
+    assert isinstance(instance, NotifyOneSignal) and \
+        instance.custom_data == {"par": 'garbage1'}
+
+    instance = Apprise.instantiate(
+        'onesignal://templateid:appid@apikey/@user/'
+        '?:par=b64:garbage2&decode=yes')
+    assert isinstance(instance, NotifyOneSignal) and \
+        instance.custom_data == {"par": 'b64:garbage2'}
+
+    instance = Apprise.instantiate(
+        'onesignal://templateid:appid@apikey/@user/'
+        '?:par=b64:garbage3==&decode=yes')
+    assert isinstance(instance, NotifyOneSignal) and \
+        instance.custom_data == {"par": 'b64:garbage3=='}
 
     # Now same with not-base64 parameters
     instance = Apprise.instantiate(
-        'onesignal://templateid:appid@apikey/@user/?:par=eyJhIjoxLCJiIjoyfQ==&:par2=123&decode=yes')
-    assert isinstance(instance, NotifyOneSignal) and instance.custom_data == {
+        'onesignal://templateid:appid@apikey/@user/'
+        '?:par=eyJhIjoxLCJiIjoyfQ==&:par2=123&decode=yes')
+    assert isinstance(instance, NotifyOneSignal) and \
+        instance.custom_data == {
         "par": "eyJhIjoxLCJiIjoyfQ==", "par2": "123"
     }
 
     # Test incorrect base64 parameters. Second one has incorrect padding
-    url = 'onesignal://templateid:appid@apikey/@user/?:par=b64:1234=&:par2=b64:eyJhIjoxLCJiIjoyfQ&:par3=b64:eyJhIjoxLCJiIjoyfQ==&decode=yes'
+    url = 'onesignal://templateid:appid@apikey/@user/' \
+        '?:par=b64:1234=&:par2=b64:eyJhIjoxLCJiIjoyfQ&' \
+        ':par3=b64:eyJhIjoxLCJiIjoyfQ==&decode=yes'
     instance = Apprise.instantiate(url)
     assert isinstance(instance, NotifyOneSignal) and instance.custom_data == {
         "par": "b64:1234=",
