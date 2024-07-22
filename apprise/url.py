@@ -577,7 +577,7 @@ class URLBase:
         return content
 
     @staticmethod
-    def parse_phone_no(content, unquote=True):
+    def parse_phone_no(content, unquote=True, prefix=False):
         """A wrapper to utils.parse_phone_no() with unquoting support
 
         Parses a specified set of data and breaks it into a list.
@@ -600,7 +600,7 @@ class URLBase:
                 # Nothing further to do
                 return []
 
-        content = parse_phone_no(content)
+        content = parse_phone_no(content, prefix=prefix)
 
         return content
 

@@ -174,6 +174,11 @@ IS_PHONE_NO = re.compile(r'^\+?(?P<phone>[0-9\s)(+-]+)\s*$')
 PHONE_NO_DETECTION_RE = re.compile(
     r'\s*([+(\s]*[0-9][0-9()\s-]+[0-9])(?=$|[\s,+(]+[0-9])', re.I)
 
+# Support for prefix: (string followed by colon) infront of phone no
+PHONE_NO_WPREFIX_DETECTION_RE = re.compile(
+    r'\s*((?:[a-z]+:)?[+(\s]*[0-9][0-9()\s-]+[0-9])'
+    r'(?=$|(?:[a-z]+:)?[\s,+(]+[0-9])', re.I)
+
 # A simple verification check to make sure the content specified
 # rougly conforms to a ham radio call sign before we parse it further
 IS_CALL_SIGN = re.compile(
@@ -939,7 +944,7 @@ def parse_bool(arg, default=False):
     return bool(arg)
 
 
-def parse_phone_no(*args, store_unparseable=True, **kwargs):
+def parse_phone_no(*args, store_unparseable=True, prefix=False, **kwargs):
     """
     Takes a string containing phone numbers separated by comma's and/or spaces
     and returns a list.
@@ -948,7 +953,8 @@ def parse_phone_no(*args, store_unparseable=True, **kwargs):
     result = []
     for arg in args:
         if isinstance(arg, str) and arg:
-            _result = PHONE_NO_DETECTION_RE.findall(arg)
+            _result = (PHONE_NO_DETECTION_RE if not prefix
+                       else PHONE_NO_WPREFIX_DETECTION_RE).findall(arg)
             if _result:
                 result += _result
 
@@ -966,7 +972,7 @@ def parse_phone_no(*args, store_unparseable=True, **kwargs):
         elif isinstance(arg, (set, list, tuple)):
             # Use recursion to handle the list of phone numbers
             result += parse_phone_no(
-                *arg, store_unparseable=store_unparseable)
+                *arg, store_unparseable=store_unparseable, prefix=prefix)
 
     return result
 
