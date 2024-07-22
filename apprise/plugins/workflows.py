@@ -73,7 +73,7 @@ class NotifyWorkflows(NotifyBase):
     """
 
     # The default descriptive name associated with the Notification
-    service_name = 'Workflows (for MSTeams)'
+    service_name = 'Power Automate / Workflows (for MSTeams)'
 
     # The services URL
     service_url = 'https://teams.micrsoft.com/'
@@ -148,6 +148,12 @@ class NotifyWorkflows(NotifyBase):
             'default': False,
             'map_to': 'include_image',
         },
+        'wrap': {
+            'name': _('Wrap Text'),
+            'type': 'bool',
+            'default': True,
+            'map_to': 'wrap',
+        },
         'template': {
             'name': _('Template Path'),
             'type': 'string',
@@ -177,8 +183,9 @@ class NotifyWorkflows(NotifyBase):
         },
     }
 
-    def __init__(self, workflow, signature, include_image=True,
-                 version=None, template=None, tokens=None, **kwargs):
+    def __init__(self, workflow, signature, include_image=None,
+                 version=None, template=None, tokens=None, wrap=None,
+                 **kwargs):
         """
         Initialize Microsoft Workflows Object
 
@@ -202,7 +209,14 @@ class NotifyWorkflows(NotifyBase):
             raise TypeError(msg)
 
         # Place a thumbnail image inline with the message body
-        self.include_image = include_image
+        self.include_image = True if (
+            include_image if include_image is not None else
+            self.template_args['image']['default']) else False
+
+        # Wrap Text
+        self.wrap = True if (
+            wrap if wrap is not None else
+            self.template_args['wrap']['default']) else False
 
         # Our template object is just an AppriseAttachment object
         self.template = AppriseAttachment(asset=self.asset)
@@ -254,15 +268,15 @@ class NotifyWorkflows(NotifyBase):
         if title:
             body_content.append({
                 "type": "TextBlock",
-                "text": title,
+                "text": f'**{title}**',
                 "style": "heading",
             })
 
         body_content.append({
             "type": "TextBlock",
-            "text": title,
+            "text": body,
             "style": "default",
-            "wrap": True,
+            "wrap": self.wrap,
         })
 
         if not self.template:
@@ -379,7 +393,8 @@ class NotifyWorkflows(NotifyBase):
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
             )
-            if r.status_code != requests.codes.ok:
+            if r.status_code not in (
+                    requests.codes.ok, requests.codes.accepted):
                 # We had a problem
                 status_str = \
                     NotifyWorkflows.http_response_code_lookup(r.status_code)
@@ -418,6 +433,7 @@ class NotifyWorkflows(NotifyBase):
         # Define any URL parameters
         params = {
             'image': 'yes' if self.include_image else 'no',
+            'wrap': 'yes' if self.wrap else 'no',
         }
 
         if self.template:
@@ -459,9 +475,13 @@ class NotifyWorkflows(NotifyBase):
         # store values if provided
         entries = NotifyWorkflows.split_path(results['fullpath'])
 
-        # Get Image
-        results['include_image'] = \
-            parse_bool(results['qsd'].get('image', True))
+        # Display image?
+        results['include_image'] = parse_bool(results['qsd'].get(
+            'image', NotifyWorkflows.template_args['image']['default']))
+
+        # Wrap Text?
+        results['wrap'] = parse_bool(results['qsd'].get(
+            'wrap', NotifyWorkflows.template_args['wrap']['default']))
 
         # Template Handling
         if 'template' in results['qsd'] and results['qsd']['template']:

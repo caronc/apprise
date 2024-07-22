@@ -76,7 +76,11 @@ apprise_url_tests = (
         # id= to store workflow id
         'instance': NotifyWorkflows,
     }),
-    ('workflows://host:443/signature/?workflow=workflow1d', {
+    ('workflows://host:443/signature/?workflow=workflow1d&wrap=yes', {
+        # workflow= to store workflow id
+        'instance': NotifyWorkflows,
+    }),
+    ('workflows://host:443/signature/?workflow=workflow1d&wrap=no', {
         # workflow= to store workflow id
         'instance': NotifyWorkflows,
     }),
@@ -408,3 +412,22 @@ def test_plugin_workflows_edge_cases():
     # test case where no tokens are specified
     obj = NotifyWorkflows(workflow='workflow', signature='signature')
     assert isinstance(obj, NotifyWorkflows)
+
+
+def test_plugin_workflows_azure_webhooks(request_mock):
+    """
+    NotifyWorkflows() Azure Webhooks
+    """
+    url = 'https://prod-15.uksouth.logic.azure.com:443' \
+        '/workflows/3XXX5/triggers/manual/paths/invoke' \
+        '?api-version=2016-06-01&' \
+        'sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=iXXXU'
+
+    #
+    # Initialize
+    #
+    obj = Apprise.instantiate(url)
+    assert isinstance(obj, NotifyWorkflows)
+    assert obj.workflow == "3XXX5"
+    assert obj.signature == "iXXXU"
+    assert obj.api_version == "2016-06-01"
