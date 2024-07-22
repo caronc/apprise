@@ -145,7 +145,7 @@ class NotifyWorkflows(NotifyBase):
         'image': {
             'name': _('Include Image'),
             'type': 'bool',
-            'default': False,
+            'default': True,
             'map_to': 'include_image',
         },
         'wrap': {
