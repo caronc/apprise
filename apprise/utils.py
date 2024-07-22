@@ -25,13 +25,15 @@
 # CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
-
+import copy
 import re
 import sys
 import json
 import contextlib
 import os
 import locale
+import typing
+import base64
 from itertools import chain
 from os.path import expanduser
 from functools import reduce
@@ -1600,3 +1602,35 @@ def dict_full_update(dict1, dict2):
 
     _merge(dict1, dict2)
     return
+
+
+def decode_b64_dict(di: dict) -> dict:
+    di = copy.deepcopy(di)
+    for k, v in di.items():
+        if not isinstance(v, str) or not v.startswith("b64:"):
+            continue
+        try:
+            parsed_v = base64.b64decode(v[4:])
+            parsed_v = json.loads(parsed_v)
+        except Exception:
+            parsed_v = v
+        di[k] = parsed_v
+    return di
+
+
+def encode_b64_dict(
+        di: dict
+) -> typing.Tuple[dict, bool]:
+    di = copy.deepcopy(di)
+    needs_decoding = False
+    for k, v in di.items():
+        if isinstance(v, str):
+            continue
+        try:
+            encoded = base64.urlsafe_b64encode(json.dumps(v).encode())
+            encoded = "b64:{}".format(encoded.decode())
+            needs_decoding = True
+        except Exception:
+            encoded = str(v)
+        di[k] = encoded
+    return di, needs_decoding

@@ -40,6 +40,8 @@ from itertools import chain
 from .base import NotifyBase
 from ..common import NotifyType
 from ..common import NotifyImageSize
+from ..utils import decode_b64_dict
+from ..utils import encode_b64_dict
 from ..utils import validate_regex
 from ..utils import parse_list
 from ..utils import parse_bool
@@ -167,6 +169,12 @@ class NotifyOneSignal(NotifyBase):
             'default': True,
             'map_to': 'use_contents',
         },
+        'decode': {
+            'name': _('Decode Template Args'),
+            'type': 'bool',
+            'default': False,
+            'map_to': 'decode_tpl_args',
+        },
         'template': {
             'alias_of': 'template',
         },
@@ -195,7 +203,8 @@ class NotifyOneSignal(NotifyBase):
 
     def __init__(self, app, apikey, targets=None, include_image=True,
                  template=None, subtitle=None, language=None, batch=None,
-                 use_contents=None, custom=None, postback=None, **kwargs):
+                 use_contents=None, decode_tpl_args=None,
+                 custom=None, postback=None, **kwargs):
         """
         Initialize OneSignal
 
@@ -227,6 +236,11 @@ class NotifyOneSignal(NotifyBase):
         self.use_contents = True if (
             use_contents if use_contents is not None else
             self.template_args['contents']['default']) else False
+
+        # Prepare Decode Template Arguments Flag
+        self.decode_tpl_args = True if (
+            decode_tpl_args if decode_tpl_args is not None else
+            self.template_args['decode']['default']) else False
 
         # Place a thumbnail image inline with the message body
         self.include_image = include_image
@@ -301,6 +315,9 @@ class NotifyOneSignal(NotifyBase):
         # Custom Data
         self.custom_data = {}
         if custom and isinstance(custom, dict):
+            if self.decode_tpl_args:
+                custom = decode_b64_dict(custom)
+
             self.custom_data.update(custom)
 
         elif custom:
@@ -471,9 +488,12 @@ class NotifyOneSignal(NotifyBase):
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
+        custom_data, needs_decoding = encode_b64_dict(self.custom_data)
+        # custom_data, needs_decoding = self.custom_data, False
         # Save our template data
         params.update(
-            {':{}'.format(k): v for k, v in self.custom_data.items()})
+            {':{}'.format(k): v for k, v in custom_data.items()}
+        )
 
         # Save our postback data
         params.update(
@@ -481,6 +501,11 @@ class NotifyOneSignal(NotifyBase):
 
         if self.use_contents != self.template_args['contents']['default']:
             params['contents'] = 'yes' if self.use_contents else 'no'
+
+        if (self.decode_tpl_args != self.template_args['decode']['default']
+                or needs_decoding):
+            params['decode'] = 'yes' if (self.decode_tpl_args or
+                                         needs_decoding) else 'no'
 
         return '{schema}://{tp_id}{app}@{apikey}/{targets}?{params}'.format(
             schema=self.secure_protocol,
@@ -567,6 +592,13 @@ class NotifyOneSignal(NotifyBase):
                 results['qsd'].get(
                     'contents',
                     NotifyOneSignal.template_args['contents']['default']))
+
+        # Get Use Contents Boolean (if set)
+        results['decode_tpl_args'] = \
+            parse_bool(
+                results['qsd'].get(
+                    'decode',
+                    NotifyOneSignal.template_args['decode']['default']))
 
         # The API Key is stored in the hostname
         results['apikey'] = NotifyOneSignal.unquote(results['host'])
