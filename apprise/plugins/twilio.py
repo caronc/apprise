@@ -43,6 +43,7 @@
 # or consider purchasing a short-code from here:
 #    https://www.twilio.com/docs/glossary/what-is-a-short-code
 #
+import re
 import requests
 from json import loads
 
@@ -53,6 +54,22 @@ from ..utils import is_phone_no
 from ..utils import parse_phone_no
 from ..utils import validate_regex
 from ..locale import gettext_lazy as _
+
+
+# Twilio Mode Detection
+MODE_DETECT_RE = re.compile(
+    r'\s*((?P<mode>[^:]+)\s*:\s*)?(?P<phoneno>.+)$', re.I)
+
+
+class TwilioMessageMode:
+    """
+    Twilio Message Mode
+    """
+    # SMS/MMS
+    TEXT = 'T'
+
+    # via WhatsApp
+    WHATSAPP = 'W'
 
 
 class NotifyTwilio(NotifyBase):
@@ -117,14 +134,14 @@ class NotifyTwilio(NotifyBase):
             'name': _('From Phone No'),
             'type': 'string',
             'required': True,
-            'regex': (r'^\+?[0-9\s)(+-]+$', 'i'),
+            'regex': (r'^([a-z]+:)?\+?[0-9\s)(+-]+$', 'i'),
             'map_to': 'source',
         },
         'target_phone': {
             'name': _('Target Phone No'),
             'type': 'string',
             'prefix': '+',
-            'regex': (r'^[0-9\s)(+-]+$', 'i'),
+            'regex': (r'^([a-z]+:)?[0-9\s)(+-]+$', 'i'),
             'map_to': 'targets',
         },
         'short_code': {
@@ -190,7 +207,22 @@ class NotifyTwilio(NotifyBase):
         self.apikey = validate_regex(
             apikey, *self.template_args['apikey']['regex'])
 
-        result = is_phone_no(source, min_len=5)
+        # Detect mode
+        result = MODE_DETECT_RE.match(source)
+        if not result:
+            msg = 'The Account (From) Phone # or Short-code specified ' \
+                  '({}) is invalid.'.format(source)
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
+        # prepare our default mode to use for all numbers that follow in
+        # target definitions
+        self.default_mode = TwilioMessageMode.WHATSAPP \
+            if result.group('mode') and \
+            result.group('mode')[0].lower() == 'w' \
+            else TwilioMessageMode.TEXT
+
+        result = is_phone_no(result.group('phoneno'), min_len=5)
         if not result:
             msg = 'The Account (From) Phone # or Short-code specified ' \
                   '({}) is invalid.'.format(source)
@@ -220,18 +252,35 @@ class NotifyTwilio(NotifyBase):
         # Parse our targets
         self.targets = list()
 
-        for target in parse_phone_no(targets):
+        for entry in parse_phone_no(targets, prefix=True):
+            # Detect mode
+            # w: (or whatsapp:) will trigger whatsapp message otherwise
+            #   sms/mms as normal
+            result = MODE_DETECT_RE.match(entry)
+            mode = TwilioMessageMode.WHATSAPP if result.group('mode') and \
+                result.group('mode')[0].lower() == 'w' else self.default_mode
+
             # Validate targets and drop bad ones:
-            result = is_phone_no(target)
+            result = is_phone_no(result.group('phoneno'))
             if not result:
                 self.logger.warning(
                     'Dropped invalid phone # '
-                    '({}) specified.'.format(target),
+                    '({}) specified.'.format(entry),
+                )
+                continue
+
+            # We can't send twilio messages using short-codes as our source
+            if len(self.source) in (5, 6) and mode is \
+                    TwilioMessageMode.WHATSAPP:
+                self.logger.warning(
+                    'Dropped WhatsApp phone # '
+                    '({}) because source provided was a short-code.'.format(
+                        entry),
                 )
                 continue
 
             # store valid phone number
-            self.targets.append('+{}'.format(result['full']))
+            self.targets.append((mode, '+{}'.format(result['full'])))
 
         return
 
@@ -260,9 +309,8 @@ class NotifyTwilio(NotifyBase):
         # Prepare our payload
         payload = {
             'Body': body,
-            'From': self.source,
-
-            # The To gets populated in the loop below
+            # The From and To gets populated in the loop below
+            'From': None,
             'To': None,
         }
 
@@ -277,14 +325,20 @@ class NotifyTwilio(NotifyBase):
 
         if len(targets) == 0:
             # No sources specified, use our own phone no
-            targets.append(self.source)
+            targets.append((self.default_mode, self.source))
 
         while len(targets):
             # Get our target to notify
-            target = targets.pop(0)
+            (mode, target) = targets.pop(0)
 
             # Prepare our user
-            payload['To'] = target
+            if mode is TwilioMessageMode.TEXT:
+                payload['From'] = self.source
+                payload['To'] = target
+
+            else:  # WhatsApp support (via Twilio)
+                payload['From'] = f'whatsapp:{self.source}'
+                payload['To'] = f'whatsapp:{target}'
 
             # Some Debug Logging
             self.logger.debug('Twilio POST URL: {} (cert_verify={})'.format(
@@ -376,9 +430,13 @@ class NotifyTwilio(NotifyBase):
             sid=self.pprint(
                 self.account_sid, privacy, mode=PrivacyMode.Tail, safe=''),
             token=self.pprint(self.auth_token, privacy, safe=''),
-            source=NotifyTwilio.quote(self.source, safe=''),
+            source=NotifyTwilio.quote(
+                self.source if self.default_mode is TwilioMessageMode.TEXT
+                else 'w:{}'.format(self.source), safe=''),
             targets='/'.join(
-                [NotifyTwilio.quote(x, safe='') for x in self.targets]),
+                [NotifyTwilio.quote(
+                    x[1] if x[0] is TwilioMessageMode.TEXT
+                    else 'w:{}'.format(x[1]), safe='') for x in self.targets]),
             params=NotifyTwilio.urlencode(params))
 
     def __len__(self):
@@ -442,6 +500,6 @@ class NotifyTwilio(NotifyBase):
         # The 'to' makes it easier to use yaml configuration
         if 'to' in results['qsd'] and len(results['qsd']['to']):
             results['targets'] += \
-                NotifyTwilio.parse_phone_no(results['qsd']['to'])
+                NotifyTwilio.parse_phone_no(results['qsd']['to'], prefix=True)
 
         return results
