@@ -295,6 +295,8 @@ class NotifyWorkflows(NotifyBase):
                             "type": "AdaptiveCard",
                             "version": self.adaptive_card_version,
                             "body": body_content,
+                            # Additionally
+                            "msteams": {"width": "full"},
                         }
                     }
                 ]
@@ -542,9 +544,24 @@ class NotifyWorkflows(NotifyBase):
             r'/workflows/'
             r'(?P<workflow>[A-Z0-9_-]+)'
             r'/triggers/manual/paths/invoke/?'
-            r'(?P<params>\?.+)$', url, re.I)
+            r'(?P<sanitize>\\)?(?P<params>\?.+)$', url, re.I)
 
         if result:
+            # Some URLs have the ?, &, and = escaped with a '\'
+            rep = {r'\\?': '?', r'\=': '=', r'\&': '&'}
+
+            if result.group('sanitize'):
+                # use these three lines to do the replacement
+                # source: https://stackoverflow.com/a/6117124/355584
+                rep = dict((re.escape(k), v) for k, v in rep.items())
+                pattern = re.compile("|".join(rep.keys()))
+                params = pattern.sub(
+                    lambda m: rep[re.escape(m.group(0))],
+                    result.group('params'))
+
+            else:
+                params = result.group('params')
+
             # Construct our URL
             return NotifyWorkflows.parse_url(
                 '{schema}://{host}{port}/{workflow}'
@@ -554,6 +571,5 @@ class NotifyWorkflows(NotifyBase):
                     port='' if not result.group('port')
                     else result.group('port'),
                     workflow=result.group('workflow'),
-                    params='' if not result.group('params')
-                    else result.group('params')))
+                    params=params))
         return None
