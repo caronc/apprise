@@ -272,6 +272,7 @@ class NotifyWorkflows(NotifyBase):
                 "text": f'{title}',
                 "style": "heading",
                 "weight": "Bolder",
+                "size": "Large",
                 "id": "title",
             })
 
