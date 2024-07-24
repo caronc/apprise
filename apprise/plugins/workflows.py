@@ -76,7 +76,8 @@ class NotifyWorkflows(NotifyBase):
     service_name = 'Power Automate / Workflows (for MSTeams)'
 
     # The services URL
-    service_url = 'https://teams.micrsoft.com/'
+    service_url = 'https://www.microsoft.com/power-platform/' \
+        'products/power-automate'
 
     # The default secure protocol
     secure_protocol = ('workflow', 'workflows')
@@ -268,8 +269,10 @@ class NotifyWorkflows(NotifyBase):
         if title:
             body_content.append({
                 "type": "TextBlock",
-                "text": f'**{title}**',
+                "text": f'{title}',
                 "style": "heading",
+                "weight": "Bolder",
+                "id": "title",
             })
 
         body_content.append({
@@ -277,6 +280,7 @@ class NotifyWorkflows(NotifyBase):
             "text": body,
             "style": "default",
             "wrap": self.wrap,
+            "id": "body",
         })
 
         if not self.template:
