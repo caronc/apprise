@@ -293,7 +293,12 @@ class NotifyMSTeams(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # else:  NoneType - this is okay
+        self.logger.deprecate(
+            "Microsoft is depricating their MSTeams webhooks on "
+            "December 31, 2024. It is advised that you switch to "
+            "Microsoft Power Automate (already supported by Apprise as "
+            "workflows://. For more information visit: "
+            "https://github.com/caronc/apprise/wiki/Notify_workflows")
         return
 
     def gen_payload(self, body, title='', notify_type=NotifyType.INFO,

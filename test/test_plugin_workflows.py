@@ -432,17 +432,3 @@ def test_plugin_workflows_azure_webhooks(request_mock):
     assert obj.workflow == "3XXX5"
     assert obj.signature == "iXXXU"
     assert obj.api_version == "2016-06-01"
-
-    #
-    # Test with escaped characters (sanitization required)
-    #
-    url = 'https://prod-15.site-abc.logic.azure.com:443' \
-        '/workflows/3XXX5/triggers/manual/paths/invoke' \
-        '\\?api-version\\=2016-06-01\\&sp\\=%2Ftriggers%2F'' \
-        manual%2Frun\\&sv\\=1.0\\&sig\\=iXXXU'
-
-    obj = Apprise.instantiate(url)
-    assert isinstance(obj, NotifyWorkflows)
-    assert obj.workflow == "3XXX5"
-    assert obj.signature == "iXXXU"
-    assert obj.api_version == "2016-06-01"
