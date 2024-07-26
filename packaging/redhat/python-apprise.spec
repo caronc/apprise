@@ -55,7 +55,7 @@ Gateway, Twilio, Twitter, Twist, VictorOps, Voipms, Vonage, WeCom Bot,
 WhatsApp, Webex Teams, Workflows, XBMC}
 
 Name:           python-%{pypi_name}
-Version:        1.8.0
+Version:        1.8.1
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        BSD
@@ -150,6 +150,15 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 %{python3_sitelib}/%{pypi_name}/cli.*
 
 %changelog
+* Thu Jul 25 2024 Chris Caron <lead2gold@gmail.com> - 1.8.1
+- Updated to v1.8.1
+
+* Fri Jul 19 2024 Fedora Release Engineering <releng@fedoraproject.org> - 1.8.0-3
+- Rebuilt for https://fedoraproject.org/wiki/Fedora_41_Mass_Rebuild
+
+* Fri Jun 07 2024 Python Maint <python-maint@redhat.com> - 1.8.0-2
+- Rebuilt for Python 3.13
+
 * Sat May 11 2024 Chris Caron <lead2gold@gmail.com> - 1.8.0
 - Updated to v1.8.0
 

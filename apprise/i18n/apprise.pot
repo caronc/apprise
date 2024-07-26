@@ -6,16 +6,16 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: apprise 1.8.0\n"
+"Project-Id-Version: apprise 1.8.1\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2024-05-11 16:13-0400\n"
+"POT-Creation-Date: 2024-07-25 18:31-0400\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.13.1\n"
+"Generated-By: Babel 2.15.0\n"
 
 msgid "A local Gnome environment is required."
 msgstr ""
@@ -33,6 +33,9 @@ msgid "API Secret"
 msgstr ""
 
 msgid "API Token"
+msgstr ""
+
+msgid "API Version"
 msgstr ""
 
 msgid "Access Key"
@@ -56,6 +59,9 @@ msgstr ""
 msgid "Action"
 msgstr ""
 
+msgid "Action Mapping"
+msgstr ""
+
 msgid "Add Tokens"
 msgstr ""
 
@@ -72,6 +78,9 @@ msgid "App Access Token"
 msgstr ""
 
 msgid "App ID"
+msgstr ""
+
+msgid "App User Name"
 msgstr ""
 
 msgid "App Version"
@@ -182,6 +191,9 @@ msgstr ""
 msgid "Currency"
 msgstr ""
 
+msgid "Custom Data"
+msgstr ""
+
 msgid "Custom Details"
 msgstr ""
 
@@ -198,6 +210,9 @@ msgid "DBus Notification"
 msgstr ""
 
 msgid "Data Entries"
+msgstr ""
+
+msgid "Decode Template Args"
 msgstr ""
 
 msgid "Delay"
@@ -242,7 +257,13 @@ msgstr ""
 msgid "Embed URL"
 msgstr ""
 
+msgid "Enable Contents"
+msgstr ""
+
 msgid "Entity"
+msgstr ""
+
+msgid "Entity ID"
 msgstr ""
 
 msgid "Event"
@@ -282,6 +303,9 @@ msgid "Forced Mime Type"
 msgstr ""
 
 msgid "Free-Mobile"
+msgstr ""
+
+msgid "From"
 msgstr ""
 
 msgid "From Email"
@@ -398,6 +422,9 @@ msgstr ""
 msgid "Matrix API Verion"
 msgstr ""
 
+msgid "Media Type"
+msgstr ""
+
 msgid "Memory"
 msgstr ""
 
@@ -478,13 +505,10 @@ msgstr ""
 msgid "Payload Extras"
 msgstr ""
 
-msgid "Ping Discord Role"
-msgstr ""
-
-msgid "Ping Discord User"
-msgstr ""
-
 msgid "Port"
+msgstr ""
+
+msgid "Postback Data"
 msgstr ""
 
 msgid "Prefix"
@@ -509,6 +533,9 @@ msgid "QOS"
 msgstr ""
 
 msgid "Query Method"
+msgstr ""
+
+msgid "Recipient Phone Number"
 msgstr ""
 
 msgid "Region"
@@ -541,6 +568,9 @@ msgstr ""
 msgid "Route Group"
 msgstr ""
 
+msgid "SMS Mode"
+msgstr ""
+
 msgid "SMTP Server"
 msgstr ""
 
@@ -571,6 +601,9 @@ msgstr ""
 msgid "Sender ID"
 msgstr ""
 
+msgid "Sender Name"
+msgstr ""
+
 msgid "Sensitive Attachments"
 msgstr ""
 
@@ -578,6 +611,12 @@ msgid "Server Key"
 msgstr ""
 
 msgid "Server Timeout"
+msgstr ""
+
+msgid "Service ID"
+msgstr ""
+
+msgid "Service Password"
 msgstr ""
 
 msgid "Severity"
@@ -589,7 +628,13 @@ msgstr ""
 msgid "Show Status"
 msgstr ""
 
+msgid "Signature"
+msgstr ""
+
 msgid "Silent Notification"
+msgstr ""
+
+msgid "Société Française du Radiotéléphone"
 msgstr ""
 
 msgid "Socket Connect Timeout"
@@ -613,7 +658,13 @@ msgstr ""
 msgid "Source Phone No"
 msgstr ""
 
+msgid "Space ID"
+msgstr ""
+
 msgid "Special Text Color"
+msgstr ""
+
+msgid "Splunk On-Call"
 msgstr ""
 
 msgid "Spoiler Text"
@@ -623,6 +674,9 @@ msgid "Sticky"
 msgstr ""
 
 msgid "Subtitle"
+msgstr ""
+
+msgid "TTS Voice"
 msgstr ""
 
 msgid "Tags"
@@ -667,6 +721,9 @@ msgstr ""
 msgid "Target Group ID"
 msgstr ""
 
+msgid "Target Phone"
+msgstr ""
+
 msgid "Target Phone No"
 msgstr ""
 
@@ -680,6 +737,9 @@ msgid "Target Room Alias"
 msgstr ""
 
 msgid "Target Room ID"
+msgstr ""
+
+msgid "Target Routing Key"
 msgstr ""
 
 msgid "Target Schedule"
@@ -755,6 +815,9 @@ msgid "Thread ID"
 msgstr ""
 
 msgid "Thread Key"
+msgstr ""
+
+msgid "Timeout"
 msgstr ""
 
 msgid "To Channel ID"
@@ -862,7 +925,13 @@ msgstr ""
 msgid "Webhook Token"
 msgstr ""
 
+msgid "Workflow ID"
+msgstr ""
+
 msgid "Workspace"
+msgstr ""
+
+msgid "Wrap Text"
 msgstr ""
 
 msgid "X-Axis"
