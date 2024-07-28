@@ -361,6 +361,9 @@ class NotifyTelegram(NotifyBase):
             'name': _('Topic Thread ID'),
             'type': 'int',
         },
+        'thread': {
+            'alias_of': 'topic',
+        },
         'mdv': {
             'name': _('Markdown Version'),
             'type': 'choice:string',
@@ -460,14 +463,13 @@ class NotifyTelegram(NotifyBase):
                 self.detect_owner = False
                 continue
 
-            try:
+            if results.group('topic'):
                 topic = int(
                     results.group('topic')
                     if results.group('topic') else self.topic)
-
-            except TypeError:
-                # No worries
-                topic = None
+            else:
+                # Default (if one set)
+                topic = self.topic
 
             if results.group('name') is not None:
                 # Name
@@ -730,7 +732,7 @@ class NotifyTelegram(NotifyBase):
             _id = self.detect_bot_owner()
             if _id:
                 # Permanently store our id in our target list for next time
-                self.targets.append((str(_id), None))
+                self.targets.append((str(_id), self.topic))
                 self.logger.info(
                     'Update your Telegram Apprise URL to read: '
                     '{}'.format(self.url(privacy=True)))
@@ -1042,6 +1044,9 @@ class NotifyTelegram(NotifyBase):
         # Support Thread Topic
         if 'topic' in results['qsd'] and len(results['qsd']['topic']):
             results['topic'] = results['qsd']['topic']
+
+        elif 'thread' in results['qsd'] and len(results['qsd']['thread']):
+            results['topic'] = results['qsd']['thread']
 
         # Silent (Sends the message Silently); users will receive
         # notification with no sound.

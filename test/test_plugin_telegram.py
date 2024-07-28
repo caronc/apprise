@@ -98,6 +98,10 @@ apprise_url_tests = (
     ('tgram://bottest@123456789:abcdefg_hijklmnop/id1/?topic=12345', {
         'instance': NotifyTelegram,
     }),
+    # Thread is just an alias of topic
+    ('tgram://bottest@123456789:abcdefg_hijklmnop/id1/?thread=12345', {
+        'instance': NotifyTelegram,
+    }),
     # Threads must be numeric
     ('tgram://bottest@123456789:abcdefg_hijklmnop/id1/?topic=invalid', {
         'instance': TypeError,
@@ -105,6 +109,11 @@ apprise_url_tests = (
     # content must be 'before' or 'after'
     ('tgram://bottest@123456789:abcdefg_hijklmnop/id1/?content=invalid', {
         'instance': TypeError,
+    }),
+    ('tgram://bottest@123456789:abcdefg_hijklmnop/id1:invalid/?thread=12345', {
+        'instance': NotifyTelegram,
+        # Notify will fail (bad target)
+        'response': False,
     }),
     # Testing image
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?image=Yes', {
@@ -907,12 +916,9 @@ def test_plugin_telegram_html_formatting(mock_post):
     NotifyTelegram() HTML Formatting
 
     """
-    # on't send anything other than <b>, <i>, <a>,<code> and <pre>
-
     # Prepare Mock
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.ok
-    mock_post.return_value.content = '{}'
 
     # Simple success response
     mock_post.return_value.content = dumps({
@@ -942,7 +948,6 @@ def test_plugin_telegram_html_formatting(mock_post):
             }},
         ],
     })
-    mock_post.return_value.status_code = requests.codes.ok
 
     aobj = Apprise()
     aobj.add('tgram://123456789:abcdefg_hijklmnop/')
@@ -1005,3 +1010,111 @@ def test_plugin_telegram_html_formatting(mock_post):
         '<b>Heading 3</b>\r\n<b>Heading 4</b>\r\n<b>Heading 5</b>\r\n' \
         '<b>Heading 6</b>\r\nA set of text\r\n' \
         'Another line after the set of text\r\nMore text\r\nlabel'
+
+
+@mock.patch('requests.post')
+def test_plugin_telegram_threads(mock_post):
+    """
+    NotifyTelegram() Threads/Topics
+
+    """
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    # Simple success response
+    mock_post.return_value.content = dumps({
+        "ok": True,
+        "result": [{
+            "update_id": 645421321,
+            "message": {
+                "message_id": 2,
+                "from": {
+                    "id": 532389719,
+                    "is_bot": False,
+                    "first_name": "Chris",
+                    "language_code": "en-US"
+                },
+                "chat": {
+                    "id": 532389719,
+                    "first_name": "Chris",
+                    "type": "private"
+                },
+                "date": 1519694394,
+                "text": "/start",
+                "entities": [{
+                    "offset": 0,
+                    "length": 6,
+                    "type": "bot_command",
+                }],
+            }},
+        ],
+    })
+
+    aobj = Apprise()
+    aobj.add('tgram://123456789:abcdefg_hijklmnop/?thread=1234')
+
+    assert len(aobj) == 1
+
+    assert isinstance(aobj[0], NotifyTelegram)
+
+    body = 'my message'
+
+    assert aobj.notify(body=body)
+
+    # 1 call to look up bot owner, and second for notification
+    assert mock_post.call_count == 2
+
+    payload = loads(mock_post.call_args_list[1][1]['data'])
+
+    assert 'message_thread_id' in payload
+    assert payload['message_thread_id'] == 1234
+
+    mock_post.reset_mock()
+
+    aobj = Apprise()
+    aobj.add('tgram://123456789:abcdefg_hijklmnop/?topic=1234')
+
+    assert len(aobj) == 1
+
+    assert isinstance(aobj[0], NotifyTelegram)
+
+    body = 'my message'
+
+    assert aobj.notify(body=body)
+
+    # 1 call to look up bot owner, and second for notification
+    assert mock_post.call_count == 2
+
+    payload = loads(mock_post.call_args_list[1][1]['data'])
+
+    assert 'message_thread_id' in payload
+    assert payload['message_thread_id'] == 1234
+
+    mock_post.reset_mock()
+
+    aobj = Apprise()
+    aobj.add('tgram://123456789:abcdefg_hijklmnop/9876:1234/9876:1111')
+
+    assert len(aobj) == 1
+
+    assert isinstance(aobj[0], NotifyTelegram)
+
+    body = 'my message'
+
+    assert aobj.notify(body=body)
+
+    # 1 call to look up bot owner, and second for notification
+    assert mock_post.call_count == 2
+
+    payload = loads(mock_post.call_args_list[0][1]['data'])
+
+    assert 'message_thread_id' in payload
+    assert payload['message_thread_id'] == 1111
+
+    payload = loads(mock_post.call_args_list[1][1]['data'])
+
+    assert 'message_thread_id' in payload
+    assert payload['message_thread_id'] == 1234
+
+    mock_post.reset_mock()
