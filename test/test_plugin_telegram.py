@@ -110,6 +110,11 @@ apprise_url_tests = (
     ('tgram://bottest@123456789:abcdefg_hijklmnop/id1/?content=invalid', {
         'instance': TypeError,
     }),
+    ('tgram://bottest@123456789:abcdefg_hijklmnop/id1:invalid/?thread=12345', {
+        'instance': NotifyTelegram,
+        # Notify will fail (bad target)
+        'response': False,
+    }),
     # Testing image
     ('tgram://123456789:abcdefg_hijklmnop/lead2gold/?image=Yes', {
         'instance': NotifyTelegram,

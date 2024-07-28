@@ -464,18 +464,9 @@ class NotifyTelegram(NotifyBase):
                 continue
 
             if results.group('topic'):
-                try:
-                    topic = int(
-                        results.group('topic')
-                        if results.group('topic') else self.topic)
-
-                except TypeError:
-                    self.logger.warning(
-                        'Dropped invalid Telegram chat/group '
-                        '({}) specified; topic is invalid.'
-                        .format(target),
-                    )
-                    continue
+                topic = int(
+                    results.group('topic')
+                    if results.group('topic') else self.topic)
             else:
                 # Default (if one set)
                 topic = self.topic
