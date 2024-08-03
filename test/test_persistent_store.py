@@ -1093,3 +1093,174 @@ def test_persistent_storage_cache_object(tmpdir):
         'v': 'garbage',
         'x': (datetime.now() - EPOCH).total_seconds(),
         'c': 'datetime'}, verify=False) is None
+
+
+def test_persistent_storage_disk_tidy(tmpdir):
+    """
+    General testing of a CacheObject
+    """
+
+    # Persistent Storage Initialization
+    pc = PersistentStore(
+        path=str(tmpdir), namespace='t01', mode=PersistentStoreMode.FLUSH)
+    # Store some data
+    assert pc.write(b'data-t01') is True
+    assert pc.set('key-t01', 'value')
+
+    pc = PersistentStore(
+        path=str(tmpdir), namespace='t02', mode=PersistentStoreMode.FLUSH)
+    # Store some data
+    assert pc.write(b'data-t02') is True
+    assert pc.set('key-t02', 'value')
+
+    # purne anything older then 30s
+    results = PersistentStore.disk_prune(path=str(tmpdir), expires=30)
+    # Nothing is older then 30s right now
+    assert isinstance(results, dict)
+    assert 't01' in results
+    assert 't02' in results
+    assert len(results['t01']) == 0
+    assert len(results['t02']) == 0
+
+    pc = PersistentStore(
+        path=str(tmpdir), namespace='t01', mode=PersistentStoreMode.FLUSH)
+
+    # Nothing is pruned
+    assert pc.get('key-t01') == 'value'
+    assert pc.read() == b'data-t01'
+
+    # An expiry of zero gets everything
+    results = PersistentStore.disk_prune(path=str(tmpdir), expires=0)
+    # We match everything now
+    assert isinstance(results, dict)
+    assert 't01' in results
+    assert 't02' in results
+    assert len(results['t01']) == 2
+    assert len(results['t02']) == 2
+
+    # Content is still not removed however because no action was put in place
+    pc = PersistentStore(
+        path=str(tmpdir), namespace='t02', mode=PersistentStoreMode.FLUSH)
+    # Nothing is pruned
+    assert pc.get('key-t02') == 'value'
+    assert pc.read() == b'data-t02'
+    pc = PersistentStore(
+        path=str(tmpdir), namespace='t01', mode=PersistentStoreMode.FLUSH)
+    # Nothing is pruned
+    assert pc.get('key-t01') == 'value'
+    assert pc.read() == b'data-t01'
+
+    # Now we'll filter on specific namespaces
+    results = PersistentStore.disk_prune(
+        namespace='notfound', path=str(tmpdir), expires=0, action=True)
+
+    # nothing matched, nothing found
+    assert isinstance(results, dict)
+    assert len(results) == 0
+
+    results = PersistentStore.disk_prune(
+        namespace=('t01', 'invalid', '-garbag!'),
+        path=str(tmpdir), expires=0, action=True)
+
+    # only t01 would be cleaned now
+    assert isinstance(results, dict)
+    assert len(results) == 1
+    assert len(results['t01']) == 2
+
+    # A second call will yield no results because the content has
+    # already been cleaned up
+    results = PersistentStore.disk_prune(
+        namespace='t01',
+        path=str(tmpdir), expires=0, action=True)
+    assert isinstance(results, dict)
+    assert len(results) == 0
+
+    # t02 is still untouched
+    pc = PersistentStore(
+        path=str(tmpdir), namespace='t02', mode=PersistentStoreMode.FLUSH)
+    # Nothing is pruned
+    assert pc.get('key-t02') == 'value'
+    assert pc.read() == b'data-t02'
+
+    # t01 of course... it's gone
+    pc = PersistentStore(
+        path=str(tmpdir), namespace='t01', mode=PersistentStoreMode.FLUSH)
+    # Nothing is pruned
+    assert pc.get('key-t01') is None
+    assert pc.read() is None
+
+    with pytest.raises(AttributeError):
+        # provide garbage in namespace field and we're going to have a problem
+        PersistentStore.disk_prune(
+            namespace=object, path=str(tmpdir), expires=0, action=True)
+
+    # Error Handling
+    with mock.patch('os.path.getmtime', side_effect=FileNotFoundError()):
+        results = PersistentStore.disk_prune(
+            namespace='t02', path=str(tmpdir), expires=0, action=True)
+        assert isinstance(results, dict)
+        assert len(results) == 1
+        assert len(results['t02']) == 0
+
+        # no files were removed, so our data is still accessible
+        pc = PersistentStore(
+            path=str(tmpdir), namespace='t02', mode=PersistentStoreMode.FLUSH)
+        # Nothing is pruned
+        assert pc.get('key-t02') == 'value'
+        assert pc.read() == b'data-t02'
+
+    with mock.patch('os.path.getmtime', side_effect=OSError()):
+        results = PersistentStore.disk_prune(
+            namespace='t02', path=str(tmpdir), expires=0, action=True)
+        assert isinstance(results, dict)
+        assert len(results) == 1
+        assert len(results['t02']) == 0
+
+        # no files were removed, so our data is still accessible
+        pc = PersistentStore(
+            path=str(tmpdir), namespace='t02', mode=PersistentStoreMode.FLUSH)
+        # Nothing is pruned
+        assert pc.get('key-t02') == 'value'
+        assert pc.read() == b'data-t02'
+
+    with mock.patch('os.unlink', side_effect=FileNotFoundError()):
+        results = PersistentStore.disk_prune(
+            namespace='t02', path=str(tmpdir), expires=0, action=True)
+        assert isinstance(results, dict)
+        assert len(results) == 1
+        assert len(results['t02']) == 2
+
+        # no files were removed, so our data is still accessible
+        pc = PersistentStore(
+            path=str(tmpdir), namespace='t02', mode=PersistentStoreMode.FLUSH)
+        # Nothing is pruned
+        assert pc.get('key-t02') == 'value'
+        assert pc.read() == b'data-t02'
+
+    with mock.patch('os.unlink', side_effect=OSError()):
+        results = PersistentStore.disk_prune(
+            namespace='t02', path=str(tmpdir), expires=0, action=True)
+        assert isinstance(results, dict)
+        assert len(results) == 1
+        assert len(results['t02']) == 2
+
+        # no files were removed, so our data is still accessible
+        pc = PersistentStore(
+            path=str(tmpdir), namespace='t02', mode=PersistentStoreMode.FLUSH)
+        # Nothing is pruned
+        assert pc.get('key-t02') == 'value'
+        assert pc.read() == b'data-t02'
+
+    with mock.patch('os.rmdir', side_effect=OSError()):
+        results = PersistentStore.disk_prune(
+            namespace='t02', path=str(tmpdir), expires=0, action=True)
+        assert isinstance(results, dict)
+        assert len(results) == 1
+        assert len(results['t02']) == 2
+
+        # no files were removed, so our data is still accessible
+        pc = PersistentStore(
+            path=str(tmpdir), namespace='t02', mode=PersistentStoreMode.FLUSH)
+        # Nothing is pruned
+        assert pc.get('key-t02') is None
+        assert pc.read() is None

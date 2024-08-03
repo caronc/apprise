@@ -31,6 +31,7 @@ import glob
 import tempfile
 import json
 import binascii
+from itertools import chain
 from datetime import datetime, timezone, timedelta
 import hashlib
 from .common import PersistentStoreMode, PERSISTENT_STORE_MODES
@@ -84,7 +85,7 @@ class CacheObject:
 
     def set_expiry(self, expires=None):
         """
-        Sets a new expirty
+        Sets a new expiry
         """
 
         if isinstance(expires, datetime):
@@ -289,6 +290,9 @@ class PersistentStore:
     # The maximum file-size we will allow the persistent store to grow to
     # 1 MB = 1048576 bytes
     max_file_size = 1048576
+
+    # 30 days in seconds
+    default_file_expiry = 2678400
 
     # File encoding to use
     encoding = 'utf-8'
@@ -1041,21 +1045,187 @@ class PersistentStore:
             if exclude:
                 self.__cache_files[exclude] = \
                     [path for path in filter(os.path.isfile, glob.glob(
-                        self.__base_path + '/**/*', recursive=True))
+                        os.path.join(self.__base_path, '**', '*'),
+                        recursive=True))
                         if next((False for p in self.__exclude_list
                                  if p.match(path)), True)]
 
             else:  # No exclusion list applied
                 self.__cache_files[exclude] = \
                     [path for path in filter(os.path.isfile, glob.glob(
-                        self.__base_path + '/**/*', recursive=True))]
+                        os.path.join(self.__base_path, '**', '*'),
+                        recursive=True))]
 
         except (OSError, IOError):
             # We can't access the directory or it does not exist
             self.__cache_files[exclude] = []
-            pass
 
         return self.__cache_files[exclude]
+
+    @staticmethod
+    def disk_prune(path, namespace=None, expires=None, action=False):
+        """
+        Prune persistent disk storage entries that are old and/or unreferenced
+
+        you must specify a path to perform the prune within
+
+        if one or more namespaces are provided, then pruning focuses ONLY on
+        those entries (if matched).
+
+        if action is not set to False, directories to be removed are returned
+        only
+
+        """
+
+        # Prepare our File Expiry
+        expires = datetime.now() - timedelta(seconds=expires) \
+            if isinstance(expires, (float, int)) and expires >= 0 \
+            else PersistentStore.default_file_expiry
+
+        # Handle our namespace searching
+        if namespace:
+            if isinstance(namespace, str):
+                namespace = [namespace]
+
+            elif not isinstance(namespace, (tuple, set, list)):
+                raise AttributeError(
+                    "namespace must be None, a string, or a tuple/set/list "
+                    "of strings")
+
+        def is_namespace(x):
+            """
+            Validate what was detected is a valid namespace
+            """
+            return os.path.isdir(os.path.join(path, x)) \
+                and PersistentStore.__valid_key.match(x)
+
+        # Acquire all of the files in question
+        namespaces = \
+            [ns for ns in filter(is_namespace, os.listdir(path))
+             if not namespace or ns in namespace]
+
+        # Track matches
+        _map = {}
+
+        for namespace in namespaces:
+            # Prepare our map
+            _map[namespace] = []
+
+            # Reference Directories
+            base_dir = os.path.join(path, namespace)
+            data_dir = os.path.join(base_dir, PersistentStore.data_dir)
+            temp_dir = os.path.join(base_dir, PersistentStore.temp_dir)
+
+            # Careful to only focus on files created by this Persistent Store
+            # object
+            files = [
+                os.path.join(base_dir, f'{PersistentStore.__cache_key}'
+                             f'{PersistentStore.__extension}'),
+                os.path.join(base_dir, f'{PersistentStore.__cache_key}'
+                             f'{PersistentStore.__backup_extension}'),
+            ]
+
+            # Update our files (applying what was defined above too)
+            valid_data_re = re.compile(
+                r'.*(' + re.escape(PersistentStore.__extension) +
+                r'|' + re.escape(PersistentStore.__backup_extension) + r')$')
+
+            files = [path for path in filter(
+                os.path.isfile, chain(glob.glob(
+                    os.path.join(data_dir, '*'), recursive=False), files))
+                if valid_data_re.match(path)]
+
+            # Now all temporary files
+            files.extend([path for path in filter(
+                os.path.isfile, glob.glob(
+                    os.path.join(temp_dir, '*'), recursive=False))])
+
+            # Track if we should do a directory sweep later on
+            dir_sweep = True if files else False
+
+            # Scan our files
+            for file in files:
+                try:
+                    mtime = datetime.fromtimestamp(os.path.getmtime(file))
+
+                except FileNotFoundError:
+                    # no worries; we were removing it anyway
+                    continue
+
+                except (OSError, IOError) as e:
+                    # File likely doesn't exist, or permission issue, either
+                    # way, there is nothing we can do at this point
+                    logger.error(
+                        'Disk Prune (ns=%s, clean=%s) detetcted inaccessible '
+                        'file: %s', namespace, 'yes' if action else 'no', file)
+                    logger.debug(
+                        'Persistent Storage Exception: %s' % str(e))
+
+                    # No longer worth doing a directory sweep
+                    dir_sweep = False
+                    continue
+
+                if expires < mtime:
+                    continue
+
+                #
+                # Handle Removing
+                #
+                record = {
+                    'path': file,
+                    'removed': False,
+                }
+
+                if action:
+                    try:
+                        os.unlink(file)
+                        # Update our record
+                        record['removed'] = True
+                        logger.info(
+                            'Disk Prune (ns=%s, clean=%s) removed persistent '
+                            'file: %s', namespace,
+                            'yes' if action else 'no', file)
+
+                    except FileNotFoundError:
+                        # no longer worth doing a directory sweep
+                        dir_sweep = False
+
+                        # otherwise, no worries; we were removing the file
+                        # anyway
+
+                    except (OSError, IOError) as e:
+                        logger.error(
+                            'Disk Prune (ns=%s, clean=%s) failed to remove '
+                            'persistent file: %s', namespace,
+                            'yes' if action else 'no', file)
+
+                        logger.debug(
+                            'Persistent Storage Exception: %s' % str(e))
+
+                        # No longer worth doing a directory sweep
+                        dir_sweep = False
+
+                # Store our record
+                _map[namespace].append(record)
+
+            # Memory tidy
+            del files
+
+            if dir_sweep:
+                # Gracefully cleanup our namespace directory. It's okay if we
+                # fail; This just means there were files in the directory.
+                for dirpath in (temp_dir, data_dir, base_dir):
+                    if action:
+                        try:
+                            os.rmdir(dirpath)
+                            logger.info(
+                                'Disk Prune (ns=%s, clean=%s) removed '
+                                'persistent dir: %s', namespace,
+                                'yes' if action else 'no', dirpath)
+                        except OSError:
+                            # do nothing;
+                            pass
+        return _map
 
     def size(self, exclude=True, lazy=True):
         """
