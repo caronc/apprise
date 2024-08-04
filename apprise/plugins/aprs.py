@@ -729,6 +729,15 @@ class NotifyAprs(NotifyBase):
             params=NotifyAprs.urlencode(params),
         )
 
+    @property
+    def url_identifier(self):
+        """
+        Returns all of the identifiers that make this URL unique from
+        another simliar one. Targets or end points should never be identified
+        here.
+        """
+        return (self.user, self.password, self.locale)
+
     def __len__(self):
         """
         Returns the number of targets associated with this notification

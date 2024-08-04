@@ -26,6 +26,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import os
 import re
 from unittest import mock
 
@@ -398,10 +399,10 @@ def test_apprise_cli_nux_env(tmpdir):
     ])
     assert result.exit_code == 0
     lines = re.split(r'[\r\n]', result.output.strip())
-    # 5 lines of all good:// entries matched
-    assert len(lines) == 5
+    # 5 lines of all good:// entries matched + url id underneath
+    assert len(lines) == 10
     # Verify we match against the remaining good:// entries
-    for i in range(0, 5):
+    for i in range(0, 10, 2):
         assert lines[i].endswith('good://')
 
     # This will fail because nothing matches mytag. It's case sensitive
@@ -674,6 +675,75 @@ def test_apprise_cli_modules(tmpdir):
     ])
 
     assert result.exit_code == 0
+
+
+def test_apprise_cli_persistent_storage(tmpdir):
+    """
+    CLI: --storage-path (-S) and --storage-mode (-SM)
+
+    """
+
+    # This is a made up class that is just used to verify
+    class TestNotification(NotifyBase):
+        """
+        A Testing Script
+        """
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+
+        def send(self, **kwargs):
+
+            # Test our persistent settings
+            self.store.set('key', 'value')
+            assert self.store.get('key') == 'value'
+
+            # Pretend everything is okay
+            return True
+
+        def url(self, *args, **kwargs):
+            # Support URL
+            return 'test://'
+
+        def parse_url(self, *args, **kwargs):
+            # parse our url
+            return {'schema': 'test'}
+
+    # assign test:// to our  notification defined above
+    N_MGR['test'] = TestNotification
+
+    runner = CliRunner()
+
+    # An invalid mode specified
+    result = runner.invoke(cli.main, [
+        '--storage-path', str(tmpdir),
+        '--storage-mode', 'invalid',
+        '-t', 'title',
+        '-b', 'body',
+        'test://',
+    ])
+    # Bad mode specified
+    assert result.exit_code == 2
+
+    # No files written yet
+    assert len(os.listdir(str(tmpdir))) == 0
+    # An invalid mode specified
+    result = runner.invoke(cli.main, [
+        '--storage-path', str(tmpdir),
+        '--storage-mode', 'flush',
+        '-t', 'title',
+        '-b', 'body',
+        'test://',
+    ])
+    # We parsed our data accordingly
+    assert result.exit_code == 0
+
+    dir_content = os.listdir(str(tmpdir))
+    assert len(dir_content) == 1
+    assert 'e70db0b9' in dir_content
+
+    # Clear loaded modules
+    N_MGR.unload_modules()
 
 
 def test_apprise_cli_details(tmpdir):

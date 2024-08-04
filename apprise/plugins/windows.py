@@ -87,6 +87,10 @@ class NotifyWindows(NotifyBase):
     # The number of seconds to display the popup for
     default_popup_duration_sec = 12
 
+    # No URL Identifier will be defined for this service as there simply isn't
+    # enough details to uniquely identify one dbus:// from another.
+    url_identifier = False
+
     # Define object templates
     templates = (
         '{schema}://',

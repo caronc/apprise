@@ -92,6 +92,10 @@ class NotifyMacOSX(NotifyBase):
     # content to display
     body_max_line_count = 10
 
+    # No URL Identifier will be defined for this service as there simply isn't
+    # enough details to uniquely identify one dbus:// from another.
+    url_identifier = False
+
     # The possible paths to the terminal-notifier
     notify_paths = (
         '/opt/homebrew/bin/terminal-notifier',

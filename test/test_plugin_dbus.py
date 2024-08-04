@@ -194,6 +194,9 @@ def test_plugin_dbus_general_success(mocker, dbus_glib_environment):
     assert obj.url().startswith('dbus://_/')
     assert re.search('image=yes', obj.url())
 
+    # URL ID Generation is disabled
+    assert obj.url_id() is None
+
     assert obj.notify(
         title='title', body='body',
         notify_type=apprise.NotifyType.INFO) is True

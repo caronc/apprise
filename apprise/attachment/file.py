@@ -29,6 +29,7 @@
 import re
 import os
 from .base import AttachBase
+from ..utils import path_decode
 from ..common import ContentLocation
 from ..locale import gettext_lazy as _
 
@@ -57,7 +58,10 @@ class AttachFile(AttachBase):
 
         # Store path but mark it dirty since we have not performed any
         # verification at this point.
-        self.dirty_path = os.path.expanduser(path)
+        self.dirty_path = path_decode(path)
+
+        # Track our file as it was saved
+        self.__original_path = os.path.normpath(path)
         return
 
     def url(self, privacy=False, *args, **kwargs):
@@ -77,7 +81,7 @@ class AttachFile(AttachBase):
             params['name'] = self._name
 
         return 'file://{path}{params}'.format(
-            path=self.quote(self.dirty_path),
+            path=self.quote(self.__original_path),
             params='?{}'.format(self.urlencode(params, safe='/'))
             if params else '',
         )

@@ -51,7 +51,7 @@ RUN rpmspec -q --buildrequires /python-apprise.spec | cut -f1 -d' ' | \
     xargs dnf install -y
 
 # RPM Build Structure Setup
-ENV FLAVOR=rpmbuild OS=centos DIST=el8
+ENV FLAVOR=rpmbuild OS=centos DIST=el9
 RUN useradd builder -u 1000 -m -G users,wheel &>/dev/null && \
     echo "builder ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers
 

@@ -132,6 +132,10 @@ class NotifyGnome(NotifyBase):
     # cause any title (if defined) to get placed into the message body.
     title_maxlen = 0
 
+    # No URL Identifier will be defined for this service as there simply isn't
+    # enough details to uniquely identify one dbus:// from another.
+    url_identifier = False
+
     # Define object templates
     templates = (
         '{schema}://',

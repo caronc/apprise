@@ -111,6 +111,9 @@ def test_plugin_windows_mocked():
     # Test URL functionality
     assert isinstance(obj.url(), str)
 
+    # Verify that a URL ID can not be generated
+    assert obj.url_id() is None
+
     # Check that it found our mocked environments
     assert obj.enabled is True
 

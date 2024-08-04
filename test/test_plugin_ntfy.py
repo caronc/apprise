@@ -573,6 +573,15 @@ def test_plugin_ntfy_config_files(mock_post, mock_get):
     assert next(aobj.find(tag='ntfy_invalid')).priority == \
         NtfyPriority.NORMAL
 
+    # A cloud reference without any identifiers; the ntfy:// (insecure mode)
+    # is not considered during the id generation as ntfys:// is always
+    # implied
+    results = NotifyNtfy.parse_url('ntfy://')
+    obj = NotifyNtfy(**results)
+    new_results = NotifyNtfy.parse_url(obj.url())
+    obj2 = NotifyNtfy(**new_results)
+    assert obj.url_id() == obj2.url_id()
+
 
 @mock.patch('requests.post')
 def test_plugin_ntfy_message_to_attach(mock_post):

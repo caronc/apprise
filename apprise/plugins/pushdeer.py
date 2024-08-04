@@ -180,6 +180,18 @@ class NotifyPushDeer(NotifyBase):
 
         return True
 
+    @property
+    def url_identifier(self):
+        """
+        Returns all of the identifiers that make this URL unique from
+        another simliar one. Targets or end points should never be identified
+        here.
+        """
+        return (
+            self.secure_protocol if self.secure else self.protocol,
+            self.push_key, self.host, self.port,
+        )
+
     def url(self, privacy=False):
         """
         Returns the URL built dynamically based on specified arguments.

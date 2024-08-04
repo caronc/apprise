@@ -35,18 +35,16 @@ import re
 
 from os.path import isfile
 from os.path import exists
-from os.path import expanduser
-from os.path import expandvars
 
-from . import NotifyType
-from . import NotifyFormat
 from . import Apprise
 from . import AppriseAsset
 from . import AppriseConfig
+from . import PersistentStore
 
-from .utils import parse_list
+from .utils import parse_list, path_decode
 from .common import NOTIFY_TYPES
 from .common import NOTIFY_FORMATS
+from .common import PERSISTENT_STORE_MODES
 from .common import ContentLocation
 from .logger import logger
 
@@ -104,58 +102,72 @@ DEFAULT_PLUGIN_PATHS = (
     '/var/lib/apprise/plugins',
 )
 
+#
+# Persistent Storage
+#
+DEFAULT_STORAGE_PATH = '~/.local/share/apprise/cache'
+
 # Detect Windows
 if platform.system() == 'Windows':
     # Default Config Search Path for Windows Users
     DEFAULT_CONFIG_PATHS = (
-        expandvars('%APPDATA%\\Apprise\\apprise'),
-        expandvars('%APPDATA%\\Apprise\\apprise.conf'),
-        expandvars('%APPDATA%\\Apprise\\apprise.yml'),
-        expandvars('%APPDATA%\\Apprise\\apprise.yaml'),
-        expandvars('%LOCALAPPDATA%\\Apprise\\apprise'),
-        expandvars('%LOCALAPPDATA%\\Apprise\\apprise.conf'),
-        expandvars('%LOCALAPPDATA%\\Apprise\\apprise.yml'),
-        expandvars('%LOCALAPPDATA%\\Apprise\\apprise.yaml'),
+        '%APPDATA%\\Apprise\\apprise',
+        '%APPDATA%\\Apprise\\apprise.conf',
+        '%APPDATA%\\Apprise\\apprise.yml',
+        '%APPDATA%\\Apprise\\apprise.yaml',
+        '%LOCALAPPDATA%\\Apprise\\apprise',
+        '%LOCALAPPDATA%\\Apprise\\apprise.conf',
+        '%LOCALAPPDATA%\\Apprise\\apprise.yml',
+        '%LOCALAPPDATA%\\Apprise\\apprise.yaml',
 
         #
         # Global Support
         #
 
         # C:\ProgramData\Apprise
-        expandvars('%ALLUSERSPROFILE%\\Apprise\\apprise'),
-        expandvars('%ALLUSERSPROFILE%\\Apprise\\apprise.conf'),
-        expandvars('%ALLUSERSPROFILE%\\Apprise\\apprise.yml'),
-        expandvars('%ALLUSERSPROFILE%\\Apprise\\apprise.yaml'),
+        '%ALLUSERSPROFILE%\\Apprise\\apprise',
+        '%ALLUSERSPROFILE%\\Apprise\\apprise.conf',
+        '%ALLUSERSPROFILE%\\Apprise\\apprise.yml',
+        '%ALLUSERSPROFILE%\\Apprise\\apprise.yaml',
 
         # C:\Program Files\Apprise
-        expandvars('%PROGRAMFILES%\\Apprise\\apprise'),
-        expandvars('%PROGRAMFILES%\\Apprise\\apprise.conf'),
-        expandvars('%PROGRAMFILES%\\Apprise\\apprise.yml'),
-        expandvars('%PROGRAMFILES%\\Apprise\\apprise.yaml'),
+        '%PROGRAMFILES%\\Apprise\\apprise',
+        '%PROGRAMFILES%\\Apprise\\apprise.conf',
+        '%PROGRAMFILES%\\Apprise\\apprise.yml',
+        '%PROGRAMFILES%\\Apprise\\apprise.yaml',
 
         # C:\Program Files\Common Files
-        expandvars('%COMMONPROGRAMFILES%\\Apprise\\apprise'),
-        expandvars('%COMMONPROGRAMFILES%\\Apprise\\apprise.conf'),
-        expandvars('%COMMONPROGRAMFILES%\\Apprise\\apprise.yml'),
-        expandvars('%COMMONPROGRAMFILES%\\Apprise\\apprise.yaml'),
+        '%COMMONPROGRAMFILES%\\Apprise\\apprise',
+        '%COMMONPROGRAMFILES%\\Apprise\\apprise.conf',
+        '%COMMONPROGRAMFILES%\\Apprise\\apprise.yml',
+        '%COMMONPROGRAMFILES%\\Apprise\\apprise.yaml',
     )
 
     # Default Plugin Search Path for Windows Users
     DEFAULT_PLUGIN_PATHS = (
-        expandvars('%APPDATA%\\Apprise\\plugins'),
-        expandvars('%LOCALAPPDATA%\\Apprise\\plugins'),
+        '%APPDATA%\\Apprise\\plugins',
+        '%LOCALAPPDATA%\\Apprise\\plugins',
 
         #
         # Global Support
         #
 
         # C:\ProgramData\Apprise\plugins
-        expandvars('%ALLUSERSPROFILE%\\Apprise\\plugins'),
+        '%ALLUSERSPROFILE%\\Apprise\\plugins',
         # C:\Program Files\Apprise\plugins
-        expandvars('%PROGRAMFILES%\\Apprise\\plugins'),
+        '%PROGRAMFILES%\\Apprise\\plugins',
         # C:\Program Files\Common Files
-        expandvars('%COMMONPROGRAMFILES%\\Apprise\\plugins'),
+        '%COMMONPROGRAMFILES%\\Apprise\\plugins',
     )
+
+    #
+    # Persistent Storage
+    #
+    DEFAULT_STORAGE_PATH = '%APPDATA%/Apprise/cache'
+
+if os.environ.get('APPRISE_STORAGE', '').strip():
+    # Over-ride Default Storage Path
+    DEFAULT_STORAGE_PATH = os.environ.get('APPRISE_STORAGE')
 
 
 def print_help_msg(command):
@@ -190,23 +202,42 @@ def print_version_msg():
 @click.option('--plugin-path', '-P', default=None, type=str, multiple=True,
               metavar='PLUGIN_PATH',
               help='Specify one or more plugin paths to scan.')
+@click.option('--storage-path', '-S', default=DEFAULT_STORAGE_PATH, type=str,
+              metavar='STORAGE_PATH',
+              help='Specify the path to the persistent storage location '
+              '(default={}).'.format(DEFAULT_STORAGE_PATH))
+@click.option('--storage-purge', '-SP', is_flag=True,
+              help='Purges old persistent storage based on '
+              '--storage-purge-days (-SPD)')
+@click.option('--storage-purge-days', '-SPD', default=30,
+              type=int,
+              help='Define the number of days the --storage-purge (-SP) '
+              'should run using. Setting this to zero (0) will eliminate '
+              'all accumulated content. By default this value is 30 (days).')
+@click.option('--storage-mode', '-SM', default=PERSISTENT_STORE_MODES[0],
+              type=str, metavar='MODE',
+              help='Persistent disk storage write mode (default={}). '
+              'Possible values are "{}", and "{}".'.format(
+                  PERSISTENT_STORE_MODES[0], '", "'.join(
+                      PERSISTENT_STORE_MODES[:-1]),
+                  PERSISTENT_STORE_MODES[-1]))
 @click.option('--config', '-c', default=None, type=str, multiple=True,
               metavar='CONFIG_URL',
               help='Specify one or more configuration locations.')
 @click.option('--attach', '-a', default=None, type=str, multiple=True,
               metavar='ATTACHMENT_URL',
               help='Specify one or more attachment.')
-@click.option('--notification-type', '-n', default=NotifyType.INFO, type=str,
+@click.option('--notification-type', '-n', default=NOTIFY_TYPES[0], type=str,
               metavar='TYPE',
               help='Specify the message type (default={}). '
               'Possible values are "{}", and "{}".'.format(
-                  NotifyType.INFO, '", "'.join(NOTIFY_TYPES[:-1]),
+                  NOTIFY_TYPES[0], '", "'.join(NOTIFY_TYPES[:-1]),
                   NOTIFY_TYPES[-1]))
-@click.option('--input-format', '-i', default=NotifyFormat.TEXT, type=str,
+@click.option('--input-format', '-i', default=NOTIFY_FORMATS[0], type=str,
               metavar='FORMAT',
               help='Specify the message input format (default={}). '
               'Possible values are "{}", and "{}".'.format(
-                  NotifyFormat.TEXT, '", "'.join(NOTIFY_FORMATS[:-1]),
+                  NOTIFY_FORMATS[0], '", "'.join(NOTIFY_FORMATS[:-1]),
                   NOTIFY_FORMATS[-1]))
 @click.option('--theme', '-T', default='default', type=str, metavar='THEME',
               help='Specify the default theme.')
@@ -243,8 +274,9 @@ def print_version_msg():
                 metavar='SERVER_URL [SERVER_URL2 [SERVER_URL3]]',)
 def main(body, title, config, attach, urls, notification_type, theme, tag,
          input_format, dry_run, recursion_depth, verbose, disable_async,
-         details, interpret_escapes, interpret_emojis, plugin_path, debug,
-         version):
+         details, interpret_escapes, interpret_emojis, plugin_path,
+         storage_path, storage_mode, storage_purge_days, storage_purge,
+         debug, version):
     """
     Send a notification to all of the specified servers identified by their
     URLs the content provided within the title, body and notification-type.
@@ -318,11 +350,20 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
         # issue.  For consistency, we also return a 2
         sys.exit(2)
 
+    storage_mode = storage_mode.strip().lower()
+    if storage_mode not in PERSISTENT_STORE_MODES:
+        logger.error(
+            'The --storage-mode (-SM) value of {} is not supported.'
+            .format(storage_mode))
+        # 2 is the same exit code returned by Click if there is a parameter
+        # issue.  For consistency, we also return a 2
+        sys.exit(2)
+
     if not plugin_path:
         # Prepare a default set of plugin path
         plugin_path = \
-            next((path for path in DEFAULT_PLUGIN_PATHS
-                 if exists(expanduser(path))), None)
+            [path for path in DEFAULT_PLUGIN_PATHS
+             if exists(path_decode(path))]
 
     # Prepare our asset
     asset = AppriseAsset(
@@ -346,6 +387,12 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
 
         # Load our plugins
         plugin_paths=plugin_path,
+
+        # Load our persistent storage path
+        storage_path=path_decode(storage_path),
+
+        # Define if we flush to disk as soon as possible or not when required
+        storage_mode=storage_mode
     )
 
     # Create our Apprise object
@@ -483,7 +530,7 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
     else:
         # Load default configuration
         a.add(AppriseConfig(
-            paths=[f for f in DEFAULT_CONFIG_PATHS if isfile(expanduser(f))],
+            paths=[f for f in DEFAULT_CONFIG_PATHS if isfile(path_decode(f))],
             asset=asset, recursion=recursion_depth))
 
     if len(a) == 0 and not urls:
@@ -496,6 +543,33 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
     # each --tag entry comprises of a comma separated 'and' list
     # we or each of of the --tag and sets specified.
     tags = None if not tag else [parse_list(t) for t in tag]
+
+    if storage_purge:
+        if storage_purge_days < 0:
+            logger.error(
+                'The --storage-purge-days (-SPD) value can not be lower then '
+                'zero (0).')
+
+            # 2 is the same exit code returned by Click if there is a parameter
+            # issue.  For consistency, we also return a 2
+            sys.exit(2)
+
+        # Get our URL IDs to filter on
+        uids = [n.url_id() for n in a if n.url_id()]
+
+        # clean up storage
+        results = PersistentStore.disk_prune(
+            # Use our asset path as it has already been properly
+            # parsed
+            path=asset.storage_path,
+            # Provide our namespaces if they exist
+            namespace=None if not uids else uids,
+            # Convert expiry from days to seconds
+            expires=storage_purge_days * 60 * 60 * 24,
+            action=not dry_run)
+
+        sys.exit(0)
+        # end if disk_prune()
 
     if not dry_run:
         if body is None:
@@ -520,11 +594,17 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
 
         for idx, server in enumerate(a.find(tag=tags)):
             url = server.url(privacy=True)
-            click.echo("{: 3d}. {}".format(
+            click.echo("{: 4d}. {}".format(
                 idx + 1,
                 url if len(url) <= rows else '{}...'.format(url[:rows - 3])))
+
+            # Share our URL ID
+            click.echo("{:>10}: {}".format(
+                'uid', '- n/a -' if not server.url_id()
+                else server.url_id()))
+
             if server.tags:
-                click.echo("{} - {}".format(' ' * 5, ', '.join(server.tags)))
+                click.echo("{:>10}: {}".format('tags', ', '.join(server.tags)))
 
         # Initialize a default response of nothing matched, otherwise
         # if we matched at least one entry, we can return True

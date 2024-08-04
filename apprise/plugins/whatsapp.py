@@ -446,6 +446,15 @@ class NotifyWhatsApp(NotifyBase):
 
         return not has_error
 
+    @property
+    def url_identifier(self):
+        """
+        Returns all of the identifiers that make this URL unique from
+        another simliar one. Targets or end points should never be identified
+        here.
+        """
+        return (self.secure_protocol, self.from_phone_id, self.token)
+
     def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.

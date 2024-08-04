@@ -61,6 +61,9 @@ def test_plugin_syslog_by_url(openlog, syslog):
     assert re.search(r'logpid=yes', obj.url()) is not None
     assert re.search(r'logperror=no', obj.url()) is not None
 
+    # We do not support generation of a URL ID
+    assert obj.url_id() is None
+
     assert isinstance(
         apprise.Apprise.instantiate(
             'syslog://:@/'), NotifySyslog)
