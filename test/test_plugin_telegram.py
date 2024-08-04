@@ -1058,7 +1058,7 @@ def test_plugin_telegram_threads(mock_post):
 
     assert isinstance(aobj[0], NotifyTelegram)
 
-    body = 'my message'
+    body = 'my threaded message'
 
     assert aobj.notify(body=body)
 
