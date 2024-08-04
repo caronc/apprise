@@ -60,6 +60,7 @@ from .attachment.base import AttachBase
 from .apprise import Apprise
 from .locale import AppriseLocale
 from .asset import AppriseAsset
+from .persistent_store import PersistentStore
 from .apprise_config import AppriseConfig
 from .apprise_attachment import AppriseAttachment
 from .manager_attachment import AttachmentManager
@@ -79,6 +80,7 @@ __all__ = [
     # Core
     'Apprise', 'AppriseAsset', 'AppriseConfig', 'AppriseAttachment', 'URLBase',
     'NotifyBase', 'ConfigBase', 'AttachBase', 'AppriseLocale',
+    'PersistentStore',
 
     # Reference
     'NotifyType', 'NotifyImageSize', 'NotifyFormat', 'OverflowMode',

@@ -39,6 +39,7 @@ from os.path import exists
 from . import Apprise
 from . import AppriseAsset
 from . import AppriseConfig
+from . import PersistentStore
 
 from .utils import parse_list, path_decode
 from .common import NOTIFY_TYPES
@@ -164,6 +165,10 @@ if platform.system() == 'Windows':
     #
     DEFAULT_STORAGE_PATH = '%APPDATA%/Apprise/cache'
 
+if os.environ.get('APPRISE_STORAGE', '').strip():
+    # Over-ride Default Storage Path
+    DEFAULT_STORAGE_PATH = os.environ.get('APPRISE_STORAGE')
+
 
 def print_help_msg(command):
     """
@@ -201,6 +206,14 @@ def print_version_msg():
               metavar='STORAGE_PATH',
               help='Specify the path to the persistent storage location '
               '(default={}).'.format(DEFAULT_STORAGE_PATH))
+@click.option('--storage-purge', '-SP', is_flag=True,
+              help='Purges old persistent storage based on '
+              '--storage-purge-days (-SPD)')
+@click.option('--storage-purge-days', '-SPD', default=30,
+              type=int,
+              help='Define the number of days the --storage-purge (-SP) '
+              'should run using. Setting this to zero (0) will eliminate '
+              'all accumulated content. By default this value is 30 (days).')
 @click.option('--storage-mode', '-SM', default=PERSISTENT_STORE_MODES[0],
               type=str, metavar='MODE',
               help='Persistent disk storage write mode (default={}). '
@@ -262,7 +275,8 @@ def print_version_msg():
 def main(body, title, config, attach, urls, notification_type, theme, tag,
          input_format, dry_run, recursion_depth, verbose, disable_async,
          details, interpret_escapes, interpret_emojis, plugin_path,
-         storage_path, storage_mode, debug, version):
+         storage_path, storage_mode, storage_purge_days, storage_purge,
+         debug, version):
     """
     Send a notification to all of the specified servers identified by their
     URLs the content provided within the title, body and notification-type.
@@ -375,7 +389,7 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
         plugin_paths=plugin_path,
 
         # Load our persistent storage path
-        storage_path=storage_path,
+        storage_path=path_decode(storage_path),
 
         # Define if we flush to disk as soon as possible or not when required
         storage_mode=storage_mode
@@ -530,6 +544,33 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
     # we or each of of the --tag and sets specified.
     tags = None if not tag else [parse_list(t) for t in tag]
 
+    if storage_purge:
+        if storage_purge_days < 0:
+            logger.error(
+                'The --storage-purge-days (-SPD) value can not be lower then '
+                'zero (0).')
+
+            # 2 is the same exit code returned by Click if there is a parameter
+            # issue.  For consistency, we also return a 2
+            sys.exit(2)
+
+        # Get our URL IDs to filter on
+        uids = [n.url_id() for n in a if n.url_id()]
+
+        # clean up storage
+        results = PersistentStore.disk_prune(
+            # Use our asset path as it has already been properly
+            # parsed
+            path=asset.storage_path,
+            # Provide our namespaces if they exist
+            namespace=None if not uids else uids,
+            # Convert expiry from days to seconds
+            expires=storage_purge_days * 60 * 60 * 24,
+            action=not dry_run)
+
+        sys.exit(0)
+        # end if disk_prune()
+
     if not dry_run:
         if body is None:
             logger.trace('No --body (-b) specified; reading from stdin')
@@ -553,11 +594,17 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
 
         for idx, server in enumerate(a.find(tag=tags)):
             url = server.url(privacy=True)
-            click.echo("{: 3d}. {}".format(
+            click.echo("{: 4d}. {}".format(
                 idx + 1,
                 url if len(url) <= rows else '{}...'.format(url[:rows - 3])))
+
+            # Share our URL ID
+            click.echo("{:>10}: {}".format(
+                'uid', '- n/a -' if not server.url_id()
+                else server.url_id()))
+
             if server.tags:
-                click.echo("{} - {}".format(' ' * 5, ', '.join(server.tags)))
+                click.echo("{:>10}: {}".format('tags', ', '.join(server.tags)))
 
         # Initialize a default response of nothing matched, otherwise
         # if we matched at least one entry, we can return True

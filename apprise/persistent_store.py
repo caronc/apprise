@@ -1099,10 +1099,25 @@ class PersistentStore:
             return os.path.isdir(os.path.join(path, x)) \
                 and PersistentStore.__valid_key.match(x)
 
-        # Acquire all of the files in question
-        namespaces = \
-            [ns for ns in filter(is_namespace, os.listdir(path))
-             if not namespace or ns in namespace]
+        try:
+            # Acquire all of the files in question
+            namespaces = \
+                [ns for ns in filter(is_namespace, os.listdir(path))
+                 if not namespace or ns in namespace]
+
+        except FileNotFoundError:
+            # no worries; Nothing to do
+            logger.debug('Disk Prune path not found; nothing to clean.')
+            return {}
+
+        except (OSError, IOError) as e:
+            # File likely doesn't exist, or permission issue, either
+            # way, there is nothing we can do at this point
+            logger.error(
+                'Disk Prune (clean=%s) detetcted inaccessible '
+                'path: %s', 'yes' if action else 'no', path)
+            logger.debug(
+                'Persistent Storage Exception: %s' % str(e))
 
         # Track matches
         _map = {}

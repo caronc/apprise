@@ -121,9 +121,6 @@ class URLBase:
     # Secure sites should be verified against a Certificate Authority
     verify_certificate = True
 
-    # Persistent storage default html settings
-    persistent_storage = True
-
     # Logging to our global logger
     logger = logger
 
@@ -179,16 +176,6 @@ class URLBase:
             # default 'could' be potentially over-ridden and changed to a
             # different value.
             '_lookup_default': 'socket_connect_timeout',
-        },
-        'store': {
-            'name': _('Persistent Storage'),
-            # Use Persistent Storage
-            'type': 'bool',
-            # Provide a default
-            'default': persistent_storage,
-            # look up default using the following parent class value at
-            # runtime.
-            '_lookup_default': 'persistent_storage',
         },
     }
 
@@ -279,14 +266,6 @@ class URLBase:
                 self.logger.warning(
                     'Invalid socket connect timeout (cto) was specified {}'
                     .format(kwargs.get('cto')))
-
-        # Prepare our Persistent Storage switch
-        self.persistent_storage = parse_bool(
-            kwargs.get('store', URLBase.persistent_storage))
-        if not self.persistent_storage:
-            # Enforce the disabling of cache (ortherwise defaults are use)
-            self.url_identifier = False
-            self.__cached_url_identifier = None
 
         if 'tag' in kwargs:
             # We want to associate some tags with our notification service.
@@ -813,10 +792,6 @@ class URLBase:
         if self.socket_connect_timeout != URLBase.socket_connect_timeout:
             params['cto'] = str(self.socket_connect_timeout)
 
-        # Persistent Storage Setting
-        if self.persistent_storage != URLBase.persistent_storage:
-            params['store'] = 'yes' if self.persistent_storage else 'no'
-
         # Certificate verification
         if self.verify_certificate != URLBase.verify_certificate:
             params['verify'] = 'yes' if self.verify_certificate else 'no'
@@ -890,10 +865,6 @@ class URLBase:
             # Store our socket connect timeout if specified
             if 'cto' in results['qsd']:
                 results['cto'] = results['qsd']['cto']
-
-            # Store our persistent storage boolean
-            if 'store' in results['qsd']:
-                results['store'] = results['qsd']['store']
 
             if 'port' in results['qsd']:
                 results['port'] = results['qsd']['port']

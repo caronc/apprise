@@ -399,10 +399,10 @@ def test_apprise_cli_nux_env(tmpdir):
     ])
     assert result.exit_code == 0
     lines = re.split(r'[\r\n]', result.output.strip())
-    # 5 lines of all good:// entries matched
-    assert len(lines) == 5
+    # 5 lines of all good:// entries matched + url id underneath
+    assert len(lines) == 10
     # Verify we match against the remaining good:// entries
-    for i in range(0, 5):
+    for i in range(0, 10, 2):
         assert lines[i].endswith('good://')
 
     # This will fail because nothing matches mytag. It's case sensitive
