@@ -695,7 +695,38 @@ def test_plugin_telegram_formatting(mock_post):
            ' had [a change](http://127.0.0.1)'
 
     aobj = Apprise()
-    aobj.add('tgram://123456789:abcdefg_hijklmnop/?format=markdown')
+    aobj.add('tgram://123456789:abcdefg_hijklmnop/?format=markdown&mdv=2')
+    assert len(aobj) == 1
+
+    assert aobj.notify(
+        title=title, body=body, body_format=NotifyFormat.MARKDOWN)
+
+    # Test our calls
+    assert mock_post.call_count == 2
+
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.telegram.org/bot123456789:abcdefg_hijklmnop/getUpdates'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://api.telegram.org/bot123456789:abcdefg_hijklmnop/sendMessage'
+
+    payload = loads(mock_post.call_args_list[1][1]['data'])
+
+    # Test that everything is escaped properly in a HTML mode
+    assert payload['text'] == \
+        '# 🚨 Change detected for _Apprise Test Title_\r\n' \
+        '_[Apprise Body Title](http://localhost)_ had ' \
+        '[a change](http://127.0.0.1)'
+
+    # Reset our values
+    mock_post.reset_mock()
+
+    # Now test our MARKDOWN Handling
+    title = '# 🚨 Change detected for _Apprise Test Title_'
+    body = '_[Apprise Body Title](http://localhost)_' \
+           ' had [a change](http://127.0.0.1)'
+
+    aobj = Apprise()
+    aobj.add('tgram://123456789:abcdefg_hijklmnop/?format=markdown&mdv=1')
     assert len(aobj) == 1
 
     assert aobj.notify(
@@ -759,9 +790,9 @@ def test_plugin_telegram_formatting(mock_post):
     # Reset our values
     mock_post.reset_mock()
 
-    # Upstream to use HTML but input specified as Markdown
+    # Upstream to use HTML but input specified as Markdown v1
     aobj = Apprise()
-    aobj.add('tgram://987654321:abcdefg_hijklmnop/?format=markdown')
+    aobj.add('tgram://987654321:abcdefg_hijklmnop/?format=markdown&mdv=1')
     assert len(aobj) == 1
 
     # Now test our MARKDOWN Handling (no title defined... not really anyway)
@@ -784,23 +815,16 @@ def test_plugin_telegram_formatting(mock_post):
 
     payload = loads(mock_post.call_args_list[1][1]['data'])
 
-    # Test that everything is escaped properly in a HTML mode
-    assert payload['text'] == \
-        '_[Apprise Body Title](http://localhost)_ had ' \
-        '[a change](http://127.0.0.2)'
+    # Test that everything is escaped properly in a MARKDOWN mode
+    assert payload['text'] == body
 
     # Reset our values
     mock_post.reset_mock()
 
-    # Upstream to use HTML but input specified as Markdown
+    # Upstream to use HTML but input specified as Markdown v2
     aobj = Apprise()
-    aobj.add('tgram://987654321:abcdefg_hijklmnop/?format=markdown')
+    aobj.add('tgram://987654321:abcdefg_hijklmnop/?format=markdown&mdv=2')
     assert len(aobj) == 1
-
-    # Set an actual title this time
-    title = '# A Great Title'
-    body = '_[Apprise Body Title](http://localhost)_' \
-           ' had [a change](http://127.0.0.2)'
 
     # MARKDOWN forced by the command line, but TEXT specified as
     # upstream mode
@@ -817,9 +841,115 @@ def test_plugin_telegram_formatting(mock_post):
 
     payload = loads(mock_post.call_args_list[1][1]['data'])
 
-    # Test that everything is escaped properly in a HTML mode
+    # Test that everything is escaped properly in a MARKDOWN mode
     assert payload['text'] == \
-        '# A Great Title\r\n_[Apprise Body Title](http://localhost)_ had ' \
+        '\\_\\[Apprise Body Title\\]\\(http://localhost\\)\\_ had \\' \
+        '[a change\\]\\(http://127\\.0\\.0\\.2\\)'
+
+    # Reset our values
+    mock_post.reset_mock()
+
+    # Upstream to use HTML but input specified as Markdown v1
+    aobj = Apprise()
+    aobj.add('tgram://987654321:abcdefg_hijklmnop/?format=markdown&mdv=1')
+    assert len(aobj) == 1
+
+    # Set an actual title this time
+    title = '# A Great Title'
+    body = '_[Apprise Body Title](http://localhost)_' \
+           ' had [a change](http://127.0.0.2)'
+
+    # TEXT forced by the command line, but MARKDOWN specified as
+    # upstream mode
+    assert aobj.notify(
+        title=title, body=body, body_format=NotifyFormat.TEXT)
+
+    # Test our calls
+    assert mock_post.call_count == 2
+
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.telegram.org/bot987654321:abcdefg_hijklmnop/getUpdates'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://api.telegram.org/bot987654321:abcdefg_hijklmnop/sendMessage'
+
+    payload = loads(mock_post.call_args_list[1][1]['data'])
+
+    # Test that everything is escaped properly in a MARKDOWN mode
+    assert payload['text'] == \
+        '# A Great Title\r\n' \
+        '_[Apprise Body Title](http://localhost)_ had ' \
+        '[a change](http://127.0.0.2)'
+
+    # Reset our values
+    mock_post.reset_mock()
+
+    # Upstream to use HTML but input specified as Markdown v2
+    aobj = Apprise()
+    aobj.add('tgram://987654321:abcdefg_hijklmnop/?format=markdown&mdv=2')
+    assert len(aobj) == 1
+
+    # TEXT forced by the command line, but MARKDOWN specified as
+    # upstream mode
+    assert aobj.notify(
+        title=title, body=body, body_format=NotifyFormat.TEXT)
+
+    # Test our calls
+    assert mock_post.call_count == 2
+
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.telegram.org/bot987654321:abcdefg_hijklmnop/getUpdates'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://api.telegram.org/bot987654321:abcdefg_hijklmnop/sendMessage'
+
+    payload = loads(mock_post.call_args_list[1][1]['data'])
+
+    # Test that everything is escaped properly in a MARKDOWN mode
+    assert payload['text'] == \
+        '\\# A Great Title\r\n' \
+        '\\_\\[Apprise Body Title\\]\\(http://localhost\\)\\_ had ' \
+        '\\[a change\\]\\(http://127\\.0\\.0\\.2\\)'
+
+    # Reset our values
+    mock_post.reset_mock()
+
+    # If input is markdown and output is v2, it is expected the user knows
+    # what he is doing... no esaping takes place
+    assert aobj.notify(
+        title=title, body=body, body_format=NotifyFormat.MARKDOWN)
+
+    # Test our calls
+    assert mock_post.call_count == 1
+
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.telegram.org/bot987654321:abcdefg_hijklmnop/sendMessage'
+
+    payload = loads(mock_post.call_args_list[0][1]['data'])
+
+    # No escaping in this circumstance
+    assert payload['text'] == \
+        '# A Great Title\r\n' \
+        '_[Apprise Body Title](http://localhost)_ had ' \
+        '[a change](http://127.0.0.2)'
+
+    # Reset our values
+    mock_post.reset_mock()
+
+    # No body format specified at all... user definitely must know what
+    # they are doing... still no escaping in this circumstance
+    assert aobj.notify(title=title, body=body)
+
+    # Test our calls
+    assert mock_post.call_count == 1
+
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.telegram.org/bot987654321:abcdefg_hijklmnop/sendMessage'
+
+    payload = loads(mock_post.call_args_list[0][1]['data'])
+
+    # No escaping in this circumstance
+    assert payload['text'] == \
+        '# A Great Title\r\n' \
+        '_[Apprise Body Title](http://localhost)_ had ' \
         '[a change](http://127.0.0.2)'
 
     # Reset our values
@@ -1118,3 +1248,82 @@ def test_plugin_telegram_threads(mock_post):
     assert payload['message_thread_id'] == 1234
 
     mock_post.reset_mock()
+
+
+@mock.patch('requests.post')
+def test_plugin_telegram_markdown_v2(mock_post):
+    """
+    NotifyTelegram() MarkdownV2
+
+    """
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    # Simple success response
+    mock_post.return_value.content = dumps({
+        "ok": True,
+        "result": [{
+            "update_id": 645421321,
+            "message": {
+                "message_id": 2,
+                "from": {
+                    "id": 532389719,
+                    "is_bot": False,
+                    "first_name": "Chris",
+                    "language_code": "en-US"
+                },
+                "chat": {
+                    "id": 532389719,
+                    "first_name": "Chris",
+                    "type": "private"
+                },
+                "date": 1519694394,
+                "text": "/start",
+                "entities": [{
+                    "offset": 0,
+                    "length": 6,
+                    "type": "bot_command",
+                }],
+            }},
+        ],
+    })
+
+    aobj = Apprise()
+    aobj.add('tgram://123456789:abcdefg_hijklmnop/?mdv=2&format=markdown')
+    assert len(aobj) == 1
+    assert isinstance(aobj[0], NotifyTelegram)
+
+    body = '# my message\r\n## more content\r\n\\# already escaped hashtag'
+
+    # Test with body format set to markdown
+    assert aobj.notify(body=body, body_format=NotifyFormat.TEXT)
+
+    # 1 call to look up bot owner, and second for notification
+    assert mock_post.call_count == 2
+    payload = loads(mock_post.call_args_list[1][1]['data'])
+
+    # Our content is escapped properly
+    assert payload['text'] == '\\# my message\r\n' \
+        '\\#\\# more content\r\n\\# already escaped hashtag'
+
+    mock_post.reset_mock()
+
+    # We'll iterate over all of the bad unsupported characters
+    mdv2_unsupported = (
+        '_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '=', '|', '{',
+        '}', '.', '!', '-')
+
+    for c in mdv2_unsupported:
+        body = f'bad character: {c}, and already escapped \\{c}'
+
+        # Test with body format set to markdown
+        assert aobj.notify(body=body, body_format=NotifyFormat.TEXT)
+        assert mock_post.call_count == 1
+        payload = loads(mock_post.call_args_list[0][1]['data'])
+
+        # Our content is escapped properly
+        assert payload['text'] == \
+            f'bad character: \\{c}, and already escapped \\{c}'
+
+        mock_post.reset_mock()
