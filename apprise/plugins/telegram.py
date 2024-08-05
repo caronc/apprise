@@ -765,6 +765,14 @@ class NotifyTelegram(NotifyBase):
         # Prepare Message Body
         if self.notify_format == NotifyFormat.MARKDOWN:
             _payload['parse_mode'] = self.markdown_ver
+
+            if self.markdown_ver == TelegramMarkdownVersion.TWO:
+                # Telegram Markdown v2 is not very accomodating to some
+                # characters such as the hashtag (#) which is fine in v1.
+                # To try and be accomodating we escape them in advance
+                # See: https://stackoverflow.com/a/69892704/355584
+                body = re.sub(r'(?<!\\)([_*[\]()~`>#+=|{}.!-])', r'\\\1', body)
+
             _payload['text'] = body
 
         else:  # HTML

@@ -1118,3 +1118,82 @@ def test_plugin_telegram_threads(mock_post):
     assert payload['message_thread_id'] == 1234
 
     mock_post.reset_mock()
+
+
+@mock.patch('requests.post')
+def test_plugin_telegram_markdown_v2(mock_post):
+    """
+    NotifyTelegram() MarkdownV2
+
+    """
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    # Simple success response
+    mock_post.return_value.content = dumps({
+        "ok": True,
+        "result": [{
+            "update_id": 645421321,
+            "message": {
+                "message_id": 2,
+                "from": {
+                    "id": 532389719,
+                    "is_bot": False,
+                    "first_name": "Chris",
+                    "language_code": "en-US"
+                },
+                "chat": {
+                    "id": 532389719,
+                    "first_name": "Chris",
+                    "type": "private"
+                },
+                "date": 1519694394,
+                "text": "/start",
+                "entities": [{
+                    "offset": 0,
+                    "length": 6,
+                    "type": "bot_command",
+                }],
+            }},
+        ],
+    })
+
+    aobj = Apprise()
+    aobj.add('tgram://123456789:abcdefg_hijklmnop/?mdv=2&format=markdown')
+    assert len(aobj) == 1
+    assert isinstance(aobj[0], NotifyTelegram)
+
+    body = '# my message\r\n## more content\r\n\\# already escaped hashtag'
+
+    # Test with body format set to markdown
+    assert aobj.notify(body=body, body_format=NotifyFormat.MARKDOWN)
+
+    # 1 call to look up bot owner, and second for notification
+    assert mock_post.call_count == 2
+    payload = loads(mock_post.call_args_list[1][1]['data'])
+
+    # Our content is escapped properly
+    assert payload['text'] == '\\# my message\r\n' \
+        '\\#\\# more content\r\n\\# already escaped hashtag'
+
+    mock_post.reset_mock()
+
+    # We'll iterate over all of the bad unsupported characters
+    mdv2_unsupported = (
+        '_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '=', '|', '{',
+        '}', '.', '!', '-')
+
+    for c in mdv2_unsupported:
+        body = f'bad character: {c}, and already escapped \\{c}'
+
+        # Test with body format set to markdown
+        assert aobj.notify(body=body, body_format=NotifyFormat.MARKDOWN)
+        assert mock_post.call_count == 1
+        payload = loads(mock_post.call_args_list[0][1]['data'])
+
+        # Our content is escapped properly
+        assert payload['text'] == \
+            f'bad character: \\{c}, and already escapped \\{c}'
+
+        mock_post.reset_mock()
