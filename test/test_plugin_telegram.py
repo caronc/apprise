@@ -695,7 +695,38 @@ def test_plugin_telegram_formatting(mock_post):
            ' had [a change](http://127.0.0.1)'
 
     aobj = Apprise()
-    aobj.add('tgram://123456789:abcdefg_hijklmnop/?format=markdown')
+    aobj.add('tgram://123456789:abcdefg_hijklmnop/?format=markdown&mdv=2')
+    assert len(aobj) == 1
+
+    assert aobj.notify(
+        title=title, body=body, body_format=NotifyFormat.MARKDOWN)
+
+    # Test our calls
+    assert mock_post.call_count == 2
+
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://api.telegram.org/bot123456789:abcdefg_hijklmnop/getUpdates'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://api.telegram.org/bot123456789:abcdefg_hijklmnop/sendMessage'
+
+    payload = loads(mock_post.call_args_list[1][1]['data'])
+
+    # Test that everything is escaped properly in a HTML mode
+    assert payload['text'] == \
+        '\\# 🚨 Change detected for \\_Apprise Test Title\\_\r\n' \
+        '\\_\\[Apprise Body Title\\]\\(http://localhost\\)\\_ had ' \
+        '\\[a change\\]\\(http://127\\.0\\.0\\.1\\)'
+
+    # Reset our values
+    mock_post.reset_mock()
+
+    # Now test our MARKDOWN Handling
+    title = '# 🚨 Change detected for _Apprise Test Title_'
+    body = '_[Apprise Body Title](http://localhost)_' \
+           ' had [a change](http://127.0.0.1)'
+
+    aobj = Apprise()
+    aobj.add('tgram://123456789:abcdefg_hijklmnop/?format=markdown&mdv=1')
     assert len(aobj) == 1
 
     assert aobj.notify(

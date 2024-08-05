@@ -368,7 +368,7 @@ class NotifyTelegram(NotifyBase):
             'name': _('Markdown Version'),
             'type': 'choice:string',
             'values': ('v1', 'v2'),
-            'default': 'v2',
+            'default': 'v1',
         },
         'to': {
             'alias_of': 'targets',
