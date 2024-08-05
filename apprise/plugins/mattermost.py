@@ -132,6 +132,9 @@ class NotifyMattermost(NotifyBase):
             'name': _('Channels'),
             'type': 'list:string',
         },
+        'channel': {
+            'alias_of': 'channels',
+        },
         'image': {
             'name': _('Include Image'),
             'type': 'bool',
@@ -357,16 +360,21 @@ class NotifyMattermost(NotifyBase):
         # Support both 'to' (for yaml configuration) and channel=
         if 'to' in results['qsd'] and len(results['qsd']['to']):
             # Allow the user to specify the channel to post to
-            results['channels'].append(
+            results['channels'].extend(
                 NotifyMattermost.parse_list(results['qsd']['to']))
 
         if 'channel' in results['qsd'] and len(results['qsd']['channel']):
             # Allow the user to specify the channel to post to
-            results['channels'].append(
+            results['channels'].extend(
                 NotifyMattermost.parse_list(results['qsd']['channel']))
 
+        if 'channels' in results['qsd'] and len(results['qsd']['channels']):
+            # Allow the user to specify the channel to post to
+            results['channels'].extend(
+                NotifyMattermost.parse_list(results['qsd']['channels']))
+
         # Image manipulation
-        results['include_image'] = \
-            parse_bool(results['qsd'].get('image', False))
+        results['include_image'] = parse_bool(results['qsd'].get(
+            'image', NotifyMattermost.template_args['image']['default']))
 
         return results
