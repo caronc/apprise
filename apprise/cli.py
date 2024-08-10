@@ -31,6 +31,7 @@ import logging
 import platform
 import sys
 import os
+import shutil
 import re
 
 from os.path import isfile
@@ -41,7 +42,7 @@ from . import AppriseAsset
 from . import AppriseConfig
 from . import PersistentStore
 
-from .utils import parse_list, path_decode
+from .utils import dir_size, bytes_to_str, parse_list, path_decode
 from .common import NOTIFY_TYPES
 from .common import NOTIFY_FORMATS
 from .common import PERSISTENT_STORE_MODES
@@ -165,6 +166,28 @@ if platform.system() == 'Windows':
     #
     DEFAULT_STORAGE_PATH = '%APPDATA%/Apprise/cache'
 
+
+class PersistentStorageMode:
+    """
+    Persistent Storage Modes
+    """
+    # List all detected configuration loaded
+    LIST = 'list'
+
+    # Prune persistent storage based on age
+    PRUNE = 'prune'
+
+    # Reset all (reguardless of age)
+    CLEAR = 'clear'
+
+
+# Define the types in a list for validation purposes
+PERSISTENT_STORAGE_MODES = (
+    PersistentStorageMode.LIST,
+    PersistentStorageMode.PRUNE,
+    PersistentStorageMode.CLEAR,
+)
+
 if os.environ.get('APPRISE_STORAGE', '').strip():
     # Over-ride Default Storage Path
     DEFAULT_STORAGE_PATH = os.environ.get('APPRISE_STORAGE')
@@ -206,12 +229,9 @@ def print_version_msg():
               metavar='STORAGE_PATH',
               help='Specify the path to the persistent storage location '
               '(default={}).'.format(DEFAULT_STORAGE_PATH))
-@click.option('--storage-purge', '-SP', is_flag=True,
-              help='Purges old persistent storage based on '
-              '--storage-purge-days (-SPD)')
-@click.option('--storage-purge-days', '-SPD', default=30,
+@click.option('--storage-prune-days', '-SPD', default=30,
               type=int,
-              help='Define the number of days the --storage-purge (-SP) '
+              help='Define the number of days the storage prune '
               'should run using. Setting this to zero (0) will eliminate '
               'all accumulated content. By default this value is 30 (days).')
 @click.option('--storage-mode', '-SM', default=PERSISTENT_STORE_MODES[0],
@@ -272,11 +292,11 @@ def print_version_msg():
               help='Display the apprise version and exit.')
 @click.argument('urls', nargs=-1,
                 metavar='SERVER_URL [SERVER_URL2 [SERVER_URL3]]',)
-def main(body, title, config, attach, urls, notification_type, theme, tag,
+@click.pass_context
+def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
          input_format, dry_run, recursion_depth, verbose, disable_async,
          details, interpret_escapes, interpret_emojis, plugin_path,
-         storage_path, storage_mode, storage_purge_days, storage_purge,
-         debug, version):
+         storage_path, storage_mode, storage_prune_days, debug, version):
     """
     Send a notification to all of the specified servers identified by their
     URLs the content provided within the title, body and notification-type.
@@ -486,7 +506,7 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
     #    4. Configuration by environment variable: APPRISE_CONFIG
     #    5. Default Configuration File(s) (if found)
     #
-    if urls:
+    elif urls and not 'storage'.startswith(urls[0]):
         if tag:
             # Ignore any tags specified
             logger.warning(
@@ -544,32 +564,119 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
     # we or each of of the --tag and sets specified.
     tags = None if not tag else [parse_list(t) for t in tag]
 
-    if storage_purge:
-        if storage_purge_days < 0:
+    # Determine if we're dealing with URLs or url_ids based on the first
+    # entry provided.
+    if urls and 'storage'.startswith(urls[0]):
+        if storage_prune_days < 0:
             logger.error(
-                'The --storage-purge-days (-SPD) value can not be lower then '
-                'zero (0).')
+                'The --storage-prune-days (-SPD) value can not be lower '
+                'then zero (0).')
 
-            # 2 is the same exit code returned by Click if there is a parameter
-            # issue.  For consistency, we also return a 2
+            # 2 is the same exit code returned by Click if there is a
+            # parameter issue.  For consistency, we also return a 2
             sys.exit(2)
 
-        # Get our URL IDs to filter on
-        uids = [n.url_id() for n in a if n.url_id()]
+        # Number of columns to assume in the terminal.  In future, maybe this
+        # can be detected and made dynamic. The actual column count is 80, but
+        # 5 characters are already reserved for the counter on the left
+        (columns, _) = shutil.get_terminal_size(fallback=(80, 24))
 
-        # clean up storage
-        results = PersistentStore.disk_prune(
-            # Use our asset path as it has already been properly
-            # parsed
-            path=asset.storage_path,
-            # Provide our namespaces if they exist
-            namespace=None if not uids else uids,
-            # Convert expiry from days to seconds
-            expires=storage_purge_days * 60 * 60 * 24,
-            action=not dry_run)
+        filter_uids = urls[1:]
+        action = PERSISTENT_STORAGE_MODES[0]
+        if filter_uids:
+            _action = next(
+                (a for a in PERSISTENT_STORAGE_MODES
+                 if a.startswith(filter_uids[0])), None)
+
+            if _action:
+                # pop top entry
+                filter_uids = filter_uids[1:]
+                action = _action
+
+        # Get our detected URL IDs
+        uids = {}
+        for plugin in a:
+            _id = plugin.url_id()
+            if not _id:
+                continue
+
+            if filter_uids and next(
+                    (False for n in filter_uids if _id.startswith(n)), True):
+                continue
+
+            if _id not in uids:
+                uids[_id] = {
+                    'plugins': [plugin],
+                    'state': 'unused',
+                    'size': 0,
+                }
+
+            else:
+                # It's possible to have more then one URL point to the same
+                # location (thus match against the same url id more then once
+                uids[_id]['plugins'].append(plugin)
+
+        if action == PersistentStorageMode.LIST:
+            detected_uid = PersistentStore.disk_scan(
+                # Use our asset path as it has already been properly parsed
+                path=asset.storage_path,
+
+                # Provide filter if specified
+                namespace=filter_uids,
+            )
+            for _id in detected_uid:
+                size, _ = dir_size(os.path.join(asset.storage_path, _id))
+                if _id in uids:
+                    uids[_id]['state'] = 'active'
+                    uids[_id]['size'] = size
+
+                else:
+                    uids[_id] = {
+                        'plugins': [],
+                        # No cross reference (wasted space?)
+                        'state': 'stale',
+                        # Acquire disk space
+                        'size': size,
+                    }
+
+            for idx, (uid, meta) in enumerate(uids.items()):
+                fg = "green" if meta['state'] == 'active' else (
+                    "red" if meta['state'] == 'stale' else "white")
+
+                if idx > 0:
+                    # New line
+                    click.echo()
+                click.echo("{: 4d}. ".format(idx + 1), nl=False)
+                click.echo(click.style("{:<52} {:<8} {}".format(
+                    uid, bytes_to_str(meta['size']), meta['state']),
+                    fg=fg, bold=True))
+
+                for entry in meta['plugins']:
+                    url = entry.url(privacy=True)
+                    click.echo("{:>7} {}".format(
+                        '-',
+                        url if len(url) <= (columns - 8) else '{}...'.format(
+                            url[:columns - 11])))
+
+        else:  # PersistentStorageMode.PRUNE or PersistentStorageMode.CLEAR
+            if action == PersistentStorageMode.CLEAR:
+                storage_prune_days = 0
+
+            # clean up storage
+            results = PersistentStore.disk_prune(
+                # Use our asset path as it has already been properly parsed
+                path=asset.storage_path,
+                # Provide our namespaces if they exist
+                namespace=None if not filter_uids else filter_uids,
+                # Convert expiry from days to seconds
+                expires=storage_prune_days * 60 * 60 * 24,
+                action=not dry_run)
+
+            sys.exit(0)
+            # end if disk_prune()
 
         sys.exit(0)
-        # end if disk_prune()
+        # end if storage()
 
     if not dry_run:
         if body is None:
@@ -582,10 +689,10 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
             body=body, title=title, notify_type=notification_type, tag=tags,
             attach=attach)
     else:
-        # Number of rows to assume in the terminal.  In future, maybe this can
-        # be detected and made dynamic. The actual row count is 80, but 5
-        # characters are already reserved for the counter on the left
-        rows = 75
+        # Number of columns to assume in the terminal.  In future, maybe this
+        # can be detected and made dynamic. The actual column count is 80, but
+        # 5 characters are already reserved for the counter on the left
+        (columns, _) = shutil.get_terminal_size(fallback=(80, 24))
 
         # Initialize our URL response;  This is populated within the for/loop
         # below; but plays a factor at the end when we need to determine if
@@ -596,7 +703,8 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
             url = server.url(privacy=True)
             click.echo("{: 4d}. {}".format(
                 idx + 1,
-                url if len(url) <= rows else '{}...'.format(url[:rows - 3])))
+                url if len(url) <= (columns - 8) else '{}...'.format(
+                    url[:columns - 9])))
 
             # Share our URL ID
             click.echo("{:>10}: {}".format(

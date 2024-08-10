@@ -29,6 +29,7 @@
 import time
 import os
 import pytest
+import shutil
 import json
 import gzip
 from unittest import mock
@@ -1095,9 +1096,9 @@ def test_persistent_storage_cache_object(tmpdir):
         'c': 'datetime'}, verify=False) is None
 
 
-def test_persistent_storage_disk_tidy(tmpdir):
+def test_persistent_storage_disk_prune(tmpdir):
     """
-    General testing of a CacheObject
+    General testing of a Persistent Store prune calls
     """
 
     # Persistent Storage Initialization
@@ -1264,3 +1265,63 @@ def test_persistent_storage_disk_tidy(tmpdir):
         # Nothing is pruned
         assert pc.get('key-t02') is None
         assert pc.read() is None
+
+
+def test_persistent_storage_disk_changes(tmpdir):
+    """
+    General testing of a Persistent Store with underlining disk changes
+    """
+
+    # Create a garbage file in place of where the namespace should be
+    tmpdir.join('t01').write('0' * 1024)
+
+    # Persistent Storage Initialization where namespace directory now is
+    # already occupied by a filename
+    pc = PersistentStore(
+        path=str(tmpdir), namespace='t01', mode=PersistentStoreMode.FLUSH)
+
+    # Store some data and note that it isn't possible
+    assert pc.write(b'data-t01') is False
+    # We actually fell back to memory mode:
+    assert pc.mode == PersistentStoreMode.MEMORY
+
+    # Set's work
+    assert pc.set('key-t01', 'value')
+
+    # But upon reinitializtion (enforcing memory mode check) we will not have
+    # the data available to us
+    pc = PersistentStore(
+        path=str(tmpdir), namespace='t01', mode=PersistentStoreMode.FLUSH)
+
+    assert pc.get('key-t01') is None
+
+    #
+    # Test situation where the file structure changed after initialization
+    #
+    pc = PersistentStore(
+        path=str(tmpdir), namespace='t02', mode=PersistentStoreMode.FLUSH)
+    # Our mode stuck as t02 initialized correctly
+    assert pc.mode == PersistentStoreMode.FLUSH
+    assert os.path.isdir(pc.path)
+
+    shutil.rmtree(pc.path)
+    assert not os.path.isdir(pc.path)
+    assert pc.set('key-t02', 'value')
+    # The directory got re-created
+    assert os.path.isdir(pc.path)
+
+    pc = PersistentStore(
+        path=str(tmpdir), namespace='t02', mode=PersistentStoreMode.FLUSH)
+    # Content was not lost
+    assert pc.get('key-t02') == 'value'
+
+    # We'll remove a sub directory of it this time
+    shutil.rmtree(os.path.join(pc.path, pc.temp_dir))
+
+    # We will still successfully write our data
+    assert pc.write(b'data-t02') is True
+    assert os.path.isdir(pc.path)
+
+    shutil.rmtree(pc.path)
+    assert not os.path.isdir(pc.path)
+    assert pc.set('key-t01', 'value')

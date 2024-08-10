@@ -46,6 +46,34 @@ AWARE_DATE_ISO_FORMAT = '%Y-%m-%dT%H:%M:%S.%f%z'
 NAIVE_DATE_ISO_FORMAT = '%Y-%m-%dT%H:%M:%S.%f'
 
 
+def _ntf_tidy(ntf):
+    """
+    Reusable NamedTemporaryFile cleanup
+    """
+    if ntf:
+        # Cleanup
+        try:
+            ntf.close()
+        except OSError:
+            pass
+
+        try:
+            os.unlink(ntf.name)
+            logger.trace(
+                'Persistent temporary file removed: %s', ntf.name)
+
+        except FileNotFoundError:
+            # no worries; we were removing it anyway
+            pass
+
+        except (OSError, IOError) as e:
+            logger.error(
+                'Persistent temporary file removal failed: %s',
+                ntf.name)
+            logger.debug(
+                'Persistent Storage Exception: %s' % str(e))
+
+
 class CacheObject:
 
     def __init__(self, value=None, expires=False, persistent=True):
@@ -378,51 +406,8 @@ class PersistentStore:
         # Internal Cache
         self._cache = None
 
-        if self.__mode != PersistentStoreMode.MEMORY:
-            # Ensure our path exists
-            try:
-                os.makedirs(self.__base_path, mode=0o770, exist_ok=True)
-
-            except (OSError, IOError) as e:
-                # Permission error
-                logger.debug(
-                    'Could not create persistent store directory %s',
-                    self.__base_path)
-                logger.debug('Persistent Storage Exception: %s' % str(e))
-
-                # Mode changed back to MEMORY
-                self.__mode = PersistentStoreMode.MEMORY
-
-            # Ensure our path exists
-            try:
-                os.makedirs(self.__temp_path, mode=0o770, exist_ok=True)
-
-            except (OSError, IOError) as e:
-                # Permission error
-                logger.debug(
-                    'Could not create persistent store directory %s',
-                    self.__temp_path)
-                logger.debug('Persistent Storage Exception: %s' % str(e))
-
-                # Mode changed back to MEMORY
-                self.__mode = PersistentStoreMode.MEMORY
-
-            try:
-                os.makedirs(self.__data_path, mode=0o770, exist_ok=True)
-
-            except (OSError, IOError) as e:
-                # Permission error
-                logger.debug(
-                    'Could not create persistent store directory %s',
-                    self.__data_path)
-                logger.debug('Persistent Storage Exception: %s' % str(e))
-
-                # Mode changed back to MEMORY
-                self.__mode = PersistentStoreMode.MEMORY
-
-            if self.__mode is PersistentStoreMode.MEMORY:
-                logger.warning(
-                    'The persistent storage could not be initialized')
+        # Prepare our environment
+        self.__prepare()
 
     def read(self, key=None, compress=True):
         """
@@ -447,7 +432,7 @@ class PersistentStore:
         # return none
         return None
 
-    def write(self, data, key=None, compress=True):
+    def write(self, data, key=None, compress=True, _recovery=False):
         """
         Writes the content to the persistent store if it doesn't exceed our
         filesize limit.
@@ -491,6 +476,10 @@ class PersistentStore:
             # Nothing further can be done
             return False
 
+        if _recovery:
+            # Attempt to recover from a bad directory structure or setup
+            self.__prepare()
+
         # generate our filename based on the key provided
         io_file = os.path.join(self.__data_path, f"{key}{self.__extension}")
 
@@ -503,6 +492,8 @@ class PersistentStore:
             prev_size = 0
 
         except (OSError, IOError) as e:
+            # Permission error of some kind or disk problem...
+            # There is nothing we can do at this point
             logger.warning('Could not write with persistent key: %s', key)
             logger.debug('Persistent Storage Exception: %s' % str(e))
             return False
@@ -537,30 +528,29 @@ class PersistentStore:
                 'Wrote %d bytes of data to persistent key: %s',
                 new_file_size, key)
 
+        except FileNotFoundError:
+            # This happens if the directory path is gone preventing the file
+            # from being created...
+            if not _recovery:
+                return self.write(
+                    data=data, key=key, compress=compress, _recovery=True)
+
+            # We've already made our best effort to recover if we are here in
+            # our code base... we're going to have to exit
+
+            # Tidy our Named Temporary File
+            _ntf_tidy(ntf)
+
+            # Early Exit
+            return False
+
         except (OSError, UnicodeEncodeError, IOError) as e:
             # We can't access the file or it does not exist
             logger.warning('Could not write to persistent key: %s', key)
             logger.debug('Persistent Storage Exception: %s' % str(e))
 
-            if ntf:
-                try:
-                    ntf.close()
-                except Exception:
-                    pass
-
-                try:
-                    os.unlink(ntf.name)
-                    logger.trace('Removed temporary file: %s', ntf.name)
-
-                except FileNotFoundError:
-                    # no worries; we were removing it anyway
-                    pass
-
-                except (OSError, IOError) as e:
-                    logger.warning(
-                        'Failed to remove persistent backup file: %s',
-                        ntf.name)
-                    logger.debug('Persistent Storage Exception: %s' % str(e))
+            # Tidy our Named Temporary File
+            _ntf_tidy(ntf)
 
             return False
 
@@ -577,19 +567,9 @@ class PersistentStore:
         # Return our final move
         if not self.__move(ntf.name, io_file):
             # Attempt to restore things as they were
-            try:
-                os.unlink(ntf.name)
-                logger.trace(
-                    'Removed temporary file: %s', ntf.name)
 
-            except FileNotFoundError:
-                # no worries; we were removing it anyway
-                pass
-
-            except (OSError, IOError) as e:
-                logger.warning(
-                    'Could not remove temporary file: %s', ntf.name)
-                logger.debug('Persistent Storage Exception: %s' % str(e))
+            # Tidy our Named Temporary File
+            _ntf_tidy(ntf)
             return False
 
         # Resetour reference variables
@@ -626,6 +606,8 @@ class PersistentStore:
             pass
 
         except (OSError, IOError) as e:
+            # Permission error of some kind or disk problem...
+            # There is nothing we can do at this point
             logger.warning(
                 'Could not previous persistent data backup: %s', dst_backup)
             logger.debug('Persistent Storage Exception: %s' % str(e))
@@ -675,6 +657,8 @@ class PersistentStore:
                 pass
 
             except (OSError, IOError) as e:
+                # Permission error of some kind or disk problem...
+                # There is nothing we can do at this point
                 logger.warning(
                     'Failed to restore original persistent file: %s', dst)
                 logger.debug('Persistent Storage Exception: %s' % str(e))
@@ -860,7 +844,8 @@ class PersistentStore:
             self._cache = {}
 
         except (OSError, IOError) as e:
-            # We failed (likely a permission issue)
+            # Permission error of some kind or disk problem...
+            # There is nothing we can do at this point
             logger.warning(
                 'Could not load persistent cache for namespace %s',
                 os.path.basename(self.__base_path))
@@ -870,7 +855,69 @@ class PersistentStore:
         # Ensure our dirty flag is set to False
         return True
 
-    def flush(self, force=False):
+    def __prepare(self):
+        """
+        Prepares a working environment
+        """
+        if self.__mode != PersistentStoreMode.MEMORY:
+            # Ensure our path exists
+            try:
+                os.makedirs(self.__base_path, mode=0o770, exist_ok=True)
+
+            except (OSError, IOError) as e:
+                # Permission error
+                logger.debug(
+                    'Could not create persistent store directory %s',
+                    self.__base_path)
+                logger.debug('Persistent Storage Exception: %s' % str(e))
+
+                # Mode changed back to MEMORY
+                self.__mode = PersistentStoreMode.MEMORY
+
+            # Ensure our path exists
+            try:
+                os.makedirs(self.__temp_path, mode=0o770, exist_ok=True)
+
+            except (OSError, IOError) as e:
+                # Permission error
+                logger.debug(
+                    'Could not create persistent store directory %s',
+                    self.__temp_path)
+                logger.debug('Persistent Storage Exception: %s' % str(e))
+
+                # Mode changed back to MEMORY
+                self.__mode = PersistentStoreMode.MEMORY
+
+            try:
+                os.makedirs(self.__data_path, mode=0o770, exist_ok=True)
+
+            except (OSError, IOError) as e:
+                # Permission error
+                logger.debug(
+                    'Could not create persistent store directory %s',
+                    self.__data_path)
+                logger.debug('Persistent Storage Exception: %s' % str(e))
+
+                # Mode changed back to MEMORY
+                self.__mode = PersistentStoreMode.MEMORY
+
+            if self.__mode is PersistentStoreMode.MEMORY:
+                logger.warning(
+                    'The persistent storage could not be fully initialized; '
+                    'operating in MEMORY mode')
+
+            else:
+                if self._cache:
+                    # Recovery taking place
+                    self.__dirty = True
+                    logger.warning(
+                        'The persistent storage environment was disrupted')
+
+                    if self.__mode is PersistentStoreMode.FLUSH:
+                        # Flush changes to disk
+                        return self.flush()
+
+    def flush(self, force=False, _recovery=False):
         """
         Save's our cache to disk
         """
@@ -878,6 +925,10 @@ class PersistentStore:
         if self._cache is None or self.__mode == PersistentStoreMode.MEMORY:
             # nothing to do
             return True
+
+        if _recovery:
+            # Attempt to recover from a bad directory structure or setup
+            self.__prepare()
 
         elif not force and self.__dirty is False:
             # Nothing further to do
@@ -908,6 +959,8 @@ class PersistentStore:
                 pass
 
             except (OSError, IOError) as e:
+                # Permission error of some kind or disk problem...
+                # There is nothing we can do at this point
                 logger.warning(
                     'Could not remove persistent cache backup: %s',
                     backup_file)
@@ -927,7 +980,7 @@ class PersistentStore:
             except (OSError, IOError) as e:
                 # This isn't good... we couldn't put our new file in place
                 logger.warning(
-                    'Could not remove persistent cache file: %s',
+                    'Could not remove stale persistent cache file: %s',
                     cache_file)
                 logger.debug('Persistent Storage Exception: %s' % str(e))
                 return False
@@ -939,6 +992,7 @@ class PersistentStore:
 
         # ntf = NamedTemporaryFile
         ntf = None
+
         try:
             ntf = tempfile.NamedTemporaryFile(
                 mode="w+", encoding=self.encoding, dir=self.__temp_path,
@@ -946,34 +1000,29 @@ class PersistentStore:
 
             ntf.close()
 
+        except FileNotFoundError:
+            # This happens if the directory path is gone preventing the file
+            # from being created...
+            if not _recovery:
+                return self.flush(force=True, _recovery=True)
+
+            # We've already made our best effort to recover if we are here in
+            # our code base... we're going to have to exit
+
+            # Tidy our Named Temporary File
+            _ntf_tidy(ntf)
+
+            # Early Exit
+            return False
+
         except OSError as e:
             logger.error(
                 'Persistent temporary directory inaccessible: %s',
                 self.__temp_path)
             logger.debug('Persistent Storage Exception: %s' % str(e))
 
-            if ntf:
-                # Cleanup
-                try:
-                    ntf.close()
-                except OSError:
-                    pass
-
-                try:
-                    os.unlink(ntf.name)
-                    logger.trace(
-                        'Persistent temporary file removed: %s', ntf.name)
-
-                except FileNotFoundError:
-                    # no worries; we were removing it anyway
-                    pass
-
-                except (OSError, IOError) as e:
-                    logger.error(
-                        'Persistent temporary file removal failed: %s',
-                        ntf.name)
-                    logger.debug(
-                        'Persistent Storage Exception: %s' % str(e))
+            # Tidy our Named Temporary File
+            _ntf_tidy(ntf)
 
             # Early Exit
             return False
@@ -988,18 +1037,9 @@ class PersistentStore:
 
         if not self.__move(ntf.name, cache_file):
             # Attempt to restore things as they were
-            try:
-                os.unlink(ntf.name)
-                logger.trace('Removed temporary file: %s', ntf.name)
 
-            except FileNotFoundError:
-                # no worries; we were removing it anyway
-                pass
-
-            except (OSError, IOError) as e:
-                logger.warning(
-                    'Could not remove temporary file: %s', ntf.name)
-                logger.debug('Persistent Storage Exception: %s' % str(e))
+            # Tidy our Named Temporary File
+            _ntf_tidy(ntf)
             return False
 
         # Ensure our dirty flag is set to False
@@ -1063,6 +1103,57 @@ class PersistentStore:
         return self.__cache_files[exclude]
 
     @staticmethod
+    def disk_scan(path, namespace=None, closest=True):
+        """
+        Scansk a path provided and returns namespaces detected
+        """
+
+        logger.trace('Persistent path can of: %s', path)
+
+        def is_namespace(x):
+            """
+            Validate what was detected is a valid namespace
+            """
+            return os.path.isdir(os.path.join(path, x)) \
+                and PersistentStore.__valid_key.match(x)
+
+        # Handle our namespace searching
+        if namespace:
+            if isinstance(namespace, str):
+                namespace = [namespace]
+
+            elif not isinstance(namespace, (tuple, set, list)):
+                raise AttributeError(
+                    "namespace must be None, a string, or a tuple/set/list "
+                    "of strings")
+
+        try:
+            # Acquire all of the files in question
+            namespaces = \
+                [ns for ns in filter(is_namespace, os.listdir(path))
+                 if not namespace or next(
+                     (True for n in namespace if ns.startswith(n)), False)] \
+                if closest else  \
+                [ns for ns in filter(is_namespace, os.listdir(path))
+                 if not namespace or ns in namespace]
+
+        except FileNotFoundError:
+            # no worries; Nothing to do
+            logger.debug('Disk Prune path not found; nothing to clean.')
+            return []
+
+        except (OSError, IOError) as e:
+            # Permission error of some kind or disk problem...
+            # There is nothing we can do at this point
+            logger.error(
+                'Disk Scan detetcted inaccessible path: %s', path)
+            logger.debug(
+                'Persistent Storage Exception: %s' % str(e))
+            return []
+
+        return namespaces
+
+    @staticmethod
     def disk_prune(path, namespace=None, expires=None, action=False):
         """
         Prune persistent disk storage entries that are old and/or unreferenced
@@ -1082,42 +1173,8 @@ class PersistentStore:
             if isinstance(expires, (float, int)) and expires >= 0 \
             else PersistentStore.default_file_expiry
 
-        # Handle our namespace searching
-        if namespace:
-            if isinstance(namespace, str):
-                namespace = [namespace]
-
-            elif not isinstance(namespace, (tuple, set, list)):
-                raise AttributeError(
-                    "namespace must be None, a string, or a tuple/set/list "
-                    "of strings")
-
-        def is_namespace(x):
-            """
-            Validate what was detected is a valid namespace
-            """
-            return os.path.isdir(os.path.join(path, x)) \
-                and PersistentStore.__valid_key.match(x)
-
-        try:
-            # Acquire all of the files in question
-            namespaces = \
-                [ns for ns in filter(is_namespace, os.listdir(path))
-                 if not namespace or ns in namespace]
-
-        except FileNotFoundError:
-            # no worries; Nothing to do
-            logger.debug('Disk Prune path not found; nothing to clean.')
-            return {}
-
-        except (OSError, IOError) as e:
-            # File likely doesn't exist, or permission issue, either
-            # way, there is nothing we can do at this point
-            logger.error(
-                'Disk Prune (clean=%s) detetcted inaccessible '
-                'path: %s', 'yes' if action else 'no', path)
-            logger.debug(
-                'Persistent Storage Exception: %s' % str(e))
+        # Get our namespaces
+        namespaces = PersistentStore.disk_scan(path, namespace)
 
         # Track matches
         _map = {}
@@ -1156,7 +1213,7 @@ class PersistentStore:
                     os.path.join(temp_dir, '*'), recursive=False))])
 
             # Track if we should do a directory sweep later on
-            dir_sweep = True if files else False
+            dir_sweep = True
 
             # Scan our files
             for file in files:
@@ -1168,8 +1225,8 @@ class PersistentStore:
                     continue
 
                 except (OSError, IOError) as e:
-                    # File likely doesn't exist, or permission issue, either
-                    # way, there is nothing we can do at this point
+                    # Permission error of some kind or disk problem...
+                    # There is nothing we can do at this point
                     logger.error(
                         'Disk Prune (ns=%s, clean=%s) detetcted inaccessible '
                         'file: %s', namespace, 'yes' if action else 'no', file)
@@ -1209,6 +1266,8 @@ class PersistentStore:
                         # anyway
 
                     except (OSError, IOError) as e:
+                        # Permission error of some kind or disk problem...
+                        # There is nothing we can do at this point
                         logger.error(
                             'Disk Prune (ns=%s, clean=%s) failed to remove '
                             'persistent file: %s', namespace,
@@ -1460,6 +1519,8 @@ class PersistentStore:
                 pass
 
             except (OSError, IOError) as e:
+                # Permission error of some kind or disk problem...
+                # There is nothing we can do at this point
                 has_error = True
                 logger.error(
                     'Failed to remove persistent file: %s', ppath)

@@ -29,6 +29,7 @@
 import re
 import os
 import sys
+from unittest import mock
 from inspect import cleandoc
 from urllib.parse import unquote
 
@@ -2740,3 +2741,174 @@ def test_cwe312_url():
     assert utils.cwe312_url(
         'slack://test@B4QP3WWB4/J3QWT41JM/XIl2ffpqXkzkwMXrJdevi7W3/'
         '#random') == 'slack://test@B...4/J...M/X...3/'
+
+
+def test_dict_base64_codec(tmpdir):
+    """
+    Test encoding/decoding of base64 content
+    """
+    original = {
+        'int': 1,
+        'float': 2.3,
+    }
+
+    encoded, needs_decoding = utils.encode_b64_dict(original)
+    assert encoded == {'int': 'b64:MQ==', 'float': 'b64:Mi4z'}
+    assert needs_decoding is True
+    decoded = utils.decode_b64_dict(encoded)
+    assert decoded == original
+
+    with mock.patch('json.dumps', side_effect=TypeError()):
+        encoded, needs_decoding = utils.encode_b64_dict(original)
+        # we failed
+        assert needs_decoding is False
+        assert encoded == {
+            'int': '1',
+            'float': '2.3',
+        }
+
+
+def test_dir_size(tmpdir):
+    """
+    Test dir size tool
+    """
+
+    # Nothing to find/see
+    size, _errors = utils.dir_size(str(tmpdir))
+    assert size == 0
+    assert len(_errors) == 0
+
+    # Write a file in our root directory
+    tmpdir.join('root.psdata').write('0' * 1024 * 1024)
+
+    # Prepare some more directories
+    namespace_1 = tmpdir.mkdir('abcdefg')
+    namespace_2 = tmpdir.mkdir('defghij')
+    namespace_2.join('cache.psdata').write('0' * 1024 * 1024)
+    size, _errors = utils.dir_size(str(tmpdir))
+    assert size == 1024 * 1024 * 2
+    assert len(_errors) == 0
+
+    # Write another file
+    namespace_1.join('cache.psdata').write('0' * 1024 * 1024)
+    size, _errors = utils.dir_size(str(tmpdir))
+    assert size == 1024 * 1024 * 3
+    assert len(_errors) == 0
+
+    size, _errors = utils.dir_size(str(namespace_1))
+    assert size == 1024 * 1024
+    assert len(_errors) == 0
+
+    # Create a directory insde one of our namespaces
+    subspace_1 = namespace_1.mkdir('zyx')
+    size, _errors = utils.dir_size(str(namespace_1))
+    assert size == 1024 * 1024
+
+    subspace_1.join('cache.psdata').write('0' * 1024 * 1024)
+    size, _errors = utils.dir_size(str(tmpdir))
+    assert size == 1024 * 1024 * 4
+    assert len(_errors) == 0
+
+    # Recursion limit reduced... no change at 2 as we can go 2
+    # diretories deep no problem
+    size, _errors = utils.dir_size(str(tmpdir), max_depth=2)
+    assert size == 1024 * 1024 * 4
+    assert len(_errors) == 0
+
+    size, _errors = utils.dir_size(str(tmpdir), max_depth=1)
+    assert size == 1024 * 1024 * 3
+    # we can't get into our subspace_1
+    assert len(_errors) == 1
+    assert str(subspace_1) in _errors
+
+    size, _errors = utils.dir_size(str(tmpdir), max_depth=0)
+    assert size == 1024 * 1024
+    # we can't get into our namespace directories
+    assert len(_errors) == 2
+    assert str(namespace_1) in _errors
+    assert str(namespace_2) in _errors
+
+    # Let's cause problems now and test the output
+    size, _errors = utils.dir_size('invalid-directory', missing_okay=True)
+    assert size == 0
+    assert len(_errors) == 0
+
+    size, _errors = utils.dir_size('invalid-directory', missing_okay=False)
+    assert size == 0
+    assert len(_errors) == 1
+    assert 'invalid-directory' in _errors
+
+    with mock.patch('os.scandir', side_effect=OSError()):
+        size, _errors = utils.dir_size(str(tmpdir), missing_okay=True)
+        assert size == 0
+        assert len(_errors) == 1
+        assert str(tmpdir) in _errors
+
+    with mock.patch('os.scandir') as mock_scandir:
+        mock_entry = mock.MagicMock()
+        mock_entry.is_file.side_effect = OSError()
+        mock_entry.path = '/test/path'
+        # Mock the scandir return value to yield the mock entry
+        mock_scandir.return_value.__enter__.return_value = [mock_entry]
+
+        size, _errors = utils.dir_size(str(tmpdir))
+        assert size == 0
+        assert len(_errors) == 1
+        assert mock_entry.path in _errors
+
+    with mock.patch('os.scandir') as mock_scandir:
+        mock_entry = mock.MagicMock()
+        mock_entry.is_file.return_value = False
+        mock_entry.is_dir.side_effect = OSError()
+        mock_entry.path = '/test/path'
+        # Mock the scandir return value to yield the mock entry
+        mock_scandir.return_value.__enter__.return_value = [mock_entry]
+        size, _errors = utils.dir_size(str(tmpdir))
+        assert len(_errors) == 1
+        assert mock_entry.path in _errors
+
+    with mock.patch('os.scandir') as mock_scandir:
+        mock_entry = mock.MagicMock()
+        mock_entry.is_file.return_value = False
+        mock_entry.is_dir.return_value = False
+        # Mock the scandir return value to yield the mock entry
+        mock_scandir.return_value.__enter__.return_value = [mock_entry]
+        size, _errors = utils.dir_size(str(tmpdir))
+        assert size == 0
+        assert len(_errors) == 0
+
+    with mock.patch('os.scandir') as mock_scandir:
+        mock_entry = mock.MagicMock()
+        mock_entry.is_file.side_effect = FileNotFoundError()
+        mock_entry.path = '/test/path'
+        # Mock the scandir return value to yield the mock entry
+        mock_scandir.return_value.__enter__.return_value = [mock_entry]
+
+        size, _errors = utils.dir_size(str(tmpdir))
+        assert size == 0
+        # No file isn't a problem, we're calculating disksize anyway,
+        # one less thing to calculate
+        assert len(_errors) == 0
+
+
+def test_bytes_to_str():
+    """
+    Test Bytes to String representation
+    """
+    # Garbage Entry
+    assert utils.bytes_to_str(None) is None
+    assert utils.bytes_to_str('') is None
+    assert utils.bytes_to_str('GARBAGE') is None
+
+    # Good Entries
+    assert utils.bytes_to_str(0) == "0.00B"
+    assert utils.bytes_to_str(1) == "1.00B"
+    assert utils.bytes_to_str(1.1) == "1.10B"
+    assert utils.bytes_to_str(1024) == "1.00KB"
+    assert utils.bytes_to_str(1024 * 1024) == "1.00MB"
+    assert utils.bytes_to_str(1024 * 1024 * 1024) == "1.00GB"
+    assert utils.bytes_to_str(1024 * 1024 * 1024 * 1024) == "1.00TB"
+
+    # Support strings too
+    assert utils.bytes_to_str("0") == "0.00B"
+    assert utils.bytes_to_str("1024") == "1.00KB"
