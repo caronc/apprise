@@ -46,6 +46,7 @@ from .utils import dir_size, bytes_to_str, parse_list, path_decode
 from .common import NOTIFY_TYPES
 from .common import NOTIFY_FORMATS
 from .common import PERSISTENT_STORE_MODES
+from .common import PersistentStoreState
 from .common import ContentLocation
 from .logger import logger
 
@@ -234,6 +235,10 @@ def print_version_msg():
               help='Define the number of days the storage prune '
               'should run using. Setting this to zero (0) will eliminate '
               'all accumulated content. By default this value is 30 (days).')
+@click.option('--storage-uid-length', '-SUL', default=8,
+              type=int,
+              help='Define the number of unique characters to store persistent'
+              'cache in. By default this value is 6 (characters).')
 @click.option('--storage-mode', '-SM', default=PERSISTENT_STORE_MODES[0],
               type=str, metavar='MODE',
               help='Persistent disk storage write mode (default={}). '
@@ -296,7 +301,8 @@ def print_version_msg():
 def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
          input_format, dry_run, recursion_depth, verbose, disable_async,
          details, interpret_escapes, interpret_emojis, plugin_path,
-         storage_path, storage_mode, storage_prune_days, debug, version):
+         storage_path, storage_mode, storage_prune_days, storage_uid_length,
+         debug, version):
     """
     Send a notification to all of the specified servers identified by their
     URLs the content provided within the title, body and notification-type.
@@ -385,6 +391,15 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
             [path for path in DEFAULT_PLUGIN_PATHS
              if exists(path_decode(path))]
 
+    if storage_uid_length < 2:
+        logger.error(
+            'The --storage-uid-length (-SUL) value can not be lower '
+            'then two (2).')
+
+        # 2 is the same exit code returned by Click if there is a
+        # parameter issue.  For consistency, we also return a 2
+        sys.exit(2)
+
     # Prepare our asset
     asset = AppriseAsset(
         # Our body format
@@ -410,6 +425,9 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
 
         # Load our persistent storage path
         storage_path=path_decode(storage_path),
+
+        # Our storage URL ID Length
+        storage_idlen=storage_uid_length,
 
         # Define if we flush to disk as soon as possible or not when required
         storage_mode=storage_mode
@@ -567,6 +585,10 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
     # Determine if we're dealing with URLs or url_ids based on the first
     # entry provided.
     if urls and 'storage'.startswith(urls[0]):
+        #
+        # Storage Mode
+        #  - urls are now to be interpreted as best matching namespaces
+        #
         if storage_prune_days < 0:
             logger.error(
                 'The --storage-prune-days (-SPD) value can not be lower '
@@ -584,7 +606,7 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
         filter_uids = urls[1:]
         action = PERSISTENT_STORAGE_MODES[0]
         if filter_uids:
-            _action = next(
+            _action = next(  # pragma: no branch
                 (a for a in PERSISTENT_STORAGE_MODES
                  if a.startswith(filter_uids[0])), None)
 
@@ -595,7 +617,7 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
 
         # Get our detected URL IDs
         uids = {}
-        for plugin in a:
+        for plugin in (a if not tags else a.find(tag=tags)):
             _id = plugin.url_id()
             if not _id:
                 continue
@@ -607,7 +629,7 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
             if _id not in uids:
                 uids[_id] = {
                     'plugins': [plugin],
-                    'state': 'unused',
+                    'state': PersistentStoreState.UNUSED,
                     'size': 0,
                 }
 
@@ -627,21 +649,24 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
             for _id in detected_uid:
                 size, _ = dir_size(os.path.join(asset.storage_path, _id))
                 if _id in uids:
-                    uids[_id]['state'] = 'active'
+                    uids[_id]['state'] = PersistentStoreState.ACTIVE
                     uids[_id]['size'] = size
 
-                else:
+                elif not tags:
                     uids[_id] = {
                         'plugins': [],
                         # No cross reference (wasted space?)
-                        'state': 'stale',
+                        'state': PersistentStoreState.STALE,
                         # Acquire disk space
                         'size': size,
                     }
 
             for idx, (uid, meta) in enumerate(uids.items()):
-                fg = "green" if meta['state'] == 'active' else (
-                    "red" if meta['state'] == 'stale' else "white")
+                fg = "green" \
+                    if meta['state'] == PersistentStoreState.ACTIVE else (
+                        "red"
+                        if meta['state'] == PersistentStoreState.STALE else
+                        "white")
 
                 if idx > 0:
                     # New line
@@ -657,6 +682,10 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
                         '-',
                         url if len(url) <= (columns - 8) else '{}...'.format(
                             url[:columns - 11])))
+
+                    if entry.tags:
+                        click.echo("{:>10}: {}".format(
+                            'tags', ', '.join(entry.tags)))
 
         else:  # PersistentStorageMode.PRUNE or PersistentStorageMode.CLEAR
             if action == PersistentStorageMode.CLEAR:

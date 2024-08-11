@@ -28,12 +28,14 @@
 
 import time
 import os
+import zlib
 import pytest
 import shutil
 import json
 import gzip
 from unittest import mock
 from datetime import datetime, timedelta, timezone
+from apprise import exception
 from apprise.asset import AppriseAsset
 from apprise.persistent_store import (
     CacheJSONEncoder, CacheObject, PersistentStore, PersistentStoreMode)
@@ -391,7 +393,7 @@ def test_persistent_storage_flush_mode(tmpdir):
 
     foobar = Foobar()
     # read() returns a non string/bin
-    with pytest.raises(AttributeError):
+    with pytest.raises(exception.AppriseDiskIOError):
         pc.write(foobar, key='foobar', compress=True)
     assert pc.read('foobar') is None
 
@@ -412,7 +414,7 @@ def test_persistent_storage_flush_mode(tmpdir):
 
     foobar = Foobar()
     # read() returns a non string/bin
-    with pytest.raises(AttributeError):
+    with pytest.raises(exception.AppriseDiskIOError):
         pc.write(foobar, key='foobar', compress=True)
     assert pc.read('foobar') is None
 
@@ -582,15 +584,51 @@ def test_persistent_storage_corruption_handling(tmpdir):
         namespace=namespace, path=str(tmpdir),
         mode=PersistentStoreMode.FLUSH)
 
-    # Test our force flush
-    pc.flush(force=True)
-    # double call
-    pc.flush(force=True)
-
     # File is corrupted
     assert 'mykey' not in pc
     pc['mykey'] = 42
     del pc
+
+    pc = PersistentStore(
+        namespace=namespace, path=str(tmpdir),
+        mode=PersistentStoreMode.FLUSH)
+
+    # Test our force flush
+    assert pc.flush(force=True) is True
+    # double call
+    assert pc.flush(force=True) is True
+
+    # Zlib error handling as well during open
+    with mock.patch('gzip.open', side_effect=OSError()):
+        with pytest.raises(KeyError):
+            pc['mykey'] = 43
+
+    pc = PersistentStore(
+        namespace=namespace, path=str(tmpdir),
+        mode=PersistentStoreMode.FLUSH)
+
+    with mock.patch('json.loads', side_effect=TypeError()):
+        with mock.patch('os.unlink', side_effect=FileNotFoundError()):
+            with pytest.raises(KeyError):
+                pc['mykey'] = 44
+
+    pc = PersistentStore(
+        namespace=namespace, path=str(tmpdir),
+        mode=PersistentStoreMode.FLUSH)
+
+    with mock.patch('json.loads', side_effect=TypeError()):
+        with mock.patch('os.unlink', side_effect=OSError()):
+            with pytest.raises(KeyError):
+                pc['mykey'] = 45
+
+    pc['my-new-key'] = 43
+    with mock.patch('gzip.open', side_effect=OSError()):
+        # We will fail to flush our content to disk
+        assert pc.flush(force=True) is False
+
+    with mock.patch('json.dumps', side_effect=TypeError()):
+        # We will fail to flush our content to disk
+        assert pc.flush(force=True) is False
 
     with mock.patch('os.makedirs', side_effect=OSError()):
         pc = PersistentStore(
@@ -600,11 +638,35 @@ def test_persistent_storage_corruption_handling(tmpdir):
         # Directory initialization failed so we fall back to memory mode
         assert pc.mode == PersistentStoreMode.MEMORY
 
+    # Handle file updates
+    pc = PersistentStore(
+        namespace='file-time-refresh', path=str(tmpdir),
+        mode=PersistentStoreMode.AUTO)
+
+    pc['test'] = 'abcd'
+    assert pc.write(b'data', key='abcd') is True
+    assert pc.read('abcd', expires=True) == b'data'
+    assert pc.write(b'data2', key='defg') is True
+    assert pc.read('defg', expires=False) == b'data2'
+    assert pc.write(b'data3', key='hijk') is True
+    assert pc.read('hijk', expires=False) == b'data3'
+    assert pc['test'] == 'abcd'
+
+    with mock.patch('os.utime', side_effect=(OSError(), FileNotFoundError())):
+        pc.flush()
+
     # directory initialization okay
     pc = PersistentStore(
         namespace=namespace, path=str(tmpdir),
         mode=PersistentStoreMode.FLUSH)
 
+    assert 'mykey' not in pc
+    pc['mykey'] = 42
+    del pc
+
+    pc = PersistentStore(
+        namespace=namespace, path=str(tmpdir),
+        mode=PersistentStoreMode.FLUSH)
     assert 'mykey' in pc
 
     # Remove the last entry
@@ -622,6 +684,38 @@ def test_persistent_storage_corruption_handling(tmpdir):
         with mock.patch('tempfile._TemporaryFileWrapper.close',
                         side_effect=OSError()):
             assert not pc.flush(force=True)
+
+    # Create another entry
+    pc['mykey'] = 43
+    mock_ntf = mock.MagicMock()
+    mock_ntf.name = os.path.join(tmpdir, 'file')
+
+    #
+    # Recursion loop checking
+    #
+    with mock.patch(
+            'tempfile.NamedTemporaryFile',
+            side_effect=[FileNotFoundError(), FileNotFoundError(), mock_ntf]):
+        # No way to have recursion loop
+        assert not pc.flush(force=True, _recovery=True)
+
+    with mock.patch(
+            'tempfile.NamedTemporaryFile',
+            side_effect=[FileNotFoundError(), FileNotFoundError(), mock_ntf]):
+        # No way to have recursion loop
+        assert not pc.flush(force=False, _recovery=True)
+
+    with mock.patch(
+            'tempfile.NamedTemporaryFile',
+            side_effect=[FileNotFoundError(), FileNotFoundError(), mock_ntf]):
+        # No way to have recursion loop
+        assert not pc.flush(force=False, _recovery=False)
+
+    with mock.patch(
+            'tempfile.NamedTemporaryFile',
+            side_effect=[FileNotFoundError(), FileNotFoundError(), mock_ntf]):
+        # No way to have recursion loop
+        assert not pc.flush(force=True, _recovery=False)
 
     with mock.patch('tempfile._TemporaryFileWrapper.close',
                     side_effect=(OSError(), None)):
@@ -665,6 +759,12 @@ def test_persistent_storage_corruption_handling(tmpdir):
     # We'll have encoding issues
     assert pc.write(data) is False
 
+    with mock.patch('gzip.open', side_effect=FileNotFoundError()):
+        pc = PersistentStore(namespace=namespace, path=str(tmpdir))
+
+        # recovery mode will kick in and even it will fail
+        assert pc.write(b'key') is False
+
     with mock.patch('gzip.open', side_effect=OSError()):
         pc = PersistentStore(namespace=namespace, path=str(tmpdir))
 
@@ -672,7 +772,7 @@ def test_persistent_storage_corruption_handling(tmpdir):
         assert pc.get('key') is None
 
         pc = PersistentStore(namespace=namespace, path=str(tmpdir))
-        with pytest.raises(OSError):
+        with pytest.raises(KeyError):
             pc['key'] = 'value'
 
         pc = PersistentStore(namespace=namespace, path=str(tmpdir))
@@ -773,7 +873,7 @@ def test_persistent_storage_corruption_handling(tmpdir):
     pc['abc'] = 1
     with mock.patch('os.unlink', side_effect=OSError()):
         # Now we can't set data
-        with pytest.raises(OSError):
+        with pytest.raises(KeyError):
             pc['new-key'] = 'value'
         # However keys that alrady exist don't get caught in check
         # and therefore won't throw
@@ -847,6 +947,39 @@ def test_persistent_custom_io(tmpdir):
         with pc.open('key') as fd:
             pass
 
+    # Also can be caught using Apprise Exception Handling
+    with pytest.raises(exception.AppriseFileNotFound):
+        with pc.open('key') as fd:
+            pass
+
+    # Write some valid data
+    with pc.open('new-key', 'wb') as fd:
+        fd.write(b'data')
+
+    with mock.patch("builtins.open", new_callable=mock.mock_open,
+                    read_data="mocked file content") as mock_file:
+        mock_file.side_effect = OSError
+        with pytest.raises(exception.AppriseDiskIOError):
+            with pc.open('new-key', compress=False) as fd:
+                pass
+
+    # Again but with compression this time
+    with mock.patch("gzip.open", new_callable=mock.mock_open,
+                    read_data="mocked file content") as mock_file:
+        mock_file.side_effect = OSError
+        with pytest.raises(exception.AppriseDiskIOError):
+            with pc.open('new-key', compress=True) as fd:
+                pass
+
+    # Zlib error handling as well during open
+    with mock.patch("gzip.open", new_callable=mock.mock_open,
+                    read_data="mocked file content") as mock_file:
+        mock_file.side_effect = zlib.error
+        with pytest.raises(exception.AppriseDiskIOError):
+            with pc.open('new-key', compress=True) as fd:
+                pass
+
+    # Writing
     with pytest.raises(AttributeError):
         pc.write(1234)
 
@@ -860,6 +993,18 @@ def test_persistent_custom_io(tmpdir):
     with pc.open('key', 'wb') as fd:
         fd.write(b'test')
         fd.close()
+
+    # Handle error capuring when failing to write to disk
+    with mock.patch("gzip.open", new_callable=mock.mock_open,
+                    read_data="mocked file content") as mock_file:
+        mock_file.side_effect = zlib.error
+
+        # We fail to write to disk
+        assert pc.write(b'test') is False
+
+        # We support other errors too
+        mock_file.side_effect = OSError
+        assert pc.write(b'test') is False
 
     with pytest.raises(AttributeError):
         pc.write(b'data', key='!invalid#-Key')
@@ -952,20 +1097,20 @@ def test_persistent_storage_cache_object(tmpdir):
     c.set(123)
     assert 'never' not in str(c)
     assert 'int:+:123' in str(c)
-    sha1 = c.sha1()
-    assert isinstance(sha1, str)
+    hash_value = c.hash()
+    assert isinstance(hash_value, str)
 
     c.set(124)
     assert 'never' not in str(c)
     assert 'int:+:124' in str(c)
-    assert c.sha1() != sha1
+    assert c.hash() != hash_value
 
     c.set(123)
     # sha is the same again if we set the value back
-    assert c.sha1() == sha1
+    assert c.hash() == hash_value
 
     c.set(124)
-    assert isinstance(c.sha1(), str)
+    assert isinstance(c.hash(), str)
     assert c.value == 124
     assert bool(c) is True
     c.set(124, expires=False, persistent=False)
@@ -1048,7 +1193,7 @@ def test_persistent_storage_cache_object(tmpdir):
     assert isinstance(obj, CacheObject)
     assert obj.value == 123
 
-    # no SHA1SUM and verify is set to true; our checksum will fail
+    # no HASH and verify is set to true; our checksum will fail
     assert CacheObject.instantiate({
         'v': 123,
         'x': (datetime.now() - EPOCH).total_seconds(),
@@ -1060,7 +1205,7 @@ def test_persistent_storage_cache_object(tmpdir):
         'x': 'garbage',
         'c': 'int'}, verify=False) is None
 
-    # We need a valid sha1 sum too
+    # We need a valid hash sum too
     assert CacheObject.instantiate({
         'v': 123,
         'x': (datetime.now() - EPOCH).total_seconds(),
@@ -1150,6 +1295,24 @@ def test_persistent_storage_disk_prune(tmpdir):
     # Nothing is pruned
     assert pc.get('key-t01') == 'value'
     assert pc.read() == b'data-t01'
+
+    with mock.patch('os.listdir', side_effect=OSError()):
+        results = PersistentStore.disk_scan(
+            namespace='t01', path=str(tmpdir), closest=True)
+        assert isinstance(results, list)
+        assert len(results) == 0
+
+    with mock.patch('os.listdir', side_effect=FileNotFoundError()):
+        results = PersistentStore.disk_scan(
+            namespace='t01', path=str(tmpdir), closest=True)
+        assert isinstance(results, list)
+        assert len(results) == 0
+
+        # Without closest flag
+        results = PersistentStore.disk_scan(
+            namespace='t01', path=str(tmpdir), closest=False)
+        assert isinstance(results, list)
+        assert len(results) == 0
 
     # Now we'll filter on specific namespaces
     results = PersistentStore.disk_prune(
@@ -1309,6 +1472,23 @@ def test_persistent_storage_disk_changes(tmpdir):
     assert pc.set('key-t02', 'value')
     # The directory got re-created
     assert os.path.isdir(pc.path)
+
+    # Same test but flag set to AUTO
+    pc = PersistentStore(
+        path=str(tmpdir), namespace='t02', mode=PersistentStoreMode.AUTO)
+    # Our mode stuck as t02 initialized correctly
+    assert pc.mode == PersistentStoreMode.AUTO
+    assert os.path.isdir(pc.path)
+
+    shutil.rmtree(pc.path)
+    assert not os.path.isdir(pc.path)
+    assert pc.set('key-t02', 'value')
+    # The directory is not recreated because of auto; it will occur on save
+    assert not os.path.isdir(pc.path)
+    path = pc.path
+    del pc
+    # It exists now
+    assert os.path.isdir(path)
 
     pc = PersistentStore(
         path=str(tmpdir), namespace='t02', mode=PersistentStoreMode.FLUSH)

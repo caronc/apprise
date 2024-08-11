@@ -679,9 +679,34 @@ def test_apprise_cli_modules(tmpdir):
 
 def test_apprise_cli_persistent_storage(tmpdir):
     """
-    CLI: --storage-path (-S) and --storage-mode (-SM)
+    CLI: test persistent storage
 
     """
+
+    # This is a made up class that is just used to verify
+    class NoURLIDNotification(NotifyBase):
+        """
+        A no URL ID
+        """
+
+        # Update URL identifier
+        url_identifier = False
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+
+        def send(self, **kwargs):
+
+            # Pretend everything is okay
+            return True
+
+        def url(self, *args, **kwargs):
+            # Support URL
+            return 'noper://'
+
+        def parse_url(self, *args, **kwargs):
+            # parse our url
+            return {'schema': 'noper'}
 
     # This is a made up class that is just used to verify
     class TestNotification(NotifyBase):
@@ -711,36 +736,383 @@ def test_apprise_cli_persistent_storage(tmpdir):
 
     # assign test:// to our  notification defined above
     N_MGR['test'] = TestNotification
+    N_MGR['noper'] = NoURLIDNotification
+
+    # Write a simple text based configuration file
+    config = tmpdir.join("apprise.cfg")
+    buf = cleandoc("""
+    # Create a config file we can source easily
+    test=test://
+    noper=noper://
+
+    # Create another entry that has no tag associatd with it
+    test://?entry=2
+    """)
+    config.write(buf)
 
     runner = CliRunner()
+
+    # Generate notification that creates persistent data
+    result = runner.invoke(cli.main, [
+        '--storage-path', str(tmpdir),
+        '--config', str(config),
+        'storage',
+        'list',
+    ])
+    # list our entries
+    assert result.exit_code == 0
+
+    # our persist storage has not been created yet
+    _stdout = result.stdout.strip()
+    assert re.match(
+        r'^1\.\s+[a-z0-9_-]{8}\s+0\.00B\s+unused\s+-\s+test://$', _stdout,
+        re.MULTILINE)
 
     # An invalid mode specified
     result = runner.invoke(cli.main, [
         '--storage-path', str(tmpdir),
         '--storage-mode', 'invalid',
+        '--config', str(config),
+        '-g', 'test',
         '-t', 'title',
         '-b', 'body',
-        'test://',
     ])
     # Bad mode specified
     assert result.exit_code == 2
 
-    # No files written yet
-    assert len(os.listdir(str(tmpdir))) == 0
-    # An invalid mode specified
+    # Invalid uid lenth specified
     result = runner.invoke(cli.main, [
         '--storage-path', str(tmpdir),
         '--storage-mode', 'flush',
+        '--storage-uid-length', 1,
+        '--config', str(config),
+        '-g', 'test',
         '-t', 'title',
         '-b', 'body',
-        'test://',
+    ])
+    # storage uid length to small
+    assert result.exit_code == 2
+
+    # No files written yet; just config file exists
+    dir_content = os.listdir(str(tmpdir))
+    assert len(dir_content) == 1
+    assert 'apprise.cfg' in dir_content
+
+    # Generate notification that creates persistent data
+    result = runner.invoke(cli.main, [
+        '--storage-path', str(tmpdir),
+        '--storage-mode', 'flush',
+        '--config', str(config),
+        '-t', 'title',
+        '-b', 'body',
+        '-g', 'test',
     ])
     # We parsed our data accordingly
     assert result.exit_code == 0
 
     dir_content = os.listdir(str(tmpdir))
-    assert len(dir_content) == 1
-    assert 'e70db0b9' in dir_content
+    assert len(dir_content) == 2
+    assert 'apprise.cfg' in dir_content
+    assert 'ea482db7' in dir_content
+
+    # Have a look at our storage listings
+    result = runner.invoke(cli.main, [
+        '--storage-path', str(tmpdir),
+        '--config', str(config),
+        'storage',
+        'list',
+    ])
+    # list our entries
+    assert result.exit_code == 0
+
+    _stdout = result.stdout.strip()
+    assert re.match(
+        r'^1\.\s+[a-z0-9_-]{8}\s+81\.00B\s+active\s+-\s+test://$', _stdout,
+        re.MULTILINE)
+
+    # keyword list is not required
+    result = runner.invoke(cli.main, [
+        '--storage-path', str(tmpdir),
+        '--config', str(config),
+        'storage',
+    ])
+    # list our entries
+    assert result.exit_code == 0
+
+    _stdout = result.stdout.strip()
+    assert re.match(
+        r'^1\.\s+[a-z0-9_-]{8}\s+81\.00B\s+active\s+-\s+test://$', _stdout,
+        re.MULTILINE)
+
+    # search on something that won't match
+    result = runner.invoke(cli.main, [
+        '--storage-path', str(tmpdir),
+        '--config', str(config),
+        'storage',
+        'list',
+        'nomatch',
+    ])
+    # list our entries
+    assert result.exit_code == 0
+
+    assert not result.stdout.strip()
+
+    # closest match search
+    result = runner.invoke(cli.main, [
+        '--storage-path', str(tmpdir),
+        '--config', str(config),
+        'storage',
+        'list',
+        # Closest match will hit a result
+        'ea',
+    ])
+    # list our entries
+    assert result.exit_code == 0
+
+    _stdout = result.stdout.strip()
+    assert re.match(
+        r'^1\.\s+[a-z0-9_-]{8}\s+81\.00B\s+active\s+-\s+test://$', _stdout,
+        re.MULTILINE)
+
+    # list is the presumed option if no match
+    result = runner.invoke(cli.main, [
+        '--storage-path', str(tmpdir),
+        '--config', str(config),
+        'storage',
+        # Closest match will hit a result
+        'ea',
+    ])
+    # list our entries successfully again..
+    assert result.exit_code == 0
+
+    _stdout = result.stdout.strip()
+    assert re.match(
+        r'^1\.\s+[a-z0-9_-]{8}\s+81\.00B\s+active\s+-\s+test://$', _stdout,
+        re.MULTILINE)
+
+    # Search based on tag
+    result = runner.invoke(cli.main, [
+        '--storage-path', str(tmpdir),
+        '--config', str(config),
+        'storage',
+        'list',
+        # We can match by tags too
+        '-g', 'test',
+    ])
+    # list our entries
+    assert result.exit_code == 0
+
+    _stdout = result.stdout.strip()
+    assert re.match(
+        r'^1\.\s+[a-z0-9_-]{8}\s+81\.00B\s+active\s+-\s+test://$', _stdout,
+        re.MULTILINE)
+
+    # Prune call but prune-days set incorrectly
+    result = runner.invoke(cli.main, [
+        '--storage-path', str(tmpdir),
+        '--storage-prune-days', -1,
+        'storage',
+        'prune',
+    ])
+    # storage prune days is invalid
+    assert result.exit_code == 2
+
+    # Create a tmporary namespace
+    tmpdir.mkdir('namespace')
+
+    # Generates another listing
+    result = runner.invoke(cli.main, [
+        '--storage-path', str(tmpdir),
+        '--config', str(config),
+        'storage',
+    ])
+
+    # list our entries
+    assert result.exit_code == 0
+
+    _stdout = result.stdout.strip()
+    assert re.match(
+        r'^[0-9]\.\s+[a-z0-9_-]{8}\s+81\.00B\s+active\s+-\s+test://$', _stdout,
+        re.MULTILINE)
+    assert re.match(
+        r'.*\s*[0-9]\.\s+namespace\s+0\.00B\s+stale.*', _stdout,
+        (re.MULTILINE | re.DOTALL))
+
+    # Generates another listing but utilize the tag
+    result = runner.invoke(cli.main, [
+        '--storage-path', str(tmpdir),
+        '--config', str(config),
+        '--tag', 'test',
+        'storage',
+    ])
+
+    # list our entries
+    assert result.exit_code == 0
+
+    _stdout = result.stdout.strip()
+    assert re.match(
+        r'^[0-9]\.\s+[a-z0-9_-]{8}\s+81\.00B\s+active\s+-\s+test://$', _stdout,
+        re.MULTILINE)
+    assert re.match(
+        r'.*\s*[0-9]\.\s+namespace\s+0\.00B\s+stale.*', _stdout,
+        (re.MULTILINE | re.DOTALL)) is None
+
+    # Clear all of our accumulated disk space
+    result = runner.invoke(cli.main, [
+        '--storage-path', str(tmpdir),
+        '--config', str(config),
+        'storage',
+        'clear',
+    ])
+
+    # successful
+    assert result.exit_code == 0
+
+    # Generate another listing
+    result = runner.invoke(cli.main, [
+        '--storage-path', str(tmpdir),
+        '--config', str(config),
+        'storage',
+    ])
+
+    # list our entries
+    assert result.exit_code == 0
+
+    _stdout = result.stdout.strip()
+    # back to unused state and 0 bytes
+    assert re.match(
+        r'^[0-9]\.\s+[a-z0-9_-]{8}\s+0\.00B\s+unused\s+-\s+test://$', _stdout,
+        re.MULTILINE)
+    # namespace is gone now
+    assert re.match(
+        r'.*\s*[0-9]\.\s+namespace\s+0\.00B\s+stale.*', _stdout,
+        (re.MULTILINE | re.DOTALL)) is None
+
+    # Provide both tags and uid
+    result = runner.invoke(cli.main, [
+        '--storage-path', str(tmpdir),
+        '--config', str(config),
+        'storage',
+        'ea',
+        '-g', 'test',
+    ])
+
+    # list our entries
+    assert result.exit_code == 0
+
+    _stdout = result.stdout.strip()
+    # back to unused state and 0 bytes
+    assert re.match(
+        r'^[0-9]\.\s+[a-z0-9_-]{8}\s+0\.00B\s+unused\s+-\s+test://$', _stdout,
+        re.MULTILINE)
+
+    # Generate notification that creates persistent data
+    result = runner.invoke(cli.main, [
+        '--storage-path', str(tmpdir),
+        '--storage-mode', 'flush',
+        '--config', str(config),
+        '-t', 'title',
+        '-b', 'body',
+        '-g', 'test',
+    ])
+    # We parsed our data accordingly
+    assert result.exit_code == 0
+
+    # Have a look at our storage listings
+    result = runner.invoke(cli.main, [
+        '--storage-path', str(tmpdir),
+        '--config', str(config),
+        'storage',
+        'list',
+    ])
+    # list our entries
+    assert result.exit_code == 0
+
+    _stdout = result.stdout.strip()
+    assert re.match(
+        r'^1\.\s+[a-z0-9_-]{8}\s+81\.00B\s+active\s+-\s+test://$', _stdout,
+        re.MULTILINE)
+
+    # Prune call but prune-days set incorrectly
+    result = runner.invoke(cli.main, [
+        '--storage-path', str(tmpdir),
+        'storage',
+        'prune',
+    ])
+
+    # Run our prune successfully
+    assert result.exit_code == 0
+
+    # Have a look at our storage listings (expected no change in output)
+    result = runner.invoke(cli.main, [
+        '--storage-path', str(tmpdir),
+        '--config', str(config),
+        'storage',
+        'list',
+    ])
+    # list our entries
+    assert result.exit_code == 0
+
+    _stdout = result.stdout.strip()
+    assert re.match(
+        r'^1\.\s+[a-z0-9_-]{8}\s+81\.00B\s+active\s+-\s+test://$', _stdout,
+        re.MULTILINE)
+
+    # Prune call but prune-days set incorrectly
+    result = runner.invoke(cli.main, [
+        '--storage-path', str(tmpdir),
+        # zero simulates a full clean
+        '--storage-prune-days', 0,
+        'storage',
+        'prune',
+    ])
+
+    # Run our prune successfully
+    assert result.exit_code == 0
+
+    # Have a look at our storage listings (expected no change in output)
+    result = runner.invoke(cli.main, [
+        '--storage-path', str(tmpdir),
+        '--config', str(config),
+        'storage',
+        'list',
+    ])
+    # list our entries
+    assert result.exit_code == 0
+
+    _stdout = result.stdout.strip()
+    assert re.match(
+        r'^1\.\s+[a-z0-9_-]{8}\s+0\.00B\s+unused\s+-\s+test://$', _stdout,
+        re.MULTILINE)
+
+    # New Temporary namespace
+    new_persistent_base = tmpdir.mkdir('namespace')
+    with environ(APPRISE_STORAGE=str(new_persistent_base)):
+        # Reload our module
+        reload(cli)
+
+        # Nothing in our directory yet
+        dir_content = os.listdir(str(new_persistent_base))
+        assert len(dir_content) == 0
+
+        # Generate notification that creates persistent data
+        # storage path is pulled out of our environment variable
+        result = runner.invoke(cli.main, [
+            '--storage-mode', 'flush',
+            '--config', str(config),
+            '-t', 'title',
+            '-b', 'body',
+            '-g', 'test',
+        ])
+        # We parsed our data accordingly
+        assert result.exit_code == 0
+
+        # Now content exists
+        dir_content = os.listdir(str(new_persistent_base))
+        assert len(dir_content) == 1
+
+    # Reload our module with our environment variable gone
+    reload(cli)
 
     # Clear loaded modules
     N_MGR.unload_modules()

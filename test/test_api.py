@@ -420,12 +420,25 @@ def apprise_test(do_notify):
         # Encoding error
         AppriseAsset(encoding='ascii', storage_salt="ボールト")
 
+    with pytest.raises(ValueError):
+        # Not a valid storage salt (must be str or bytes)
+        AppriseAsset(storage_salt=42)
+
     # Set our cache to be off
     plugin = a.instantiate('good://localhost?store=no', asset=asset)
     assert isinstance(plugin, NotifyBase)
     assert plugin.url_id(lazy=False) is None
     # Verify our cache is disabled
     assert 'store=no' in plugin.url()
+
+    with pytest.raises(ValueError):
+        # idlen must be greater then 0
+        AppriseAsset(storage_idlen=-1)
+
+    # Create a larger idlen
+    asset = AppriseAsset(storage_idlen=32)
+    plugin = a.instantiate('good://localhost', asset=asset)
+    assert len(plugin.url_id()) == 32
 
     # Instantiate a bad object
     plugin = a.instantiate(object, tag="bad_object")

@@ -56,6 +56,7 @@ from .url import PrivacyMode
 from .plugins.base import NotifyBase
 from .config.base import ConfigBase
 from .attachment.base import AttachBase
+from . import exception
 
 from .apprise import Apprise
 from .locale import AppriseLocale
@@ -81,6 +82,9 @@ __all__ = [
     'Apprise', 'AppriseAsset', 'AppriseConfig', 'AppriseAttachment', 'URLBase',
     'NotifyBase', 'ConfigBase', 'AttachBase', 'AppriseLocale',
     'PersistentStore',
+
+    # Exceptions
+    'exception',
 
     # Reference
     'NotifyType', 'NotifyImageSize', 'NotifyFormat', 'OverflowMode',

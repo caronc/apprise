@@ -106,7 +106,8 @@ class URLBase:
     socket_read_timeout = 4.0
 
     # provide the information required to allow for unique id generation when
-    # calling url_id().  Over-ride this in calling classes.
+    # calling url_id().  Over-ride this in calling classes. Calling classes
+    # should set this to false if there can be no url_id generated
     url_identifier = None
 
     # Tracks the last generated url_id() to prevent regeneration; initializes
@@ -359,10 +360,10 @@ class URLBase:
             params=('?' + URLBase.urlencode(params) if params else ''),
         )
 
-    def url_id(self, lazy=True, hash_engine=hashlib.sha1):
+    def url_id(self, lazy=True, hash_engine=hashlib.sha256):
         """
         Returns a unique URL identifier that representing the Apprise URL
-        itself. The url_id is always a sha1 string or None if it can't
+        itself. The url_id is always a hash string or None if it can't
         be generated.
 
         The idea is to only build the ID based on the credentials or specific

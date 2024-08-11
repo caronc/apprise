@@ -31,8 +31,10 @@ import glob
 import tempfile
 import json
 import binascii
+from . import exception
 from itertools import chain
 from datetime import datetime, timezone, timedelta
+import time
 import hashlib
 from .common import PersistentStoreMode, PERSISTENT_STORE_MODES
 from .utils import path_decode
@@ -54,7 +56,9 @@ def _ntf_tidy(ntf):
         # Cleanup
         try:
             ntf.close()
+
         except OSError:
+            # Already closed
             pass
 
         try:
@@ -62,8 +66,9 @@ def _ntf_tidy(ntf):
             logger.trace(
                 'Persistent temporary file removed: %s', ntf.name)
 
-        except FileNotFoundError:
-            # no worries; we were removing it anyway
+        except (FileNotFoundError, AttributeError):
+            # AttributeError: something weird was passed in, no action required
+            # FileNotFound: no worries; we were removing it anyway
             pass
 
         except (OSError, IOError) as e:
@@ -75,6 +80,9 @@ def _ntf_tidy(ntf):
 
 
 class CacheObject:
+
+    hash_engine = hashlib.sha256
+    hash_length = 6
 
     def __init__(self, value=None, expires=False, persistent=True):
         """
@@ -135,17 +143,17 @@ class CacheObject:
             raise AttributeError(
                 f"An invalid expiry time ({expires} was specified")
 
-    def sha1(self):
+    def hash(self):
         """
         Our checksum to track the validity of our data
         """
         try:
-            return hashlib.sha1(
+            return self.hash_engine(
                 str(self).encode('utf-8'), usedforsecurity=False).hexdigest()
 
         except TypeError:
             # Python <= v3.8 - usedforsecurity flag does not work
-            return hashlib.sha1(str(self).encode('utf-8')).hexdigest()
+            return self.hash_engine(str(self).encode('utf-8')).hexdigest()
 
     def json(self):
         """
@@ -159,7 +167,7 @@ class CacheObject:
             'c': self.__class_name if not isinstance(self.__value, datetime)
             else (
                 'aware_datetime' if self.__value.tzinfo else 'naive_datetime'),
-            '!': self.sha1()[:6],
+            '!': self.hash()[:self.hash_length],
         }
 
     @staticmethod
@@ -167,7 +175,7 @@ class CacheObject:
         """
         Loads back data read in and returns a CacheObject or None if it could
         not be loaded. You can pass in the contents of CacheObject.json() and
-        you'll receive a copy assuming the sha1 checks okay
+        you'll receive a copy assuming the hash checks okay
 
         """
         try:
@@ -181,8 +189,8 @@ class CacheObject:
             if not isinstance(class_name, str):
                 raise TypeError('Class name not expected string')
 
-            sha1sum = content.get('!', '')
-            if not isinstance(sha1sum, str):
+            hashsum = content.get('!', '')
+            if not isinstance(hashsum, str):
                 raise TypeError('SHA1SUM not expected string')
 
         except (TypeError, KeyError) as e:
@@ -217,7 +225,7 @@ class CacheObject:
 
         # Initialize our object
         co = CacheObject(value, expires, persistent=persistent)
-        if verify and co.sha1()[:6] != sha1sum:
+        if verify and co.hash()[:co.hash_length] != hashsum:
             # Our object was tampered with
             logger.debug(f'Tampering detected with cache entry {co}')
             del co
@@ -366,6 +374,9 @@ class PersistentStore:
         # Populated only once and after size() is called
         self.__exclude_list = None
 
+        # Files to renew on calls to flush
+        self.__renew = set()
+
         if not isinstance(namespace, str) \
                 or not self.__valid_key.match(namespace):
             raise AttributeError(
@@ -409,18 +420,30 @@ class PersistentStore:
         # Prepare our environment
         self.__prepare()
 
-    def read(self, key=None, compress=True):
+    def read(self, key=None, compress=True, expires=False):
         """
         Returns the content of the persistent store object
+
+        if refresh is set to True, then the file's modify time is updated
+        preventing it from getting caught in prune calls.  It's a means
+        of allowing it to persist and not get cleaned up in later prune
+        calls.
 
         Content is always returned as a byte object
         """
         try:
             with self.open(key, mode="rb", compress=compress) as fd:
-                return fd.read(self.max_file_size)
+                results = fd.read(self.max_file_size)
+                if expires is False:
+                    self.__renew.add(os.path.join(
+                        self.__data_path, f"{key}{self.__extension}"))
 
-        except FileNotFoundError:
-            # No problem
+                return results
+
+        except (FileNotFoundError, exception.AppriseDiskIOError):
+            # FileNotFoundError: No problem
+            # exception.AppriseDiskIOError:
+            #   - Logging of error already occurred inside self.open()
             pass
 
         except (OSError, zlib.error, EOFError, UnicodeDecodeError,
@@ -438,6 +461,8 @@ class PersistentStore:
         filesize limit.
 
         Content is always written as a byte object
+
+        _recovery is reserved for internal usage and should not be changed
         """
 
         if key is None:
@@ -468,7 +493,7 @@ class PersistentStore:
                     'Could read() from potential iostream with persistent '
                     'key: %s', key)
                 logger.debug('Persistent Storage Exception: %s' % str(e))
-                raise AttributeError(
+                raise exception.AppriseDiskIOError(
                     "Invalid data type {} provided to Persistent Storage"
                     .format(type(data)))
 
@@ -544,7 +569,7 @@ class PersistentStore:
             # Early Exit
             return False
 
-        except (OSError, UnicodeEncodeError, IOError) as e:
+        except (OSError, UnicodeEncodeError, IOError, zlib.error) as e:
             # We can't access the file or it does not exist
             logger.warning('Could not write to persistent key: %s', key)
             logger.debug('Persistent Storage Exception: %s' % str(e))
@@ -689,12 +714,25 @@ class PersistentStore:
             raise FileNotFoundError()
 
         io_file = os.path.join(self.__data_path, f"{key}{self.__extension}")
-        return open(
-            io_file, mode=mode, buffering=buffering, encoding=encoding,
-            errors=errors, newline=newline, closefd=closefd, opener=opener) \
-            if not compress else gzip.open(
-                io_file, compresslevel=compresslevel, encoding=encoding,
-                errors=errors, newline=newline)
+        try:
+            return open(
+                io_file, mode=mode, buffering=buffering, encoding=encoding,
+                errors=errors, newline=newline, closefd=closefd,
+                opener=opener) \
+                if not compress else gzip.open(
+                    io_file, compresslevel=compresslevel, encoding=encoding,
+                    errors=errors, newline=newline)
+
+        except FileNotFoundError:
+            # pass along (but wrap with Apprise exception)
+            raise exception.AppriseFileNotFound(
+                f"No such file or directory: '{io_file}'")
+
+        except (OSError, IOError, zlib.error) as e:
+            # We can't access the file or it does not exist
+            logger.warning('Could not read with persistent key: %s', key)
+            logger.debug('Persistent Storage Exception: %s' % str(e))
+            raise exception.AppriseDiskIOError(str(e))
 
     def get(self, key, default=None, lazy=True):
         """
@@ -703,6 +741,13 @@ class PersistentStore:
 
         if self._cache is None and not self.__load_cache():
             return default
+
+        if key in self._cache and \
+                not self.__mode == PersistentStoreMode.MEMORY and \
+                not self.__dirty:
+
+            # ensure we renew our content
+            self.__renew.add(self.cache_file)
 
         return self._cache[key].value \
             if key in self._cache and self._cache[key] else default
@@ -801,9 +846,11 @@ class PersistentStore:
 
         return change
 
-    def __load_cache(self):
+    def __load_cache(self, _recovery=False):
         """
         Loads our cache
+
+        _recovery is reserved for internal usage and should not be changed
         """
 
         # Prepare our dirty flag
@@ -831,12 +878,34 @@ class PersistentStore:
                         self.__dirty = True
 
         except (UnicodeDecodeError, json.decoder.JSONDecodeError, zlib.error,
-                EOFError):
+                TypeError, AttributeError, EOFError):
+
             # Let users known there was a problem
-            self._cache = {}
             logger.warning(
                 'Corrupted access persistent cache content: %s',
                 cache_file)
+
+            if not _recovery:
+                try:
+                    os.unlink(cache_file)
+                    logger.trace(
+                        'Removed previous persistent cache content: %s',
+                        cache_file)
+
+                except FileNotFoundError:
+                    # no worries; we were removing it anyway
+                    pass
+
+                except (OSError, IOError) as e:
+                    # Permission error of some kind or disk problem...
+                    # There is nothing we can do at this point
+                    logger.warning(
+                        'Could not remove persistent cache content: %s',
+                        cache_file)
+                    logger.debug('Persistent Storage Exception: %s' % str(e))
+                    return False
+                return self.__load_cache(_recovery=True)
+
             return False
 
         except FileNotFoundError:
@@ -855,7 +924,7 @@ class PersistentStore:
         # Ensure our dirty flag is set to False
         return True
 
-    def __prepare(self):
+    def __prepare(self, flush=True):
         """
         Prepares a working environment
         """
@@ -913,9 +982,9 @@ class PersistentStore:
                     logger.warning(
                         'The persistent storage environment was disrupted')
 
-                    if self.__mode is PersistentStoreMode.FLUSH:
+                    if self.__mode is PersistentStoreMode.FLUSH and flush:
                         # Flush changes to disk
-                        return self.flush()
+                        return self.flush(_recovery=True)
 
     def flush(self, force=False, _recovery=False):
         """
@@ -926,14 +995,33 @@ class PersistentStore:
             # nothing to do
             return True
 
-        if _recovery:
-            # Attempt to recover from a bad directory structure or setup
-            self.__prepare()
+        while self.__renew:
+            # update our files
+            path = self.__renew.pop()
+            ftime = time.time()
 
-        elif not force and self.__dirty is False:
+            try:
+                # (access_time, modify_time)
+                os.utime(path, (ftime, ftime))
+                logger.trace('file timestamp updated: %s', path)
+
+            except FileNotFoundError:
+                # No worries... move along
+                pass
+
+            except (OSError, IOError) as e:
+                # We can't access the file or it does not exist
+                logger.debug('Could not update file timestamp: %s', path)
+                logger.debug('Persistent Storage Exception: %s' % str(e))
+
+        if not force and self.__dirty is False:
             # Nothing further to do
             logger.trace('Persistent cache is consistent with memory map')
             return True
+
+        if _recovery:
+            # Attempt to recover from a bad directory structure or setup
+            self.__prepare(flush=False)
 
         # Unset our size lazy setting
         self.__cache_size = None
@@ -1027,13 +1115,40 @@ class PersistentStore:
             # Early Exit
             return False
 
-        # write our content currently saved to disk to our temporary file
-        with gzip.open(ntf.name, 'wb') as f:
-            # Write our content to disk
-            f.write(json.dumps(
-                {k: v for k, v in self._cache.items() if v and v.persistent},
-                separators=(',', ':'),
-                cls=CacheJSONEncoder).encode(self.encoding))
+        try:
+            # write our content currently saved to disk to our temporary file
+            with gzip.open(ntf.name, 'wb') as f:
+                # Write our content to disk
+                f.write(json.dumps(
+                    {k: v for k, v in self._cache.items()
+                     if v and v.persistent},
+                    separators=(',', ':'),
+                    cls=CacheJSONEncoder).encode(self.encoding))
+
+        except TypeError as e:
+            # JSON object contains content that can not be encoded to disk
+            logger.error(
+                'Persistent temporary file can not be written to '
+                'due to bad input data: %s', ntf.name)
+            logger.debug('Persistent Storage Exception: %s' % str(e))
+
+            # Tidy our Named Temporary File
+            _ntf_tidy(ntf)
+
+            # Early Exit
+            return False
+
+        except (OSError, EOFError, zlib.error) as e:
+            logger.error(
+                'Persistent temporary file inaccessible: %s',
+                ntf.name)
+            logger.debug('Persistent Storage Exception: %s' % str(e))
+
+            # Tidy our Named Temporary File
+            _ntf_tidy(ntf)
+
+            # Early Exit
+            return False
 
         if not self.__move(ntf.name, cache_file):
             # Attempt to restore things as they were
@@ -1341,7 +1456,7 @@ class PersistentStore:
         Remove a cache entry by it's key
         """
         if self._cache is None and not self.__load_cache():
-            raise KeyError
+            raise KeyError("Could not initialize cache")
 
         try:
             if self._cache[key].persistent:
@@ -1378,10 +1493,10 @@ class PersistentStore:
         """
 
         if self._cache is None and not self.__load_cache():
-            raise OSError("Could not set cache")
+            raise KeyError("Could not initialize cache")
 
         if key not in self._cache and not self.set(key, value):
-            raise OSError("Could not set cache")
+            raise KeyError("Could not set cache")
 
         else:
             # Update our value
@@ -1403,11 +1518,11 @@ class PersistentStore:
         """
 
         if self._cache is None and not self.__load_cache():
-            raise KeyError()
+            raise KeyError("Could not initialize cache")
 
         result = self.get(key, default=self.__not_found_ref, lazy=False)
         if result is self.__not_found_ref:
-            raise KeyError()
+            raise KeyError(f" {key} not found in cache")
 
         return result
 

@@ -207,6 +207,22 @@ PERSISTENT_STORE_MODES = (
 )
 
 
+class PersistentStoreState:
+    """
+    Defines the persistent states describing what has been cached
+    """
+    # Persistent Directory is actively cross-referenced against a matching URL
+    ACTIVE = 'active'
+
+    # Persistent Directory is no longer being used or has no cross-reference
+    STALE = 'stale'
+
+    # Persistent Directory is not utilizing any disk space at all, however
+    # it potentially could if the plugin it successfully cross-references
+    # is utilized
+    UNUSED = 'unused'
+
+
 # This is a reserved tag that is automatically assigned to every
 # Notification Plugin
 MATCH_ALL_TAG = 'all'
