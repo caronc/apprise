@@ -534,8 +534,115 @@ aobj.add('foobar://')
 # Send our notification out through our foobar://
 aobj.notify("test")
 ```
-
 You can read more about creating your own custom notifications and/or hooks [here](https://github.com/caronc/apprise/wiki/decorator_notify).
+
+# Persistent Storage
+
+Persistent storage allows Apprise to cache re-occurring actions optionaly to disk. This can greatly reduce the overhead used to send a notification.
+
+There are 3 options Apprise can operate using this:
+1. `AUTO`:  Flush any gathered data for persistent storage on demand.  This option is incredibly light weight.  This is the default behavior for all CLI usage. Content can be manually flushed to disk using this option as well should a developer choose to do so.  The CLI uses this option by default and only writes anything accumulated to disk after all of it's notifications have completed.
+1. `FLUSH`: Flushes any gathered data for persistent storage as often as it is acquired.
+1. `MEMORY`: Only store information in memory, never write to disk.  This is the option one would set if they simply wish to disable Persistent Storage entirely.  By default this is the mode used by the API and is at the developers discretion to enable one of the other options.
+
+## CLI Persistent Storage Commands
+Persistent storage is set to `AUTO` mode by default.
+
+Specifying the keyword `storage` will assume that all subseqent calls are related to the storage subsection of Apprise.
+```bash
+# List all of the occupied space used by Apprise's Persistent Storage:
+apprise storage list
+
+# list is the default option, so the following does the same thing:
+apprise storage
+
+# You can prune all of your storage older then 30 days
+# and not accessed for this period like so:
+apprise storage prune
+
+# You can do a hard reset (and wipe all persistent storage) with:
+apprise storage clean
+
+```
+
+You can also filter your results by adding tags and/or URL Identifiers.  When you get a listing (`apprise storage list`), you may see:
+```
+   # example output of 'apprise storage list':
+   1. f7077a65                                             0.00B    unused
+      - matrixs://abcdef:****@synapse.example12.com/%23general?image=no&mode=off&version=3&msgtype...
+      tags: team
+
+   2. 0e873a46                                            81.10B    active
+      - tgram://W...U//?image=False&detect=yes&silent=no&preview=no&content=before&mdv=v1&format=m...
+      tags: personal
+
+   3. abcd123                                             12.00B    stale
+
+```
+The states are:
+ - `unused`: This plugin has not commited anything to disk for reuse/cache purposes
+ - `active`: This plugin has written content to disk.  Or at the very least, it has prepared a persistent storage location it can write into.
+ - `stale`: The system detected a location where a URL may have possibly written to in the past, but there is nothing linking to it using the URLs provided.  It is likely wasting space or is no longer of any use.
+
+You can use this information to filter your results by specifying _URL ID_ values after your command.  For example:
+```bash
+# The below commands continue with the example already identified above
+# the following would match abcd123 (even though just ab was provided)
+# The output would only list the 'stale' entry above
+apprise storage list ab
+
+# knowing our filter is safe, we could remove it
+# the below command would not obstruct our other to URLs and would only
+# remove our stale one:
+apprise storage clean ab
+
+# Entries can be filtered by tag as well:
+apprise storage list --tag=team
+
+# You can match on multiple URL ID's as well:
+# The followin would actually match the URL ID's of 1. and .2 above
+apprise storage list f 0
+```
+
+## API Persistent Storage Commands
+By default, no persistent storage is set to be in `MEMORY` mode for those building from within the Apprise API.
+It's at the developers discretion to enable it. But should you choose to do so, it's as easy as including the information in the `AppriseAsset()` object prior to the initialization of your `Apprise()` instance.
+
+For example:
+```python
+from apprise import Apprise
+from apprise import AppriseAsset
+from apprise import PersistentStoreMode
+
+# Prepare a location the persistent storage can write to
+# This immediately assumes you wish to write in AUTO mode
+asset = AppriseAsset(storage_path="/path/to/save/data")
+
+# If you want to be more explicit and set more options, then
+# you may do the following
+asset = AppriseAsset(
+    # Set our storage path directory (minimum requirement to enable it)
+    storage_path="/path/to/save/data",
+
+    # Set the mode... the options are:
+    # 1. PersistentStoreMode.MEMORY
+    #       - disable persistent storage from writing to disk
+    # 2. PersistentStoreMode.AUTO
+    #       - write to disk on demand
+    # 3. PersistentStoreMode.FLUSH
+    #       - write to disk always and often
+    storage_mode=PersistentStoreMode.FLUSH
+
+    # the URL IDs are by default 8 characters in length, there is
+    # really no reason to change this.  You can increase/decrease
+    # it's value here.  Must be > 2; default is 8 if not specified
+    storage_idlen=6,
+)
+
+# Now that we've got our asset, we just work with our Apprise object as we
+# normally do
+aobj = Apprise(asset=asset)
+```
 
 # Want To Learn More?
 

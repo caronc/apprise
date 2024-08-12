@@ -27,6 +27,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import click
+import textwrap
 import logging
 import platform
 import sys
@@ -194,15 +195,6 @@ if os.environ.get('APPRISE_STORAGE', '').strip():
     DEFAULT_STORAGE_PATH = os.environ.get('APPRISE_STORAGE')
 
 
-def print_help_msg(command):
-    """
-    Prints help message when -h or --help is specified.
-
-    """
-    with click.Context(command) as ctx:
-        click.echo(command.get_help(ctx))
-
-
 def print_version_msg():
     """
     Prints version message when -V or --version is specified.
@@ -216,7 +208,106 @@ def print_version_msg():
     click.echo('\n'.join(result))
 
 
-@click.command(context_settings=CONTEXT_SETTINGS)
+class CustomHelpCommand(click.Command):
+    def format_help(self, ctx, formatter):
+        # Custom help message
+        content = (
+            'Send a notification to all of the specified servers '
+            'identified by their URLs',
+            'the content provided within the title, body and '
+            'notification-type.',
+            '',
+            'For a list of all of the supported services and information on '
+            'how to use ',
+            'them, check out at https://github.com/caronc/apprise')
+
+        for line in content:
+            formatter.write_text(line)
+
+        # Display options and arguments in the default format
+        self.format_options(ctx, formatter)
+        self.format_epilog(ctx, formatter)
+
+        # Custom 'Actions:' section after the 'Options:'
+        formatter.write_text('')
+        formatter.write_text('Actions:')
+
+        actions = [(
+            'storage', 'Access the persistent storage disk administration',
+            [(
+                'list',
+                'List all URL IDs associated with detected URL(s). '
+                'This is also the default action ran if nothing is provided',
+            ), (
+                'prune',
+                'Eliminates stale entries found based on '
+                '--storage-prune-days (-SPD)',
+            ), (
+                'clean',
+                'Removes any persistent data created by Apprise',
+            )],
+        )]
+
+        #
+        # Some variables
+        #
+
+        # actions are indented this many spaces
+        # sub actions double this value
+        action_indent = 2
+
+        # label padding (for alignment)
+        action_label_width = 10
+
+        space = ' '
+        space_re = re.compile(r'\r*\n')
+        cols = 80
+        indent = 10
+
+        # Format each action and its subactions
+        for action, description, sub_actions in actions:
+            # Our action indent
+            ai = ' ' * action_indent
+            # Format the main action description
+            formatted_description = space_re.split(textwrap.fill(
+                description, width=(cols - indent - action_indent),
+                initial_indent=space * indent,
+                subsequent_indent=space * indent))
+            for no, line in enumerate(formatted_description):
+                if not no:
+                    formatter.write_text(
+                        f'{ai}{action:<{action_label_width}}{line}')
+
+                else:  # pragma: no cover
+                    # Note: no branch is set intentionally since this is not
+                    #       tested since in 2024.08.13 when this was set up
+                    #       it never entered this area of the code.  But we
+                    #       know it works because we repeat this process with
+                    #       our sub-options below
+                    formatter.write_text(
+                        f'{ai}{space:<{action_label_width}}{line}')
+
+            # Format each subaction
+            ai = ' ' * (action_indent * 2)
+            for action, description in sub_actions:
+                formatted_description = space_re.split(textwrap.fill(
+                    description, width=(cols - indent - (action_indent * 3)),
+                    initial_indent=space * (indent - action_indent),
+                    subsequent_indent=space * (indent - action_indent)))
+
+                for no, line in enumerate(formatted_description):
+                    if not no:
+                        formatter.write_text(
+                            f'{ai}{action:<{action_label_width}}{line}')
+                    else:
+                        formatter.write_text(
+                            f'{ai}{space:<{action_label_width}}{line}')
+
+        # Include any epilog or additional text
+        self.format_epilog(ctx, formatter)
+
+
+@click.command(context_settings=CONTEXT_SETTINGS, cls=CustomHelpCommand)
 @click.option('--body', '-b', default=None, type=str,
               help='Specify the message body. If no body is specified then '
               'content is read from <stdin>.')
@@ -311,7 +402,7 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
     use them, check out at https://github.com/caronc/apprise
     """
     # Note: Click ignores the return values of functions it wraps, If you
-    #       want to return a specific error code, you must call sys.exit()
+    #       want to return a specific error code, you must call ctx.exit()
     #       as you will see below.
 
     debug = True if debug else False
@@ -355,7 +446,7 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
 
     if version:
         print_version_msg()
-        sys.exit(0)
+        ctx.exit(0)
 
     # Simple Error Checking
     notification_type = notification_type.strip().lower()
@@ -365,7 +456,7 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
             .format(notification_type))
         # 2 is the same exit code returned by Click if there is a parameter
         # issue.  For consistency, we also return a 2
-        sys.exit(2)
+        ctx.exit(2)
 
     input_format = input_format.strip().lower()
     if input_format not in NOTIFY_FORMATS:
@@ -374,7 +465,7 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
             .format(input_format))
         # 2 is the same exit code returned by Click if there is a parameter
         # issue.  For consistency, we also return a 2
-        sys.exit(2)
+        ctx.exit(2)
 
     storage_mode = storage_mode.strip().lower()
     if storage_mode not in PERSISTENT_STORE_MODES:
@@ -383,7 +474,7 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
             .format(storage_mode))
         # 2 is the same exit code returned by Click if there is a parameter
         # issue.  For consistency, we also return a 2
-        sys.exit(2)
+        ctx.exit(2)
 
     if not plugin_path:
         # Prepare a default set of plugin path
@@ -398,7 +489,7 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
 
         # 2 is the same exit code returned by Click if there is a
         # parameter issue.  For consistency, we also return a 2
-        sys.exit(2)
+        ctx.exit(2)
 
     # Prepare our asset
     asset = AppriseAsset(
@@ -514,7 +605,7 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
             # new line padding between entries
             click.echo()
 
-        sys.exit(0)
+        ctx.exit(0)
         # end if details()
 
     # The priorities of what is accepted are parsed in order below:
@@ -575,8 +666,8 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
         logger.error(
             'You must specify at least one server URL or populated '
             'configuration file.')
-        print_help_msg(main)
-        sys.exit(1)
+        click.echo(ctx.get_help())
+        ctx.exit(1)
 
     # each --tag entry comprises of a comma separated 'and' list
     # we or each of of the --tag and sets specified.
@@ -596,7 +687,7 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
 
             # 2 is the same exit code returned by Click if there is a
             # parameter issue.  For consistency, we also return a 2
-            sys.exit(2)
+            ctx.exit(2)
 
         # Number of columns to assume in the terminal.  In future, maybe this
         # can be detected and made dynamic. The actual column count is 80, but
@@ -701,10 +792,10 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
                 expires=storage_prune_days * 60 * 60 * 24,
                 action=not dry_run)
 
-            sys.exit(0)
+            ctx.exit(0)
             # end if disk_prune()
 
-        sys.exit(0)
+        ctx.exit(0)
         # end if storage()
 
     if not dry_run:
@@ -754,11 +845,11 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
 
         # Exit code 3 is used since Click uses exit code 2 if there is an
         # error with the parameters specified
-        sys.exit(3)
+        ctx.exit(3)
 
     elif result is False:
         # At least 1 notification service failed to send
-        sys.exit(1)
+        ctx.exit(1)
 
     # else:  We're good!
-    sys.exit(0)
+    ctx.exit(0)

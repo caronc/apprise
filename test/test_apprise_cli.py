@@ -745,6 +745,9 @@ def test_apprise_cli_persistent_storage(tmpdir):
     test=test://
     noper=noper://
 
+    # Define a second test URL that will
+    two-urls=test://
+
     # Create another entry that has no tag associatd with it
     test://?entry=2
     """)
