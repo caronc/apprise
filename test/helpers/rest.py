@@ -37,6 +37,7 @@ from string import ascii_uppercase as str_alpha
 from string import digits as str_num
 
 from apprise import NotifyBase
+from apprise import PersistentStoreMode
 from apprise import NotifyType
 from apprise import Apprise
 from apprise import AppriseAsset
@@ -134,16 +135,24 @@ class AppriseURLTester:
         # Our regular expression
         url_matches = meta.get('url_matches')
 
+        # Our storage mode to set
+        storage_mode = meta.get('storage_mode', PersistentStoreMode.MEMORY)
+
+        # Debug Mode
+        pdb = meta.get('pdb', False)
+
         # Whether or not we should include an image with our request; unless
         # otherwise specified, we assume that images are to be included
         include_image = meta.get('include_image', True)
         if include_image:
             # a default asset
-            asset = AppriseAsset()
+            asset = AppriseAsset(storage_mode=storage_mode)
 
         else:
             # Disable images
-            asset = AppriseAsset(image_path_mask=False, image_url_mask=False)
+            asset = AppriseAsset(
+                image_path_mask=False, image_url_mask=False,
+                storage_mode=storage_mode)
             asset.image_url_logo = None
 
         # Mock our request object
@@ -152,6 +161,12 @@ class AppriseURLTester:
         mock_get.return_value = robj
         mock_post.return_value = robj
         mock_request.return_value = robj
+
+        if pdb:
+            # Makes it easier to debug with this peice of code
+            # just add `pdb': True to the call that is failing
+            import pdb
+            pdb.set_trace()
 
         try:
             # We can now instantiate our object:

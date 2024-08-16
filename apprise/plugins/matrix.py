@@ -42,6 +42,7 @@ from ..url import PrivacyMode
 from ..common import NotifyType
 from ..common import NotifyImageSize
 from ..common import NotifyFormat
+from ..common import PersistentStoreMode
 from ..utils import parse_bool
 from ..utils import parse_list
 from ..utils import is_hostname
@@ -175,6 +176,13 @@ class NotifyMatrix(NotifyBase):
     # the server doesn't remind us how long we shoul wait for
     default_wait_ms = 1000
 
+    # Our default is to no not use persistent storage beyond in-memory
+    # reference
+    storage_mode = PersistentStoreMode.AUTO
+
+    # Keep our cache for 20 days
+    default_cache_expiry_sec = 60 * 60 * 24 * 20
+
     # Define object templates
     templates = (
         # Targets are ignored when using t2bot mode; only a token is required
@@ -299,10 +307,6 @@ class NotifyMatrix(NotifyBase):
         # Place an image inline with the message body
         self.include_image = include_image
 
-        # maintain a lookup of room alias's we already paired with their id
-        # to speed up future requests
-        self._room_cache = {}
-
         # Setup our mode
         self.mode = self.template_args['mode']['default'] \
             if not isinstance(mode, str) else mode.lower()
@@ -342,6 +346,7 @@ class NotifyMatrix(NotifyBase):
                   .format(self.host)
             self.logger.warning(msg)
             raise TypeError(msg)
+
         else:
             # Verify port if specified
             if self.port is not None and not (
@@ -352,6 +357,23 @@ class NotifyMatrix(NotifyBase):
                       .format(self.port)
                 self.logger.warning(msg)
                 raise TypeError(msg)
+
+        #
+        # Initialize from cache if present
+        #
+        if self.mode != MatrixWebhookMode.T2BOT:
+            # our home server gets populated after a login/registration
+            self.home_server = self.store.get('home_server')
+
+            # our user_id gets populated after a login/registration
+            self.user_id = self.store.get('user_id')
+
+            # This gets initialized after a login/registration
+            self.access_token = self.store.get('access_token')
+
+        # This gets incremented for each request made against the v3 API
+        self.transaction_id = 0 if not self.access_token \
+            else self.store.get('transaction_id', 0)
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
@@ -695,6 +717,9 @@ class NotifyMatrix(NotifyBase):
             # recognized as retransmissions and ignored
             if self.version == MatrixVersion.V3:
                 self.transaction_id += 1
+                self.store.set(
+                    'transaction_id', self.transaction_id,
+                    expires=self.default_cache_expiry_sec)
 
             if not postokay:
                 # Notify our user
@@ -811,7 +836,18 @@ class NotifyMatrix(NotifyBase):
         self.home_server = response.get('home_server')
         self.user_id = response.get('user_id')
 
+        self.store.set(
+            'access_token', self.access_token,
+            expires=self.default_cache_expiry_sec)
+        self.store.set(
+            'home_server', self.home_server,
+            expires=self.default_cache_expiry_sec)
+        self.store.set(
+            'user_id', self.user_id,
+            expires=self.default_cache_expiry_sec)
+
         if self.access_token is not None:
+            # Store our token into our store
             self.logger.debug(
                 'Registered successfully with Matrix server.')
             return True
@@ -870,6 +906,18 @@ class NotifyMatrix(NotifyBase):
 
         self.logger.debug(
             'Authenticated successfully with Matrix server.')
+
+        # Store our token into our store
+        self.store.set(
+            'access_token', self.access_token,
+            expires=self.default_cache_expiry_sec)
+        self.store.set(
+            'home_server', self.home_server,
+            expires=self.default_cache_expiry_sec)
+        self.store.set(
+            'user_id', self.user_id,
+            expires=self.default_cache_expiry_sec)
+
         return True
 
     def _logout(self):
@@ -907,8 +955,9 @@ class NotifyMatrix(NotifyBase):
         self.home_server = None
         self.user_id = None
 
-        # Clear our room cache
-        self._room_cache = {}
+        # clear our tokens
+        self.store.clear(
+            'access_token', 'home_server', 'user_id', 'transaction_id')
 
         self.logger.debug(
             'Unauthenticated successfully with Matrix server.')
@@ -948,9 +997,13 @@ class NotifyMatrix(NotifyBase):
             )
 
             # Check our cache for speed:
-            if room_id in self._room_cache:
+            try:
                 # We're done as we've already joined the channel
-                return self._room_cache[room_id]['id']
+                return self.store[room_id]['id']
+
+            except KeyError:
+                # No worries, we'll try to acquire the info
+                pass
 
             # Build our URL
             path = '/join/{}'.format(NotifyMatrix.quote(room_id))
@@ -959,10 +1012,10 @@ class NotifyMatrix(NotifyBase):
             postokay, _ = self._fetch(path, payload=payload)
             if postokay:
                 # Cache our entry for fast access later
-                self._room_cache[room_id] = {
+                self.store.set(room_id, {
                     'id': room_id,
                     'home_server': home_server,
-                }
+                })
 
             return room_id if postokay else None
 
@@ -984,9 +1037,13 @@ class NotifyMatrix(NotifyBase):
         room = '#{}:{}'.format(result.group('room'), home_server)
 
         # Check our cache for speed:
-        if room in self._room_cache:
+        try:
             # We're done as we've already joined the channel
-            return self._room_cache[room]['id']
+            return self.store[room]['id']
+
+        except KeyError:
+            # No worries, we'll try to acquire the info
+            pass
 
         # If we reach here, we need to join the channel
 
@@ -997,11 +1054,12 @@ class NotifyMatrix(NotifyBase):
         postokay, response = self._fetch(path, payload=payload)
         if postokay:
             # Cache our entry for fast access later
-            self._room_cache[room] = {
+            self.store.set(room, {
                 'id': response.get('room_id'),
                 'home_server': home_server,
-            }
-            return self._room_cache[room]['id']
+            })
+
+            return response.get('room_id')
 
         # Try to create the channel
         return self._room_create(room)
@@ -1056,10 +1114,10 @@ class NotifyMatrix(NotifyBase):
             return None
 
         # Cache our entry for fast access later
-        self._room_cache[response.get('room_alias')] = {
+        self.store.set(response.get('room_alias'), {
             'id': response.get('room_id'),
             'home_server': home_server,
-        }
+        })
 
         return response.get('room_id')
 
@@ -1290,6 +1348,11 @@ class NotifyMatrix(NotifyBase):
         """
         if self.mode == MatrixWebhookMode.T2BOT:
             # nothing to do
+            return
+
+        if self.store.mode != PersistentStoreMode.MEMORY:
+            # We no longer have to log out as we have persistant storage to
+            # re-use our credentials with
             return
 
         try:

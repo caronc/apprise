@@ -193,6 +193,12 @@ def test_persistent_storage_general(tmpdir):
 
     pc = PersistentStore(
         namespace=namespace, path=str(tmpdir))
+    assert pc.keys()
+    # Second call after already initialized skips over initialization
+    assert pc.keys()
+
+    pc = PersistentStore(
+        namespace=namespace, path=str(tmpdir))
 
     with pytest.raises(KeyError):
         # The below
@@ -602,6 +608,15 @@ def test_persistent_storage_corruption_handling(tmpdir):
     with mock.patch('gzip.open', side_effect=OSError()):
         with pytest.raises(KeyError):
             pc['mykey'] = 43
+
+    pc = PersistentStore(
+        namespace=namespace, path=str(tmpdir),
+        mode=PersistentStoreMode.FLUSH)
+
+    # Zlib error handling as well during open
+    with mock.patch('gzip.open', side_effect=OSError()):
+        # No keys can be returned
+        assert not pc.keys()
 
     pc = PersistentStore(
         namespace=namespace, path=str(tmpdir),

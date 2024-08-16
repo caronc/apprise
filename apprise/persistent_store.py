@@ -1530,6 +1530,10 @@ class PersistentStore:
         """
         Returns our keys
         """
+        if self._cache is None and not self.__load_cache():
+            # There are no keys to return
+            return {}.keys()
+
         return self._cache.keys()
 
     def delete(self, *args, all=None, temp=None, cache=None, validate=True):
