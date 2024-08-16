@@ -75,7 +75,7 @@ jobs:
     steps:
 
     - name: Acquire sources
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Install prerequisites (Linux)
       if: runner.os == 'Linux'
@@ -137,7 +137,7 @@ jobs:
         coverage report
 
     - name: Upload coverage data
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
         files: ./coverage.xml
         fail_ci_if_error: false
