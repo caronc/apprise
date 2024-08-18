@@ -244,7 +244,7 @@ class NotifySplunk(NotifyBase):
             # Assign what was defined:
             self.entity_id = entity_id.strip(' \r\n\t\v/')
 
-        if isinstance(action, str) and action:
+        if action and isinstance(action, str):
             self.action = next(
                 (a for a in SPLUNK_ACTIONS if a.startswith(action)), None)
             if self.action not in SPLUNK_ACTIONS:
@@ -253,7 +253,7 @@ class NotifySplunk(NotifyBase):
                 self.logger.warning(msg)
                 raise TypeError(msg)
         else:
-            self.action = self.template_args['action']['default'] \
+            self.action = self.template_args['action']['default']
 
         # Store our mappings
         self.mapping = self.splunk_message_map.copy()

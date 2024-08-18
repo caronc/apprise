@@ -47,10 +47,12 @@
 # API Integration Docs: https://docs.opsgenie.com/docs/api-integration
 
 import requests
-from json import dumps
+from json import dumps, loads
+import hashlib
 
 from .base import NotifyBase
-from ..common import NotifyType
+from ..common import NotifyType, NOTIFY_TYPES
+from ..common import PersistentStoreMode
 from ..utils import validate_regex
 from ..utils import is_uuid
 from ..utils import parse_list
@@ -74,6 +76,47 @@ OPSGENIE_CATEGORIES = (
     OpsgenieCategory.ESCALATION,
     OpsgenieCategory.TEAM,
 )
+
+
+class OpsgenieAlertAction:
+    """
+    Defines the supported actions
+    """
+    # Use mapping (specify :key=arg to over-ride)
+    MAP = 'map'
+
+    # Create new alert (default)
+    NEW = 'new'
+
+    # Close Alert
+    CLOSE = 'close'
+
+    # Delete Alert
+    DELETE = 'delete'
+
+    # Acknowledge Alert
+    ACKNOWLEDGE = 'acknowledge'
+
+    # Add note to alert
+    NOTE = 'note'
+
+
+OPSGENIE_ACTIONS = (
+    OpsgenieAlertAction.MAP,
+    OpsgenieAlertAction.NEW,
+    OpsgenieAlertAction.CLOSE,
+    OpsgenieAlertAction.DELETE,
+    OpsgenieAlertAction.ACKNOWLEDGE,
+    OpsgenieAlertAction.NOTE,
+)
+
+# Map all support Apprise Categories to Opsgenie Categories
+OPSGENIE_ALERT_MAP = {
+    NotifyType.INFO: OpsgenieAlertAction.CLOSE,
+    NotifyType.SUCCESS: OpsgenieAlertAction.CLOSE,
+    NotifyType.WARNING: OpsgenieAlertAction.NEW,
+    NotifyType.FAILURE: OpsgenieAlertAction.NEW,
+}
 
 
 # Regions
@@ -160,6 +203,10 @@ class NotifyOpsgenie(NotifyBase):
     # The maximum length of the body
     body_maxlen = 15000
 
+    # Our default is to no not use persistent storage beyond in-memory
+    # reference
+    storage_mode = PersistentStoreMode.AUTO
+
     # If we don't have the specified min length, then we don't bother using
     # the body directive
     opsgenie_body_minlen = 130
@@ -170,10 +217,24 @@ class NotifyOpsgenie(NotifyBase):
     # The maximum allowable targets within a notification
     default_batch_size = 50
 
+    # Defines our default message mapping
+    opsgenie_message_map = {
+        # Add a note to existing alert
+        NotifyType.INFO: OpsgenieAlertAction.NOTE,
+        # Close existing alert
+        NotifyType.SUCCESS: OpsgenieAlertAction.CLOSE,
+        # Create notice
+        NotifyType.WARNING: OpsgenieAlertAction.NEW,
+        # Create notice
+        NotifyType.FAILURE: OpsgenieAlertAction.NEW,
+    }
+
     # Define object templates
     templates = (
         '{schema}://{apikey}',
+        '{schema}://{user}@{apikey}',
         '{schema}://{apikey}/{targets}',
+        '{schema}://{user}@{apikey}/{targets}',
     )
 
     # Define our template tokens
@@ -183,6 +244,10 @@ class NotifyOpsgenie(NotifyBase):
             'type': 'string',
             'private': True,
             'required': True,
+        },
+        'user': {
+            'name': _('Username'),
+            'type': 'string',
         },
         'target_escalation': {
             'name': _('Target Escalation'),
@@ -249,6 +314,12 @@ class NotifyOpsgenie(NotifyBase):
         'to': {
             'alias_of': 'targets',
         },
+        'action': {
+            'name': _('Action'),
+            'type': 'choice:string',
+            'values': OPSGENIE_ACTIONS,
+            'default': OPSGENIE_ACTIONS[0],
+        }
     })
 
     # Map of key-value pairs to use as custom properties of the alert.
@@ -257,11 +328,15 @@ class NotifyOpsgenie(NotifyBase):
             'name': _('Details'),
             'prefix': '+',
         },
+        'mapping': {
+            'name': _('Action Mapping'),
+            'prefix': ':',
+        },
     }
 
     def __init__(self, apikey, targets, region_name=None, details=None,
                  priority=None, alias=None, entity=None, batch=False,
-                 tags=None, **kwargs):
+                 tags=None, action=None, mapping=None, **kwargs):
         """
         Initialize Opsgenie Object
         """
@@ -297,6 +372,41 @@ class NotifyOpsgenie(NotifyBase):
                   .format(region_name)
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        if action and isinstance(action, str):
+            self.action = next(
+                (a for a in OPSGENIE_ACTIONS if a.startswith(action)), None)
+            if self.action not in OPSGENIE_ACTIONS:
+                msg = 'The Opsgenie action specified ({}) is invalid.'\
+                    .format(action)
+                self.logger.warning(msg)
+                raise TypeError(msg)
+        else:
+            self.action = self.template_args['action']['default']
+
+        # Store our mappings
+        self.mapping = self.opsgenie_message_map.copy()
+        if mapping and isinstance(mapping, dict):
+            for _k, _v in mapping.items():
+                # Get our mapping
+                k = next((t for t in NOTIFY_TYPES if t.startswith(_k)), None)
+                if not k:
+                    msg = 'The Opsgenie mapping key specified ({}) ' \
+                        'is invalid.'.format(_k)
+                    self.logger.warning(msg)
+                    raise TypeError(msg)
+
+                _v_lower = _v.lower()
+                v = next((v for v in OPSGENIE_ACTIONS[1:]
+                          if v.startswith(_v_lower)), None)
+                if not v:
+                    msg = 'The Opsgenie mapping value (assigned to {}) ' \
+                          'specified ({}) is invalid.'.format(k, _v)
+                    self.logger.warning(msg)
+                    raise TypeError(msg)
+
+                # Update our mapping
+                self.mapping[k] = v
 
         self.details = {}
         if details:
@@ -367,16 +477,95 @@ class NotifyOpsgenie(NotifyBase):
                     if is_uuid(target) else
                     {'type': OpsgenieCategory.USER, 'username': target})
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
+    def _fetch(self, method, url, payload, params=None):
         """
-        Perform Opsgenie Notification
+        Performs server retrieval/update and returns JSON Response
         """
-
         headers = {
             'User-Agent': self.app_id,
             'Content-Type': 'application/json',
             'Authorization': 'GenieKey {}'.format(self.apikey),
         }
+
+        # Some Debug Logging
+        self.logger.debug(
+            'Opsgenie POST URL: {} (cert_verify={})'.format(
+                url, self.verify_certificate))
+        self.logger.debug('Opsgenie Payload: {}' .format(payload))
+
+        # Initialize our response object
+        content = {}
+
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+        try:
+            r = method(
+                url,
+                data=dumps(payload),
+                params=params,
+                headers=headers,
+                verify=self.verify_certificate,
+                timeout=self.request_timeout,
+            )
+
+            # A Response might look like:
+            # {
+            #     "result": "Request will be processed",
+            #     "took": 0.302,
+            #     "requestId": "43a29c5c-3dbf-4fa4-9c26-f4f71023e120"
+            # }
+
+            try:
+                # Update our response object
+                content = loads(r.content)
+
+            except (AttributeError, TypeError, ValueError):
+                # ValueError = r.content is Unparsable
+                # TypeError = r.content is None
+                # AttributeError = r is None
+                content = {}
+
+            if r.status_code not in (
+                    requests.codes.accepted, requests.codes.ok):
+                status_str = \
+                    NotifyBase.http_response_code_lookup(
+                        r.status_code)
+
+                self.logger.warning(
+                    'Failed to send Opsgenie notification:'
+                    '{}{}error={}.'.format(
+                        status_str,
+                        ', ' if status_str else '',
+                        r.status_code))
+
+                self.logger.debug(
+                    'Response Details:\r\n{}'.format(r.content))
+
+                return (False, content.get('requestId'))
+
+            # If we reach here; the message was sent
+            self.logger.info('Sent Opsgenie notification')
+            self.logger.debug(
+                'Response Details:\r\n{}'.format(r.content))
+
+            return (True, content.get('requestId'))
+
+        except requests.RequestException as e:
+            self.logger.warning(
+                'A Connection error occurred sending Opsgenie '
+                'notification.')
+            self.logger.debug('Socket Exception: %s' % str(e))
+
+        return (False, content.get('requestId'))
+
+    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
+        """
+        Perform Opsgenie Notification
+        """
+
+        # Get our Opsgenie Action
+        action = OPSGENIE_ALERT_MAP[notify_type] \
+            if self.action == OpsgenieAlertAction.MAP else self.action
 
         # Prepare our URL as it's based on our hostname
         notify_url = OPSGENIE_API_LOOKUP[self.region_name]
@@ -384,95 +573,126 @@ class NotifyOpsgenie(NotifyBase):
         # Initialize our has_error flag
         has_error = False
 
-        # Use body if title not set
-        title_body = body if not title else title
+        # Default method is to post
+        method = requests.post
 
-        # Create a copy ouf our details object
-        details = self.details.copy()
-        if 'type' not in details:
-            details['type'] = notify_type
+        # For indexing in persistent store
+        key = hashlib.sha1(
+            (self.entity if self.entity else (
+                self.alias if self.alias else (
+                    title if title else self.app_id)))
+            .encode('utf-8')).hexdigest()[0:10]
 
-        # Prepare our payload
-        payload = {
-            'source': self.app_desc,
-            'message': title_body,
-            'description': body,
-            'details': details,
-            'priority': 'P{}'.format(self.priority),
-        }
+        # Get our Opsgenie Request IDs
+        request_ids = self.store.get(key, [])
+        if not isinstance(request_ids, list):
+            request_ids = []
 
-        # Use our body directive if we exceed the minimum message
-        # limitation
-        if len(payload['message']) > self.opsgenie_body_minlen:
-            payload['message'] = '{}...'.format(
-                title_body[:self.opsgenie_body_minlen - 3])
+        if action == OpsgenieAlertAction.NEW:
+            # Create a copy ouf our details object
+            details = self.details.copy()
+            if 'type' not in details:
+                details['type'] = notify_type
 
-        if self.__tags:
-            payload['tags'] = self.__tags
+            # Use body if title not set
+            title_body = body if not title else title
 
-        if self.entity:
-            payload['entity'] = self.entity
+            # Prepare our payload
+            payload = {
+                'source': self.app_desc,
+                'message': title_body,
+                'description': body,
+                'details': details,
+                'priority': 'P{}'.format(self.priority),
+            }
 
-        if self.alias:
-            payload['alias'] = self.alias
+            # Use our body directive if we exceed the minimum message
+            # limitation
+            if len(payload['message']) > self.opsgenie_body_minlen:
+                payload['message'] = '{}...'.format(
+                    title_body[:self.opsgenie_body_minlen - 3])
 
-        length = len(self.targets) if self.targets else 1
-        for index in range(0, length, self.batch_size):
-            if self.targets:
-                # If there were no targets identified, then we simply
-                # just iterate once without the responders set
-                payload['responders'] = \
-                    self.targets[index:index + self.batch_size]
+            if self.__tags:
+                payload['tags'] = self.__tags
 
-            # Some Debug Logging
-            self.logger.debug(
-                'Opsgenie POST URL: {} (cert_verify={})'.format(
-                    notify_url, self.verify_certificate))
-            self.logger.debug('Opsgenie Payload: {}' .format(payload))
+            if self.entity:
+                payload['entity'] = self.entity
 
-            # Always call throttle before any remote server i/o is made
-            self.throttle()
-            try:
-                r = requests.post(
-                    notify_url,
-                    data=dumps(payload),
-                    headers=headers,
-                    verify=self.verify_certificate,
-                    timeout=self.request_timeout,
-                )
+            if self.alias:
+                payload['alias'] = self.alias
 
-                if r.status_code not in (
-                        requests.codes.accepted, requests.codes.ok):
-                    status_str = \
-                        NotifyBase.http_response_code_lookup(
-                            r.status_code)
+            if self.user:
+                payload['user'] = self.user
 
-                    self.logger.warning(
-                        'Failed to send Opsgenie notification:'
-                        '{}{}error={}.'.format(
-                            status_str,
-                            ', ' if status_str else '',
-                            r.status_code))
+            # reset our request IDs - we will re-populate them
+            request_ids = []
 
-                    self.logger.debug(
-                        'Response Details:\r\n{}'.format(r.content))
+            length = len(self.targets) if self.targets else 1
+            for index in range(0, length, self.batch_size):
+                if self.targets:
+                    # If there were no targets identified, then we simply
+                    # just iterate once without the responders set
+                    payload['responders'] = \
+                        self.targets[index:index + self.batch_size]
 
-                    # Mark our failure
+                # Perform our post
+                success, request_id = self._fetch(
+                    method, notify_url, payload)
+
+                if success and request_id:
+                    # Save our response
+                    request_ids.append(request_id)
+
+                else:
                     has_error = True
-                    continue
 
-                # If we reach here; the message was sent
-                self.logger.info('Sent Opsgenie notification')
-                self.logger.debug(
-                    'Response Details:\r\n{}'.format(r.content))
+            # Store our entries for a maximum of 60 days
+            self.store.set(key, request_ids, expires=60 * 60 * 24 * 60)
 
-            except requests.RequestException as e:
-                self.logger.warning(
-                    'A Connection error occurred sending Opsgenie '
-                    'notification.')
-                self.logger.debug('Socket Exception: %s' % str(e))
-                # Mark our failure
-                has_error = True
+        elif request_ids:
+            # Prepare our payload
+            payload = {
+                'source': self.app_desc,
+                'note': body,
+            }
+
+            if self.user:
+                payload['user'] = self.user
+
+            # Prepare our Identifier type
+            params = {
+                'identifierType': 'id',
+            }
+
+            for request_id in request_ids:
+                if action == OpsgenieAlertAction.DELETE:
+                    # Update our URL
+                    url = f'{notify_url}/{request_id}'
+                    method = requests.delete
+
+                elif action == OpsgenieAlertAction.ACKNOWLEDGE:
+                    url = f'{notify_url}/{request_id}/acknowledge'
+
+                elif action == OpsgenieAlertAction.CLOSE:
+                    url = f'{notify_url}/{request_id}/close'
+
+                else:  # action == OpsgenieAlertAction.CLOSE:
+                    url = f'{notify_url}/{request_id}/notes'
+
+                # Perform our post
+                success, _ = self._fetch(method, url, payload, params)
+
+                if not success:
+                    has_error = True
+
+            if not has_error and action == OpsgenieAlertAction.DELETE:
+                # Remove cached entry
+                self.store.clear(key)
+
+        else:
+            self.logger.info(
+                'No Opsgenie notification sent due to (nothing to %s) '
+                'condition', self.action)
 
         return not has_error
 
@@ -492,6 +712,7 @@ class NotifyOpsgenie(NotifyBase):
 
         # Define any URL parameters
         params = {
+            'action': self.action,
             'region': self.region_name,
             'priority':
                 OPSGENIE_PRIORITIES[self.template_args['priority']['default']]
@@ -515,6 +736,10 @@ class NotifyOpsgenie(NotifyBase):
         # Append our details into our parameters
         params.update({'+{}'.format(k): v for k, v in self.details.items()})
 
+        # Append our assignment extra's into our parameters
+        params.update(
+            {':{}'.format(k): v for k, v in self.mapping.items()})
+
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
@@ -531,8 +756,9 @@ class NotifyOpsgenie(NotifyBase):
                 NotifyOpsgenie.template_tokens['target_team']['prefix'],
         }
 
-        return '{schema}://{apikey}/{targets}/?{params}'.format(
+        return '{schema}://{user}{apikey}/{targets}/?{params}'.format(
             schema=self.secure_protocol,
+            user='{}@'.format(self.user) if self.user else '',
             apikey=self.pprint(self.apikey, privacy, safe=''),
             targets='/'.join(
                 [NotifyOpsgenie.quote('{}{}'.format(
@@ -616,5 +842,15 @@ class NotifyOpsgenie(NotifyBase):
         # Handle 'to' email address
         if 'to' in results['qsd'] and len(results['qsd']['to']):
             results['targets'].append(results['qsd']['to'])
+
+        # Store our action (if defined)
+        if 'action' in results['qsd'] and len(results['qsd']['action']):
+            results['action'] = \
+                NotifyOpsgenie.unquote(results['qsd']['action'])
+
+        # store any custom mapping defined
+        results['mapping'] = \
+            {NotifyOpsgenie.unquote(x): NotifyOpsgenie.unquote(y)
+             for x, y in results['qsd:'].items()}
 
         return results

@@ -106,18 +106,18 @@ class AppriseURLTester:
             'meta': meta,
         })
 
-    def run_all(self):
+    def run_all(self, tmpdir=None):
         """
         Run all of our tests
         """
         # iterate over our dictionary and test it out
         for (url, meta) in self.__tests:
-            self.run(url, meta)
+            self.run(url, meta, tmpdir)
 
     @mock.patch('requests.get')
     @mock.patch('requests.post')
     @mock.patch('requests.request')
-    def run(self, url, meta, mock_request, mock_post, mock_get):
+    def run(self, url, meta, tmpdir, mock_request, mock_post, mock_get):
         """
         Run a specific test
         """
@@ -135,8 +135,17 @@ class AppriseURLTester:
         # Our regular expression
         url_matches = meta.get('url_matches')
 
+        # Detect our storage path (used to set persistent storage
+        # mode
+        storage_path = \
+            tmpdir if tmpdir and isinstance(tmpdir, str) and \
+            os.path.isdir(tmpdir) else None
+
         # Our storage mode to set
-        storage_mode = meta.get('storage_mode', PersistentStoreMode.MEMORY)
+        storage_mode = meta.get(
+            'storage_mode',
+            PersistentStoreMode.MEMORY
+            if not storage_path else PersistentStoreMode.AUTO)
 
         # Debug Mode
         pdb = meta.get('pdb', False)
@@ -146,13 +155,18 @@ class AppriseURLTester:
         include_image = meta.get('include_image', True)
         if include_image:
             # a default asset
-            asset = AppriseAsset(storage_mode=storage_mode)
+            asset = AppriseAsset(
+                storage_mode=storage_mode,
+                storage_path=storage_path,
+            )
 
         else:
             # Disable images
             asset = AppriseAsset(
                 image_path_mask=False, image_url_mask=False,
-                storage_mode=storage_mode)
+                storage_mode=storage_mode,
+                storage_path=storage_path,
+            )
             asset.image_url_logo = None
 
         # Mock our request object
@@ -287,6 +301,7 @@ class AppriseURLTester:
 
             # Tidy our object
             del obj_cmp
+            del instance
 
         if _self:
             # Iterate over our expected entries inside of our
@@ -593,7 +608,7 @@ class AppriseURLTester:
                     try:
                         assert obj.notify(
                             body=self.body, title=self.title,
-                            notify_type=NotifyType.INFO) is False
+                            notify_type=notify_type) is False
 
                     except AssertionError:
                         # Don't mess with these entries
@@ -639,7 +654,7 @@ class AppriseURLTester:
                     try:
                         assert obj.notify(
                             body=self.body,
-                            notify_type=NotifyType.INFO) is False
+                            notify_type=notify_type) is False
 
                     except AssertionError:
                         # Don't mess with these entries
