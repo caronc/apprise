@@ -28,6 +28,7 @@
 
 import sys
 import os
+import gc
 
 import pytest
 import mimetypes
@@ -69,3 +70,14 @@ def no_throttling_everywhere(session_mocker):
 
     for plugin in N_MGR.plugins():
         session_mocker.patch.object(plugin, "request_rate_per_sec", 0)
+
+
+@pytest.fixture(scope="function", autouse=True)
+def collect_all_garbage(session_mocker):
+    """
+    A pytest session fixture to ensure no __del__ cleanup call from
+    one plugin will cause testing issues with another.  Run garbage
+    collection after every test
+    """
+    # Force garbage collection
+    gc.collect()

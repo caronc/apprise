@@ -1193,11 +1193,16 @@ def test_plugin_matrix_transaction_ids_api_v3_no_cache(
     mock_get.return_value = response
     mock_put.return_value = response
 
+    # For each element is 1 batch that is ran
+    # the number defined is the number of notifications to send
     batch = [10, 1, 5]
 
     for notifications in batch:
         # Instantiate our object
         obj = Apprise.instantiate('matrix://user:pass@localhost/#general?v=3')
+
+        # Ensure mode is flush
+        assert obj.store.mode == PersistentStoreMode.MEMORY
 
         # Performs a login
         assert obj.notify(
@@ -1270,6 +1275,8 @@ def test_plugin_matrix_transaction_ids_api_v3_w_cache(
     mock_get.return_value = response
     mock_put.return_value = response
 
+    # For each element is 1 batch that is ran
+    # the number defined is the number of notifications to send
     batch = [10, 1, 5]
 
     mock_post.reset_mock()
@@ -1288,6 +1295,9 @@ def test_plugin_matrix_transaction_ids_api_v3_w_cache(
         # Instantiate our object
         obj = Apprise.instantiate(
             'matrix://user:pass@localhost/#general?v=3', asset=asset)
+
+        # Ensure mode is flush
+        assert obj.store.mode == PersistentStoreMode.FLUSH
 
         # Performs a login
         assert obj.notify(
