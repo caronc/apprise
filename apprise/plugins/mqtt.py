@@ -204,10 +204,15 @@ class NotifyMQTT(NotifyBase):
             'type': 'bool',
             'default': False,
         },
+        'retain': {
+            'name': _('Retain Messages'),
+            'type': 'bool',
+            'default': False,
+        },
     })
 
     def __init__(self, targets=None, version=None, qos=None,
-                 client_id=None, session=None, **kwargs):
+                 client_id=None, session=None, retain=None, **kwargs):
         """
         Initialize MQTT Object
         """
@@ -229,6 +234,10 @@ class NotifyMQTT(NotifyBase):
         self.session = self.template_args['session']['default'] \
             if session is None or not self.client_id \
             else parse_bool(session)
+
+        # Our Retain Message Flag
+        self.retain = self.template_args['retain']['default'] \
+            if retain is None else parse_bool(retain)
 
         # Set up our Quality of Service (QoS)
         try:
@@ -376,7 +385,7 @@ class NotifyMQTT(NotifyBase):
                 self.logger.debug('MQTT Payload: %s' % str(body))
 
                 result = self.client.publish(
-                    topic, payload=body, qos=self.qos, retain=False)
+                    topic, payload=body, qos=self.qos, retain=self.retain)
 
                 if result.rc != mqtt.MQTT_ERR_SUCCESS:
                     # Toggle our status
@@ -456,6 +465,7 @@ class NotifyMQTT(NotifyBase):
             'version': self.version,
             'qos': str(self.qos),
             'session': 'yes' if self.session else 'no',
+            'retain': 'yes' if self.retain else 'no',
         }
 
         if self.client_id:
@@ -534,6 +544,10 @@ class NotifyMQTT(NotifyBase):
 
         if 'session' in results['qsd'] and len(results['qsd']['session']):
             results['session'] = parse_bool(results['qsd']['session'])
+
+        # Message Retain Flag
+        if 'retain' in results['qsd'] and len(results['qsd']['retain']):
+            results['retain'] = parse_bool(results['qsd']['retain'])
 
         # The MQTT Quality of Service to use
         if 'qos' in results['qsd'] and len(results['qsd']['qos']):
