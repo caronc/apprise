@@ -548,8 +548,8 @@ class NotifyBase(URLBase):
         response = list()
 
         # tidy
-        title = '' if not title else title.strip()
-        body = '' if not body else body.rstrip()
+        title = '' if not title else str(title).strip()
+        body = '' if not body else str(body).rstrip()
 
         if overflow is None:
             # default
