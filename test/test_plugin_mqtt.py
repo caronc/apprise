@@ -320,6 +320,24 @@ def test_plugin_mqtt_session_client_id_success(mqtt_client_mock):
     assert re.search(r'my/topic', obj.url())
     assert re.search(r'client_id=apprise', obj.url())
     assert re.search(r'session=yes', obj.url())
+    assert re.search(r'retain=no', obj.url())
+    assert obj.notify(body="test=test") is True
+
+
+def test_plugin_mqtt_retain(mqtt_client_mock):
+    """
+    Verify handling of Retain Message Flag
+    """
+
+    obj = apprise.Apprise.instantiate(
+        'mqtt://user@localhost/my/topic?retain=yes',
+        suppress_exceptions=False)
+
+    assert isinstance(obj, NotifyMQTT)
+    assert obj.url().startswith('mqtt://user@localhost')
+    assert re.search(r'my/topic', obj.url())
+    assert re.search(r'session=no', obj.url())
+    assert re.search(r'retain=yes', obj.url())
     assert obj.notify(body="test=test") is True
 
 
