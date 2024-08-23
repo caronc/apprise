@@ -38,7 +38,9 @@ from ..common import NotifyFormat
 from ..common import NOTIFY_FORMATS
 from ..common import OverflowMode
 from ..common import OVERFLOW_MODES
+from ..common import PersistentStoreMode
 from ..locale import gettext_lazy as _
+from ..persistent_store import PersistentStore
 from ..apprise_attachment import AppriseAttachment
 
 
@@ -130,11 +132,18 @@ class NotifyBase(URLBase):
     # of lines. Setting this to zero disables this feature.
     body_max_line_count = 0
 
+    # Persistent storage default html settings
+    persistent_storage = True
+
     # Default Notify Format
     notify_format = NotifyFormat.TEXT
 
     # Default Overflow Mode
     overflow_mode = OverflowMode.UPSTREAM
+
+    # Our default is to no not use persistent storage beyond in-memory
+    # reference
+    storage_mode = PersistentStoreMode.MEMORY
 
     # Default Emoji Interpretation
     interpret_emojis = False
@@ -196,6 +205,16 @@ class NotifyBase(URLBase):
             # look up default using the following parent class value at
             # runtime.
             '_lookup_default': 'interpret_emojis',
+        },
+        'store': {
+            'name': _('Persistent Storage'),
+            # Use Persistent Storage
+            'type': 'bool',
+            # Provide a default
+            'default': persistent_storage,
+            # look up default using the following parent class value at
+            # runtime.
+            '_lookup_default': 'persistent_storage',
         },
     })
 
@@ -268,6 +287,9 @@ class NotifyBase(URLBase):
         # are turned off (no user over-rides allowed)
         #
 
+        # Our Persistent Storage object is initialized on demand
+        self.__store = None
+
         # Take a default
         self.interpret_emojis = self.asset.interpret_emojis
         if 'emojis' in kwargs:
@@ -300,6 +322,14 @@ class NotifyBase(URLBase):
 
             # Provide override
             self.overflow_mode = overflow
+
+        # Prepare our Persistent Storage switch
+        self.persistent_storage = parse_bool(
+            kwargs.get('store', NotifyBase.persistent_storage))
+        if not self.persistent_storage:
+            # Enforce the disabling of cache (ortherwise defaults are use)
+            self.url_identifier = False
+            self.__cached_url_identifier = None
 
     def image_url(self, notify_type, logo=False, extension=None,
                   image_size=None):
@@ -726,6 +756,10 @@ class NotifyBase(URLBase):
             'overflow': self.overflow_mode,
         }
 
+        # Persistent Storage Setting
+        if self.persistent_storage != NotifyBase.persistent_storage:
+            params['store'] = 'yes' if self.persistent_storage else 'no'
+
         params.update(super().url_parameters(*args, **kwargs))
 
         # return default parameters
@@ -778,6 +812,10 @@ class NotifyBase(URLBase):
         # Allow emoji's override
         if 'emojis' in results['qsd']:
             results['emojis'] = parse_bool(results['qsd'].get('emojis'))
+            # Store our persistent storage boolean
+
+        if 'store' in results['qsd']:
+            results['store'] = results['qsd']['store']
 
         return results
 
@@ -798,3 +836,29 @@ class NotifyBase(URLBase):
         should return the same set of results that parse_url() does.
         """
         return None
+
+    @property
+    def store(self):
+        """
+        Returns a pointer to our persistent store for use.
+
+          The best use cases are:
+           self.store.get('key')
+           self.store.set('key', 'value')
+           self.store.delete('key1', 'key2', ...)
+
+          You can also access the keys this way:
+           self.store['key']
+
+          And clear them:
+           del self.store['key']
+
+        """
+        if self.__store is None:
+            # Initialize our persistent store for use
+            self.__store = PersistentStore(
+                namespace=self.url_id(),
+                path=self.asset.storage_path,
+                mode=self.asset.storage_mode)
+
+        return self.__store

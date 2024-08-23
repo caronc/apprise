@@ -30,7 +30,8 @@ from unittest import mock
 import os
 import requests
 import pytest
-from apprise import Apprise, AppriseAsset, AppriseAttachment, NotifyType
+from apprise import (
+    Apprise, AppriseAsset, AppriseAttachment, NotifyType, PersistentStoreMode)
 from json import dumps
 
 from apprise.plugins.matrix import NotifyMatrix
@@ -646,49 +647,56 @@ def test_plugin_matrix_rooms(mock_post, mock_get, mock_put):
 
     assert obj._room_join('!abc123') == response_obj['room_id']
     # Use cache to get same results
-    assert len(obj._room_cache) == 1
+    assert obj.store.get('!abc123') is None
+    # However this is how the cache entry gets stored
+    assert obj.store.get('!abc123:localhost') is not None
+    assert obj.store.get('!abc123:localhost')['id'] == response_obj['room_id']
     assert obj._room_join('!abc123') == response_obj['room_id']
 
-    obj._room_cache = {}
+    obj.store.clear()
     assert obj._room_join('!abc123:localhost') == response_obj['room_id']
+    assert obj.store.get('!abc123:localhost') is not None
+    assert obj.store.get('!abc123:localhost')['id'] == response_obj['room_id']
     # Use cache to get same results
-    assert len(obj._room_cache) == 1
     assert obj._room_join('!abc123:localhost') == response_obj['room_id']
 
-    obj._room_cache = {}
+    obj.store.clear()
     assert obj._room_join('abc123') == response_obj['room_id']
     # Use cache to get same results
-    assert len(obj._room_cache) == 1
+    assert obj.store.get('#abc123:localhost') is not None
+    assert obj.store.get('#abc123:localhost')['id'] == response_obj['room_id']
     assert obj._room_join('abc123') == response_obj['room_id']
 
-    obj._room_cache = {}
+    obj.store.clear()
     assert obj._room_join('abc123:localhost') == response_obj['room_id']
     # Use cache to get same results
-    assert len(obj._room_cache) == 1
+    assert obj.store.get('#abc123:localhost') is not None
+    assert obj.store.get('#abc123:localhost')['id'] == response_obj['room_id']
     assert obj._room_join('abc123:localhost') == response_obj['room_id']
 
-    obj._room_cache = {}
+    obj.store.clear()
     assert obj._room_join('#abc123:localhost') == response_obj['room_id']
     # Use cache to get same results
-    assert len(obj._room_cache) == 1
+    assert obj.store.get('#abc123:localhost') is not None
+    assert obj.store.get('#abc123:localhost')['id'] == response_obj['room_id']
     assert obj._room_join('#abc123:localhost') == response_obj['room_id']
 
-    obj._room_cache = {}
+    obj.store.clear()
     assert obj._room_join('%') is None
     assert obj._room_join(None) is None
 
     # 403 response; this will push for a room creation for alias based rooms
     # and these will fail
     request.status_code = 403
-    obj._room_cache = {}
+    obj.store.clear()
     assert obj._room_join('!abc123') is None
-    obj._room_cache = {}
+    obj.store.clear()
     assert obj._room_join('!abc123:localhost') is None
-    obj._room_cache = {}
+    obj.store.clear()
     assert obj._room_join('abc123') is None
-    obj._room_cache = {}
+    obj.store.clear()
     assert obj._room_join('abc123:localhost') is None
-    obj._room_cache = {}
+    obj.store.clear()
     assert obj._room_join('#abc123:localhost') is None
     del obj
 
@@ -707,24 +715,24 @@ def test_plugin_matrix_rooms(mock_post, mock_get, mock_put):
     # You can't add room_id's, they must be aliases
     assert obj._room_create('!abc123') is None
     assert obj._room_create('!abc123:localhost') is None
-    obj._room_cache = {}
+    obj.store.clear()
     assert obj._room_create('abc123') == response_obj['room_id']
-    obj._room_cache = {}
+    obj.store.clear()
     assert obj._room_create('abc123:localhost') == response_obj['room_id']
-    obj._room_cache = {}
+    obj.store.clear()
     assert obj._room_create('#abc123:localhost') == response_obj['room_id']
-    obj._room_cache = {}
+    obj.store.clear()
     assert obj._room_create('%') is None
     assert obj._room_create(None) is None
 
     # 403 response; this will push for a room creation for alias based rooms
     # and these will fail
     request.status_code = 403
-    obj._room_cache = {}
+    obj.store.clear()
     assert obj._room_create('abc123') is None
-    obj._room_cache = {}
+    obj.store.clear()
     assert obj._room_create('abc123:localhost') is None
-    obj._room_cache = {}
+    obj.store.clear()
     assert obj._room_create('#abc123:localhost') is None
 
     request.status_code = 403
@@ -732,7 +740,7 @@ def test_plugin_matrix_rooms(mock_post, mock_get, mock_put):
         u'errcode': u'M_ROOM_IN_USE',
         u'error': u'Room alias already taken',
     })
-    obj._room_cache = {}
+    obj.store.clear()
     # This causes us to look up a channel ID if we get a ROOM_IN_USE response
     assert obj._room_create('#abc123:localhost') is None
     del obj
@@ -780,19 +788,19 @@ def test_plugin_matrix_rooms(mock_post, mock_get, mock_put):
     # You can't add room_id's, they must be aliases
     assert obj._room_id('!abc123') is None
     assert obj._room_id('!abc123:localhost') is None
-    obj._room_cache = {}
+    obj.store.clear()
     assert obj._room_id('abc123') == response_obj['room_id']
-    obj._room_cache = {}
+    obj.store.clear()
     assert obj._room_id('abc123:localhost') == response_obj['room_id']
-    obj._room_cache = {}
+    obj.store.clear()
     assert obj._room_id('#abc123:localhost') == response_obj['room_id']
-    obj._room_cache = {}
+    obj.store.clear()
     assert obj._room_id('%') is None
     assert obj._room_id(None) is None
 
     # If we can't look the code up, we return None
     request.status_code = 403
-    obj._room_cache = {}
+    obj.store.clear()
     assert obj._room_id('#abc123:localhost') is None
 
     # Force a object removal (thus a logout call)
@@ -1164,7 +1172,8 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get):
 @mock.patch('requests.put')
 @mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_matrix_transaction_ids_api_v3(mock_post, mock_get, mock_put):
+def test_plugin_matrix_transaction_ids_api_v3_no_cache(
+        mock_post, mock_get, mock_put):
     """
     NotifyMatrix() Transaction ID Checks (v3)
 
@@ -1184,11 +1193,16 @@ def test_plugin_matrix_transaction_ids_api_v3(mock_post, mock_get, mock_put):
     mock_get.return_value = response
     mock_put.return_value = response
 
+    # For each element is 1 batch that is ran
+    # the number defined is the number of notifications to send
     batch = [10, 1, 5]
 
     for notifications in batch:
         # Instantiate our object
         obj = Apprise.instantiate('matrix://user:pass@localhost/#general?v=3')
+
+        # Ensure mode is flush
+        assert obj.store.mode == PersistentStoreMode.MEMORY
 
         # Performs a login
         assert obj.notify(
@@ -1234,4 +1248,106 @@ def test_plugin_matrix_transaction_ids_api_v3(mock_post, mock_get, mock_put):
         assert mock_post.call_args_list[0][0][0] == \
             'http://localhost/_matrix/client/v3/logout'
         mock_post.reset_mock()
+        assert mock_put.call_count == 0
+
+
+@mock.patch('requests.put')
+@mock.patch('requests.get')
+@mock.patch('requests.post')
+def test_plugin_matrix_transaction_ids_api_v3_w_cache(
+        mock_post, mock_get, mock_put, tmpdir):
+    """
+    NotifyMatrix() Transaction ID Checks (v3)
+
+    """
+
+    # Prepare a good response
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = MATRIX_GOOD_RESPONSE.encode('utf-8')
+
+    # Prepare a bad response
+    bad_response = mock.Mock()
+    bad_response.status_code = requests.codes.internal_server_error
+
+    # Prepare Mock return object
+    mock_post.return_value = response
+    mock_get.return_value = response
+    mock_put.return_value = response
+
+    # For each element is 1 batch that is ran
+    # the number defined is the number of notifications to send
+    batch = [10, 1, 5]
+
+    mock_post.reset_mock()
+    mock_get.reset_mock()
+    mock_put.reset_mock()
+
+    asset = AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir),
+    )
+
+    # Message Counter
+    transaction_id = 1
+
+    for no, notifications in enumerate(batch):
+        # Instantiate our object
+        obj = Apprise.instantiate(
+            'matrix://user:pass@localhost/#general?v=3', asset=asset)
+
+        # Ensure mode is flush
+        assert obj.store.mode == PersistentStoreMode.FLUSH
+
+        # Performs a login
+        assert obj.notify(
+            body='body', title='title', notify_type=NotifyType.INFO
+        ) is True
+        assert mock_get.call_count == 0
+        if no == 0:
+            # first entry
+            assert mock_post.call_count == 2
+            assert mock_post.call_args_list[0][0][0] == \
+                'http://localhost/_matrix/client/v3/login'
+            assert mock_post.call_args_list[1][0][0] == \
+                'http://localhost/_matrix/client/v3/' \
+                'join/%23general%3Alocalhost'
+            assert mock_put.call_count == 1
+            assert mock_put.call_args_list[0][0][0] == \
+                'http://localhost/_matrix/client/v3/rooms/' + \
+                '%21abc123%3Alocalhost/send/m.room.message/0'
+
+        for no, _ in enumerate(range(notifications), start=transaction_id):
+            # Clean our slate
+            mock_post.reset_mock()
+            mock_get.reset_mock()
+            mock_put.reset_mock()
+
+            assert obj.notify(
+                body='body', title='title', notify_type=NotifyType.INFO
+            ) is True
+
+            # Increment transaction counter
+            transaction_id += 1
+
+            assert mock_get.call_count == 0
+            assert mock_post.call_count == 0
+            assert mock_put.call_count == 1
+            assert mock_put.call_args_list[0][0][0] == \
+                'http://localhost/_matrix/client/v3/rooms/' + \
+                f'%21abc123%3Alocalhost/send/m.room.message/{no}'
+
+        # Increment transaction counter
+        transaction_id += 1
+
+        mock_post.reset_mock()
+        mock_get.reset_mock()
+        mock_put.reset_mock()
+
+        # Force a object removal
+        # Biggest takeaway is that a logout no longer happens
+        del obj
+
+        assert mock_get.call_count == 0
+        assert mock_post.call_count == 0
         assert mock_put.call_count == 0

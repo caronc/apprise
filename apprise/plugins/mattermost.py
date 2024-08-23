@@ -223,8 +223,8 @@ class NotifyMattermost(NotifyBase):
                 payload['channel'] = channel
 
             url = '{}://{}:{}{}/hooks/{}'.format(
-                self.schema, self.host, self.port, self.fullpath,
-                self.token)
+                self.schema, self.host, self.port,
+                self.fullpath.rstrip('/'), self.token)
 
             self.logger.debug('Mattermost POST URL: %s (cert_verify=%r)' % (
                 url, self.verify_certificate,
@@ -285,6 +285,18 @@ class NotifyMattermost(NotifyBase):
 
         # Return our overall status
         return not has_error
+
+    @property
+    def url_identifier(self):
+        """
+        Returns all of the identifiers that make this URL unique from
+        another simliar one. Targets or end points should never be identified
+        here.
+        """
+        return (
+            self.secure_protocol if self.secure else self.protocol,
+            self.token, self.host, self.port, self.fullpath,
+        )
 
     def url(self, privacy=False, *args, **kwargs):
         """

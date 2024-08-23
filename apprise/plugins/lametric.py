@@ -783,6 +783,29 @@ class NotifyLametric(NotifyBase):
 
         return True
 
+    @property
+    def url_identifier(self):
+        """
+        Returns all of the identifiers that make this URL unique from
+        another simliar one. Targets or end points should never be identified
+        here.
+        """
+        if self.mode == LametricMode.DEVICE:
+            return (
+                self.secure_protocol if self.secure else self.protocol,
+                self.user, self.lametric_apikey, self.host,
+                self.port if self.port else (
+                    443 if self.secure else
+                    self.template_tokens['port']['default']),
+            )
+
+        return (
+            self.protocol,
+            self.lametric_app_access_token,
+            self.lametric_app_id,
+            self.lametric_app_ver,
+        )
+
     def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.
@@ -871,6 +894,9 @@ class NotifyLametric(NotifyBase):
             results['password'] = results['user']
             results['user'] = None
 
+        # Get unquoted entries
+        entries = NotifyLametric.split_path(results['fullpath'])
+
         # Priority Handling
         if 'priority' in results['qsd'] and results['qsd']['priority']:
             results['priority'] = NotifyLametric.unquote(
@@ -912,6 +938,10 @@ class NotifyLametric(NotifyBase):
             # Extract the App ID from an argument
             results['app_ver'] = \
                 NotifyLametric.unquote(results['qsd']['app_ver'])
+
+        elif entries:
+            # Store our app id
+            results['app_ver'] = entries.pop(0)
 
         if 'token' in results['qsd'] and results['qsd']['token']:
             # Extract Application Access Token from an argument

@@ -96,6 +96,9 @@ def test_plugin_mqtt_default_success(mqtt_client_mock):
     assert len(obj) == 1
     assert obj.url().startswith('mqtt://localhost:1234/my/topic')
 
+    # Genrate the URL Identifier
+    assert isinstance(obj.url_id(), str)
+
     # Verify default settings.
     assert re.search(r'qos=0', obj.url())
     assert re.search(r'version=v3.1.1', obj.url())

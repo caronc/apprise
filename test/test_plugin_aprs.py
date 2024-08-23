@@ -190,6 +190,9 @@ def test_plugin_aprs_edge_cases(mock_create_connection):
         "aprs://DF1JSL-15:12345@DF1ABC/DF1DEF")
     assert isinstance(instance, NotifyAprs)
 
+    # our URL Identifier
+    assert isinstance(instance.url_id(), str)
+
     # Objects read
     assert len(instance) == 2
 

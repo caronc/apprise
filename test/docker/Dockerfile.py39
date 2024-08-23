@@ -1,4 +1,3 @@
-#!/bin/bash
 # -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
@@ -26,47 +25,25 @@
 # CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
-#
-PYTEST=$(which py.test 2>/dev/null)
-# Support different distributions
-[ -z "$PYTEST" ] && PYTEST=$(which py.test-3 2>/dev/null)
-# This script can basically be used to test individual tests that have
-# been created. Just run the to run all tests:
-#    ./devel/test.sh
 
-# to key in on a specific test type:
-#     ./devel/test.sh <keyword>
+# Base
+FROM python:3.9-buster
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libdbus-1-dev libgirepository1.0-dev build-essential musl-dev bash dbus && \
+    rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir dbus-python "PyGObject==3.44.2"
 
-# Absolute path to this script, e.g. /home/user/bin/foo.sh
-SCRIPT=$(readlink -f "$0")
+# Apprise Setup
+VOLUME ["/apprise"]
+WORKDIR /apprise
+COPY requirements.txt /
+COPY dev-requirements.txt /
+ENV PYTHONPATH /apprise
+ENV PYTHONPYCACHEPREFIX /apprise/__pycache__/py39
 
-# Absolute path this script is in, thus /home/user/bin
-SCRIPTPATH=$(dirname "$SCRIPT")
+RUN pip install --no-cache-dir -r /requirements.txt -r /dev-requirements.txt
 
-PYTHONPATH=""
+RUN addgroup --gid ${USER_GID:-1000} apprise
+RUN adduser --system --uid ${USER_UID:-1000} --ingroup apprise --home /apprise --no-create-home --disabled-password apprise
 
-if [ -f "$(dirname $SCRIPTPATH)/setup.cfg" ]; then
-   PYTHONPATH="$(dirname $SCRIPTPATH)"
-
-elif [ -f "$SCRIPTPATH/setup.cfg" ]; then
-   PYTHONPATH="$SCRIPTPATH"
-
-else
-   echo "Error: Could not locate apprise setup.cfg file."
-   exit 1
-fi
-
-if [ ! -x $PYTEST ]; then
-   echo "Error: $PYTEST was not found; make sure it is installed: 'pip3 install pytest'"
-   exit 1
-fi
-
-pushd $PYTHONPATH &>/dev/null
-if [ ! -z "$@" ]; then
-   LANG=C.UTF-8 PYTHONPATH=$PYTHONPATH $PYTEST -k "$@"
-   exit $?
-
-else
-   LANG=C.UTF-8 PYTHONPATH=$PYTHONPATH $PYTEST
-   exit $?
-fi
+USER apprise

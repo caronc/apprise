@@ -86,15 +86,21 @@ def test_attach_http_query_string_dictionary():
 
     """
 
-    # no qsd specified
-    results = AttachHTTP.parse_url('http://localhost')
+    # Set verify off
+    results = AttachHTTP.parse_url('http://localhost?verify=no&rto=9&cto=8')
     assert isinstance(results, dict)
 
     # Create our object
     obj = AttachHTTP(**results)
     assert isinstance(obj, AttachHTTP)
 
-    assert re.search(r'[?&]verify=yes', obj.url())
+    # verify is disabled and therefore set
+    assert re.search(r'[?&]verify=no', obj.url())
+
+    # Our connect timeout flag is set since it differs from the default
+    assert re.search(r'[?&]cto=8', obj.url())
+    # Our read timeout flag is set since it differs from the default
+    assert re.search(r'[?&]rto=9', obj.url())
 
     # Now lets create a URL with a custom Query String entry
 
@@ -106,7 +112,8 @@ def test_attach_http_query_string_dictionary():
     obj = AttachHTTP(**results)
     assert isinstance(obj, AttachHTTP)
 
-    assert re.search(r'[?&]verify=yes', obj.url())
+    # verify is not in the URL as it is implied (default)
+    assert not re.search(r'[?&]verify=yes', obj.url())
 
     # But now test that our custom arguments have also been set
     assert re.search(r'[?&]dl=1', obj.url())

@@ -413,6 +413,19 @@ class NotifyBulkSMS(NotifyBase):
                  for x in self.groups])),
             params=NotifyBulkSMS.urlencode(params))
 
+    @property
+    def url_identifier(self):
+        """
+        Returns all of the identifiers that make this URL unique from
+        another simliar one. Targets or end points should never be identified
+        here.
+        """
+        return (
+            self.secure_protocol,
+            self.user if self.user else None,
+            self.password if self.password else None,
+        )
+
     def __len__(self):
         """
         Returns the number of targets associated with this notification

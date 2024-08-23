@@ -27,26 +27,27 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import click
+import textwrap
 import logging
 import platform
 import sys
 import os
+import shutil
 import re
 
 from os.path import isfile
 from os.path import exists
-from os.path import expanduser
-from os.path import expandvars
 
-from . import NotifyType
-from . import NotifyFormat
 from . import Apprise
 from . import AppriseAsset
 from . import AppriseConfig
+from . import PersistentStore
 
-from .utils import parse_list
+from .utils import dir_size, bytes_to_str, parse_list, path_decode
 from .common import NOTIFY_TYPES
 from .common import NOTIFY_FORMATS
+from .common import PERSISTENT_STORE_MODES
+from .common import PersistentStoreState
 from .common import ContentLocation
 from .logger import logger
 
@@ -104,67 +105,94 @@ DEFAULT_PLUGIN_PATHS = (
     '/var/lib/apprise/plugins',
 )
 
+#
+# Persistent Storage
+#
+DEFAULT_STORAGE_PATH = '~/.local/share/apprise/cache'
+
 # Detect Windows
 if platform.system() == 'Windows':
     # Default Config Search Path for Windows Users
     DEFAULT_CONFIG_PATHS = (
-        expandvars('%APPDATA%\\Apprise\\apprise'),
-        expandvars('%APPDATA%\\Apprise\\apprise.conf'),
-        expandvars('%APPDATA%\\Apprise\\apprise.yml'),
-        expandvars('%APPDATA%\\Apprise\\apprise.yaml'),
-        expandvars('%LOCALAPPDATA%\\Apprise\\apprise'),
-        expandvars('%LOCALAPPDATA%\\Apprise\\apprise.conf'),
-        expandvars('%LOCALAPPDATA%\\Apprise\\apprise.yml'),
-        expandvars('%LOCALAPPDATA%\\Apprise\\apprise.yaml'),
+        '%APPDATA%\\Apprise\\apprise',
+        '%APPDATA%\\Apprise\\apprise.conf',
+        '%APPDATA%\\Apprise\\apprise.yml',
+        '%APPDATA%\\Apprise\\apprise.yaml',
+        '%LOCALAPPDATA%\\Apprise\\apprise',
+        '%LOCALAPPDATA%\\Apprise\\apprise.conf',
+        '%LOCALAPPDATA%\\Apprise\\apprise.yml',
+        '%LOCALAPPDATA%\\Apprise\\apprise.yaml',
 
         #
         # Global Support
         #
 
         # C:\ProgramData\Apprise
-        expandvars('%ALLUSERSPROFILE%\\Apprise\\apprise'),
-        expandvars('%ALLUSERSPROFILE%\\Apprise\\apprise.conf'),
-        expandvars('%ALLUSERSPROFILE%\\Apprise\\apprise.yml'),
-        expandvars('%ALLUSERSPROFILE%\\Apprise\\apprise.yaml'),
+        '%ALLUSERSPROFILE%\\Apprise\\apprise',
+        '%ALLUSERSPROFILE%\\Apprise\\apprise.conf',
+        '%ALLUSERSPROFILE%\\Apprise\\apprise.yml',
+        '%ALLUSERSPROFILE%\\Apprise\\apprise.yaml',
 
         # C:\Program Files\Apprise
-        expandvars('%PROGRAMFILES%\\Apprise\\apprise'),
-        expandvars('%PROGRAMFILES%\\Apprise\\apprise.conf'),
-        expandvars('%PROGRAMFILES%\\Apprise\\apprise.yml'),
-        expandvars('%PROGRAMFILES%\\Apprise\\apprise.yaml'),
+        '%PROGRAMFILES%\\Apprise\\apprise',
+        '%PROGRAMFILES%\\Apprise\\apprise.conf',
+        '%PROGRAMFILES%\\Apprise\\apprise.yml',
+        '%PROGRAMFILES%\\Apprise\\apprise.yaml',
 
         # C:\Program Files\Common Files
-        expandvars('%COMMONPROGRAMFILES%\\Apprise\\apprise'),
-        expandvars('%COMMONPROGRAMFILES%\\Apprise\\apprise.conf'),
-        expandvars('%COMMONPROGRAMFILES%\\Apprise\\apprise.yml'),
-        expandvars('%COMMONPROGRAMFILES%\\Apprise\\apprise.yaml'),
+        '%COMMONPROGRAMFILES%\\Apprise\\apprise',
+        '%COMMONPROGRAMFILES%\\Apprise\\apprise.conf',
+        '%COMMONPROGRAMFILES%\\Apprise\\apprise.yml',
+        '%COMMONPROGRAMFILES%\\Apprise\\apprise.yaml',
     )
 
     # Default Plugin Search Path for Windows Users
     DEFAULT_PLUGIN_PATHS = (
-        expandvars('%APPDATA%\\Apprise\\plugins'),
-        expandvars('%LOCALAPPDATA%\\Apprise\\plugins'),
+        '%APPDATA%\\Apprise\\plugins',
+        '%LOCALAPPDATA%\\Apprise\\plugins',
 
         #
         # Global Support
         #
 
         # C:\ProgramData\Apprise\plugins
-        expandvars('%ALLUSERSPROFILE%\\Apprise\\plugins'),
+        '%ALLUSERSPROFILE%\\Apprise\\plugins',
         # C:\Program Files\Apprise\plugins
-        expandvars('%PROGRAMFILES%\\Apprise\\plugins'),
+        '%PROGRAMFILES%\\Apprise\\plugins',
         # C:\Program Files\Common Files
-        expandvars('%COMMONPROGRAMFILES%\\Apprise\\plugins'),
+        '%COMMONPROGRAMFILES%\\Apprise\\plugins',
     )
 
+    #
+    # Persistent Storage
+    #
+    DEFAULT_STORAGE_PATH = '%APPDATA%/Apprise/cache'
 
-def print_help_msg(command):
-    """
-    Prints help message when -h or --help is specified.
 
+class PersistentStorageMode:
     """
-    with click.Context(command) as ctx:
-        click.echo(command.get_help(ctx))
+    Persistent Storage Modes
+    """
+    # List all detected configuration loaded
+    LIST = 'list'
+
+    # Prune persistent storage based on age
+    PRUNE = 'prune'
+
+    # Reset all (reguardless of age)
+    CLEAR = 'clear'
+
+
+# Define the types in a list for validation purposes
+PERSISTENT_STORAGE_MODES = (
+    PersistentStorageMode.LIST,
+    PersistentStorageMode.PRUNE,
+    PersistentStorageMode.CLEAR,
+)
+
+if os.environ.get('APPRISE_STORAGE', '').strip():
+    # Over-ride Default Storage Path
+    DEFAULT_STORAGE_PATH = os.environ.get('APPRISE_STORAGE')
 
 
 def print_version_msg():
@@ -180,7 +208,106 @@ def print_version_msg():
     click.echo('\n'.join(result))
 
 
-@click.command(context_settings=CONTEXT_SETTINGS)
+class CustomHelpCommand(click.Command):
+    def format_help(self, ctx, formatter):
+        # Custom help message
+        content = (
+            'Send a notification to all of the specified servers '
+            'identified by their URLs',
+            'the content provided within the title, body and '
+            'notification-type.',
+            '',
+            'For a list of all of the supported services and information on '
+            'how to use ',
+            'them, check out at https://github.com/caronc/apprise')
+
+        for line in content:
+            formatter.write_text(line)
+
+        # Display options and arguments in the default format
+        self.format_options(ctx, formatter)
+        self.format_epilog(ctx, formatter)
+
+        # Custom 'Actions:' section after the 'Options:'
+        formatter.write_text('')
+        formatter.write_text('Actions:')
+
+        actions = [(
+            'storage', 'Access the persistent storage disk administration',
+            [(
+                'list',
+                'List all URL IDs associated with detected URL(s). '
+                'This is also the default action ran if nothing is provided',
+            ), (
+                'prune',
+                'Eliminates stale entries found based on '
+                '--storage-prune-days (-SPD)',
+            ), (
+                'clean',
+                'Removes any persistent data created by Apprise',
+            )],
+        )]
+
+        #
+        # Some variables
+        #
+
+        # actions are indented this many spaces
+        # sub actions double this value
+        action_indent = 2
+
+        # label padding (for alignment)
+        action_label_width = 10
+
+        space = ' '
+        space_re = re.compile(r'\r*\n')
+        cols = 80
+        indent = 10
+
+        # Format each action and its subactions
+        for action, description, sub_actions in actions:
+            # Our action indent
+            ai = ' ' * action_indent
+            # Format the main action description
+            formatted_description = space_re.split(textwrap.fill(
+                description, width=(cols - indent - action_indent),
+                initial_indent=space * indent,
+                subsequent_indent=space * indent))
+            for no, line in enumerate(formatted_description):
+                if not no:
+                    formatter.write_text(
+                        f'{ai}{action:<{action_label_width}}{line}')
+
+                else:  # pragma: no cover
+                    # Note: no branch is set intentionally since this is not
+                    #       tested since in 2024.08.13 when this was set up
+                    #       it never entered this area of the code.  But we
+                    #       know it works because we repeat this process with
+                    #       our sub-options below
+                    formatter.write_text(
+                        f'{ai}{space:<{action_label_width}}{line}')
+
+            # Format each subaction
+            ai = ' ' * (action_indent * 2)
+            for action, description in sub_actions:
+                formatted_description = space_re.split(textwrap.fill(
+                    description, width=(cols - indent - (action_indent * 3)),
+                    initial_indent=space * (indent - action_indent),
+                    subsequent_indent=space * (indent - action_indent)))
+
+                for no, line in enumerate(formatted_description):
+                    if not no:
+                        formatter.write_text(
+                            f'{ai}{action:<{action_label_width}}{line}')
+                    else:
+                        formatter.write_text(
+                            f'{ai}{space:<{action_label_width}}{line}')
+
+        # Include any epilog or additional text
+        self.format_epilog(ctx, formatter)
+
+
+@click.command(context_settings=CONTEXT_SETTINGS, cls=CustomHelpCommand)
 @click.option('--body', '-b', default=None, type=str,
               help='Specify the message body. If no body is specified then '
               'content is read from <stdin>.')
@@ -190,23 +317,43 @@ def print_version_msg():
 @click.option('--plugin-path', '-P', default=None, type=str, multiple=True,
               metavar='PLUGIN_PATH',
               help='Specify one or more plugin paths to scan.')
+@click.option('--storage-path', '-S', default=DEFAULT_STORAGE_PATH, type=str,
+              metavar='STORAGE_PATH',
+              help='Specify the path to the persistent storage location '
+              '(default={}).'.format(DEFAULT_STORAGE_PATH))
+@click.option('--storage-prune-days', '-SPD', default=30,
+              type=int,
+              help='Define the number of days the storage prune '
+              'should run using. Setting this to zero (0) will eliminate '
+              'all accumulated content. By default this value is 30 (days).')
+@click.option('--storage-uid-length', '-SUL', default=8,
+              type=int,
+              help='Define the number of unique characters to store persistent'
+              'cache in. By default this value is 6 (characters).')
+@click.option('--storage-mode', '-SM', default=PERSISTENT_STORE_MODES[0],
+              type=str, metavar='MODE',
+              help='Persistent disk storage write mode (default={}). '
+              'Possible values are "{}", and "{}".'.format(
+                  PERSISTENT_STORE_MODES[0], '", "'.join(
+                      PERSISTENT_STORE_MODES[:-1]),
+                  PERSISTENT_STORE_MODES[-1]))
 @click.option('--config', '-c', default=None, type=str, multiple=True,
               metavar='CONFIG_URL',
               help='Specify one or more configuration locations.')
 @click.option('--attach', '-a', default=None, type=str, multiple=True,
               metavar='ATTACHMENT_URL',
               help='Specify one or more attachment.')
-@click.option('--notification-type', '-n', default=NotifyType.INFO, type=str,
+@click.option('--notification-type', '-n', default=NOTIFY_TYPES[0], type=str,
               metavar='TYPE',
               help='Specify the message type (default={}). '
               'Possible values are "{}", and "{}".'.format(
-                  NotifyType.INFO, '", "'.join(NOTIFY_TYPES[:-1]),
+                  NOTIFY_TYPES[0], '", "'.join(NOTIFY_TYPES[:-1]),
                   NOTIFY_TYPES[-1]))
-@click.option('--input-format', '-i', default=NotifyFormat.TEXT, type=str,
+@click.option('--input-format', '-i', default=NOTIFY_FORMATS[0], type=str,
               metavar='FORMAT',
               help='Specify the message input format (default={}). '
               'Possible values are "{}", and "{}".'.format(
-                  NotifyFormat.TEXT, '", "'.join(NOTIFY_FORMATS[:-1]),
+                  NOTIFY_FORMATS[0], '", "'.join(NOTIFY_FORMATS[:-1]),
                   NOTIFY_FORMATS[-1]))
 @click.option('--theme', '-T', default='default', type=str, metavar='THEME',
               help='Specify the default theme.')
@@ -241,10 +388,12 @@ def print_version_msg():
               help='Display the apprise version and exit.')
 @click.argument('urls', nargs=-1,
                 metavar='SERVER_URL [SERVER_URL2 [SERVER_URL3]]',)
-def main(body, title, config, attach, urls, notification_type, theme, tag,
+@click.pass_context
+def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
          input_format, dry_run, recursion_depth, verbose, disable_async,
-         details, interpret_escapes, interpret_emojis, plugin_path, debug,
-         version):
+         details, interpret_escapes, interpret_emojis, plugin_path,
+         storage_path, storage_mode, storage_prune_days, storage_uid_length,
+         debug, version):
     """
     Send a notification to all of the specified servers identified by their
     URLs the content provided within the title, body and notification-type.
@@ -253,7 +402,7 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
     use them, check out at https://github.com/caronc/apprise
     """
     # Note: Click ignores the return values of functions it wraps, If you
-    #       want to return a specific error code, you must call sys.exit()
+    #       want to return a specific error code, you must call ctx.exit()
     #       as you will see below.
 
     debug = True if debug else False
@@ -297,7 +446,7 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
 
     if version:
         print_version_msg()
-        sys.exit(0)
+        ctx.exit(0)
 
     # Simple Error Checking
     notification_type = notification_type.strip().lower()
@@ -307,7 +456,7 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
             .format(notification_type))
         # 2 is the same exit code returned by Click if there is a parameter
         # issue.  For consistency, we also return a 2
-        sys.exit(2)
+        ctx.exit(2)
 
     input_format = input_format.strip().lower()
     if input_format not in NOTIFY_FORMATS:
@@ -316,13 +465,31 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
             .format(input_format))
         # 2 is the same exit code returned by Click if there is a parameter
         # issue.  For consistency, we also return a 2
-        sys.exit(2)
+        ctx.exit(2)
+
+    storage_mode = storage_mode.strip().lower()
+    if storage_mode not in PERSISTENT_STORE_MODES:
+        logger.error(
+            'The --storage-mode (-SM) value of {} is not supported.'
+            .format(storage_mode))
+        # 2 is the same exit code returned by Click if there is a parameter
+        # issue.  For consistency, we also return a 2
+        ctx.exit(2)
 
     if not plugin_path:
         # Prepare a default set of plugin path
         plugin_path = \
-            next((path for path in DEFAULT_PLUGIN_PATHS
-                 if exists(expanduser(path))), None)
+            [path for path in DEFAULT_PLUGIN_PATHS
+             if exists(path_decode(path))]
+
+    if storage_uid_length < 2:
+        logger.error(
+            'The --storage-uid-length (-SUL) value can not be lower '
+            'then two (2).')
+
+        # 2 is the same exit code returned by Click if there is a
+        # parameter issue.  For consistency, we also return a 2
+        ctx.exit(2)
 
     # Prepare our asset
     asset = AppriseAsset(
@@ -346,6 +513,15 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
 
         # Load our plugins
         plugin_paths=plugin_path,
+
+        # Load our persistent storage path
+        storage_path=path_decode(storage_path),
+
+        # Our storage URL ID Length
+        storage_idlen=storage_uid_length,
+
+        # Define if we flush to disk as soon as possible or not when required
+        storage_mode=storage_mode
     )
 
     # Create our Apprise object
@@ -429,7 +605,7 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
             # new line padding between entries
             click.echo()
 
-        sys.exit(0)
+        ctx.exit(0)
         # end if details()
 
     # The priorities of what is accepted are parsed in order below:
@@ -439,7 +615,7 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
     #    4. Configuration by environment variable: APPRISE_CONFIG
     #    5. Default Configuration File(s) (if found)
     #
-    if urls:
+    elif urls and not 'storage'.startswith(urls[0]):
         if tag:
             # Ignore any tags specified
             logger.warning(
@@ -483,19 +659,144 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
     else:
         # Load default configuration
         a.add(AppriseConfig(
-            paths=[f for f in DEFAULT_CONFIG_PATHS if isfile(expanduser(f))],
+            paths=[f for f in DEFAULT_CONFIG_PATHS if isfile(path_decode(f))],
             asset=asset, recursion=recursion_depth))
 
     if len(a) == 0 and not urls:
         logger.error(
             'You must specify at least one server URL or populated '
             'configuration file.')
-        print_help_msg(main)
-        sys.exit(1)
+        click.echo(ctx.get_help())
+        ctx.exit(1)
 
     # each --tag entry comprises of a comma separated 'and' list
     # we or each of of the --tag and sets specified.
     tags = None if not tag else [parse_list(t) for t in tag]
+
+    # Determine if we're dealing with URLs or url_ids based on the first
+    # entry provided.
+    if urls and 'storage'.startswith(urls[0]):
+        #
+        # Storage Mode
+        #  - urls are now to be interpreted as best matching namespaces
+        #
+        if storage_prune_days < 0:
+            logger.error(
+                'The --storage-prune-days (-SPD) value can not be lower '
+                'then zero (0).')
+
+            # 2 is the same exit code returned by Click if there is a
+            # parameter issue.  For consistency, we also return a 2
+            ctx.exit(2)
+
+        # Number of columns to assume in the terminal.  In future, maybe this
+        # can be detected and made dynamic. The actual column count is 80, but
+        # 5 characters are already reserved for the counter on the left
+        (columns, _) = shutil.get_terminal_size(fallback=(80, 24))
+
+        filter_uids = urls[1:]
+        action = PERSISTENT_STORAGE_MODES[0]
+        if filter_uids:
+            _action = next(  # pragma: no branch
+                (a for a in PERSISTENT_STORAGE_MODES
+                 if a.startswith(filter_uids[0])), None)
+
+            if _action:
+                # pop top entry
+                filter_uids = filter_uids[1:]
+                action = _action
+
+        # Get our detected URL IDs
+        uids = {}
+        for plugin in (a if not tags else a.find(tag=tags)):
+            _id = plugin.url_id()
+            if not _id:
+                continue
+
+            if filter_uids and next(
+                    (False for n in filter_uids if _id.startswith(n)), True):
+                continue
+
+            if _id not in uids:
+                uids[_id] = {
+                    'plugins': [plugin],
+                    'state': PersistentStoreState.UNUSED,
+                    'size': 0,
+                }
+
+            else:
+                # It's possible to have more then one URL point to the same
+                # location (thus match against the same url id more then once
+                uids[_id]['plugins'].append(plugin)
+
+        if action == PersistentStorageMode.LIST:
+            detected_uid = PersistentStore.disk_scan(
+                # Use our asset path as it has already been properly parsed
+                path=asset.storage_path,
+
+                # Provide filter if specified
+                namespace=filter_uids,
+            )
+            for _id in detected_uid:
+                size, _ = dir_size(os.path.join(asset.storage_path, _id))
+                if _id in uids:
+                    uids[_id]['state'] = PersistentStoreState.ACTIVE
+                    uids[_id]['size'] = size
+
+                elif not tags:
+                    uids[_id] = {
+                        'plugins': [],
+                        # No cross reference (wasted space?)
+                        'state': PersistentStoreState.STALE,
+                        # Acquire disk space
+                        'size': size,
+                    }
+
+            for idx, (uid, meta) in enumerate(uids.items()):
+                fg = "green" \
+                    if meta['state'] == PersistentStoreState.ACTIVE else (
+                        "red"
+                        if meta['state'] == PersistentStoreState.STALE else
+                        "white")
+
+                if idx > 0:
+                    # New line
+                    click.echo()
+                click.echo("{: 4d}. ".format(idx + 1), nl=False)
+                click.echo(click.style("{:<52} {:<8} {}".format(
+                    uid, bytes_to_str(meta['size']), meta['state']),
+                    fg=fg, bold=True))
+
+                for entry in meta['plugins']:
+                    url = entry.url(privacy=True)
+                    click.echo("{:>7} {}".format(
+                        '-',
+                        url if len(url) <= (columns - 8) else '{}...'.format(
+                            url[:columns - 11])))
+
+                    if entry.tags:
+                        click.echo("{:>10}: {}".format(
+                            'tags', ', '.join(entry.tags)))
+
+        else:  # PersistentStorageMode.PRUNE or PersistentStorageMode.CLEAR
+            if action == PersistentStorageMode.CLEAR:
+                storage_prune_days = 0
+
+            # clean up storage
+            results = PersistentStore.disk_prune(
+                # Use our asset path as it has already been properly parsed
+                path=asset.storage_path,
+                # Provide our namespaces if they exist
+                namespace=None if not filter_uids else filter_uids,
+                # Convert expiry from days to seconds
+                expires=storage_prune_days * 60 * 60 * 24,
+                action=not dry_run)
+
+            ctx.exit(0)
+            # end if disk_prune()
+
+        ctx.exit(0)
+        # end if storage()
 
     if not dry_run:
         if body is None:
@@ -508,10 +809,10 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
             body=body, title=title, notify_type=notification_type, tag=tags,
             attach=attach)
     else:
-        # Number of rows to assume in the terminal.  In future, maybe this can
-        # be detected and made dynamic. The actual row count is 80, but 5
-        # characters are already reserved for the counter on the left
-        rows = 75
+        # Number of columns to assume in the terminal.  In future, maybe this
+        # can be detected and made dynamic. The actual column count is 80, but
+        # 5 characters are already reserved for the counter on the left
+        (columns, _) = shutil.get_terminal_size(fallback=(80, 24))
 
         # Initialize our URL response;  This is populated within the for/loop
         # below; but plays a factor at the end when we need to determine if
@@ -520,11 +821,18 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
 
         for idx, server in enumerate(a.find(tag=tags)):
             url = server.url(privacy=True)
-            click.echo("{: 3d}. {}".format(
+            click.echo("{: 4d}. {}".format(
                 idx + 1,
-                url if len(url) <= rows else '{}...'.format(url[:rows - 3])))
+                url if len(url) <= (columns - 8) else '{}...'.format(
+                    url[:columns - 9])))
+
+            # Share our URL ID
+            click.echo("{:>10}: {}".format(
+                'uid', '- n/a -' if not server.url_id()
+                else server.url_id()))
+
             if server.tags:
-                click.echo("{} - {}".format(' ' * 5, ', '.join(server.tags)))
+                click.echo("{:>10}: {}".format('tags', ', '.join(server.tags)))
 
         # Initialize a default response of nothing matched, otherwise
         # if we matched at least one entry, we can return True
@@ -537,11 +845,11 @@ def main(body, title, config, attach, urls, notification_type, theme, tag,
 
         # Exit code 3 is used since Click uses exit code 2 if there is an
         # error with the parameters specified
-        sys.exit(3)
+        ctx.exit(3)
 
     elif result is False:
         # At least 1 notification service failed to send
-        sys.exit(1)
+        ctx.exit(1)
 
     # else:  We're good!
-    sys.exit(0)
+    ctx.exit(0)

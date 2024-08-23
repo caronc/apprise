@@ -37,6 +37,7 @@ from string import ascii_uppercase as str_alpha
 from string import digits as str_num
 
 from apprise import NotifyBase
+from apprise import PersistentStoreMode
 from apprise import NotifyType
 from apprise import Apprise
 from apprise import AppriseAsset
@@ -105,18 +106,18 @@ class AppriseURLTester:
             'meta': meta,
         })
 
-    def run_all(self):
+    def run_all(self, tmpdir=None):
         """
         Run all of our tests
         """
         # iterate over our dictionary and test it out
         for (url, meta) in self.__tests:
-            self.run(url, meta)
+            self.run(url, meta, tmpdir)
 
     @mock.patch('requests.get')
     @mock.patch('requests.post')
     @mock.patch('requests.request')
-    def run(self, url, meta, mock_request, mock_post, mock_get):
+    def run(self, url, meta, tmpdir, mock_request, mock_post, mock_get):
         """
         Run a specific test
         """
@@ -134,16 +135,38 @@ class AppriseURLTester:
         # Our regular expression
         url_matches = meta.get('url_matches')
 
+        # Detect our storage path (used to set persistent storage
+        # mode
+        storage_path = \
+            tmpdir if tmpdir and isinstance(tmpdir, str) and \
+            os.path.isdir(tmpdir) else None
+
+        # Our storage mode to set
+        storage_mode = meta.get(
+            'storage_mode',
+            PersistentStoreMode.MEMORY
+            if not storage_path else PersistentStoreMode.AUTO)
+
+        # Debug Mode
+        pdb = meta.get('pdb', False)
+
         # Whether or not we should include an image with our request; unless
         # otherwise specified, we assume that images are to be included
         include_image = meta.get('include_image', True)
         if include_image:
             # a default asset
-            asset = AppriseAsset()
+            asset = AppriseAsset(
+                storage_mode=storage_mode,
+                storage_path=storage_path,
+            )
 
         else:
             # Disable images
-            asset = AppriseAsset(image_path_mask=False, image_url_mask=False)
+            asset = AppriseAsset(
+                image_path_mask=False, image_url_mask=False,
+                storage_mode=storage_mode,
+                storage_path=storage_path,
+            )
             asset.image_url_logo = None
 
         # Mock our request object
@@ -152,6 +175,12 @@ class AppriseURLTester:
         mock_get.return_value = robj
         mock_post.return_value = robj
         mock_request.return_value = robj
+
+        if pdb:
+            # Makes it easier to debug with this peice of code
+            # just add `pdb': True to the call that is failing
+            import pdb
+            pdb.set_trace()
 
         try:
             # We can now instantiate our object:
@@ -201,6 +230,13 @@ class AppriseURLTester:
             # this url
             assert isinstance(obj.url(), str) is True
 
+            # Test that we support a url identifier
+            url_id = obj.url_id()
+
+            # It can be either disabled or a string; nothing else
+            assert isinstance(url_id, str) or \
+                (url_id is None and obj.url_identifier is False)
+
             # Verify we can acquire a target count as an integer
             assert isinstance(len(obj), int)
 
@@ -230,6 +266,20 @@ class AppriseURLTester:
             # from the one that was already created properly
             obj_cmp = Apprise.instantiate(obj.url())
 
+            # Our new object should produce the same url identifier
+            if obj.url_identifier != obj_cmp.url_identifier:
+                print('Provided %s' % url)
+                raise AssertionError(
+                    "URL Identifier: '{}' != expected '{}'".format(
+                        obj_cmp.url_identifier, obj.url_identifier))
+
+            # Back our check up
+            if obj.url_id() != obj_cmp.url_id():
+                print('Provided %s' % url)
+                raise AssertionError(
+                    "URL ID(): '{}' != expected '{}'".format(
+                        obj_cmp.url_id(), obj.url_id()))
+
             # Our object should be the same instance as what we had
             # originally expected above.
             if not isinstance(obj_cmp, NotifyBase):
@@ -251,6 +301,7 @@ class AppriseURLTester:
 
             # Tidy our object
             del obj_cmp
+            del instance
 
         if _self:
             # Iterate over our expected entries inside of our
@@ -557,7 +608,7 @@ class AppriseURLTester:
                     try:
                         assert obj.notify(
                             body=self.body, title=self.title,
-                            notify_type=NotifyType.INFO) is False
+                            notify_type=notify_type) is False
 
                     except AssertionError:
                         # Don't mess with these entries
@@ -603,7 +654,7 @@ class AppriseURLTester:
                     try:
                         assert obj.notify(
                             body=self.body,
-                            notify_type=NotifyType.INFO) is False
+                            notify_type=notify_type) is False
 
                     except AssertionError:
                         # Don't mess with these entries

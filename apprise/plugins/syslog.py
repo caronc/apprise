@@ -126,6 +126,10 @@ class NotifySyslog(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_syslog'
 
+    # No URL Identifier will be defined for this service as there simply isn't
+    # enough details to uniquely identify one dbus:// from another.
+    url_identifier = False
+
     # Disable throttle rate for Syslog requests since they are normally
     # local anyway
     request_rate_per_sec = 0

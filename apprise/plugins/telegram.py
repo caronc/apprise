@@ -63,6 +63,7 @@ from .base import NotifyBase
 from ..common import NotifyType
 from ..common import NotifyImageSize
 from ..common import NotifyFormat
+from ..common import PersistentStoreMode
 from ..utils import parse_bool
 from ..utils import parse_list
 from ..utils import validate_regex
@@ -163,6 +164,10 @@ class NotifyTelegram(NotifyBase):
 
     # Telegram is limited to sending a maximum of 100 requests per second.
     request_rate_per_sec = 0.001
+
+    # Our default is to no not use persistent storage beyond in-memory
+    # reference
+    storage_mode = PersistentStoreMode.AUTO
 
     # Define object templates
     templates = (
@@ -715,6 +720,7 @@ class NotifyTelegram(NotifyBase):
                     self.logger.info(
                         'Detected Telegram user %s (userid=%d)' % (_user, _id))
                     # Return our detected userid
+                    self.store.set('bot_owner', _id)
                     return _id
 
         self.logger.warning(
@@ -729,7 +735,7 @@ class NotifyTelegram(NotifyBase):
         """
 
         if len(self.targets) == 0 and self.detect_owner:
-            _id = self.detect_bot_owner()
+            _id = self.store.get('bot_owner') or self.detect_bot_owner()
             if _id:
                 # Permanently store our id in our target list for next time
                 self.targets.append((str(_id), self.topic))
@@ -929,6 +935,15 @@ class NotifyTelegram(NotifyBase):
                 'Sent Telegram attachment: {}.'.format(attachment))
 
         return not has_error
+
+    @property
+    def url_identifier(self):
+        """
+        Returns all of the identifiers that make this URL unique from
+        another simliar one. Targets or end points should never be identified
+        here.
+        """
+        return (self.secure_protocol, self.bot_token)
 
     def url(self, privacy=False, *args, **kwargs):
         """

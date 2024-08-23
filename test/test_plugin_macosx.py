@@ -100,6 +100,11 @@ def test_plugin_macosx_general_success(macos_notify_environment):
     # Test url() call
     assert isinstance(obj.url(), str) is True
 
+    # URL Identifier has been disabled as this isn't unique enough
+    # to be mapped to more the 1 end point; verify that None is always
+    # returned
+    assert obj.url_id() is None
+
     # test notifications
     assert obj.notify(title='title', body='body',
                       notify_type=apprise.NotifyType.INFO) is True

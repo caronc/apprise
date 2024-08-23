@@ -25,38 +25,29 @@
 # CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
+import errno
 
-# Base
-FROM rockylinux:9
-ENV container docker
-RUN \
-	rm -f /lib/systemd/system/multi-user.target.wants/*;\
-	rm -f /etc/systemd/system/*.wants/*;\
-	rm -f /lib/systemd/system/local-fs.target.wants/*; \
-	rm -f /lib/systemd/system/sockets.target.wants/*udev*; \
-	rm -f /lib/systemd/system/sockets.target.wants/*initctl*; \
-	rm -f /lib/systemd/system/basic.target.wants/*;\
-	rm -f /lib/systemd/system/anaconda.target.wants/*; \
-   echo "assumeyes=1" >> /etc/yum.conf; \
-   dnf install -y epel-release; \
-   dnf install -y rpm-build rpmlint python3-pip rubygem-ronn \
-                  dnf-plugins-core 'dnf-command(config-manager)' \
-                 'dnf-command(builddep)' sudo rsync rpmdevtools; \
-   dnf config-manager --set-enabled crb;
 
-COPY packaging/redhat/python-apprise.spec /
-# Place our build file into the path
-COPY bin/build-rpm.sh /usr/bin
-RUN rpmspec -q --buildrequires /python-apprise.spec | cut -f1 -d' ' | \
-    xargs dnf install -y
+class AppriseException(Exception):
+    """
+    Base Apprise Exception Class
+    """
+    def __init__(self, message, error_code=0):
+        super().__init__(message)
+        self.error_code = error_code
 
-# RPM Build Structure Setup
-ENV FLAVOR=rpmbuild OS=centos DIST=el8
-RUN useradd builder -u 1000 -m -G users,wheel &>/dev/null && \
-    echo "builder ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-VOLUME ["/apprise"]
-WORKDIR /apprise
+class AppriseDiskIOError(AppriseException):
+    """
+    Thrown when an disk i/o error occurs
+    """
+    def __init__(self, message, error_code=errno.EIO):
+        super().__init__(message, error_code=error_code)
 
-# RPMs should never be built as root
-USER builder
+
+class AppriseFileNotFound(AppriseDiskIOError, FileNotFoundError):
+    """
+    Thrown when a persistent write occured in MEMORY mode
+    """
+    def __init__(self, message):
+        super().__init__(message, error_code=errno.ENOENT)

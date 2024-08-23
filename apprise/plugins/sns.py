@@ -573,6 +573,18 @@ class NotifySNS(NotifyBase):
 
         return response
 
+    @property
+    def url_identifier(self):
+        """
+        Returns all of the identifiers that make this URL unique from
+        another simliar one. Targets or end points should never be identified
+        here.
+        """
+        return (
+            self.secure_protocol, self.aws_access_key_id,
+            self.aws_secret_access_key, self.aws_region_name,
+        )
+
     def url(self, privacy=False, *args, **kwargs):
         """
         Returns the URL built dynamically based on specified arguments.

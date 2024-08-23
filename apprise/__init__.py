@@ -48,16 +48,20 @@ from .common import ContentIncludeMode
 from .common import CONTENT_INCLUDE_MODES
 from .common import ContentLocation
 from .common import CONTENT_LOCATIONS
+from .common import PersistentStoreMode
+from .common import PERSISTENT_STORE_MODES
 
 from .url import URLBase
 from .url import PrivacyMode
 from .plugins.base import NotifyBase
 from .config.base import ConfigBase
 from .attachment.base import AttachBase
+from . import exception
 
 from .apprise import Apprise
 from .locale import AppriseLocale
 from .asset import AppriseAsset
+from .persistent_store import PersistentStore
 from .apprise_config import AppriseConfig
 from .apprise_attachment import AppriseAttachment
 from .manager_attachment import AttachmentManager
@@ -77,6 +81,10 @@ __all__ = [
     # Core
     'Apprise', 'AppriseAsset', 'AppriseConfig', 'AppriseAttachment', 'URLBase',
     'NotifyBase', 'ConfigBase', 'AttachBase', 'AppriseLocale',
+    'PersistentStore',
+
+    # Exceptions
+    'exception',
 
     # Reference
     'NotifyType', 'NotifyImageSize', 'NotifyFormat', 'OverflowMode',
@@ -84,6 +92,7 @@ __all__ = [
     'ConfigFormat', 'CONFIG_FORMATS',
     'ContentIncludeMode', 'CONTENT_INCLUDE_MODES',
     'ContentLocation', 'CONTENT_LOCATIONS',
+    'PersistentStoreMode', 'PERSISTENT_STORE_MODES',
     'PrivacyMode',
 
     # Managers

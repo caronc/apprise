@@ -137,6 +137,9 @@ def test_plugin_rsyslog_by_url(mock_getpid, mock_socket):
     assert obj.url().startswith('rsyslog://localhost:9000/daemon') is True
     assert re.search(r'logpid=no', obj.url()) is not None
 
+    # Verify our URL ID is generated
+    assert isinstance(obj.url_id(), str)
+
     # Test notifications
     # + 1 byte in size due to user
     # + length of pid returned

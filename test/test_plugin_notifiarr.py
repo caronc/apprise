@@ -85,7 +85,19 @@ apprise_url_tests = (
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'notifiarr://a...y/#123/#432',
     }),
+    ('notifiarr://apikey/?to=123,432&event=1234', {
+        # Test event
+        'instance': NotifyNotifiarr,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'notifiarr://a...y/#123/#432',
+    }),
     ('notifiarr://123/?apikey=myapikey', {
+        'instance': NotifyNotifiarr,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'notifiarr://m...y/#123',
+    }),
+    ('notifiarr://123/?key=myapikey', {
+        # Support key=
         'instance': NotifyNotifiarr,
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'notifiarr://m...y/#123',
