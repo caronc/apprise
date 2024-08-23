@@ -604,6 +604,9 @@ apprise storage list --tag=team
 apprise storage list f 0
 ```
 
+For more information on persistent storage, [visit here](https://github.com/caronc/apprise/wiki/persistent_storage).
+
+
 ## API Persistent Storage Commands
 By default, no persistent storage is set to be in `MEMORY` mode for those building from within the Apprise API.
 It's at the developers discretion to enable it. But should you choose to do so, it's as easy as including the information in the `AppriseAsset()` object prior to the initialization of your `Apprise()` instance.
@@ -644,6 +647,8 @@ asset = AppriseAsset(
 aobj = Apprise(asset=asset)
 ```
 
+For more information on persistent storage, [visit here](https://github.com/caronc/apprise/wiki/persistent_storage).
+
 # Want To Learn More?
 
 If you're interested in reading more about this and other methods on how to customize your own notifications, please check out the following links:
@@ -652,6 +657,7 @@ If you're interested in reading more about this and other methods on how to cust
 * 🔧 [Troubleshooting](https://github.com/caronc/apprise/wiki/Troubleshooting)
 * ⚙️ [Configuration File Help](https://github.com/caronc/apprise/wiki/config)
 * ⚡ [Create Your Own Custom Notifications](https://github.com/caronc/apprise/wiki/decorator_notify)
+* 💾 [Persistent Storage](https://github.com/caronc/apprise/wiki/persistent_storage)
 * 🌎 [Apprise API/Web Interface](https://github.com/caronc/apprise-api)
 * 🎉 [Showcase](https://github.com/caronc/apprise/wiki/showcase)
 
