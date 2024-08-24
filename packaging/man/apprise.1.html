@@ -198,6 +198,11 @@ accept them).</li>
 
 <h2 id="PERSISTENT-STORAGE">PERSISTENT STORAGE</h2>
 
+<p>Persistent storage by default writes to the following location unless the environment variable <code>APPRISE_STORAGE_PATH</code> over-rides it and/or <code>--storage-path</code> (<code>-SP</code>) is specified to over-ride it:</p>
+
+<pre><code>~/.local/share/apprise/cache
+</code></pre>
+
 <p>To utilize the <a href="https://github.com/caronc/apprise/wiki/persistent_storage">persistent storage</a> element associated with Apprise, simply
 specify the keyword <strong>storage</strong></p>
 

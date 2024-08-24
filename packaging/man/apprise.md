@@ -117,6 +117,10 @@ The Apprise options are as follows:
 
 ## PERSISTENT STORAGE
 
+Persistent storage by default writes to the following location unless the environment variable `APPRISE_STORAGE_PATH` over-rides it and/or `--storage-path` (`-SP`) is specified to over-ride it:
+
+    ~/.local/share/apprise/cache
+
 To utilize the [persistent storage][pstorage] element associated with Apprise, simply
 specify the keyword **storage**
 

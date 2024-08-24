@@ -74,6 +74,13 @@ return characters prior to the delivery of the notification\.
 .P
 \fB\-h\fR, \fB\-\-help\fR: Show this message and exit\.
 .SH "PERSISTENT STORAGE"
+Persistent storage by default writes to the following location unless the environment variable \fBAPPRISE_STORAGE_PATH\fR over\-rides it and/or \fB\-\-storage\-path\fR (\fB\-SP\fR) is specified to over\-ride it:
+.IP "" 4
+.nf
+~/\.local/share/apprise/cache
+.fi
+.IP "" 0
+.P
 To utilize the persistent storage \fIhttps://github\.com/caronc/apprise/wiki/persistent_storage\fR element associated with Apprise, simply specify the keyword \fBstorage\fR
 .IP "" 4
 .nf
