@@ -58,6 +58,9 @@ class CustomNotifyPlugin(NotifyBase):
     # Support Attachments
     attachment_support = True
 
+    # Allow persistent storage support
+    storage_mode = common.PersistentStoreMode.AUTO
+
     # Define object templates
     templates = (
         '{schema}://',

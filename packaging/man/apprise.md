@@ -4,6 +4,7 @@ apprise(1) -- Push Notifications that work with just about every platform!
 ## SYNOPSIS
 
 `apprise` [<options>...] <service-url>...<br>
+`apprise` storage [<options>...] [<action>] <url-id>...<br>
 
 ## DESCRIPTION
 
@@ -15,16 +16,18 @@ Telegram, Pushbullet, Slack, Twitter, etc.
   * A common and intuitive notification syntax.
   * Supports the handling of images (to the notification services that will
     accept them).
+  * It's incredibly lightweight.
+  * Amazing response times because all messages sent asynchronously.
 
 ## OPTIONS
 
 The Apprise options are as follows:
 
-  `-b`, `--body=`<TEXT>:
+  `-b`, `--body=`<VALUE>:
   Specify the message body. If no body is specified then content is read from
   <stdin>.
 
-  `-t`, `--title=`<TEXT>:
+  `-t`, `--title=`<VALUE>:
   Specify the message title. This field is complete optional.
 
   `-c`, `--config=`<CONFIG-URL>:
@@ -33,7 +36,7 @@ The Apprise options are as follows:
   `-a`, `--attach=`<ATTACH-URL>:
   Specify one or more file attachment locations.
 
-  `-P`, `--plugin-path=`<PLUGIN-PATH>:
+  `-P`, `--plugin-path=`<PATH>:
   Specify a path to scan for custom notification plugin support.
   You can create your own notification by simply creating a Python file
   that contains the `@notify("schema")` decorator.
@@ -41,18 +44,18 @@ The Apprise options are as follows:
   You can optioanly chose to specify more then one **--plugin-path** (**-P**)
   to increase the modules included.
 
-  `-n`, `--notification-type=`<TYPE>:
+  `-n`, `--notification-type=`<VALUE>:
   Specify the message type (default=info). Possible values are "info",
   "success", "failure", and "warning".
 
-  `-i`, `--input-format=`<FORMAT>:
+  `-i`, `--input-format=`<VALUE>:
   Specify the input message format (default=text). Possible values are "text",
   "html", and "markdown".
 
-  `-T`, `--theme=`THEME:
+  `-T`, `--theme=`<VALUE>:
   Specify the default theme.
 
-  `-g`, `--tag=`TAG:
+  `-g`, `--tag=`<VALUE>:
   Specify one or more tags to filter which services to notify. Use multiple
   **--tag** (**-g**) entries to `OR` the tags together and comma separated
   to `AND` them. If no tags are specified then all services are notified.
@@ -61,7 +64,7 @@ The Apprise options are as follows:
   Send notifications synchronously (one after the other) instead of
   all at once.
 
-  `-R`, `--recursion-depth`:
+  `-R`, `--recursion-depth`<INTEGER>:
   he number of recursive import entries that can be loaded from within
   Apprise configuration. By default this is set to 1. If this is set to
   zero, then import statements found in any configuration is ignored.
@@ -74,6 +77,22 @@ The Apprise options are as follows:
   Enable interpretation of emoji strings. For example, this would convert
   sequences such as :smile: or :grin: to their respected unicode emoji
   character.
+
+  `-S`, `--storage-path=`<PATH>:
+  Specify the path to the persistent storage caching location
+
+  `-SM`, `--storage-mode=`<MODE>:
+  Specify the persistent storage operational mode. Possible values are "auto",
+  "flush", and "memory". The default is "auto" not not specified.
+
+  `-SPD`, `--storage-prune-days=`<INTEGER>:
+  Define the number of days the storage prune should run using.
+  Setting this to zero (0) will eliminate all accumulated content. By
+  default this value is 30 (days).
+
+  `-SUL`, `--storage-uid-length=`<INTEGER>:
+  Define the number of unique characters to store persistent cache in.
+  By default this value is 8 (characters).
 
   `-d`, `--dry-run`:
   Perform a trial run but only prints the notification services to-be
@@ -95,6 +114,32 @@ The Apprise options are as follows:
 
   `-h`, `--help`:
   Show this message and exit.
+
+## PERSISTENT STORAGE
+
+Persistent storage by default writes to the following location unless the environment variable `APPRISE_STORAGE_PATH` over-rides it and/or `--storage-path` (`-SP`) is specified to over-ride it:
+
+    ~/.local/share/apprise/cache
+
+To utilize the [persistent storage][pstorage] element associated with Apprise, simply
+specify the keyword **storage**
+
+    $ apprise storage
+
+The **storage** action has the following sub actions:
+
+  `list`:
+  List all of the detected persistent storage elements and their state
+  (**stale**, **active**, or **unused**).  This is the default action if
+  nothing further is identified.
+
+  `prune`:
+  Removes all persistent storage that has not been referenced for more then 30
+  days. You can optionally set the `--storage-prune-days` to alter this
+  default value.
+
+  `clean`:
+  Removes all persistent storage reguardless of age.
 
 ## EXIT STATUS
 
@@ -147,6 +192,18 @@ Include an attachment:
     $ apprise -vv -t "School Assignment" -b "See attached" \
        --attach=Documents/FinalReport.docx
 
+List all of the notifications loaded:
+
+    $ apprise --dry-run --tag=all
+
+List all of the details around the current persistent storage setup:
+
+    $ apprise storage list
+
+Prune all persistent storage that has not been referenced for at least 10 days or more
+
+    $ apprise storage prune --storage-prune-days=10
+
 ## CUSTOM PLUGIN/NOTIFICATIONS
 Apprise can additionally allow you to define your own custom **schema://**
 entries that you can trigger on and call services you've defined.
@@ -166,11 +223,11 @@ it:
     # references:
     @notify(on="foobar", name="My Custom Notification")
     def my_wrapper(body, title, notify_type, *args, **kwargs):
-    
-         <define your custom code here>
-   
-    		# Returning True/False is a way to relay your status back to Apprise.
-    		# Returning nothing (None by default) is always interpreted as a Success
+
+         print("Define your custom code here")
+
+         # Returning True/False will relay your status back through Apprise
+         # Returning nothing (None by default) is always interpreted as True
          return True
 
 ## CONFIGURATION
@@ -215,17 +272,24 @@ tool simplifies to:
 If you leveraged [tagging][tagging], you can define all of Apprise Service URLs in your
 configuration that you want and only specifically notify a subset of them:
 
-    $ apprise -vv -t "Will Be Late" -b "Go ahead and make dinner without me" \
-              --tag=family
+    $ apprise -vv --title "Will Be Late Getting Home" \
+        --body "Please go ahead and make dinner without me." \
+        --tag=family
 
 [yamlconfig]: https://github.com/caronc/apprise/wiki/config_yaml
+[textconfig]: https://github.com/caronc/apprise/wiki/config_text
 [tagging]: https://github.com/caronc/apprise/wiki/CLI_Usage#label-leverage-tagging
-
+[pstorage]: https://github.com/caronc/apprise/wiki/persistent_storage
 
 ## BUGS
 
 If you find any bugs, please make them known at:
 <https://github.com/caronc/apprise/issues>
+
+## DONATIONS
+If you found Apprise useful at all, [please consider donating][donations]!
+
+[donations]: https://github.com/caronc/apprise/wiki/persistent_storage
 
 ## COPYRIGHT
 

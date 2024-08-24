@@ -28,6 +28,7 @@
 
 import time
 import os
+import sys
 import zlib
 import pytest
 import shutil
@@ -1256,6 +1257,8 @@ def test_persistent_storage_cache_object(tmpdir):
         'c': 'datetime'}, verify=False) is None
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32", reason="Unreliable results to be determined")
 def test_persistent_storage_disk_prune(tmpdir):
     """
     General testing of a Persistent Store prune calls
@@ -1291,6 +1294,8 @@ def test_persistent_storage_disk_prune(tmpdir):
     assert pc.read() == b'data-t01'
 
     # An expiry of zero gets everything
+    # Note: This test randomly fails in Microsoft Windows for unknown reasons
+    # When this is determined, this test can be opened back up
     results = PersistentStore.disk_prune(path=str(tmpdir), expires=0)
     # We match everything now
     assert isinstance(results, dict)

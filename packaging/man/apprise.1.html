@@ -57,12 +57,14 @@
     <a href="#SYNOPSIS">SYNOPSIS</a>
     <a href="#DESCRIPTION">DESCRIPTION</a>
     <a href="#OPTIONS">OPTIONS</a>
+    <a href="#PERSISTENT-STORAGE">PERSISTENT STORAGE</a>
     <a href="#EXIT-STATUS">EXIT STATUS</a>
     <a href="#SERVICE-URLS">SERVICE URLS</a>
     <a href="#EXAMPLES">EXAMPLES</a>
     <a href="#CUSTOM-PLUGIN-NOTIFICATIONS">CUSTOM PLUGIN/NOTIFICATIONS</a>
     <a href="#CONFIGURATION">CONFIGURATION</a>
     <a href="#BUGS">BUGS</a>
+    <a href="#DONATIONS">DONATIONS</a>
     <a href="#COPYRIGHT">COPYRIGHT</a>
   </div>
 
@@ -80,7 +82,8 @@
 </p>
 <h2 id="SYNOPSIS">SYNOPSIS</h2>
 
-<p><code>apprise</code> [<var>options</var>...] <var>service-url</var>...<br></p>
+<p><code>apprise</code> [<var>options</var>...] <var>service-url</var>...<br>
+<code>apprise</code> storage [<var>options</var>...] [<var>action</var>] <var>url-id</var>...<br></p>
 
 <h2 id="DESCRIPTION">DESCRIPTION</h2>
 
@@ -93,17 +96,19 @@ Telegram, Pushbullet, Slack, Twitter, etc.</p>
   <li>A common and intuitive notification syntax.</li>
   <li>Supports the handling of images (to the notification services that will
 accept them).</li>
+  <li>It's incredibly lightweight.</li>
+  <li>Amazing response times because all messages sent asynchronously.</li>
 </ul>
 
 <h2 id="OPTIONS">OPTIONS</h2>
 
 <p>The Apprise options are as follows:</p>
 
-<p><code>-b</code>, <code>--body=</code><var>TEXT</var>:
+<p><code>-b</code>, <code>--body=</code><var>VALUE</var>:
   Specify the message body. If no body is specified then content is read from
   <var>stdin</var>.</p>
 
-<p><code>-t</code>, <code>--title=</code><var>TEXT</var>:
+<p><code>-t</code>, <code>--title=</code><var>VALUE</var>:
   Specify the message title. This field is complete optional.</p>
 
 <p><code>-c</code>, <code>--config=</code><var>CONFIG-URL</var>:
@@ -112,7 +117,7 @@ accept them).</li>
 <p><code>-a</code>, <code>--attach=</code><var>ATTACH-URL</var>:
   Specify one or more file attachment locations.</p>
 
-<p><code>-P</code>, <code>--plugin-path=</code><var>PLUGIN-PATH</var>:
+<p><code>-P</code>, <code>--plugin-path=</code><var>PATH</var>:
   Specify a path to scan for custom notification plugin support.
   You can create your own notification by simply creating a Python file
   that contains the <code>@notify("schema")</code> decorator.</p>
@@ -120,18 +125,18 @@ accept them).</li>
 <p>You can optioanly chose to specify more then one <strong>--plugin-path</strong> (<strong>-P</strong>)
   to increase the modules included.</p>
 
-<p><code>-n</code>, <code>--notification-type=</code><var>TYPE</var>:
+<p><code>-n</code>, <code>--notification-type=</code><var>VALUE</var>:
   Specify the message type (default=info). Possible values are "info",
   "success", "failure", and "warning".</p>
 
-<p><code>-i</code>, <code>--input-format=</code><var>FORMAT</var>:
+<p><code>-i</code>, <code>--input-format=</code><var>VALUE</var>:
   Specify the input message format (default=text). Possible values are "text",
   "html", and "markdown".</p>
 
-<p><code>-T</code>, <code>--theme=</code>THEME:
+<p><code>-T</code>, <code>--theme=</code><var>VALUE</var>:
   Specify the default theme.</p>
 
-<p><code>-g</code>, <code>--tag=</code>TAG:
+<p><code>-g</code>, <code>--tag=</code><var>VALUE</var>:
   Specify one or more tags to filter which services to notify. Use multiple
   <strong>--tag</strong> (<strong>-g</strong>) entries to <code>OR</code> the tags together and comma separated
   to <code>AND</code> them. If no tags are specified then all services are notified.</p>
@@ -140,7 +145,7 @@ accept them).</li>
   Send notifications synchronously (one after the other) instead of
   all at once.</p>
 
-<p><code>-R</code>, <code>--recursion-depth</code>:
+<p><code>-R</code>, <code>--recursion-depth</code><var>INTEGER</var>:
   he number of recursive import entries that can be loaded from within
   Apprise configuration. By default this is set to 1. If this is set to
   zero, then import statements found in any configuration is ignored.</p>
@@ -153,6 +158,22 @@ accept them).</li>
   Enable interpretation of emoji strings. For example, this would convert
   sequences such as :smile: or :grin: to their respected unicode emoji
   character.</p>
+
+<p><code>-S</code>, <code>--storage-path=</code><var>PATH</var>:
+  Specify the path to the persistent storage caching location</p>
+
+<p><code>-SM</code>, <code>--storage-mode=</code><var>MODE</var>:
+  Specify the persistent storage operational mode. Possible values are "auto",
+  "flush", and "memory". The default is "auto" not not specified.</p>
+
+<p><code>-SPD</code>, <code>--storage-prune-days=</code><var>INTEGER</var>:
+  Define the number of days the storage prune should run using.
+  Setting this to zero (0) will eliminate all accumulated content. By
+  default this value is 30 (days).</p>
+
+<p><code>-SUL</code>, <code>--storage-uid-length=</code><var>INTEGER</var>:
+  Define the number of unique characters to store persistent cache in.
+  By default this value is 8 (characters).</p>
 
 <p><code>-d</code>, <code>--dry-run</code>:
   Perform a trial run but only prints the notification services to-be
@@ -174,6 +195,34 @@ accept them).</li>
 
 <p><code>-h</code>, <code>--help</code>:
   Show this message and exit.</p>
+
+<h2 id="PERSISTENT-STORAGE">PERSISTENT STORAGE</h2>
+
+<p>Persistent storage by default writes to the following location unless the environment variable <code>APPRISE_STORAGE_PATH</code> over-rides it and/or <code>--storage-path</code> (<code>-SP</code>) is specified to over-ride it:</p>
+
+<pre><code>~/.local/share/apprise/cache
+</code></pre>
+
+<p>To utilize the <a href="https://github.com/caronc/apprise/wiki/persistent_storage">persistent storage</a> element associated with Apprise, simply
+specify the keyword <strong>storage</strong></p>
+
+<pre><code>$ apprise storage
+</code></pre>
+
+<p>The <strong>storage</strong> action has the following sub actions:</p>
+
+<p><code>list</code>:
+  List all of the detected persistent storage elements and their state
+  (<strong>stale</strong>, <strong>active</strong>, or <strong>unused</strong>).  This is the default action if
+  nothing further is identified.</p>
+
+<p><code>prune</code>:
+  Removes all persistent storage that has not been referenced for more then 30
+  days. You can optionally set the <code>--storage-prune-days</code> to alter this
+  default value.</p>
+
+<p><code>clean</code>:
+  Removes all persistent storage reguardless of age.</p>
 
 <h2 id="EXIT-STATUS">EXIT STATUS</h2>
 
@@ -235,6 +284,21 @@ notification service URLs and only notify the ones tagged as <em>devops</em>.</p
    --attach=Documents/FinalReport.docx
 </code></pre>
 
+<p>List all of the notifications loaded:</p>
+
+<pre><code>$ apprise --dry-run --tag=all
+</code></pre>
+
+<p>List all of the details around the current persistent storage setup:</p>
+
+<pre><code>$ apprise storage list
+</code></pre>
+
+<p>Prune all persistent storage that has not been referenced for at least 10 days or more</p>
+
+<pre><code>$ apprise storage prune --storage-prune-days=10
+</code></pre>
+
 <h2 id="CUSTOM-PLUGIN-NOTIFICATIONS">CUSTOM PLUGIN/NOTIFICATIONS</h2>
 <p>Apprise can additionally allow you to define your own custom <strong>schema://</strong>
 entries that you can trigger on and call services you've defined.</p>
@@ -256,17 +320,17 @@ it:
 @notify(on="foobar", name="My Custom Notification")
 def my_wrapper(body, title, notify_type, *args, **kwargs):
 
-     &lt;define your custom code here&gt;
-   
-		# Returning True/False is a way to relay your status back to Apprise.
-		# Returning nothing (None by default) is always interpreted as a Success
+     print("Define your custom code here")
+
+     # Returning True/False will relay your status back through Apprise
+     # Returning nothing (None by default) is always interpreted as True
      return True
 </code></pre>
 
 <h2 id="CONFIGURATION">CONFIGURATION</h2>
 
 <p>A configuration file can be in the format of either <strong>TEXT</strong> or <strong>YAML</strong> where
-[TEXT][textconfig] is the easiest and most ideal solution for most users.  However
+<a href="https://github.com/caronc/apprise/wiki/config_text">TEXT</a> is the easiest and most ideal solution for most users.  However
 <a href="https://github.com/caronc/apprise/wiki/config_yaml">YAML</a> configuration files grants the user a bit more leverage and access
 to some of the internal features of Apprise. Reguardless of which format you choose,
 both provide the users the ability to leverage <strong>tagging</strong> which adds a more rich and
@@ -307,8 +371,9 @@ tool simplifies to:</p>
 <p>If you leveraged <a href="https://github.com/caronc/apprise/wiki/CLI_Usage#label-leverage-tagging">tagging</a>, you can define all of Apprise Service URLs in your
 configuration that you want and only specifically notify a subset of them:</p>
 
-<pre><code>$ apprise -vv -t "Will Be Late" -b "Go ahead and make dinner without me" \
-          --tag=family
+<pre><code>$ apprise -vv --title "Will Be Late Getting Home" \
+    --body "Please go ahead and make dinner without me." \
+    --tag=family
 </code></pre>
 
 <h2 id="BUGS">BUGS</h2>
@@ -316,13 +381,16 @@ configuration that you want and only specifically notify a subset of them:</p>
 <p>If you find any bugs, please make them known at:
 <a href="https://github.com/caronc/apprise/issues" data-bare-link="true">https://github.com/caronc/apprise/issues</a></p>
 
+<h2 id="DONATIONS">DONATIONS</h2>
+<p>If you found Apprise useful at all, <a href="#DONATIONS" title="DONATIONS" data-bare-link="true">please consider donating</a>!</p>
+
 <h2 id="COPYRIGHT">COPYRIGHT</h2>
 
 <p>Apprise is Copyright (C) 2024 Chris Caron <a href="mailto:lead2gold@gmail.com" data-bare-link="true">lead2gold@gmail.com</a></p>
 
   <ol class='man-decor man-foot man foot'>
     <li class='tl'>Chris Caron &lt;lead2gold@gmail.com&gt;</li>
-    <li class='tc'>July 2024</li>
+    <li class='tc'>August 2024</li>
     <li class='tr'>apprise(1)</li>
   </ol>
 

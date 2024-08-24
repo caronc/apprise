@@ -540,15 +540,17 @@ You can read more about creating your own custom notifications and/or hooks [her
 
 Persistent storage allows Apprise to cache re-occurring actions optionaly to disk. This can greatly reduce the overhead used to send a notification.
 
-There are 3 options Apprise can operate using this:
-1. `AUTO`:  Flush any gathered data for persistent storage on demand.  This option is incredibly light weight.  This is the default behavior for all CLI usage. Content can be manually flushed to disk using this option as well should a developer choose to do so.  The CLI uses this option by default and only writes anything accumulated to disk after all of it's notifications have completed.
-1. `FLUSH`: Flushes any gathered data for persistent storage as often as it is acquired.
-1. `MEMORY`: Only store information in memory, never write to disk.  This is the option one would set if they simply wish to disable Persistent Storage entirely.  By default this is the mode used by the API and is at the developers discretion to enable one of the other options.
+There are 3 Persistent Storage operational states Apprise can operate using:
+1. `auto`:  Flush gathered cache information to the filesystem on demand.  This option is incredibly light weight.  This is the default behavior for all CLI usage.
+   * Developers who choose to use this operational mode can also force cached information manually if they choose.
+   * The CLI will use this operational mode by default.
+1. `flush`: Flushes any cache information to the filesystem during every transaction.
+1. `memory`: Effectively disable Persistent Storage.  Any caching of data required by each plugin used is done in memory.  Apprise effectively operates as it always did before peristent storage was available. This setting ensures no content is every written to disk.
+   * By default this is the mode Apprise will operate under for those developing with it unless they configure it to otherwise operate as `auto` or `flush`.  This is done through the `AppriseAsset()` object and is explained further on in this documentation.
 
 ## CLI Persistent Storage Commands
-Persistent storage is set to `AUTO` mode by default.
 
-Specifying the keyword `storage` will assume that all subseqent calls are related to the storage subsection of Apprise.
+You can provide the keyword `storage` on your CLI call to see the persistent storage options available to you.
 ```bash
 # List all of the occupied space used by Apprise's Persistent Storage:
 apprise storage list
@@ -579,12 +581,12 @@ You can also filter your results by adding tags and/or URL Identifiers.  When yo
    3. abcd123                                             12.00B    stale
 
 ```
-The states are:
+The (persistent storage) cache states are:
  - `unused`: This plugin has not commited anything to disk for reuse/cache purposes
  - `active`: This plugin has written content to disk.  Or at the very least, it has prepared a persistent storage location it can write into.
  - `stale`: The system detected a location where a URL may have possibly written to in the past, but there is nothing linking to it using the URLs provided.  It is likely wasting space or is no longer of any use.
 
-You can use this information to filter your results by specifying _URL ID_ values after your command.  For example:
+You can use this information to filter your results by specifying _URL ID_ (UID) values after your command.  For example:
 ```bash
 # The below commands continue with the example already identified above
 # the following would match abcd123 (even though just ab was provided)
@@ -603,13 +605,14 @@ apprise storage list --tag=team
 # The followin would actually match the URL ID's of 1. and .2 above
 apprise storage list f 0
 ```
+When using the CLI, Persistent storage is set to the operational mode of `auto` by default, you can change this by providing `--storage-mode=` (`-SM`) during your calls.  If you want to ensure it's always set to a value of your choice.
 
 For more information on persistent storage, [visit here](https://github.com/caronc/apprise/wiki/persistent_storage).
 
-
 ## API Persistent Storage Commands
-By default, no persistent storage is set to be in `MEMORY` mode for those building from within the Apprise API.
-It's at the developers discretion to enable it. But should you choose to do so, it's as easy as including the information in the `AppriseAsset()` object prior to the initialization of your `Apprise()` instance.
+For developers, persistent storage is set in the operational mode of `memory` by default.
+
+It's at the developers discretion to enable it (by switching it to either `auto` or `flush`). Should you choose to do so: it's as easy as including the information in the `AppriseAsset()` object prior to the initialization of your `Apprise()` instance.
 
 For example:
 ```python
@@ -617,12 +620,13 @@ from apprise import Apprise
 from apprise import AppriseAsset
 from apprise import PersistentStoreMode
 
-# Prepare a location the persistent storage can write to
-# This immediately assumes you wish to write in AUTO mode
+# Prepare a location the persistent storage can write it's cached content to.
+# By setting this path, this immediately assumes you wish to operate the
+# persistent storage in the operational 'auto' mode
 asset = AppriseAsset(storage_path="/path/to/save/data")
 
-# If you want to be more explicit and set more options, then
-# you may do the following
+# If you want to be more explicit and set more options, then you may do the
+# following
 asset = AppriseAsset(
     # Set our storage path directory (minimum requirement to enable it)
     storage_path="/path/to/save/data",
@@ -636,10 +640,10 @@ asset = AppriseAsset(
     #       - write to disk always and often
     storage_mode=PersistentStoreMode.FLUSH
 
-    # the URL IDs are by default 8 characters in length, there is
-    # really no reason to change this.  You can increase/decrease
-    # it's value here.  Must be > 2; default is 8 if not specified
-    storage_idlen=6,
+    # The URL IDs are by default 8 characters in length. You can increase and
+    # decrease it's value here.  The value must be > 2. The default value is 8
+    # if not otherwise specified
+    storage_idlen=8,
 )
 
 # Now that we've got our asset, we just work with our Apprise object as we
