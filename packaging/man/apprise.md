@@ -282,6 +282,11 @@ configuration that you want and only specifically notify a subset of them:
 If you find any bugs, please make them known at:
 <https://github.com/caronc/apprise/issues>
 
+## DONATIONS
+If you found Apprise useful at all, [please consider donating][donations]!
+
+[donations]: https://github.com/caronc/apprise/wiki/persistent_storage
+
 ## COPYRIGHT
 
 Apprise is Copyright (C) 2024 Chris Caron <lead2gold@gmail.com>
