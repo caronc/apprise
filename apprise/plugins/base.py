@@ -132,7 +132,7 @@ class NotifyBase(URLBase):
     # of lines. Setting this to zero disables this feature.
     body_max_line_count = 0
 
-    # Persistent storage default html settings
+    # Persistent storage default settings
     persistent_storage = True
 
     # Default Notify Format
