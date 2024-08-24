@@ -768,7 +768,7 @@ def test_apprise_cli_persistent_storage(tmpdir):
     # our persist storage has not been created yet
     _stdout = result.stdout.strip()
     assert re.match(
-        r'^1\.\s+[a-z0-9_-]{8}\s+0\.00B\s+unused\s+-\s+test://$', _stdout,
+        r'^1\.\s+[a-z0-9]{8}\s+0\.00B\s+unused\s+-\s+test://\s*', _stdout,
         re.MULTILINE)
 
     # An invalid mode specified
@@ -1090,7 +1090,7 @@ def test_apprise_cli_persistent_storage(tmpdir):
 
     # New Temporary namespace
     new_persistent_base = tmpdir.mkdir('namespace')
-    with environ(APPRISE_STORAGE=str(new_persistent_base)):
+    with environ(APPRISE_STORAGE_PATH=str(new_persistent_base)):
         # Reload our module
         reload(cli)
 
@@ -1348,6 +1348,28 @@ def test_apprise_cli_details(tmpdir):
 
     # Clear loaded modules
     N_MGR.unload_modules()
+
+
+def test_apprise_cli_print_help():
+    """
+    CLI: --help (-h)
+
+    """
+    runner = CliRunner()
+
+    # Clear our working variables so they don't obstruct the next test
+    # This simulates an actual call from the CLI.  Unfortunately through
+    # testing were occupying the same memory space so our singleton's
+    # have already been populated
+    N_MGR._paths_previously_scanned.clear()
+    N_MGR._custom_module_map.clear()
+
+    # Print help and exit
+    result = runner.invoke(cli.main, ['--help'])
+    assert result.exit_code == 0
+
+    result = runner.invoke(cli.main, ['-h'])
+    assert result.exit_code == 0
 
 
 @mock.patch('requests.post')

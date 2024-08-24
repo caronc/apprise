@@ -1,10 +1,12 @@
 .\" generated with Ronn-NG/v0.9.1
 .\" http://github.com/apjanke/ronn-ng/tree/0.9.1
-.TH "APPRISE" "1" "July 2024" "Chris Caron <lead2gold@gmail.com>"
+.TH "APPRISE" "1" "August 2024" "Chris Caron <lead2gold@gmail.com>"
 .SH "NAME"
 \fBapprise\fR \- Push Notifications that work with just about every platform!
 .SH "SYNOPSIS"
 \fBapprise\fR [\fIoptions\fR\|\.\|\.\|\.] \fIservice\-url\fR\|\.\|\.\|\.
+.br
+\fBapprise\fR storage [\fIoptions\fR\|\.\|\.\|\.] [\fIaction\fR] \fIurl\-id\fR\|\.\|\.\|\.
 .br
 .SH "DESCRIPTION"
 \fBApprise\fR allows you to send a notification to \fIalmost all\fR of the most popular notification services available to us today such as: Discord, Telegram, Pushbullet, Slack, Twitter, etc\.
@@ -14,37 +16,49 @@ One notification library to rule them all\.
 A common and intuitive notification syntax\.
 .IP "\[ci]" 4
 Supports the handling of images (to the notification services that will accept them)\.
+.IP "\[ci]" 4
+It\'s incredibly lightweight\.
+.IP "\[ci]" 4
+Amazing response times because all messages sent asynchronously\.
 .IP "" 0
 .SH "OPTIONS"
 The Apprise options are as follows:
 .P
-\fB\-b\fR, \fB\-\-body=\fR\fITEXT\fR: Specify the message body\. If no body is specified then content is read from \fIstdin\fR\.
+\fB\-b\fR, \fB\-\-body=\fR\fIVALUE\fR: Specify the message body\. If no body is specified then content is read from \fIstdin\fR\.
 .P
-\fB\-t\fR, \fB\-\-title=\fR\fITEXT\fR: Specify the message title\. This field is complete optional\.
+\fB\-t\fR, \fB\-\-title=\fR\fIVALUE\fR: Specify the message title\. This field is complete optional\.
 .P
 \fB\-c\fR, \fB\-\-config=\fR\fICONFIG\-URL\fR: Specify one or more configuration locations\.
 .P
 \fB\-a\fR, \fB\-\-attach=\fR\fIATTACH\-URL\fR: Specify one or more file attachment locations\.
 .P
-\fB\-P\fR, \fB\-\-plugin\-path=\fR\fIPLUGIN\-PATH\fR: Specify a path to scan for custom notification plugin support\. You can create your own notification by simply creating a Python file that contains the \fB@notify("schema")\fR decorator\.
+\fB\-P\fR, \fB\-\-plugin\-path=\fR\fIPATH\fR: Specify a path to scan for custom notification plugin support\. You can create your own notification by simply creating a Python file that contains the \fB@notify("schema")\fR decorator\.
 .P
 You can optioanly chose to specify more then one \fB\-\-plugin\-path\fR (\fB\-P\fR) to increase the modules included\.
 .P
-\fB\-n\fR, \fB\-\-notification\-type=\fR\fITYPE\fR: Specify the message type (default=info)\. Possible values are "info", "success", "failure", and "warning"\.
+\fB\-n\fR, \fB\-\-notification\-type=\fR\fIVALUE\fR: Specify the message type (default=info)\. Possible values are "info", "success", "failure", and "warning"\.
 .P
-\fB\-i\fR, \fB\-\-input\-format=\fR\fIFORMAT\fR: Specify the input message format (default=text)\. Possible values are "text", "html", and "markdown"\.
+\fB\-i\fR, \fB\-\-input\-format=\fR\fIVALUE\fR: Specify the input message format (default=text)\. Possible values are "text", "html", and "markdown"\.
 .P
-\fB\-T\fR, \fB\-\-theme=\fRTHEME: Specify the default theme\.
+\fB\-T\fR, \fB\-\-theme=\fR\fIVALUE\fR: Specify the default theme\.
 .P
-\fB\-g\fR, \fB\-\-tag=\fRTAG: Specify one or more tags to filter which services to notify\. Use multiple \fB\-\-tag\fR (\fB\-g\fR) entries to \fBOR\fR the tags together and comma separated to \fBAND\fR them\. If no tags are specified then all services are notified\.
+\fB\-g\fR, \fB\-\-tag=\fR\fIVALUE\fR: Specify one or more tags to filter which services to notify\. Use multiple \fB\-\-tag\fR (\fB\-g\fR) entries to \fBOR\fR the tags together and comma separated to \fBAND\fR them\. If no tags are specified then all services are notified\.
 .P
 \fB\-Da\fR, \fB\-\-disable\-async\fR: Send notifications synchronously (one after the other) instead of all at once\.
 .P
-\fB\-R\fR, \fB\-\-recursion\-depth\fR: he number of recursive import entries that can be loaded from within Apprise configuration\. By default this is set to 1\. If this is set to zero, then import statements found in any configuration is ignored\.
+\fB\-R\fR, \fB\-\-recursion\-depth\fR\fIINTEGER\fR: he number of recursive import entries that can be loaded from within Apprise configuration\. By default this is set to 1\. If this is set to zero, then import statements found in any configuration is ignored\.
 .P
 \fB\-e\fR, \fB\-\-interpret\-escapes\fR Enable interpretation of backslash escapes\. For example, this would convert sequences such as \en and \er to their respected ascii new\-line and carriage
 .P
 \fB\-j\fR, \fB\-\-interpret\-emojis\fR Enable interpretation of emoji strings\. For example, this would convert sequences such as :smile: or :grin: to their respected unicode emoji character\.
+.P
+\fB\-S\fR, \fB\-\-storage\-path=\fR\fIPATH\fR: Specify the path to the persistent storage caching location
+.P
+\fB\-SM\fR, \fB\-\-storage\-mode=\fR\fIMODE\fR: Specify the persistent storage operational mode\. Possible values are "auto", "flush", and "memory"\. The default is "auto" not not specified\.
+.P
+\fB\-SPD\fR, \fB\-\-storage\-prune\-days=\fR\fIINTEGER\fR: Define the number of days the storage prune should run using\. Setting this to zero (0) will eliminate all accumulated content\. By default this value is 30 (days)\.
+.P
+\fB\-SUL\fR, \fB\-\-storage\-uid\-length=\fR\fIINTEGER\fR: Define the number of unique characters to store persistent cache in\. By default this value is 8 (characters)\.
 .P
 \fB\-d\fR, \fB\-\-dry\-run\fR: Perform a trial run but only prints the notification services to\-be triggered to \fBstdout\fR\. Notifications are never sent using this mode\.
 .P
@@ -59,6 +73,21 @@ return characters prior to the delivery of the notification\.
 \fB\-V\fR, \fB\-\-version\fR: Display the apprise version and exit\.
 .P
 \fB\-h\fR, \fB\-\-help\fR: Show this message and exit\.
+.SH "PERSISTENT STORAGE"
+To utilize the persistent storage \fIhttps://github\.com/caronc/apprise/wiki/persistent_storage\fR element associated with Apprise, simply specify the keyword \fBstorage\fR
+.IP "" 4
+.nf
+$ apprise storage
+.fi
+.IP "" 0
+.P
+The \fBstorage\fR action has the following sub actions:
+.P
+\fBlist\fR: List all of the detected persistent storage elements and their state (\fBstale\fR, \fBactive\fR, or \fBunused\fR)\. This is the default action if nothing further is identified\.
+.P
+\fBprune\fR: Removes all persistent storage that has not been referenced for more then 30 days\. You can optionally set the \fB\-\-storage\-prune\-days\fR to alter this default value\.
+.P
+\fBclean\fR: Removes all persistent storage reguardless of age\.
 .SH "EXIT STATUS"
 \fBapprise\fR exits with a status of:
 .IP "\[ci]" 4
@@ -114,6 +143,27 @@ $ apprise \-vv \-t "School Assignment" \-b "See attached" \e
    \-\-attach=Documents/FinalReport\.docx
 .fi
 .IP "" 0
+.P
+List all of the notifications loaded:
+.IP "" 4
+.nf
+$ apprise \-\-dry\-run \-\-tag=all
+.fi
+.IP "" 0
+.P
+List all of the details around the current persistent storage setup:
+.IP "" 4
+.nf
+$ apprise storage list
+.fi
+.IP "" 0
+.P
+Prune all persistent storage that has not been referenced for at least 10 days or more
+.IP "" 4
+.nf
+$ apprise storage prune \-\-storage\-prune\-days=10
+.fi
+.IP "" 0
 .SH "CUSTOM PLUGIN/NOTIFICATIONS"
 Apprise can additionally allow you to define your own custom \fBschema://\fR entries that you can trigger on and call services you\'ve defined\.
 .P
@@ -134,15 +184,15 @@ Simply create your own python file with the following bare minimum content in it
 @notify(on="foobar", name="My Custom Notification")
 def my_wrapper(body, title, notify_type, *args, **kwargs):
 
-     <define your custom code here>
+     print("Define your custom code here")
 
-		# Returning True/False is a way to relay your status back to Apprise\.
-		# Returning nothing (None by default) is always interpreted as a Success
+     # Returning True/False will relay your status back through Apprise\.
+     # Returning nothing (None by default) is always interpreted as True
      return True
 .fi
 .IP "" 0
 .SH "CONFIGURATION"
-A configuration file can be in the format of either \fBTEXT\fR or \fBYAML\fR where [TEXT][textconfig] is the easiest and most ideal solution for most users\. However YAML \fIhttps://github\.com/caronc/apprise/wiki/config_yaml\fR configuration files grants the user a bit more leverage and access to some of the internal features of Apprise\. Reguardless of which format you choose, both provide the users the ability to leverage \fBtagging\fR which adds a more rich and powerful notification environment\.
+A configuration file can be in the format of either \fBTEXT\fR or \fBYAML\fR where TEXT \fIhttps://github\.com/caronc/apprise/wiki/config_text\fR is the easiest and most ideal solution for most users\. However YAML \fIhttps://github\.com/caronc/apprise/wiki/config_yaml\fR configuration files grants the user a bit more leverage and access to some of the internal features of Apprise\. Reguardless of which format you choose, both provide the users the ability to leverage \fBtagging\fR which adds a more rich and powerful notification environment\.
 .P
 Configuration files can be directly referenced via \fBapprise\fR when referencing the \fB\-\-config=\fR (\fB\-c\fR) CLI directive\. You can identify as many as you like on the command line and all of them will be loaded\. You can also point your configuration to a cloud location (by referencing \fBhttp://\fR or \fBhttps://\fR\. By default \fBapprise\fR looks in the following local locations for configuration files and loads them:
 .IP "" 4
@@ -176,8 +226,9 @@ $ apprise \-vv \-t "my title" \-b "my notification body"
 If you leveraged tagging \fIhttps://github\.com/caronc/apprise/wiki/CLI_Usage#label\-leverage\-tagging\fR, you can define all of Apprise Service URLs in your configuration that you want and only specifically notify a subset of them:
 .IP "" 4
 .nf
-$ apprise \-vv \-t "Will Be Late" \-b "Go ahead and make dinner without me" \e
-          \-\-tag=family
+$ apprise \-vv \-\-title "Will Be Late Getting Home" \e
+    \-\-body "Please go ahead and make dinner without me\." \e
+    \-\-tag=family
 .fi
 .IP "" 0
 .SH "BUGS"

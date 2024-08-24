@@ -60,6 +60,14 @@ from . import __copywrite__
 # files.
 DEFAULT_RECURSION_DEPTH = 1
 
+# Default number of days to prune persistent storage
+DEFAULT_STORAGE_PRUNE_DAYS = \
+    int(os.environ.get('APPRISE_STORAGE_PRUNE_DAYS', 30))
+
+# The default URL ID Length
+DEFAULT_STORAGE_UID_LENGTH = \
+    int(os.environ.get('APPRISE_STORAGE_UID_LENGTH', 8))
+
 # Defines our click context settings adding -h to the additional options that
 # can be specified to get the help menu to come up
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
@@ -190,9 +198,9 @@ PERSISTENT_STORAGE_MODES = (
     PersistentStorageMode.CLEAR,
 )
 
-if os.environ.get('APPRISE_STORAGE', '').strip():
+if os.environ.get('APPRISE_STORAGE_PATH', '').strip():
     # Over-ride Default Storage Path
-    DEFAULT_STORAGE_PATH = os.environ.get('APPRISE_STORAGE')
+    DEFAULT_STORAGE_PATH = os.environ.get('APPRISE_STORAGE_PATH')
 
 
 def print_version_msg():
@@ -210,7 +218,14 @@ def print_version_msg():
 
 class CustomHelpCommand(click.Command):
     def format_help(self, ctx, formatter):
+        formatter.write_text('Usage:')
+        formatter.write_text(
+            '   apprise [OPTIONS] [APPRISE_URL [APPRISE_URL2 [APPRISE_URL3]]]')
+        formatter.write_text(
+            '   apprise storage [OPTIONS] [ACTION] [UID1 [UID2 [UID3]]]')
+
         # Custom help message
+        formatter.write_text('')
         content = (
             'Send a notification to all of the specified servers '
             'identified by their URLs',
@@ -315,25 +330,27 @@ class CustomHelpCommand(click.Command):
               help='Specify the message title. This field is complete '
               'optional.')
 @click.option('--plugin-path', '-P', default=None, type=str, multiple=True,
-              metavar='PLUGIN_PATH',
+              metavar='PATH',
               help='Specify one or more plugin paths to scan.')
 @click.option('--storage-path', '-S', default=DEFAULT_STORAGE_PATH, type=str,
-              metavar='STORAGE_PATH',
+              metavar='PATH',
               help='Specify the path to the persistent storage location '
               '(default={}).'.format(DEFAULT_STORAGE_PATH))
-@click.option('--storage-prune-days', '-SPD', default=30,
-              type=int,
+@click.option('--storage-prune-days', '-SPD',
+              default=DEFAULT_STORAGE_PRUNE_DAYS, type=int,
               help='Define the number of days the storage prune '
               'should run using. Setting this to zero (0) will eliminate '
-              'all accumulated content. By default this value is 30 (days).')
-@click.option('--storage-uid-length', '-SUL', default=8,
-              type=int,
+              'all accumulated content. By default this value is {} days.'
+              .format(DEFAULT_STORAGE_PRUNE_DAYS))
+@click.option('--storage-uid-length', '-SUL',
+              default=DEFAULT_STORAGE_UID_LENGTH, type=int,
               help='Define the number of unique characters to store persistent'
-              'cache in. By default this value is 6 (characters).')
+              'cache in. By default this value is {} characters.'
+              .format(DEFAULT_STORAGE_UID_LENGTH))
 @click.option('--storage-mode', '-SM', default=PERSISTENT_STORE_MODES[0],
               type=str, metavar='MODE',
-              help='Persistent disk storage write mode (default={}). '
-              'Possible values are "{}", and "{}".'.format(
+              help='Specify the persistent storage operational mode '
+              '(default={}). Possible values are "{}", and "{}".'.format(
                   PERSISTENT_STORE_MODES[0], '", "'.join(
                       PERSISTENT_STORE_MODES[:-1]),
                   PERSISTENT_STORE_MODES[-1]))
@@ -527,6 +544,9 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
     # Create our Apprise object
     a = Apprise(asset=asset, debug=debug, location=ContentLocation.LOCAL)
 
+    # Track if we are performing a storage action
+    storage_action = True if urls and 'storage'.startswith(urls[0]) else False
+
     if details:
         # Print details and exit
         results = a.details(show_requirements=True, show_disabled=True)
@@ -615,7 +635,7 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
     #    4. Configuration by environment variable: APPRISE_CONFIG
     #    5. Default Configuration File(s) (if found)
     #
-    elif urls and not 'storage'.startswith(urls[0]):
+    elif urls and not storage_action:
         if tag:
             # Ignore any tags specified
             logger.warning(
@@ -662,11 +682,10 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
             paths=[f for f in DEFAULT_CONFIG_PATHS if isfile(path_decode(f))],
             asset=asset, recursion=recursion_depth))
 
-    if len(a) == 0 and not urls:
+    if not dry_run and not (a or storage_action):
         logger.error(
             'You must specify at least one server URL or populated '
             'configuration file.')
-        click.echo(ctx.get_help())
         ctx.exit(1)
 
     # each --tag entry comprises of a comma separated 'and' list
@@ -675,7 +694,7 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
 
     # Determine if we're dealing with URLs or url_ids based on the first
     # entry provided.
-    if urls and 'storage'.startswith(urls[0]):
+    if storage_action:
         #
         # Storage Mode
         #  - urls are now to be interpreted as best matching namespaces
@@ -694,7 +713,9 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
         # 5 characters are already reserved for the counter on the left
         (columns, _) = shutil.get_terminal_size(fallback=(80, 24))
 
+        # Pop 'storage' off of the head of our list
         filter_uids = urls[1:]
+
         action = PERSISTENT_STORAGE_MODES[0]
         if filter_uids:
             _action = next(  # pragma: no branch
@@ -702,7 +723,7 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
                  if a.startswith(filter_uids[0])), None)
 
             if _action:
-                # pop top entry
+                # pop 'action' off the head of our list
                 filter_uids = filter_uids[1:]
                 action = _action
 

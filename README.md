@@ -617,12 +617,13 @@ from apprise import Apprise
 from apprise import AppriseAsset
 from apprise import PersistentStoreMode
 
-# Prepare a location the persistent storage can write to
-# This immediately assumes you wish to write in AUTO mode
+# Prepare a location the persistent storage can write it's cached content to.
+# By setting this path, this immediately assumes you wish to operate the
+# persistent storage in the operational 'auto' mode
 asset = AppriseAsset(storage_path="/path/to/save/data")
 
-# If you want to be more explicit and set more options, then
-# you may do the following
+# If you want to be more explicit and set more options, then you may do the
+# following
 asset = AppriseAsset(
     # Set our storage path directory (minimum requirement to enable it)
     storage_path="/path/to/save/data",
@@ -636,10 +637,10 @@ asset = AppriseAsset(
     #       - write to disk always and often
     storage_mode=PersistentStoreMode.FLUSH
 
-    # the URL IDs are by default 8 characters in length, there is
-    # really no reason to change this.  You can increase/decrease
-    # it's value here.  Must be > 2; default is 8 if not specified
-    storage_idlen=6,
+    # The URL IDs are by default 8 characters in length. You can increase and
+    # decrease it's value here.  The value must be > 2. The default value is 8
+    # if not otherwise specified
+    storage_idlen=8,
 )
 
 # Now that we've got our asset, we just work with our Apprise object as we
