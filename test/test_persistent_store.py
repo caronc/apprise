@@ -1294,7 +1294,7 @@ def test_persistent_storage_disk_prune(tmpdir):
     assert pc.read() == b'data-t01'
 
     # An expiry of zero gets everything
-    # This test randomly fails in Microsoft Windows for unknown reasons
+    # Note: This test randomly fails in Microsoft Windows for unknown reasons
     # When this is determined, this test can be opened back up
     results = PersistentStore.disk_prune(path=str(tmpdir), expires=0)
     # We match everything now
