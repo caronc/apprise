@@ -28,15 +28,15 @@
 #
 
 import requests
-from .NotifyBase import NotifyBase
-from ..URLBase import PrivacyMode
+from .base import NotifyBase
+from ..url import PrivacyMode
 from ..common import NotifyType
 from ..utils import is_phone_no
 from ..utils import is_email
 from ..utils import parse_phone_no
 from ..utils import parse_bool
 from ..utils import validate_regex
-from ..AppriseLocale import gettext_lazy as _
+from ..locale import gettext_lazy as _
 
 
 # Octopush Message Types
@@ -293,7 +293,7 @@ class NotifyOctopush(NotifyBase):
         # Prepare our headers
         headers = {
             'User-Agent': self.app_id,
-            'Accept': 'application/json',
+            'Content-Type': 'application/json',
             'api-key': self.api_key,
             'api-login': self.api_login,
             'cache-control': 'no-cache',
@@ -341,7 +341,9 @@ class NotifyOctopush(NotifyBase):
                     timeout=self.request_timeout,
                 )
 
-                if r.status_code != requests.codes.ok:
+                if r.status_code not in (
+                        requests.codes.ok, requests.codes.created):
+
                     # We had a problem
                     status_str = \
                         NotifyBase.http_response_code_lookup(
@@ -379,6 +381,17 @@ class NotifyOctopush(NotifyBase):
                 continue
 
         return not has_error
+
+    @property
+    def url_identifier(self):
+        """
+        Returns all of the identifiers that make this URL unique from
+        another simliar one. Targets or end points should never be identified
+        here.
+        """
+        return (
+            self.secure_protocol, self.api_login, self.api_key, self.mtype,
+        )
 
     def url(self, privacy=False, *args, **kwargs):
         """
