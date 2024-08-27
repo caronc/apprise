@@ -575,7 +575,7 @@ class NotifyPushSafer(NotifyBase):
                         attachment.name,
                         'data:{};base64,{}'.format(
                             attachment.mimetype,
-                            attachment.base64,
+                            attachment.base64(),
                         )
                     ))
 
