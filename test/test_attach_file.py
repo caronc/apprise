@@ -29,6 +29,7 @@
 import re
 import time
 import urllib
+import pytest
 from unittest import mock
 
 from os.path import dirname
@@ -37,6 +38,7 @@ from apprise.attachment.base import AttachBase
 from apprise.attachment.file import AttachFile
 from apprise import AppriseAttachment
 from apprise.common import ContentLocation
+from apprise import exception
 
 # Disable logging for a cleaner testing output
 import logging
@@ -210,3 +212,37 @@ def test_attach_file():
     # Test hosted configuration and that we can't add a valid file
     aa = AppriseAttachment(location=ContentLocation.HOSTED)
     assert aa.add(path) is False
+
+
+def test_attach_file_base64():
+    """
+    API: AttachFile() with base64 encoding
+
+    """
+
+    # Simple gif test
+    path = join(TEST_VAR_DIR, 'apprise-test.gif')
+    response = AppriseAttachment.instantiate(path)
+    assert isinstance(response, AttachFile)
+    assert response.name == 'apprise-test.gif'
+    assert response.mimetype == 'image/gif'
+
+    # now test our base64 output
+    assert isinstance(response.base64(), str)
+    # No encoding if we choose
+    assert isinstance(response.base64(encoding=None), bytes)
+
+    # Error cases:
+    with mock.patch('os.path.isfile', return_value=False):
+        with pytest.raises(exception.AppriseFileNotFound):
+            response.base64()
+
+    with mock.patch("builtins.open", new_callable=mock.mock_open,
+                    read_data="mocked file content") as mock_file:
+        mock_file.side_effect = FileNotFoundError
+        with pytest.raises(exception.AppriseFileNotFound):
+            response.base64()
+
+        mock_file.side_effect = OSError
+        with pytest.raises(exception.AppriseDiskIOError):
+            response.base64()

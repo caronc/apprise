@@ -50,12 +50,14 @@ import requests
 from json import dumps
 
 from .base import NotifyBase
+from .. import exception
 from ..common import NotifyFormat
 from ..common import NotifyType
 from ..utils import parse_list
 from ..utils import is_email
 from ..utils import validate_regex
 from ..locale import gettext_lazy as _
+
 
 # Extend HTTP Error Messages
 SENDGRID_HTTP_ERROR_MAP = {
@@ -89,6 +91,9 @@ class NotifySendGrid(NotifyBase):
 
     # The default Email API URL to use
     notify_url = 'https://api.sendgrid.com/v3/mail/send'
+
+    # Support attachments
+    attachment_support = True
 
     # Allow 300 requests per minute.
     # 60/300 = 0.2
@@ -297,7 +302,8 @@ class NotifySendGrid(NotifyBase):
         """
         return len(self.targets)
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
+             **kwargs):
         """
         Perform SendGrid Notification
         """
@@ -330,6 +336,36 @@ class NotifySendGrid(NotifyBase):
                 'value': body,
             }],
         }
+
+        if attach and self.attachment_support:
+            attachments = []
+
+            # Send our attachments
+            for no, attachment in enumerate(attach, start=1):
+                try:
+                    attachments.append({
+                        "content": attachment.base64(),
+                        "filename": attachment.name
+                        if attachment.name else f'attach{no:03}.dat',
+                        "type": "application/octet-stream",
+                        "disposition": "attachment"
+                    })
+
+                except exception.AppriseException:
+                    # We could not access the attachment
+                    self.logger.error(
+                        'Could not access attachment {}.'.format(
+                            attachment.url(privacy=True)))
+                    return False
+
+                self.logger.debug(
+                    'Appending SendGrid attachment {}'.format(
+                        attachment.url(privacy=True)))
+
+            # Append our attachments to the payload
+            _payload.update({
+                'attachments': attachments,
+            })
 
         if self.template:
             _payload['template_id'] = self.template

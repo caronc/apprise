@@ -29,6 +29,8 @@
 import os
 import time
 import mimetypes
+import base64
+from .. import exception
 from ..url import URLBase
 from ..utils import parse_bool
 from ..common import ContentLocation
@@ -288,6 +290,37 @@ class AttachBase(URLBase):
                 pass
 
         return False if not retrieve_if_missing else self.download()
+
+    def base64(self, encoding='utf-8'):
+        """
+        Returns the attachment object as a base64 string otherwise
+        None is returned if an error occurs.
+
+        If encoding is set to None, then it is not encoded when returned
+        """
+        if not self:
+            # We could not access the attachment
+            self.logger.error(
+                'Could not access attachment {}.'.format(
+                    self.url(privacy=True)))
+            raise exception.AppriseFileNotFound("Attachment Missing")
+
+        try:
+            with open(self.path, 'rb') as f:
+                # Prepare our Attachment in Base64
+                return base64.b64encode(f.read()).decode(encoding) \
+                    if encoding else base64.b64encode(f.read())
+
+        except (TypeError, FileNotFoundError):
+            # We no longer have a path to open
+            raise exception.AppriseFileNotFound("Attachment Missing")
+
+        except (TypeError, OSError, IOError) as e:
+            self.logger.warning(
+                'An I/O error occurred while reading {}.'.format(
+                    self.name if self else 'attachment'))
+            self.logger.debug('I/O Exception: %s' % str(e))
+            raise exception.AppriseDiskIOError("Attachment Access Error")
 
     def invalidate(self):
         """
