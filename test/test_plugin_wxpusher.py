@@ -39,8 +39,8 @@ from helpers import AppriseURLTester
 import logging
 logging.disable(logging.CRITICAL)
 
-WXPUSHER_GOOD_RESPONSE = dumps({"success": True})
-WXPUSHER_BAD_RESPONSE = dumps({"success": False})
+WXPUSHER_GOOD_RESPONSE = dumps({"code": 1000})
+WXPUSHER_BAD_RESPONSE = dumps({"code": 99})
 
 
 # Attachment Directory
@@ -244,8 +244,6 @@ def test_plugin_wxpusher_edge_cases(mock_post):
         'contentType': 0,
         'topicIds': [],
         'uids': ['UID_abcd'],
-        'verifyPay': False,
-        'verifyPayType': 0,
         'url': None,
     }
 
@@ -291,8 +289,6 @@ def test_plugin_wxpusher_result_set(mock_post):
         'contentType': 0,
         'topicIds': [123],
         'uids': ['UID_456'],
-        'verifyPay': False,
-        'verifyPayType': 0,
         'url': None,
     }
 
@@ -323,8 +319,6 @@ def test_plugin_wxpusher_result_set(mock_post):
         'contentType': 0,
         'topicIds': [123456789],
         'uids': ['UID_123', 'UID_abc'],
-        'verifyPay': False,
-        'verifyPayType': 0,
         'url': None,
     }
 

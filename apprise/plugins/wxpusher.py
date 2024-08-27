@@ -213,7 +213,7 @@ class NotifyWxPusher(NotifyBase):
             'uids': self._users,
 
             # unsupported at this time
-            'verifyPay': False,
+            # 'verifyPay': False,
             # 'verifyPayType': 0,
             'url': None,
         }
@@ -244,8 +244,9 @@ class NotifyWxPusher(NotifyBase):
                 # AttributeError = r is None
                 content = {}
 
+            # 1000 is the expected return code for a successful query
             if r.status_code == requests.codes.ok and \
-                    content and content.get('success', False):
+                    content and content.get("code") == 1000:
 
                 # We're good!
                 self.logger.info(
@@ -254,16 +255,17 @@ class NotifyWxPusher(NotifyBase):
 
             else:
                 # We had a problem
+                error_str = content.get('msg') if content else None
                 status_str = \
                     NotifyWxPusher.http_response_code_lookup(
-                        r.status_code)
+                        r.status_code) if not error_str else error_str
 
                 self.logger.warning(
-                    'Failed to send WxPusher notification: '
-                    '{}{}error={}.'.format(
-                        status_str,
-                        ', ' if status_str else '',
-                        r.status_code))
+                    'Failed to send WxPusher notification, '
+                    'code={}/{}: {}'.format(
+                        r.status_code,
+                        'unk' if not content else content.get("code"),
+                        status_str))
 
                 self.logger.debug(
                     'Response Details:\r\n{}'.format(
@@ -282,6 +284,15 @@ class NotifyWxPusher(NotifyBase):
             return False
 
         return True
+
+    @property
+    def url_identifier(self):
+        """
+        Returns all of the identifiers that make this URL unique from
+        another simliar one. Targets or end points should never be identified
+        here.
+        """
+        return (self.secure_protocol, self.token)
 
     def url(self, privacy=False, *args, **kwargs):
         """
