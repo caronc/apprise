@@ -383,9 +383,15 @@ class NotifyMailgun(NotifyBase):
                 self.logger.debug(
                     'Preparing Mailgun attachment {}'.format(
                         attachment.url(privacy=True)))
+
+                # Prepare our filename
+                filename = attachment.name \
+                    if attachment.name \
+                    else 'file{no:03}.dat'.format(no=idx + 1)
+
                 try:
                     files['attachment[{}]'.format(idx)] = \
-                        (attachment.name, open(attachment.path, 'rb'))
+                        (filename, open(attachment.path, 'rb'))
 
                 except (OSError, IOError) as e:
                     self.logger.warning(

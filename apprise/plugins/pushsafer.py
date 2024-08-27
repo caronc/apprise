@@ -548,7 +548,7 @@ class NotifyPushSafer(NotifyBase):
         if attach and self.attachment_support:
             # We need to upload our payload first so that we can source it
             # in remaining messages
-            for attachment in attach:
+            for no, attachment in enumerate(attach, start=1):
                 # prepare payload
                 if not attachment:
                     # We could not access the attachment
@@ -572,7 +572,8 @@ class NotifyPushSafer(NotifyBase):
                     # Output must be in a DataURL format (that's what
                     # PushSafer calls it):
                     attachments.append((
-                        attachment.name,
+                        attachment.name
+                        if attachment.name else f'file{no:03}.dat',
                         'data:{};base64,{}'.format(
                             attachment.mimetype,
                             attachment.base64(),

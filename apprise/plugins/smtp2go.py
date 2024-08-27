@@ -294,7 +294,7 @@ class NotifySMTP2Go(NotifyBase):
         attachments = []
 
         if attach and self.attachment_support:
-            for attachment in attach:
+            for no, attachment in enumerate(attach, start=1):
                 # Perform some simple error checking
                 if not attachment:
                     # We could not access the attachment
@@ -306,7 +306,8 @@ class NotifySMTP2Go(NotifyBase):
                 try:
                     # Format our attachment
                     attachments.append({
-                        'filename': attachment.name,
+                        'filename': attachment.name
+                        if attachment.name else f'file{no:03}.dat',
                         'fileblob': attachment.base64(),
                         'mimetype': attachment.mimetype,
                     })

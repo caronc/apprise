@@ -213,7 +213,7 @@ class NotifyJSON(NotifyBase):
         # Track our potential attachments
         attachments = []
         if attach and self.attachment_support:
-            for no, attachment in enumerate(attach):
+            for no, attachment in enumerate(attach, start=1):
                 # Perform some simple error checking
                 if not attachment:
                     # We could not access the attachment

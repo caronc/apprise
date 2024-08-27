@@ -546,7 +546,7 @@ class NotifySparkPost(NotifyBase):
             # Prepare ourselves an attachment object
             payload['content']['attachments'] = []
 
-            for attachment in attach:
+            for no, attachment in enumerate(attach, start=1):
                 # Perform some simple error checking
                 if not attachment:
                     # We could not access the attachment
@@ -558,7 +558,8 @@ class NotifySparkPost(NotifyBase):
                 try:
                     # Prepare API Upload Payload
                     payload['content']['attachments'].append({
-                        'name': attachment.name,
+                        'name': attachment.name
+                        if attachment.name else f'file{no:03}.dat',
                         'type': attachment.mimetype,
                         'data': attachment.base64(),
                     })

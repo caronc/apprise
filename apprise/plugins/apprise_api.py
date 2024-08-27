@@ -266,12 +266,15 @@ class NotifyAppriseAPI(NotifyBase):
                     return False
 
                 try:
+                    # Our Attachment filename
+                    filename = attachment.name \
+                        if attachment.name else f'file{no:03}.dat'
+
                     if self.method == AppriseAPIMethod.JSON:
                         # Output must be in a DataURL format (that's what
                         # PushSafer calls it):
                         attachments.append({
-                            "filename": attachment.name
-                            if attachment.name else f'file{no:03}.dat',
+                            "filename": filename,
                             'base64': attachment.base64(),
                             'mimetype': attachment.mimetype,
                         })
@@ -280,7 +283,7 @@ class NotifyAppriseAPI(NotifyBase):
                         files.append((
                             'file{:02d}'.format(no),
                             (
-                                attachment.name,
+                                filename,
                                 open(attachment.path, 'rb'),
                                 attachment.mimetype,
                             )
