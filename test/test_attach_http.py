@@ -29,6 +29,8 @@
 import re
 from unittest import mock
 
+import pytest
+from apprise import exception
 import requests
 import mimetypes
 from os.path import join
@@ -481,3 +483,33 @@ def test_attach_http(mock_get, mock_post):
     assert mock_post.call_count == 30
     # We only fetched once and re-used the same fetch for all posts
     assert mock_get.call_count == 1
+
+    #
+    # We will test our base64 handling now
+    #
+    mock_get.reset_mock()
+    mock_post.reset_mock()
+
+    AttachHTTP.max_file_size = getsize(path)
+    # Set ourselves a Content-Disposition (providing a filename)
+    dummy_response.headers['Content-Disposition'] = \
+        'attachment; filename="myimage.gif"'
+    results = AttachHTTP.parse_url('http://user@localhost/filename.gif')
+    assert isinstance(results, dict)
+    obj = AttachHTTP(**results)
+
+    # now test our base64 output
+    assert isinstance(obj.base64(), str)
+    # No encoding if we choose
+    assert isinstance(obj.base64(encoding=None), bytes)
+
+    # Error cases:
+    with mock.patch("builtins.open", new_callable=mock.mock_open,
+                    read_data="mocked file content") as mock_file:
+        mock_file.side_effect = FileNotFoundError
+        with pytest.raises(exception.AppriseFileNotFound):
+            obj.base64()
+
+        mock_file.side_effect = OSError
+        with pytest.raises(exception.AppriseDiskIOError):
+            obj.base64()

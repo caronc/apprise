@@ -342,11 +342,19 @@ class NotifySendGrid(NotifyBase):
 
             # Send our attachments
             for no, attachment in enumerate(attach, start=1):
+                # Perform some simple error checking
+                if not attachment:
+                    # We could not access the attachment
+                    self.logger.error(
+                        'Could not access SendGrid attachment {}.'.format(
+                            attachment.url(privacy=True)))
+                    return False
+
                 try:
                     attachments.append({
                         "content": attachment.base64(),
                         "filename": attachment.name
-                        if attachment.name else f'attach{no:03}.dat',
+                        if attachment.name else f'file{no:03}.dat',
                         "type": "application/octet-stream",
                         "disposition": "attachment"
                     })
@@ -354,7 +362,7 @@ class NotifySendGrid(NotifyBase):
                 except exception.AppriseException:
                     # We could not access the attachment
                     self.logger.error(
-                        'Could not access attachment {}.'.format(
+                        'Could not access SendGrid attachment {}.'.format(
                             attachment.url(privacy=True)))
                     return False
 

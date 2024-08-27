@@ -448,7 +448,7 @@ class NotifySES(NotifyBase):
                 base.attach(content)
 
                 # Now store our attachments
-                for attachment in attach:
+                for no, attachment in enumerate(attach, start=1):
                     if not attachment:
                         # We could not load the attachment; take an early
                         # exit since this isn't what the end user wanted
@@ -468,10 +468,13 @@ class NotifySES(NotifyBase):
                         app = MIMEApplication(abody.read())
                         app.set_type(attachment.mimetype)
 
+                        filename = attachment.name \
+                            if attachment.name else f'file{no:03}.dat'
+
                         app.add_header(
                             'Content-Disposition',
                             'attachment; filename="{}"'.format(
-                                Header(attachment.name, 'utf-8')),
+                                Header(filename, 'utf-8')),
                         )
 
                         base.attach(app)

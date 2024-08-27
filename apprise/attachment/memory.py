@@ -29,7 +29,9 @@
 import re
 import os
 import io
+import base64
 from .base import AttachBase
+from .. import exception
 from ..common import ContentLocation
 from ..locale import gettext_lazy as _
 import uuid
@@ -144,6 +146,23 @@ class AttachMemory(AttachBase):
             return False
 
         return True
+
+    def base64(self, encoding='ascii'):
+        """
+        We need to over-ride this since the base64 sub-library seems to close
+        our file descriptor making it no longer referencable.
+        """
+
+        if not self:
+            # We could not access the attachment
+            self.logger.error(
+                'Could not access attachment {}.'.format(
+                    self.url(privacy=True)))
+            raise exception.AppriseFileNotFound("Attachment Missing")
+        self._data.seek(0, 0)
+
+        return base64.b64encode(self._data.read()).decode(encoding) \
+            if encoding else base64.b64encode(self._data.read())
 
     def invalidate(self):
         """

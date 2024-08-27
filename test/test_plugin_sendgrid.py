@@ -197,6 +197,12 @@ def test_plugin_sendgrid_attachments(mock_post, mock_get):
     mock_get.reset_mock()
 
     # Try again in a use case where we can't access the file
+    with mock.patch("os.path.isfile", return_value=False):
+        assert obj.notify(
+            body='body', title='title', notify_type=NotifyType.INFO,
+            attach=attach) is False
+
+    # Try again in a use case where we can't access the file
     with mock.patch("builtins.open", side_effect=OSError):
         assert obj.notify(
             body='body', title='title', notify_type=NotifyType.INFO,

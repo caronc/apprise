@@ -287,7 +287,7 @@ class NotifyTwitter(NotifyBase):
         if attach and self.attachment_support:
             # We need to upload our payload first so that we can source it
             # in remaining messages
-            for attachment in attach:
+            for no, attachment in enumerate(attach, start=1):
 
                 # Perform some simple error checking
                 if not attachment:
@@ -320,11 +320,15 @@ class NotifyTwitter(NotifyBase):
                     # We can't post our attachment
                     return False
 
+                # Prepare our filename
+                filename = attachment.name \
+                    if attachment.name else f'file{no:03}.dat'
+
                 if not (isinstance(response, dict)
                         and response.get('media_id')):
                     self.logger.debug(
                         'Could not attach the file to Twitter: %s (mime=%s)',
-                        attachment.name, attachment.mimetype)
+                        filename, attachment.mimetype)
                     continue
 
                 # If we get here, our output will look something like this:
@@ -344,7 +348,7 @@ class NotifyTwitter(NotifyBase):
                 response.update({
                     # Update our response to additionally include the
                     # attachment details
-                    'file_name': attachment.name,
+                    'file_name': filename,
                     'file_mime': attachment.mimetype,
                     'file_path': attachment.path,
                 })

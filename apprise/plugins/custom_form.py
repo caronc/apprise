@@ -302,7 +302,8 @@ class NotifyForm(NotifyBase):
                     files.append((
                         self.attach_as.format(no)
                         if self.attach_multi_support else self.attach_as, (
-                            attachment.name,
+                            attachment.name
+                            if attachment.name else f'file{no:03}.dat',
                             open(attachment.path, 'rb'),
                             attachment.mimetype)
                     ))

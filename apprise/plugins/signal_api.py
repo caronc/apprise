@@ -29,10 +29,10 @@
 import re
 import requests
 from json import dumps
-import base64
 
 from .base import NotifyBase
 from ..common import NotifyType
+from .. import exception
 from ..utils import is_phone_no
 from ..utils import parse_phone_no
 from ..utils import parse_bool
@@ -239,22 +239,23 @@ class NotifySignalAPI(NotifyBase):
                 if not attachment:
                     # We could not access the attachment
                     self.logger.error(
-                        'Could not access attachment {}.'.format(
+                        'Could not access Signal API attachment {}.'.format(
                             attachment.url(privacy=True)))
                     return False
 
                 try:
-                    with open(attachment.path, 'rb') as f:
-                        # Prepare our Attachment in Base64
-                        attachments.append(
-                            base64.b64encode(f.read()).decode('utf-8'))
+                    attachments.append(attachment.base64())
 
-                except (OSError, IOError) as e:
-                    self.logger.warning(
-                        'An I/O error occurred while reading {}.'.format(
-                            attachment.name if attachment else 'attachment'))
-                    self.logger.debug('I/O Exception: %s' % str(e))
+                except exception.AppriseException:
+                    # We could not access the attachment
+                    self.logger.error(
+                        'Could not access Signal API attachment {}.'.format(
+                            attachment.url(privacy=True)))
                     return False
+
+                self.logger.debug(
+                    'Appending Signal API attachment {}'.format(
+                        attachment.url(privacy=True)))
 
         # Prepare our headers
         headers = {

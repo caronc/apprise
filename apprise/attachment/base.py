@@ -291,7 +291,7 @@ class AttachBase(URLBase):
 
         return False if not retrieve_if_missing else self.download()
 
-    def base64(self, encoding='utf-8'):
+    def base64(self, encoding='ascii'):
         """
         Returns the attachment object as a base64 string otherwise
         None is returned if an error occurs.
@@ -306,7 +306,7 @@ class AttachBase(URLBase):
             raise exception.AppriseFileNotFound("Attachment Missing")
 
         try:
-            with open(self.path, 'rb') as f:
+            with self.open() as f:
                 # Prepare our Attachment in Base64
                 return base64.b64encode(f.read()).decode(encoding) \
                     if encoding else base64.b64encode(f.read())

@@ -646,7 +646,7 @@ class NotifySlack(NotifyBase):
         if attach and self.attachment_support and \
                 self.mode is SlackMode.BOT and attach_channel_list:
             # Send our attachments (can only be done in bot mode)
-            for attachment in attach:
+            for no, attachment in enumerate(attach, start=1):
 
                 # Perform some simple error checking
                 if not attachment:
@@ -663,7 +663,8 @@ class NotifySlack(NotifyBase):
                 # Get the URL to which to upload the file.
                 # https://api.slack.com/methods/files.getUploadURLExternal
                 _params = {
-                    'filename': attachment.name,
+                    'filename': attachment.name
+                    if attachment.name else f'file{no:03}.dat',
                     'length': len(attachment),
                 }
                 _url = self.api_url.format('files.getUploadURLExternal')

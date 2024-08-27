@@ -152,7 +152,7 @@ class NotifyPushBullet(NotifyBase):
         if attach and self.attachment_support:
             # We need to upload our payload first so that we can source it
             # in remaining messages
-            for attachment in attach:
+            for no, attachment in enumerate(attach, start=1):
 
                 # Perform some simple error checking
                 if not attachment:
@@ -168,7 +168,8 @@ class NotifyPushBullet(NotifyBase):
 
                 # prepare payload
                 payload = {
-                    'file_name': attachment.name,
+                    'file_name': attachment.name
+                    if attachment.name else f'file{no:03}.dat',
                     'file_type': attachment.mimetype,
                 }
                 # First thing we need to do is make a request so that we can

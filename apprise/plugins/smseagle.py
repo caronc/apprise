@@ -29,11 +29,11 @@
 import re
 import requests
 from json import dumps, loads
-import base64
 from itertools import chain
 
 from .base import NotifyBase
 from ..common import NotifyType
+from .. import exception
 from ..utils import validate_regex
 from ..utils import is_phone_no
 from ..utils import parse_phone_no
@@ -345,7 +345,7 @@ class NotifySMSEagle(NotifyBase):
                 if not attachment:
                     # We could not access the attachment
                     self.logger.error(
-                        'Could not access attachment {}.'.format(
+                        'Could not access SMSEagle attachment {}.'.format(
                             attachment.url(privacy=True)))
                     return False
 
@@ -357,20 +357,22 @@ class NotifySMSEagle(NotifyBase):
                     continue
 
                 try:
-                    with open(attachment.path, 'rb') as f:
-                        # Prepare our Attachment in Base64
-                        attachments.append({
-                            'content_type': attachment.mimetype,
-                            'content': base64.b64encode(
-                                f.read()).decode('utf-8'),
-                        })
+                    # Prepare our Attachment in Base64
+                    attachments.append({
+                        'content_type': attachment.mimetype,
+                        'content': attachment.base64(),
+                    })
 
-                except (OSError, IOError) as e:
-                    self.logger.warning(
-                        'An I/O error occurred while reading {}.'.format(
-                            attachment.name if attachment else 'attachment'))
-                    self.logger.debug('I/O Exception: %s' % str(e))
+                except exception.AppriseException:
+                    # We could not access the attachment
+                    self.logger.error(
+                        'Could not access SMSEagle attachment {}.'.format(
+                            attachment.url(privacy=True)))
                     return False
+
+                self.logger.debug(
+                    'Appending SMSEagle attachment {}'.format(
+                        attachment.url(privacy=True)))
 
         # Prepare our headers
         headers = {

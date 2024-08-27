@@ -28,8 +28,8 @@
 
 import re
 import requests
-import base64
 
+from .. import exception
 from .base import NotifyBase
 from ..url import PrivacyMode
 from ..common import NotifyImageSize
@@ -287,34 +287,38 @@ class NotifyXML(NotifyBase):
 
         attachments = []
         if attach and self.attachment_support:
-            for attachment in attach:
+            for no, attachment in enumerate(attach, start=1):
                 # Perform some simple error checking
                 if not attachment:
                     # We could not access the attachment
                     self.logger.error(
-                        'Could not access attachment {}.'.format(
+                        'Could not access Custom XML attachment {}.'.format(
                             attachment.url(privacy=True)))
                     return False
 
                 try:
-                    with open(attachment.path, 'rb') as f:
-                        # Prepare our Attachment in Base64
-                        entry = \
-                            '<Attachment filename="{}" mimetype="{}">'.format(
-                                NotifyXML.escape_html(
-                                    attachment.name, whitespace=False),
-                                NotifyXML.escape_html(
-                                    attachment.mimetype, whitespace=False))
-                        entry += base64.b64encode(f.read()).decode('utf-8')
-                        entry += '</Attachment>'
-                        attachments.append(entry)
+                    # Prepare our Attachment in Base64
+                    entry = \
+                        '<Attachment filename="{}" mimetype="{}">'.format(
+                            NotifyXML.escape_html(
+                                attachment.name if attachment.name
+                                else f'file{no:03}.dat', whitespace=False),
+                            NotifyXML.escape_html(
+                                attachment.mimetype, whitespace=False))
+                    entry += attachment.base64()
+                    entry += '</Attachment>'
+                    attachments.append(entry)
 
-                except (OSError, IOError) as e:
-                    self.logger.warning(
-                        'An I/O error occurred while reading {}.'.format(
-                            attachment.name if attachment else 'attachment'))
-                    self.logger.debug('I/O Exception: %s' % str(e))
+                except exception.AppriseException:
+                    # We could not access the attachment
+                    self.logger.error(
+                        'Could not access Custom XML attachment {}.'.format(
+                            attachment.url(privacy=True)))
                     return False
+
+                self.logger.debug(
+                    'Appending Custom XML attachment {}'.format(
+                        attachment.url(privacy=True)))
 
             # Update our xml_attachments record:
             xml_attachments = \
