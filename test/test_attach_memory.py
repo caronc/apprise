@@ -30,6 +30,7 @@ import re
 import urllib
 import pytest
 
+from apprise import exception
 from apprise.attachment.base import AttachBase
 from apprise.attachment.memory import AttachMemory
 from apprise import AppriseAttachment
@@ -203,3 +204,12 @@ def test_attach_memory():
     # Test hosted configuration and that we can't add a valid memory file
     aa = AppriseAttachment(location=ContentLocation.HOSTED)
     assert aa.add(response) is False
+
+    # now test our base64 output
+    assert isinstance(response.base64(), str)
+    # No encoding if we choose
+    assert isinstance(response.base64(encoding=None), bytes)
+
+    response.invalidate()
+    with pytest.raises(exception.AppriseFileNotFound):
+        response.base64()

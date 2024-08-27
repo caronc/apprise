@@ -26,11 +26,11 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import base64
 import requests
 from json import loads
 
 from .base import NotifyBase
+from .. import exception
 from ..common import NotifyType
 from ..utils import parse_list
 from ..utils import validate_regex
@@ -553,7 +553,7 @@ class NotifyPushSafer(NotifyBase):
                 if not attachment:
                     # We could not access the attachment
                     self.logger.error(
-                        'Could not access attachment {}.'.format(
+                        'Could not access PushSafer attachment {}.'.format(
                             attachment.url(privacy=True)))
                     return False
 
@@ -569,24 +569,26 @@ class NotifyPushSafer(NotifyBase):
                         attachment.url(privacy=True)))
 
                 try:
-                    with open(attachment.path, 'rb') as f:
-                        # Output must be in a DataURL format (that's what
-                        # PushSafer calls it):
-                        attachment = (
-                            attachment.name,
-                            'data:{};base64,{}'.format(
-                                attachment.mimetype,
-                                base64.b64encode(f.read())))
+                    # Output must be in a DataURL format (that's what
+                    # PushSafer calls it):
+                    attachments.append((
+                        attachment.name,
+                        'data:{};base64,{}'.format(
+                            attachment.mimetype,
+                            attachment.base64,
+                        )
+                    ))
 
-                except (OSError, IOError) as e:
-                    self.logger.warning(
-                        'An I/O error occurred while reading {}.'.format(
-                            attachment.name if attachment else 'attachment'))
-                    self.logger.debug('I/O Exception: %s' % str(e))
+                except exception.AppriseException:
+                    # We could not access the attachment
+                    self.logger.error(
+                        'Could not access PushSafer attachment {}.'.format(
+                            attachment.url(privacy=True)))
                     return False
 
-                # Save our pre-prepared payload for attachment posting
-                attachments.append(attachment)
+                self.logger.debug(
+                    'Appending PushSafer attachment {}'.format(
+                        attachment.url(privacy=True)))
 
         # Create a copy of the targets list
         targets = list(self.targets)

@@ -45,11 +45,11 @@
 #  the email will be transmitted from.  If no email address is specified
 #  then it will also become the 'to' address as well.
 #
-import base64
 import requests
 from json import dumps
 from email.utils import formataddr
 from .base import NotifyBase
+from .. import exception
 from ..common import NotifyType
 from ..common import NotifyFormat
 from ..utils import parse_emails
@@ -299,27 +299,28 @@ class NotifySMTP2Go(NotifyBase):
                 if not attachment:
                     # We could not access the attachment
                     self.logger.error(
-                        'Could not access attachment {}.'.format(
+                        'Could not access SMTP2Go attachment {}.'.format(
                             attachment.url(privacy=True)))
                     return False
 
                 try:
-                    with open(attachment.path, 'rb') as f:
-                        # Output must be in a DataURL format (that's what
-                        # PushSafer calls it):
-                        attachments.append({
-                            'filename': attachment.name,
-                            'fileblob': base64.b64encode(f.read())
-                            .decode('utf-8'),
-                            'mimetype': attachment.mimetype,
-                        })
+                    # Format our attachment
+                    attachments.append({
+                        'filename': attachment.name,
+                        'fileblob': attachment.base64(),
+                        'mimetype': attachment.mimetype,
+                    })
 
-                except (OSError, IOError) as e:
-                    self.logger.warning(
-                        'An I/O error occurred while reading {}.'.format(
-                            attachment.name if attachment else 'attachment'))
-                    self.logger.debug('I/O Exception: %s' % str(e))
+                except exception.AppriseException:
+                    # We could not access the attachment
+                    self.logger.error(
+                        'Could not access SMTP2Go attachment {}.'.format(
+                            attachment.url(privacy=True)))
                     return False
+
+                self.logger.debug(
+                    'Appending SMTP2Go attachment {}'.format(
+                        attachment.url(privacy=True)))
 
         sender = formataddr(
             (self.from_name if self.from_name else False,

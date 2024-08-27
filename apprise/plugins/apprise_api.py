@@ -29,8 +29,8 @@
 import re
 import requests
 from json import dumps
-import base64
 
+from .. import exception
 from .base import NotifyBase
 from ..url import PrivacyMode
 from ..common import NotifyType
@@ -261,21 +261,20 @@ class NotifyAppriseAPI(NotifyBase):
                 if not attachment:
                     # We could not access the attachment
                     self.logger.error(
-                        'Could not access attachment {}.'.format(
+                        'Could not access Apprise API attachment {}.'.format(
                             attachment.url(privacy=True)))
                     return False
 
                 try:
                     if self.method == AppriseAPIMethod.JSON:
-                        with open(attachment.path, 'rb') as f:
-                            # Output must be in a DataURL format (that's what
-                            # PushSafer calls it):
-                            attachments.append({
-                                'filename': attachment.name,
-                                'base64': base64.b64encode(f.read())
-                                .decode('utf-8'),
-                                'mimetype': attachment.mimetype,
-                            })
+                        # Output must be in a DataURL format (that's what
+                        # PushSafer calls it):
+                        attachments.append({
+                            "filename": attachment.name
+                            if attachment.name else f'file{no:03}.dat',
+                            'base64': attachment.base64(),
+                            'mimetype': attachment.mimetype,
+                        })
 
                     else:  # AppriseAPIMethod.FORM
                         files.append((
@@ -287,12 +286,16 @@ class NotifyAppriseAPI(NotifyBase):
                             )
                         ))
 
-                except (OSError, IOError) as e:
-                    self.logger.warning(
-                        'An I/O error occurred while reading {}.'.format(
-                            attachment.name if attachment else 'attachment'))
-                    self.logger.debug('I/O Exception: %s' % str(e))
+                except (TypeError, OSError, exception.AppriseException):
+                    # We could not access the attachment
+                    self.logger.error(
+                        'Could not access AppriseAPI attachment {}.'.format(
+                            attachment.url(privacy=True)))
                     return False
+
+                self.logger.debug(
+                    'Appending AppriseAPI attachment {}'.format(
+                        attachment.url(privacy=True)))
 
         # prepare Apprise API Object
         payload = {
