@@ -55,13 +55,31 @@ IS_USER = re.compile(
     r'^\s*(?P<full>(?P<prefix>UID_)(?P<user>[^\s]+))\s*$', re.I)
 
 
+WXPUSHER_RESPONSE_CODES = {
+    1000: "The request was processed successfully.",
+    1001: "The token provided in the request is missing.",
+    1002: "The token provided in the request is incorrect or expired.",
+    1003: "The body of the message was not provided.",
+    1004: "The user or topic you're trying to send the message to does not "
+    "exist",
+    1005: "The app or topic binding process failed.",
+    1006: "There was an error in sending the message.",
+    1007: "The message content exceeds the allowed length.",
+    1008: "The API call frequency is too high and the server rejected the "
+    "request.",
+    1009: "There might be other issues that are not explicitly covered by "
+    "the above codes",
+    1010: "The IP address making the request is not whitelisted.",
+}
+
+
 class WxPusherContentType:
     """
     Defines the different supported content types
     """
-    TEXT = 0
-    HTML = 1
-    MARKDOWN = 2
+    TEXT = 1
+    HTML = 2
+    MARKDOWN = 3
 
 
 class SubscriptionType:
@@ -254,8 +272,12 @@ class NotifyWxPusher(NotifyBase):
                         len(self._users) + len(self._topics)))
 
             else:
+                error_str = content.get('msg') if content else (
+                    WXPUSHER_RESPONSE_CODES.get(
+                        content.get("code") if content else None,
+                        "An unknown error occured."))
+
                 # We had a problem
-                error_str = content.get('msg') if content else None
                 status_str = \
                     NotifyWxPusher.http_response_code_lookup(
                         r.status_code) if not error_str else error_str
