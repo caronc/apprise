@@ -52,7 +52,7 @@ Reddit, Rocket.Chat, RSyslog, SendGrid, ServerChan, SFR, Signal, SimplePush,
 Sinch, Slack, SMSEagle, SMS Manager, SMTP2Go, SparkPost, Splunk, Super Toasty,
 Streamlabs, Stride, Synology Chat, Syslog, Techulus Push, Telegram, Threema
 Gateway, Twilio, Twitter, Twist, VictorOps, Voipms, Vonage, WeCom Bot,
-WhatsApp, Webex Teams, Workflows, XBMC}
+WhatsApp, Webex Teams, Workflows, WxPusher, XBMC}
 
 Name:           python-%{pypi_name}
 Version:        1.8.1
