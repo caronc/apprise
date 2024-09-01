@@ -2030,7 +2030,7 @@ def test_parse_emails():
         assert email in results
         is_email = utils.parse.is_email(email)
         assert is_email
-        assert is_email.get('name')
+        assert is_email.get("name")
 
     # pass the entries in as a list
     results = utils.parse.parse_emails(emails)
