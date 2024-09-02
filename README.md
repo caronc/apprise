@@ -43,6 +43,7 @@ System Administrators and DevOps who wish to send a notification now no longer n
   * [Configuration Files](#api-configuration-files)
   * [File Attachments](#api-file-attachments)
   * [Loading Custom Notifications/Hooks](#api-loading-custom-notificationshooks)
+* [Persistent Storage](#persistent-storage)
 * [More Supported Links and Documentation](#want-to-learn-more)
 <!--te-->
 

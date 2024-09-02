@@ -76,7 +76,7 @@ def _ntf_tidy(ntf):
                 'Persistent temporary file removal failed: %s',
                 ntf.name)
             logger.debug(
-                'Persistent Storage Exception: %s' % str(e))
+                'Persistent Storage Exception: %s', str(e))
 
 
 class CacheObject:
@@ -195,7 +195,7 @@ class CacheObject:
 
         except (TypeError, KeyError) as e:
             logger.trace(f'CacheObject could not be parsed from {content}')
-            logger.trace('CacheObject exception: %s' % str(e))
+            logger.trace('CacheObject exception: %s', str(e))
             return None
 
         if class_name in ('aware_datetime', 'naive_datetime', 'datetime'):
@@ -450,7 +450,7 @@ class PersistentStore:
                 IOError) as e:
             # We can't access the file or it does not exist
             logger.warning('Could not read with persistent key: %s', key)
-            logger.debug('Persistent Storage Exception: %s' % str(e))
+            logger.debug('Persistent Storage Exception: %s', str(e))
 
         # return none
         return None
@@ -492,7 +492,7 @@ class PersistentStore:
                 logger.warning(
                     'Could read() from potential iostream with persistent '
                     'key: %s', key)
-                logger.debug('Persistent Storage Exception: %s' % str(e))
+                logger.debug('Persistent Storage Exception: %s', str(e))
                 raise exception.AppriseDiskIOError(
                     "Invalid data type {} provided to Persistent Storage"
                     .format(type(data)))
@@ -520,7 +520,7 @@ class PersistentStore:
             # Permission error of some kind or disk problem...
             # There is nothing we can do at this point
             logger.warning('Could not write with persistent key: %s', key)
-            logger.debug('Persistent Storage Exception: %s' % str(e))
+            logger.debug('Persistent Storage Exception: %s', str(e))
             return False
 
         # Create a temporary file to write our content into
@@ -572,7 +572,7 @@ class PersistentStore:
         except (OSError, UnicodeEncodeError, IOError, zlib.error) as e:
             # We can't access the file or it does not exist
             logger.warning('Could not write to persistent key: %s', key)
-            logger.debug('Persistent Storage Exception: %s' % str(e))
+            logger.debug('Persistent Storage Exception: %s', str(e))
 
             # Tidy our Named Temporary File
             _ntf_tidy(ntf)
@@ -635,7 +635,7 @@ class PersistentStore:
             # There is nothing we can do at this point
             logger.warning(
                 'Could not previous persistent data backup: %s', dst_backup)
-            logger.debug('Persistent Storage Exception: %s' % str(e))
+            logger.debug('Persistent Storage Exception: %s', str(e))
             return False
 
         try:
@@ -654,7 +654,7 @@ class PersistentStore:
             logger.warning(
                 'Could not install persistent content %s -> %s',
                 dst, os.path.basename(dst_backup))
-            logger.debug('Persistent Storage Exception: %s' % str(e))
+            logger.debug('Persistent Storage Exception: %s', str(e))
             return False
 
         #
@@ -670,7 +670,7 @@ class PersistentStore:
             logger.warning(
                 'Could not install persistent content %s -> %s',
                 src, os.path.basename(dst))
-            logger.debug('Persistent Storage Exception: %s' % str(e))
+            logger.debug('Persistent Storage Exception: %s', str(e))
             try:
                 # Restore our old backup (if it exists)
                 os.rename(dst_backup, dst)
@@ -686,7 +686,7 @@ class PersistentStore:
                 # There is nothing we can do at this point
                 logger.warning(
                     'Failed to restore original persistent file: %s', dst)
-                logger.debug('Persistent Storage Exception: %s' % str(e))
+                logger.debug('Persistent Storage Exception: %s', str(e))
 
             return False
 
@@ -731,7 +731,7 @@ class PersistentStore:
         except (OSError, IOError, zlib.error) as e:
             # We can't access the file or it does not exist
             logger.warning('Could not read with persistent key: %s', key)
-            logger.debug('Persistent Storage Exception: %s' % str(e))
+            logger.debug('Persistent Storage Exception: %s', str(e))
             raise exception.AppriseDiskIOError(str(e))
 
     def get(self, key, default=None, lazy=True):
@@ -799,7 +799,7 @@ class PersistentStore:
             for arg in args:
 
                 try:
-                    del self._cache['key']
+                    del self._cache[arg]
 
                     # Set our dirty flag (if not set already)
                     self.__dirty = True
@@ -902,7 +902,7 @@ class PersistentStore:
                     logger.warning(
                         'Could not remove persistent cache content: %s',
                         cache_file)
-                    logger.debug('Persistent Storage Exception: %s' % str(e))
+                    logger.debug('Persistent Storage Exception: %s', str(e))
                     return False
                 return self.__load_cache(_recovery=True)
 
@@ -918,7 +918,7 @@ class PersistentStore:
             logger.warning(
                 'Could not load persistent cache for namespace %s',
                 os.path.basename(self.__base_path))
-            logger.debug('Persistent Storage Exception: %s' % str(e))
+            logger.debug('Persistent Storage Exception: %s', str(e))
             return False
 
         # Ensure our dirty flag is set to False
@@ -938,7 +938,7 @@ class PersistentStore:
                 logger.debug(
                     'Could not create persistent store directory %s',
                     self.__base_path)
-                logger.debug('Persistent Storage Exception: %s' % str(e))
+                logger.debug('Persistent Storage Exception: %s', str(e))
 
                 # Mode changed back to MEMORY
                 self.__mode = PersistentStoreMode.MEMORY
@@ -952,7 +952,7 @@ class PersistentStore:
                 logger.debug(
                     'Could not create persistent store directory %s',
                     self.__temp_path)
-                logger.debug('Persistent Storage Exception: %s' % str(e))
+                logger.debug('Persistent Storage Exception: %s', str(e))
 
                 # Mode changed back to MEMORY
                 self.__mode = PersistentStoreMode.MEMORY
@@ -965,7 +965,7 @@ class PersistentStore:
                 logger.debug(
                     'Could not create persistent store directory %s',
                     self.__data_path)
-                logger.debug('Persistent Storage Exception: %s' % str(e))
+                logger.debug('Persistent Storage Exception: %s', str(e))
 
                 # Mode changed back to MEMORY
                 self.__mode = PersistentStoreMode.MEMORY
@@ -1012,7 +1012,7 @@ class PersistentStore:
             except (OSError, IOError) as e:
                 # We can't access the file or it does not exist
                 logger.debug('Could not update file timestamp: %s', path)
-                logger.debug('Persistent Storage Exception: %s' % str(e))
+                logger.debug('Persistent Storage Exception: %s', str(e))
 
         if not force and self.__dirty is False:
             # Nothing further to do
@@ -1052,7 +1052,7 @@ class PersistentStore:
                 logger.warning(
                     'Could not remove persistent cache backup: %s',
                     backup_file)
-                logger.debug('Persistent Storage Exception: %s' % str(e))
+                logger.debug('Persistent Storage Exception: %s', str(e))
                 return False
 
             try:
@@ -1070,7 +1070,7 @@ class PersistentStore:
                 logger.warning(
                     'Could not remove stale persistent cache file: %s',
                     cache_file)
-                logger.debug('Persistent Storage Exception: %s' % str(e))
+                logger.debug('Persistent Storage Exception: %s', str(e))
                 return False
             return True
 
@@ -1107,7 +1107,7 @@ class PersistentStore:
             logger.error(
                 'Persistent temporary directory inaccessible: %s',
                 self.__temp_path)
-            logger.debug('Persistent Storage Exception: %s' % str(e))
+            logger.debug('Persistent Storage Exception: %s', str(e))
 
             # Tidy our Named Temporary File
             _ntf_tidy(ntf)
@@ -1130,7 +1130,7 @@ class PersistentStore:
             logger.error(
                 'Persistent temporary file can not be written to '
                 'due to bad input data: %s', ntf.name)
-            logger.debug('Persistent Storage Exception: %s' % str(e))
+            logger.debug('Persistent Storage Exception: %s', str(e))
 
             # Tidy our Named Temporary File
             _ntf_tidy(ntf)
@@ -1142,7 +1142,7 @@ class PersistentStore:
             logger.error(
                 'Persistent temporary file inaccessible: %s',
                 ntf.name)
-            logger.debug('Persistent Storage Exception: %s' % str(e))
+            logger.debug('Persistent Storage Exception: %s', str(e))
 
             # Tidy our Named Temporary File
             _ntf_tidy(ntf)
@@ -1263,7 +1263,7 @@ class PersistentStore:
             logger.error(
                 'Disk Scan detetcted inaccessible path: %s', path)
             logger.debug(
-                'Persistent Storage Exception: %s' % str(e))
+                'Persistent Storage Exception: %s', str(e))
             return []
 
         return namespaces
@@ -1346,7 +1346,7 @@ class PersistentStore:
                         'Disk Prune (ns=%s, clean=%s) detetcted inaccessible '
                         'file: %s', namespace, 'yes' if action else 'no', file)
                     logger.debug(
-                        'Persistent Storage Exception: %s' % str(e))
+                        'Persistent Storage Exception: %s', str(e))
 
                     # No longer worth doing a directory sweep
                     dir_sweep = False
@@ -1389,7 +1389,7 @@ class PersistentStore:
                             'yes' if action else 'no', file)
 
                         logger.debug(
-                            'Persistent Storage Exception: %s' % str(e))
+                            'Persistent Storage Exception: %s', str(e))
 
                         # No longer worth doing a directory sweep
                         dir_sweep = False
@@ -1643,7 +1643,7 @@ class PersistentStore:
                 has_error = True
                 logger.error(
                     'Failed to remove persistent file: %s', ppath)
-                logger.debug('Persistent Storage Exception: %s' % str(e))
+                logger.debug('Persistent Storage Exception: %s', str(e))
 
         # Reset our reference variables
         self.__cache_size = None
