@@ -6,9 +6,9 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: apprise 1.8.1\n"
+"Project-Id-Version: apprise 1.9.0\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2024-07-25 18:31-0400\n"
+"POT-Creation-Date: 2024-09-02 12:59-0400\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -78,6 +78,9 @@ msgid "App Access Token"
 msgstr ""
 
 msgid "App ID"
+msgstr ""
+
+msgid "App Token"
 msgstr ""
 
 msgid "App User Name"
@@ -505,6 +508,9 @@ msgstr ""
 msgid "Payload Extras"
 msgstr ""
 
+msgid "Persistent Storage"
+msgstr ""
+
 msgid "Port"
 msgstr ""
 
@@ -557,6 +563,9 @@ msgid "Resend Delay"
 msgstr ""
 
 msgid "Resubmit Flag"
+msgstr ""
+
+msgid "Retain Messages"
 msgstr ""
 
 msgid "Retry"
@@ -767,6 +776,9 @@ msgid "Target Topic"
 msgstr ""
 
 msgid "Target User"
+msgstr ""
+
+msgid "Target User ID"
 msgstr ""
 
 msgid "Targets"
