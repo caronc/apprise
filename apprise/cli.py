@@ -468,27 +468,30 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
     # Simple Error Checking
     notification_type = notification_type.strip().lower()
     if notification_type not in NOTIFY_TYPES:
-        logger.error(
+        click.echo(
             'The --notification-type (-n) value of {} is not supported.'
             .format(notification_type))
+        click.echo("Try 'apprise --help' for more information.")
         # 2 is the same exit code returned by Click if there is a parameter
         # issue.  For consistency, we also return a 2
         ctx.exit(2)
 
     input_format = input_format.strip().lower()
     if input_format not in NOTIFY_FORMATS:
-        logger.error(
+        click.echo(
             'The --input-format (-i) value of {} is not supported.'
             .format(input_format))
+        click.echo("Try 'apprise --help' for more information.")
         # 2 is the same exit code returned by Click if there is a parameter
         # issue.  For consistency, we also return a 2
         ctx.exit(2)
 
     storage_mode = storage_mode.strip().lower()
     if storage_mode not in PERSISTENT_STORE_MODES:
-        logger.error(
+        click.echo(
             'The --storage-mode (-SM) value of {} is not supported.'
             .format(storage_mode))
+        click.echo("Try 'apprise --help' for more information.")
         # 2 is the same exit code returned by Click if there is a parameter
         # issue.  For consistency, we also return a 2
         ctx.exit(2)
@@ -500,9 +503,10 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
              if exists(path_decode(path))]
 
     if storage_uid_length < 2:
-        logger.error(
+        click.echo(
             'The --storage-uid-length (-SUL) value can not be lower '
             'then two (2).')
+        click.echo("Try 'apprise --help' for more information.")
 
         # 2 is the same exit code returned by Click if there is a
         # parameter issue.  For consistency, we also return a 2
@@ -683,9 +687,10 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
             asset=asset, recursion=recursion_depth))
 
     if not dry_run and not (a or storage_action):
-        logger.error(
+        click.echo(
             'You must specify at least one server URL or populated '
             'configuration file.')
+        click.echo("Try 'apprise --help' for more information.")
         ctx.exit(1)
 
     # each --tag entry comprises of a comma separated 'and' list
@@ -700,9 +705,10 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
         #  - urls are now to be interpreted as best matching namespaces
         #
         if storage_prune_days < 0:
-            logger.error(
+            click.echo(
                 'The --storage-prune-days (-SPD) value can not be lower '
                 'then zero (0).')
+            click.echo("Try 'apprise --help' for more information.")
 
             # 2 is the same exit code returned by Click if there is a
             # parameter issue.  For consistency, we also return a 2
