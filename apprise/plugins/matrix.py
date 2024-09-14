@@ -1300,13 +1300,13 @@ class NotifyMatrix(NotifyBase):
                     timeout=self.request_timeout,
                 )
 
+                # Store status code
+                status_code = r.status_code
+
                 self.logger.debug(
                     'Matrix Response: code=%d, %s' % (
                         r.status_code, str(r.content)))
                 response = loads(r.content)
-
-                # Store status code
-                status_code = r.status_code
 
                 if r.status_code == requests.codes.too_many_requests:
                     wait = self.default_wait_ms / 1000
@@ -1616,7 +1616,7 @@ class NotifyMatrix(NotifyBase):
             self.store.get(self.discovery_identity_key),
         )
 
-        if base_url is not None and identity_url is not None:
+        if not (base_url is None and identity_url is None):
             # We can use our cached value and return early
             return base_url
 
@@ -1641,7 +1641,7 @@ class NotifyMatrix(NotifyBase):
             self.logger.debug(
                 'Matrix Well-Known Base URI not found at %s', verify_url)
 
-            # Clear our keys out for fast recall later on
+            # Set our keys out for fast recall later on
             self.store.set(
                 self.discovery_base_key, '',
                 expires=self.discovery_cache_length_sec)
@@ -1656,6 +1656,20 @@ class NotifyMatrix(NotifyBase):
             self.logger.warning(
                 '%s - %s returned error code: %d', msg, verify_url, code)
             raise MatrixDiscoveryException(msg, error_code=code)
+
+        if not wk_response:
+            # This is an acceptable response; we simply do nothing
+            self.logger.debug(
+                'Matrix Well-Known Base URI not defined %s', verify_url)
+
+            # Set our keys out for fast recall later on
+            self.store.set(
+                self.discovery_base_key, '',
+                expires=self.discovery_cache_length_sec)
+            self.store.set(
+                self.discovery_identity_key, '',
+                expires=self.discovery_cache_length_sec)
+            return ''
 
         #
         # Parse our m.homeserver information
@@ -1695,8 +1709,7 @@ class NotifyMatrix(NotifyBase):
         #
         # Phase 2: Handle m.identity_server IF defined
         #
-        if isinstance(wk_response, dict) \
-                and 'm.identity_server' in wk_response:
+        if 'm.identity_server' in wk_response:
             try:
                 identity_url = \
                     wk_response['m.identity_server']['base_url'].rstrip('/')
@@ -1733,7 +1746,14 @@ class NotifyMatrix(NotifyBase):
             # Update our cache
             self.store.set(
                 self.discovery_identity_key, identity_url,
-                expires=self.discovery_cache_length_sec)
+                # Add 2 seconds to prevent this key from expiring before base
+                expires=self.discovery_cache_length_sec + 2)
+        else:
+            # No identity server
+            self.store.set(
+                self.discovery_identity_key, '',
+                # Add 2 seconds to prevent this key from expiring before base
+                expires=self.discovery_cache_length_sec + 2)
 
         # Update our cache
         self.store.set(
@@ -1758,6 +1778,8 @@ class NotifyMatrix(NotifyBase):
                 self.discovery_base_key, self.discovery_identity_key)
             raise
 
+        # If we get hear, we need to build our URL dynamically based on what
+        # was provided to us during the plugins initialization
         default_port = 443 if self.secure else 80
 
         return '{schema}://{hostname}{port}'.format(

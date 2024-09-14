@@ -1192,12 +1192,23 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get):
     assert NotifyMatrix.discovery_base_key not in obj.store
     assert NotifyMatrix.discovery_identity_key not in obj.store
 
-    # Enforce cleanup
+    # Test an empty block response
     response.status_code = requests.codes.ok
+    response.content = ''
     mock_get.return_value = response
     mock_get.side_effect = None
     mock_post.return_value = response
     mock_post.side_effect = None
+    obj.store.clear(
+        NotifyMatrix.discovery_base_key, NotifyMatrix.discovery_identity_key)
+
+    assert obj.base_url == 'https://example.com'
+    assert obj.identity_url == 'https://example.com'
+
+    # Verify cache saved
+    assert NotifyMatrix.discovery_base_key in obj.store
+    assert NotifyMatrix.discovery_identity_key in obj.store
+
     del obj
 
 
