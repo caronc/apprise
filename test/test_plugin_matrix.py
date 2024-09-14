@@ -1070,6 +1070,7 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get):
     response.status_code = requests.codes.ok
     obj.store.clear(
         NotifyMatrix.discovery_base_key, NotifyMatrix.discovery_identity_key)
+
     # bad data
     _resp['m.homeserver'] = '!garbage!:303'
     response.content = dumps(_resp).encode('utf-8')
@@ -1082,6 +1083,9 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get):
     # Verify cache is not saved
     assert NotifyMatrix.discovery_base_key not in obj.store
     assert NotifyMatrix.discovery_identity_key not in obj.store
+
+    # We fail our discovery and therefore can't send our notification
+    assert obj.notify('hello world') is False
 
     # bad key
     _resp['m.homeserver'] = {}
@@ -1101,6 +1105,13 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get):
         NotifyMatrix.discovery_base_key, NotifyMatrix.discovery_identity_key)
     assert obj.base_url == 'https://nuxref.com/base'
     assert obj.identity_url == "https://vector.im"
+
+    # Verify cache saved
+    assert NotifyMatrix.discovery_base_key in obj.store
+    assert NotifyMatrix.discovery_identity_key in obj.store
+
+    # Discovery passes so notifications work too
+    assert obj.notify('hello world') is True
 
     # bad data
     _resp['m.identity_server'] = '!garbage!:303'
@@ -1148,6 +1159,14 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get):
     assert obj.base_url == 'https://example.com'
     assert obj.identity_url == 'https://example.com'
 
+    # Verify cache saved
+    assert NotifyMatrix.discovery_base_key in obj.store
+    assert NotifyMatrix.discovery_identity_key in obj.store
+
+    # Discovery passes so notifications work too
+    response.status_code = requests.codes.ok
+    assert obj.notify('hello world') is True
+
     response.status_code = requests.codes.ok
     mock_get.return_value = None
     mock_get.side_effect = (response, bad_response)
@@ -1161,7 +1180,24 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get):
     assert NotifyMatrix.discovery_base_key not in obj.store
     assert NotifyMatrix.discovery_identity_key not in obj.store
 
+    # Test case where ourIdentity URI fails to do it's check
+    mock_get.side_effect = (response, response, bad_response)
+    obj.store.clear(
+        NotifyMatrix.discovery_base_key, NotifyMatrix.discovery_identity_key)
+
+    with pytest.raises(MatrixDiscoveryException):
+        obj.base_url
+
+    # Verify cache is not saved
+    assert NotifyMatrix.discovery_base_key not in obj.store
+    assert NotifyMatrix.discovery_identity_key not in obj.store
+
     # Enforce cleanup
+    response.status_code = requests.codes.ok
+    mock_get.return_value = response
+    mock_get.side_effect = None
+    mock_post.return_value = response
+    mock_post.side_effect = None
     del obj
 
 

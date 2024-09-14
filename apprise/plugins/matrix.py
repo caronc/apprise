@@ -1640,6 +1640,14 @@ class NotifyMatrix(NotifyBase):
             # This is an acceptable response; we're done
             self.logger.debug(
                 'Matrix Well-Known Base URI not found at %s', verify_url)
+
+            # Clear our keys out for fast recall later on
+            self.store.set(
+                self.discovery_base_key, '',
+                expires=self.discovery_cache_length_sec)
+            self.store.set(
+                self.discovery_identity_key, '',
+                expires=self.discovery_cache_length_sec)
             return ''
 
         elif code != requests.codes.ok:
