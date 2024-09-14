@@ -83,7 +83,7 @@ apprise_url_tests = (
     ('plivo://?id={}&token={}&from=15551233000&to=15551232000'.format(
         'a' * 25, 'a' * 40), {
             # Our expected url(privacy=True) startswith() response:
-            'privacy_url': 'plivo://a...a@a...a/15551233000/15551232000',
+            'privacy_url': 'plivo://a...a@a...a/+15551233000/+15551232000',
             # reference to to= and from=
             'instance': NotifyPlivo,
     }),
@@ -92,7 +92,7 @@ apprise_url_tests = (
          # reference to to= and from=
          'instance': NotifyPlivo,
          # Our expected url(privacy=True) startswith() response:
-         'privacy_url': 'plivo://a...a@a...a/15551233000/15551232123'}),
+         'privacy_url': 'plivo://a...a@a...a/+15551233000/+15551232123'}),
     ('plivo://{}@{}/15551232000'.format('a' * 25, 'a' * 40), {
         'instance': NotifyPlivo,
         # throw a bizzare code forcing us to fail to look it up

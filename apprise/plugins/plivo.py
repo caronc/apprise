@@ -169,9 +169,8 @@ class NotifyPlivo(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # Store our source
-        self.source = '{}{}'.format(
-            '' if source[0] != '+' else '+', result['full'])
+        # Store our source; enforce E.164 format
+        self.source = f'+{result["full"]}'
 
         # Parse our targets
         self.targets = list()
@@ -181,9 +180,8 @@ class NotifyPlivo(NotifyBase):
                 # Validate targets and drop bad ones:
                 result = is_phone_no(target)
                 if result:
-                    # store valid phone number
-                    self.targets.append('{}{}'.format(
-                        '' if target[0] != '+' else '+', result['full']))
+                    # store valid phone number; enforce E.164 format
+                    self.targets.append(f'+{result["full"]}')
                     continue
 
                 self.logger.warning(
@@ -331,7 +329,7 @@ class NotifyPlivo(NotifyBase):
                 token=self.pprint(self.token, privacy, safe=''),
                 source=self.source,
                 targets='/'.join(
-                    [NotifyPlivo.quote(x, safe='') for x in self.targets]),
+                    [NotifyPlivo.quote(x, safe='+') for x in self.targets]),
                 params=NotifyPlivo.urlencode(params))
 
     def __len__(self):
