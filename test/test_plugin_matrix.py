@@ -1289,9 +1289,9 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get):
     # Force a object removal (thus a logout call)
     del obj
 
-    # Instantiate our object
+    # Instantiate our object (no discovery required)
     obj = Apprise.instantiate(
-        'matrixs://user:pass@localhost/#general?v=2&image=y')
+        'matrixs://user:pass@localhost/#general?v=2&discovery=no&image=y')
 
     # Reset our object
     mock_post.reset_mock()

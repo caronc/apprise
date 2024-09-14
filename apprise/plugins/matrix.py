@@ -1280,7 +1280,9 @@ class NotifyMatrix(NotifyBase):
             # Decrement our throttle retry count
             retries -= 1
 
-            self.logger.debug('Matrix POST URL: %s (cert_verify=%r)' % (
+            self.logger.debug('Matrix %s URL: %s (cert_verify=%r)' % (
+                'POST' if method == 'POST' else (
+                    requests.put if method == 'PUT' else 'GET'),
                 url, self.verify_certificate,
             ))
             self.logger.debug('Matrix Payload: %s' % str(payload))
