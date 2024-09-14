@@ -41,7 +41,7 @@ logging.disable(logging.CRITICAL)
 apprise_url_tests = (
     ('plivo://', {
         # No hostname/apikey specified
-        'instance': None,
+        'instance': TypeError,
     }),
     ('plivo://{}@{}/15551232000'.format('a' * 10, 'a' * 25), {
         # invalid auth id
@@ -59,23 +59,40 @@ apprise_url_tests = (
         # invalid phone number
         'instance': TypeError,
     }),
-    ('plivo://{}@{}/15551232000'.format('a' * 25, 'a' * 40), {
+    ('plivo://{}@{}/15551231234'.format('a' * 25, 'b' * 40), {
         # target phone number becomes who we text too; all is good
         'instance': NotifyPlivo,
     }),
     ('plivo://{}@{}/15551232000/abcd'.format('a' * 25, 'a' * 40), {
-        # invalid target phone number; we fall back to texting ourselves
+        # invalid target phone number
         'instance': NotifyPlivo,
+        # Notify will fail because it couldn't send to anyone
+        'response': False,
     }),
     ('plivo://{}@{}/15551232000/123'.format('a' * 25, 'a' * 40), {
-        # invalid target phone number; we fall back to texting ourselves
+        # invalid target phone number
         'instance': NotifyPlivo,
+        # Notify will fail because it couldn't send to anyone
+        'response': False,
     }),
-    ('plivo://{}@{}/?from=15551233000&to=15551232000'.format(
+    ('plivo://{}@{}/?from=15551233000&to=15551232000&batch=yes'.format(
         'a' * 25, 'a' * 40), {
-            # reference to to= and frome=
+            # reference to to= and from=
             'instance': NotifyPlivo,
     }),
+    ('plivo://?id={}&token={}&from=15551233000&to=15551232000'.format(
+        'a' * 25, 'a' * 40), {
+            # Our expected url(privacy=True) startswith() response:
+            'privacy_url': 'plivo://a...a@a...a/15551233000/15551232000',
+            # reference to to= and from=
+            'instance': NotifyPlivo,
+    }),
+    ('plivo://15551232123?id={}&token={}&from=15551233000'
+     '&to=15551232000'.format('a' * 25, 'a' * 40), {
+         # reference to to= and from=
+         'instance': NotifyPlivo,
+         # Our expected url(privacy=True) startswith() response:
+         'privacy_url': 'plivo://a...a@a...a/15551233000/15551232123'}),
     ('plivo://{}@{}/15551232000'.format('a' * 25, 'a' * 40), {
         'instance': NotifyPlivo,
         # throw a bizzare code forcing us to fail to look it up

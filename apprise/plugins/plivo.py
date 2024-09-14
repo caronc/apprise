@@ -36,17 +36,16 @@
 #   - https://console.plivo.com/dashboard/
 #
 
-import re
 import requests
 
+from json import dumps
 from .base import NotifyBase
 from ..common import NotifyType
-from ..utils import parse_list
+from ..utils import parse_bool
+from ..utils import is_phone_no
+from ..utils import parse_phone_no
 from ..utils import validate_regex
 from ..locale import gettext_lazy as _
-
-# Some Phone Number Detection
-IS_PHONE_NO = re.compile(r'^\+?(?P<phone>[0-9\s)(+-]+)\s*$')
 
 
 class NotifyPlivo(NotifyBase):
@@ -68,6 +67,9 @@ class NotifyPlivo(NotifyBase):
 
     # Plivo uses the http protocol with JSON requests
     notify_url = 'https://api.plivo.com/v1/Account/{auth_id}/Message/'
+
+    # The maximum number of messages that can be sent in a single batch
+    default_batch_size = 20
 
     # The maximum length of the body
     body_maxlen = 140
@@ -124,9 +126,21 @@ class NotifyPlivo(NotifyBase):
         'from': {
             'alias_of': 'source',
         },
+        'token': {
+            'alias_of': 'token',
+        },
+        'id': {
+            'alias_of': 'auth_id',
+        },
+        'batch': {
+            'name': _('Batch Mode'),
+            'type': 'bool',
+            'default': False,
+        },
     })
 
-    def __init__(self, auth_id, token, source, targets=None, **kwargs):
+    def __init__(self, auth_id, token, source, targets=None, batch=None,
+                 **kwargs):
         """
         Initialize Plivo Object
         """
@@ -148,53 +162,55 @@ class NotifyPlivo(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        result = IS_PHONE_NO.match(source)
+        result = is_phone_no(source)
         if not result:
             msg = 'The Plivo source specified ({}) is invalid.'\
                 .format(source)
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # Further check our phone # for it's digit count
-        result = ''.join(re.findall(r'\d+', result.group('phone')))
-        if len(result) < 11 or len(result) > 14:
-            msg = 'The Plivo source # specified ({}) is invalid.'\
-                .format(source)
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
         # Store our source
-        self.source = result
+        self.source = '{}{}'.format(
+            '' if source[0] != '+' else '+', result['full'])
 
         # Parse our targets
         self.targets = list()
 
-        for target in parse_list(targets):
-            # Validate targets and drop bad ones:
-            result = IS_PHONE_NO.match(target)
-            if result:
-                # Further check our phone # for it's digit count
-                result = ''.join(re.findall(r'\d+', result.group('phone')))
-                if len(result) < 11 or len(result) > 14:
-                    self.logger.warning(
-                        'Dropped invalid phone # '
-                        '({}) specified.'.format(target),
-                    )
+        if targets:
+            for target in parse_phone_no(targets):
+                # Validate targets and drop bad ones:
+                result = is_phone_no(target)
+                if result:
+                    # store valid phone number
+                    self.targets.append('{}{}'.format(
+                        '' if target[0] != '+' else '+', result['full']))
                     continue
 
-                # store valid phone number
-                self.targets.append(result)
-                continue
+                self.logger.warning(
+                    'Dropped invalid phone # '
+                    '({}) specified.'.format(target),
+                )
+        else:
+            # No sources specified, use our own phone no
+            self.targets.append(self.source)
 
-            self.logger.warning(
-                'Dropped invalid phone # '
-                '({}) specified.'.format(target),
-            )
+        # Set batch
+        self.batch = batch if batch is not None \
+            else self.template_args['batch']['default']
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
         Perform Plivo Notification
         """
+
+        if not self.targets:
+            # There were no services to notify
+            self.logger.warning(
+                'There were no Plivo targets to notify.')
+            return False
+
+        # Initialize our has_error flag
+        has_error = False
 
         # Prepare our headers
         headers = {
@@ -210,69 +226,78 @@ class NotifyPlivo(NotifyBase):
             'src': self.source,
             'dst': None,
             'text': body,
-
         }
-        # Create a copy of the targets list
-        targets = list(self.targets)
 
-        if len(targets) == 0:
-            # No sources specified, use our own phone no
-            targets.append(self.source)
+        # Send in batches if identified to do so
+        batch_size = 1 if not self.batch else self.default_batch_size
 
-        # Prepare our phone no (< delimits more then one)
-        payload['recipients'] = '<'.join(self.targets)
+        for index in range(0, len(self.targets), batch_size):
+            # Prepare our phone no (< delimits more then one)
+            payload['recipients'] = \
+                ','.join(self.targets[index:index + batch_size])
 
-        # Some Debug Logging
-        self.logger.debug(
-            'Plivo POST URL: {} (cert_verify={})'.format(
-                self.notify_url, self.verify_certificate))
-        self.logger.debug('Plivo Payload: {}' .format(payload))
+            # Some Debug Logging
+            self.logger.debug(
+                'Plivo POST URL: {} (cert_verify={})'.format(
+                    self.notify_url, self.verify_certificate))
+            self.logger.debug('Plivo Payload: {}' .format(payload))
 
-        # Always call throttle before any remote server i/o is made
-        self.throttle()
-        try:
-            r = requests.post(
-                self.notify_url,
-                data=payload,
-                headers=headers,
-                auth=auth,
-                verify=self.verify_certificate,
-            )
+            # Always call throttle before any remote server i/o is made
+            self.throttle()
+            try:
+                r = requests.post(
+                    self.notify_url,
+                    data=dumps(payload),
+                    headers=headers,
+                    auth=auth,
+                    verify=self.verify_certificate,
+                    timeout=self.request_timeout,
+                )
 
-            if r.status_code not in (
-                    requests.codes.ok, requests.codes.accepted):
-                # We had a problem
-                status_str = \
-                    NotifyPlivo.http_response_code_lookup(
-                        r.status_code)
+                if r.status_code not in (
+                        requests.codes.ok, requests.codes.accepted):
+                    # We had a problem
+                    status_str = \
+                        NotifyPlivo.http_response_code_lookup(
+                            r.status_code)
 
+                    self.logger.warning(
+                        'Failed to send {} Plivo notification{}: '
+                        '{}{}error={}.'.format(
+                            len(self.targets[index:index + batch_size]),
+                            ' to {}'.format(self.targets[index])
+                            if batch_size == 1 else '(s)',
+                            status_str,
+                            ', ' if status_str else '',
+                            r.status_code))
+
+                    self.logger.debug(
+                        'Response Details:\r\n{}'.format(r.content))
+
+                    # Mark our failure
+                    has_error = True
+                    continue
+
+                else:
+                    self.logger.info(
+                        'Send {} Plivo notification{}'.format(
+                            len(self.targets[index:index + batch_size]),
+                            ' to {}'.format(self.targets[index])
+                            if batch_size == 1 else '(s)',
+                        ))
+
+            except requests.RequestException as e:
                 self.logger.warning(
-                    'Failed to send Plivo notification to {}: '
-                    '{}{}error={}.'.format(
-                        ','.join(self.targets),
-                        status_str,
-                        ', ' if status_str else '',
-                        r.status_code))
+                    'A Connection error occured sending Plivo:%s ' % (
+                        self.targets) + 'notification.'
+                )
+                self.logger.debug('Socket Exception: %s' % str(e))
 
-                self.logger.debug(
-                    'Response Details:\r\n{}'.format(r.content))
+                # Mark our failure
+                has_error = True
+                continue
 
-                return False
-
-            else:
-                self.logger.info(
-                    'Sent Plivo notification to {}.'.format(self.targets))
-
-        except requests.RequestException as e:
-            self.logger.warning(
-                'A Connection error occured sending Plivo:%s ' % (
-                    self.targets) + 'notification.'
-            )
-            self.logger.debug('Socket Exception: %s' % str(e))
-
-            return False
-
-        return True
+        return not has_error
 
     @property
     def url_identifier(self):
@@ -292,21 +317,22 @@ class NotifyPlivo(NotifyBase):
         """
 
         # Define any arguments set
-        args = {
-            'format': self.notify_format,
-            'overflow': self.overflow_mode,
-            'verify': 'yes' if self.verify_certificate else 'no',
+        params = {
+            'batch': 'yes' if self.batch else 'no',
         }
 
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+
         return '{schema}://{auth_id}@{token}/{source}/' \
-            '{targets}/?{args}'.format(
+            '{targets}/?{params}'.format(
                 schema=self.secure_protocol,
                 auth_id=self.pprint(self.auth_id, privacy, safe=''),
                 token=self.pprint(self.token, privacy, safe=''),
                 source=self.source,
                 targets='/'.join(
                     [NotifyPlivo.quote(x, safe='') for x in self.targets]),
-                args=NotifyPlivo.urlencode(args))
+                params=NotifyPlivo.urlencode(params))
 
     def __len__(self):
         """
@@ -315,8 +341,7 @@ class NotifyPlivo(NotifyBase):
         #
         # Factor batch into calculation
         #
-        targets = len(self.targets)
-        return targets if targets > 0 else 1
+        return len(self.targets) if self.targets else 1
 
     @staticmethod
     def parse_url(url):
@@ -326,38 +351,57 @@ class NotifyPlivo(NotifyBase):
 
         """
 
-        results = NotifyBase.parse_url(url)
-
+        results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
 
         # The Auth ID is in the username field
-        results['auth_id'] = NotifyPlivo.unquote(results['user'])
+        if 'id' in results['qsd'] and len(results['qsd']['id']):
+            results['auth_id'] = NotifyPlivo.unquote(results['qsd']['id'])
 
-        # The hostname is our authentication key
-        results['token'] = NotifyPlivo.unquote(results['host'])
+        else:
+            results['auth_id'] = NotifyPlivo.unquote(results['user'])
 
         # Get our entries; split_path() looks after unquoting content for us
         # by default
         results['targets'] = NotifyPlivo.split_path(results['fullpath'])
+        if 'token' in results['qsd'] and len(results['qsd']['token']):
+            # Store token
+            results['token'] = NotifyPlivo.unquote(results['qsd']['token'])
 
-        try:
-            # The first path entry is the source/originator
-            results['source'] = results['targets'].pop(0)
-        except IndexError:
-            # No path specified... this URL is potentially un-parseable; we can
-            # hope for a from= entry
-            pass
+            # go ahead and put the host entry in the targets list
+            if results['host']:
+                results['targets'].insert(
+                    0, NotifyPlivo.unquote(results['host']))
+
+        else:
+            # The hostname is our authentication key
+            results['token'] = NotifyPlivo.unquote(results['host'])
+
+        if 'from' in results['qsd'] and len(results['qsd']['from']):
+            results['source'] = \
+                NotifyPlivo.unquote(results['qsd']['from'])
+
+        else:
+            try:
+                # The first path entry is the source/originator
+                results['source'] = results['targets'].pop(0)
+
+            except IndexError:
+                # No source specified...
+                results['source'] = None
+                pass
 
         # Support the 'to' variable so that we can support targets this way too
         # The 'to' makes it easier to use yaml configuration
         if 'to' in results['qsd'] and len(results['qsd']['to']):
             results['targets'] += \
-                NotifyPlivo.parse_list(results['qsd']['to'])
+                NotifyPlivo.parse_phone_no(results['qsd']['to'])
 
-        if 'from' in results['qsd'] and len(results['qsd']['from']):
-            results['source'] = \
-                NotifyPlivo.unquote(results['qsd']['from'])
+        # Get Batch Mode Flag
+        results['batch'] = \
+            parse_bool(results['qsd'].get(
+                'batch', NotifyPlivo.template_args['batch']['default']))
 
         return results
