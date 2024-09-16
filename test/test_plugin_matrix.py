@@ -32,9 +32,10 @@ import requests
 import pytest
 from apprise import (
     Apprise, AppriseAsset, AppriseAttachment, NotifyType, PersistentStoreMode)
-from json import dumps
+from json import dumps, loads
 
 from apprise.plugins.matrix import NotifyMatrix
+from apprise.plugins.matrix import MatrixDiscoveryException
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -47,6 +48,14 @@ MATRIX_GOOD_RESPONSE = dumps({
     'joined_rooms': ['!abc123:localhost', '!def456:localhost'],
     'access_token': 'abcd1234',
     'home_server': 'localhost',
+
+    # Simulate .well-known
+    "m.homeserver": {
+        "base_url": "https://matrix.example.com"
+    },
+    "m.identity_server": {
+        "base_url": "https://vector.im"
+    },
 })
 
 # Attachment Directory
@@ -1014,6 +1023,197 @@ def test_plugin_matrix_attachments_api_v3(mock_post, mock_get, mock_put):
 
 @mock.patch('requests.get')
 @mock.patch('requests.post')
+def test_plugin_matrix_discovery_service(mock_post, mock_get):
+    """
+    NotifyMatrix() Discovery Service
+
+    """
+
+    # Prepare a good response
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = MATRIX_GOOD_RESPONSE.encode('utf-8')
+
+    # Prepare a good response
+    bad_response = mock.Mock()
+    bad_response.status_code = requests.codes.unauthorized
+    bad_response.content = MATRIX_GOOD_RESPONSE.encode('utf-8')
+
+    # Prepare Mock return object
+    mock_post.return_value = response
+    mock_get.return_value = response
+
+    # Instantiate our object
+    obj = Apprise.instantiate(
+        'matrixs://user:pass@example.com/#general?v=2&discovery=yes')
+    assert obj.notify('body') is True
+
+    response = mock.Mock()
+    response.status_code = requests.codes.unavailable
+    _resp = loads(MATRIX_GOOD_RESPONSE)
+
+    mock_get.return_value = response
+    mock_post.return_value = response
+    obj = Apprise.instantiate(
+        'matrixs://user:pass@example.com/#general?v=2&discovery=yes')
+    obj.store.clear(
+        NotifyMatrix.discovery_base_key, NotifyMatrix.discovery_identity_key)
+
+    # Invalid host / fallback is to resolve our own host
+    with pytest.raises(MatrixDiscoveryException):
+        obj.base_url
+
+    # Verify cache is not saved
+    assert NotifyMatrix.discovery_base_key not in obj.store
+    assert NotifyMatrix.discovery_identity_key not in obj.store
+
+    response.status_code = requests.codes.ok
+    obj.store.clear(
+        NotifyMatrix.discovery_base_key, NotifyMatrix.discovery_identity_key)
+
+    # bad data
+    _resp['m.homeserver'] = '!garbage!:303'
+    response.content = dumps(_resp).encode('utf-8')
+    obj.store.clear(
+        NotifyMatrix.discovery_base_key, NotifyMatrix.discovery_identity_key)
+
+    with pytest.raises(MatrixDiscoveryException):
+        obj.base_url
+
+    # Verify cache is not saved
+    assert NotifyMatrix.discovery_base_key not in obj.store
+    assert NotifyMatrix.discovery_identity_key not in obj.store
+
+    # We fail our discovery and therefore can't send our notification
+    assert obj.notify('hello world') is False
+
+    # bad key
+    _resp['m.homeserver'] = {}
+    response.content = dumps(_resp).encode('utf-8')
+    obj.store.clear(
+        NotifyMatrix.discovery_base_key, NotifyMatrix.discovery_identity_key)
+    with pytest.raises(MatrixDiscoveryException):
+        obj.base_url
+
+    # Verify cache is not saved
+    assert NotifyMatrix.discovery_base_key not in obj.store
+    assert NotifyMatrix.discovery_identity_key not in obj.store
+
+    _resp['m.homeserver'] = {'base_url': 'https://nuxref.com/base'}
+    response.content = dumps(_resp).encode('utf-8')
+    obj.store.clear(
+        NotifyMatrix.discovery_base_key, NotifyMatrix.discovery_identity_key)
+    assert obj.base_url == 'https://nuxref.com/base'
+    assert obj.identity_url == "https://vector.im"
+
+    # Verify cache saved
+    assert NotifyMatrix.discovery_base_key in obj.store
+    assert NotifyMatrix.discovery_identity_key in obj.store
+
+    # Discovery passes so notifications work too
+    assert obj.notify('hello world') is True
+
+    # bad data
+    _resp['m.identity_server'] = '!garbage!:303'
+    response.content = dumps(_resp).encode('utf-8')
+    obj.store.clear(
+        NotifyMatrix.discovery_base_key, NotifyMatrix.discovery_identity_key)
+
+    with pytest.raises(MatrixDiscoveryException):
+        obj.base_url
+
+    # Verify cache is not saved
+    assert NotifyMatrix.discovery_base_key not in obj.store
+    assert NotifyMatrix.discovery_identity_key not in obj.store
+
+    # no key
+    _resp['m.identity_server'] = {}
+    response.content = dumps(_resp).encode('utf-8')
+    obj.store.clear(
+        NotifyMatrix.discovery_base_key, NotifyMatrix.discovery_identity_key)
+
+    with pytest.raises(MatrixDiscoveryException):
+        obj.base_url
+
+    # Verify cache is not saved
+    assert NotifyMatrix.discovery_base_key not in obj.store
+    assert NotifyMatrix.discovery_identity_key not in obj.store
+
+    # remove
+    del _resp['m.identity_server']
+    response.content = dumps(_resp).encode('utf-8')
+
+    obj.store.clear(
+        NotifyMatrix.discovery_base_key, NotifyMatrix.discovery_identity_key)
+    assert obj.base_url == 'https://nuxref.com/base'
+    assert obj.identity_url == 'https://nuxref.com/base'
+
+    # restore
+    _resp['m.identity_server'] = {'base_url': '"https://vector.im'}
+    response.content = dumps(_resp).encode('utf-8')
+
+    # Not found is an acceptable response (no exceptions thrown)
+    response.status_code = requests.codes.not_found
+    obj.store.clear(
+        NotifyMatrix.discovery_base_key, NotifyMatrix.discovery_identity_key)
+    assert obj.base_url == 'https://example.com'
+    assert obj.identity_url == 'https://example.com'
+
+    # Verify cache saved
+    assert NotifyMatrix.discovery_base_key in obj.store
+    assert NotifyMatrix.discovery_identity_key in obj.store
+
+    # Discovery passes so notifications work too
+    response.status_code = requests.codes.ok
+    assert obj.notify('hello world') is True
+
+    response.status_code = requests.codes.ok
+    mock_get.return_value = None
+    mock_get.side_effect = (response, bad_response)
+    obj.store.clear(
+        NotifyMatrix.discovery_base_key, NotifyMatrix.discovery_identity_key)
+
+    with pytest.raises(MatrixDiscoveryException):
+        obj.base_url
+
+    # Verify cache is not saved
+    assert NotifyMatrix.discovery_base_key not in obj.store
+    assert NotifyMatrix.discovery_identity_key not in obj.store
+
+    # Test case where ourIdentity URI fails to do it's check
+    mock_get.side_effect = (response, response, bad_response)
+    obj.store.clear(
+        NotifyMatrix.discovery_base_key, NotifyMatrix.discovery_identity_key)
+
+    with pytest.raises(MatrixDiscoveryException):
+        obj.base_url
+
+    # Verify cache is not saved
+    assert NotifyMatrix.discovery_base_key not in obj.store
+    assert NotifyMatrix.discovery_identity_key not in obj.store
+
+    # Test an empty block response
+    response.status_code = requests.codes.ok
+    response.content = ''
+    mock_get.return_value = response
+    mock_get.side_effect = None
+    mock_post.return_value = response
+    mock_post.side_effect = None
+    obj.store.clear(
+        NotifyMatrix.discovery_base_key, NotifyMatrix.discovery_identity_key)
+
+    assert obj.base_url == 'https://example.com'
+    assert obj.identity_url == 'https://example.com'
+
+    # Verify cache saved
+    assert NotifyMatrix.discovery_base_key in obj.store
+    assert NotifyMatrix.discovery_identity_key in obj.store
+
+    del obj
+
+
+@mock.patch('requests.get')
+@mock.patch('requests.post')
 def test_plugin_matrix_attachments_api_v2(mock_post, mock_get):
     """
     NotifyMatrix() Attachment Checks (v2)
@@ -1068,17 +1268,18 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get):
     # Test our call count
     assert mock_post.call_count == 5
     assert mock_post.call_args_list[0][0][0] == \
-        'https://localhost/_matrix/client/r0/login'
+        'https://matrix.example.com/_matrix/client/r0/login'
     assert mock_post.call_args_list[1][0][0] == \
-        'https://localhost/_matrix/media/r0/upload'
+        'https://matrix.example.com/_matrix/media/r0/upload'
     assert mock_post.call_args_list[2][0][0] == \
-        'https://localhost/_matrix/client/r0/join/%23general%3Alocalhost'
+        'https://matrix.example.com/_matrix/client/r0/' \
+        'join/%23general%3Alocalhost'
     assert mock_post.call_args_list[3][0][0] == \
-        'https://localhost/_matrix/client/r0/rooms/%21abc123%3Alocalhost/' \
-        'send/m.room.message'
+        'https://matrix.example.com/_matrix/client/r0' \
+        '/rooms/%21abc123%3Alocalhost/send/m.room.message'
     assert mock_post.call_args_list[4][0][0] == \
-        'https://localhost/_matrix/client/r0/rooms/%21abc123%3Alocalhost/' \
-        'send/m.room.message'
+        'https://matrix.example.com/_matrix/client/r0/' \
+        'rooms/%21abc123%3Alocalhost/send/m.room.message'
 
     # Attach an unsupported file type; these are skipped
     attach = AppriseAttachment(
@@ -1135,9 +1336,9 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get):
     # Force a object removal (thus a logout call)
     del obj
 
-    # Instantiate our object
+    # Instantiate our object (no discovery required)
     obj = Apprise.instantiate(
-        'matrixs://user:pass@localhost/#general?v=2&image=y')
+        'matrixs://user:pass@localhost/#general?v=2&discovery=no&image=y')
 
     # Reset our object
     mock_post.reset_mock()
