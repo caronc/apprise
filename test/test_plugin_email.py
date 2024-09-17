@@ -29,6 +29,7 @@
 import logging
 import pytest
 import os
+import sys
 import re
 from unittest import mock
 from inspect import cleandoc
@@ -40,6 +41,7 @@ from apprise import NotifyType, NotifyBase
 from apprise import Apprise
 from apprise import AttachBase
 from apprise import AppriseAsset
+from apprise import PersistentStoreMode
 from apprise.config import ConfigBase
 from apprise import AppriseAttachment
 from apprise.plugins.email import NotifyEmail
@@ -47,7 +49,6 @@ from apprise.plugins import email as NotifyEmailModule
 
 # Disable logging for a cleaner testing output
 logging.disable(logging.CRITICAL)
-
 
 # Attachment Directory
 TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), 'var')
@@ -128,6 +129,10 @@ TEST_URLS = (
         'instance': NotifyEmail,
     }),
     ('mailtos://%20@domain.com?user=admin@mail-domain.com', {
+        'instance': NotifyEmail,
+    }),
+    ('mailtos://%20@domain.com?user=admin@mail-domain.com?pgp=yes', {
+        # Test pgp flag
         'instance': NotifyEmail,
     }),
     ('mailtos://user:pass@nuxref.com:567/l2g@nuxref.com', {
@@ -2049,3 +2054,72 @@ def test_plugin_email_by_ipaddr_1113(mock_smtp, mock_smtp_ssl):
     assert email.smtp_host == '10.0.0.195'
     assert email.port == 25
     assert email.targets == [(False, 'alerts@example.com')]
+
+
+@pytest.mark.skipif('pgpy' not in sys.modules, reason="Requires PGPy")
+@mock.patch('smtplib.SMTP_SSL')
+@mock.patch('smtplib.SMTP')
+def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
+    """
+    NotifyEmail() PGP Tests
+
+    """
+
+    # Initialize our email (no from name)
+    obj = Apprise.instantiate('mailto://user:pass@nuxref.com?pgp=yes')
+
+    # Test our names
+    fnames = obj.pgp_fnames
+    assert isinstance(fnames, list)
+
+    # login is pgp
+    obj = Apprise.instantiate('mailto://pgp:pass@nuxref.com?pgp=yes')
+
+    # Test our names
+    fnames = obj.pgp_fnames
+    assert isinstance(fnames, list)
+
+    # login is pgp
+    obj = Apprise.instantiate('mailto://chris:pass@nuxref.com?pgp=yes')
+    fnames = obj.pgp_fnames
+    assert isinstance(fnames, list)
+
+    # Attempt to generate keys
+    obj = Apprise.instantiate('mailto://chris:pass@nuxref.com?pgp=yes')
+    # We're in memory mode
+    assert obj.store.mode == PersistentStoreMode.MEMORY
+    assert obj.pgp_generate_keys() is False
+    tmpdir1 = tmpdir.mkdir('tmp01')
+    # However explicitly setting a path works
+    assert obj.pgp_generate_keys(str(tmpdir1)) is True
+
+    tmpdir2 = tmpdir.mkdir('tmp02')
+    asset = AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir2),
+    )
+    obj = Apprise.instantiate(
+        'mailto://chris:pass@nuxref.com?pgp=yes', asset=asset)
+
+    assert obj.store.mode == PersistentStoreMode.FLUSH
+    assert obj.pgp_generate_keys() is True
+
+    # We do this again but even when we do a requisition for a public key
+    # it will generate a new pair or keys for us once it detects we don't
+    # have any
+    tmpdir3 = tmpdir.mkdir('tmp03')
+    asset = AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir3),
+    )
+    obj = Apprise.instantiate(
+        'mailto://chris:pass@nuxref.com?pgp=yes', asset=asset)
+
+    assert obj.store.mode == PersistentStoreMode.FLUSH
+
+    # We'll have a public key object to encrypt with
+    assert obj.pgp_public_key() is not None
+
+    encrypted = obj.pgp_encrypt_message("hello world")
+    assert encrypted.startswith('-----BEGIN PGP MESSAGE-----')
+    assert encrypted.rstrip().endswith('-----END PGP MESSAGE-----')
