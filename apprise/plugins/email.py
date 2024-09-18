@@ -44,6 +44,7 @@ from datetime import datetime
 from datetime import timedelta
 from datetime import timezone
 
+from ..apprise_attachment import AppriseAttachment
 from .base import NotifyBase
 from ..url import PrivacyMode
 from ..common import NotifyFormat, NotifyType, PersistentStoreMode
@@ -367,6 +368,10 @@ class NotifyEmail(NotifyBase):
     # Support attachments
     attachment_support = True
 
+    # There is no reason a PGP Public Key should exceed 8K in size
+    # If it is more than this, then it is not accepted
+    max_pgp_public_key_size = 8000
+
     # Default Notify Format
     notify_format = NotifyFormat.HTML
 
@@ -469,6 +474,14 @@ class NotifyEmail(NotifyBase):
             'type': 'list:string',
             'map_to': 'reply_to',
         },
+        'pgpkey': {
+            'name': _('PGP Public Key Path'),
+            'type': 'string',
+            'private': True,
+            # By default persistent storage is referenced
+            'default': '',
+            'map_to': 'pgp_key',
+        },
     })
 
     # Define any kwargs we're using
@@ -481,7 +494,7 @@ class NotifyEmail(NotifyBase):
 
     def __init__(self, smtp_host=None, from_addr=None, secure_mode=None,
                  targets=None, cc=None, bcc=None, reply_to=None, headers=None,
-                 use_pgp=None, **kwargs):
+                 use_pgp=None, pgp_key=None, **kwargs):
         """
         Initialize Email Object
 
@@ -528,6 +541,18 @@ class NotifyEmail(NotifyBase):
             self.logger.warning(
                 'PGP Support is not available on this installation; '
                 'ask admin to install PGPy')
+
+        # Our template object is just an AppriseAttachment object
+        if pgp_key:
+            self.pgp_key = AppriseAttachment(asset=self.asset)
+            # Add our definition to our pgp_key reference
+            self.pgp_key.add(pgp_key)
+            # Enforce maximum file size
+            self.pgp_key[0].max_file_size = self.max_pgp_public_key_size
+
+        else:
+            # No key; use auto-generation
+            self.pgp_key = None
 
         # Now detect secure mode
         if secure_mode:
@@ -861,6 +886,7 @@ class NotifyEmail(NotifyBase):
                 base = mixed
 
             if self.use_pgp:
+                self.logger.debug("Securing email with PGP Encryption")
                 # Apply our encryption
                 encrypted_content = self.pgp_encrypt_message(base.as_string())
                 if encrypted_content:
@@ -1054,10 +1080,26 @@ class NotifyEmail(NotifyBase):
         return True
 
     @property
-    def pgp_fnames(self):
+    def pgp_pubkey(self):
         """
         Returns a list of filenames worth scanning for
         """
+        if self.pgp_key is not None:
+            # If our code reaches here, then we fetch our public key
+            pgp_key = self.pgp_key[0]
+            if not pgp_key:
+                # We could not access the attachment
+                self.logger.error(
+                    'Could not access PGP Public Key {}.'.format(
+                        pgp_key.url(privacy=True)))
+                return False
+
+            return pgp_key.path
+
+        elif not self.store.path:
+            # No path
+            return None
+
         fnames = [
             'pgp-public.asc',
             'pgp-pub.asc',
@@ -1077,7 +1119,11 @@ class NotifyEmail(NotifyBase):
         if _entry not in fnames:
             fnames.insert(0, f'{_entry}-pub.asc')
 
-        return fnames
+        return next(
+            (os.path.join(self.store.path, fname)
+             for fname in fnames
+             if os.path.isfile(os.path.join(self.store.path, fname))),
+            None)
 
     def pgp_public_key(self, path=None):
         """
@@ -1085,20 +1131,11 @@ class NotifyEmail(NotifyBase):
         is used to encrypt the message
         """
         if path is None:
-            path = next(
-                (os.path.join(self.store.path, fname)
-                 for fname in self.pgp_fnames
-                 if os.path.isfile(os.path.join(self.store.path, fname))),
-                None)
+            path = self.pgp_pubkey
 
             if not path:
                 if self.pgp_generate_keys(path=self.store.path):
-                    path = next(
-                        (os.path.join(self.store.path, fname)
-                         for fname in self.pgp_fnames
-                         if os.path.isfile(
-                             os.path.join(self.store.path, fname))), None)
-
+                    path = self.pgp_pubkey
                     if path:
                         # We should get a hit now
                         return self.pgp_public_key(path=path)
@@ -1138,7 +1175,6 @@ class NotifyEmail(NotifyBase):
             self.logger.debug(f'I/O Exception: {e}')
             return None
 
-        self.store.set(ps_key, public_key, expires=86400)
         self.pgp_public_keys[ps_key] = {
             'public_key': public_key,
             'expires':
@@ -1178,6 +1214,11 @@ class NotifyEmail(NotifyBase):
         params = {
             'pgp': 'yes' if self.use_pgp else 'no',
         }
+
+        # Store oure public key back into your URL
+        if self.pgp_key is not None:
+            params['pgp_key'] = NotifyEmail.quote(
+                self.pgp_key[0].url(privacy=privacy), safe=':')
 
         # Append our headers into our parameters
         params.update({'+{}'.format(k): v for k, v in self.headers.items()})
@@ -1334,6 +1375,11 @@ class NotifyEmail(NotifyBase):
         results['use_pgp'] = \
             parse_bool(results['qsd'].get(
                 'pgp', NotifyEmail.template_args['pgp']['default']))
+
+        # Get PGP Public Key Override
+        if 'pgpkey' in results['qsd'] and results['qsd']['pgpkey']:
+            results['pgp_key'] = \
+                NotifyEmail.unquote(results['qsd']['pgpkey'])
 
         # The From address is a must; either through the use of templates
         # from= entry and/or merging the user and hostname together, this

@@ -2068,27 +2068,42 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     # Initialize our email (no from name)
     obj = Apprise.instantiate('mailto://user:pass@nuxref.com?pgp=yes')
 
-    # Test our names
-    fnames = obj.pgp_fnames
-    assert isinstance(fnames, list)
-
-    # login is pgp
-    obj = Apprise.instantiate('mailto://pgp:pass@nuxref.com?pgp=yes')
-
-    # Test our names
-    fnames = obj.pgp_fnames
-    assert isinstance(fnames, list)
-
-    # login is pgp
-    obj = Apprise.instantiate('mailto://chris:pass@nuxref.com?pgp=yes')
-    fnames = obj.pgp_fnames
-    assert isinstance(fnames, list)
-
-    # Attempt to generate keys
-    obj = Apprise.instantiate('mailto://chris:pass@nuxref.com?pgp=yes')
-    # We're in memory mode
-    assert obj.store.mode == PersistentStoreMode.MEMORY
+    # Nothing to lookup
+    assert obj.pgp_pubkey is None
+    assert obj.pgp_public_key() is None
+    assert obj.pgp_encrypt_message("message") is False
+    # Keys can not be generated in memory mode
     assert obj.pgp_generate_keys() is False
+
+    # The reason... no location to store data
+    assert obj.store.mode == PersistentStoreMode.MEMORY
+
+    tmpdir0 = tmpdir.mkdir('tmp00')
+    asset = AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir0),
+    )
+
+    # Prepare PGP
+    obj = Apprise.instantiate(
+        'mailto://pgp:pass@nuxref.com?pgp=yes', asset=asset)
+    assert obj.store.mode == PersistentStoreMode.FLUSH
+
+    # Still no public key
+    assert obj.pgp_pubkey is None
+
+    assert obj.pgp_generate_keys() is True
+    # Now we'll have a public key
+    assert isinstance(obj.pgp_pubkey, str)
+
+    # Prepare PGP
+    obj = Apprise.instantiate(
+        f'mailto://pgp:pass@nuxref.com?pgp=yes&pgpkey={obj.pgp_pubkey}',
+        asset=asset)
+
+    # We will find our key
+    assert obj.pgp_public_key() is not None
+
     tmpdir1 = tmpdir.mkdir('tmp01')
     # However explicitly setting a path works
     assert obj.pgp_generate_keys(str(tmpdir1)) is True
