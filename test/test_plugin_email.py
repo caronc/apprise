@@ -2069,7 +2069,7 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     obj = Apprise.instantiate('mailto://user:pass@nuxref.com?pgp=yes')
 
     # Nothing to lookup
-    assert obj.pgp_pubkey is None
+    assert obj.pgp_pubkey() is None
     assert obj.pgp_public_key() is None
     assert obj.pgp_encrypt_message("message") is False
     # Keys can not be generated in memory mode
@@ -2090,15 +2090,15 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     assert obj.store.mode == PersistentStoreMode.FLUSH
 
     # Still no public key
-    assert obj.pgp_pubkey is None
+    assert obj.pgp_pubkey() is None
 
     assert obj.pgp_generate_keys() is True
     # Now we'll have a public key
-    assert isinstance(obj.pgp_pubkey, str)
+    assert isinstance(obj.pgp_pubkey(), str)
 
     # Prepare PGP
     obj = Apprise.instantiate(
-        f'mailto://pgp:pass@nuxref.com?pgp=yes&pgpkey={obj.pgp_pubkey}',
+        'mailto://pgp:pass@nuxref.com?pgp=yes&pgpkey=%s' % obj.pgp_pubkey(),
         asset=asset)
 
     # We will find our key
