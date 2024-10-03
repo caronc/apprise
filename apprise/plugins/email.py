@@ -1011,14 +1011,8 @@ class NotifyEmail(NotifyBase):
 
         finally:
             # Gracefully terminate the connection with the server
-            if socket is not None:  # pragma: no branch
-                try:
-                    socket.quit()
-
-                except (SocketError, smtplib.SMTPException):
-                    # No need to make this a bigger issue as we were exiting
-                    # anyway
-                    pass
+            if socket is not None:
+                socket.quit()
 
         # Reduce our dictionary (eliminate expired keys if any)
         self.pgp_public_keys = {
@@ -1057,6 +1051,12 @@ class NotifyEmail(NotifyBase):
         file_prefix = email.split('@')[0].lower()
         pub_path = os.path.join(path, f'{file_prefix}-pub.asc')
         prv_path = os.path.join(path, f'{file_prefix}-prv.asc')
+
+        if os.path.isfile(pub_path):
+            self.logger.warning(
+                'PGP generation aborted; Public key already exists: %s',
+                pub_path)
+            return True
 
         # Add the user ID to the key
         key.add_uid(uid, usage={
@@ -1140,12 +1140,10 @@ class NotifyEmail(NotifyBase):
             'pub.asc',
         ]
 
-        emails = []
+        # Prepare our key files
+        emails = [self.from_addr[1]]
         if email:
             emails.append(email)
-
-        # Prepare our key files:
-        emails.append(self.from_addr[1])
 
         for email in emails:
             _entry = email.split('@')[0].lower()
@@ -1180,11 +1178,6 @@ class NotifyEmail(NotifyBase):
 
                 self.logger.warning('No PGP Public Key could be loaded')
                 return None
-
-        if not isinstance(path, str):
-            raise AttributeError(
-                'Invalid path to PGP Public Key specified: %s: %s',
-                type(path), str(path))
 
         # Persistent storage key:
         ps_key = hashlib.sha1(
