@@ -2147,6 +2147,12 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     # However explicitly setting a path works
     assert obj.pgp_generate_keys(str(tmpdir1)) is True
 
+    # Prepare Invalid PGP Key
+    obj = Apprise.instantiate(
+        'mailto://pgp:pass@nuxref.com?pgp=yes&pgpkey=invalid',
+        asset=asset)
+    assert obj.pgp_pubkey() is False
+
     tmpdir2 = tmpdir.mkdir('tmp02')
     asset = AppriseAsset(
         storage_mode=PersistentStoreMode.FLUSH,
@@ -2204,6 +2210,10 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
         os.path.join(obj.store.path, 'user@example.com-pub.asc'))
 
     assert obj.pgp_pubkey() is None
+    assert obj.pgp_pubkey(email="not-reference@example.com") is None
+    assert obj.pgp_pubkey(email="user@example.com")\
+        .endswith('user@example.com-pub.asc')
+
     assert obj.pgp_pubkey(email="user@example.com")\
         .endswith('user@example.com-pub.asc')
     assert obj.pgp_pubkey(email="User@Example.com")\
@@ -2214,6 +2224,7 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
         os.path.join(obj.store.path, 'user@example.com-pub.asc'),
         os.path.join(obj.store.path, 'user-pub.asc'),
     )
+
     assert obj.pgp_pubkey(email="user@example.com")\
         .endswith('user@example.com-pub.asc')
     assert obj.pgp_pubkey(email="User@Example.com")\
@@ -2255,12 +2266,19 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     obj = Apprise.instantiate(
         'mailto://chris:pass@nuxref.com/user@example.com?pgp=yes', asset=asset)
 
-    with mock.patch('builtins.open', side_effect=OSError()):
+    with mock.patch('builtins.open', side_effect=FileNotFoundError):
+        # can't open key
+        assert obj.pgp_public_key(path=obj.store.path) is None
+
+    with mock.patch('builtins.open', side_effect=OSError):
         # can't open key
         assert obj.pgp_public_key(path=obj.store.path) is None
         # Test unlink
-        with mock.patch('os.unlink', side_effect=OSError()):
+        with mock.patch('os.unlink', side_effect=OSError):
             assert obj.pgp_public_key(path=obj.store.path) is None
+
+        # Key Generation will fail
+        assert obj.pgp_generate_keys() is False
 
     with mock.patch('pgpy.PGPKey.new', side_effect=NameError):
         # Can't Generate keys
@@ -2282,3 +2300,67 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
 
     with mock.patch('pgpy.PGPMessage.new', side_effect=NameError):
         assert obj.pgp_encrypt_message("message") is None
+        # Attempts to encrypt a message
+        assert obj.notify('test') is False
+
+    # Create new keys
+    assert obj.pgp_generate_keys() is True
+    with mock.patch('os.path.isfile', return_value=False):
+        with mock.patch('builtins.open', side_effect=OSError):
+            with mock.patch('os.unlink', return_value=None):
+                assert obj.pgp_generate_keys() is False
+
+    # Testing again
+    tmpdir5 = tmpdir.mkdir('tmp05')
+    asset = AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir5),
+    )
+    obj = Apprise.instantiate(
+        'mailto://chris:pass@nuxref.com/user@example.com?pgp=yes', asset=asset)
+
+    # Catch edge case where we just can't generate the the key
+    with mock.patch('os.path.isfile', side_effect=(
+            # 5x False to skip through pgp_pubkey()
+            False, False, False, False, False, False,
+            # 1x True to pass pgp_generate_keys()
+            True,
+            # 5x False to skip through pgp_pubkey() second call
+            False, False, False, False, False, False)):
+        with mock.patch('pgpy.PGPKey.from_blob',
+                        side_effect=FileNotFoundError):
+            assert obj.pgp_public_key() is None
+
+    # Corrupt Data
+    tmpdir6 = tmpdir.mkdir('tmp06')
+    asset = AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir6),
+    )
+    obj = Apprise.instantiate(
+        'mailto://chris:pass@nuxref.com/user@example.com?pgp=yes', asset=asset)
+
+    shutil.copyfile(
+        os.path.join(TEST_VAR_DIR, 'pgp', 'corrupt-pub.asc'),
+        os.path.join(obj.store.path, 'chris-pub.asc'),
+    )
+
+    # Key is corrupted
+    obj.notify('test') is False
+
+    shutil.copyfile(
+        os.path.join(TEST_VAR_DIR, 'apprise-test.jpeg'),
+        os.path.join(obj.store.path, 'chris-pub.asc'),
+    )
+
+    # Key is a binary image; definitely not a valid key
+    obj.notify('test') is False
+
+    # Using a public key
+    shutil.copyfile(
+        os.path.join(TEST_VAR_DIR, 'pgp', 'valid-pub.asc'),
+        os.path.join(obj.store.path, 'chris-pub.asc'),
+    )
+
+    # Notification goes through
+    obj.notify('test') is True

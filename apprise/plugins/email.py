@@ -900,25 +900,29 @@ class NotifyEmail(NotifyBase):
 
                 # Apply our encryption
                 encrypted_content = self.pgp_encrypt_message(base.as_string())
-                if encrypted_content:
-                    # prepare our messsage
-                    base = MIMEMultipart(
-                        "encrypted", protocol="application/pgp-encrypted")
+                if not encrypted_content:
+                    self.logger.warning('Unable to PGP encrypt email')
+                    # Unable to send notification
+                    return False
 
-                    # Store Autocrypt header (DeltaChat Support)
-                    base.add_header(
-                        "Autocrypt",
-                        "addr=%s; prefer-encrypt=mutual" % formataddr(
-                            (False, to_addr), charset='utf-8'))
+                # prepare our messsage
+                base = MIMEMultipart(
+                    "encrypted", protocol="application/pgp-encrypted")
 
-                    # Set Encryption Info Part
-                    enc_payload = MIMEText("Version: 1", "plain")
-                    enc_payload.set_type("application/pgp-encrypted")
-                    base.attach(enc_payload)
+                # Store Autocrypt header (DeltaChat Support)
+                base.add_header(
+                    "Autocrypt",
+                    "addr=%s; prefer-encrypt=mutual" % formataddr(
+                        (False, to_addr), charset='utf-8'))
 
-                    enc_payload = MIMEBase("application", "octet-stream")
-                    enc_payload.set_payload(encrypted_content)
-                    base.attach(enc_payload)
+                # Set Encryption Info Part
+                enc_payload = MIMEText("Version: 1", "plain")
+                enc_payload.set_type("application/pgp-encrypted")
+                base.attach(enc_payload)
+
+                enc_payload = MIMEBase("application", "octet-stream")
+                enc_payload.set_payload(encrypted_content)
+                base.attach(enc_payload)
 
             # Apply any provided custom headers
             for k, v in self.headers.items():
@@ -1147,13 +1151,11 @@ class NotifyEmail(NotifyBase):
 
         for email in emails:
             _entry = email.split('@')[0].lower()
-            if _entry not in fnames:
-                fnames.insert(0, f'{_entry}-pub.asc')
+            fnames.insert(0, f'{_entry}-pub.asc')
 
             # Lowercase email (Highest Priority)
             _entry = email.lower()
-            if _entry not in fnames:
-                fnames.insert(0, f'{_entry}-pub.asc')
+            fnames.insert(0, f'{_entry}-pub.asc')
 
         return next(
             (os.path.join(self.store.path, fname)
@@ -1179,7 +1181,7 @@ class NotifyEmail(NotifyBase):
                 self.logger.warning('No PGP Public Key could be loaded')
                 return None
 
-        # Persistent storage key:
+        # Persistent storage key
         ps_key = hashlib.sha1(
             os.path.abspath(path).encode('utf-8')).hexdigest()
         if ps_key in self.pgp_public_keys:
@@ -1229,6 +1231,11 @@ class NotifyEmail(NotifyBase):
             message_object = pgpy.PGPMessage.new(message)
             encrypted_message = public_key.encrypt(message_object)
             return str(encrypted_message)
+
+        except pgpy.errors.PGPError:
+            # Encryption not Possible
+            self.logger.debug(
+                'PGP Public Key Corruption; encryption not possible')
 
         except NameError:
             # PGPy not installed
