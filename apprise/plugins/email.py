@@ -52,7 +52,6 @@ from ..common import NotifyFormat, NotifyType, PersistentStoreMode
 from ..conversion import convert_between
 from ..utils import is_ipaddr, is_email, parse_emails, is_hostname, parse_bool
 from ..locale import gettext_lazy as _
-from ..logger import logger
 
 try:
     import pgpy
