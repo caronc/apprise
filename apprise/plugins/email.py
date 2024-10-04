@@ -52,7 +52,6 @@ from ..common import NotifyFormat, NotifyType, PersistentStoreMode
 from ..conversion import convert_between
 from ..utils import is_ipaddr, is_email, parse_emails, is_hostname, parse_bool
 from ..locale import gettext_lazy as _
-from ..logger import logger
 
 try:
     import pgpy
@@ -1440,14 +1439,9 @@ class NotifyEmail(NotifyBase):
             from_addr = NotifyEmail.unquote(results['qsd']['from'])
 
             if 'name' in results['qsd'] and len(results['qsd']['name']):
-                # Depricate use of both `from=` and `name=` in the same url as
-                # they will be synomomus of one another in the future.
                 from_addr = formataddr(
                     (NotifyEmail.unquote(results['qsd']['name']), from_addr),
                     charset='utf-8')
-                logger.warning(
-                    'Email name= and from= are synonymous; '
-                    'use one or the other.')
 
         elif 'name' in results['qsd'] and len(results['qsd']['name']):
             # Extract from name to associate with from address
