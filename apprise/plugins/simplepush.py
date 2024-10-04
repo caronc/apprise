@@ -177,7 +177,25 @@ class NotifySimplePush(NotifyBase):
 
         padder = padding.PKCS7(algorithms.AES.block_size).padder()
         content = padder.update(content.encode()) + padder.finalize()
+        #
+        # Encryption Notice
+        #
 
+        # CBC mode doesn't provide integrity guarantees. Unless the message
+        # authentication for IV and the ciphertext are applied, it will be
+        # vulnerable to a padding oracle attack
+
+        # It is important to identify that both the Apprise package and team
+        # recognizes this AES-CBC-128 weakness but requires that it exists due
+        # to it being the SimplePush Requirement as documented on their
+        # website here https://simplepush.io/features.
+
+        # In the event the website link above does not exist/work, a screen
+        # capture of the reference to the requirement for this encryption
+        # can also be found on the Apprise SimplePush Wiki:
+        #   https://github.com/caronc/apprise/wiki/Notify_simplepush\
+        #       #lock-aes-cbc-128-encryption-weakness
+        #
         encryptor = Cipher(
             algorithms.AES(self._key),
             modes.CBC(self._iv),
