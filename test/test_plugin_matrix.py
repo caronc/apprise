@@ -1402,7 +1402,7 @@ def test_plugin_matrix_transaction_ids_api_v3_no_cache(
         # Instantiate our object
         obj = Apprise.instantiate('matrix://user:pass@localhost/#general?v=3')
 
-        # Ensure mode is flush
+        # Ensure mode is memory
         assert obj.store.mode == PersistentStoreMode.MEMORY
 
         # Performs a login
