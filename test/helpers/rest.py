@@ -219,7 +219,7 @@ class AppriseURLTester:
 
         if not isinstance(obj, instance):
             print('%s instantiated %s (but expected %s)' % (
-                url, type(instance), type(obj)))
+                url, type(obj), instance))
             assert False
 
         if isinstance(obj, NotifyBase):
