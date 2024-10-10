@@ -105,7 +105,6 @@ BuildRequires: python%{python3_pkgversion}-pytest
 BuildRequires: python%{python3_pkgversion}-pytest-mock
 BuildRequires: python%{python3_pkgversion}-pytest-runner
 BuildRequires: python%{python3_pkgversion}-pytest-cov
-BuildRequires: python%{python3_pkgversion}-pytest-xdist
 %endif
 
 %description -n python%{python3_pkgversion}-%{pypi_name} %{common_description}
