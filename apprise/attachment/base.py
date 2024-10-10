@@ -359,11 +359,26 @@ class AttachBase(URLBase):
 
     def open(self, mode='rb'):
         """
-        return our file pointer and track it (we'll auto close later
+        return our file pointer and track it (we'll auto close later)
         """
         pointer = open(self.path, mode=mode)
         self.__pointers.add(pointer)
         return pointer
+
+    def chunk(self, size=5242880):
+        """
+        A Generator that yield chunks of a file with the specified size.
+
+        By default the chunk size is set to 5MB (5242880 bytes)
+        """
+
+        with self.open() as file:
+            while True:
+                chunk = file.read(size)
+                if not chunk:
+                    break
+
+                yield chunk
 
     def __enter__(self):
         """
@@ -431,7 +446,15 @@ class AttachBase(URLBase):
         Returns the filesize of the attachment.
 
         """
-        return os.path.getsize(self.path) if self.path else 0
+        if not self:
+            return 0
+
+        try:
+            return os.path.getsize(self.path) if self.path else 0
+
+        except OSError:
+            # OSError can occur if the file is inaccessible
+            return 0
 
     def __bool__(self):
         """
