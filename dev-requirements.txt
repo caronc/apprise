@@ -3,5 +3,4 @@ flake8
 pytest
 pytest-cov
 pytest-mock
-pytest-xdist
 babel
