@@ -34,6 +34,8 @@ import requests
 from datetime import datetime
 from json import dumps
 from apprise import Apprise
+from apprise import NotifyType
+from apprise import AppriseAttachment
 from apprise.plugins.office365 import NotifyOffice365
 from helpers import AppriseURLTester
 
@@ -57,7 +59,7 @@ apprise_url_tests = (
         # invalid url
         'instance': TypeError,
     }),
-    ('o365://{tenant}:{aid}/{cid}/{secret}/{targets}'.format(
+    ('o365://{aid}/{tenant}/{cid}/{secret}/{targets}'.format(
         # invalid tenant
         tenant=',',
         cid='ab-cd-ef-gh',
@@ -65,10 +67,10 @@ apprise_url_tests = (
         secret='abcd/123/3343/@jack/test',
         targets='/'.join(['email1@test.ca'])), {
 
-        # We're valid and good to go
+        # Expected failure
         'instance': TypeError,
     }),
-    ('o365://{tenant}:{aid}/{cid}/{secret}/{targets}'.format(
+    ('o365://{aid}/{tenant}/{cid}/{secret}/{targets}'.format(
         tenant='tenant',
         # invalid client id
         cid='ab.',
@@ -76,13 +78,50 @@ apprise_url_tests = (
         secret='abcd/123/3343/@jack/test',
         targets='/'.join(['email1@test.ca'])), {
 
-        # We're valid and good to go
+        # Expected failure
         'instance': TypeError,
     }),
-    ('o365://{tenant}:{aid}/{cid}/{secret}/{targets}'.format(
+    ('o365://{aid}/{tenant}/{cid}/{secret}/{targets}?mode=invalid'.format(
+        # Invalid mode
         tenant='tenant',
         cid='ab-cd-ef-gh',
         aid='user@example.com',
+        secret='abcd/123/3343/@jack/test',
+        targets='/'.join(['email1@test.ca'])), {
+
+        # Expected failure
+        'instance': TypeError,
+    }),
+    ('o365://{tenant}/{cid}/{secret}/{targets}?mode=user'.format(
+        # Invalid mode when no email specified
+        tenant='tenant',
+        cid='ab-cd-ef-gh',
+        secret='abcd/123/3343/@jack/test',
+        targets='/'.join(['email1@test.ca'])), {
+
+        # Expected failure
+        'instance': TypeError,
+    }),
+    ('o365://{tenant}/{cid}/{secret}/{targets}?mode=self'.format(
+        # email not required if mode is set to self
+        tenant='tenant',
+        cid='ab-cd-ef-gh',
+        secret='abcd/123/3343/@jack/test',
+        targets='/'.join(['email1@test.ca'])), {
+
+        # We're valid and good to go
+        'instance': NotifyOffice365,
+
+        # Test what happens if a batch send fails to return a messageCount
+        'requests_response_text': {
+            'expires_in': 2000,
+            'access_token': 'abcd1234',
+        },
+    }),
+    ('o365://{aid}/{tenant}/{cid}/{secret}/{targets}'.format(
+        tenant='tenant',
+        cid='ab-cd-ef-gh',
+        aid='user@example.edu',
         secret='abcd/123/3343/@jack/test',
         targets='/'.join(['email1@test.ca'])), {
 
@@ -96,14 +135,14 @@ apprise_url_tests = (
         },
 
         # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'o365://t...t:user@example.com/a...h/'
-                       '****/email1%40test.ca/'}),
+        'privacy_url': 'azure://user@example.edu/t...t/a...h/'
+                       '****/email1@test.ca/'}),
     # test our arguments
     ('o365://_/?oauth_id={cid}&oauth_secret={secret}&tenant={tenant}'
         '&to={targets}&from={aid}'.format(
             tenant='tenant',
             cid='ab-cd-ef-gh',
-            aid='user@example.com',
+            aid='user@example.ca',
             secret='abcd/123/3343/@jack/test',
             targets='email1@test.ca'),
         {
@@ -117,10 +156,10 @@ apprise_url_tests = (
             },
 
             # Our expected url(privacy=True) startswith() response:
-            'privacy_url': 'o365://t...t:user@example.com/a...h/'
-                           '****/email1%40test.ca/'}),
+            'privacy_url': 'azure://user@example.ca/t...t/a...h/'
+                           '****/email1@test.ca/'}),
     # Test invalid JSON (no tenant defaults to email domain)
-    ('o365://{tenant}:{aid}/{cid}/{secret}/{targets}'.format(
+    ('o365://{aid}/{tenant}/{cid}/{secret}/{targets}'.format(
         tenant='tenant',
         cid='ab-cd-ef-gh',
         aid='user@example.com',
@@ -135,7 +174,7 @@ apprise_url_tests = (
         'notify_response': False,
     }),
     # No Targets specified
-    ('o365://{tenant}:{aid}/{cid}/{secret}'.format(
+    ('o365://{aid}/{tenant}/{cid}/{secret}'.format(
         tenant='tenant',
         cid='ab-cd-ef-gh',
         aid='user@example.com',
@@ -150,7 +189,7 @@ apprise_url_tests = (
             'access_token': 'abcd1234',
         },
     }),
-    ('o365://{tenant}:{aid}/{cid}/{secret}/{targets}'.format(
+    ('o365://{aid}/{tenant}/{cid}/{secret}/{targets}'.format(
         tenant='tenant',
         cid='zz-zz-zz-zz',
         aid='user@example.com',
@@ -212,7 +251,7 @@ def test_plugin_office365_general(mock_post):
 
     # Instantiate our object
     obj = Apprise.instantiate(
-        'o365://{tenant}:{email}/{tenant}/{secret}/{targets}'.format(
+        'o365://{email}/{tenant}/{secret}/{targets}'.format(
             tenant=tenant,
             email=email,
             secret=secret,
@@ -228,10 +267,11 @@ def test_plugin_office365_general(mock_post):
 
     # Instantiate our object
     obj = Apprise.instantiate(
-        'o365://{tenant}:{email}/{tenant}/{secret}/{targets}'
+        'o365://{email}/{tenant}/{client_id}/{secret}/{targets}'
         '?bcc={bcc}&cc={cc}'.format(
             tenant=tenant,
             email=email,
+            client_id=client_id,
             secret=secret,
             targets=targets,
             # Test the cc and bcc list (use good and bad email)
@@ -260,7 +300,7 @@ def test_plugin_office365_general(mock_post):
     with pytest.raises(TypeError):
         # Invalid email
         NotifyOffice365(
-            email=None,
+            email='invalid',
             client_id=client_id,
             tenant=tenant,
             secret=secret,
@@ -336,7 +376,7 @@ def test_plugin_office365_authentication(mock_post):
 
     # Instantiate our object
     obj = Apprise.instantiate(
-        'o365://{tenant}:{email}/{client_id}/{secret}/{targets}'.format(
+        'azure://{email}/{tenant}/{client_id}/{secret}/{targets}'.format(
             client_id=client_id,
             tenant=tenant,
             email=email,
@@ -394,3 +434,64 @@ def test_plugin_office365_authentication(mock_post):
     del invalid_auth_entries['expires_in']
     response.content = dumps(invalid_auth_entries)
     assert obj.authenticate() is False
+
+
+@mock.patch('requests.post')
+def test_plugin_office365_attachments(mock_post):
+    """
+    NotifyOffice365() Attachments
+
+    """
+
+    # Initialize some generic (but valid) tokens
+    email = 'user@example.net'
+    tenant = 'ff-gg-hh-ii-jj'
+    client_id = 'aa-bb-cc-dd-ee'
+    secret = 'abcd/1234/abcd@ajd@/test'
+    targets = 'target@example.com'
+
+    # Prepare Mock return object
+    authentication = {
+        "token_type": "Bearer",
+        "expires_in": 6000,
+        "access_token": "abcd1234"
+    }
+    okay_response = mock.Mock()
+    okay_response.content = dumps(authentication)
+    okay_response.status_code = requests.codes.ok
+    mock_post.return_value = okay_response
+
+    # Instantiate our object
+    obj = Apprise.instantiate(
+        'azure://{email}/{tenant}/{client_id}{secret}/{targets}'.format(
+            client_id=client_id,
+            tenant=tenant,
+            email=email,
+            secret=secret,
+            targets=targets))
+
+    assert isinstance(obj, NotifyOffice365)
+
+    # Test Valid Attachment
+    path = os.path.join(TEST_VAR_DIR, 'apprise-test.gif')
+    attach = AppriseAttachment(path)
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=attach) is True
+
+    # Test invalid attachment
+    path = os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=path) is False
+
+    with mock.patch('base64.b64encode', side_effect=OSError()):
+        # We can't send the message if we fail to parse the data
+        assert obj.notify(
+            body='body', title='title', notify_type=NotifyType.INFO,
+            attach=attach) is False
+
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=attach) is True
+    assert mock_post.call_count == 3
