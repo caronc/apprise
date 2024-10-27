@@ -29,10 +29,8 @@ import copy
 import re
 import sys
 import json
-import contextlib
 import os
 import binascii
-import locale
 import platform
 import typing
 import base64
@@ -1516,39 +1514,6 @@ def cwe312_url(url):
         fullpath=results['fullpath'] if results['fullpath'] else '',
         params=params,
     )
-
-
-@contextlib.contextmanager
-def environ(*remove, **update):
-    """
-    Temporarily updates the ``os.environ`` dictionary in-place.
-
-    The ``os.environ`` dictionary is updated in-place so that the modification
-    is sure to work in all situations.
-
-    :param remove: Environment variable(s) to remove.
-    :param update: Dictionary of environment variables and values to
-                   add/update.
-    """
-
-    # Create a backup of our environment for restoration purposes
-    env_orig = os.environ.copy()
-    loc_orig = locale.getlocale()
-    try:
-        os.environ.update(update)
-        [os.environ.pop(k, None) for k in remove]
-        yield
-
-    finally:
-        # Restore our snapshot
-        os.environ = env_orig.copy()
-        try:
-            # Restore locale
-            locale.setlocale(locale.LC_ALL, loc_orig)
-
-        except locale.Error:
-            # Handle this case
-            pass
 
 
 def apply_template(template, app_mode=TemplateType.RAW, **kwargs):

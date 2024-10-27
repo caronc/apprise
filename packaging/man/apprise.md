@@ -159,6 +159,9 @@ visit the [Apprise GitHub page][serviceurls] and see what's available.
 
 [serviceurls]: https://github.com/caronc/apprise/wiki#notification-services
 
+The **environment variable** of `APPRISE_URLS` (comma/space delimited) can be specified to
+provide the default set of URLs you wish to notify if none are otherwise specified.
+
 ## EXAMPLES
 
 Send a notification to as many servers as you want to specify as you can
@@ -215,8 +218,13 @@ files and loads them:
     ~/.config/apprise/plugins
     /var/lib/apprise/plugins
 
+The **environment variable** of `APPRISE_PLUGIN_PATH` can be specified to override
+the list identified above with one of your own.  use a semi-colon (`;`), line-feed (`\n`),
+and/or carriage return (`\r`) to delimit multiple entries.
+
 Simply create your own python file with the following bare minimum content in
 it:
+
     from apprise.decorators import notify
 
     # This example assumes you want your function to trigger on foobar://
@@ -263,6 +271,10 @@ in the following local locations for configuration files and loads them:
 The **configuration files** specified above can also be identified with a `.yml`
 extension or even just entirely removing the `.conf` extension altogether.
 
+The **environment variable** of `APPRISE_CONFIG_PATH` can be specified to override
+the list identified above with one of your own.  use a semi-colon (`;`), line-feed (`\n`),
+and/or carriage return (`\r`) to delimit multiple entries.
+
 If a default configuration file is referenced in any way by the **apprise**
 tool, you no longer need to provide it a Service URL.  Usage of the **apprise**
 tool simplifies to:
@@ -280,6 +292,22 @@ configuration that you want and only specifically notify a subset of them:
 [textconfig]: https://github.com/caronc/apprise/wiki/config_text
 [tagging]: https://github.com/caronc/apprise/wiki/CLI_Usage#label-leverage-tagging
 [pstorage]: https://github.com/caronc/apprise/wiki/persistent_storage
+
+## ENVIRONMENT VARIABLES
+  `APPRISE_URLS`:
+  Specify the default URLs to notify if none are otherwise specified on the command line.
+  Use white space and/or a comma (`,`) to delimit multiple entries.
+
+  `APPRISE_CONFIG_PATH`:
+  Explicitly specify the config search path to use (over-riding the default).
+  Use a semi-colon (`;`), line-feed (`\n`), and/or carriage return (`\r`) to delimit multiple entries.
+
+  `APPRISE_PLUGIN_PATH`:
+  Explicitly specify the plugin search path to use (over-riding the default).
+  Use a semi-colon (`;`), line-feed (`\n`), and/or carriage return (`\r`) to delimit multiple entries.
+
+  `APPRISE_STORAGE_PATH`:
+  Explicitly specify the persistent storage path to use (over-riding the default).
 
 ## BUGS
 

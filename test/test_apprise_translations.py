@@ -34,7 +34,7 @@ import ctypes
 import pytest
 
 from apprise import locale
-from apprise.utils import environ
+from helpers import environ
 from importlib import reload
 
 # Disable logging for a cleaner testing output

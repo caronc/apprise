@@ -68,6 +68,21 @@ DEFAULT_STORAGE_PRUNE_DAYS = \
 DEFAULT_STORAGE_UID_LENGTH = \
     int(os.environ.get('APPRISE_STORAGE_UID_LENGTH', 8))
 
+# Defines the envrionment variable to parse if defined. This is ONLY
+# Referenced if:
+# - No Configuration Files were found/loaded/specified
+# - No URLs were provided directly into the CLI Call
+DEFAULT_ENV_APPRISE_URLS = 'APPRISE_URLS'
+
+# Defines the over-ride path for the configuration files read
+DEFAULT_ENV_APPRISE_CONFIG_PATH = 'APPRISE_CONFIG_PATH'
+
+# Defines the over-ride path for the plugins to load
+DEFAULT_ENV_APPRISE_PLUGIN_PATH = 'APPRISE_PLUGIN_PATH'
+
+# Defines the over-ride path for the persistent storage
+DEFAULT_ENV_APPRISE_STORAGE_PATH = 'APPRISE_STORAGE_PATH'
+
 # Defines our click context settings adding -h to the additional options that
 # can be specified to get the help menu to come up
 CONTEXT_SETTINGS = dict(help_option_names=['-h', '--help'])
@@ -496,11 +511,53 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
         # issue.  For consistency, we also return a 2
         ctx.exit(2)
 
-    if not plugin_path:
-        # Prepare a default set of plugin path
-        plugin_path = \
-            [path for path in DEFAULT_PLUGIN_PATHS
-             if exists(path_decode(path))]
+    #
+    # Apply Environment Over-rides if defined
+    #
+    _config_paths = DEFAULT_CONFIG_PATHS
+    if 'APPRISE_CONFIG' in os.environ:
+        # Deprecate (this was from previous versions of Apprise <= 1.9.1)
+        logger.deprecate(
+            'APPRISE_CONFIG environment variable has been changed to '
+            f'{DEFAULT_ENV_APPRISE_CONFIG_PATH}')
+        logger.debug(
+            'Loading provided APPRISE_CONFIG (deprecated) environment '
+            'variable')
+        _config_paths = (os.environ.get('APPRISE_CONFIG', '').strip(), )
+
+    elif DEFAULT_ENV_APPRISE_CONFIG_PATH in os.environ:
+        logger.debug(
+            f'Loading provided {DEFAULT_ENV_APPRISE_CONFIG_PATH} '
+            'environment variable')
+        _config_paths = re.split(
+            r'[\r\n;]+', os.environ.get(
+                DEFAULT_ENV_APPRISE_CONFIG_PATH).strip())
+
+    _plugin_paths = DEFAULT_PLUGIN_PATHS
+    if DEFAULT_ENV_APPRISE_PLUGIN_PATH in os.environ:
+        logger.debug(
+            f'Loading provided {DEFAULT_ENV_APPRISE_PLUGIN_PATH} environment '
+            'variable')
+        _plugin_paths = re.split(
+            r'[\r\n;]+', os.environ.get(
+                DEFAULT_ENV_APPRISE_PLUGIN_PATH).strip())
+
+    if DEFAULT_ENV_APPRISE_STORAGE_PATH in os.environ:
+        logger.debug(
+            f'Loading provided {DEFAULT_ENV_APPRISE_STORAGE_PATH} environment '
+            'variable')
+        storage_path = \
+            os.environ.get(DEFAULT_ENV_APPRISE_STORAGE_PATH).strip()
+
+    #
+    # Continue with initialization process
+    #
+
+    # Prepare a default set of plugin paths to scan; anything specified
+    # on the CLI always trumps
+    plugin_paths = \
+        [path for path in _plugin_paths if exists(path_decode(path))] \
+        if not plugin_path else plugin_path
 
     if storage_uid_length < 2:
         click.echo(
@@ -533,7 +590,7 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
         async_mode=disable_async is not True,
 
         # Load our plugins
-        plugin_paths=plugin_path,
+        plugin_paths=plugin_paths,
 
         # Load our persistent storage path
         storage_path=path_decode(storage_path),
@@ -636,8 +693,7 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
     #    1. URLs by command line
     #    2. Configuration by command line
     #    3. URLs by environment variable: APPRISE_URLS
-    #    4. Configuration by environment variable: APPRISE_CONFIG
-    #    5. Default Configuration File(s) (if found)
+    #    4. Default Configuration File(s)
     #
     elif urls and not storage_action:
         if tag:
@@ -662,8 +718,10 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
         a.add(AppriseConfig(
             paths=config, asset=asset, recursion=recursion_depth))
 
-    elif os.environ.get('APPRISE_URLS', '').strip():
-        logger.debug('Loading provided APPRISE_URLS environment variable')
+    elif os.environ.get(DEFAULT_ENV_APPRISE_URLS, '').strip():
+        logger.debug(
+            f'Loading provided {DEFAULT_ENV_APPRISE_URLS} environment '
+            'variable')
         if tag:
             # Ignore any tags specified
             logger.warning(
@@ -671,19 +729,12 @@ def main(ctx, body, title, config, attach, urls, notification_type, theme, tag,
             tag = None
 
         # Attempt to use our APPRISE_URLS environment variable (if populated)
-        a.add(os.environ['APPRISE_URLS'].strip())
-
-    elif os.environ.get('APPRISE_CONFIG', '').strip():
-        logger.debug('Loading provided APPRISE_CONFIG environment variable')
-        # Fall back to config environment variable (if populated)
-        a.add(AppriseConfig(
-            paths=os.environ['APPRISE_CONFIG'].strip(),
-            asset=asset, recursion=recursion_depth))
+        a.add(os.environ[DEFAULT_ENV_APPRISE_URLS].strip())
 
     else:
         # Load default configuration
         a.add(AppriseConfig(
-            paths=[f for f in DEFAULT_CONFIG_PATHS if isfile(path_decode(f))],
+            paths=[f for f in _config_paths if isfile(path_decode(f))],
             asset=asset, recursion=recursion_depth))
 
     if not dry_run and not (a or storage_action):
