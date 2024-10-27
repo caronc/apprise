@@ -295,15 +295,16 @@ configuration that you want and only specifically notify a subset of them:
 
 ## ENVIRONMENT VARIABLES
   `APPRISE_URLS`:
-  Specify the default URLs to notify if none are otherwise specified on the command line.
-  Use white space and/or a comma (`,`) to delimit multiple entries.
+  Specify the default URLs to notify IF none are otherwise specified on the command line
+  explicitly.  If the `--config` (`-c`) is specified, then this will over-rides any
+  reference to this variable. Use white space and/or a comma (`,`) to delimit multiple entries.
 
   `APPRISE_CONFIG_PATH`:
   Explicitly specify the config search path to use (over-riding the default).
   Use a semi-colon (`;`), line-feed (`\n`), and/or carriage return (`\r`) to delimit multiple entries.
 
   `APPRISE_PLUGIN_PATH`:
-  Explicitly specify the plugin search path to use (over-riding the default).
+  Explicitly specify the custom plugin search path to use (over-riding the default).
   Use a semi-colon (`;`), line-feed (`\n`), and/or carriage return (`\r`) to delimit multiple entries.
 
   `APPRISE_STORAGE_PATH`:
