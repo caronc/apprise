@@ -40,7 +40,7 @@ from apprise import cli
 from apprise import NotifyBase
 from apprise import NotificationManager
 from click.testing import CliRunner
-from apprise.utils import environ
+from helpers import environ
 from apprise.locale import gettext_lazy as _
 
 from importlib import reload
@@ -515,6 +515,22 @@ def test_apprise_cli_nux_env(tmpdir):
         assert result.exit_code == 0
 
     with environ(APPRISE_CONFIG=str(t2)):
+        # Deprecated test case
+        result = runner.invoke(cli.main, [
+            '-b', 'has myTag',
+            '--tag', 'myTag',
+        ])
+        assert result.exit_code == 0
+
+    with environ(APPRISE_CONFIG_PATH=str(t2)):
+        # Our configuration file will load from our environmment variable
+        result = runner.invoke(cli.main, [
+            '-b', 'has myTag',
+            '--tag', 'myTag',
+        ])
+        assert result.exit_code == 0
+
+    with environ(APPRISE_CONFIG_PATH=str(t2) + ';/another/path'):
         # Our configuration file will load from our environmment variable
         result = runner.invoke(cli.main, [
             '-b', 'has myTag',
@@ -676,6 +692,17 @@ def test_apprise_cli_modules(tmpdir):
     ])
 
     assert result.exit_code == 0
+
+    with environ(
+            APPRISE_PLUGIN_PATH=str(notify_cmod) + ';' + str(notify_cmod2)):
+        # Leverage our environment variables to specify the plugin path
+        result = runner.invoke(cli.main, [
+            '-b', 'body',
+            'climod://',
+            'climod2://',
+        ])
+
+        assert result.exit_code == 0
 
 
 @pytest.mark.skipif(

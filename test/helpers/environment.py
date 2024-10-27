@@ -26,14 +26,43 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from .rest import AppriseURLTester
-from .asyncio import OuterEventLoop
-from .module import reload_plugin
-from .environment import environ
+import os
+import contextlib
+import locale
 
-__all__ = [
-    'AppriseURLTester',
-    'OuterEventLoop',
-    'reload_plugin',
-    'environ',
-]
+# Disable logging for a cleaner testing output
+import logging
+logging.disable(logging.CRITICAL)
+
+
+@contextlib.contextmanager
+def environ(*remove, **update):
+    """
+    Temporarily updates the ``os.environ`` dictionary in-place.
+
+    The ``os.environ`` dictionary is updated in-place so that the modification
+    is sure to work in all situations.
+
+    :param remove: Environment variable(s) to remove.
+    :param update: Dictionary of environment variables and values to
+                   add/update.
+    """
+
+    # Create a backup of our environment for restoration purposes
+    env_orig = os.environ.copy()
+    loc_orig = locale.getlocale()
+    try:
+        os.environ.update(update)
+        [os.environ.pop(k, None) for k in remove]
+        yield
+
+    finally:
+        # Restore our snapshot
+        os.environ = env_orig.copy()
+        try:
+            # Restore locale
+            locale.setlocale(locale.LC_ALL, loc_orig)
+
+        except locale.Error:
+            # Handle this case
+            pass

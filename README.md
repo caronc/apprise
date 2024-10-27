@@ -39,6 +39,7 @@ System Administrators and DevOps who wish to send a notification now no longer n
   * [Configuration Files](#cli-configuration-files)
   * [File Attachments](#cli-file-attachments)
   * [Loading Custom Notifications/Hooks](#cli-loading-custom-notificationshooks)
+  * [Environment Variables](#cli-environment-variables)
 * [Developer API Usage](#developer-api-usage)
   * [Configuration Files](#api-configuration-files)
   * [File Attachments](#api-file-attachments)
@@ -351,6 +352,17 @@ apprise -vv --title 'custom override' \
 ```
 
 You can read more about creating your own custom notifications and/or hooks [here](https://github.com/caronc/apprise/wiki/decorator_notify).
+
+## CLI Environment Variables
+
+Those using the Command Line Interface (CLI) can also leverage environment variables to pre-set the default settings:
+
+| Variable                | Description       |
+|------------------------ | ----------------- |
+| `APPRISE_URLS`          |  Specify the default URLs to notify IF none are otherwise specified on the command line explicitly. If the `--config` (`-c`) is specified, then this will over-rides any reference to this variable. Use white space and/or a comma (`,`) to delimit multiple entries.
+|  `APPRISE_CONFIG_PATH`  | Explicitly specify the config search path to use (over-riding the default). The path(s) defined here must point to the absolute filename to open/reference. Use a semi-colon (`;`), line-feed (`\n`), and/or carriage return (`\r`) to delimit multiple entries.
+|  `APPRISE_PLUGIN_PATH`  | Explicitly specify the custom plugin search path to use (over-riding the default). Use a semi-colon (`;`), line-feed (`\n`), and/or carriage return (`\r`) to delimit multiple entries.
+|  `APPRISE_STORAGE_PATH` | Explicitly specify the persistent storage path to use (over-riding the default).
 
 # Developer API Usage
 
