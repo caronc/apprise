@@ -47,7 +47,7 @@ from ..locale import gettext_lazy as _
 
 class NotifyVoipms(NotifyBase):
     """
-    A wrapper for Voipms Notifications
+    A wrapper for VoIPms Notifications
     """
 
     # The default descriptive name associated with the Notification
@@ -62,11 +62,14 @@ class NotifyVoipms(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_voipms'
 
-    # Voipms uses the http protocol with JSON requests
+    # VoIPms uses the http protocol with JSON requests
     notify_url = 'https://voip.ms/api/v1/rest.php'
 
     # The maximum length of the body
     body_maxlen = 160
+
+    # The supported country code by VoIP.ms
+    voip_ms_country_code = '1'
 
     # A title can not be used for SMS Messages.  Setting this to zero will
     # cause any title (if defined) to get placed into the message body.
@@ -122,12 +125,11 @@ class NotifyVoipms(NotifyBase):
 
     def __init__(self, email, source=None, targets=None, **kwargs):
         """
-        Initialize Voipms Object
+        Initialize VoIPms Object
         """
         super().__init__(**kwargs)
 
         # Validate our params here.
-
         if self.password is None:
             msg = 'Password has to be specified.'
             self.logger.warning(msg)
@@ -136,7 +138,7 @@ class NotifyVoipms(NotifyBase):
         # User is the email associated with the account
         result = is_email(email)
         if not result:
-            msg = 'An invalid Voipms user email: ' \
+            msg = 'An invalid VoIPms user email: ' \
                 '({}) was specified.'.format(email)
             self.logger.warning(msg)
             raise TypeError(msg)
@@ -145,15 +147,16 @@ class NotifyVoipms(NotifyBase):
         # Validate our source Phone #
         result = is_phone_no(source)
         if not result:
-            msg = 'An invalid Voipms source phone # ' \
+            msg = 'An invalid VoIPms source phone # ' \
                   '({}) was specified.'.format(source)
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Source Phone # only supports +1 country code
         # Allow 7 digit phones (presume they're local with +1 country code)
-        if result['country'] and result['country'] != '1':
-            msg = 'Voipms only supports +1 country code ' \
+        if result['country'] \
+                and result['country'] != self.voip_ms_country_code:
+            msg = 'VoIPms only supports +1 country code ' \
                   '({}) was specified.'.format(source)
             self.logger.warning(msg)
             raise TypeError(msg)
@@ -170,9 +173,10 @@ class NotifyVoipms(NotifyBase):
                 result = is_phone_no(target)
 
                 # Target Phone # only supports +1 country code
-                if result['country'] != '1':
+                if result['country'] \
+                        and result['country'] != self.voip_ms_country_code:
                     self.logger.warning(
-                        'Dropped invalid phone # '
+                        'Ignoring invalid phone # '
                         '({}) specified.'.format(target),
                     )
                     continue
@@ -188,12 +192,12 @@ class NotifyVoipms(NotifyBase):
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
-        Perform Voipms Notification
+        Perform VoIPms Notification
         """
 
         if len(self.targets) == 0:
             # There were no services to notify
-            self.logger.warning('There were no Voipms targets to notify.')
+            self.logger.warning('There were no VoIPms targets to notify.')
             return False
 
         # error tracking (used for function return)
@@ -228,9 +232,9 @@ class NotifyVoipms(NotifyBase):
             payload['dst'] = target
 
             # Some Debug Logging
-            self.logger.debug('Voipms GET URL: {} (cert_verify={})'.format(
+            self.logger.debug('VoIPms GET URL: {} (cert_verify={})'.format(
                 self.notify_url, self.verify_certificate))
-            self.logger.debug('Voipms Payload: {}' .format(payload))
+            self.logger.debug('VoIPms Payload: {}' .format(payload))
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -262,7 +266,7 @@ class NotifyVoipms(NotifyBase):
                             r.status_code)
 
                     self.logger.warning(
-                        'Failed to send Voipms notification to {}: '
+                        'Failed to send VoIPms SMS notification to {}: '
                         '{}{}error={}.'.format(
                             target,
                             status_str,
@@ -276,12 +280,12 @@ class NotifyVoipms(NotifyBase):
                     has_error = True
                     continue
 
-                # Voipms sends 200 OK even if there is an error
+                # VoIPms sends 200 OK even if there is an error
                 # check if status in response and if it is not success
 
                 if response is not None and response['status'] != 'success':
                     self.logger.warning(
-                        'Failed to send Voipms notification to {}: '
+                        'Failed to send VoIPms SMS notification to {}: '
                         'status: {}, message: {}'.format(
                             target, response['status'], response['message'])
                     )
@@ -291,12 +295,12 @@ class NotifyVoipms(NotifyBase):
                     continue
                 else:
                     self.logger.info(
-                        'Sent Voipms notification to %s' % target)
+                        'Sent VoIPms SMS notification to %s' % target)
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occurred sending Voipms:%s '
-                    'notification.' % target
+                    'A Connection error occurred sending VoIPms:%s '
+                    'SMS notification.' % target
                 )
                 self.logger.debug('Socket Exception: %s' % str(e))
 
@@ -331,9 +335,11 @@ class NotifyVoipms(NotifyBase):
             schema=self.secure_protocol,
             email=self.email,
             password=self.pprint(self.password, privacy, safe=''),
-            from_phone='1' + self.pprint(self.source, privacy, safe=''),
+            from_phone=self.voip_ms_country_code +
+            self.pprint(self.source, privacy, safe=''),
             targets='/'.join(
-                ['1' + NotifyVoipms.quote(x, safe='') for x in self.targets]),
+                [self.voip_ms_country_code + NotifyVoipms.quote(x, safe='')
+                 for x in self.targets]),
             params=NotifyVoipms.urlencode(params))
 
     def __len__(self):
