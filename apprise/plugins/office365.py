@@ -50,6 +50,24 @@ from ..utils import validate_regex
 from ..locale import gettext_lazy as _
 
 
+class Office365WebhookMode:
+    """
+    Office 365 Webhook Mode
+    """
+    # Send message as ourselves using the /me/ endpoint
+    SELF = 'self'
+
+    # Send message as ourselves using the /users/ endpoint
+    AS_USER = 'user'
+
+
+# Define the modes in a list for validation purposes
+OFFICE365_WEBHOOK_MODES = (
+    Office365WebhookMode.SELF,
+    Office365WebhookMode.AS_USER,
+)
+
+
 class NotifyOffice365(NotifyBase):
     """
     A wrapper for Office 365 Notifications
@@ -62,7 +80,7 @@ class NotifyOffice365(NotifyBase):
     service_url = 'https://office.com/'
 
     # The default protocol
-    secure_protocol = 'o365'
+    secure_protocol = ('azure', 'o365')
 
     # Allow 300 requests per minute.
     # 60/300 = 0.2
@@ -103,7 +121,6 @@ class NotifyOffice365(NotifyBase):
         '{schema}://{email}/{tenant}/{client_id}/{secret}',
         '{schema}://{email}/{tenant}/{client_id}/{secret}/{targets}',
         # Send from 'me'
-        '{schema}://{tenant}/{client_id}/{secret}',
         '{schema}://{tenant}/{client_id}/{secret}/{targets}',
     )
 
@@ -164,14 +181,32 @@ class NotifyOffice365(NotifyBase):
         'oauth_secret': {
             'alias_of': 'secret',
         },
+        'mode': {
+            'name': _('Webhook Mode'),
+            'type': 'choice:string',
+            'values': OFFICE365_WEBHOOK_MODES,
+            'default': Office365WebhookMode.SELF,
+        },
     })
 
-    def __init__(self, tenant, email, client_id, secret,
-                 targets=None, cc=None, bcc=None, **kwargs):
+    def __init__(self, tenant, client_id, secret, email=None,
+                 mode=None, targets=None, cc=None, bcc=None, **kwargs):
         """
         Initialize Office 365 Object
         """
         super().__init__(**kwargs)
+
+        # Prepare our Mode
+        self.mode = self.template_args['mode']['default'] \
+            if not mode else next(
+            (f for f in OFFICE365_WEBHOOK_MODES
+             if f.startswith(
+                 mode.lower())), None)
+        if mode and not self.mode:
+            msg = \
+                'The specified Webhook mode ({}) was not found '.format(mode)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         # Tenant identifier
         self.tenant = validate_regex(
@@ -182,15 +217,23 @@ class NotifyOffice365(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        result = is_email(email)
-        if not result:
-            msg = 'An invalid Office 365 Email Account ID' \
-                  '({}) was specified.'.format(email)
+        self.email = None
+        if email is not None:
+            result = is_email(email)
+            if not result:
+                msg = 'An invalid Office 365 Email Account ID' \
+                      '({}) was specified.'.format(email)
+                self.logger.warning(msg)
+                raise TypeError(msg)
+
+            # Otherwise store our the email address
+            self.email = result['full_email']
+
+        elif self.mode != Office365WebhookMode.SELF:
+            msg = 'An expected Office 365 Email was not specified ' \
+                  '(mode={})'.format(self.mode)
             self.logger.warning(msg)
             raise TypeError(msg)
-
-        # Otherwise store our the email address
-        self.email = result['full_email']
 
         # Client Key (associated with generated OAuth2 Login)
         self.client_id = validate_regex(
@@ -318,7 +361,7 @@ class NotifyOffice365(NotifyBase):
         # Define our URL to post to
         url = '{graph_url}/v1.0/me/sendMail'.format(
             graph_url=self.graph_url,
-        ) if not self.self.email \
+        ) if not self.email \
             else '{graph_url}/v1.0/users/{userid}/sendMail'.format(
                 userid=self.email,
                 graph_url=self.graph_url,
@@ -616,7 +659,7 @@ class NotifyOffice365(NotifyBase):
         here.
         """
         return (
-            self.secure_protocol, self.email, self.tenant, self.client_id,
+            self.secure_protocol[0], self.email, self.tenant, self.client_id,
             self.secret,
         )
 
@@ -625,8 +668,13 @@ class NotifyOffice365(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Our URL parameters
-        params = self.url_parameters(privacy=privacy, *args, **kwargs)
+        # Define any URL parameters
+        params = {
+            'mode': self.mode,
+        }
+
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         if self.cc:
             # Handle our Carbon Copy Addresses
@@ -642,13 +690,13 @@ class NotifyOffice365(NotifyBase):
                     '' if not self.names.get(e)
                     else '{}:'.format(self.names[e]), e) for e in self.bcc])
 
-        return '{schema}://{tenant}:{email}/{client_id}/{secret}' \
+        return '{schema}://{email}{tenant}/{client_id}/{secret}' \
             '/{targets}/?{params}'.format(
-                schema=self.secure_protocol,
+                schema=self.secure_protocol[0],
                 tenant=self.pprint(self.tenant, privacy, safe=''),
                 # email does not need to be escaped because it should
                 # already be a valid host and username at this point
-                email=self.email,
+                email=self.email + '/' if self.email else '',
                 client_id=self.pprint(self.client_id, privacy, safe=''),
                 secret=self.pprint(
                     self.secret, privacy, mode=PrivacyMode.Secret,
@@ -656,7 +704,7 @@ class NotifyOffice365(NotifyBase):
                 targets='/'.join(
                     [NotifyOffice365.quote('{}{}'.format(
                         '' if not e[0] else '{}:'.format(e[0]), e[1]),
-                        safe='') for e in self.targets]),
+                        safe='@') for e in self.targets]),
                 params=NotifyOffice365.urlencode(params))
 
     def __len__(self):
@@ -687,6 +735,7 @@ class NotifyOffice365(NotifyBase):
 
         # Initialize our tenant
         results['tenant'] = None
+
         # Initialize our email
         results['email'] = None
 
@@ -697,28 +746,36 @@ class NotifyOffice365(NotifyBase):
             results['email'] = \
                 NotifyOffice365.unquote(results['qsd']['from'])
 
-            # Hostname is no longer part of `from` and possibly instead
-            # is the tenant id
-            entries.insert(0, NotifyOffice365.unquote(results['host']))
-
-        # Tenant
-        if 'tenant' in results['qsd'] and \
-                len(results['qsd']['tenant']):
-            # Extract the Tenant from the argument
-            results['tenant'] = \
-                NotifyOffice365.unquote(results['qsd']['tenant'])
-
-        # If tenant is occupied, then the user defined makes
-        # up our email
-        if not results['email'] and results['user']:
+        # If tenant is occupied, then the user defined makes up our email
+        elif results['user']:
             results['email'] = '{}@{}'.format(
                 NotifyOffice365.unquote(results['user']),
                 NotifyOffice365.unquote(results['host']),
             )
 
-        elif not results['user']:
-            # Only tenant id specified (emails are sent 'from me')
-            results['tenant'] = NotifyOffice365.unquote(results['host'])
+        else:
+            # Hostname is no longer part of `from` and possibly instead
+            # is the tenant id
+            entries.insert(0, NotifyOffice365.unquote(results['host']))
+
+        # Tenant
+        if 'tenant' in results['qsd'] and len(results['qsd']['tenant']):
+            # Extract the Tenant from the argument
+            results['tenant'] = \
+                NotifyOffice365.unquote(results['qsd']['tenant'])
+
+        elif entries:
+            results['tenant'] = NotifyOffice365.unquote(entries.pop(0))
+
+        # OAuth2 ID
+        if 'oauth_id' in results['qsd'] and len(results['qsd']['oauth_id']):
+            # Extract the API Key from an argument
+            results['client_id'] = \
+                NotifyOffice365.unquote(results['qsd']['oauth_id'])
+
+        elif entries:
+            # Get our client_id is the first entry on the path
+            results['client_id'] = NotifyOffice365.unquote(entries.pop(0))
 
         #
         # Prepare our target listing
@@ -739,16 +796,6 @@ class NotifyOffice365(NotifyBase):
 
             # We're done
             break
-
-        # OAuth2 ID
-        if 'oauth_id' in results['qsd'] and len(results['qsd']['oauth_id']):
-            # Extract the API Key from an argument
-            results['client_id'] = \
-                NotifyOffice365.unquote(results['qsd']['oauth_id'])
-
-        elif entries:
-            # Get our client_id is the first entry on the path
-            results['client_id'] = NotifyOffice365.unquote(entries.pop(0))
 
         # OAuth2 Secret
         if 'oauth_secret' in results['qsd'] and \
@@ -777,5 +824,9 @@ class NotifyOffice365(NotifyBase):
         # Handle Blind Carbon Copy Addresses
         if 'bcc' in results['qsd'] and len(results['qsd']['bcc']):
             results['bcc'] = results['qsd']['bcc']
+
+        # Handle Mode
+        if 'mode' in results['qsd'] and len(results['qsd']['mode']):
+            results['mode'] = results['qsd']['mode']
 
         return results
