@@ -103,11 +103,15 @@ class MatrixVersion:
     # Version 3
     V3 = "3"
 
+    # Token
+    TOKEN = "token"
+
 
 # webhook modes are placed into this list for validation purposes
 MATRIX_VERSIONS = (
     MatrixVersion.V2,
     MatrixVersion.V3,
+    MatrixVersion.TOKEN
 )
 
 
@@ -1474,6 +1478,9 @@ class NotifyMatrix(NotifyBase):
 
         auth = ''
         if self.mode != MatrixWebhookMode.T2BOT:
+            if self.version == "token":
+                self.access_token = self.user
+
             # Determine Authentication
             if self.user and self.password:
                 auth = '{user}:{password}@'.format(
@@ -1574,6 +1581,8 @@ class NotifyMatrix(NotifyBase):
 
         elif 'v' in results['qsd'] and len(results['qsd']['v']):
             results['version'] = NotifyMatrix.unquote(results['qsd']['v'])
+            if results['version'] == "token":
+                results['mode'] = MatrixWebhookMode.DISABLED
 
         return results
 
