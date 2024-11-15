@@ -9,8 +9,8 @@ cryptography
 gntp
 
 # Provides mqtt:// support
-# use v1.x due to https://github.com/eclipse/paho.mqtt.python/issues/814
-paho-mqtt < 2.0.0
+# use any version other than 2.0.x due to https://github.com/eclipse/paho.mqtt.python/issues/814
+paho-mqtt != 2.0.*
 
 # Pretty Good Privacy (PGP) Provides mailto:// and deltachat:// support
 PGPy
