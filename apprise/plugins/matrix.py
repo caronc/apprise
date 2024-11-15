@@ -1478,7 +1478,7 @@ class NotifyMatrix(NotifyBase):
 
         auth = ''
         if self.mode != MatrixWebhookMode.T2BOT:
-            if self.version == "token":
+            if self.version == MatrixVersion.TOKEN:
                 self.access_token = self.user
 
             # Determine Authentication
