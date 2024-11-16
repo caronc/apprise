@@ -117,6 +117,30 @@ apprise_url_tests = (
         # active level
         'instance': NotifyBark,
     }),
+    ('bark://192.168.0.6:8081/device_key/?level=critical', {
+        # critical level
+        'instance': NotifyBark,
+    }),
+    ('bark://192.168.0.6:8081/device_key/?level=critical&volume=10', {
+        # critical level with volume 10
+        'instance': NotifyBark,
+    }),
+    ('bark://192.168.0.6:8081/device_key/?level=critical&volume=invalid', {
+        # critical level with invalid volume
+        'instance': NotifyBark,
+    }),
+    ('bark://192.168.0.6:8081/device_key/?level=critical&volume=11', {
+        # volume > 10
+        'instance': NotifyBark,
+    }),
+    ('bark://192.168.0.6:8081/device_key/?level=critical&volume=0', {
+        # volume < 1
+        'instance': NotifyBark,
+    }),
+    ('bark://192.168.0.6:8081/device_key/?level=critical&volume=', {
+        # volume None
+        'instance': NotifyBark,
+    }),
     ('bark://user:pass@192.168.0.5:8086/device_key/device_key2/', {
         # Everything is okay
         'instance': NotifyBark,
@@ -150,3 +174,4 @@ def test_plugin_bark_urls():
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
