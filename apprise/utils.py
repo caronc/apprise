@@ -325,7 +325,7 @@ def is_hostname(hostname, ipv4=True, ipv6=True, underscore=True):
     labels = hostname.split(".")
 
     # ipv4 check
-    if len(labels) == 4 and re.match(r'[0-9.]+', hostname):
+    if len(labels) == 4 and re.match(r'^[0-9.]+$', hostname):
         return is_ipaddr(hostname, ipv4=ipv4, ipv6=False)
 
     # - RFC 1123 permits hostname labels to start with digits

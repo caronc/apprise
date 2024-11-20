@@ -87,6 +87,22 @@ def test_parse_url_general():
     assert result['qsd+'] == {}
     assert result['qsd:'] == {}
 
+    # GitHub Ticket 1234 - Unparseable Hostname
+    result = utils.parse_url('http://5t4m59hl-34343.euw.devtunnels.ms')
+    assert result['schema'] == 'http'
+    assert result['host'] == '5t4m59hl-34343.euw.devtunnels.ms'
+    assert result['port'] is None
+    assert result['user'] is None
+    assert result['password'] is None
+    assert result['fullpath'] is None
+    assert result['path'] is None
+    assert result['query'] is None
+    assert result['url'] == 'http://5t4m59hl-34343.euw.devtunnels.ms'
+    assert result['qsd'] == {}
+    assert result['qsd-'] == {}
+    assert result['qsd+'] == {}
+    assert result['qsd:'] == {}
+
     result = utils.parse_url('http://hostname/')
     assert result['schema'] == 'http'
     assert result['host'] == 'hostname'
