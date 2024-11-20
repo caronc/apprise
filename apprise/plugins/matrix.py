@@ -1581,7 +1581,7 @@ class NotifyMatrix(NotifyBase):
 
         elif 'v' in results['qsd'] and len(results['qsd']['v']):
             results['version'] = NotifyMatrix.unquote(results['qsd']['v'])
-            if results['version'] == "token":
+            if results['version'] == MatrixVersion.TOKEN:
                 results['mode'] = MatrixWebhookMode.DISABLED
 
         return results
