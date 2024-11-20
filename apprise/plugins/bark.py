@@ -184,7 +184,7 @@ class NotifyBark(NotifyBase):
         'volume': {
             'name': _('Volume'),
             'type': 'int',
-            'min': 1,
+            'min': 0,
             'max': 10,
         },
         'click': {
@@ -272,14 +272,14 @@ class NotifyBark(NotifyBase):
         # Volume
         try:
             self.volume = int(volume) if volume is not None else None
-            if self.volume is not None and not (1 <= self.volume <= 10):
+            if self.volume is not None and not (0 <= self.volume <= 10):
                 raise ValueError()
         except (TypeError, ValueError):
             self.volume = None
             if volume is not None:
                 self.logger.warning(
                     'The specified Bark volume ({}) is not valid. '
-                    'Must be between 1 and 10', volume)
+                    'Must be between 0 and 10', volume)
 
         # Level
         self.level = None if not level else next(

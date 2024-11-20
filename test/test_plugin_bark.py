@@ -133,8 +133,8 @@ apprise_url_tests = (
         # volume > 10
         'instance': NotifyBark,
     }),
-    ('bark://192.168.0.6:8081/device_key/?level=critical&volume=0', {
-        # volume < 1
+    ('bark://192.168.0.6:8081/device_key/?level=critical&volume=-1', {
+        # volume < 0
         'instance': NotifyBark,
     }),
     ('bark://192.168.0.6:8081/device_key/?level=critical&volume=', {
@@ -174,4 +174,3 @@ def test_plugin_bark_urls():
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
-
