@@ -201,9 +201,11 @@ class NotifyMatrix(NotifyBase):
         '{schema}://{token}',
         '{schema}://{user}@{token}',
 
-        # Disabled webhook
+        # Matrix Server
         '{schema}://{user}:{password}@{host}/{targets}',
         '{schema}://{user}:{password}@{host}:{port}/{targets}',
+        '{schema}://{token}@{host}/{targets}',
+        '{schema}://{token}@{host}:{port}/{targets}',
 
         # Webhook mode
         '{schema}://{user}:{token}@{host}/{targets}',
@@ -612,6 +614,9 @@ class NotifyMatrix(NotifyBase):
         Perform Direct Matrix Server Notification (no webhook)
         """
 
+        if self.access_token is None and self.password and not self.user:
+            self.access_token = self.password
+
         if self.access_token is None:
             # We need to register
             if not self._login():
@@ -890,31 +895,32 @@ class NotifyMatrix(NotifyBase):
             # Login not required; silently skip-over
             return True
 
-        if not (self.user and self.password):
+        if (self.user and self.password):
+            # Prepare our Authentication Payload
+            if self.version == MatrixVersion.V3:
+                payload = {
+                    'type': 'm.login.password',
+                    'identifier': {
+                        'type': 'm.id.user',
+                        'user': self.user,
+                    },
+                    'password': self.password,
+                }
+
+            else:
+                payload = {
+                    'type': 'm.login.password',
+                    'user': self.user,
+                    'password': self.password,
+                }
+
+        else:
             # It's not possible to register since we need these 2 values to
             # make the action possible.
             self.logger.warning(
                 'Failed to login to Matrix server: '
-                'user/pass combo is missing.')
+                'token or user/pass combo is missing.')
             return False
-
-        # Prepare our Authentication Payload
-        if self.version == MatrixVersion.V3:
-            payload = {
-                'type': 'm.login.password',
-                'identifier': {
-                    'type': 'm.id.user',
-                    'user': self.user,
-                },
-                'password': self.password,
-            }
-
-        else:
-            payload = {
-                'type': 'm.login.password',
-                'user': self.user,
-                'password': self.password,
-            }
 
         # Build our URL
         postokay, response = self._fetch('/login', payload=payload)
@@ -1483,9 +1489,10 @@ class NotifyMatrix(NotifyBase):
                         safe=''),
                 )
 
-            elif self.user:
-                auth = '{user}@'.format(
-                    user=NotifyMatrix.quote(self.user, safe=''),
+            elif self.user or self.password:
+                auth = '{value}@'.format(
+                    value=NotifyMatrix.quote(
+                        self.user if self.user else self.password, safe=''),
                 )
 
         default_port = 443 if self.secure else 80
@@ -1566,6 +1573,11 @@ class NotifyMatrix(NotifyBase):
         # Support the use of the token= keyword
         if 'token' in results['qsd'] and len(results['qsd']['token']):
             results['password'] = NotifyMatrix.unquote(results['qsd']['token'])
+
+        elif not results['password'] and results['user']:
+            # swap
+            results['password'] = results['user']
+            results['user'] = None
 
         # Support the use of the version= or v= keyword
         if 'version' in results['qsd'] and len(results['qsd']['version']):
