@@ -32,7 +32,6 @@
 #
 import re
 import requests
-import uuid
 from markdown import markdown
 from json import dumps
 from json import loads
@@ -617,7 +616,6 @@ class NotifyMatrix(NotifyBase):
 
         if self.access_token is None and self.password and not self.user:
             self.access_token = self.password
-            self.transaction_id = uuid.uuid4()
 
         if self.access_token is None:
             # We need to register
