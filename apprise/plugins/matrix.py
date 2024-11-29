@@ -670,7 +670,6 @@ class NotifyMatrix(NotifyBase):
 
             # Build our path
             if self.version == MatrixVersion.V3:
-
                 path = '/rooms/{}/send/m.room.message/{}'.format(
                     NotifyMatrix.quote(room_id),
                     self.transaction_id,
