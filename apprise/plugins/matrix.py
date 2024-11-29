@@ -748,7 +748,7 @@ class NotifyMatrix(NotifyBase):
 
             # Increment the transaction ID to avoid future messages being
             # recognized as retransmissions and ignored
-            if self.version == MatrixVersion.V3:
+            if self.version == MatrixVersion.V3 and self.access_token != self.password:
                 self.transaction_id += 1
                 self.store.set(
                     'transaction_id', self.transaction_id,
