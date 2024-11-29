@@ -617,6 +617,7 @@ class NotifyMatrix(NotifyBase):
 
         if self.access_token is None and self.password and not self.user:
             self.access_token = self.password
+            self.transaction_id = uuid.uuid4()
 
         if self.access_token is None:
             # We need to register
@@ -672,7 +673,7 @@ class NotifyMatrix(NotifyBase):
 
                 path = '/rooms/{}/send/m.room.message/{}'.format(
                     NotifyMatrix.quote(room_id),
-                    uuid.uuid4(),
+                    self.transaction_id,
                 )
 
             else:
