@@ -32,6 +32,7 @@
 #
 import re
 import requests
+import uuid
 from markdown import markdown
 from json import dumps
 from json import loads
@@ -668,9 +669,10 @@ class NotifyMatrix(NotifyBase):
 
             # Build our path
             if self.version == MatrixVersion.V3:
+
                 path = '/rooms/{}/send/m.room.message/{}'.format(
                     NotifyMatrix.quote(room_id),
-                    self.transaction_id,
+                    uuid.uuid4(),
                 )
 
             else:
