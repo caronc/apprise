@@ -1403,9 +1403,11 @@ class NotifyMatrix(NotifyBase):
             # re-use our credentials with
             return
 
+        if self.access_token != None and self.access_token == self.password and not self.user:
+            return
+
         try:
-            print(1)
-            #self._logout()
+            self._logout()
 
         except LookupError:  # pragma: no cover
             # Python v3.5 call to requests can sometimes throw the exception
