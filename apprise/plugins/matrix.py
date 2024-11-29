@@ -1404,7 +1404,8 @@ class NotifyMatrix(NotifyBase):
             return
 
         try:
-            self._logout()
+            print(1)
+            #self._logout()
 
         except LookupError:  # pragma: no cover
             # Python v3.5 call to requests can sometimes throw the exception
