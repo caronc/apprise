@@ -270,13 +270,14 @@ class NotifyBark(NotifyBase):
                 'The specified Bark sound ({}) was not found ', sound)
 
         # Volume
-        try:
-            self.volume = int(volume) if volume is not None else None
-            if self.volume is not None and not (0 <= self.volume <= 10):
-                raise ValueError()
-        except (TypeError, ValueError):
-            self.volume = None
-            if volume is not None:
+        self.volume = None
+        if volume is not None:
+            try:
+                self.volume = int(volume) if volume is not None else None
+                if self.volume is not None and not (0 <= self.volume <= 10):
+                    raise ValueError()
+
+            except (TypeError, ValueError):
                 self.logger.warning(
                     'The specified Bark volume ({}) is not valid. '
                     'Must be between 0 and 10', volume)
