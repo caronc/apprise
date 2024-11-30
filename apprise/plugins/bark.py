@@ -89,11 +89,14 @@ class NotifyBarkLevel:
 
     PASSIVE = 'passive'
 
+    CRITICAL = 'critical'
+
 
 BARK_LEVELS = (
     NotifyBarkLevel.ACTIVE,
     NotifyBarkLevel.TIME_SENSITIVE,
     NotifyBarkLevel.PASSIVE,
+    NotifyBarkLevel.CRITICAL,
 )
 
 
@@ -178,6 +181,12 @@ class NotifyBark(NotifyBase):
             'type': 'choice:string',
             'values': BARK_LEVELS,
         },
+        'volume': {
+            'name': _('Volume'),
+            'type': 'int',
+            'min': 0,
+            'max': 10,
+        },
         'click': {
             'name': _('Click'),
             'type': 'string',
@@ -205,7 +214,7 @@ class NotifyBark(NotifyBase):
 
     def __init__(self, targets=None, include_image=True, sound=None,
                  category=None, group=None, level=None, click=None,
-                 badge=None, **kwargs):
+                 badge=None, volume=None, **kwargs):
         """
         Initialize Notify Bark Object
         """
@@ -259,6 +268,19 @@ class NotifyBark(NotifyBase):
         if sound and not self.sound:
             self.logger.warning(
                 'The specified Bark sound ({}) was not found ', sound)
+
+        # Volume
+        self.volume = None
+        if volume is not None:
+            try:
+                self.volume = int(volume) if volume is not None else None
+                if self.volume is not None and not (0 <= self.volume <= 10):
+                    raise ValueError()
+
+            except (TypeError, ValueError):
+                self.logger.warning(
+                    'The specified Bark volume ({}) is not valid. '
+                    'Must be between 0 and 10', volume)
 
         # Level
         self.level = None if not level else next(
@@ -329,6 +351,9 @@ class NotifyBark(NotifyBase):
 
         if self.group:
             payload['group'] = self.group
+
+        if self.volume:
+            payload['volume'] = self.volume
 
         auth = None
         if self.user:
@@ -429,6 +454,9 @@ class NotifyBark(NotifyBase):
         if self.level:
             params['level'] = self.level
 
+        if self.volume:
+            params['volume'] = str(self.volume)
+
         if self.category:
             params['category'] = self.category
 
@@ -501,6 +529,11 @@ class NotifyBark(NotifyBase):
         if 'badge' in results['qsd'] and results['qsd']['badge']:
             results['badge'] = NotifyBark.unquote(
                 results['qsd']['badge'].strip())
+
+        # Volume
+        if 'volume' in results['qsd'] and results['qsd']['volume']:
+            results['volume'] = NotifyBark.unquote(
+                results['qsd']['volume'].strip())
 
         # Level
         if 'level' in results['qsd'] and results['qsd']['level']:
