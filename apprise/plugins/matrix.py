@@ -32,6 +32,7 @@
 #
 import re
 import requests
+import uuid
 from markdown import markdown
 from json import dumps
 from json import loads
@@ -616,6 +617,7 @@ class NotifyMatrix(NotifyBase):
 
         if self.access_token is None and self.password and not self.user:
             self.access_token = self.password
+            self.transaction_id = uuid.uuid4()
 
         if self.access_token is None:
             # We need to register
@@ -746,7 +748,8 @@ class NotifyMatrix(NotifyBase):
 
             # Increment the transaction ID to avoid future messages being
             # recognized as retransmissions and ignored
-            if self.version == MatrixVersion.V3:
+            if self.version == MatrixVersion.V3 \
+               and self.access_token != self.password:
                 self.transaction_id += 1
                 self.store.set(
                     'transaction_id', self.transaction_id,
@@ -1399,6 +1402,10 @@ class NotifyMatrix(NotifyBase):
         if self.store.mode != PersistentStoreMode.MEMORY:
             # We no longer have to log out as we have persistant storage to
             # re-use our credentials with
+            return
+
+        if self.access_token is not None \
+           and self.access_token == self.password and not self.user:
             return
 
         try:
