@@ -33,7 +33,11 @@
 # Information on sending an email:
 # https://docs.microsoft.com/en-us/graph/api/user-sendmail\
 #       ?view=graph-rest-1.0&tabs=http
-
+#
+# Note: One must set up Application Permissions (not Delegated Permissions)
+#       - Scopes required: Mail.Send
+#       - For Large Attachments: Mail.ReadWrite
+#
 import requests
 from datetime import datetime
 from datetime import timedelta
@@ -48,24 +52,6 @@ from ..utils import is_email
 from ..utils import parse_emails
 from ..utils import validate_regex
 from ..locale import gettext_lazy as _
-
-
-class Office365WebhookMode:
-    """
-    Office 365 Webhook Mode
-    """
-    # Send message as ourselves using the /me/ endpoint
-    SELF = 'self'
-
-    # Send message as ourselves using the /users/ endpoint
-    AS_USER = 'user'
-
-
-# Define the modes in a list for validation purposes
-OFFICE365_WEBHOOK_MODES = (
-    Office365WebhookMode.SELF,
-    Office365WebhookMode.AS_USER,
-)
 
 
 class NotifyOffice365(NotifyBase):
@@ -117,11 +103,9 @@ class NotifyOffice365(NotifyBase):
 
     # Define object templates
     templates = (
-        # Send as user
-        '{schema}://{email}/{tenant}/{client_id}/{secret}',
-        '{schema}://{email}/{tenant}/{client_id}/{secret}/{targets}',
-        # Send from 'me'
-        '{schema}://{tenant}/{client_id}/{secret}/{targets}',
+        # Send as user (only supported method)
+        '{schema}://{source}/{tenant}/{client_id}/{secret}',
+        '{schema}://{source}/{tenant}/{client_id}/{secret}/{targets}',
     )
 
     # Define our template tokens
@@ -133,8 +117,8 @@ class NotifyOffice365(NotifyBase):
             'private': True,
             'regex': (r'^[a-z0-9-]+$', 'i'),
         },
-        'email': {
-            'name': _('Account Email'),
+        'source': {
+            'name': _('Account Email or Object ID'),
             'type': 'string',
             'required': True,
         },
@@ -181,32 +165,14 @@ class NotifyOffice365(NotifyBase):
         'oauth_secret': {
             'alias_of': 'secret',
         },
-        'mode': {
-            'name': _('Webhook Mode'),
-            'type': 'choice:string',
-            'values': OFFICE365_WEBHOOK_MODES,
-            'default': Office365WebhookMode.SELF,
-        },
     })
 
-    def __init__(self, tenant, client_id, secret, email=None,
-                 mode=None, targets=None, cc=None, bcc=None, **kwargs):
+    def __init__(self, tenant, client_id, secret, source=None,
+                 targets=None, cc=None, bcc=None, **kwargs):
         """
         Initialize Office 365 Object
         """
         super().__init__(**kwargs)
-
-        # Prepare our Mode
-        self.mode = self.template_args['mode']['default'] \
-            if not mode else next(
-            (f for f in OFFICE365_WEBHOOK_MODES
-             if f.startswith(
-                 mode.lower())), None)
-        if mode and not self.mode:
-            msg = \
-                'The specified Webhook mode ({}) was not found '.format(mode)
-            self.logger.warning(msg)
-            raise TypeError(msg)
 
         # Tenant identifier
         self.tenant = validate_regex(
@@ -217,23 +183,8 @@ class NotifyOffice365(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        self.email = None
-        if email is not None:
-            result = is_email(email)
-            if not result:
-                msg = 'An invalid Office 365 Email Account ID' \
-                      '({}) was specified.'.format(email)
-                self.logger.warning(msg)
-                raise TypeError(msg)
-
-            # Otherwise store our the email address
-            self.email = result['full_email']
-
-        elif self.mode != Office365WebhookMode.SELF:
-            msg = 'An expected Office 365 Email was not specified ' \
-                  '(mode={})'.format(self.mode)
-            self.logger.warning(msg)
-            raise TypeError(msg)
+        # Store our email/ObjectID Source
+        self.source = source
 
         # Client Key (associated with generated OAuth2 Login)
         self.client_id = validate_regex(
@@ -280,8 +231,14 @@ class NotifyOffice365(NotifyBase):
                     .format(recipient))
 
         else:
-            # If our target email list is empty we want to add ourselves to it
-            self.targets.append((False, self.email))
+            result = is_email(self.source)
+            if not result:
+                self.logger.warning('No Target Office 365 Email Detected')
+
+            else:
+                # If our target email list is empty we want to add ourselves to
+                # it
+                self.targets.append((False, self.source))
 
         # Validate recipients (cc:) and drop bad ones:
         for recipient in parse_emails(cc):
@@ -359,12 +316,9 @@ class NotifyOffice365(NotifyBase):
         emails = list(self.targets)
 
         # Define our URL to post to
-        url = '{graph_url}/v1.0/me/sendMail'.format(
+        url = '{graph_url}/v1.0/users/{userid}/sendMail'.format(
+            userid=self.source,
             graph_url=self.graph_url,
-        ) if not self.email \
-            else '{graph_url}/v1.0/users/{userid}/sendMail'.format(
-                userid=self.email,
-                graph_url=self.graph_url,
         )
 
         attachments = []
@@ -478,9 +432,7 @@ class NotifyOffice365(NotifyBase):
                         else '{}: '.format(self.names[e]), e) for e in bcc])))
 
             # Perform upstream fetch
-            postokay, response = self._fetch(
-                url=url, payload=dumps(payload),
-                content_type='application/json')
+            postokay, response = self._fetch(url=url, payload=dumps(payload))
 
             # Test if we were okay
             if not postokay:
@@ -513,12 +465,12 @@ class NotifyOffice365(NotifyBase):
 
         # Prepare our payload
         payload = {
+            'grant_type': 'client_credentials',
             'client_id': self.client_id,
             'client_secret': self.secret,
             'scope': '{graph_url}/{scope}'.format(
                 graph_url=self.graph_url,
                 scope=self.scope),
-            'grant_type': 'client_credentials',
         }
 
         # Prepare our URL
@@ -573,8 +525,7 @@ class NotifyOffice365(NotifyBase):
         # We're authenticated
         return True if self.token else False
 
-    def _fetch(self, url, payload,
-               content_type='application/x-www-form-urlencoded'):
+    def _fetch(self, url, payload, method='POST'):
         """
         Wrapper to request object
 
@@ -583,7 +534,6 @@ class NotifyOffice365(NotifyBase):
         # Prepare our headers:
         headers = {
             'User-Agent': self.app_id,
-            'Content-Type': content_type,
         }
 
         if self.token:
@@ -602,8 +552,9 @@ class NotifyOffice365(NotifyBase):
         self.throttle()
 
         # fetch function
+        req = requests.post if method == 'POST' else requests.get
         try:
-            r = requests.post(
+            r = req(
                 url,
                 data=payload,
                 headers=headers,
@@ -624,6 +575,21 @@ class NotifyOffice365(NotifyBase):
                         url,
                         ', ' if status_str else '',
                         r.status_code))
+
+                # A Response could look like this if a Scope element was not
+                # found:
+                # {
+                #  "error": {
+                #     "code": "MissingClaimType",
+                #     "message":"The token is missing the claim type \'oid\'.",
+                #     "innerError": {
+                #       "oAuthEventOperationId":" 7abe20-339f-4659-9381-38f52",
+                #       "oAuthEventcV": "xsOSpAHSHVm3Tp4SNH5oIA.1.1",
+                #       "errorUrl": "https://url",
+                #       "requestId": "2328ea-ec9e-43a8-80f4-164c",
+                #       "date":"2024-12-01T02:03:13"
+                #  }}
+                # }
 
                 self.logger.debug(
                     'Response Details:\r\n{}'.format(r.content))
@@ -659,7 +625,7 @@ class NotifyOffice365(NotifyBase):
         here.
         """
         return (
-            self.secure_protocol[0], self.email, self.tenant, self.client_id,
+            self.secure_protocol[0], self.source, self.tenant, self.client_id,
             self.secret,
         )
 
@@ -668,13 +634,8 @@ class NotifyOffice365(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        # Define any URL parameters
-        params = {
-            'mode': self.mode,
-        }
-
         # Extend our parameters
-        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+        params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         if self.cc:
             # Handle our Carbon Copy Addresses
@@ -690,13 +651,13 @@ class NotifyOffice365(NotifyBase):
                     '' if not self.names.get(e)
                     else '{}:'.format(self.names[e]), e) for e in self.bcc])
 
-        return '{schema}://{email}{tenant}/{client_id}/{secret}' \
+        return '{schema}://{source}/{tenant}/{client_id}/{secret}' \
             '/{targets}/?{params}'.format(
                 schema=self.secure_protocol[0],
                 tenant=self.pprint(self.tenant, privacy, safe=''),
                 # email does not need to be escaped because it should
                 # already be a valid host and username at this point
-                email=self.email + '/' if self.email else '',
+                source=self.source,
                 client_id=self.pprint(self.client_id, privacy, safe=''),
                 secret=self.pprint(
                     self.secret, privacy, mode=PrivacyMode.Secret,
@@ -743,20 +704,19 @@ class NotifyOffice365(NotifyBase):
         if 'from' in results['qsd'] and \
                 len(results['qsd']['from']):
             # Extract the sending account's information
-            results['email'] = \
+            results['source'] = \
                 NotifyOffice365.unquote(results['qsd']['from'])
 
-        # If tenant is occupied, then the user defined makes up our email
+        # If tenant is occupied, then the user defined makes up our source
         elif results['user']:
-            results['email'] = '{}@{}'.format(
+            results['source'] = '{}@{}'.format(
                 NotifyOffice365.unquote(results['user']),
                 NotifyOffice365.unquote(results['host']),
             )
 
         else:
-            # Hostname is no longer part of `from` and possibly instead
-            # is the tenant id
-            entries.insert(0, NotifyOffice365.unquote(results['host']))
+            # Object ID instead of email
+            results['source'] = NotifyOffice365.unquote(results['host'])
 
         # Tenant
         if 'tenant' in results['qsd'] and len(results['qsd']['tenant']):
@@ -824,9 +784,5 @@ class NotifyOffice365(NotifyBase):
         # Handle Blind Carbon Copy Addresses
         if 'bcc' in results['qsd'] and len(results['qsd']['bcc']):
             results['bcc'] = results['qsd']['bcc']
-
-        # Handle Mode
-        if 'mode' in results['qsd'] and len(results['qsd']['mode']):
-            results['mode'] = results['qsd']['mode']
 
         return results
