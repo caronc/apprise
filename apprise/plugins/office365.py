@@ -39,10 +39,9 @@
 #       - For Large Attachments: Mail.ReadWrite
 #
 import requests
+import json
 from datetime import datetime
 from datetime import timedelta
-from json import loads
-from json import dumps
 from .base import NotifyBase
 from .. import exception
 from ..url import PrivacyMode
@@ -432,7 +431,7 @@ class NotifyOffice365(NotifyBase):
                         else '{}: '.format(self.names[e]), e) for e in bcc])))
 
             # Perform upstream fetch
-            postokay, response = self._fetch(url=url, payload=dumps(payload))
+            postokay, response = self._fetch(url=url, payload=payload)
 
             # Test if we were okay
             if not postokay:
@@ -498,7 +497,9 @@ class NotifyOffice365(NotifyBase):
         #      "correlation_id": "fb3d2015-bc17-4bb9-bb85-30c5cf1aaaa7"
         #    }
 
-        postokay, response = self._fetch(url=url, payload=payload)
+        postokay, response = self._fetch(
+            url=url, payload=payload,
+            content_type='application/x-www-form-urlencoded')
         if not postokay:
             return False
 
@@ -525,7 +526,8 @@ class NotifyOffice365(NotifyBase):
         # We're authenticated
         return True if self.token else False
 
-    def _fetch(self, url, payload, method='POST'):
+    def _fetch(self, url, payload, content_type='application/json',
+               method='POST'):
         """
         Wrapper to request object
 
@@ -534,6 +536,7 @@ class NotifyOffice365(NotifyBase):
         # Prepare our headers:
         headers = {
             'User-Agent': self.app_id,
+            'Content-Type': content_type,
         }
 
         if self.token:
@@ -556,7 +559,8 @@ class NotifyOffice365(NotifyBase):
         try:
             r = req(
                 url,
-                data=payload,
+                data=json.dumps(payload)
+                if content_type.endswith('/json') else payload,
                 headers=headers,
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
@@ -591,6 +595,16 @@ class NotifyOffice365(NotifyBase):
                 #  }}
                 # }
 
+                # Another response type (error 415):
+                # {
+                #  "error": {
+                #    "code": "RequestBodyRead",
+                #    "message": "A missing or empty content type header was \
+                #        found when trying to read a message. The content \
+                #        type header is required.",
+                #  }
+                # }
+
                 self.logger.debug(
                     'Response Details:\r\n{}'.format(r.content))
 
@@ -598,7 +612,7 @@ class NotifyOffice365(NotifyBase):
                 return (False, content)
 
             try:
-                content = loads(r.content)
+                content = json.loads(r.content)
 
             except (AttributeError, TypeError, ValueError):
                 # ValueError = r.content is Unparsable

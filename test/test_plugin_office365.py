@@ -74,35 +74,14 @@ apprise_url_tests = (
         tenant='tenant',
         # invalid client id
         cid='ab.',
-        aid='user@example.com',
+        aid='user2@example.com',
         secret='abcd/123/3343/@jack/test',
         targets='/'.join(['email1@test.ca'])), {
 
         # Expected failure
         'instance': TypeError,
     }),
-    ('o365://{aid}/{tenant}/{cid}/{secret}/{targets}?mode=invalid'.format(
-        # Invalid mode
-        tenant='tenant',
-        cid='ab-cd-ef-gh',
-        aid='user@example.com',
-        secret='abcd/123/3343/@jack/test',
-        targets='/'.join(['email1@test.ca'])), {
-
-        # Expected failure
-        'instance': TypeError,
-    }),
-    ('o365://{tenant}/{cid}/{secret}/{targets}?mode=user'.format(
-        # Invalid mode when no email specified
-        tenant='tenant',
-        cid='ab-cd-ef-gh',
-        secret='abcd/123/3343/@jack/test',
-        targets='/'.join(['email1@test.ca'])), {
-
-        # Expected failure
-        'instance': TypeError,
-    }),
-    ('o365://{tenant}/{cid}/{secret}/{targets}?mode=self'.format(
+    ('o365://{tenant}/{cid}/{secret}/{targets}'.format(
         # email not required if mode is set to self
         tenant='tenant',
         cid='ab-cd-ef-gh',
@@ -137,6 +116,49 @@ apprise_url_tests = (
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'azure://user@example.edu/t...t/a...h/'
                        '****/email1@test.ca/'}),
+    ('o365://{aid}/{tenant}/{cid}/{secret}/{targets}'.format(
+        tenant='tenant',
+        cid='ab-cd-ef-gh',
+        # Source can also be Object ID
+        aid='hg-fe-dc-ba',
+        secret='abcd/123/3343/@jack/test',
+        targets='/'.join(['email1@test.ca'])), {
+
+        # We're valid and good to go
+        'instance': NotifyOffice365,
+
+        # Test what happens if a batch send fails to return a messageCount
+        'requests_response_text': {
+            'expires_in': 2000,
+            'access_token': 'abcd1234',
+        },
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'azure://hg-fe-dc-ba/t...t/a...h/'
+                       '****/email1@test.ca/'}),
+
+    # ObjectID Specified, but no targets
+    ('o365://{aid}/{tenant}/{cid}/{secret}/'.format(
+        tenant='tenant',
+        cid='ab-cd-ef-gh',
+        # Source can also be Object ID
+        aid='hg-fe-dc-ba',
+        secret='abcd/123/3343/@jack/test'), {
+
+        # We're valid and good to go
+        'instance': NotifyOffice365,
+
+        # Test what happens if a batch send fails to return a messageCount
+        'requests_response_text': {
+            'expires_in': 2000,
+            'access_token': 'abcd1234',
+        },
+        # No emails detected
+        'notify_response': False,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'azure://hg-fe-dc-ba/t...t/a...h/****'}),
+
     # test our arguments
     ('o365://_/?oauth_id={cid}&oauth_secret={secret}&tenant={tenant}'
         '&to={targets}&from={aid}'.format(
@@ -294,26 +316,6 @@ def test_plugin_office365_general(mock_post):
             client_id=client_id,
             tenant=tenant,
             secret=None,
-            targets=None,
-        )
-
-    with pytest.raises(TypeError):
-        # Invalid email
-        NotifyOffice365(
-            email='invalid',
-            client_id=client_id,
-            tenant=tenant,
-            secret=secret,
-            targets=None,
-        )
-
-    with pytest.raises(TypeError):
-        # Invalid email
-        NotifyOffice365(
-            email='garbage',
-            client_id=client_id,
-            tenant=tenant,
-            secret=secret,
             targets=None,
         )
 
@@ -479,19 +481,52 @@ def test_plugin_office365_attachments(mock_post):
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=attach) is True
 
+    assert mock_post.call_count == 2
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://login.microsoftonline.com/{}/oauth2/v2.0/token'.format(tenant)
+    assert mock_post.call_args_list[0][1]['headers'] \
+        .get('Content-Type') == 'application/x-www-form-urlencoded'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://graph.microsoft.com/v1.0/users/{}/sendMail'.format(email)
+    assert mock_post.call_args_list[1][1]['headers'] \
+        .get('Content-Type') == 'application/json'
+    mock_post.reset_mock()
+
     # Test invalid attachment
     path = os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=path) is False
+    assert mock_post.call_count == 0
+    mock_post.reset_mock()
 
     with mock.patch('base64.b64encode', side_effect=OSError()):
         # We can't send the message if we fail to parse the data
         assert obj.notify(
             body='body', title='title', notify_type=NotifyType.INFO,
             attach=attach) is False
+    assert mock_post.call_count == 0
+    mock_post.reset_mock()
+
+    # Force a smaller attachment size forcing us to create an attachment
+    obj.outlook_attachment_inline_max = 50
+    # We can't create an attachment now..
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO,
+        attach=attach) is True
+
+    # Can't send attachment
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://graph.microsoft.com/v1.0/users/{}/sendMail'.format(email)
+    mock_post.reset_mock()
 
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=attach) is True
-    assert mock_post.call_count == 3
+
+    # already authenticated
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://graph.microsoft.com/v1.0/users/{}/sendMail'.format(email)
+    mock_post.reset_mock()
