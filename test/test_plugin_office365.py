@@ -95,6 +95,7 @@ apprise_url_tests = (
         'requests_response_text': {
             'expires_in': 2000,
             'access_token': 'abcd1234',
+            'mail': 'user@example.ca',
         },
     }),
     ('o365://{aid}/{tenant}/{cid}/{secret}/{targets}'.format(
@@ -111,6 +112,8 @@ apprise_url_tests = (
         'requests_response_text': {
             'expires_in': 2000,
             'access_token': 'abcd1234',
+            # For 'From:' Lookup
+            'mail': 'user@example.ca',
         },
 
         # Our expected url(privacy=True) startswith() response:
@@ -131,6 +134,7 @@ apprise_url_tests = (
         'requests_response_text': {
             'expires_in': 2000,
             'access_token': 'abcd1234',
+            'mail': 'user@example.ca',
         },
 
         # Our expected url(privacy=True) startswith() response:
@@ -152,6 +156,30 @@ apprise_url_tests = (
         'requests_response_text': {
             'expires_in': 2000,
             'access_token': 'abcd1234',
+            'mail': 'user@example.ca',
+        },
+        # No emails detected
+        'notify_response': False,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'azure://hg-fe-dc-ba/t...t/a...h/****'}),
+
+    # ObjectID Specified, but no targets
+    ('o365://{aid}/{tenant}/{cid}/{secret}/'.format(
+        tenant='tenant',
+        cid='ab-cd-ef-gh',
+        # Source can also be Object ID
+        aid='hg-fe-dc-ba',
+        secret='abcd/123/3343/@jack/test'), {
+
+        # We're valid and good to go
+        'instance': NotifyOffice365,
+
+        # Test what happens if a batch send fails to return a messageCount
+        'requests_response_text': {
+            'expires_in': 2000,
+            'access_token': 'abcd1234',
+            'userPrincipalName': 'user@example.ca',
         },
         # No emails detected
         'notify_response': False,
@@ -175,6 +203,7 @@ apprise_url_tests = (
             'requests_response_text': {
                 'expires_in': 2000,
                 'access_token': 'abcd1234',
+                'mail': 'user@example.ca',
             },
 
             # Our expected url(privacy=True) startswith() response:
@@ -209,6 +238,7 @@ apprise_url_tests = (
         'requests_response_text': {
             'expires_in': 2000,
             'access_token': 'abcd1234',
+            'userPrincipalName': 'user@example.ca',
         },
     }),
     ('o365://{aid}/{tenant}/{cid}/{secret}/{targets}'.format(
@@ -246,8 +276,9 @@ def test_plugin_office365_urls():
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
+@mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_office365_general(mock_post):
+def test_plugin_office365_general(mock_get, mock_post):
     """
     NotifyOffice365() General Testing
 
@@ -261,15 +292,20 @@ def test_plugin_office365_general(mock_post):
     targets = 'target@example.com'
 
     # Prepare Mock return object
-    authentication = {
+    payload = {
         "token_type": "Bearer",
         "expires_in": 6000,
-        "access_token": "abcd1234"
+        "access_token": "abcd1234",
+        # For 'From:' Lookup
+        "mail": "abc@example.ca",
+        # For our Draft Email ID:
+        "id": "draft-id-no",
     }
     response = mock.Mock()
-    response.content = dumps(authentication)
+    response.content = dumps(payload)
     response.status_code = requests.codes.ok
     mock_post.return_value = response
+    mock_get.return_value = response
 
     # Instantiate our object
     obj = Apprise.instantiate(
@@ -343,8 +379,9 @@ def test_plugin_office365_general(mock_post):
     assert obj.notify(title='title', body='test') is False
 
 
+@mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_office365_authentication(mock_post):
+def test_plugin_office365_authentication(mock_get, mock_post):
     """
     NotifyOffice365() Authentication Testing
 
@@ -375,6 +412,7 @@ def test_plugin_office365_authentication(mock_post):
     response.content = dumps(authentication_okay)
     response.status_code = requests.codes.ok
     mock_post.return_value = response
+    mock_get.return_value = response
 
     # Instantiate our object
     obj = Apprise.instantiate(
@@ -438,8 +476,10 @@ def test_plugin_office365_authentication(mock_post):
     assert obj.authenticate() is False
 
 
+@mock.patch('requests.put')
+@mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_office365_attachments(mock_post):
+def test_plugin_office365_attachments(mock_post, mock_get, mock_put):
     """
     NotifyOffice365() Attachments
 
@@ -453,15 +493,23 @@ def test_plugin_office365_attachments(mock_post):
     targets = 'target@example.com'
 
     # Prepare Mock return object
-    authentication = {
+    payload = {
         "token_type": "Bearer",
         "expires_in": 6000,
-        "access_token": "abcd1234"
+        "access_token": "abcd1234",
+        # For 'From:' Lookup
+        "mail": "user@example.edu",
+        # For our Draft Email ID:
+        "id": "draft-id-no",
+        # For FIle Uploads
+        "uploadUrl": "https://my.url.path/"
     }
     okay_response = mock.Mock()
-    okay_response.content = dumps(authentication)
+    okay_response.content = dumps(payload)
     okay_response.status_code = requests.codes.ok
     mock_post.return_value = okay_response
+    mock_get.return_value = okay_response
+    mock_put.return_value = okay_response
 
     # Instantiate our object
     obj = Apprise.instantiate(
@@ -512,15 +560,22 @@ def test_plugin_office365_attachments(mock_post):
     obj.outlook_attachment_inline_max = 50
     # We can't create an attachment now..
     assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO,
+        body='body', title='title-test', notify_type=NotifyType.INFO,
         attach=attach) is True
 
-    # Can't send attachment
-    assert mock_post.call_count == 1
+    # Large Attachments
+    assert mock_post.call_count == 3
     assert mock_post.call_args_list[0][0][0] == \
+        'https://graph.microsoft.com/v1.0/users/{}/messages'.format(email)
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://graph.microsoft.com/v1.0/users/{}/'.format(email) + \
+        'message/draft-id-no/attachments/createUploadSession'
+    assert mock_post.call_args_list[2][0][0] == \
         'https://graph.microsoft.com/v1.0/users/{}/sendMail'.format(email)
     mock_post.reset_mock()
 
+    # Reset attachment size
+    obj.outlook_attachment_inline_max = 50 * 1024 * 1024
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
         attach=attach) is True

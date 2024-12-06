@@ -40,6 +40,7 @@
 #
 import requests
 import json
+from uuid import uuid4
 from datetime import datetime
 from datetime import timedelta
 from .base import NotifyBase
@@ -51,6 +52,7 @@ from ..utils import is_email
 from ..utils import parse_emails
 from ..utils import validate_regex
 from ..locale import gettext_lazy as _
+from ..common import PersistentStoreMode
 
 
 class NotifyOffice365(NotifyBase):
@@ -82,6 +84,10 @@ class NotifyOffice365(NotifyBase):
 
     # Support attachments
     attachment_support = True
+
+    # Our default is to no not use persistent storage beyond in-memory
+    # reference
+    storage_mode = PersistentStoreMode.AUTO
 
     # the maximum size an attachment can be for it to be allowed to be
     # uploaded inline with the current email going out (one http post)
@@ -277,6 +283,12 @@ class NotifyOffice365(NotifyBase):
         # Presume that our token has expired 'now'
         self.token_expiry = datetime.now()
 
+        # Our email source; we detect this if the source is an ObjectID
+        # If it is unknown we set this to None
+        self.from_email = self.source \
+            if (self.source and is_email(self.source)) \
+            else self.store.get('from')
+
         return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
@@ -294,6 +306,32 @@ class NotifyOffice365(NotifyBase):
                 'There are no Email recipients to notify')
             return False
 
+        if not self.from_email:
+            if not self.authenticate():
+                # We could not authenticate ourselves; we're done
+                return False
+
+            # Acquire our from_email
+            url = "https://graph.microsoft.com/v1.0/users/{}".format(
+                self.source)
+            postokay, response = self._fetch(url=url, method='GET')
+            if not postokay:
+                self.logger.warning(
+                    'Could not acquire From email address; ensure '
+                    '"User.Read.All" Application scope is set!')
+                return False
+
+            # Acquire our from_email
+            self.from_email = \
+                response.get("mail") or response.get("userPrincipalName")
+            if not is_email(self.from_email):
+                self.logger.warning(
+                    'Could not get From email from the Azure endpoint.')
+                return False
+
+            # Store our email for future reference
+            self.store.set('from', self.from_email)
+
         # Setup our Content Type
         content_type = \
             'HTML' if self.notify_format == NotifyFormat.HTML else 'Text'
@@ -301,6 +339,11 @@ class NotifyOffice365(NotifyBase):
         # Prepare our payload
         payload = {
             'message': {
+                'from': {
+                    "emailAddress": {
+                        "address": self.from_email,
+                    }
+                },
                 'subject': title,
                 'body': {
                     'contentType': content_type,
@@ -316,12 +359,24 @@ class NotifyOffice365(NotifyBase):
 
         # Define our URL to post to
         url = '{graph_url}/v1.0/users/{userid}/sendMail'.format(
-            userid=self.source,
             graph_url=self.graph_url,
+            userid=self.source,
         )
 
-        attachments = []
-        too_large = []
+        # Prepare our Draft URL
+        draft_url = \
+            '{graph_url}/v1.0/users/{userid}/messages' \
+            .format(
+                graph_url=self.graph_url,
+                userid=self.source,
+            )
+
+        small_attachments = []
+        large_attachments = []
+
+        # draft emails
+        drafts = []
+
         if attach and self.attachment_support:
             for no, attachment in enumerate(attach, start=1):
                 # Perform some simple error checking
@@ -333,13 +388,18 @@ class NotifyOffice365(NotifyBase):
                     return False
 
                 if len(attachment) > self.outlook_attachment_inline_max:
-                    # Messages larger then xMB need to be uploaded after
-                    too_large.append(attach)
+                    # Messages larger then xMB need to be uploaded after; a
+                    # draft email must be prepared; below is our session
+                    large_attachments.append({
+                        'obj': attachment,
+                        'name': attachment.name
+                        if attachment.name else f'file{no:03}.dat',
+                    })
                     continue
 
                 try:
                     # Prepare our Attachment in Base64
-                    attachments.append({
+                    small_attachments.append({
                         "@odata.type": "#microsoft.graph.fileAttachment",
                         # Name of the attachment (as it should appear in email)
                         "name": attachment.name
@@ -362,9 +422,9 @@ class NotifyOffice365(NotifyBase):
                     'Appending Office 365 attachment {}'.format(
                         attachment.url(privacy=True)))
 
-        if attachments:
+        if small_attachments:
             # Store Attachments
-            payload['message']['attachments'] = attachments
+            payload['message']['attachments'] = small_attachments
 
         while len(emails):
             # authenticate ourselves if we aren't already; but this function
@@ -394,7 +454,8 @@ class NotifyOffice365(NotifyBase):
                 payload['message']['toRecipients'][0]['emailAddress']['name'] \
                     = to_name
 
-            self.logger.debug('Email To: {}'.format(to_addr))
+            self.logger.debug('{}Email To: {}'.format(
+                'Draft' if large_attachments else '', to_addr))
 
             if cc:
                 # Prepare our CC list
@@ -408,10 +469,12 @@ class NotifyOffice365(NotifyBase):
                     payload['message']['ccRecipients']\
                         .append({'emailAddress': _payload})
 
-                self.logger.debug('Email Cc: {}'.format(', '.join(
-                    ['{}{}'.format(
-                        '' if self.names.get(e)
-                        else '{}: '.format(self.names[e]), e) for e in cc])))
+                self.logger.debug('{}Email Cc: {}'.format(
+                    'Draft' if large_attachments else '', ', '.join(
+                        ['{}{}'.format(
+                            '' if self.names.get(e)
+                            else '{}: '.format(
+                                self.names[e]), e) for e in cc])))
 
             if bcc:
                 # Prepare our CC list
@@ -425,28 +488,152 @@ class NotifyOffice365(NotifyBase):
                     payload['message']['bccRecipients']\
                         .append({'emailAddress': _payload})
 
-                self.logger.debug('Email Bcc: {}'.format(', '.join(
-                    ['{}{}'.format(
-                        '' if self.names.get(e)
-                        else '{}: '.format(self.names[e]), e) for e in bcc])))
+                self.logger.debug('{}Email Bcc: {}'.format(
+                    'Draft' if large_attachments else '', ', '.join(
+                        ['{}{}'.format(
+                            '' if self.names.get(e)
+                            else '{}: '.format(
+                                self.names[e]), e) for e in bcc])))
 
-            # Perform upstream fetch
-            postokay, response = self._fetch(url=url, payload=payload)
+            # Perform upstream post
+            postokay, response = self._fetch(
+                url=url if not large_attachments
+                else draft_url, payload=payload)
 
             # Test if we were okay
             if not postokay:
                 has_error = True
 
-            elif too_large:
+            elif large_attachments:
                 # We have large attachments now to upload and associate with
                 # our message. We need to prepare a draft message; acquire
                 # the message-id associated with it and then attach the file
                 # via this means.
 
-                # TODO
-                pass
+                # Acquire our Draft ID to work with
+                message_id = response.get("id")
+                if not message_id:
+                    self.logger.warning(
+                        'Email Draft ID could not be retrieved')
+                    has_error = True
+                    continue
+
+                self.logger.debug('Email Draft ID: {}'.format(message_id))
+                # In future, the below could probably be called via async
+                has_attach_error = False
+                for attachment in large_attachments:
+                    if not self.upload_attachment(
+                            attachment['obj'], message_id, attachment['name']):
+                        self.logger.warning(
+                            'Could not prepare attachment session for %s',
+                            attachment['name'])
+
+                        has_error = True
+                        has_attach_error = True
+                        # Take early exit
+                        break
+
+                if has_attach_error:
+                    continue
+
+                # Send off our draft
+                attach_url = \
+                    "https://graph.microsoft.com/v1.0/users/" \
+                    "{}/messages/{}/send"
+
+                attach_url = attach_url.format(
+                    self.source,
+                    message_id,
+                )
+
+                # Trigger our send
+                postokay, response = self._fetch(url=url)
+                if not postokay:
+                    self.logger.warning(
+                        'Could not send drafted email id: {} ', message_id)
+                    has_error = True
+                    continue
+
+        # Memory management
+        del small_attachments
+        del large_attachments
+        del drafts
 
         return not has_error
+
+    def upload_attachment(self, attachment, message_id, name=None):
+        """
+        Uploads an attachment to a session
+        """
+
+        # Perform some simple error checking
+        if not attachment:
+            # We could not access the attachment
+            self.logger.error(
+                'Could not access Office 365 attachment {}.'.format(
+                    attachment.url(privacy=True)))
+            return False
+
+        # Our Session URL
+        url = \
+            '{graph_url}/v1.0/users/{userid}/message/{message_id}' \
+            .format(
+                graph_url=self.graph_url,
+                userid=self.source,
+                message_id=message_id,
+            ) + '/attachments/createUploadSession'
+
+        file_size = len(attachment)
+
+        payload = {
+            "AttachmentItem": {
+                "attachmentType": "file",
+                "name": name if name else (
+                    attachment.name
+                    if attachment.name else '{}.dat'.format(str(uuid4()))),
+                # MIME type of the attachment
+                "contentType": attachment.mimetype,
+                "size": file_size,
+            }
+        }
+
+        if not self.authenticate():
+            # We could not authenticate ourselves; we're done
+            return False
+
+        # Get our Upload URL
+        postokay, response = self._fetch(url, payload)
+        if not postokay:
+            return False
+
+        upload_url = response.get('uploadUrl')
+        if not upload_url:
+            return False
+
+        start_byte = 0
+        postokay = False
+        response = None
+
+        for chunk in attachment.chunk():
+            end_byte = start_byte + len(chunk) - 1
+
+            # Define headers for this chunk
+            headers = {
+                'User-Agent': self.app_id,
+                'Content-Length': str(len(chunk)),
+                'Content-Range':
+                f'bytes {start_byte}-{end_byte}/{file_size}'
+            }
+
+            # Upload the chunk
+            postokay, response = self._fetch(
+                upload_url, chunk, headers=headers, content_type=None,
+                method='PUT')
+            if not postokay:
+                return False
+
+        # Return our Upload URL
+        return postokay
 
     def authenticate(self):
         """
@@ -526,18 +713,19 @@ class NotifyOffice365(NotifyBase):
         # We're authenticated
         return True if self.token else False
 
-    def _fetch(self, url, payload, content_type='application/json',
-               method='POST'):
+    def _fetch(self, url, payload=None, headers=None,
+               content_type='application/json', method='POST'):
         """
         Wrapper to request object
 
         """
 
         # Prepare our headers:
-        headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': content_type,
-        }
+        if not headers:
+            headers = {
+                'User-Agent': self.app_id,
+                'Content-Type': content_type,
+            }
 
         if self.token:
             # Are we authenticated?
@@ -547,38 +735,42 @@ class NotifyOffice365(NotifyBase):
         content = {}
 
         # Some Debug Logging
-        self.logger.debug('Office 365 POST URL: {} (cert_verify={})'.format(
-            url, self.verify_certificate))
+        self.logger.debug('Office 365 %s URL: {} (cert_verify={})'.format(
+            url, self.verify_certificate), method)
         self.logger.debug('Office 365 Payload: {}' .format(payload))
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
 
         # fetch function
-        req = requests.post if method == 'POST' else requests.get
+        req = requests.post if method == 'POST' else (
+            requests.put if method == 'PUT' else requests.get)
+
         try:
             r = req(
                 url,
                 data=json.dumps(payload)
-                if content_type.endswith('/json') else payload,
+                if content_type and content_type.endswith('/json')
+                else payload,
                 headers=headers,
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
             )
 
             if r.status_code not in (
-                    requests.codes.ok, requests.codes.accepted):
+                    requests.codes.ok, requests.codes.created,
+                    requests.codes.accepted):
 
                 # We had a problem
                 status_str = \
                     NotifyOffice365.http_response_code_lookup(r.status_code)
 
                 self.logger.warning(
-                    'Failed to send Office 365 POST to {}: '
+                    'Failed to send Office 365 %s to {}: '
                     '{}error={}.'.format(
                         url,
                         ', ' if status_str else '',
-                        r.status_code))
+                        r.status_code), method)
 
                 # A Response could look like this if a Scope element was not
                 # found:
@@ -622,8 +814,8 @@ class NotifyOffice365(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'Exception received when sending Office 365 POST to {}: '.
-                format(url))
+                'Exception received when sending Office 365 %s to {}: '.
+                format(url), method)
             self.logger.debug('Socket Exception: %s' % str(e))
 
             # Mark our failure
