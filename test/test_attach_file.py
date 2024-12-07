@@ -89,6 +89,31 @@ def test_file_expiry(tmpdir):
         assert aa.exists()
 
 
+def test_attach_mimetype():
+    """
+    API: AttachFile MimeType()
+
+    """
+    # Simple gif test
+    path = join(TEST_VAR_DIR, 'apprise-test.gif')
+    response = AppriseAttachment.instantiate(path)
+    assert isinstance(response, AttachFile)
+    assert response.path == path
+    assert response.name == 'apprise-test.gif'
+    assert response.mimetype == 'image/gif'
+
+    # Force mimetype
+    response._mimetype = None
+    response.detected_mimetype = None
+
+    assert response.mimetype == 'image/gif'
+
+    response._mimetype = None
+    response.detected_mimetype = None
+    with mock.patch('mimetypes.guess_type', side_effect=TypeError):
+        assert response.mimetype == 'application/octet-stream'
+
+
 def test_attach_file():
     """
     API: AttachFile()
@@ -104,6 +129,18 @@ def test_attach_file():
     # Download is successful and has already been called by now; below pulls
     # results from cache
     assert response.download()
+
+    with mock.patch('os.path.isfile', side_effect=OSError):
+        assert response.exists() is False
+
+    with mock.patch('os.path.isfile', return_value=False):
+        assert response.exists() is False
+
+    # Test that our file exists
+    assert response.exists() is True
+    response.cache = True
+    # Leverage always-cached flag
+    assert response.exists() is True
 
     # On Windows, it is `file://D%3A%5Ca%5Capprise%5Capprise%5Ctest%5Cvar%5Capprise-test.gif`.  # noqa E501
     # TODO: Review - is this correct?
@@ -212,6 +249,23 @@ def test_attach_file():
     # Test hosted configuration and that we can't add a valid file
     aa = AppriseAttachment(location=ContentLocation.HOSTED)
     assert aa.add(path) is False
+
+    response = AppriseAttachment.instantiate(path)
+    assert len(response) > 0
+
+    # Get file
+    assert response.download()
+
+    # Test the inability to get our file size
+    with mock.patch('os.path.getsize', side_effect=(0, OSError)):
+        assert len(response) == 0
+
+    # get file again
+    assert response.download()
+    with mock.patch('os.path.isfile', return_value=True):
+        response.cache = True
+        with mock.patch('os.path.getsize', side_effect=OSError):
+            assert len(response) == 0
 
 
 def test_attach_file_base64():

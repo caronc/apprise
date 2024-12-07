@@ -101,7 +101,11 @@ class AttachFile(AttachBase):
         # Ensure any existing content set has been invalidated
         self.invalidate()
 
-        if not os.path.isfile(self.dirty_path):
+        try:
+            if not os.path.isfile(self.dirty_path):
+                return False
+
+        except OSError:
             return False
 
         if self.max_file_size > 0 and \
