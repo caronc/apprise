@@ -269,25 +269,26 @@ class AttachBase(URLBase):
         cache = self.template_args['cache']['default'] \
             if self.cache is None else self.cache
 
-        if self.download_path and os.path.isfile(self.download_path) \
-                and cache:
+        try:
+            if self.download_path and os.path.isfile(self.download_path) \
+                    and cache:
 
-            # We have enough reason to look further into our cached content
-            # and verify it has not expired.
-            if cache is True:
-                # return our fixed content as is; we will always cache it
-                return True
+                # We have enough reason to look further into our cached content
+                # and verify it has not expired.
+                if cache is True:
+                    # return our fixed content as is; we will always cache it
+                    return True
 
-            # Verify our cache time to determine whether we will get our
-            # content again.
-            try:
-                age_in_sec = time.time() - os.stat(self.download_path).st_mtime
+                # Verify our cache time to determine whether we will get our
+                # content again.
+                age_in_sec = \
+                    time.time() - os.stat(self.download_path).st_mtime
                 if age_in_sec <= cache:
                     return True
 
-            except (OSError, IOError):
-                # The file is not present
-                pass
+        except (OSError, IOError):
+            # The file is not present
+            pass
 
         return False if not retrieve_if_missing else self.download()
 
