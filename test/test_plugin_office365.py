@@ -135,6 +135,7 @@ apprise_url_tests = (
             'expires_in': 2000,
             'access_token': 'abcd1234',
             'mail': 'user@example.ca',
+            "displayName": "John",
         },
 
         # Our expected url(privacy=True) startswith() response:
@@ -479,6 +480,105 @@ def test_plugin_office365_authentication(mock_get, mock_post):
 @mock.patch('requests.put')
 @mock.patch('requests.get')
 @mock.patch('requests.post')
+def test_plugin_office365_queries(mock_post, mock_get, mock_put):
+    """
+    NotifyOffice365() General Queries
+
+    """
+
+    # Initialize some generic (but valid) tokens
+    source = 'abc-1234-object-id'
+    tenant = 'ff-gg-hh-ii-jj'
+    client_id = 'aa-bb-cc-dd-ee'
+    secret = 'abcd/1234/abcd@ajd@/test'
+    targets = 'target@example.ca'
+
+    # Prepare Mock return object
+    payload = {
+        "token_type": "Bearer",
+        "expires_in": 6000,
+        "access_token": "abcd1234",
+        # For 'From:' Lookup (email)
+        "mail": "user@example.edu",
+        # For 'From:' Lookup (name)
+        "displayName": "John",
+        # For our Draft Email ID:
+        "id": "draft-id-no",
+        # For FIle Uploads
+        "uploadUrl": "https://my.url.path/"
+    }
+
+    okay_response = mock.Mock()
+    okay_response.content = dumps(payload)
+    okay_response.status_code = requests.codes.ok
+    mock_post.return_value = okay_response
+    mock_put.return_value = okay_response
+
+    bad_response = mock.Mock()
+    bad_response.content = dumps(payload)
+    bad_response.status_code = requests.codes.forbidden
+
+    # Assign our GET a bad response so we fail to look up the user
+    mock_get.return_value = bad_response
+
+    # Instantiate our object
+    obj = Apprise.instantiate(
+        'azure://{source}/{tenant}/{client_id}{secret}/{targets}'.format(
+            client_id=client_id,
+            tenant=tenant,
+            source=source,
+            secret=secret,
+            targets=targets))
+
+    assert isinstance(obj, NotifyOffice365)
+
+    # We can still send a notification even if we can't look up the email
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
+
+    assert mock_post.call_count == 2
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://login.microsoftonline.com/{}/oauth2/v2.0/token'.format(tenant)
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://graph.microsoft.com/v1.0/users/abc-1234-object-id/sendMail'
+    mock_post.reset_mock()
+
+    # Now test a case where we just couldn't get any email details from the
+    # payload returned
+
+    # Prepare Mock return object
+    temp_payload = {
+        "token_type": "Bearer",
+        "expires_in": 6000,
+        "access_token": "abcd1234",
+        # For our Draft Email ID:
+        "id": "draft-id-no",
+        # For FIle Uploads
+        "uploadUrl": "https://my.url.path/"
+    }
+
+    bad_response.content = dumps(temp_payload)
+    bad_response.status_code = requests.codes.okay
+    mock_get.return_value = bad_response
+
+    obj = Apprise.instantiate(
+        'azure://{source}/{tenant}/{client_id}{secret}/{targets}'.format(
+            client_id=client_id,
+            tenant=tenant,
+            source=source,
+            secret=secret,
+            targets=targets))
+
+    assert isinstance(obj, NotifyOffice365)
+
+    # We can still send a notification even if we can't look up the email
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is True
+
+
+@mock.patch('requests.put')
+@mock.patch('requests.get')
+@mock.patch('requests.post')
 def test_plugin_office365_attachments(mock_post, mock_get, mock_put):
     """
     NotifyOffice365() Attachments
@@ -486,7 +586,7 @@ def test_plugin_office365_attachments(mock_post, mock_get, mock_put):
     """
 
     # Initialize some generic (but valid) tokens
-    email = 'user@example.net'
+    source = 'user@example.net'
     tenant = 'ff-gg-hh-ii-jj'
     client_id = 'aa-bb-cc-dd-ee'
     secret = 'abcd/1234/abcd@ajd@/test'
@@ -513,10 +613,10 @@ def test_plugin_office365_attachments(mock_post, mock_get, mock_put):
 
     # Instantiate our object
     obj = Apprise.instantiate(
-        'azure://{email}/{tenant}/{client_id}{secret}/{targets}'.format(
+        'azure://{source}/{tenant}/{client_id}{secret}/{targets}'.format(
             client_id=client_id,
             tenant=tenant,
-            email=email,
+            source=source,
             secret=secret,
             targets=targets))
 
@@ -535,12 +635,50 @@ def test_plugin_office365_attachments(mock_post, mock_get, mock_put):
     assert mock_post.call_args_list[0][1]['headers'] \
         .get('Content-Type') == 'application/x-www-form-urlencoded'
     assert mock_post.call_args_list[1][0][0] == \
-        'https://graph.microsoft.com/v1.0/users/{}/sendMail'.format(email)
+        'https://graph.microsoft.com/v1.0/users/{}/sendMail'.format(source)
     assert mock_post.call_args_list[1][1]['headers'] \
         .get('Content-Type') == 'application/json'
     mock_post.reset_mock()
 
+    # Test Authentication Failure
+    obj = Apprise.instantiate(
+        'azure://{source}/{tenant}/{client_id}{secret}/{targets}'.format(
+            client_id=client_id,
+            tenant=tenant,
+            source='object-id-requiring-lookup',
+            secret=secret,
+            targets=targets))
+
+    bad_response = mock.Mock()
+    bad_response.content = dumps(payload)
+    bad_response.status_code = requests.codes.forbidden
+    mock_post.return_value = bad_response
+
+    assert isinstance(obj, NotifyOffice365)
+    # Authentication will fail
+    assert obj.notify(
+        body='auth-fail', title='title', notify_type=NotifyType.INFO) is False
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://login.microsoftonline.com/ff-gg-hh-ii-jj/oauth2/v2.0/token'
+    mock_post.reset_mock()
+
+    #
     # Test invalid attachment
+    #
+
+    # Instantiate our object
+    obj = Apprise.instantiate(
+        'azure://{source}/{tenant}/{client_id}{secret}/{targets}'.format(
+            client_id=client_id,
+            tenant=tenant,
+            source=source,
+            secret=secret,
+            targets=targets))
+
+    assert isinstance(obj, NotifyOffice365)
+
+    mock_post.return_value = okay_response
     path = os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
     assert obj.notify(
         body='body', title='title', notify_type=NotifyType.INFO,
@@ -556,22 +694,179 @@ def test_plugin_office365_attachments(mock_post, mock_get, mock_put):
     assert mock_post.call_count == 0
     mock_post.reset_mock()
 
+    #
+    # Test case where we can't authenticate
+    #
+    obj = Apprise.instantiate(
+        'azure://{source}/{tenant}/{client_id}{secret}/{targets}'.format(
+            client_id=client_id,
+            tenant=tenant,
+            source=source,
+            secret=secret,
+            targets=targets))
+
     # Force a smaller attachment size forcing us to create an attachment
     obj.outlook_attachment_inline_max = 50
-    # We can't create an attachment now..
+
+    assert isinstance(obj, NotifyOffice365)
+
+    path = os.path.join(TEST_VAR_DIR, 'apprise-test.gif')
+    attach = AppriseAttachment(path)
+    mock_post.return_value = bad_response
+    assert obj.upload_attachment(attach[0], 'id') is False
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://login.microsoftonline.com/ff-gg-hh-ii-jj/oauth2/v2.0/token'
+
+    mock_post.reset_mock()
+
+    mock_post.side_effect = (okay_response, bad_response)
+    mock_post.return_value = None
+    assert obj.upload_attachment(attach[0], 'id') is False
+    assert mock_post.call_count == 2
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://login.microsoftonline.com/ff-gg-hh-ii-jj/oauth2/v2.0/token'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://graph.microsoft.com/v1.0/users/{}/'.format(source) + \
+        'message/id/attachments/createUploadSession'
+
+    mock_post.reset_mock()
+    # Return our status
+    mock_post.side_effect = None
+
+    # Prepare Mock return object
+    payload_no_upload_url = {
+        "token_type": "Bearer",
+        "expires_in": 6000,
+        "access_token": "abcd1234",
+        # For 'From:' Lookup
+        "mail": "user@example.edu",
+        # For our Draft Email ID:
+        "id": "draft-id-no",
+    }
+    tmp_response = mock.Mock()
+    tmp_response.content = dumps(payload_no_upload_url)
+    tmp_response.status_code = requests.codes.ok
+    mock_post.return_value = tmp_response
+
+    assert obj.upload_attachment(attach[0], 'id') is False
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://graph.microsoft.com/v1.0/users/{}/'.format(source) + \
+        'message/id/attachments/createUploadSession'
+
+    mock_post.reset_mock()
+    # Return our status
+    mock_post.side_effect = None
+    mock_post.return_value = okay_response
+
+    obj = Apprise.instantiate(
+        'azure://{source}/{tenant}/{client_id}{secret}/{targets}'.format(
+            client_id=client_id,
+            tenant=tenant,
+            source=source,
+            secret=secret,
+            targets=targets))
+
+    # Force a smaller attachment size forcing us to create an attachment
+    obj.outlook_attachment_inline_max = 50
+
+    assert isinstance(obj, NotifyOffice365)
+
+    # We now have to prepare sepparate session attachments using draft emails
     assert obj.notify(
         body='body', title='title-test', notify_type=NotifyType.INFO,
         attach=attach) is True
 
     # Large Attachments
+    assert mock_post.call_count == 4
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://login.microsoftonline.com/ff-gg-hh-ii-jj/oauth2/v2.0/token'
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://graph.microsoft.com/v1.0/users/{}/messages'.format(source)
+    assert mock_post.call_args_list[2][0][0] == \
+        'https://graph.microsoft.com/v1.0/users/{}/'.format(source) + \
+        'message/draft-id-no/attachments/createUploadSession'
+    assert mock_post.call_args_list[3][0][0] == \
+        'https://graph.microsoft.com/v1.0/users/{}/sendMail'.format(source)
+    mock_post.reset_mock()
+
+    #
+    # Handle another case where can't upload the attachment at all
+    #
+    path = os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
+    bad_attach = AppriseAttachment(path)
+    assert obj.upload_attachment(bad_attach[0], 'id') is False
+
+    mock_post.reset_mock()
+    #
+    # Handle test case where we can't send the draft email after everything
+    # has been prepared
+    #
+    mock_post.return_value = None
+    mock_post.side_effect = (okay_response, okay_response, bad_response)
+    assert obj.notify(
+        body='body', title='title-test', notify_type=NotifyType.INFO,
+        attach=attach) is False
+
     assert mock_post.call_count == 3
     assert mock_post.call_args_list[0][0][0] == \
-        'https://graph.microsoft.com/v1.0/users/{}/messages'.format(email)
+        'https://graph.microsoft.com/v1.0/users/{}/messages'.format(source)
     assert mock_post.call_args_list[1][0][0] == \
-        'https://graph.microsoft.com/v1.0/users/{}/'.format(email) + \
+        'https://graph.microsoft.com/v1.0/users/{}/'.format(source) + \
         'message/draft-id-no/attachments/createUploadSession'
     assert mock_post.call_args_list[2][0][0] == \
-        'https://graph.microsoft.com/v1.0/users/{}/sendMail'.format(email)
+        'https://graph.microsoft.com/v1.0/users/{}/sendMail'.format(source)
+    mock_post.reset_mock()
+    mock_post.side_effect = None
+    mock_post.return_value = okay_response
+
+    #
+    # Handle test case where we can not upload chunks
+    #
+    mock_put.return_value = bad_response
+
+    # We now have to prepare sepparate session attachments using draft emails
+    assert obj.notify(
+        body='body', title='title-no-chunk', notify_type=NotifyType.INFO,
+        attach=attach) is False
+
+    assert mock_post.call_count == 2
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://graph.microsoft.com/v1.0/users/{}/messages'.format(source)
+    assert mock_post.call_args_list[1][0][0] == \
+        'https://graph.microsoft.com/v1.0/users/{}/'.format(source) + \
+        'message/draft-id-no/attachments/createUploadSession'
+
+    mock_put.return_value = okay_response
+    mock_post.reset_mock()
+
+    # Prepare Mock return object
+    payload_missing_id = {
+        "token_type": "Bearer",
+        "expires_in": 6000,
+        "access_token": "abcd1234",
+        # For 'From:' Lookup
+        "mail": "user@example.edu",
+        # For FIle Uploads
+        "uploadUrl": "https://my.url.path/"
+    }
+    temp_response = mock.Mock()
+    temp_response.content = dumps(payload_missing_id)
+    temp_response.status_code = requests.codes.ok
+    mock_post.return_value = temp_response
+
+    # We could not acquire an attachment id, so we'll fail to send our
+    # notification
+    assert obj.notify(
+        body='body', title='title-test', notify_type=NotifyType.INFO,
+        attach=attach) is False
+
+    # Large Attachments
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == \
+        'https://graph.microsoft.com/v1.0/users/user@example.net/messages'
+
     mock_post.reset_mock()
 
     # Reset attachment size
@@ -583,5 +878,5 @@ def test_plugin_office365_attachments(mock_post, mock_get, mock_put):
     # already authenticated
     assert mock_post.call_count == 1
     assert mock_post.call_args_list[0][0][0] == \
-        'https://graph.microsoft.com/v1.0/users/{}/sendMail'.format(email)
+        'https://graph.microsoft.com/v1.0/users/{}/sendMail'.format(source)
     mock_post.reset_mock()

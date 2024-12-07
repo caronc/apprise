@@ -37,6 +37,7 @@
 # Note: One must set up Application Permissions (not Delegated Permissions)
 #       - Scopes required: Mail.Send
 #       - For Large Attachments: Mail.ReadWrite
+#       - For Email Lookups: User.Read.All
 #
 import requests
 import json
@@ -285,9 +286,16 @@ class NotifyOffice365(NotifyBase):
 
         # Our email source; we detect this if the source is an ObjectID
         # If it is unknown we set this to None
-        self.from_email = self.source \
-            if (self.source and is_email(self.source)) \
-            else self.store.get('from')
+        # User is the email associated with the account
+        self.from_email = self.store.get('from')
+        result = is_email(self.source)
+        if result:
+            self.from_email = result['full_email']
+            self.from_name = \
+                result['name'] or self.store.get('name')
+
+        else:
+            self.from_name = self.store.get('name')
 
         return
 
@@ -306,7 +314,7 @@ class NotifyOffice365(NotifyBase):
                 'There are no Email recipients to notify')
             return False
 
-        if not self.from_email:
+        if self.from_email is None:
             if not self.authenticate():
                 # We could not authenticate ourselves; we're done
                 return False
@@ -319,18 +327,27 @@ class NotifyOffice365(NotifyBase):
                 self.logger.warning(
                     'Could not acquire From email address; ensure '
                     '"User.Read.All" Application scope is set!')
-                return False
 
-            # Acquire our from_email
-            self.from_email = \
-                response.get("mail") or response.get("userPrincipalName")
-            if not is_email(self.from_email):
-                self.logger.warning(
-                    'Could not get From email from the Azure endpoint.')
-                return False
+            else:  # Acquire our from_email (if possible)
+                from_email = \
+                    response.get("mail") or response.get("userPrincipalName")
+                result = is_email(from_email)
+                if not result:
+                    self.logger.warning(
+                        'Could not get From email from the Azure endpoint.')
 
-            # Store our email for future reference
-            self.store.set('from', self.from_email)
+                    # Prevent re-occuring upstream fetches for info that isn't
+                    # there
+                    self.from_email = False
+
+                else:
+                    # Store our email for future reference
+                    self.from_email = result['full_email']
+                    self.store.set('from', result['full_email'])
+
+                    self.from_name = response.get("displayName")
+                    if self.from_name:
+                        self.store.set('name', self.from_name)
 
         # Setup our Content Type
         content_type = \
@@ -339,11 +356,6 @@ class NotifyOffice365(NotifyBase):
         # Prepare our payload
         payload = {
             'message': {
-                'from': {
-                    "emailAddress": {
-                        "address": self.from_email,
-                    }
-                },
                 'subject': title,
                 'body': {
                     'contentType': content_type,
@@ -353,6 +365,19 @@ class NotifyOffice365(NotifyBase):
             # Below takes a string (not bool) of either 'true' or 'false'
             'saveToSentItems': 'true'
         }
+
+        if self.from_email:
+            # Apply from email if it is known
+            payload.update({
+                'message': {
+                    'from': {
+                        "emailAddress": {
+                            "address": self.from_email,
+                            "name": self.from_name or self.app_id,
+                        }
+                    },
+                }
+            })
 
         # Create a copy of the email list
         emails = list(self.targets)
@@ -446,7 +471,7 @@ class NotifyOffice365(NotifyBase):
             # Prepare our email
             payload['message']['toRecipients'] = [{
                 'emailAddress': {
-                    'Address': to_addr
+                    'address': to_addr
                 }
             }]
             if to_name:
@@ -461,9 +486,9 @@ class NotifyOffice365(NotifyBase):
                 # Prepare our CC list
                 payload['message']['ccRecipients'] = []
                 for addr in cc:
-                    _payload = {'Address': addr}
+                    _payload = {'address': addr}
                     if self.names.get(addr):
-                        _payload['Name'] = self.names[addr]
+                        _payload['name'] = self.names[addr]
 
                     # Store our address in our payload
                     payload['message']['ccRecipients']\
@@ -785,6 +810,23 @@ class NotifyOffice365(NotifyBase):
                 #       "requestId": "2328ea-ec9e-43a8-80f4-164c",
                 #       "date":"2024-12-01T02:03:13"
                 #  }}
+                # }
+
+                # Error 403; the below is returned if he User.Read.All
+                #           Application scope is not set and a lookup is
+                #           attempted.
+                # {
+                #   "error": {
+                #     "code": "Authorization_RequestDenied",
+                #     "message":
+                #        "Insufficient privileges to complete the operation.",
+                #     "innerError": {
+                #       "date": "2024-12-06T00:15:57",
+                #       "request-id":
+                #         "48fdb3e7-2f1a-4f45-a5a0-99b8b851278b",
+                #         "client-request-id": "48f-2f1a-4f45-a5a0-99b8"
+                #     }
+                #   }
                 # }
 
                 # Another response type (error 415):
