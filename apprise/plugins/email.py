@@ -52,6 +52,8 @@ from ..common import NotifyFormat, NotifyType, PersistentStoreMode
 from ..conversion import convert_between
 from ..utils import is_ipaddr, is_email, parse_emails, is_hostname, parse_bool
 from ..locale import gettext_lazy as _
+from ..logger import logger
+from ..exception import AppriseException
 
 try:
     import pgpy
@@ -64,6 +66,14 @@ except ImportError:
 
 # Globally Default encoding mode set to Quoted Printable.
 charset.add_charset('utf-8', charset.QP, charset.QP, 'utf-8')
+
+
+class AppriseEmailException(AppriseException):
+    """
+    Thrown when there is an error with the Email Attachment
+    """
+    def __init__(self, message, error_code=601):
+        super().__init__(message, error_code=error_code)
 
 
 class WebBaseLogin:
@@ -456,12 +466,6 @@ class NotifyEmail(NotifyBase):
             'type': 'string',
             'map_to': 'smtp_host',
         },
-        'pgp': {
-            'name': _('PGP Encryption'),
-            'type': 'bool',
-            'map_to': 'use_pgp',
-            'default': False,
-        },
         'mode': {
             'name': _('Secure Mode'),
             'type': 'choice:string',
@@ -473,6 +477,12 @@ class NotifyEmail(NotifyBase):
             'name': _('Reply To'),
             'type': 'list:string',
             'map_to': 'reply_to',
+        },
+        'pgp': {
+            'name': _('PGP Encryption'),
+            'type': 'bool',
+            'map_to': 'use_pgp',
+            'default': False,
         },
         'pgpkey': {
             'name': _('PGP Public Key Path'),
@@ -518,7 +528,9 @@ class NotifyEmail(NotifyBase):
         # For tracking our email -> name lookups
         self.names = {}
 
-        self.headers = {}
+        self.headers = {
+            'X-Application': self.app_id,
+        }
         if headers:
             # Store our extra headers
             self.headers.update(headers)
@@ -763,194 +775,13 @@ class NotifyEmail(NotifyBase):
 
                 break
 
-    def _get_charset(self, input_string):
-        """
-        Get utf-8 charset if non ascii string only
-
-        Encode an ascii string to utf-8 is bad for email deliverability
-        because some anti-spam gives a bad score for that
-        like SUBJ_EXCESS_QP flag on Rspamd
-        """
-        if not input_string:
-            return None
-        return 'utf-8' if not all(ord(c) < 128 for c in input_string) else None
-
     def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
              **kwargs):
-        """
-        Perform Email Notification
-        """
 
         if not self.targets:
             # There is no one to email; we're done
-            self.logger.warning(
-                'There are no Email recipients to notify')
+            logger.warning('There are no Email recipients to notify')
             return False
-
-        elif self.use_pgp and not PGP_SUPPORT:
-            self.logger.warning('PGP Support unavailable')
-            return False
-
-        messages: t.List[EmailMessage] = []
-
-        # Create a copy of the targets list
-        emails = list(self.targets)
-        while len(emails):
-            # Get our email to notify
-            to_name, to_addr = emails.pop(0)
-
-            # Strip target out of cc list if in To or Bcc
-            cc = (self.cc - self.bcc - set([to_addr]))
-
-            # Strip target out of bcc list if in To
-            bcc = (self.bcc - set([to_addr]))
-
-            # Strip target out of reply_to list if in To
-            reply_to = (self.reply_to - set([to_addr]))
-
-            # Format our cc addresses to support the Name field
-            cc = [formataddr(
-                (self.names.get(addr, False), addr), charset='utf-8')
-                for addr in cc]
-
-            # Format our bcc addresses to support the Name field
-            bcc = [formataddr(
-                (self.names.get(addr, False), addr), charset='utf-8')
-                for addr in bcc]
-
-            if reply_to:
-                # Format our reply-to addresses to support the Name field
-                reply_to = [formataddr(
-                    (self.names.get(addr, False), addr), charset='utf-8')
-                    for addr in reply_to]
-
-            self.logger.debug(
-                'Email From: {}'.format(
-                    formataddr(self.from_addr, charset='utf-8')))
-
-            self.logger.debug('Email To: {}'.format(to_addr))
-            if cc:
-                self.logger.debug('Email Cc: {}'.format(', '.join(cc)))
-            if bcc:
-                self.logger.debug('Email Bcc: {}'.format(', '.join(bcc)))
-            if reply_to:
-                self.logger.debug(
-                    'Email Reply-To: {}'.format(', '.join(reply_to))
-                )
-            self.logger.debug('Login ID: {}'.format(self.user))
-            self.logger.debug(
-                'Delivery: {}:{}'.format(self.smtp_host, self.port))
-
-            # Prepare Email Message
-            if self.notify_format == NotifyFormat.HTML:
-                base = MIMEMultipart("alternative")
-                base.attach(MIMEText(
-                    convert_between(
-                        NotifyFormat.HTML, NotifyFormat.TEXT, body),
-                    'plain', 'utf-8')
-                )
-                base.attach(MIMEText(body, 'html', 'utf-8'))
-            else:
-                base = MIMEText(body, 'plain', 'utf-8')
-
-            if attach and self.attachment_support:
-                mixed = MIMEMultipart("mixed")
-                mixed.attach(base)
-                # Now store our attachments
-                for no, attachment in enumerate(attach, start=1):
-                    if not attachment:
-                        # We could not load the attachment; take an early
-                        # exit since this isn't what the end user wanted
-
-                        # We could not access the attachment
-                        self.logger.error(
-                            'Could not access attachment {}.'.format(
-                                attachment.url(privacy=True)))
-
-                        return False
-
-                    self.logger.debug(
-                        'Preparing Email attachment {}'.format(
-                            attachment.url(privacy=True)))
-
-                    with open(attachment.path, "rb") as abody:
-                        app = MIMEApplication(abody.read())
-                        app.set_type(attachment.mimetype)
-
-                        # Prepare our attachment name
-                        filename = attachment.name \
-                            if attachment.name else f'file{no:03}.dat'
-
-                        app.add_header(
-                            'Content-Disposition',
-                            'attachment; filename="{}"'.format(
-                                Header(filename, 'utf-8')),
-                        )
-                        mixed.attach(app)
-                base = mixed
-
-            if self.use_pgp:
-                self.logger.debug("Securing email with PGP Encryption")
-                # Set our header information to include in the encryption
-                base['From'] = formataddr(
-                    (None, self.from_addr[1]), charset='utf-8')
-                base['To'] = formataddr((None, to_addr), charset='utf-8')
-                base['Subject'] = Header(title, self._get_charset(title))
-
-                # Apply our encryption
-                encrypted_content = self.pgp_encrypt_message(base.as_string())
-                if not encrypted_content:
-                    self.logger.warning('Unable to PGP encrypt email')
-                    # Unable to send notification
-                    return False
-
-                # prepare our messsage
-                base = MIMEMultipart(
-                    "encrypted", protocol="application/pgp-encrypted")
-
-                # Store Autocrypt header (DeltaChat Support)
-                base.add_header(
-                    "Autocrypt",
-                    "addr=%s; prefer-encrypt=mutual" % formataddr(
-                        (False, to_addr), charset='utf-8'))
-
-                # Set Encryption Info Part
-                enc_payload = MIMEText("Version: 1", "plain")
-                enc_payload.set_type("application/pgp-encrypted")
-                base.attach(enc_payload)
-
-                enc_payload = MIMEBase("application", "octet-stream")
-                enc_payload.set_payload(encrypted_content)
-                base.attach(enc_payload)
-
-            # Apply any provided custom headers
-            for k, v in self.headers.items():
-                base[k] = Header(v, self._get_charset(v))
-
-            base['Subject'] = Header(title, self._get_charset(title))
-            base['From'] = formataddr(self.from_addr, charset='utf-8')
-            base['To'] = formataddr((to_name, to_addr), charset='utf-8')
-            base['Message-ID'] = make_msgid(domain=self.smtp_host)
-            base['Date'] = \
-                datetime.now(timezone.utc)\
-                .strftime("%a, %d %b %Y %H:%M:%S +0000")
-            base['X-Application'] = self.app_id
-
-            if cc:
-                base['Cc'] = ','.join(cc)
-
-            if reply_to:
-                base['Reply-To'] = ','.join(reply_to)
-
-            message = EmailMessage(
-                recipient=to_addr,
-                to_addrs=[to_addr] + list(cc) + list(bcc),
-                body=base.as_string())
-            messages.append(message)
-
-        return self.submit(messages)
-
-    def submit(self, messages: t.List[EmailMessage]):
 
         # error tracking (used for function return)
         has_error = False
@@ -980,13 +811,21 @@ class NotifyEmail(NotifyBase):
                 self.logger.debug('Securing connection with STARTTLS...')
                 socket.starttls()
 
+            self.logger.trace('Login ID: {}'.format(self.user))
             if self.user and self.password:
                 # Apply Login credetials
                 self.logger.debug('Applying user credentials...')
                 socket.login(self.user, self.password)
 
-            # Send the emails
-            for message in messages:
+            # Iterate over our email messages we can generate and then
+            # send them off.
+            for message in NotifyEmail.prepare_emails(
+                    subject=title, body=body, notify_format=self.notify_format,
+                    from_addr=self.from_addr, to=self.targets,
+                    cc=self.cc, bcc=self.bcc, reply_to=self.reply_to,
+                    smtp_host=self.smtp_host,
+                    attach=attach, headers=self.headers, names=self.names,
+                    pgp=self.use_pgp, pgp_path='TODO'):
                 try:
                     socket.sendmail(
                         self.from_addr[1],
@@ -1007,6 +846,12 @@ class NotifyEmail(NotifyBase):
             self.logger.warning(
                 'Connection error while submitting email to "%s"',
                 self.smtp_host)
+            self.logger.debug(f'Socket Exception: {e}')
+
+            # Mark as failure
+            has_error = True
+
+        except AppriseEmailException as e:
             self.logger.debug(f'Socket Exception: {e}')
 
             # Mark as failure
@@ -1477,3 +1322,224 @@ class NotifyEmail(NotifyBase):
                               for x, y in results['qsd+'].items()}
 
         return results
+
+    @staticmethod
+    def _get_charset(input_string):
+        """
+        Get utf-8 charset if non ascii string only
+
+        Encode an ascii string to utf-8 is bad for email deliverability
+        because some anti-spam gives a bad score for that
+        like SUBJ_EXCESS_QP flag on Rspamd
+        """
+        if not input_string:
+            return None
+        return 'utf-8' if not all(ord(c) < 128 for c in input_string) else None
+
+    @staticmethod
+    def prepare_emails(subject, body, from_addr, to,
+                       cc=None, bcc=None, reply_to=None,
+                       # Providing an SMTP Host helps improve Email Message-ID
+                       # and avoids getting flagged as spam
+                       smtp_host=None,
+                       notify_format=NotifyFormat.HTML,
+                       attach=None, headers=None, names=None,
+                       # Pretty Good Privacy Support
+                       pgp=False, pgp_path=None):
+        """
+        Generator for emails
+            from_addr: must be in format: (from_name, from_addr)
+            to: must be in the format:
+                 [(to_name, to_addr), (to_name, to_addr)), ...]
+            cc: must be a set of email addresses
+            bcc: must be a set of email addresses
+            reply_to: must be either None, or an email address
+            smtp_host: This is used to generate the email's Message-ID. Set
+                       this correctly to avoid getting flagged as Spam
+            notify_format: can be either 'text' or 'html'
+            attach: must be of class AppriseAttachment
+            headers: Optionally provide a dictionary of additional headers you
+                     would like to include in the email payload
+            names: This is a dictionary of email addresses as keys and the
+                   Names to associate with them when sending the email.
+                   This is cross referenced for the cc and bcc lists
+            pgp:   Encrypting the message using Pretty Good Privacy support
+                   This requires that the pgp_path provided exists and
+                   keys can be referenced here to perform the encryption
+                   with. If a key isn't found, one will be generated.
+
+                   pgp support requires the 'PGPy' Python library to be
+                   available.
+            pgp_path: The path file the PGP Keys can be found/generated in
+                      if pgp is set to True
+        """
+
+        if not to:
+            # There is no one to email; we're done
+            logger.warning('There are no Email recipients to notify')
+            return
+
+        elif pgp and not PGP_SUPPORT:
+            msg = 'PGP Support unavailable; install PGPy library'
+            logger.warning(msg)
+            raise AppriseEmailException(msg)
+
+        if not names:
+            # Prepare a empty dictionary to prevent errors/warnings
+            names = {}
+
+        if not smtp_host:
+            # Generate a host identifier (used for Message-ID Creation)
+            smtp_host = from_addr.split('@')[1]
+        logger.debug('SMTP Host: {smtp_host}')
+
+        # Create a copy of the targets list
+        emails = list(to)
+        while len(emails):
+            # Get our email to notify
+            to_name, to_addr = emails.pop(0)
+
+            # Strip target out of cc list if in To or Bcc
+            _cc = (cc - bcc - set([to_addr]))
+
+            # Strip target out of bcc list if in To
+            _bcc = (bcc - set([to_addr]))
+
+            # Strip target out of reply_to list if in To
+            _reply_to = (reply_to - set([to_addr]))
+
+            # Format our cc addresses to support the Name field
+            _cc = [formataddr(
+                (names.get(addr, False), addr), charset='utf-8')
+                for addr in _cc]
+
+            # Format our bcc addresses to support the Name field
+            _bcc = [formataddr(
+                (names.get(addr, False), addr), charset='utf-8')
+                for addr in _bcc]
+
+            if reply_to:
+                # Format our reply-to addresses to support the Name field
+                reply_to = [formataddr(
+                    (names.get(addr, False), addr), charset='utf-8')
+                    for addr in reply_to]
+
+            logger.debug(
+                'Email From: {}'.format(
+                    formataddr(from_addr, charset='utf-8')))
+
+            logger.debug('Email To: {}'.format(to_addr))
+            if _cc:
+                logger.debug('Email Cc: {}'.format(', '.join(_cc)))
+            if _bcc:
+                logger.debug('Email Bcc: {}'.format(', '.join(_bcc)))
+            if _reply_to:
+                logger.debug(
+                    'Email Reply-To: {}'.format(', '.join(_reply_to))
+                )
+
+            # Prepare Email Message
+            if notify_format == NotifyFormat.HTML:
+                base = MIMEMultipart("alternative")
+                base.attach(MIMEText(
+                    convert_between(
+                        NotifyFormat.HTML, NotifyFormat.TEXT, body),
+                    'plain', 'utf-8')
+                )
+                base.attach(MIMEText(body, 'html', 'utf-8'))
+            else:
+                base = MIMEText(body, 'plain', 'utf-8')
+
+            if attach:
+                mixed = MIMEMultipart("mixed")
+                mixed.attach(base)
+                # Now store our attachments
+                for no, attachment in enumerate(attach, start=1):
+                    if not attachment:
+                        # We could not load the attachment; take an early
+                        # exit since this isn't what the end user wanted
+
+                        # We could not access the attachment
+                        msg = 'Could not access attachment {}.'.format(
+                            attachment.url(privacy=True))
+                        logger.error(msg)
+                        raise AppriseEmailException(msg)
+
+                    logger.debug(
+                        'Preparing Email attachment {}'.format(
+                            attachment.url(privacy=True)))
+
+                    with open(attachment.path, "rb") as abody:
+                        app = MIMEApplication(abody.read())
+                        app.set_type(attachment.mimetype)
+
+                        # Prepare our attachment name
+                        filename = attachment.name \
+                            if attachment.name else f'file{no:03}.dat'
+
+                        app.add_header(
+                            'Content-Disposition',
+                            'attachment; filename="{}"'.format(
+                                Header(filename, 'utf-8')),
+                        )
+                        mixed.attach(app)
+                base = mixed
+
+            if pgp:
+                logger.debug("Securing Email with PGP Encryption")
+                # Set our header information to include in the encryption
+                base['From'] = formataddr(
+                    (None, from_addr[1]), charset='utf-8')
+                base['To'] = formataddr((None, to_addr), charset='utf-8')
+                base['Subject'] = \
+                    Header(subject, NotifyEmail._get_charset(subject))
+
+            #     # Apply our encryption
+            #     encrypted_content = self.pgp_encrypt_message(base.as_string())
+            #     if not encrypted_content:
+            #         self.logger.warning('Unable to PGP encrypt email')
+            #         # Unable to send notification
+            #         return False
+
+            #     # prepare our messsage
+            #     base = MIMEMultipart(
+            #         "encrypted", protocol="application/pgp-encrypted")
+
+            #     # Store Autocrypt header (DeltaChat Support)
+            #     base.add_header(
+            #         "Autocrypt",
+            #         "addr=%s; prefer-encrypt=mutual" % formataddr(
+            #             (False, to_addr), charset='utf-8'))
+
+            #     # Set Encryption Info Part
+            #     enc_payload = MIMEText("Version: 1", "plain")
+            #     enc_payload.set_type("application/pgp-encrypted")
+            #     base.attach(enc_payload)
+
+            #     enc_payload = MIMEBase("application", "octet-stream")
+            #     enc_payload.set_payload(encrypted_content)
+            #     base.attach(enc_payload)
+
+            # Apply any provided custom headers
+            for k, v in headers.items():
+                base[k] = Header(v, NotifyEmail._get_charset(v))
+
+            base['Subject'] = \
+                Header(subject, NotifyEmail._get_charset(subject))
+            base['From'] = formataddr(from_addr, charset='utf-8')
+            base['To'] = formataddr((to_name, to_addr), charset='utf-8')
+            base['Message-ID'] = make_msgid(domain=smtp_host)
+            base['Date'] = \
+                datetime.now(timezone.utc)\
+                .strftime("%a, %d %b %Y %H:%M:%S +0000")
+
+            if cc:
+                base['Cc'] = ','.join(_cc)
+
+            if reply_to:
+                base['Reply-To'] = ','.join(_reply_to)
+
+            yield EmailMessage(
+                recipient=to_addr,
+                to_addrs=[to_addr] + list(_cc) + list(_bcc),
+                body=base.as_string())
