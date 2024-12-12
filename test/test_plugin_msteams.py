@@ -92,6 +92,15 @@ apprise_url_tests = (
 
          # Our expected url(privacy=True) startswith() response (v2 format):
          'privacy_url': 'msteams://myteam/8...2/m...m/8...2/'}),
+    # Support Newer Native URLs with 4 tokens, introduced in 2024
+    ('https://myteam.webhook.office.com/webhookb2/{}@{}/IncomingWebhook/{}/{}'
+     '/{}'
+     .format(UUID4, UUID4, 'm' * 32, UUID4, 'V2-_' + 'n' * 43), {
+         # All tokens provided - we're good
+         'instance': NotifyMSTeams,
+
+         # Our expected url(privacy=True) startswith() response (v2 format):
+         'privacy_url': 'msteams://myteam/8...2/m...m/8...2/V...n'}),
 
     # Legacy URL Formatting
     ('msteams://{}@{}/{}/{}?t2'.format(UUID4, UUID4, 'c' * 32, UUID4), {
