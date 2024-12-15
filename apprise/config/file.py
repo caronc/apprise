@@ -29,7 +29,7 @@
 import re
 import os
 from .base import ConfigBase
-from ..utils import path_decode
+from ..utils.disk import path_decode
 from ..common import ConfigFormat
 from ..common import ContentIncludeMode
 from ..locale import gettext_lazy as _

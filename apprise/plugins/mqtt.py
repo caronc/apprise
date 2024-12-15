@@ -41,8 +41,7 @@ from os.path import isfile
 from .base import NotifyBase
 from ..url import PrivacyMode
 from ..common import NotifyType
-from ..utils import parse_list
-from ..utils import parse_bool
+from ..utils.parse import parse_list, parse_bool
 from ..locale import gettext_lazy as _
 
 # Default our global support flag

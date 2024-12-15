@@ -82,10 +82,8 @@ from .base import NotifyBase
 from ..common import NotifyImageSize
 from ..common import NotifyType
 from ..common import NotifyFormat
-from ..utils import is_email
-from ..utils import parse_bool
-from ..utils import parse_list
-from ..utils import validate_regex
+from ..utils.parse import (
+    is_email, parse_bool, parse_list, validate_regex)
 from ..locale import gettext_lazy as _
 
 # Extend HTTP Error Messages

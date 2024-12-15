@@ -36,9 +36,8 @@ from ..common import NotifyImageSize
 from ..common import NOTIFY_IMAGE_SIZES
 from ..common import NotifyType
 from ..common import NOTIFY_TYPES
-from ..utils import parse_list
-from ..utils import cwe312_url
-from ..utils import GET_SCHEMA_RE
+from ..utils.cwe312 import cwe312_url
+from ..utils.parse import parse_list, GET_SCHEMA_RE
 from ..logger import logger
 from ..locale import gettext_lazy as _
 from ..locale import LazyTranslation

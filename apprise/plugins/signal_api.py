@@ -33,9 +33,7 @@ from json import dumps
 from .base import NotifyBase
 from ..common import NotifyType
 from .. import exception
-from ..utils import is_phone_no
-from ..utils import parse_phone_no
-from ..utils import parse_bool
+from ..utils.parse import is_phone_no, parse_phone_no, parse_bool
 from ..url import PrivacyMode
 from ..locale import gettext_lazy as _
 

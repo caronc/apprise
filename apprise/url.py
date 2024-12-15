@@ -39,11 +39,8 @@ from urllib.parse import quote as _quote
 
 from .locale import gettext_lazy as _
 from .asset import AppriseAsset
-from .utils import urlencode
-from .utils import parse_url
-from .utils import parse_bool
-from .utils import parse_list
-from .utils import parse_phone_no
+from .utils.parse import (
+    urlencode, parse_url, parse_bool, parse_list, parse_phone_no)
 
 # Used to break a path list into parts
 PATHSPLIT_LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')

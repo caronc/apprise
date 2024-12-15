@@ -33,7 +33,7 @@ from .manager_attachment import AttachmentManager
 from .logger import logger
 from .common import ContentLocation
 from .common import CONTENT_LOCATIONS
-from .utils import GET_SCHEMA_RE
+from .utils.parse import GET_SCHEMA_RE
 
 # Grant access to our Notification Manager Singleton
 A_MGR = AttachmentManager()

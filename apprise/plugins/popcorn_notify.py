@@ -30,11 +30,8 @@ import requests
 
 from .base import NotifyBase
 from ..common import NotifyType
-from ..utils import is_email
-from ..utils import is_phone_no
-from ..utils import parse_list
-from ..utils import parse_bool
-from ..utils import validate_regex
+from ..utils.parse import (
+    is_email, is_phone_no, parse_list, parse_bool, validate_regex)
 from ..locale import gettext_lazy as _
 
 

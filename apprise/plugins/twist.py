@@ -39,8 +39,7 @@ from .base import NotifyBase
 from ..url import PrivacyMode
 from ..common import NotifyFormat
 from ..common import NotifyType
-from ..utils import parse_list
-from ..utils import is_email
+from ..utils.parse import parse_list, is_email
 from ..locale import gettext_lazy as _
 
 

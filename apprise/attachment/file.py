@@ -29,7 +29,7 @@
 import re
 import os
 from .base import AttachBase
-from ..utils import path_decode
+from ..utils.disk import path_decode
 from ..common import ContentLocation
 from ..locale import gettext_lazy as _
 

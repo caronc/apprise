@@ -32,11 +32,10 @@ import os
 from itertools import chain
 from . import common
 from .conversion import convert_between
-from .utils import is_exclusive_match
+from .utils.logic import is_exclusive_match
+from .utils.parse import parse_list, parse_urls
+from .utils.cwe312 import cwe312_url
 from .manager_plugins import NotificationManager
-from .utils import parse_list
-from .utils import parse_urls
-from .utils import cwe312_url
 from .emojis import apply_emojis
 from .logger import logger
 from .asset import AppriseAsset

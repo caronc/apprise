@@ -59,10 +59,8 @@ from email.utils import formataddr
 from .base import NotifyBase
 from ..common import NotifyType
 from ..common import NotifyFormat
-from ..utils import parse_emails
-from ..utils import parse_bool
-from ..utils import is_email
-from ..utils import validate_regex
+from ..utils.parse import (
+    parse_emails, parse_bool, is_email, validate_regex)
 from ..logger import logger
 from ..locale import gettext_lazy as _
 

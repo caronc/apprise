@@ -34,7 +34,7 @@
 # https://firebase.google.com/docs/reference/fcm/rest/v1/\
 #       projects.messages#androidnotification
 import re
-from ...utils import parse_bool
+from ...utils.parse import parse_bool
 from ...common import NotifyType
 from ...asset import AppriseAsset
 

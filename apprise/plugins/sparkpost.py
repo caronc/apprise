@@ -61,11 +61,9 @@ from .base import NotifyBase
 from .. import exception
 from ..common import NotifyType
 from ..common import NotifyFormat
-from ..utils import is_email
 from email.utils import formataddr
-from ..utils import validate_regex
-from ..utils import parse_emails
-from ..utils import parse_bool
+from ..utils.parse import (
+    validate_regex, parse_emails, parse_bool, is_email)
 from ..locale import gettext_lazy as _
 
 # Provide some known codes SparkPost uses and what they translate to:

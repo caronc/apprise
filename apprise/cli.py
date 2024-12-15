@@ -43,7 +43,8 @@ from . import AppriseAsset
 from . import AppriseConfig
 from . import PersistentStore
 
-from .utils import dir_size, bytes_to_str, parse_list, path_decode
+from .utils.parse import parse_list
+from .utils.disk import dir_size, bytes_to_str, path_decode
 from .common import NOTIFY_TYPES
 from .common import NOTIFY_FORMATS
 from .common import PERSISTENT_STORE_MODES

@@ -74,8 +74,7 @@ from .base import NotifyBase
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..common import NotifyType
-from ..utils import is_call_sign
-from ..utils import parse_call_sign
+from ..utils.parse import is_call_sign, parse_call_sign
 from .. import __version__
 import re
 

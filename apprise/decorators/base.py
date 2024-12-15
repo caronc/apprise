@@ -29,10 +29,8 @@
 
 from ..plugins.base import NotifyBase
 from ..manager_plugins import NotificationManager
-from ..utils import URL_DETAILS_RE
-from ..utils import parse_url
-from ..utils import url_assembly
-from ..utils import dict_full_update
+from ..utils.parse import URL_DETAILS_RE, parse_url, url_assembly
+from ..utils.logic import dict_full_update
 from .. import common
 from ..logger import logger
 import inspect

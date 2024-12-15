@@ -46,11 +46,8 @@ from ..common import NotifyFormat
 from ..common import NotifyType
 from ..common import NotifyImageSize
 from ..locale import gettext_lazy as _
-from ..utils import parse_list
-from ..utils import parse_bool
-from ..utils import is_hostname
-from ..utils import is_ipaddr
-from ..utils import validate_regex
+from ..utils.parse import (
+    parse_list, parse_bool, is_hostname, is_ipaddr, validate_regex)
 from ..url import PrivacyMode
 from ..attachment.base import AttachBase
 from ..attachment.memory import AttachMemory

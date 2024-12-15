@@ -92,10 +92,8 @@ import requests
 from json import dumps
 from .base import NotifyBase
 from ..common import NotifyType
-from ..utils import validate_regex
 from ..locale import gettext_lazy as _
-from ..utils import is_hostname
-from ..utils import is_ipaddr
+from ..utils.parse import validate_regex, is_hostname, is_ipaddr
 
 # A URL Parser to detect App ID
 LAMETRIC_APP_ID_DETECTOR_RE = re.compile(
