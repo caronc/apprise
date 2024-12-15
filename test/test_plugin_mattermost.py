@@ -93,6 +93,11 @@ apprise_url_tests = (
     ('mmosts://localhost/3ccdd113474722377935511fc85d3dd4', {
         'instance': NotifyMattermost,
     }),
+    ('https://mattermost.example.com/hooks/3ccdd113474722377935511fc85d3dd4', {
+        'instance': NotifyMattermost,
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'mmosts://mattermost.example.com/3...4/',
+    }),
     # Test our paths
     ('mmosts://localhost/a/path/3ccdd113474722377935511fc85d3dd4', {
         'instance': NotifyMattermost,

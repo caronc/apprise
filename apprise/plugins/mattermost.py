@@ -36,6 +36,7 @@
 #  - swap http with mmost
 #  - drop /hooks/ reference
 
+import re
 import requests
 from json import dumps
 
@@ -69,9 +70,6 @@ class NotifyMattermost(NotifyBase):
 
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_mattermost'
-
-    # The default Mattermost port
-    default_port = 8065
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_72
@@ -171,9 +169,6 @@ class NotifyMattermost(NotifyBase):
 
         # Optional Channels (strip off any channel prefix entries if present)
         self.channels = [x.lstrip('#') for x in parse_list(channels)]
-
-        if not self.port:
-            self.port = self.default_port
 
         # Place a thumbnail image inline with the message body
         self.include_image = include_image
@@ -316,7 +311,7 @@ class NotifyMattermost(NotifyBase):
             params['channel'] = ','.join(
                 [NotifyMattermost.quote(x, safe='') for x in self.channels])
 
-        default_port = 443 if self.secure else self.default_port
+        default_port = 443 if self.secure else 80
         default_schema = self.secure_protocol if self.secure else self.protocol
 
         # Determine if there is a botname present
@@ -334,8 +329,8 @@ class NotifyMattermost(NotifyBase):
                 # never encode hostname since we're expecting it to be a valid
                 # one
                 hostname=self.host,
-                port='' if not self.port or self.port == default_port
-                     else ':{}'.format(self.port),
+                port='' if self.port is None or self.port == default_port
+                else ':{}'.format(self.port),
                 fullpath='/' if not self.fullpath else '{}/'.format(
                     NotifyMattermost.quote(self.fullpath, safe='/')),
                 token=self.pprint(self.token, privacy, safe=''),
@@ -388,3 +383,42 @@ class NotifyMattermost(NotifyBase):
             'image', NotifyMattermost.template_args['image']['default']))
 
         return results
+
+    @staticmethod
+    def parse_native_url(url):
+        """
+        Support parsing the webhook straight from URL
+            https://HOST:443/workflows/WORKFLOWID/triggers/manual/paths/invoke
+            https://mattermost.HOST/hooks/TOKEN
+        """
+
+        # Match our workflows webhook URL and re-assemble
+        result = re.match(
+            r'^http(?P<secure>s?)://(?P<host>mattermost\.[A-Z0-9_.-]+)'
+            r'(:(?P<port>[1-9][0-9]{0,5}))?'
+            r'/hooks/'
+            r'(?P<token>[A-Z0-9_-]+)/?'
+            r'(?P<params>\?.+)?$', url, re.I)
+
+        if result:
+            default_port = \
+                int(result.group('port')) if result.group('port') else (
+                    443 if result.group('secure') else 80)
+
+            default_schema = \
+                NotifyMattermost.secure_protocol \
+                if result.group('secure') else NotifyMattermost.protocol
+
+            # Construct our URL
+            return NotifyMattermost.parse_url(
+                '{schema}://{host}{port}/{token}'
+                '/{params}'.format(
+                    schema=default_schema,
+                    host=result.group('host'),
+                    port='' if not result.group('port')
+                    or int(result.group('port')) == default_port
+                    else f':{default_port}',
+                    token=result.group('token'),
+                    params='' if not result.group('params')
+                    else result.group('params')))
+        return None
