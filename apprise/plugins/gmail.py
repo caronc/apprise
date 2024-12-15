@@ -37,9 +37,7 @@ from email.utils import formataddr
 from ..url import PrivacyMode
 from ..common import NotifyFormat
 from ..common import NotifyType
-from ..utils import is_email
-from ..utils import parse_emails
-from ..utils import validate_regex
+from ..utils.parse import is_email, parse_emails, validate_regex
 from ..locale import gettext_lazy as _
 from ..common import PersistentStoreMode
 from . import email as _email
