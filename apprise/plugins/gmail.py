@@ -639,16 +639,9 @@ class NotifyGMail(NotifyBase):
                     requests.codes.ok, requests.codes.created,
                     requests.codes.accepted):
 
-                # We had a problem
-                status_str = \
-                    NotifyGMail.http_response_code_lookup(r.status_code)
-
                 self.logger.warning(
-                    'Failed to send GMail to {}: '
-                    '{}error={}.'.format(
-                        url,
-                        ', ' if status_str else '',
-                        r.status_code))
+                    'Failed to send GMail to %s [error=%d]',
+                    url, r.status_code)
 
                 self.logger.debug(
                     'Response Details:\r\n{}'.format(r.content))
