@@ -40,7 +40,11 @@ logging.TRACE = logging.DEBUG - 1
 # from the command line.  The idea here is to allow for deprecation notices
 logging.DEPRECATE = logging.ERROR + 1
 
+# Action Required Notices
+logging.ACTION_REQUIRED = logging.ERROR + 2
+
 # Assign our Levels into our logging object
+logging.addLevelName(logging.ACTION_REQUIRED, "ACTION REQUIRED")
 logging.addLevelName(logging.DEPRECATE, "DEPRECATION WARNING")
 logging.addLevelName(logging.TRACE, "TRACE")
 
@@ -61,9 +65,18 @@ def deprecate(self, message, *args, **kwargs):
         self._log(logging.DEPRECATE, message, args, **kwargs)
 
 
+def action_required(self, message, *args, **kwargs):
+    """
+    Action Required Logging
+    """
+    if self.isEnabledFor(logging.ACTION_REQUIRED):
+        self._log(logging.ACTION_REQUIRED, message, args, **kwargs)
+
+
 # Assign our Loggers for use in Apprise
 logging.Logger.trace = trace
 logging.Logger.deprecate = deprecate
+logging.Logger.action_required = action_required
 
 # Create ourselve a generic (singleton) logging reference
 logger = logging.getLogger(LOGGER_NAME)
