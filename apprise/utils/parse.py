@@ -25,69 +25,15 @@
 # CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
-import copy
 import re
-import sys
-import json
-import os
-import binascii
-import platform
-import typing
-import base64
-from itertools import chain
-from os.path import expanduser
 from functools import reduce
-from . import common
-from .logger import logger
 from urllib.parse import unquote
 from urllib.parse import quote
 from urllib.parse import urlparse
 from urllib.parse import urlencode as _urlencode
 
-import importlib.util
 
-
-# A simple path decoder we can re-use which looks after
-# ensuring our file info is expanded correctly when provided
-# a path.
-__PATH_DECODER = os.path.expandvars if \
-    platform.system() == 'Windows' else os.path.expanduser
-
-
-def path_decode(path):
-    """
-    Returns the fully decoded path based on the operating system
-    """
-    return os.path.abspath(__PATH_DECODER(path))
-
-
-def import_module(path, name):
-    """
-    Load our module based on path
-    """
-    spec = importlib.util.spec_from_file_location(name, path)
-    try:
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[name] = module
-
-        spec.loader.exec_module(module)
-
-    except Exception as e:
-        # module isn't loadable
-        try:
-            del sys.modules[name]
-
-        except KeyError:
-            # nothing to clean up
-            pass
-
-        module = None
-
-        logger.debug(
-            'Module exception raised from %s (name=%s) %s',
-            path, name, str(e))
-
-    return module
+from .disk import tidy_path
 
 
 # URL Indexing Table for returns via parse_url()
@@ -108,41 +54,6 @@ STRING_DELIMITERS = r'[\[\]\;,\s]+'
 
 # String Delimiters without the whitespace
 STRING_DELIMITERS_NO_WS = r'[\[\]\;,]+'
-
-# Pre-Escape content since we reference it so much
-ESCAPED_PATH_SEPARATOR = re.escape('\\/')
-ESCAPED_WIN_PATH_SEPARATOR = re.escape('\\')
-ESCAPED_NUX_PATH_SEPARATOR = re.escape('/')
-
-TIDY_WIN_PATH_RE = re.compile(
-    r'(^[%s]{2}|[^%s\s][%s]|[\s][%s]{2}])([%s]+)' % (
-        ESCAPED_WIN_PATH_SEPARATOR,
-        ESCAPED_WIN_PATH_SEPARATOR,
-        ESCAPED_WIN_PATH_SEPARATOR,
-        ESCAPED_WIN_PATH_SEPARATOR,
-        ESCAPED_WIN_PATH_SEPARATOR,
-    ),
-)
-TIDY_WIN_TRIM_RE = re.compile(
-    r'^(.+[^:][^%s])[\s%s]*$' % (
-        ESCAPED_WIN_PATH_SEPARATOR,
-        ESCAPED_WIN_PATH_SEPARATOR,
-    ),
-)
-
-TIDY_NUX_PATH_RE = re.compile(
-    r'([%s])([%s]+)' % (
-        ESCAPED_NUX_PATH_SEPARATOR,
-        ESCAPED_NUX_PATH_SEPARATOR,
-    ),
-)
-
-TIDY_NUX_TRIM_RE = re.compile(
-    r'([^%s])[\s%s]+$' % (
-        ESCAPED_NUX_PATH_SEPARATOR,
-        ESCAPED_NUX_PATH_SEPARATOR,
-    ),
-)
 
 # The handling of custom arguments passed in the URL; we treat any
 # argument (which would otherwise appear in the qsd area of our parse_url()
@@ -227,35 +138,6 @@ VALID_PYTHON_FILE_RE = re.compile(r'.+\.py(o|c)?$', re.IGNORECASE)
 # validate_regex() utilizes this mapping to track and re-use pre-complied
 # regular expressions
 REGEX_VALIDATE_LOOKUP = {}
-
-
-class Singleton(type):
-    """
-    Our Singleton MetaClass
-    """
-    _instances = {}
-
-    def __call__(cls, *args, **kwargs):
-        """
-        instantiate our singleton meta entry
-        """
-        if cls not in cls._instances:
-            # we have not every built an instance before.  Build one now.
-            cls._instances[cls] = super().__call__(*args, **kwargs)
-        return cls._instances[cls]
-
-
-class TemplateType:
-    """
-    Defines the different template types we can perform parsing on
-    """
-    # RAW does nothing at all to the content being parsed
-    # data is taken at it's absolute value
-    RAW = 'raw'
-
-    # Data is presumed to be of type JSON and is therefore escaped
-    # if required to do so (such as single quotes)
-    JSON = 'json'
 
 
 def is_ipaddr(addr, ipv4=True, ipv6=True):
@@ -542,24 +424,6 @@ def is_email(address):
         }
 
     return False
-
-
-def tidy_path(path):
-    """take a filename and or directory and attempts to tidy it up by removing
-    trailing slashes and correcting any formatting issues.
-
-    For example: ////absolute//path// becomes:
-        /absolute/path
-
-    """
-    # Windows
-    path = TIDY_WIN_PATH_RE.sub('\\1', path.strip())
-    # Linux
-    path = TIDY_NUX_PATH_RE.sub('\\1', path)
-
-    # Windows Based (final) Trim
-    path = expanduser(TIDY_WIN_TRIM_RE.sub('\\1', path))
-    return path
 
 
 def parse_qsd(qs, simple=False, plus_to_space=False, sanitize=True):
@@ -1056,37 +920,6 @@ def parse_emails(*args, store_unparseable=True, **kwargs):
     return result
 
 
-def parse_urls(*args, store_unparseable=True, **kwargs):
-    """
-    Takes a string containing URLs separated by comma's and/or spaces and
-    returns a list.
-    """
-
-    result = []
-    for arg in args:
-        if isinstance(arg, str) and arg:
-            _result = URL_DETECTION_RE.findall(arg)
-            if _result:
-                result += _result
-
-            elif not _result and store_unparseable:
-                # we had content passed into us that was lost because it was
-                # so poorly formatted that it didn't even come close to
-                # meeting the regular expression we defined. We intentially
-                # keep it as part of our result set so that parsing done
-                # at a higher level can at least report this to the end user
-                # and hopefully give them some indication as to what they
-                # may have done wrong.
-                result += \
-                    [x for x in filter(bool, re.split(STRING_DELIMITERS, arg))]
-
-        elif isinstance(arg, (set, list, tuple)):
-            # Use recursion to handle the list of URLs
-            result += parse_urls(*arg, store_unparseable=store_unparseable)
-
-    return result
-
-
 def url_assembly(**kwargs):
     """
     This function reverses the parse_url() function by taking in the provided
@@ -1156,6 +989,37 @@ def urlencode(query, doseq=False, safe='', encoding=None, errors=None):
         errors=errors)
 
 
+def parse_urls(*args, store_unparseable=True, **kwargs):
+    """
+    Takes a string containing URLs separated by comma's and/or spaces and
+    returns a list.
+    """
+
+    result = []
+    for arg in args:
+        if isinstance(arg, str) and arg:
+            _result = URL_DETECTION_RE.findall(arg)
+            if _result:
+                result += _result
+
+            elif not _result and store_unparseable:
+                # we had content passed into us that was lost because it was
+                # so poorly formatted that it didn't even come close to
+                # meeting the regular expression we defined. We intentially
+                # keep it as part of our result set so that parsing done
+                # at a higher level can at least report this to the end user
+                # and hopefully give them some indication as to what they
+                # may have done wrong.
+                result += \
+                    [x for x in filter(bool, re.split(STRING_DELIMITERS, arg))]
+
+        elif isinstance(arg, (set, list, tuple)):
+            # Use recursion to handle the list of URLs
+            result += parse_urls(*arg, store_unparseable=store_unparseable)
+
+    return result
+
+
 def parse_list(*args, cast=None, allow_whitespace=True):
     """
     Take a string list and break it into a delimited
@@ -1199,77 +1063,6 @@ def parse_list(*args, cast=None, allow_whitespace=True):
     return sorted([x for x in filter(bool, list(set(result)))]) \
         if allow_whitespace else sorted(
             [x.strip() for x in filter(bool, list(set(result))) if x.strip()])
-
-
-def is_exclusive_match(logic, data, match_all=common.MATCH_ALL_TAG,
-                       match_always=common.MATCH_ALWAYS_TAG):
-    """
-
-    The data variable should always be a set of strings that the logic can be
-    compared against. It should be a set.  If it isn't already, then it will
-    be converted as such. These identify the tags themselves.
-
-    Our logic should be a list as well:
-      - top level entries are treated as an 'or'
-      - second level (or more) entries are treated as 'and'
-
-      examples:
-        logic="tagA, tagB"                = tagA or tagB
-        logic=['tagA', 'tagB']            = tagA or tagB
-        logic=[('tagA', 'tagC'), 'tagB']  = (tagA and tagC) or tagB
-        logic=[('tagB', 'tagC')]          = tagB and tagC
-
-    If `match_always` is not set to None, then its value is added as an 'or'
-    to all specified logic searches.
-    """
-
-    if isinstance(logic, str):
-        # Update our logic to support our delimiters
-        logic = set(parse_list(logic))
-
-    if not logic:
-        # If there is no logic to apply then we're done early; we only match
-        # if there is also no data to match against
-        return not data
-
-    if not isinstance(logic, (list, tuple, set)):
-        # garbage input
-        return False
-
-    if match_always:
-        # Add our match_always to our logic searching if secified
-        logic = chain(logic, [match_always])
-
-    # Track what we match against; but by default we do not match
-    # against anything
-    matched = False
-
-    # Every entry here will be or'ed with the next
-    for entry in logic:
-        if not isinstance(entry, (str, list, tuple, set)):
-            # Garbage entry in our logic found
-            return False
-
-        # treat these entries as though all elements found
-        # must exist in the notification service
-        entries = set(parse_list(entry))
-        if not entries:
-            # We got a bogus set of tags to parse
-            # If there is no logic to apply then we're done early; we only
-            # match if there is also no data to match against
-            return not data
-
-        if len(entries.intersection(data.union({match_all}))) == len(entries):
-            # our set contains all of the entries found
-            # in our notification data set
-            matched = True
-            break
-
-        # else: keep looking
-
-    # Return True if we matched against our logic (or simply none was
-    # specified).
-    return matched
 
 
 def validate_regex(value, regex=r'[^\s]+', flags=re.I, strip=True, fmt=None):
@@ -1346,383 +1139,3 @@ def validate_regex(value, regex=r'[^\s]+', flags=re.I, strip=True, fmt=None):
 
     # Return our response
     return value.strip() if strip else value
-
-
-def cwe312_word(word, force=False, advanced=True, threshold=5):
-    """
-    This function was written to help mask secure/private information that may
-    or may not be found within Apprise. The idea is to provide a presentable
-    word response that the user who prepared it would understand, yet not
-    reveal any private information for any potential intruder
-
-    For more detail see CWE-312 @
-       https://cwe.mitre.org/data/definitions/312.html
-
-    The `force` is an optional argument used to keep the string formatting
-    consistent and in one place. If set, the content passed in is presumed
-    to be containing secret information and will be updated accordingly.
-
-    If advanced is set to `True` then content is additionally checked for
-    upper/lower/ascii/numerical variances. If an obscurity threshold is
-    reached, then content is considered secret
-    """
-
-    class Variance:
-        """
-        A Simple List of Possible Character Variances
-        """
-        # An Upper Case Character (ABCDEF... etc)
-        ALPHA_UPPER = '+'
-        # An Lower Case Character (abcdef... etc)
-        ALPHA_LOWER = '-'
-        # A Special Character ($%^;... etc)
-        SPECIAL = 's'
-        # A Numerical Character (1234... etc)
-        NUMERIC = 'n'
-
-    if not (isinstance(word, str) and word.strip()):
-        # not a password if it's not something we even support
-        return word
-
-    # Formatting
-    word = word.strip()
-    if force:
-        # We're forcing the representation to be a secret
-        # We do this for consistency
-        return '{}...{}'.format(word[0:1], word[-1:])
-
-    elif len(word) > 1 and \
-            not is_hostname(word, ipv4=True, ipv6=True, underscore=False):
-        # Verify if it is a hostname or not
-        return '{}...{}'.format(word[0:1], word[-1:])
-
-    elif len(word) >= 16:
-        # an IP will be 15 characters so we don't want to use a smaller
-        # value then 16 (e.g 101.102.103.104)
-        # we can assume very long words are passwords otherwise
-        return '{}...{}'.format(word[0:1], word[-1:])
-
-    if advanced:
-        #
-        # Mark word a secret based on it's obscurity
-        #
-
-        # Our variances will increase depending on these variables:
-        last_variance = None
-        obscurity = 0
-
-        for c in word:
-            # Detect our variance
-            if c.isdigit():
-                variance = Variance.NUMERIC
-            elif c.isalpha() and c.isupper():
-                variance = Variance.ALPHA_UPPER
-            elif c.isalpha() and c.islower():
-                variance = Variance.ALPHA_LOWER
-            else:
-                variance = Variance.SPECIAL
-
-            if last_variance != variance or variance == Variance.SPECIAL:
-                obscurity += 1
-
-                if obscurity >= threshold:
-                    return '{}...{}'.format(word[0:1], word[-1:])
-
-            last_variance = variance
-
-    # Otherwise we're good; return our word
-    return word
-
-
-def cwe312_url(url):
-    """
-    This function was written to help mask secure/private information that may
-    or may not be found on an Apprise URL. The idea is to not disrupt the
-    structure of the previous URL too much, yet still protect the users
-    private information from being logged directly to screen.
-
-    For more detail see CWE-312 @
-       https://cwe.mitre.org/data/definitions/312.html
-
-    For example, consider the URL: http://user:password@localhost/
-
-    When passed into this function, the return value would be:
-      http://user:****@localhost/
-
-    Since apprise allows you to put private information everywhere in it's
-    custom URLs, it uses this function to manipulate the content before
-    returning to any kind of logger.
-
-    The idea is that the URL can still be interpreted by the person who
-    constructed them, but not to an intruder.
-    """
-    # Parse our URL
-    results = parse_url(url)
-    if not results:
-        # Nothing was returned (invalid data was fed in); return our
-        # information as it was fed to us (without changing it)
-        return url
-
-    # Update our URL with values
-    results['password'] = cwe312_word(results['password'], force=True)
-    if not results['schema'].startswith('http'):
-        results['user'] = cwe312_word(results['user'])
-        results['host'] = cwe312_word(results['host'])
-
-    else:
-        results['host'] = cwe312_word(results['host'], advanced=False)
-        results['user'] = cwe312_word(results['user'], advanced=False)
-
-    # Apply our full path scan in all cases
-    results['fullpath'] = '/' + \
-        '/'.join([cwe312_word(x)
-                 for x in re.split(
-                     r'[\\/]+',
-                     results['fullpath'].lstrip('/'))]) \
-        if results['fullpath'] else ''
-
-    #
-    # Now re-assemble our URL for display purposes
-    #
-
-    # Determine Authentication
-    auth = ''
-    if results['user'] and results['password']:
-        auth = '{user}:{password}@'.format(
-            user=results['user'],
-            password=results['password'],
-        )
-    elif results['user']:
-        auth = '{user}@'.format(
-            user=results['user'],
-        )
-
-    params = ''
-    if results['qsd']:
-        params = '?{}'.format(
-            "&".join(["{}={}".format(k, cwe312_word(v, force=(
-                k in ('password', 'secret', 'pass', 'token', 'key',
-                      'id', 'apikey', 'to'))))
-                      for k, v in results['qsd'].items()]))
-
-    return '{schema}://{auth}{hostname}{port}{fullpath}{params}'.format(
-        schema=results['schema'],
-        auth=auth,
-        # never encode hostname since we're expecting it to be a valid one
-        hostname=results['host'],
-        port='' if not results['port'] else ':{}'.format(results['port']),
-        fullpath=results['fullpath'] if results['fullpath'] else '',
-        params=params,
-    )
-
-
-def apply_template(template, app_mode=TemplateType.RAW, **kwargs):
-    """
-    Takes a template in a str format and applies all of the keywords
-    and their values to it.
-
-    The app$mode is used to dictact any pre-processing that needs to take place
-    to the escaped string prior to it being placed.  The idea here is for
-    elements to be placed in a JSON response for example should be escaped
-    early in their string format.
-
-    The template must contain keywords wrapped in in double
-    squirly braces like {{keyword}}.  These are matched to the respected
-    kwargs passed into this function.
-
-    If there is no match found, content is not swapped.
-
-    """
-
-    def _escape_raw(content):
-        # No escaping necessary
-        return content
-
-    def _escape_json(content):
-        # remove surounding quotes
-        return json.dumps(content)[1:-1]
-
-    # Our escape function
-    fn = _escape_json if app_mode == TemplateType.JSON else _escape_raw
-
-    lookup = [re.escape(x) for x in kwargs.keys()]
-
-    # Compile this into a list
-    mask_r = re.compile(
-        re.escape('{{') + r'\s*(' + '|'.join(lookup) + r')\s*'
-        + re.escape('}}'), re.IGNORECASE)
-
-    # we index 2 characters off the head and 2 characters from the tail
-    # to drop the '{{' and '}}' surrounding our match so that we can
-    # re-index it back into our list
-    return mask_r.sub(lambda x: fn(kwargs[x.group()[2:-2].strip()]), template)
-
-
-def remove_suffix(value, suffix):
-    """
-    Removes a suffix from the end of a string.
-    """
-    return value[:-len(suffix)] if value.endswith(suffix) else value
-
-
-def dict_full_update(dict1, dict2):
-    """
-    Takes 2 dictionaries (dict1 and dict2) that contain sub-dictionaries and
-    gracefully merges them into dict1.
-
-    This is similar to: dict1.update(dict2) except that internal dictionaries
-    are also recursively applied.
-    """
-    def _merge(dict1, dict2):
-        for k in dict2:
-            if k in dict1 and isinstance(dict1[k], dict) \
-                    and isinstance(dict2[k], dict):
-                _merge(dict1[k], dict2[k])
-            else:
-                dict1[k] = dict2[k]
-
-    _merge(dict1, dict2)
-    return
-
-
-def dir_size(path, max_depth=3, missing_okay=True, _depth=0, _errors=None):
-    """
-    Scans a provided path an returns it's size (in bytes) of path provided
-    """
-
-    if _errors is None:
-        _errors = set()
-
-    if _depth > max_depth:
-        _errors.add(path)
-        return (0, _errors)
-
-    total = 0
-    try:
-        with os.scandir(path) as it:
-            for entry in it:
-                try:
-                    if entry.is_file(follow_symlinks=False):
-                        total += entry.stat(follow_symlinks=False).st_size
-
-                    elif entry.is_dir(follow_symlinks=False):
-                        (totals, _) = dir_size(
-                            entry.path,
-                            max_depth=max_depth,
-                            _depth=_depth + 1,
-                            _errors=_errors)
-                        total += totals
-
-                except FileNotFoundError:
-                    # no worries; Nothing to do
-                    continue
-
-                except (OSError, IOError) as e:
-                    # Permission error of some kind or disk problem...
-                    # There is nothing we can do at this point
-                    _errors.add(entry.path)
-                    logger.warning(
-                        'dir_size detetcted inaccessible path: %s',
-                        os.fsdecode(entry.path))
-                    logger.debug('dir_size Exception: %s' % str(e))
-                    continue
-
-    except FileNotFoundError:
-        if not missing_okay:
-            # Conditional error situation
-            _errors.add(path)
-
-    except (OSError, IOError) as e:
-        # Permission error of some kind or disk problem...
-        # There is nothing we can do at this point
-        _errors.add(path)
-        logger.warning(
-            'dir_size detetcted inaccessible path: %s',
-            os.fsdecode(path))
-        logger.debug('dir_size Exception: %s' % str(e))
-
-    return (total, _errors)
-
-
-def bytes_to_str(value):
-    """
-    Covert an integer (in bytes) into it's string representation with
-    acompanied unit value (such as B, KB, MB, GB, TB, etc)
-    """
-    unit = 'B'
-    try:
-        value = float(value)
-
-    except (ValueError, TypeError):
-        return None
-
-    if value >= 1024.0:
-        value = value / 1024.0
-        unit = 'KB'
-        if value >= 1024.0:
-            value = value / 1024.0
-            unit = 'MB'
-            if value >= 1024.0:
-                value = value / 1024.0
-                unit = 'GB'
-                if value >= 1024.0:
-                    value = value / 1024.0
-                    unit = 'TB'
-
-    return '%.2f%s' % (round(value, 2), unit)
-
-
-def decode_b64_dict(di: dict) -> dict:
-    """
-    decodes base64 dictionary previously encoded
-
-    string entries prefixed with `b64:` are targeted
-    """
-    di = copy.deepcopy(di)
-    for k, v in di.items():
-        if not isinstance(v, str) or not v.startswith("b64:"):
-            continue
-
-        try:
-            parsed_v = base64.b64decode(v[4:])
-            parsed_v = json.loads(parsed_v)
-
-        except (ValueError, TypeError, binascii.Error,
-                json.decoder.JSONDecodeError):
-            # ValueError: the length of altchars is not 2.
-            # TypeError: invalid input
-            # binascii.Error: not base64 (bad padding)
-            # json.decoder.JSONDecodeError: Bad JSON object
-
-            parsed_v = v
-        di[k] = parsed_v
-    return di
-
-
-def encode_b64_dict(di: dict, encoding='utf-8') -> typing.Tuple[dict, bool]:
-    """
-    Encodes dictionary entries containing binary types (int, float) into base64
-
-    Final product is always string based values
-    """
-    di = copy.deepcopy(di)
-    needs_decoding = False
-    for k, v in di.items():
-        if isinstance(v, str):
-            continue
-
-        try:
-            encoded = base64.urlsafe_b64encode(json.dumps(v).encode(encoding))
-            encoded = "b64:{}".format(encoded.decode(encoding))
-            needs_decoding = True
-
-        except (ValueError, TypeError):
-            # ValueError:
-            #  - the length of altchars is not 2.
-            # TypeError:
-            #  - json not searializable or
-            #  - bytes object not passed into urlsafe_b64encode()
-            encoded = str(v)
-
-        di[k] = encoded
-    return di, needs_decoding

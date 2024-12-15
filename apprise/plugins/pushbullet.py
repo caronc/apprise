@@ -31,10 +31,8 @@ from json import dumps
 from json import loads
 
 from .base import NotifyBase
-from ..utils import is_email
 from ..common import NotifyType
-from ..utils import parse_list
-from ..utils import validate_regex
+from ..utils.parse import is_email, parse_list, validate_regex
 from ..locale import gettext_lazy as _
 from ..attachment.base import AttachBase
 

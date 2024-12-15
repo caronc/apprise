@@ -57,9 +57,7 @@ from .base import NotifyBase
 from ..url import PrivacyMode
 from ..common import NotifyFormat
 from ..common import NotifyType
-from ..utils import parse_list
-from ..utils import parse_bool
-from ..utils import validate_regex
+from ..utils.parse import parse_list, parse_bool, validate_regex
 from ..locale import gettext_lazy as _
 from .. import __title__, __version__
 

@@ -40,12 +40,8 @@ from itertools import chain
 from .base import NotifyBase
 from ..common import NotifyType
 from ..common import NotifyImageSize
-from ..utils import decode_b64_dict
-from ..utils import encode_b64_dict
-from ..utils import validate_regex
-from ..utils import parse_list
-from ..utils import parse_bool
-from ..utils import is_email
+from ..utils.base64 import decode_b64_dict, encode_b64_dict
+from ..utils.parse import validate_regex, parse_list, parse_bool, is_email
 from ..locale import gettext_lazy as _
 
 

@@ -46,8 +46,7 @@ from .base import NotifyBase
 from ..common import NotifyImageSize
 from ..common import NotifyFormat
 from ..common import NotifyType
-from ..utils import validate_regex
-from ..utils import parse_list
+from ..utils.parse import validate_regex, parse_list
 from ..locale import gettext_lazy as _
 
 

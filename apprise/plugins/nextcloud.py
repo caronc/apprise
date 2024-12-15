@@ -31,7 +31,7 @@ import requests
 from .base import NotifyBase
 from ..url import PrivacyMode
 from ..common import NotifyType
-from ..utils import parse_list
+from ..utils.parse import parse_list
 from ..locale import gettext_lazy as _
 
 

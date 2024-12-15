@@ -36,10 +36,8 @@ from json import dumps
 from .base import NotifyBase
 from ..common import NotifyType
 from ..common import NotifyImageSize
-from ..utils import parse_list
-from ..utils import is_hostname
-from ..utils import is_ipaddr
-from ..utils import parse_bool
+from ..utils.parse import (
+    parse_list, is_hostname, is_ipaddr, parse_bool)
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 

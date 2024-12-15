@@ -47,8 +47,7 @@ import json
 from .base import NotifyBase
 from ..common import NotifyType
 from ..locale import gettext_lazy as _
-from ..utils import is_phone_no
-from ..utils import parse_phone_no
+from ..utils.parse import is_phone_no, parse_phone_no
 from ..url import PrivacyMode
 
 

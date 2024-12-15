@@ -36,7 +36,7 @@ from json import loads
 
 from .base import NotifyBase
 from ..url import PrivacyMode
-from ..utils import parse_bool
+from ..utils.parse import parse_bool
 from ..common import NotifyType
 from .. import __version__ as VERSION
 from ..locale import gettext_lazy as _

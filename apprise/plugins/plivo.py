@@ -41,10 +41,8 @@ import requests
 from json import dumps
 from .base import NotifyBase
 from ..common import NotifyType
-from ..utils import parse_bool
-from ..utils import is_phone_no
-from ..utils import parse_phone_no
-from ..utils import validate_regex
+from ..utils.parse import (
+    parse_bool, is_phone_no, parse_phone_no, validate_regex)
 from ..locale import gettext_lazy as _
 
 

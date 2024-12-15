@@ -99,10 +99,8 @@ from .base import NotifyBase
 from ..url import PrivacyMode
 from ..common import NotifyFormat
 from ..common import NotifyType
-from ..utils import parse_emails
-from ..utils import validate_regex
+from ..utils.parse import parse_emails, validate_regex, is_email
 from ..locale import gettext_lazy as _
-from ..utils import is_email
 
 # Our Regin Identifier
 # support us-gov-west-1 syntax as well

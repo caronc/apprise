@@ -43,9 +43,11 @@ from apprise import Apprise
 from apprise import AttachBase
 from apprise import AppriseAsset
 from apprise import PersistentStoreMode
+from apprise.exception import AppriseException
 from apprise.config import ConfigBase
 from apprise import AppriseAttachment
 from apprise.plugins import email
+from apprise import utils
 
 # Disable logging for a cleaner testing output
 logging.disable(logging.CRITICAL)
@@ -466,7 +468,7 @@ def test_plugin_email_webbase_lookup(mock_smtp, mock_smtpssl):
     """
 
     # Insert a test email at the head of our table
-    email.EMAIL_TEMPLATES = (
+    email.templates.EMAIL_TEMPLATES = (
         (
             # Testing URL
             'Testing Lookup',
@@ -478,7 +480,7 @@ def test_plugin_email_webbase_lookup(mock_smtp, mock_smtpssl):
                 'login_type': (email.WebBaseLogin.USERID, )
             },
         ),
-    ) + email.EMAIL_TEMPLATES
+    ) + email.templates.EMAIL_TEMPLATES
 
     obj = Apprise.instantiate(
         'mailto://user:pass@l2g.com', suppress_exceptions=True)
@@ -2073,8 +2075,8 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     mock_smtp.return_value = mock_socket
     mock_smtpssl.return_value = mock_socket
 
-    assert email.PGP_SUPPORT is True
-    email.PGP_SUPPORT = False
+    assert utils.pgp.PGP_SUPPORT is True
+    utils.pgp.PGP_SUPPORT = False
     # Forces to run through section of code that produces a warning there is
     # no PGP
     obj = Apprise.instantiate('mailto://user:pass@nuxref.com?pgp=yes')
@@ -2082,17 +2084,17 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     assert obj.notify('test body') is False
 
     # Return the PGP status for remaining checks
-    email.PGP_SUPPORT = True
+    utils.pgp.PGP_SUPPORT = True
 
     # Initialize our email (no from name)
-    obj = Apprise.instantiate('mailto://user:pass@nuxref.com?pgp=yes')
+    obj = Apprise.instantiate('mailto://user2:pass@nuxref.com?pgp=yes')
 
     # Nothing to lookup
-    assert obj.pgp_pubkey() is None
-    assert obj.pgp_public_key() is None
-    assert obj.pgp_encrypt_message("message") is False
+    assert obj.pgp.public_keyfile() is None
+    assert obj.pgp.public_key() is None
+    assert obj.pgp.encrypt("message") is False
     # Keys can not be generated in memory mode
-    assert obj.pgp_generate_keys() is False
+    assert obj.pgp.keygen() is False
 
     # The reason... no location to store data
     assert obj.store.mode == PersistentStoreMode.MEMORY
@@ -2109,14 +2111,13 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     assert obj.store.mode == PersistentStoreMode.FLUSH
 
     # Still no public key
-    assert obj.pgp_pubkey() is None
-
-    assert obj.pgp_generate_keys() is True
+    assert obj.pgp.public_key(autogen=False) is None
+    assert obj.pgp.keygen() is True
     # Now we'll have a public key
-    assert isinstance(obj.pgp_pubkey(), str)
+    assert isinstance(obj.pgp.public_keyfile(), str)
 
     # Generate warning by second call
-    assert obj.pgp_generate_keys() is True
+    assert obj.pgp.keygen() is True
 
     # Remove newly generated files
     os.unlink(os.path.join(obj.store.path, 'pgp-pub.asc'))
@@ -2124,34 +2125,65 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     obj = Apprise.instantiate(
         'mailto://pgp:pass@nuxref.com?pgp=yes', asset=asset)
     assert obj.store.mode == PersistentStoreMode.FLUSH
-    assert obj.pgp_generate_keys() is True
+    assert obj.pgp.keygen() is True
 
-    # Prepare PGP
+    # Prepare PGP while providing it a key
     obj = Apprise.instantiate(
-        'mailto://pgp:pass@nuxref.com?pgp=yes&pgpkey=%s' % obj.pgp_pubkey(),
-        asset=asset)
+        'mailto://pgp:pass@nuxref.com?pgp=yes&pgpkey=%s' %
+        obj.pgp.public_keyfile(), asset=asset)
 
-    # Regenerate our keys even with a pgpkey provided
-    assert obj.pgp_generate_keys() is True
+    # keyfile Defined
+    assert obj.pgp.pub_keyfile is not None
+
+    # Get our key
+    key = obj.pgp.public_key()
+
+    # In this circumstance we can not generate a new key as the one provided
+    # is immutable
+    assert obj.pgp.keygen() is False
+
+    # Our key is the same
+    assert key is obj.pgp.public_key()
+
+    tmpdir0 = tmpdir.mkdir('tmp00a')
+    asset0 = AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir0),
+    )
+
+    # Prepare Invalid PGP Key
+    obj = Apprise.instantiate(
+        'mailto://pgpX:pass@nuxref.com?pgp=yes',
+        asset=asset0)
+
+    # No keyfiles
+    assert obj.pgp.pub_keyfile is None
+
+    # Generate our keys
+    assert obj.pgp.keygen() is True
 
     # Second call uses cache
-    assert obj.pgp_generate_keys() is True
-
-    # Utilize path parameter
-    assert obj.pgp_generate_keys(path=obj.store.path) is True
+    assert obj.pgp.keygen() is True
 
     # We will find our key
-    assert obj.pgp_public_key() is not None
+    key = obj.pgp.public_key()
+    assert key is not None
 
-    tmpdir1 = tmpdir.mkdir('tmp01')
-    # However explicitly setting a path works
-    assert obj.pgp_generate_keys(str(tmpdir1)) is True
+    # Utilize force parameter
+    assert obj.pgp.keygen(force=True) is True
+
+    # Our key is new
+    assert key != obj.pgp.public_key()
+    assert obj.pgp.public_key() is not None
 
     # Prepare Invalid PGP Key
     obj = Apprise.instantiate(
         'mailto://pgp:pass@nuxref.com?pgp=yes&pgpkey=invalid',
         asset=asset)
-    assert obj.pgp_pubkey() is False
+
+    # Returns false
+    assert obj.pgp.pub_keyfile is False
+    assert obj.pgp.public_keyfile() is False
 
     tmpdir2 = tmpdir.mkdir('tmp02')
     asset = AppriseAsset(
@@ -2162,18 +2194,13 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
         'mailto://chris:pass@nuxref.com?pgp=yes', asset=asset)
 
     assert obj.store.mode == PersistentStoreMode.FLUSH
-    assert obj.pgp_generate_keys() is True
+    assert obj.pgp.keygen() is True
 
     # Second call uses cache
-    assert obj.pgp_generate_keys() is True
-    # Utilize path parameter
-    assert obj.pgp_generate_keys(path=obj.store.path) is True
+    assert obj.pgp.keygen() is True
 
     # We will find our key
-    assert obj.pgp_public_key() is not None
-
-    # However explicitly setting a path works
-    assert obj.pgp_generate_keys(str(tmpdir1)) is True
+    assert obj.pgp.public_key() is not None
 
     # We do this again but even when we do a requisition for a public key
     # it will generate a new pair or keys for us once it detects we don't
@@ -2189,9 +2216,9 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     assert obj.store.mode == PersistentStoreMode.FLUSH
 
     # We'll have a public key object to encrypt with
-    assert obj.pgp_public_key() is not None
+    assert obj.pgp.public_key() is not None
 
-    encrypted = obj.pgp_encrypt_message("hello world")
+    encrypted = obj.pgp.encrypt("hello world")
     assert encrypted.startswith('-----BEGIN PGP MESSAGE-----')
     assert encrypted.rstrip().endswith('-----END PGP MESSAGE-----')
 
@@ -2199,7 +2226,7 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     assert 'chris-pub.asc' in dir_content
     assert 'chris-prv.asc' in dir_content
 
-    assert obj.pgp_pubkey().endswith('chris-pub.asc')
+    assert obj.pgp.public_keyfile().endswith('chris-pub.asc')
 
     assert obj.notify('test body') is True
 
@@ -2209,53 +2236,53 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
         os.path.join(obj.store.path, 'chris-pub.asc'),
         os.path.join(obj.store.path, 'user@example.com-pub.asc'))
 
-    assert obj.pgp_pubkey() is None
-    assert obj.pgp_pubkey(email="not-reference@example.com") is None
-    assert obj.pgp_pubkey(email="user@example.com")\
+    assert obj.pgp.public_keyfile() is None
+    assert obj.pgp.public_keyfile("not-reference@example.com") is None
+    assert obj.pgp.public_keyfile("user@example.com")\
         .endswith('user@example.com-pub.asc')
 
-    assert obj.pgp_pubkey(email="user@example.com")\
+    assert obj.pgp.public_keyfile("user@example.com")\
         .endswith('user@example.com-pub.asc')
-    assert obj.pgp_pubkey(email="User@Example.com")\
+    assert obj.pgp.public_keyfile("User@Example.com")\
         .endswith('user@example.com-pub.asc')
-    assert obj.pgp_pubkey(email="unknown") is None
+    assert obj.pgp.public_keyfile("unknown") is None
 
     shutil.copyfile(
         os.path.join(obj.store.path, 'user@example.com-pub.asc'),
         os.path.join(obj.store.path, 'user-pub.asc'),
     )
 
-    assert obj.pgp_pubkey(email="user@example.com")\
+    assert obj.pgp.public_keyfile("user@example.com")\
         .endswith('user@example.com-pub.asc')
-    assert obj.pgp_pubkey(email="User@Example.com")\
+    assert obj.pgp.public_keyfile("User@Example.com")\
         .endswith('user@example.com-pub.asc')
 
     # Remove file
     os.unlink(os.path.join(obj.store.path, 'user@example.com-pub.asc'))
-    assert obj.pgp_pubkey(email="user@example.com").endswith('user-pub.asc')
+    assert obj.pgp.public_keyfile("user@example.com").endswith('user-pub.asc')
     shutil.copyfile(
         os.path.join(obj.store.path, 'user-pub.asc'),
         os.path.join(obj.store.path, 'chris-pub.asc'),
     )
     # user-pub.asc still trumps still trumps
-    assert obj.pgp_pubkey(email="user@example.com").endswith('user-pub.asc')
+    assert obj.pgp.public_keyfile("user@example.com").endswith('user-pub.asc')
     shutil.copyfile(
         os.path.join(obj.store.path, 'chris-pub.asc'),
         os.path.join(obj.store.path, 'chris@nuxref.com-pub.asc'),
     )
     # user-pub still trumps
-    assert obj.pgp_pubkey(email="user@example.com").endswith('user-pub.asc')
-    assert obj.pgp_pubkey(email="invalid@example.com")\
+    assert obj.pgp.public_keyfile("user@example.com").endswith('user-pub.asc')
+    assert obj.pgp.public_keyfile("invalid@example.com")\
         .endswith('chris@nuxref.com-pub.asc')
 
     # remove this file
     os.unlink(os.path.join(obj.store.path, 'user-pub.asc'))
 
     # now we fall back to basic/default configuration
-    assert obj.pgp_pubkey(email="user@example.com")\
+    assert obj.pgp.public_keyfile("user@example.com")\
         .endswith('chris@nuxref.com-pub.asc')
     os.unlink(os.path.join(obj.store.path, 'chris@nuxref.com-pub.asc'))
-    assert obj.pgp_pubkey(email="user@example.com").endswith('chris-pub.asc')
+    assert obj.pgp.public_keyfile("user@example.com").endswith('chris-pub.asc')
 
     # Testing again
     tmpdir4 = tmpdir.mkdir('tmp04')
@@ -2268,47 +2295,47 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
 
     with mock.patch('builtins.open', side_effect=FileNotFoundError):
         # can't open key
-        assert obj.pgp_public_key(path=obj.store.path) is None
+        assert obj.pgp.public_key() is None
 
     with mock.patch('builtins.open', side_effect=OSError):
         # can't open key
-        assert obj.pgp_public_key(path=obj.store.path) is None
+        assert obj.pgp.public_key() is None
         # Test unlink
         with mock.patch('os.unlink', side_effect=OSError):
-            assert obj.pgp_public_key(path=obj.store.path) is None
+            assert obj.pgp.public_key() is None
 
         # Key Generation will fail
-        assert obj.pgp_generate_keys() is False
+        assert obj.pgp.keygen() is False
 
     with mock.patch('pgpy.PGPKey.new', side_effect=NameError):
         # Can't Generate keys
-        assert obj.pgp_generate_keys() is False
+        assert obj.pgp.keygen() is False
         # can't open key
-        assert obj.pgp_public_key(path=obj.store.path) is None
+        assert obj.pgp.public_key() is None
 
-    with mock.patch('pgpy.PGPKey.new', side_effect=FileNotFoundError):
+    with mock.patch('pgpy.PGPKey.from_blob', side_effect=FileNotFoundError):
         # can't open key
-        assert obj.pgp_public_key(path=obj.store.path) is None
+        assert obj.pgp.public_key() is None
 
-    with mock.patch('pgpy.PGPKey.new', side_effect=OSError):
+    with mock.patch('pgpy.PGPKey.from_blob', side_effect=OSError):
         # can't open key
-        assert obj.pgp_public_key(path=obj.store.path) is None
+        assert obj.pgp.public_key() is None
 
     # Can't encrypt key
     with mock.patch('pgpy.PGPKey.from_blob', side_effect=NameError):
-        assert obj.pgp_public_key() is None
+        assert obj.pgp.public_key() is None
 
     with mock.patch('pgpy.PGPMessage.new', side_effect=NameError):
-        assert obj.pgp_encrypt_message("message") is None
+        assert obj.pgp.encrypt("message") is None
         # Attempts to encrypt a message
-        assert obj.notify('test') is False
+        assert obj.notify('test-encrypt') is False
 
     # Create new keys
-    assert obj.pgp_generate_keys() is True
+    assert obj.pgp.keygen() is True
     with mock.patch('os.path.isfile', return_value=False):
         with mock.patch('builtins.open', side_effect=OSError):
             with mock.patch('os.unlink', return_value=None):
-                assert obj.pgp_generate_keys() is False
+                assert obj.pgp.keygen() is False
 
     # Testing again
     tmpdir5 = tmpdir.mkdir('tmp05')
@@ -2321,15 +2348,15 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
 
     # Catch edge case where we just can't generate the the key
     with mock.patch('os.path.isfile', side_effect=(
-            # 5x False to skip through pgp_pubkey()
+            # 5x False to skip through pgp.public_keyfile()
             False, False, False, False, False, False,
-            # 1x True to pass pgp_generate_keys()
+            # 1x True to pass pgp.keygen()
             True,
-            # 5x False to skip through pgp_pubkey() second call
+            # 5x False to skip through pgp.public_keyfile() second call
             False, False, False, False, False, False)):
         with mock.patch('pgpy.PGPKey.from_blob',
                         side_effect=FileNotFoundError):
-            assert obj.pgp_public_key() is None
+            assert obj.pgp.public_key() is None
 
     # Corrupt Data
     tmpdir6 = tmpdir.mkdir('tmp06')
@@ -2364,3 +2391,70 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
 
     # Notification goes through
     obj.notify('test') is True
+
+
+@pytest.mark.skipif('pgpy' not in sys.modules, reason="Requires PGPy")
+def test_plugin_email_prepare():
+    """
+    NotifyEmail() prepare_emails static function
+
+    """
+    with pytest.raises(AppriseException):
+        # No To: provided
+        for e in email.NotifyEmail.prepare_emails(
+                subject="Email Subject",
+                body="Email Body",
+                from_addr=(None, "test@test.com"), to=[]):
+            pass
+
+    # Most basic call (a lot of defaults are used)
+    _iterator = email.NotifyEmail.prepare_emails(
+        subject="Email Subject",
+        body="Email Body",
+        from_addr=(None, "test@test.com"),
+        to=[('Apprise User', 'apprise@test.com'), ])
+    entries = [i for i in _iterator]
+    assert len(entries) == 1
+
+
+@pytest.mark.skipif('pgpy' not in sys.modules, reason="Requires PGPy")
+def test_plugin_pgp(tmpdir):
+    """
+    Pretty Good Privacy Testing
+    """
+
+    p_obj = utils.pgp.ApprisePGPController(path=None)
+    # No Path
+    assert p_obj.keygen() is False
+    assert p_obj.public_keyfile() is None
+
+    p_obj = utils.pgp.ApprisePGPController(
+        path=None, email='l2g@email.com')
+    # No Path
+    assert p_obj.keygen() is False
+
+    tmpdir0 = tmpdir.mkdir('tmp00')
+    p_obj = utils.pgp.ApprisePGPController(
+        path=str(tmpdir0), email='l2g@email.com')
+
+    # A key can be generated with a path defined
+    assert p_obj.keygen() is True
+    assert p_obj.public_keyfile() is not None
+    # A key can be generated with a path defined
+    assert p_obj.keygen(name='Apprise', force=True) is True
+    assert p_obj.keygen(
+        email='l2g@email.com', name='Apprise', force=True) is True
+
+    assert utils.pgp.PGP_SUPPORT is True
+    utils.pgp.PGP_SUPPORT = False
+
+    with pytest.raises(AppriseException):
+        assert p_obj.public_keyfile()
+
+    # Return the PGP status for remaining checks
+    utils.pgp.PGP_SUPPORT = True
+
+    tmpdir1 = tmpdir.mkdir('tmp01')
+    p_obj = utils.pgp.ApprisePGPController(
+        path=str(tmpdir1), pub_keyfile='bad-file')
+    assert p_obj.public_keyfile() is False

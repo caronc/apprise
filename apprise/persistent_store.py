@@ -37,7 +37,7 @@ from datetime import datetime, timezone, timedelta
 import time
 import hashlib
 from .common import PersistentStoreMode, PERSISTENT_STORE_MODES
-from .utils import path_decode
+from .utils.disk import path_decode
 from .logger import logger
 
 # Used for writing/reading time stored in cache file

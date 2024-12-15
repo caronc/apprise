@@ -30,7 +30,7 @@ import syslog
 
 from .base import NotifyBase
 from ..common import NotifyType
-from ..utils import parse_bool
+from ..utils.parse import parse_bool
 from ..locale import gettext_lazy as _
 
 

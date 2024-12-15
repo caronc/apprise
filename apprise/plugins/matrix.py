@@ -45,10 +45,8 @@ from ..common import NotifyType
 from ..common import NotifyImageSize
 from ..common import NotifyFormat
 from ..common import PersistentStoreMode
-from ..utils import parse_bool
-from ..utils import parse_list
-from ..utils import is_hostname
-from ..utils import validate_regex
+from ..utils.parse import (
+    parse_bool, parse_list, is_hostname, validate_regex)
 from ..locale import gettext_lazy as _
 
 # Define default path

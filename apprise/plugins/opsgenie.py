@@ -53,10 +53,7 @@ import hashlib
 from .base import NotifyBase
 from ..common import NotifyType, NOTIFY_TYPES
 from ..common import PersistentStoreMode
-from ..utils import validate_regex
-from ..utils import is_uuid
-from ..utils import parse_list
-from ..utils import parse_bool
+from ..utils.parse import validate_regex, is_uuid, parse_list, parse_bool
 from ..locale import gettext_lazy as _
 
 

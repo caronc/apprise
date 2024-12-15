@@ -32,7 +32,7 @@ import mimetypes
 import base64
 from .. import exception
 from ..url import URLBase
-from ..utils import parse_bool
+from ..utils.parse import parse_bool
 from ..common import ContentLocation
 from ..locale import gettext_lazy as _
 

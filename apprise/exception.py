@@ -37,6 +37,14 @@ class AppriseException(Exception):
         self.error_code = error_code
 
 
+class ApprisePluginException(AppriseException):
+    """
+    Class object for handling exceptions raised from within a plugin
+    """
+    def __init__(self, message, error_code=600):
+        super().__init__(message, error_code=error_code)
+
+
 class AppriseDiskIOError(AppriseException):
     """
     Thrown when an disk i/o error occurs

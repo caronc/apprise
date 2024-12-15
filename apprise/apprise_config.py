@@ -32,9 +32,8 @@ from .manager_config import ConfigurationManager
 from . import URLBase
 from .asset import AppriseAsset
 from . import common
-from .utils import GET_SCHEMA_RE
-from .utils import parse_list
-from .utils import is_exclusive_match
+from .utils.parse import GET_SCHEMA_RE, parse_list
+from .utils.logic import is_exclusive_match
 from .logger import logger
 
 # Grant access to our Configuration Manager Singleton

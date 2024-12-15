@@ -36,10 +36,8 @@ import requests
 from .base import NotifyBase
 from ..url import PrivacyMode
 from ..common import NotifyType
-from ..utils import is_phone_no
-from ..utils import parse_phone_no
-from ..utils import parse_bool
-from ..utils import validate_regex
+from ..utils.parse import (
+    is_phone_no, parse_phone_no, parse_bool, validate_regex)
 from ..locale import gettext_lazy as _
 
 

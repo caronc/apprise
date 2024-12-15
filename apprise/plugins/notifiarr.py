@@ -35,8 +35,7 @@ from .base import NotifyBase
 from ..common import NotifyType
 from ..locale import gettext_lazy as _
 from ..common import NotifyImageSize
-from ..utils import parse_list, parse_bool
-from ..utils import validate_regex
+from ..utils.parse import parse_list, parse_bool, validate_regex
 from .discord import USER_ROLE_DETECTION_RE
 
 # Used to break path apart into list of channels

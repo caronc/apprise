@@ -59,10 +59,8 @@ from .base import NotifyBase
 from ..common import NotifyImageSize
 from ..common import NotifyType
 from ..common import NotifyFormat
-from ..utils import parse_bool
-from ..utils import validate_regex
-from ..utils import apply_template
-from ..utils import TemplateType
+from ..utils.parse import parse_bool, validate_regex
+from ..utils.templates import apply_template, TemplateType
 from ..apprise_attachment import AppriseAttachment
 from ..locale import gettext_lazy as _
 

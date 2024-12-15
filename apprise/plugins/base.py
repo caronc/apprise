@@ -32,7 +32,7 @@ from functools import partial
 
 from ..url import URLBase
 from ..common import NotifyType
-from ..utils import parse_bool
+from ..utils.parse import parse_bool
 from ..common import NOTIFY_TYPES
 from ..common import NotifyFormat
 from ..common import NOTIFY_FORMATS

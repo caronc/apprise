@@ -52,10 +52,8 @@ import requests
 from json import dumps
 from ..base import NotifyBase
 from ...common import NotifyType
-from ...utils import validate_regex
-from ...utils import parse_list
-from ...utils import parse_bool
-from ...utils import dict_full_update
+from ...utils.parse import validate_regex, parse_list, parse_bool
+from ...utils.logic import dict_full_update
 from ...common import NotifyImageSize
 from ...apprise_attachment import AppriseAttachment
 from ...locale import gettext_lazy as _

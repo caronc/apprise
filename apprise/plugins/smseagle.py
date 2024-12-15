@@ -34,10 +34,8 @@ from itertools import chain
 from .base import NotifyBase
 from ..common import NotifyType
 from .. import exception
-from ..utils import validate_regex
-from ..utils import is_phone_no
-from ..utils import parse_phone_no
-from ..utils import parse_bool
+from ..utils.parse import (
+    validate_regex, is_phone_no, parse_phone_no, parse_bool)
 from ..url import PrivacyMode
 from ..locale import gettext_lazy as _
 

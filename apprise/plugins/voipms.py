@@ -39,9 +39,7 @@ from json import loads
 
 from .base import NotifyBase
 from ..common import NotifyType
-from ..utils import is_phone_no
-from ..utils import is_email
-from ..utils import parse_phone_no
+from ..utils.parse import is_phone_no, is_email, parse_phone_no
 from ..locale import gettext_lazy as _
 
 

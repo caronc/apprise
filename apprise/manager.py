@@ -33,10 +33,10 @@ import time
 import hashlib
 import inspect
 import threading
-from .utils import import_module
-from .utils import Singleton
-from .utils import parse_list
-from .utils import path_decode
+from .utils.module import import_module
+from .utils.singleton import Singleton
+from .utils.parse import parse_list
+from .utils.disk import path_decode
 from os.path import dirname
 from os.path import abspath
 from os.path import join
@@ -244,8 +244,10 @@ class PluginManager(metaclass=Singleton):
                     for schema in schemas:
                         if schema in self._schema_map:
                             logger.error(
-                                "{} schema ({}) mismatch detected - {} to {}"
-                                .format(self.name, schema, self._schema_map,
+                                "{} schema ({}) mismatch detected -"
+                                ' {} already maps to {}'
+                                .format(self.name, schema,
+                                        self._schema_map[schema],
                                         plugin))
                             continue
 

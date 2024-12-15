@@ -37,9 +37,7 @@ from .base import NotifyBase
 from ..url import PrivacyMode
 from ..common import NotifyType
 from ..common import NotifyImageSize
-from ..utils import validate_regex
-from ..utils import parse_list
-from ..utils import parse_bool
+from ..utils.parse import validate_regex, parse_list, parse_bool
 from ..locale import gettext_lazy as _
 
 

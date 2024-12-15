@@ -53,9 +53,7 @@ from .base import NotifyBase
 from .. import exception
 from ..common import NotifyFormat
 from ..common import NotifyType
-from ..utils import parse_list
-from ..utils import is_email
-from ..utils import validate_regex
+from ..utils.parse import parse_list, is_email, validate_regex
 from ..locale import gettext_lazy as _
 
 
