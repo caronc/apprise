@@ -78,7 +78,7 @@ apprise_url_tests = (
         # An invalid visibility
         'instance': TypeError,
     }),
-    ('misskeys://access_token@hostname?visibility=private', {
+    ('misskeys://access_token@hostname?visibility=specified', {
         # Specified a different visiblity
         'instance': NotifyMisskey,
     }),

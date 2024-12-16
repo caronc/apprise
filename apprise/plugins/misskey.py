@@ -64,8 +64,6 @@ class MisskeyVisibility:
 
     FOLLOWERS = 'followers'
 
-    PRIVATE = 'private'
-
     SPECIFIED = 'specified'
 
 
@@ -74,7 +72,6 @@ MISSKEY_VISIBILITIES = (
     MisskeyVisibility.PUBLIC,
     MisskeyVisibility.HOME,
     MisskeyVisibility.FOLLOWERS,
-    MisskeyVisibility.PRIVATE,
     MisskeyVisibility.SPECIFIED,
 )
 
