@@ -96,6 +96,9 @@ class NotifyWebexTeams(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_wxteams'
 
+    # Support attachments
+    attachment_support = True
+
     # Webex Teams uses the http protocol with JSON requests
     notify_url = 'https://api.ciscospark.com/v1/webhooks/incoming/'
 
@@ -104,6 +107,10 @@ class NotifyWebexTeams(NotifyBase):
 
     # We don't support titles for Webex notifications
     title_maxlen = 0
+
+    # Defines the maximum webex filesize before an attachment needs to
+    # be sent as another
+    webex_max_file_size = 10 * 1024 * 1024  # 10 MB
 
     # Default to markdown; fall back to text
     notify_format = NotifyFormat.MARKDOWN
@@ -139,16 +146,51 @@ class NotifyWebexTeams(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
+    def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
+             **kwargs):
         """
         Perform Webex Teams Notification
         """
 
-        # Setup our headers
-        headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/json',
-        }
+        # Tracks emails to send in batch
+        files = None
+
+        if not (attach and self.attachment_support):
+            # Setup our headers
+            headers = {
+                'User-Agent': self.app_id,
+                'Content-Type': 'application/json',
+            }
+
+        else:
+            batch = []
+            files = []
+            # Prepare batches
+            for no, attachment in enumerate(attach, start=1):
+
+                # Perform some simple error checking
+                if not attachment:
+                    # We could not access the attachment
+                    self.logger.warning(
+                        'Could not access Webex Teams attachment {}.'.format(
+                            attachment.url(privacy=True)))
+                    return False
+
+                if len(attachment) > self.webex_max_file_size:
+                    self.logger.warning(
+                        'Webex Teams attachment %d > limit (%d) %s',
+                        no, len(attachment), attachment.url(privacy=True))
+                    return False
+
+                self.logger.debug(
+                    'Appending Webex Teams attachment %d (msg/%d)  %s',
+                    no, len(batch) + 1, attachment.url(privacy=True))
+
+                files.append((
+                    'files', (
+                        attachment.name if attachment.name
+                        else f'file{no:03}.dat',
+                        open(attachment.path, 'rb'), attachment.mimetype)))
 
         # Prepare our URL
         url = '{}/{}'.format(self.notify_url, self.token)
