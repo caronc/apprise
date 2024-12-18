@@ -6,16 +6,16 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: apprise 1.9.0\n"
+"Project-Id-Version: apprise 1.9.1\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2024-09-02 12:59-0400\n"
+"POT-Creation-Date: 2024-12-17 19:32-0500\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=utf-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Generated-By: Babel 2.15.0\n"
+"Generated-By: Babel 2.16.0\n"
 
 msgid "A local Gnome environment is required."
 msgstr ""
@@ -50,7 +50,7 @@ msgstr ""
 msgid "Access Token"
 msgstr ""
 
-msgid "Account Email"
+msgid "Account Email or Object ID"
 msgstr ""
 
 msgid "Account SID"
@@ -105,6 +105,9 @@ msgid "Attach File As"
 msgstr ""
 
 msgid "Attach Filename"
+msgstr ""
+
+msgid "Auth ID"
 msgstr ""
 
 msgid "Auth Token"
@@ -493,6 +496,12 @@ msgstr ""
 msgid "Overflow Mode"
 msgstr ""
 
+msgid "PGP Encryption"
+msgstr ""
+
+msgid "PGP Public Key Path"
+msgstr ""
+
 msgid "Packages are recommended to improve functionality."
 msgstr ""
 
@@ -616,6 +625,9 @@ msgstr ""
 msgid "Sensitive Attachments"
 msgstr ""
 
+msgid "Server Discovery"
+msgstr ""
+
 msgid "Server Key"
 msgstr ""
 
@@ -709,9 +721,6 @@ msgstr ""
 msgid "Target Device"
 msgstr ""
 
-msgid "Target Device ID"
-msgstr ""
-
 msgid "Target Email"
 msgstr ""
 
@@ -761,9 +770,6 @@ msgid "Target Stream"
 msgstr ""
 
 msgid "Target Subreddit"
-msgstr ""
-
-msgid "Target Tag ID"
 msgstr ""
 
 msgid "Target Team"
@@ -853,6 +859,9 @@ msgstr ""
 msgid "Token C"
 msgstr ""
 
+msgid "Token D"
+msgstr ""
+
 msgid "Topic"
 msgstr ""
 
@@ -914,6 +923,9 @@ msgid "Vibration"
 msgstr ""
 
 msgid "Visibility"
+msgstr ""
+
+msgid "Volume"
 msgstr ""
 
 msgid "Web Based"

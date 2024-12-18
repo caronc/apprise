@@ -63,6 +63,7 @@
     <a href="#EXAMPLES">EXAMPLES</a>
     <a href="#CUSTOM-PLUGIN-NOTIFICATIONS">CUSTOM PLUGIN/NOTIFICATIONS</a>
     <a href="#CONFIGURATION">CONFIGURATION</a>
+    <a href="#ENVIRONMENT-VARIABLES">ENVIRONMENT VARIABLES</a>
     <a href="#BUGS">BUGS</a>
     <a href="#DONATIONS">DONATIONS</a>
     <a href="#COPYRIGHT">COPYRIGHT</a>
@@ -246,6 +247,9 @@ loaded but none could be notified due to user filtering (via tags).</li>
 <p>There are to many service URL and combinations to list here. It's best to
 visit the <a href="https://github.com/caronc/apprise/wiki#notification-services">Apprise GitHub page</a> and see what's available.</p>
 
+<p>The <strong>environment variable</strong> of <code>APPRISE_URLS</code> (comma/space delimited) can be specified to
+provide the default set of URLs you wish to notify if none are otherwise specified.</p>
+
 <h2 id="EXAMPLES">EXAMPLES</h2>
 
 <p>Send a notification to as many servers as you want to specify as you can
@@ -311,11 +315,16 @@ files and loads them:</p>
 /var/lib/apprise/plugins
 </code></pre>
 
-<p>Simply create your own python file with the following bare minimum content in
-it:
-    from apprise.decorators import notify</p>
+<p>The <strong>environment variable</strong> of <code>APPRISE_PLUGIN_PATH</code> can be specified to override
+the list identified above with one of your own.  use a semi-colon (<code>;</code>), line-feed (<code>\n</code>),
+and/or carriage return (<code>\r</code>) to delimit multiple entries.</p>
 
-<pre><code># This example assumes you want your function to trigger on foobar://
+<p>Simply create your own python file with the following bare minimum content in
+it:</p>
+
+<pre><code>from apprise.decorators import notify
+
+# This example assumes you want your function to trigger on foobar://
 # references:
 @notify(on="foobar", name="My Custom Notification")
 def my_wrapper(body, title, notify_type, *args, **kwargs):
@@ -361,6 +370,10 @@ in the following local locations for configuration files and loads them:</p>
 <p>The <strong>configuration files</strong> specified above can also be identified with a <code>.yml</code>
 extension or even just entirely removing the <code>.conf</code> extension altogether.</p>
 
+<p>The <strong>environment variable</strong> of <code>APPRISE_CONFIG_PATH</code> can be specified to override
+the list identified above with one of your own.  use a semi-colon (<code>;</code>), line-feed (<code>\n</code>),
+and/or carriage return (<code>\r</code>) to delimit multiple entries.</p>
+
 <p>If a default configuration file is referenced in any way by the <strong>apprise</strong>
 tool, you no longer need to provide it a Service URL.  Usage of the <strong>apprise</strong>
 tool simplifies to:</p>
@@ -376,6 +389,23 @@ configuration that you want and only specifically notify a subset of them:</p>
     --tag=family
 </code></pre>
 
+<h2 id="ENVIRONMENT-VARIABLES">ENVIRONMENT VARIABLES</h2>
+<p><code>APPRISE_URLS</code>:
+  Specify the default URLs to notify IF none are otherwise specified on the command line
+  explicitly.  If the <code>--config</code> (<code>-c</code>) is specified, then this will over-rides any
+  reference to this variable. Use white space and/or a comma (<code>,</code>) to delimit multiple entries.</p>
+
+<p><code>APPRISE_CONFIG_PATH</code>:
+  Explicitly specify the config search path to use (over-riding the default).
+  Use a semi-colon (<code>;</code>), line-feed (<code>\n</code>), and/or carriage return (<code>\r</code>) to delimit multiple entries.</p>
+
+<p><code>APPRISE_PLUGIN_PATH</code>:
+  Explicitly specify the custom plugin search path to use (over-riding the default).
+  Use a semi-colon (<code>;</code>), line-feed (<code>\n</code>), and/or carriage return (<code>\r</code>) to delimit multiple entries.</p>
+
+<p><code>APPRISE_STORAGE_PATH</code>:
+  Explicitly specify the persistent storage path to use (over-riding the default).</p>
+
 <h2 id="BUGS">BUGS</h2>
 
 <p>If you find any bugs, please make them known at:
@@ -390,7 +420,7 @@ configuration that you want and only specifically notify a subset of them:</p>
 
   <ol class='man-decor man-foot man foot'>
     <li class='tl'>Chris Caron &lt;lead2gold@gmail.com&gt;</li>
-    <li class='tc'>August 2024</li>
+    <li class='tc'>December 2024</li>
     <li class='tr'>apprise(1)</li>
   </ol>
 

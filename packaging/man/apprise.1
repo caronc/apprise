@@ -1,6 +1,6 @@
 .\" generated with Ronn-NG/v0.9.1
 .\" http://github.com/apjanke/ronn-ng/tree/0.9.1
-.TH "APPRISE" "1" "August 2024" "Chris Caron <lead2gold@gmail.com>"
+.TH "APPRISE" "1" "December 2024" "Chris Caron <lead2gold@gmail.com>"
 .SH "NAME"
 \fBapprise\fR \- Push Notifications that work with just about every platform!
 .SH "SYNOPSIS"
@@ -108,6 +108,8 @@ The \fBstorage\fR action has the following sub actions:
 .IP "" 0
 .SH "SERVICE URLS"
 There are to many service URL and combinations to list here\. It\'s best to visit the Apprise GitHub page \fIhttps://github\.com/caronc/apprise/wiki#notification\-services\fR and see what\'s available\.
+.P
+The \fBenvironment variable\fR of \fBAPPRISE_URLS\fR (comma/space delimited) can be specified to provide the default set of URLs you wish to notify if none are otherwise specified\.
 .SH "EXAMPLES"
 Send a notification to as many servers as you want to specify as you can easily chain them together:
 .IP "" 4
@@ -183,9 +185,13 @@ By default \fBapprise\fR looks in the following local locations for custom plugi
 .fi
 .IP "" 0
 .P
-Simply create your own python file with the following bare minimum content in it: from apprise\.decorators import notify
+The \fBenvironment variable\fR of \fBAPPRISE_PLUGIN_PATH\fR can be specified to override the list identified above with one of your own\. use a semi\-colon (\fB;\fR), line\-feed (\fB\en\fR), and/or carriage return (\fB\er\fR) to delimit multiple entries\.
+.P
+Simply create your own python file with the following bare minimum content in it:
 .IP "" 4
 .nf
+from apprise\.decorators import notify
+
 # This example assumes you want your function to trigger on foobar://
 # references:
 @notify(on="foobar", name="My Custom Notification")
@@ -223,6 +229,8 @@ Configuration files can be directly referenced via \fBapprise\fR when referencin
 .P
 The \fBconfiguration files\fR specified above can also be identified with a \fB\.yml\fR extension or even just entirely removing the \fB\.conf\fR extension altogether\.
 .P
+The \fBenvironment variable\fR of \fBAPPRISE_CONFIG_PATH\fR can be specified to override the list identified above with one of your own\. use a semi\-colon (\fB;\fR), line\-feed (\fB\en\fR), and/or carriage return (\fB\er\fR) to delimit multiple entries\.
+.P
 If a default configuration file is referenced in any way by the \fBapprise\fR tool, you no longer need to provide it a Service URL\. Usage of the \fBapprise\fR tool simplifies to:
 .IP "" 4
 .nf
@@ -238,6 +246,14 @@ $ apprise \-vv \-\-title "Will Be Late Getting Home" \e
     \-\-tag=family
 .fi
 .IP "" 0
+.SH "ENVIRONMENT VARIABLES"
+\fBAPPRISE_URLS\fR: Specify the default URLs to notify IF none are otherwise specified on the command line explicitly\. If the \fB\-\-config\fR (\fB\-c\fR) is specified, then this will over\-rides any reference to this variable\. Use white space and/or a comma (\fB,\fR) to delimit multiple entries\.
+.P
+\fBAPPRISE_CONFIG_PATH\fR: Explicitly specify the config search path to use (over\-riding the default)\. Use a semi\-colon (\fB;\fR), line\-feed (\fB\en\fR), and/or carriage return (\fB\er\fR) to delimit multiple entries\.
+.P
+\fBAPPRISE_PLUGIN_PATH\fR: Explicitly specify the custom plugin search path to use (over\-riding the default)\. Use a semi\-colon (\fB;\fR), line\-feed (\fB\en\fR), and/or carriage return (\fB\er\fR) to delimit multiple entries\.
+.P
+\fBAPPRISE_STORAGE_PATH\fR: Explicitly specify the persistent storage path to use (over\-riding the default)\.
 .SH "BUGS"
 If you find any bugs, please make them known at: \fIhttps://github\.com/caronc/apprise/issues\fR
 .SH "DONATIONS"
