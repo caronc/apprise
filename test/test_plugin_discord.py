@@ -89,10 +89,11 @@ apprise_url_tests = (
             'instance': NotifyDiscord,
             'requests_response_code': requests.codes.no_content,
     }),
-    ('discord://%s/%s?format=markdown&footer=Yes&image=Yes' % (
+    ('discord://jack@%s/%s?format=markdown&footer=Yes&image=Yes' % (
         'i' * 24, 't' * 64), {
             'instance': NotifyDiscord,
             'requests_response_code': requests.codes.no_content,
+            'privacy_url': 'discord://jack@i...i/t...t/',
     }),
     ('https://discord.com/api/webhooks/{}/{}'.format(
         '0' * 10, 'B' * 40), {
@@ -113,6 +114,14 @@ apprise_url_tests = (
             # Native URL Support with arguments
             'instance': NotifyDiscord,
             'requests_response_code': requests.codes.no_content,
+            'privacy_url': 'discord://0...0/B...B/',
+    }),
+    ('https://discordapp.com/api/webhooks/{}/{}?footer=yes&botname=joe'.format(
+        '0' * 10, 'B' * 40), {
+            # Native URL Support with arguments
+            'instance': NotifyDiscord,
+            'requests_response_code': requests.codes.no_content,
+            'privacy_url': 'discord://joe@0...0/B...B/',
     }),
     ('discord://%s/%s?format=markdown&avatar=No&footer=No' % (
         'i' * 24, 't' * 64), {
