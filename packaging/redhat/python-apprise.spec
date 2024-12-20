@@ -58,7 +58,7 @@ Name:           python-%{pypi_name}
 Version:        1.9.1
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
-License:        BSD
+License:        BSD-2-Clause
 URL:            https://github.com/caronc/%{pypi_name}
 Source0:        %{url}/archive/v%{version}/%{pypi_name}-%{version}.tar.gz
 BuildArch:      noarch
