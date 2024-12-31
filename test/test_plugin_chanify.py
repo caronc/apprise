@@ -28,7 +28,7 @@
 
 import requests
 
-from apprise.plugins.chantify import NotifyChantify
+from apprise.plugins.chanify import NotifyChanify
 from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
@@ -37,37 +37,37 @@ logging.disable(logging.CRITICAL)
 
 # Our Testing URLs
 apprise_url_tests = (
-    ('chantify://', {
+    ('chanify://', {
         'instance': TypeError,
     }),
-    ('chantify://:@/', {
+    ('chanify://:@/', {
         'instance': TypeError,
     }),
-    ('chantify://%badtoken%', {
+    ('chanify://%badtoken%', {
         'instance': TypeError,
     }),
-    ('chantify://abc123', {
+    ('chanify://abc123', {
         # Test token
-        'instance': NotifyChantify,
+        'instance': NotifyChanify,
     }),
-    ('chantify://?token=abc123', {
+    ('chanify://?token=abc123', {
         # Test token
-        'instance': NotifyChantify,
+        'instance': NotifyChanify,
     }),
-    ('chantify://token', {
-        'instance': NotifyChantify,
+    ('chanify://token', {
+        'instance': NotifyChanify,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
-    ('chantify://token', {
-        'instance': NotifyChantify,
+    ('chanify://token', {
+        'instance': NotifyChanify,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
-    ('chantify://token', {
-        'instance': NotifyChantify,
+    ('chanify://token', {
+        'instance': NotifyChanify,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
         'test_requests_exceptions': True,
@@ -75,9 +75,9 @@ apprise_url_tests = (
 )
 
 
-def test_plugin_chantify_urls():
+def test_plugin_chanify_urls():
     """
-    NotifyChantify() Apprise URLs
+    NotifyChanify() Apprise URLs
 
     """
 

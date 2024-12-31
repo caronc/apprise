@@ -26,7 +26,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-# Chantify
+# Chanify
 #   1. Visit https://chanify.net/
 
 # The API URL will look something like this:
@@ -41,22 +41,22 @@ from ..utils.parse import validate_regex
 from ..locale import gettext_lazy as _
 
 
-class NotifyChantify(NotifyBase):
+class NotifyChanify(NotifyBase):
     """
-    A wrapper for Chantify Notifications
+    A wrapper for Chanify Notifications
     """
 
     # The default descriptive name associated with the Notification
-    service_name = _('Chantify')
+    service_name = _('Chanify')
 
     # The services URL
     service_url = 'https://chanify.net/'
 
     # The default secure protocol
-    secure_protocol = 'chantify'
+    secure_protocol = 'chanify'
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_chantify'
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_chanify'
 
     # Notification URL
     notify_url = 'https://api.chanify.net/v1/sender/{token}/'
@@ -91,14 +91,14 @@ class NotifyChantify(NotifyBase):
 
     def __init__(self, token, **kwargs):
         """
-        Initialize Chantify Object
+        Initialize Chanify Object
         """
         super().__init__(**kwargs)
 
         self.token = validate_regex(
             token, *self.template_tokens['token']['regex'])
         if not self.token:
-            msg = 'The Chantify token specified ({}) is invalid.'\
+            msg = 'The Chanify token specified ({}) is invalid.'\
                 .format(token)
             self.logger.warning(msg)
             raise TypeError(msg)
@@ -121,9 +121,9 @@ class NotifyChantify(NotifyBase):
             'text': body
         }
 
-        self.logger.debug('Chantify GET URL: %s (cert_verify=%r)' % (
+        self.logger.debug('Chanify GET URL: %s (cert_verify=%r)' % (
             self.notify_url, self.verify_certificate))
-        self.logger.debug('Chantify Payload: %s' % str(payload))
+        self.logger.debug('Chanify Payload: %s' % str(payload))
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -139,10 +139,10 @@ class NotifyChantify(NotifyBase):
             if r.status_code != requests.codes.ok:
                 # We had a problem
                 status_str = \
-                    NotifyChantify.http_response_code_lookup(r.status_code)
+                    NotifyChanify.http_response_code_lookup(r.status_code)
 
                 self.logger.warning(
-                    'Failed to send Chantify notification: '
+                    'Failed to send Chanify notification: '
                     '{}{}error={}.'.format(
                         status_str,
                         ', ' if status_str else '',
@@ -154,11 +154,11 @@ class NotifyChantify(NotifyBase):
                 return False
 
             else:
-                self.logger.info('Sent Chantify notification.')
+                self.logger.info('Sent Chanify notification.')
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occurred sending Chantify '
+                'A Connection error occurred sending Chanify '
                 'notification.')
             self.logger.debug('Socket Exception: %s' % str(e))
 
@@ -178,7 +178,7 @@ class NotifyChantify(NotifyBase):
         return '{schema}://{token}/?{params}'.format(
             schema=self.secure_protocol,
             token=self.pprint(self.token, privacy, safe=''),
-            params=NotifyChantify.urlencode(params),
+            params=NotifyChanify.urlencode(params),
         )
 
     @property
@@ -207,9 +207,9 @@ class NotifyChantify(NotifyBase):
 
         # Allow over-ride
         if 'token' in results['qsd'] and len(results['qsd']['token']):
-            results['token'] = NotifyChantify.unquote(results['qsd']['token'])
+            results['token'] = NotifyChanify.unquote(results['qsd']['token'])
 
         else:
-            results['token'] = NotifyChantify.unquote(results['host'])
+            results['token'] = NotifyChanify.unquote(results['host'])
 
         return results
