@@ -773,6 +773,27 @@ def test_parse_url_general():
     assert result['qsd']['+KeY'] == result['qsd+']['KeY']
     assert result['qsd']['-kEy'] == result['qsd-']['kEy']
 
+    # Testing Defect 1264 - whitespaces in url
+    result = utils.parse.parse_url(
+        'posts://example.com/my endpoint?-token=ab cdefg')
+
+    assert len(result['qsd-']) == 1
+    assert len(result['qsd+']) == 0
+    assert len(result['qsd']) == 1
+    assert len(result['qsd:']) == 0
+
+    assert result['schema'] == 'posts'
+    assert result['host'] == 'example.com'
+    assert result['port'] is None
+    assert result['user'] is None
+    assert result['password'] is None
+    assert result['fullpath'] == '/my%20endpoint'
+    assert result['path'] == '/'
+    assert result['query'] == "my%20endpoint"
+    assert result['url'] == 'posts://example.com/my%20endpoint'
+    assert '-token' in result['qsd']
+    assert result['qsd-']['token'] == 'ab cdefg'
+
 
 def test_parse_url_simple():
     "utils: parse_url() testing """
@@ -1180,6 +1201,38 @@ def test_url_assembly():
     url = 'schema://hostname:10/a/file.php'
     assert utils.parse.url_assembly(
         **utils.parse.parse_url(url, verify_host=False)) == url
+
+    # When spaces and special characters are introduced, the URL
+    # is hard to mimic what was entered. Instead it is normalized
+    url = 'schema://hostname:10/a space/file.php?' \
+        'arg=a+space&arg2=a%20space&arg3=a space'
+    assert utils.parse.url_assembly(
+        **utils.parse.parse_url(url, verify_host=False)) == \
+        'schema://hostname:10/a%20space/file.php?' \
+        'arg=a%2Bspace&arg2=a+space&arg3=a+space'
+
+    # encode=True should only be used if you're passing in un-assembled
+    # content... hence the following is likely not what is expected:
+    assert utils.parse.url_assembly(
+        **utils.parse.parse_url(url, verify_host=False), encode=True) == \
+        'schema://hostname:10/a%2520space/file.php?' \
+        'arg=a%2Bspace&arg2=a+space&arg3=a+space'
+
+    # But the following utilizes the encode=True and produces the
+    # desired effects:
+    content = {
+        'host': 'hostname',
+        # Note that fullpath requires escaping in this case
+        'fullpath': '/a space/file.php',
+        'path': '/a space/',
+        'query': 'file.php',
+        'schema': 'schema',
+        # our query arguments also require escaping as well
+        'qsd': {'arg': 'a+space', 'arg2': 'a space', 'arg3': 'a space'},
+    }
+    assert utils.parse.url_assembly(**content, encode=True) == \
+        'schema://hostname/a%20space/file.php?' \
+        'arg=a%2Bspace&arg2=a+space&arg3=a+space'
 
 
 def test_parse_bool():
