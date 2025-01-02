@@ -920,25 +920,31 @@ def parse_emails(*args, store_unparseable=True, **kwargs):
     return result
 
 
-def url_assembly(**kwargs):
+def url_assembly(encode=False, **kwargs):
     """
     This function reverses the parse_url() function by taking in the provided
     result set and re-assembling a URL
 
     """
+    def _no_encode(content, *args, **kwargs):
+        # dummy function that does nothing to content
+        return content
+
+    _quote = quote if encode else _no_encode
+
     # Determine Authentication
     auth = ''
     if kwargs.get('user') is not None and \
             kwargs.get('password') is not None:
 
         auth = '{user}:{password}@'.format(
-            user=quote(kwargs.get('user'), safe=''),
-            password=quote(kwargs.get('password'), safe=''),
+            user=_quote(kwargs.get('user'), safe=''),
+            password=_quote(kwargs.get('password'), safe=''),
         )
 
     elif kwargs.get('user') is not None:
         auth = '{user}@'.format(
-            user=quote(kwargs.get('user'), safe=''),
+            user=_quote(kwargs.get('user'), safe=''),
         )
 
     return '{schema}://{auth}{hostname}{port}{fullpath}{params}'.format(
@@ -948,7 +954,7 @@ def url_assembly(**kwargs):
         hostname='' if not kwargs.get('host') else kwargs.get('host', ''),
         port='' if not kwargs.get('port')
         else ':{}'.format(kwargs.get('port')),
-        fullpath=quote(kwargs.get('fullpath', ''), safe='/'),
+        fullpath=_quote(kwargs.get('fullpath', ''), safe='/'),
         params='' if not kwargs.get('qsd')
         else '?{}'.format(urlencode(kwargs.get('qsd'))),
     )

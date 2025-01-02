@@ -431,6 +431,81 @@ def test_notify_complex_decoration():
     N_MGR.remove('utiltest')
 
 
+def test_notify_decorator_urls_with_space():
+    """decorators: URLs containing spaces
+    """
+    # This is in relation to https://github.com/caronc/apprise/issues/1264
+
+    # Verify our schema we're about to declare doesn't already exist
+    # in our schema map:
+    assert 'post' not in N_MGR
+
+    verify_obj = []
+
+    @notify(on="posts")
+    def apprise_custom_api_call_wrapper(
+            body, title, notify_type, attach, meta, *args, **kwargs):
+
+        # Track what is added
+        verify_obj.append({
+            'body': body,
+            'title': title,
+            'notify_type': notify_type,
+            'attach': attach,
+            'meta': meta,
+            'args': args,
+            'kwargs': kwargs,
+        })
+
+    assert 'posts' in N_MGR
+
+    # Create ourselves an apprise object
+    aobj = Apprise()
+
+    # Add our configuration
+    aobj.add("posts://example.com/my endpoint?-token=ab cdefg")
+
+    # We loaded 1 item
+    assert len(aobj) == 1
+
+    # Nothing stored yet in our object
+    assert len(verify_obj) == 0
+
+    # Send utf-8 characters
+    assert aobj.notify("ツ".encode('utf-8'), title="My Title") is True
+
+    # Service notified
+    assert len(verify_obj) == 1
+
+    # Extract our object
+    obj = verify_obj.pop()
+
+    assert obj.get('body') == 'ツ'
+    assert obj.get('title') == 'My Title'
+    assert obj.get('notify_type') == 'info'
+    assert obj.get('attach') is None
+    assert isinstance(obj.get('args'), tuple)
+    assert len(obj.get('args')) == 0
+    assert obj.get('kwargs') == {'body_format': None}
+    meta = obj.get('meta')
+    assert isinstance(meta, dict)
+
+    assert meta.get('schema') == 'posts'
+    assert meta.get('url') == \
+        'posts://example.com/my%20endpoint?-token=ab+cdefg'
+    assert meta.get('qsd') == {'-token': 'ab cdefg'}
+    assert meta.get('host') == 'example.com'
+    assert meta.get('fullpath') == '/my%20endpoint'
+    assert meta.get('path') == '/'
+    assert meta.get('query') == 'my%20endpoint'
+    assert isinstance(meta.get('tag'), set)
+    assert len(meta.get('tag')) == 0
+    assert isinstance(meta.get('asset'), AppriseAsset)
+
+    # Tidy
+    N_MGR.remove('posts')
+
+
 def test_notify_multi_instance_decoration(tmpdir):
     """decorators: Test multi-instance @notify
     """
@@ -481,7 +556,7 @@ def test_notify_multi_instance_decoration(tmpdir):
     # The number of configuration files that exist
     assert len(ac) == 1
 
-    # no notifications are loaded
+    # 2 notification endpoints are loaded
     assert len(ac.servers()) == 2
 
     # Nothing stored yet in our object
