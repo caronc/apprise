@@ -2,7 +2,7 @@
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
-# Copyright (c) 2024, Chris Caron <lead2gold@gmail.com>
+# Copyright (c) 2025, Chris Caron <lead2gold@gmail.com>
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -92,7 +92,7 @@ apprise_url_tests = (
 
          # Our expected url(privacy=True) startswith() response (v2 format):
          'privacy_url': 'msteams://myteam/8...2/m...m/8...2/'}),
-    # Support Newer Native URLs with 4 tokens, introduced in 2024
+    # Support Newer Native URLs with 4 tokens, introduced in 2025
     ('https://myteam.webhook.office.com/webhookb2/{}@{}/IncomingWebhook/{}/{}'
      '/{}'
      .format(UUID4, UUID4, 'm' * 32, UUID4, 'V2-_' + 'n' * 43), {

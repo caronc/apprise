@@ -2,7 +2,7 @@
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
-# Copyright (c) 2024, Chris Caron <lead2gold@gmail.com>
+# Copyright (c) 2025, Chris Caron <lead2gold@gmail.com>
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -309,7 +309,7 @@ class NotifyMSTeams(NotifyBase):
 
         self.logger.deprecate(
             "Microsoft is deprecating their MSTeams webhooks on "
-            "December 31, 2024. It is advised that you switch to "
+            "December 31, 2025. It is advised that you switch to "
             "Microsoft Power Automate (already supported by Apprise as "
             "workflows://. For more information visit: "
             "https://github.com/caronc/apprise/wiki/Notify_workflows")

@@ -1,7 +1,7 @@
-# BSD 3-Clause License
+# BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
-# Copyright (c) 2024, Chris Caron <lead2gold@gmail.com>
+# Copyright (c) 2025, Chris Caron <lead2gold@gmail.com>
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -55,7 +55,7 @@ Telegram, Threema Gateway, Twilio, Twitter, Twist, VictorOps, Voipms, Vonage,
 WeCom Bot, WhatsApp, Webex Teams, Workflows, WxPusher, XBMC}
 
 Name:           python-%{pypi_name}
-Version:        1.9.1
+Version:        1.9.2
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        BSD-2-Clause
@@ -149,6 +149,9 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version
 %{python3_sitelib}/%{pypi_name}/cli.*
 
 %changelog
+* Wed Jan  8 2025 Chris Caron <lead2gold@gmail.com> - 1.9.2
+- Updated to v1.9.2
+
 * Tue Dec 17 2024 Chris Caron <lead2gold@gmail.com> - 1.9.1
 - Updated to v1.9.1
 

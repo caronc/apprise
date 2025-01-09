@@ -322,4 +322,4 @@ If you found Apprise useful at all, [please consider donating][donations]!
 
 ## COPYRIGHT
 
-Apprise is Copyright (C) 2024 Chris Caron <lead2gold@gmail.com>
+Apprise is Copyright (C) 2025 Chris Caron <lead2gold@gmail.com>

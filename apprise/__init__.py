@@ -2,7 +2,7 @@
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
-# Copyright (c) 2024, Chris Caron <lead2gold@gmail.com>
+# Copyright (c) 2025, Chris Caron <lead2gold@gmail.com>
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -27,10 +27,10 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 __title__ = 'Apprise'
-__version__ = '1.9.1'
+__version__ = '1.9.2'
 __author__ = 'Chris Caron'
-__license__ = 'BSD'
-__copywrite__ = 'Copyright (C) 2024 Chris Caron <lead2gold@gmail.com>'
+__license__ = 'BSD 2-Clause'
+__copywrite__ = 'Copyright (C) 2025 Chris Caron <lead2gold@gmail.com>'
 __email__ = 'lead2gold@gmail.com'
 __status__ = 'Production'
 

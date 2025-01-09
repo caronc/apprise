@@ -3,7 +3,7 @@
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
-# Copyright (c) 2024, Chris Caron <lead2gold@gmail.com>
+# Copyright (c) 2025, Chris Caron <lead2gold@gmail.com>
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -63,9 +63,9 @@ else:
 
 setup(
     name='apprise',
-    version='1.9.1',
+    version='1.9.2',
     description='Push Notifications that work with just about every platform!',
-    license='BSD',
+    license='BSD 2-Clause',
     long_description=open('README.md', encoding="utf-8").read(),
     long_description_content_type='text/markdown',
     cmdclass=cmdclass,
