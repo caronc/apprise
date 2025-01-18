@@ -349,6 +349,11 @@ class NotifyOpsgenie(NotifyBase):
         """Initialize Opsgenie Object."""
         super().__init__(**kwargs)
 
+        # Notify users that this plugin will require them to switch soon
+        self.logger.deprecate(
+            'Opsgenie will soon be depricated and moved to Jira; '
+            'visit https://atlassian.com/ for more details')
+
         # API Key (associated with project)
         self.apikey = validate_regex(apikey)
         if not self.apikey:
