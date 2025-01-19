@@ -366,15 +366,13 @@ class NotifyOffice365(NotifyBase):
 
         if self.from_email:
             # Apply from email if it is known
-            payload.update({
-                'message': {
-                    'from': {
-                        "emailAddress": {
-                            "address": self.from_email,
-                            "name": self.from_name or self.app_id,
-                        }
-                    },
-                }
+            payload['message'].update({
+                'from': {
+                    "emailAddress": {
+                        "address": self.from_email,
+                        "name": self.from_name or self.app_id,
+                    }
+                },
             })
 
         # Create a copy of the email list
