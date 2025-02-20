@@ -445,12 +445,24 @@ def test_plugin_telegram_general(mock_post):
             body='body', title='title', notify_type=NotifyType.INFO,
             attach=attach) is True
 
+        # Test large messages
+        assert obj.notify(
+            body='a' * (obj.telegram_caption_maxlen + 1),
+            title='title', notify_type=NotifyType.INFO,
+            attach=attach) is True
+
         # An invalid attachment will cause a failure
         path = os.path.join(
             TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
         attach = AppriseAttachment(path)
         assert obj.notify(
             body='body', title='title', notify_type=NotifyType.INFO,
+            attach=path) is False
+
+        # Test large messages
+        assert obj.notify(
+            body='a' * (obj.telegram_caption_maxlen + 1),
+            title='title', notify_type=NotifyType.INFO,
             attach=path) is False
 
     obj = NotifyTelegram(bot_token=bot_token, targets=None)
