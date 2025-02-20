@@ -139,6 +139,8 @@ The table below identifies the services this tool supports and some example serv
 
 ## SMS Notifications
 
+SMS Notifications for the most part do not have a both a `title` and `body`.  They consist of a single `body` which is usually no more then 160 characters in length.  When using Apprise, the `title` and `body` are therefore combined into a single message prior to their transmission.
+
 | Notification Service | Service ID | Default Port | Example Syntax |
 | -------------------- | ---------- | ------------ | -------------- |
 | [Africas Talking](https://github.com/caronc/apprise/wiki/Notify_africas_talking) | atalk://  | (TCP) 443   | atalk://AppUser@ApiKey/ToPhoneNo<br/>atalk://AppUser@ApiKey/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
