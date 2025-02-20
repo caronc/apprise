@@ -157,6 +157,11 @@ class NotifyTelegram(NotifyBase):
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 4096
 
+    # The maximum number of characters a telegram attachment caption can be
+    # If an attachment is provided and the body is within the caption limit
+    # then it is captioned with the attachment instead.
+    telegram_caption_maxlen = 1024
+
     # Title is to be part of body
     title_maxlen = 0
 
@@ -485,7 +490,7 @@ class NotifyTelegram(NotifyBase):
         # or not.
         self.include_image = include_image
 
-    def send_media(self, target, notify_type, attach=None):
+    def send_media(self, target, notify_type, payload={}, attach=None):
         """
         Sends a sticker based on the specified notify type
 
@@ -547,7 +552,7 @@ class NotifyTelegram(NotifyBase):
         # Extract our target
         chat_id, topic = target
 
-        payload = {'chat_id': chat_id}
+        payload['chat_id'] = chat_id
         if topic:
             payload['message_thread_id'] = topic
 
@@ -798,9 +803,19 @@ class NotifyTelegram(NotifyBase):
             # Prepare our payload based on HTML or TEXT
             _payload['text'] = body
 
+        # Prepare our caption payload
+        caption_payload = {
+            'caption': _payload['text'],
+            'show_caption_above_media': True
+            if self.content == TelegramContentPlacement.BEFORE else False,
+            'parse_mode': _payload['parse_mode']} \
+            if attach and body and len(_payload.get('text', '')) < \
+            self.telegram_caption_maxlen else {}
+
         # Handle payloads without a body specified (but an attachment present)
         attach_content = \
-            TelegramContentPlacement.AFTER if not body else self.content
+            TelegramContentPlacement.AFTER \
+            if not body or caption_payload else self.content
 
         # Create a copy of the chat_ids list
         targets = list(self.targets)
@@ -822,7 +837,7 @@ class NotifyTelegram(NotifyBase):
                     # We failed to send the image associated with our
                     notify_type
                     self.logger.warning(
-                        'Failed to send Telegram type image to {}.',
+                        'Failed to send Telegram attachment to {}.',
                         pchat_id)
 
             if attach and self.attachment_support and \
@@ -830,6 +845,7 @@ class NotifyTelegram(NotifyBase):
                 # Send our attachments now (if specified and if it exists)
                 if not self._send_attachments(
                         target, notify_type=notify_type,
+                        payload=caption_payload,
                         attach=attach):
 
                     has_error = True
@@ -838,6 +854,10 @@ class NotifyTelegram(NotifyBase):
                 if not body:
                     # Nothing more to do; move along to the next attachment
                     continue
+
+            if caption_payload:
+                # nothing further to do; move along to the next attachment
+                continue
 
             # Always call throttle before any remote server i/o is made;
             # Telegram throttles to occur before sending the image so that
@@ -916,14 +936,22 @@ class NotifyTelegram(NotifyBase):
 
         return not has_error
 
-    def _send_attachments(self, target, notify_type, attach):
+    def _send_attachments(self, target, notify_type, attach, payload={}):
         """
         Sends our attachments
         """
         has_error = False
         # Send our attachments now (if specified and if it exists)
-        for attachment in attach:
-            if not self.send_media(target, notify_type, attach=attachment):
+        for no, attachment in enumerate(attach, start=1):
+            payload = payload if payload and no == 1 else {}
+            payload.update({
+                'title': attachment.name
+                if attachment.name else f'file{no:03}.dat'})
+
+            if not self.send_media(
+                    target, notify_type,
+                    payload=payload,
+                    attach=attachment):
 
                 # We failed; don't continue
                 has_error = True
