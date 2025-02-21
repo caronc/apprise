@@ -195,7 +195,7 @@ class NotifyTwitter(NotifyBase):
     })
 
     def __init__(self, ckey, csecret, akey, asecret, targets=None,
-                 mode=TwitterMessageMode.DM, cache=True, batch=True, **kwargs):
+                 mode=None, cache=True, batch=True, **kwargs):
         """
         Initialize Twitter Object
 
@@ -230,11 +230,16 @@ class NotifyTwitter(NotifyBase):
         self.mode = self.template_args['mode']['default'] \
             if not isinstance(mode, str) else mode.lower()
 
-        if self.mode not in TWITTER_MESSAGE_MODES:
-            msg = 'The Twitter message mode specified ({}) is invalid.' \
-                .format(mode)
-            self.logger.warning(msg)
-            raise TypeError(msg)
+        if mode and isinstance(mode, str):
+            self.mode = next(
+                (a for a in TWITTER_MESSAGE_MODES if a.startswith(mode)), None)
+            if self.mode not in TWITTER_MESSAGE_MODES:
+                msg = 'The Twitter message mode specified ({}) is invalid.'\
+                    .format(mode)
+                self.logger.warning(msg)
+                raise TypeError(msg)
+        else:
+            self.mode = self.template_args['mode']['default']
 
         # Set Cache Flag
         self.cache = cache
