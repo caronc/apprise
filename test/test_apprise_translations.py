@@ -297,6 +297,9 @@ def test_apprise_trans_windows_users_nux(mock_getlocale):
     # 4105 = en_CA
     windll.kernel32.GetUserDefaultUILanguage.return_value = 4105
 
+    # Store default value to not break other tests
+    default_language = locale.AppriseLocale._default_language
+
     with environ('LANGUAGE', 'LC_ALL', 'LC_CTYPE', 'LANG'):
         # Our default language
         locale.AppriseLocale._default_language = 'zz'
@@ -324,6 +327,9 @@ def test_apprise_trans_windows_users_nux(mock_getlocale):
         assert locale.AppriseLocale.detect_language() == 'fr'
 
     delattr(ctypes, 'windll')
+
+    # Restore default value
+    locale.AppriseLocale._default_language = default_language
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Unique Nux test cases")
