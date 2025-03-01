@@ -508,9 +508,7 @@ class NotifySlack(NotifyBase):
         # First we need to acquire a code
         params = {
             'client_id': self.client_id,
-            'scope': ','.join(self.slack_v2_oauth_scopes),
-            # Out of Band
-            'redirect_uri': 'urn:ietf:wg:oauth:2.0:oob',
+            'scope': ' '.join(self.slack_v2_oauth_scopes),
         }
 
         # Sharing this code with the user to click on and have a code generated
@@ -523,6 +521,7 @@ class NotifySlack(NotifyBase):
         # try:
         #     r = requests.get(
         #         get_code_url,
+        #         headers=headers,
         #         verify=self.verify_certificate,
         #         timeout=self.request_timeout,
         #     )
