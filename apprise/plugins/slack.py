@@ -89,7 +89,7 @@ from ..common import NotifyImageSize
 from ..common import NotifyType
 from ..common import NotifyFormat
 from ..utils.parse import (
-    is_email, parse_bool, parse_list, validate_regex)
+    is_email, parse_bool, parse_list, validate_regex, urlencode)
 from ..locale import gettext_lazy as _
 
 # Extend HTTP Error Messages
@@ -102,7 +102,13 @@ CHANNEL_LIST_DELIM = re.compile(r'[ \t\r\n,#\\/]+')
 
 # Channel Regular Expression Parsing
 CHANNEL_RE = re.compile(
-    r'^(?P<channel>[+#@]?[A-Z0-9_-]{1,32})(:(?P<thread_ts>[0-9.]+))?$', re.I)
+    r'^(?P<channel>[+#@]?[a-z0-9_-]{1,32})(:(?P<thread_ts>[0-9.]+))?$', re.I)
+
+# Webhook
+WEBHOOK_RE = re.compile(
+    r'^([a-z]{4,5}://([^/:]+:)?([^/@]+@)?)?'
+    r'(?P<webhook>[a-z0-9]{9,12}/+[a-z0-9]{9,12}/+'
+    r'[a-z0-9]{20,24})([/?].*|\s*$)', re.I)
 
 # For detecting Slack API v2 Client IDs
 CLIENT_ID_RE = re.compile(r'^\d{8,}\.\d{8,}$', re.I)
@@ -267,7 +273,7 @@ class NotifySlack(NotifyBase):
             'name': _('OAuth Access Token'),
             'type': 'string',
             'private': True,
-            'regex': (r'^xox[abp]-[A-Z0-9-]+$', 'i'),
+            'regex': (r'^xox[abp]-[a-z0-9-]+$', 'i'),
         },
         # Token required as part of the Webhook request
         #  AAAAAAAAA/BBBBBBBBB/CCCCCCCCCCCCCCCCCCCCCCCC
@@ -275,7 +281,7 @@ class NotifySlack(NotifyBase):
             'name': _('Legacy Webhook Token'),
             'type': 'string',
             'private': True,
-            'regex': (r'^[a-z0-9]+/[a-z0-9]+/[a-z0-9]$', 'i'),
+            'regex': (r'^[a-z0-9]+/[a-z0-9]+/[a-z0-9]+$', 'i'),
         },
         'target_encoded_id': {
             'name': _('Target Encoded ID'),
@@ -403,16 +409,26 @@ class NotifySlack(NotifyBase):
         # Setup our mode
         self.mode = SlackMode.BOT if access_token else SlackMode.WEBHOOK
 
+        # v1 Defaults
+        self.access_token = None
+        self.token = None
+
+        # v2 Defaults
+        self.code = None
+        self.client_id = None
+        self.secret = None
+
         # Get our Slack API Version
-        self.api_ver = \
-            SLACK_API_VERSION_MAP[NotifySlack.
-                                  template_args['ver']['default']] \
-            if ver is None else \
-            next((
-                v for k, v in SLACK_API_VERSION_MAP.items()
-                if str(ver).lower().startswith(k)),
+        self.api_ver = SlackAPIVersion.TWO if client_id \
+            and secret and not (token or access_token) and ver is None \
+            else (
                 SLACK_API_VERSION_MAP[NotifySlack.
-                                      template_args['ver']['default']])
+                                      template_args['ver']['default']]
+                if ver is None else next((
+                    v for k, v in SLACK_API_VERSION_MAP.items()
+                    if str(ver).lower().startswith(k)),
+                    SLACK_API_VERSION_MAP[NotifySlack.
+                                          template_args['ver']['default']]))
 
         # Depricated Notification
         if self.api_ver == SlackAPIVersion.ONE:
@@ -421,14 +437,19 @@ class NotifySlack(NotifyBase):
                 'You must update your App and/or Bot')
 
         if self.mode is SlackMode.WEBHOOK:
-            self.access_token = None
-            self.token = validate_regex(
-                token, *self.template_tokens['token']['regex'])
-            if not self.token:
-                msg = 'An invalid Slack Token ' \
-                      '({}) was specified.'.format(token)
-                self.logger.warning(msg)
-                raise TypeError(msg)
+            if self.api_ver == SlackAPIVersion.ONE:
+                self.token = validate_regex(
+                    token, *self.template_tokens['token']['regex'])
+                if not self.token:
+                    msg = 'An invalid Slack Token ' \
+                          '({}) was specified.'.format(token)
+                    self.logger.warning(msg)
+                    raise TypeError(msg)
+
+            else:  # version 2
+                self.code = code
+                self.client_id = client_id
+                self.secret = secret
 
         else:  # Bot
             self.access_token = validate_regex(
@@ -492,23 +513,26 @@ class NotifySlack(NotifyBase):
             'redirect_uri': 'urn:ietf:wg:oauth:2.0:oob',
         }
 
-        get_code_url = 'https://slack.com/oauth/v2/authorize'
-        try:
-            r = requests.post(
-                get_code_url,
-                params=params,
-                verify=self.verify_certificate,
-                timeout=self.request_timeout,
-            )
-            import pdb
-            pdb.set_trace()
+        # Sharing this code with the user to click on and have a code generated
+        # does not work if there is no valid redirect_uri provided; the
+        # 'out-of-band' on defined above does not work.
+        get_code_url = \
+            f'https://slack.com/oauth/v2/authorize?{urlencode(params)}'
 
-        except requests.RequestException as e:
-            self.logger.warning(
-                'A Connection error occurred acquiring Slack access code.',
-            )
-            self.logger.debug('Socket Exception: %s' % str(e))
-            # Return; we're done
+        # The following code does not work (below).
+        # try:
+        #     r = requests.get(
+        #         get_code_url,
+        #         verify=self.verify_certificate,
+        #         timeout=self.request_timeout,
+        #     )
+
+        # except requests.RequestException as e:
+        #     self.logger.warning(
+        #         'A Connection error occurred acquiring Slack access code.',
+        #     )
+        #     self.logger.debug('Socket Exception: %s' % str(e))
+        #     # Return; we're done
         return None
 
     def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
@@ -520,6 +544,9 @@ class NotifySlack(NotifyBase):
         # error tracking (used for function return)
         has_error = False
 
+        if self.api_ver == SlackAPIVersion.TWO:
+            if not self.authenticate():
+                return False
         #
         # Prepare JSON Object (applicable to both WEBHOOK and BOT mode)
         #
@@ -1144,7 +1171,8 @@ class NotifySlack(NotifyBase):
         """
         return (
             self.secure_protocol, self.token, self.access_token,
-            self.client_id, self.secret, self.code
+            self.client_id, self.secret,
+            # self.code is intentionally left out
         )
 
     def url(self, privacy=False, *args, **kwargs):
@@ -1177,7 +1205,9 @@ class NotifySlack(NotifyBase):
                     '{targets}/?{params}'.format(
                         schema=self.secure_protocol,
                         botname=botname,
-                        token=self.pprint(self.token, privacy, safe=''),
+                        token='/'.join(
+                            [self.pprint(token, privacy, safe='/')
+                             for token in self.token.split('/')]),
                         targets='/'.join(
                             [NotifySlack.quote(x, safe='')
                                 for x in self.channels]),
@@ -1188,7 +1218,7 @@ class NotifySlack(NotifyBase):
                 '{targets}?{params}'.format(
                     schema=self.secure_protocol,
                     botname=botname,
-                    client_id=self.pprint(self.client_id, privacy, safe=''),
+                    client_id=self.pprint(self.client_id, privacy, safe='/'),
                     secret=self.pprint(self.secret, privacy, safe=''),
                     code='' if not self.code else '/' + self.pprint(
                         self.code, privacy, safe=''),
@@ -1203,7 +1233,7 @@ class NotifySlack(NotifyBase):
             '?{params}'.format(
                 schema=self.secure_protocol,
                 botname=botname,
-                access_token=self.pprint(self.access_token, privacy, safe=''),
+                access_token=self.pprint(self.access_token, privacy, safe='/'),
                 targets='/'.join(
                     [NotifySlack.quote(x, safe='') for x in self.channels]),
                 params=NotifySlack.urlencode(params),
@@ -1228,8 +1258,9 @@ class NotifySlack(NotifyBase):
             return results
 
         # The first token is stored in the hostname
-        results['targets'] = \
-            [NotifySlack.unquote(results['host'])] if results['host'] else []
+        results['targets'] = re.split(
+            r'[\s/]+', NotifySlack.unquote(results['host'])) \
+            if results['host'] else []
 
         # Get unquoted entries
         results['targets'] += NotifySlack.split_path(results['fullpath'])
@@ -1253,7 +1284,7 @@ class NotifySlack(NotifyBase):
 
         if 'token' in results['qsd'] and len(results['qsd']['token']):
             # We're dealing with a Slack v1 API
-            token = NotifySlack.unquote(results['qsd']['token'])
+            token = NotifySlack.unquote(results['qsd']['token']).strip('/')
             # check to see if we're dealing with a bot/user token
             if token.startswith('xo'):
                 # We're dealing with a bot
@@ -1264,7 +1295,7 @@ class NotifySlack(NotifyBase):
                 results['access_token'] = None
                 results['token'] = token
 
-        # Verify if our token_a us a bot token or part of a webhook:
+        # Verify if our token is a bot token or part of a webhook:
         if not (results.get('token') or results.get('access_token')
                 or 'client_id' in results or 'secret' in results
                 or 'code' in results) and results['targets'] \
@@ -1278,6 +1309,14 @@ class NotifySlack(NotifyBase):
                 and CLIENT_ID_RE.match(results['targets'][0]):
             # Store our Client ID
             results['client_id'] = results['targets'].pop(0)
+
+        else:  # parse token from URL if present
+            match = WEBHOOK_RE.match(url)
+            if match:
+                results['access_token'] = None
+                results['token'] = match.group('webhook')
+                # Eliminate webhook entries
+                results['targets'] = results['targets'][3:]
 
         # We have several entries on our URL and we don't know where they
         # go. They could also be channels/users/emails
@@ -1324,9 +1363,9 @@ class NotifySlack(NotifyBase):
 
         result = re.match(
             r'^https?://hooks\.slack\.com/services/'
-            r'(?P<token_a>[A-Z0-9]+)/'
-            r'(?P<token_b>[A-Z0-9]+)/'
-            r'(?P<token_c>[A-Z0-9]+)/?'
+            r'(?P<token_a>[a-z0-9]+)/'
+            r'(?P<token_b>[a-z0-9]+)/'
+            r'(?P<token_c>[a-z0-9]+)/?'
             r'(?P<params>\?.+)?$', url, re.I)
 
         if result:
