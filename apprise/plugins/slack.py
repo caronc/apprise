@@ -27,7 +27,13 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # There are 2 ways to use this plugin...
-# Method 1: Via Webhook:
+# Method 1 : Via Webhook:
+#   Visit https://api.slack.com/apps
+#    - Click on 'Create new App'
+#    - Create one from Scratch
+#    - Provide it an 'App Name' and 'Workspace'
+
+# Method 1 (legacy) : Via Webhook:
 #   Visit https://my.slack.com/services/new/incoming-webhook/
 #   to create a new incoming webhook for your account. You'll need to
 #   follow the wizard to pre-determine the channel(s) you want your
@@ -38,7 +44,7 @@
 #                                       |         |               |
 #    These are important <--------------^---------^---------------^
 #
-# Method 2: Via a Bot:
+# Method 2 (legacy) : Via a Bot:
 #   1. visit: https://api.slack.com/apps?new_app=1
 #   2. Pick an App Name (such as Apprise) and select your workspace.  Then
 #       press 'Create App'
@@ -77,13 +83,13 @@ import requests
 from json import dumps
 from json import loads
 from time import time
-
+from datetime import (datetime, timezone)
 from .base import NotifyBase
 from ..common import NotifyImageSize
 from ..common import NotifyType
 from ..common import NotifyFormat
 from ..utils.parse import (
-    is_email, parse_bool, parse_list, validate_regex)
+    is_email, parse_bool, parse_list, validate_regex, urlencode)
 from ..locale import gettext_lazy as _
 
 # Extend HTTP Error Messages
@@ -96,7 +102,19 @@ CHANNEL_LIST_DELIM = re.compile(r'[ \t\r\n,#\\/]+')
 
 # Channel Regular Expression Parsing
 CHANNEL_RE = re.compile(
-    r'^(?P<channel>[+#@]?[A-Z0-9_-]{1,32})(:(?P<thread_ts>[0-9.]+))?$', re.I)
+    r'^(?P<channel>[+#@]?[a-z0-9_-]{1,32})(:(?P<thread_ts>[0-9.]+))?$', re.I)
+
+# Webhook
+WEBHOOK_RE = re.compile(
+    r'^([a-z]{4,5}://([^/:]+:)?([^/@]+@)?)?'
+    r'(?P<webhook>[a-z0-9]{9,12}/+[a-z0-9]{9,12}/+'
+    r'[a-z0-9]{20,24})([/?].*|\s*$)', re.I)
+
+# For detecting Slack API v2 Client IDs
+CLIENT_ID_RE = re.compile(r'^\d{8,}\.\d{8,}$', re.I)
+
+# For detecting Slack API v2 Codes
+CODE_RE = re.compile(r'^[a-z0-9_-]{10,}$', re.I)
 
 
 class SlackMode:
@@ -118,6 +136,37 @@ SLACK_MODES = (
     SlackMode.WEBHOOK,
     SlackMode.BOT,
 )
+
+
+class SlackAPIVersion:
+    """
+    Slack API Version
+    """
+    # Original - Said to be depricated on March 31st, 2025
+    ONE = '1'
+
+    # New 2024 API Format
+    TWO = '2'
+
+
+SLACK_API_VERSION_MAP = {
+    # v1
+    "v1": SlackAPIVersion.ONE,
+    "1": SlackAPIVersion.ONE,
+    # v2
+    "v2": SlackAPIVersion.TWO,
+    "2": SlackAPIVersion.TWO,
+    "2024": SlackAPIVersion.TWO,
+    "2025": SlackAPIVersion.TWO,
+    "default": SlackAPIVersion.ONE,
+}
+
+
+SLACK_API_VERSIONS = {
+    # Note: This also acts as a reverse lookup mapping
+    SlackAPIVersion.ONE: 'v1',
+    SlackAPIVersion.TWO: 'v2',
+}
 
 
 class NotifySlack(NotifyBase):
@@ -164,13 +213,28 @@ class NotifySlack(NotifyBase):
     # becomes the default channel in BOT mode
     default_notification_channel = '#general'
 
+    # The scopes required to work with Slack
+    slack_v2_oauth_scopes = (
+        # Required for creating a message
+        'chat:write',
+        # Required for attachments
+        'files:write',
+        # Required for looking up a user id when provided ones email
+        'users:read.email'
+    )
+
     # Define object templates
     templates = (
-        # Webhook
-        '{schema}://{token_a}/{token_b}/{token_c}',
-        '{schema}://{botname}@{token_a}/{token_b}{token_c}',
-        '{schema}://{token_a}/{token_b}/{token_c}/{targets}',
-        '{schema}://{botname}@{token_a}/{token_b}/{token_c}/{targets}',
+        # Webhook (2024+)
+        '{schema}://{client_id}/{secret}/',  # code-aquisition URL
+        '{schema}://{client_id}/{secret}/{code}',
+        '{schema}://{client_id}/{secret}/{code}/{targets}',
+
+        # Webhook (legacy)
+        '{schema}://{token}',
+        '{schema}://{botname}@{token}',
+        '{schema}://{token}/{targets}',
+        '{schema}://{botname}@{token}/{targets}',
 
         # Bot
         '{schema}://{access_token}/',
@@ -179,6 +243,24 @@ class NotifySlack(NotifyBase):
 
     # Define our template tokens
     template_tokens = dict(NotifyBase.template_tokens, **{
+        # Slack API v2 (2024+)
+        'client_id': {
+            'name': _('Client ID'),
+            'type': 'string',
+            'private': True,
+        },
+        'secret': {
+            'name': _('Client Secret'),
+            'type': 'string',
+            'private': True,
+        },
+        'code': {
+            'name': _('Access Code'),
+            'type': 'string',
+            'private': True,
+        },
+
+        # Legacy Slack API v1
         'botname': {
             'name': _('Bot Name'),
             'type': 'string',
@@ -191,32 +273,15 @@ class NotifySlack(NotifyBase):
             'name': _('OAuth Access Token'),
             'type': 'string',
             'private': True,
-            'required': True,
-            'regex': (r'^xox[abp]-[A-Z0-9-]+$', 'i'),
+            'regex': (r'^xox[abp]-[a-z0-9-]+$', 'i'),
         },
         # Token required as part of the Webhook request
-        #  /AAAAAAAAA/........./........................
-        'token_a': {
-            'name': _('Token A'),
+        #  AAAAAAAAA/BBBBBBBBB/CCCCCCCCCCCCCCCCCCCCCCCC
+        'token': {
+            'name': _('Legacy Webhook Token'),
             'type': 'string',
             'private': True,
-            'regex': (r'^[A-Z0-9]+$', 'i'),
-        },
-        # Token required as part of the Webhook request
-        #  /........./BBBBBBBBB/........................
-        'token_b': {
-            'name': _('Token B'),
-            'type': 'string',
-            'private': True,
-            'regex': (r'^[A-Z0-9]+$', 'i'),
-        },
-        # Token required as part of the Webhook request
-        #  /........./........./CCCCCCCCCCCCCCCCCCCCCCCC
-        'token_c': {
-            'name': _('Token C'),
-            'type': 'string',
-            'private': True,
-            'regex': (r'^[A-Za-z0-9]+$', 'i'),
+            'regex': (r'^[a-z0-9]+/[a-z0-9]+/[a-z0-9]+$', 'i'),
         },
         'target_encoded_id': {
             'name': _('Target Encoded ID'),
@@ -272,9 +337,24 @@ class NotifySlack(NotifyBase):
         'to': {
             'alias_of': 'targets',
         },
+        'client_id': {
+            'alias_of': 'client_id',
+        },
+        'secret': {
+            'alias_of': 'secret',
+        },
+        'code': {
+            'alias_of': 'code',
+        },
         'token': {
             'name': _('Token'),
-            'alias_of': ('access_token', 'token_a', 'token_b', 'token_c'),
+            'alias_of': ('access_token', 'token'),
+        },
+        'ver': {
+            'name': _('Slack API Version'),
+            'type': 'choice:string',
+            'values': ('v1', 'v2'),
+            'default': 'v1',
         },
     })
 
@@ -312,9 +392,15 @@ class NotifySlack(NotifyBase):
         r'(?:[ \t]*\|[ \t]*(?:(?P<val>[^\n]+?)[ \t]*)?(?:>|\&gt;)'
         r'|(?:>|\&gt;)))', re.IGNORECASE)
 
-    def __init__(self, access_token=None, token_a=None, token_b=None,
-                 token_c=None, targets=None, include_image=True,
-                 include_footer=True, use_blocks=None, **kwargs):
+    def __init__(self, access_token=None, token=None, targets=None,
+                 include_image=None, include_footer=None, use_blocks=None,
+                 ver=None,
+
+                 # Entries needed for Webhook - Slack API v2 (2024+)
+                 client_id=None, secret=None, code=None,
+
+                 # Catch-all
+                 **kwargs):
         """
         Initialize Slack Object
         """
@@ -323,39 +409,53 @@ class NotifySlack(NotifyBase):
         # Setup our mode
         self.mode = SlackMode.BOT if access_token else SlackMode.WEBHOOK
 
+        # v1 Defaults
+        self.access_token = None
+        self.token = None
+
+        # v2 Defaults
+        self.code = None
+        self.client_id = None
+        self.secret = None
+
+        # Get our Slack API Version
+        self.api_ver = SlackAPIVersion.TWO if client_id \
+            and secret and not (token or access_token) and ver is None \
+            else (
+                SLACK_API_VERSION_MAP[NotifySlack.
+                                      template_args['ver']['default']]
+                if ver is None else next((
+                    v for k, v in SLACK_API_VERSION_MAP.items()
+                    if str(ver).lower().startswith(k)),
+                    SLACK_API_VERSION_MAP[NotifySlack.
+                                          template_args['ver']['default']]))
+
+        # Depricated Notification
+        if self.api_ver == SlackAPIVersion.ONE:
+            self.logger.deprecate(
+                'Slack Legacy API is set to be deprecated on Mar 31st, 2025. '
+                'You must update your App and/or Bot')
+
         if self.mode is SlackMode.WEBHOOK:
-            self.access_token = None
-            self.token_a = validate_regex(
-                token_a, *self.template_tokens['token_a']['regex'])
-            if not self.token_a:
-                msg = 'An invalid Slack (first) Token ' \
-                      '({}) was specified.'.format(token_a)
-                self.logger.warning(msg)
-                raise TypeError(msg)
+            if self.api_ver == SlackAPIVersion.ONE:
+                self.token = validate_regex(
+                    token, *self.template_tokens['token']['regex'])
+                if not self.token:
+                    msg = 'An invalid Slack Token ' \
+                          '({}) was specified.'.format(token)
+                    self.logger.warning(msg)
+                    raise TypeError(msg)
 
-            self.token_b = validate_regex(
-                token_b, *self.template_tokens['token_b']['regex'])
-            if not self.token_b:
-                msg = 'An invalid Slack (second) Token ' \
-                      '({}) was specified.'.format(token_b)
-                self.logger.warning(msg)
-                raise TypeError(msg)
+            else:  # version 2
+                self.code = code
+                self.client_id = client_id
+                self.secret = secret
 
-            self.token_c = validate_regex(
-                token_c, *self.template_tokens['token_c']['regex'])
-            if not self.token_c:
-                msg = 'An invalid Slack (third) Token ' \
-                      '({}) was specified.'.format(token_c)
-                self.logger.warning(msg)
-                raise TypeError(msg)
-        else:
-            self.token_a = None
-            self.token_b = None
-            self.token_c = None
+        else:  # Bot
             self.access_token = validate_regex(
                 access_token, *self.template_tokens['access_token']['regex'])
             if not self.access_token:
-                msg = 'An invalid Slack OAuth Access Token ' \
+                msg = 'An invalid Slack (Bot) OAuth Access Token ' \
                       '({}) was specified.'.format(access_token)
                 self.logger.warning(msg)
                 raise TypeError(msg)
@@ -386,11 +486,53 @@ class NotifySlack(NotifyBase):
             re.IGNORECASE,
         )
         # Place a thumbnail image inline with the message body
-        self.include_image = include_image
+        self.include_image = include_image if include_image is not None \
+            else self.template_args['image']['default']
 
         # Place a footer with each post
-        self.include_footer = include_footer
+        self.include_footer = include_footer if include_footer is not None \
+            else self.template_args['footer']['default']
+
+        # Access token is required with the new 2024 Slack API and
+        # is acquired after authenticating
+        self.__refresh_token = None
+        self.__access_token = None
+        self.__access_token_expiry = datetime.now(timezone.utc)
         return
+
+    def authenticate(self, **kwargs):
+        """
+        Authenticates with Slack API Servers
+        """
+
+        # First we need to acquire a code
+        params = {
+            'client_id': self.client_id,
+            'scope': ' '.join(self.slack_v2_oauth_scopes),
+        }
+
+        # Sharing this code with the user to click on and have a code generated
+        # does not work if there is no valid redirect_uri provided; the
+        # 'out-of-band' on defined above does not work.
+        get_code_url = \
+            f'https://slack.com/oauth/v2/authorize?{urlencode(params)}'
+
+        # The following code does not work (below).
+        # try:
+        #     r = requests.get(
+        #         get_code_url,
+        #         headers=headers,
+        #         verify=self.verify_certificate,
+        #         timeout=self.request_timeout,
+        #     )
+
+        # except requests.RequestException as e:
+        #     self.logger.warning(
+        #         'A Connection error occurred acquiring Slack access code.',
+        #     )
+        #     self.logger.debug('Socket Exception: %s' % str(e))
+        #     # Return; we're done
+        return None
 
     def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
              **kwargs):
@@ -401,6 +543,9 @@ class NotifySlack(NotifyBase):
         # error tracking (used for function return)
         has_error = False
 
+        if self.api_ver == SlackAPIVersion.TWO:
+            if not self.authenticate():
+                return False
         #
         # Prepare JSON Object (applicable to both WEBHOOK and BOT mode)
         #
@@ -557,12 +702,7 @@ class NotifySlack(NotifyBase):
 
         # Prepare our Slack URL (depends on mode)
         if self.mode is SlackMode.WEBHOOK:
-            url = '{}/{}/{}/{}'.format(
-                self.webhook_url,
-                self.token_a,
-                self.token_b,
-                self.token_c,
-            )
+            url = '{}/{}'.format(self.webhook_url, self.token)
 
         else:  # SlackMode.BOT
             url = self.api_url.format('chat.postMessage')
@@ -1029,8 +1169,9 @@ class NotifySlack(NotifyBase):
         here.
         """
         return (
-            self.secure_protocol, self.token_a, self.token_b, self.token_c,
-            self.access_token,
+            self.secure_protocol, self.token, self.access_token,
+            self.client_id, self.secret,
+            # self.code is intentionally left out
         )
 
     def url(self, privacy=False, *args, **kwargs):
@@ -1043,6 +1184,7 @@ class NotifySlack(NotifyBase):
             'image': 'yes' if self.include_image else 'no',
             'footer': 'yes' if self.include_footer else 'no',
             'blocks': 'yes' if self.use_blocks else 'no',
+            'ver': SLACK_API_VERSIONS[self.api_ver],
         }
 
         # Extend our parameters
@@ -1056,24 +1198,41 @@ class NotifySlack(NotifyBase):
             )
 
         if self.mode == SlackMode.WEBHOOK:
-            return '{schema}://{botname}{token_a}/{token_b}/{token_c}/'\
-                '{targets}/?{params}'.format(
+
+            if self.api_ver == SlackAPIVersion.ONE:
+                return '{schema}://{botname}{token}/'\
+                    '{targets}/?{params}'.format(
+                        schema=self.secure_protocol,
+                        botname=botname,
+                        token='/'.join(
+                            [self.pprint(token, privacy, safe='/')
+                             for token in self.token.split('/')]),
+                        targets='/'.join(
+                            [NotifySlack.quote(x, safe='')
+                                for x in self.channels]),
+                        params=NotifySlack.urlencode(params),
+                    )
+
+            return '{schema}://{botname}{client_id}/{secret}{code}'\
+                '{targets}?{params}'.format(
                     schema=self.secure_protocol,
                     botname=botname,
-                    token_a=self.pprint(self.token_a, privacy, safe=''),
-                    token_b=self.pprint(self.token_b, privacy, safe=''),
-                    token_c=self.pprint(self.token_c, privacy, safe=''),
-                    targets='/'.join(
+                    client_id=self.pprint(self.client_id, privacy, safe='/'),
+                    secret=self.pprint(self.secret, privacy, safe=''),
+                    code='' if not self.code else '/' + self.pprint(
+                        self.code, privacy, safe=''),
+                    targets=('/' + '/'.join(
                         [NotifySlack.quote(x, safe='')
-                            for x in self.channels]),
+                            for x in self.channels])) if self.channels else '',
                     params=NotifySlack.urlencode(params),
                 )
+
         # else -> self.mode == SlackMode.BOT:
         return '{schema}://{botname}{access_token}/{targets}/'\
             '?{params}'.format(
                 schema=self.secure_protocol,
                 botname=botname,
-                access_token=self.pprint(self.access_token, privacy, safe=''),
+                access_token=self.pprint(self.access_token, privacy, safe='/'),
                 targets='/'.join(
                     [NotifySlack.quote(x, safe='') for x in self.channels]),
                 params=NotifySlack.urlencode(params),
@@ -1098,48 +1257,79 @@ class NotifySlack(NotifyBase):
             return results
 
         # The first token is stored in the hostname
-        token = NotifySlack.unquote(results['host'])
+        results['targets'] = re.split(
+            r'[\s/]+', NotifySlack.unquote(results['host'])) \
+            if results['host'] else []
 
         # Get unquoted entries
-        entries = NotifySlack.split_path(results['fullpath'])
+        results['targets'] += NotifySlack.split_path(results['fullpath'])
 
-        # Verify if our token_a us a bot token or part of a webhook:
-        if token.startswith('xo'):
-            # We're dealing with a bot
-            results['access_token'] = token
+        # Support Slack API Version
+        if 'ver' in results['qsd'] and len(results['qsd']['ver']):
+            results['ver'] = results['qsd']['ver']
 
-        else:
-            # We're dealing with a webhook
-            results['token_a'] = token
-            results['token_b'] = entries.pop(0) if entries else None
-            results['token_c'] = entries.pop(0) if entries else None
+        # Get our values if defined
+        if 'client_id' in results['qsd'] and len(results['qsd']['client_id']):
+            # We're dealing with a Slack v2 API
+            results['client_id'] = results['qsd']['client_id']
 
-        # assign remaining entries to the channels we wish to notify
-        results['targets'] = entries
+        if 'secret' in results['qsd'] and len(results['qsd']['secret']):
+            # We're dealing with a Slack v2 API
+            results['secret'] = results['qsd']['secret']
 
-        # Support the token flag where you can set it to the bot token
-        # or the webhook token (with slash delimiters)
+        if 'code' in results['qsd'] and len(results['qsd']['code']):
+            # We're dealing with a Slack v2 API
+            results['code'] = results['qsd']['code']
+
         if 'token' in results['qsd'] and len(results['qsd']['token']):
-            # Break our entries up into a list; we can ue the Channel
-            # list delimiter above since it doesn't contain any characters
-            # we don't otherwise accept anyway in our token
-            entries = [x for x in filter(
-                bool, CHANNEL_LIST_DELIM.split(
-                    NotifySlack.unquote(results['qsd']['token'])))]
-
+            # We're dealing with a Slack v1 API
+            token = NotifySlack.unquote(results['qsd']['token']).strip('/')
             # check to see if we're dealing with a bot/user token
-            if entries and entries[0].startswith('xo'):
+            if token.startswith('xo'):
                 # We're dealing with a bot
-                results['access_token'] = entries[0]
-                results['token_a'] = None
-                results['token_b'] = None
-                results['token_c'] = None
+                results['access_token'] = token
+                results['token'] = None
 
             else:  # Webhook
                 results['access_token'] = None
-                results['token_a'] = entries.pop(0) if entries else None
-                results['token_b'] = entries.pop(0) if entries else None
-                results['token_c'] = entries.pop(0) if entries else None
+                results['token'] = token
+
+        # Verify if our token is a bot token or part of a webhook:
+        if not (results.get('token') or results.get('access_token')
+                or 'client_id' in results or 'secret' in results
+                or 'code' in results) and results['targets'] \
+                and results['targets'][0].startswith('xo'):
+
+            # We're dealing with a bot
+            results['access_token'] = results['targets'].pop(0)
+            results['token'] = None
+
+        elif 'client_id' not in results and results['targets'] \
+                and CLIENT_ID_RE.match(results['targets'][0]):
+            # Store our Client ID
+            results['client_id'] = results['targets'].pop(0)
+
+        else:  # parse token from URL if present
+            match = WEBHOOK_RE.match(url)
+            if match:
+                results['access_token'] = None
+                results['token'] = match.group('webhook')
+                # Eliminate webhook entries
+                results['targets'] = results['targets'][3:]
+
+        # We have several entries on our URL and we don't know where they
+        # go. They could also be channels/users/emails
+        if 'client_id' in results and 'secret' not in results:
+            # Acquire secret
+            results['secret'] = \
+                results['targets'].pop(0) if results['targets'] else None
+
+        if 'secret' in results and 'code' not in results \
+                and results['targets'] and \
+                CODE_RE.match(results['targets'][0]):
+
+            # Acquire our code
+            results['code'] = results['targets'].pop(0)
 
         # Support the 'to' variable so that we can support rooms this way too
         # The 'to' makes it easier to use yaml configuration
@@ -1150,7 +1340,8 @@ class NotifySlack(NotifyBase):
 
         # Get Image Flag
         results['include_image'] = \
-            parse_bool(results['qsd'].get('image', True))
+            parse_bool(results['qsd'].get(
+                'image', NotifySlack.template_args['image']['default']))
 
         # Get Payload structure (use blocks?)
         if 'blocks' in results['qsd'] and len(results['qsd']['blocks']):
@@ -1158,21 +1349,22 @@ class NotifySlack(NotifyBase):
 
         # Get Footer Flag
         results['include_footer'] = \
-            parse_bool(results['qsd'].get('footer', True))
+            parse_bool(results['qsd'].get(
+                'footer', NotifySlack.template_args['footer']['default']))
 
         return results
 
     @staticmethod
     def parse_native_url(url):
         """
-        Support https://hooks.slack.com/services/TOKEN_A/TOKEN_B/TOKEN_C
+        Legacy Support https://hooks.slack.com/services/TOKEN_A/TOKEN_B/TOKEN_C
         """
 
         result = re.match(
             r'^https?://hooks\.slack\.com/services/'
-            r'(?P<token_a>[A-Z0-9]+)/'
-            r'(?P<token_b>[A-Z0-9]+)/'
-            r'(?P<token_c>[A-Z0-9]+)/?'
+            r'(?P<token_a>[a-z0-9]+)/'
+            r'(?P<token_b>[a-z0-9]+)/'
+            r'(?P<token_c>[a-z0-9]+)/?'
             r'(?P<params>\?.+)?$', url, re.I)
 
         if result:
@@ -1182,7 +1374,7 @@ class NotifySlack(NotifyBase):
                     token_a=result.group('token_a'),
                     token_b=result.group('token_b'),
                     token_c=result.group('token_c'),
-                    params='' if not result.group('params')
-                    else result.group('params')))
+                    params='?ver=1' if not result.group('params')
+                    else result.group('params') + '&ver=1'))
 
         return None
