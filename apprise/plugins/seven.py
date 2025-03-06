@@ -34,9 +34,8 @@ import requests
 import json
 from .base import NotifyBase
 from ..common import NotifyType
-from ..utils.parse import is_phone_no, parse_phone_no
+from ..utils.parse import is_phone_no, parse_phone_no, parse_bool
 from ..locale import gettext_lazy as _
-
 
 class NotifySeven(NotifyBase):
     """
@@ -108,9 +107,14 @@ class NotifySeven(NotifyBase):
         'from': {
             'alias_of': 'source',
         },
+        'flash': {
+            'name': _('Flash'),
+            'type': 'bool',
+            'default': False,
+        },
     })
 
-    def __init__(self, apikey, targets=None, source=None, **kwargs):
+    def __init__(self, apikey, targets=None, source=None, flash=None, **kwargs):
         """
         Initialize Seven Object
         """
@@ -125,6 +129,8 @@ class NotifySeven(NotifyBase):
 
         self.source = None \
             if not isinstance(source, str) else source.strip()
+        self.flash = self.template_args['flash']['default'] \
+            if flash is None else bool(flash)
 
         # Parse our targets
         self.targets = list()
@@ -179,6 +185,8 @@ class NotifySeven(NotifyBase):
         }
         if self.source:
             payload['from'] = self.source
+        if self.flash:
+            payload['flash'] = self.flash
         # Create a copy of the targets list
         targets = list(self.targets)
         while len(targets):
@@ -263,7 +271,9 @@ class NotifySeven(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
-        params = {}
+        params = {
+            'flash': 'yes' if self.flash else 'no',
+        }
         if self.source:
             params['from'] = self.source
 
@@ -317,5 +327,8 @@ class NotifySeven(NotifyBase):
         elif 'source' in results['qsd'] and len(results['qsd']['source']):
             results['source'] = \
                 NotifySeven.unquote(results['qsd']['source'])
+
+        results['flash'] = \
+            parse_bool(results['qsd'].get('flash', False))
 
         return results

@@ -85,6 +85,14 @@ apprise_url_tests = (
         # valid number, utilizing the optional source= variable (same as from)
         'instance': NotifySeven,
     }),
+    ('seven://{}/15551232000?from=apprise&flash=true'.format('3' * 14), {
+        # valid number, utilizing the optional from= variable
+        'instance': NotifySeven,
+    }),
+    ('seven://{}/15551232000?source=apprise&flash=true'.format('3' * 14), {
+        # valid number, utilizing the optional source= variable (same as from)
+        'instance': NotifySeven,
+    }),
 )
 
 
