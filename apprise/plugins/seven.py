@@ -37,6 +37,7 @@ from ..common import NotifyType
 from ..utils.parse import is_phone_no, parse_phone_no, parse_bool
 from ..locale import gettext_lazy as _
 
+
 class NotifySeven(NotifyBase):
     """
     A wrapper for seven Notifications
@@ -114,7 +115,8 @@ class NotifySeven(NotifyBase):
         },
     })
 
-    def __init__(self, apikey, targets=None, source=None, flash=None, **kwargs):
+    def __init__(self, apikey, targets=None, source=None, flash=None,
+                 **kwargs):
         """
         Initialize Seven Object
         """
