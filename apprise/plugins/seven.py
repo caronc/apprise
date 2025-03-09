@@ -34,7 +34,7 @@ import requests
 import json
 from .base import NotifyBase
 from ..common import NotifyType
-from ..utils.parse import is_phone_no, parse_phone_no
+from ..utils.parse import is_phone_no, parse_phone_no, parse_bool
 from ..locale import gettext_lazy as _
 
 
@@ -88,7 +88,7 @@ class NotifySeven(NotifyBase):
         'targets': {
             'name': _('Targets'),
             'type': 'list:string',
-        }
+        },
     })
 
     # Define our template arguments
@@ -96,9 +96,27 @@ class NotifySeven(NotifyBase):
         'to': {
             'alias_of': 'targets',
         },
+        'source': {
+            # Originating address,In cases where the rewriting of the sender's
+            # address is supported or permitted by the SMS-C. This is used to
+            # transmit the message, this number is transmitted as the
+            # originating address and is completely optional.
+            'name': _('Originating Address'),
+            'type': 'string',
+            'map_to': 'source',
+        },
+        'from': {
+            'alias_of': 'source',
+        },
+        'flash': {
+            'name': _('Flash'),
+            'type': 'bool',
+            'default': False,
+        },
     })
 
-    def __init__(self, apikey, targets=None, **kwargs):
+    def __init__(self, apikey, targets=None, source=None, flash=None,
+                 **kwargs):
         """
         Initialize Seven Object
         """
@@ -110,6 +128,11 @@ class NotifySeven(NotifyBase):
                   '({}) was specified.'.format(apikey)
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        self.source = None \
+            if not isinstance(source, str) else source.strip()
+        self.flash = self.template_args['flash']['default'] \
+            if flash is None else bool(flash)
 
         # Parse our targets
         self.targets = list()
@@ -162,6 +185,10 @@ class NotifySeven(NotifyBase):
             'to': None,
             'text': body,
         }
+        if self.source:
+            payload['from'] = self.source
+        if self.flash:
+            payload['flash'] = self.flash
         # Create a copy of the targets list
         targets = list(self.targets)
         while len(targets):
@@ -246,8 +273,15 @@ class NotifySeven(NotifyBase):
         Returns the URL built dynamically based on specified arguments.
         """
 
+        params = {
+            'flash': 'yes' if self.flash else 'no',
+        }
+        if self.source:
+            params['from'] = self.source
+
         # Our URL parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
+
         return '{schema}://{apikey}/{targets}/?{params}'.format(
             schema=self.secure_protocol,
             apikey=self.pprint(self.apikey, privacy, safe=''),
@@ -286,5 +320,17 @@ class NotifySeven(NotifyBase):
         if 'to' in results['qsd'] and len(results['qsd']['to']):
             results['targets'] += \
                 NotifySeven.parse_phone_no(results['qsd']['to'])
+
+        # Support the 'from' and source variable
+        if 'from' in results['qsd'] and len(results['qsd']['from']):
+            results['source'] = \
+                NotifySeven.unquote(results['qsd']['from'])
+
+        elif 'source' in results['qsd'] and len(results['qsd']['source']):
+            results['source'] = \
+                NotifySeven.unquote(results['qsd']['source'])
+
+        results['flash'] = \
+            parse_bool(results['qsd'].get('flash', False))
 
         return results

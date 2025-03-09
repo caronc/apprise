@@ -77,6 +77,22 @@ apprise_url_tests = (
         # Our call to notify() under the hood will fail
         'notify_response': False,
     }),
+    ('seven://{}/15551232000?from=apprise'.format('3' * 14), {
+        # valid number, utilizing the optional from= variable
+        'instance': NotifySeven,
+    }),
+    ('seven://{}/15551232000?source=apprise'.format('3' * 14), {
+        # valid number, utilizing the optional source= variable (same as from)
+        'instance': NotifySeven,
+    }),
+    ('seven://{}/15551232000?from=apprise&flash=true'.format('3' * 14), {
+        # valid number, utilizing the optional from= variable
+        'instance': NotifySeven,
+    }),
+    ('seven://{}/15551232000?source=apprise&flash=true'.format('3' * 14), {
+        # valid number, utilizing the optional source= variable (same as from)
+        'instance': NotifySeven,
+    }),
 )
 
 
