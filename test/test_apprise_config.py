@@ -895,6 +895,28 @@ include strict://{}""".format(str(cfg04), str(cfg04), str(cfg04)))
     assert len(ac.servers()) == 3
 
 
+def test_apprise_config_file_loading(tmpdir):
+    """
+    API: AppriseConfig() URL Testing
+
+    """
+
+    config_path = tmpdir / "apprise.yml"
+
+    # Create a temporary config file
+    config_path.write("urls:\n      - json://localhost")
+
+    # Flow from README.md
+    ap = Apprise()
+    ap.add('xml://localhost')
+    config = AppriseConfig()
+    config.add(str(config_path))
+    ap.add(config)
+
+    # Using urls()
+    assert len(ap.urls()) == 2
+
+
 def test_apprise_config_matrix_load():
     """
     API: AppriseConfig() matrix initialization
