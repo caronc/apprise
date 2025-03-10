@@ -759,7 +759,14 @@ class Apprise:
         """
         Returns all of the loaded URLs defined in this apprise object.
         """
-        return [x.url(privacy=privacy) for x in self.servers]
+        urls = []
+        for s in self.servers:
+            if isinstance(s, (ConfigBase, AppriseConfig)):
+                for _s in s.servers():
+                    urls.append(_s.url(privacy=privacy))
+            else:
+                urls.append(s.url(privacy=privacy))
+        return urls
 
     def pop(self, index):
         """
