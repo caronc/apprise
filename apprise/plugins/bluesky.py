@@ -31,7 +31,7 @@
 # 3. Generate an App Password.  Optionally grant yourself access to Direct
 #    Messages if you want to be able to send them
 # 4. Assemble your Apprise URL like:
-#       bluesky://you-token-here
+#       bluesky://handle@you-token-here
 #
 import re
 import requests
