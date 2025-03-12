@@ -113,10 +113,14 @@ class NotifySeven(NotifyBase):
             'type': 'bool',
             'default': False,
         },
+        'label': {
+            'name': _('Label'),
+            'type': 'string'
+        },
     })
 
     def __init__(self, apikey, targets=None, source=None, flash=None,
-                 **kwargs):
+                 label=None, **kwargs):
         """
         Initialize Seven Object
         """
@@ -133,6 +137,8 @@ class NotifySeven(NotifyBase):
             if not isinstance(source, str) else source.strip()
         self.flash = self.template_args['flash']['default'] \
             if flash is None else bool(flash)
+        self.label = None \
+            if not isinstance(label, str) else label.strip()
 
         # Parse our targets
         self.targets = list()
@@ -154,7 +160,7 @@ class NotifySeven(NotifyBase):
     def url_identifier(self):
         """
         Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
+        another similar one. Targets or end points should never be identified
         here.
         """
         return (self.secure_protocol, self.apikey)
@@ -189,6 +195,8 @@ class NotifySeven(NotifyBase):
             payload['from'] = self.source
         if self.flash:
             payload['flash'] = self.flash
+        if self.label:
+            payload['label'] = self.label
         # Create a copy of the targets list
         targets = list(self.targets)
         while len(targets):
@@ -278,6 +286,8 @@ class NotifySeven(NotifyBase):
         }
         if self.source:
             params['from'] = self.source
+        if self.label:
+            params['label'] = self.label
 
         # Our URL parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
@@ -332,5 +342,7 @@ class NotifySeven(NotifyBase):
 
         results['flash'] = \
             parse_bool(results['qsd'].get('flash', False))
+        results['label'] = \
+            results['qsd'].get('label', None)
 
         return results
