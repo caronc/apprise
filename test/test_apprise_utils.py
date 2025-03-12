@@ -1536,6 +1536,66 @@ def test_is_email():
     assert 'a-z0-9_!#$%&*/=?%`{|}~^.-' == results['user']
 
 
+def test_is_domain_service_target():
+    """
+    API: is_domain_service_target() function
+
+    """
+    # Invalid information
+    assert utils.parse.is_domain_service_target(None) is False
+    assert utils.parse.is_domain_service_target(42) is False
+    assert utils.parse.is_domain_service_target(object) is False
+    assert utils.parse.is_domain_service_target('') is False
+    assert utils.parse.is_domain_service_target('+()') is False
+    assert utils.parse.is_domain_service_target('+') is False
+
+    # Valid entries
+    result = utils.parse.is_domain_service_target('service')
+    assert isinstance(result, dict)
+    assert 'service' == result['service']
+    # Default domain
+    assert 'notify' == result['domain']
+    assert isinstance(result['targets'], list)
+    assert len(result['targets']) == 0
+
+    result = utils.parse.is_domain_service_target('domain.service')
+    assert isinstance(result, dict)
+    assert 'service' == result['service']
+    assert 'domain' == result['domain']
+    assert isinstance(result['targets'], list)
+    assert len(result['targets']) == 0
+
+    result = utils.parse.is_domain_service_target('domain.service:target')
+    assert isinstance(result, dict)
+    assert 'service' == result['service']
+    assert 'domain' == result['domain']
+    assert isinstance(result['targets'], list)
+    assert len(result['targets']) == 1
+    assert result['targets'][0] == 'target'
+
+    result = utils.parse.is_domain_service_target('domain.service:t1,t2,t3')
+    assert isinstance(result, dict)
+    assert 'service' == result['service']
+    assert 'domain' == result['domain']
+    assert isinstance(result['targets'], list)
+    assert len(result['targets']) == 3
+    assert 't1' in result['targets']
+    assert 't2' in result['targets']
+    assert 't3' in result['targets']
+
+    result = utils.parse.is_domain_service_target(
+        'service:t1,t2,t3', domain='new_default')
+    assert isinstance(result, dict)
+    assert 'service' == result['service']
+    # Default domain
+    assert 'new_default' == result['domain']
+    assert isinstance(result['targets'], list)
+    assert len(result['targets']) == 3
+    assert 't1' in result['targets']
+    assert 't2' in result['targets']
+    assert 't3' in result['targets']
+
+
 def test_is_call_sign_no():
     """
     API: is_call_sign() function
@@ -1551,8 +1611,6 @@ def test_is_call_sign_no():
     assert utils.parse.is_call_sign('abc') is False
     assert utils.parse.is_call_sign('+()') is False
     assert utils.parse.is_call_sign('+') is False
-    assert utils.parse.is_call_sign(None) is False
-    assert utils.parse.is_call_sign(42) is False
 
     # To short or 2 long
     assert utils.parse.is_call_sign('DF1AB') is False
@@ -1726,6 +1784,57 @@ def test_parse_call_sign():
     assert len(results) == 2
     assert '0A1DEF' in results
     assert 'DF1ABC' in results
+
+
+def test_parse_domain_service_targets():
+    """utils: parse_domain_service_targets() testing """
+
+    results = utils.parse.parse_domain_service_targets('')
+    assert isinstance(results, list)
+    assert len(results) == 0
+
+    results = utils.parse.parse_domain_service_targets('service1 service2')
+    assert isinstance(results, list)
+    assert len(results) == 2
+    assert 'service1' in results
+    assert 'service2' in results
+
+    results = utils.parse.parse_domain_service_targets(
+        'service1:target1,target2')
+    assert isinstance(results, list)
+    assert len(results) == 1
+    assert 'service1:target1,target2' in results
+
+    results = utils.parse.parse_domain_service_targets(
+        'service1:target1,target2 service2 domain.service3')
+    assert isinstance(results, list)
+    assert len(results) == 3
+    assert 'service1:target1,target2' in results
+    assert 'service2' in results
+    assert 'domain.service3' in results
+
+    # Support a comma in the space between entries
+    results = utils.parse.parse_domain_service_targets(
+        'service1:target1,target2, service2 ,domain.service3,'
+        '    ,  , service4')
+    assert isinstance(results, list)
+    assert len(results) == 4
+    assert 'service1:target1,target2' in results
+    assert 'service2' in results
+    assert 'domain.service3' in results
+    assert 'service4' in results
+
+    results = utils.parse.parse_domain_service_targets(
+        'service:target1,target2')
+    assert isinstance(results, list)
+    assert len(results) == 1
+    assert 'service:target1,target2' in results
+
+    # Handle unparseables
+    results = utils.parse.parse_domain_service_targets(
+        ': %invalid ^entries%', store_unparseable=False)
+    assert isinstance(results, list)
+    assert len(results) == 0
 
 
 def test_parse_phone_no():
