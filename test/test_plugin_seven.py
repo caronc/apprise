@@ -93,6 +93,10 @@ apprise_url_tests = (
         # valid number, utilizing the optional source= variable (same as from)
         'instance': NotifySeven,
     }),
+    ('seven://{}/15551232000?source=AR&flash=1&label=123'.format('3' * 14), {
+        # valid number, utilizing the optional source= variable (same as from)
+        'instance': NotifySeven,
+    }),
 )
 
 
