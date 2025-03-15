@@ -205,6 +205,10 @@ class NotifyMattermost(NotifyBase):
         # Set our user
         payload['username'] = self.user if self.user else self.app_id
 
+        port = ''
+        if self.port is not None:
+            port = ':{}'.format(self.port)
+
         # For error tracking
         has_error = False
 
@@ -215,8 +219,8 @@ class NotifyMattermost(NotifyBase):
             if channel:
                 payload['channel'] = channel
 
-            url = '{}://{}:{}{}/hooks/{}'.format(
-                self.schema, self.host, self.port,
+            url = '{}://{}{}{}/hooks/{}'.format(
+                self.schema, self.host, port,
                 self.fullpath.rstrip('/'), self.token)
 
             self.logger.debug('Mattermost POST URL: %s (cert_verify=%r)' % (
