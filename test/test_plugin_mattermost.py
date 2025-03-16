@@ -200,6 +200,7 @@ def test_plugin_mattermost_channels(request_mock):
     assert posted_json['channel'] == 'two'
     assert posted_json['text'] == 'title\r\nbody'
 
+
 def test_mattermost_post_default_port(request_mock):
     # Test token
     token = 'token'
