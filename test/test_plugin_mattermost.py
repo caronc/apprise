@@ -199,3 +199,28 @@ def test_plugin_mattermost_channels(request_mock):
     assert posted_json['username'] == 'user1'
     assert posted_json['channel'] == 'two'
     assert posted_json['text'] == 'title\r\nbody'
+
+
+def test_mattermost_post_default_port(request_mock):
+    # Test token
+    token = 'token'
+
+    # Instantiate our URL
+    obj = Apprise.instantiate(
+        'mmosts://mattermost.example.com/{token}'.format(
+            token=token)
+    )
+
+    assert isinstance(obj, NotifyMattermost)
+    assert obj.notify(body="body", title='title') is True
+
+    # Make sure we don't use port if not provided
+    assert request_mock.called is True
+    assert request_mock.call_count == 1
+    assert request_mock.call_args_list[0][0][0].startswith(
+        'https://mattermost.example.com/hooks/token')
+
+    # Our Posted JSON Object
+    posted_json = json.loads(request_mock.call_args_list[0][1]['data'])
+    assert 'text' in posted_json
+    assert posted_json['text'] == 'title\r\nbody'
