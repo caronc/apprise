@@ -521,10 +521,12 @@ def test_plugin_twitter_edge_cases():
     )
 
     # Invalid Target User
-    with pytest.raises(TypeError):
-        NotifyTwitter(
-            ckey='value', csecret='value', akey='value', asecret='value',
-            targets='%G@rB@g3')
+    obj = NotifyTwitter(
+        ckey='value', csecret='value', akey='value', asecret='value',
+        targets='%G@rB@g3')
+
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is False
 
 
 def test_plugin_twitter_dm_caching(

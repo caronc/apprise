@@ -268,9 +268,7 @@ class NotifyTwitter(NotifyBase):
             # and we failed to load any of them.  Since it's also valid to
             # notify no one at all (which means we notify ourselves), it's
             # important we don't switch from the users original intentions
-            msg = 'No Twitter targets to notify.'
-            self.logger.warning(msg)
-            raise TypeError(msg)
+            self.targets = None
 
         # Initialize our cache values
         self._whoami_cache = None
@@ -283,6 +281,10 @@ class NotifyTwitter(NotifyBase):
         """
         Perform Twitter Notification
         """
+
+        if self.targets is None:
+            self.logger.warning('No valid Twitter targets to notify.')
+            return False
 
         # Build a list of our attachments
         attachments = []
@@ -815,7 +817,7 @@ class NotifyTwitter(NotifyBase):
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         return '{schema}://{ckey}/{csecret}/{akey}/{asecret}' \
-            '/{targets}/?{params}'.format(
+            '/{targets}?{params}'.format(
                 schema=self.secure_protocol[0],
                 ckey=self.pprint(self.ckey, privacy, safe=''),
                 csecret=self.pprint(
@@ -825,7 +827,7 @@ class NotifyTwitter(NotifyBase):
                     self.asecret, privacy, mode=PrivacyMode.Secret, safe=''),
                 targets='/'.join(
                     [NotifyTwitter.quote('@{}'.format(target), safe='@')
-                     for target in self.targets]),
+                     for target in self.targets]) if self.targets else '',
                 params=NotifyTwitter.urlencode(params))
 
     def __len__(self):
