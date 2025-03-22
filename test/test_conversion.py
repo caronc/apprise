@@ -104,6 +104,11 @@ def test_conversion_html_to_text():
                    "<a href='#'>my link</a>") == \
         "test my link"
 
+    # a with missing href entry
+    assert to_html("<span></span<<span>test</span> "
+                   "<a>my link</a>") == \
+        "test my link"
+
     # </p> missing
     assert to_html("<body><div>line 1 <b>bold</b></div>  "
                    " <a href='#'>my link</a>"
@@ -202,6 +207,126 @@ wanted."
     with pytest.raises(TypeError):
         # Invalid input
         assert to_html(object)
+
+
+def test_conversion_html_to_markdown():
+    """conversion: Test HTML to plain text
+    """
+
+    def to_markdown(body):
+        """
+        A function to simply html conversion tests
+        """
+        return convert_between(NotifyFormat.HTML, NotifyFormat.MARKDOWN, body)
+
+    assert to_markdown("No HTML code here.") == "No HTML code here."
+
+    clist = to_markdown("<ul><li>Lots and lots</li><li>of lists.</li></ul>")
+    assert "- Lots and lots" in clist
+    assert "- of lists." in clist
+
+    assert "> To be or not to be." == to_markdown(
+        "<blockquote>To be or not to be.</blockquote>")
+
+    cspace = to_markdown(
+        "<h2>Fancy heading</h2>"
+        "<p>And a paragraph too.<br>Plus line break.</p>")
+    assert "# Fancy heading" in cspace
+    assert "And a paragraph too.\nPlus line break." in cspace
+
+    assert to_markdown(
+        "<style>body { font: 200%; }</style>"
+        "<p>Some obnoxious text here.</p>") == "Some obnoxious text here."
+
+    assert to_markdown(
+        "<p>line 1</p>"
+        "<p>line 2</p>"
+        "<p>line 3</p>") == "line 1\nline 2\nline 3"
+
+    # Case sensitivity
+    assert to_markdown(
+        "<p>line 1</P>"
+        "<P>line 2</P>"
+        "<P>line 3</P>") == "line 1\nline 2\nline 3"
+
+    # double new lines (testing <br> and </br>)
+    assert to_markdown(
+        "some information<br/><br>and more information") == \
+        "some information\n\nand more information"
+
+    #
+    # Test bad tags
+    #
+
+    # first 2 entries are okay, but last will do as best as it can
+    assert to_markdown(
+        "<h1>Heading 1</h1>"
+        "<h2>Heading 2</h2>"
+        "<h3>Heading 3</h3>"
+        "<h4>Heading 4</h4>"
+        "<h5>Heading 5</h5>"
+        "<h6>Heading 6</h6>"
+        "<p>line 1</>"
+        "<p><em>line 2</em></gar>"
+        "<p>line 3>") == \
+        "# Heading 1\n## Heading 2\n### Heading 3\n" \
+        "#### Heading 4\n##### Heading 5\n###### Heading 6\n" \
+        "line 1\n*line 2*\nline 3>"
+
+    # Make sure we ignore fields that aren't important to us
+    assert to_markdown(
+        "<script>ignore this</script>"
+        "<p>line 1</p>"
+        "Another line without being enclosed") == \
+        "line 1\nAnother line without being enclosed"
+
+    # Test <code> and <pre>
+    assert to_markdown(
+        "<code>multi-line 1\nmulti-line 2</code>more content"
+        "<pre>multi-line 1\nmulti-line 2</pre>more content") == \
+        '`multi-line 1\nmulti-line 2`more content' \
+        '\n```\nmulti-line 1\nmulti-line 2\n```\nmore content'
+
+    # Test cases when there are no new lines (we're dealing with just inline
+    # entries); an empty entry as well
+    assert to_markdown("<span></span<<span>test</span> "
+                       "<a href='#'>my link</a>") == \
+           "test [my link](#)"
+
+    # </p> missing
+    assert to_markdown("<body><div>line 1 <b>bold</b></div>  "
+                       " <a href='/link'>my link</a>"
+                       "<p>3rd line</body>") == \
+           "line 1 **bold**\n[my link](/link)\n3rd line"
+
+    # <hr/> on it's own
+    assert to_markdown("<hr/>") == "---"
+    assert to_markdown("<hr>") == "---"
+
+    # We need to handle HTML Encodings
+    assert to_markdown("""
+        <html>
+            <title>ignore this entry</title>
+        <body>
+          Let&apos;s handle&nbsp;special html encoding
+          <hr/>
+        </body>
+        """) == "Let's handle special html encoding\n---"
+
+    # If you give nothing, you get nothing in return
+    assert to_markdown("") == ""
+
+    with pytest.raises(TypeError):
+        # Invalid input
+        assert to_markdown(None)
+
+    with pytest.raises(TypeError):
+        # Invalid input
+        assert to_markdown(42)
+
+    with pytest.raises(TypeError):
+        # Invalid input
+        assert to_markdown(object)
 
 
 def test_conversion_text_to():
