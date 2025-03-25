@@ -24,8 +24,7 @@ System Administrators and DevOps who wish to send a notification now no longer n
 [![Python](https://img.shields.io/pypi/pyversions/apprise.svg?style=flat-square)](https://pypi.org/project/apprise/)
 [![Build Status](https://github.com/caronc/apprise/actions/workflows/tests.yml/badge.svg)](https://github.com/caronc/apprise/actions/workflows/tests.yml)
 [![CodeCov Status](https://codecov.io/github/caronc/apprise/branch/master/graph/badge.svg)](https://codecov.io/github/caronc/apprise)
-[![Downloads](http://pepy.tech/badge/apprise)](https://pypi.org/project/apprise/)
-[![PyPi](https://img.shields.io/pepy/dt/apprise.svg?style=flat-square)](https://pypi.org/project/apprise/)
+[![PyPi Downloads](https://img.shields.io/pepy/dt/apprise.svg?style=flat-square)](https://pypi.org/project/apprise/)
 
 # Table of Contents
 <!--ts-->
