@@ -127,7 +127,7 @@ class NotifyNextcloudTalk(NotifyBase):
         super().__init__(**kwargs)
 
         if self.user is None or self.password is None:
-            msg = 'User and password have to be specified.'
+            msg = 'A NextCloudTalk User and Password must be specified.'
             self.logger.warning(msg)
             raise TypeError(msg)
 

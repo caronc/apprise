@@ -133,7 +133,7 @@ class NotifyBulkSMS(NotifyBase):
         'target_group': {
             'name': _('Target Group'),
             'type': 'string',
-            'prefix': '+',
+            'prefix': '@',
             'regex': (r'^[A-Z0-9 _-]+$', 'i'),
             'map_to': 'targets',
         },
