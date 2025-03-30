@@ -40,7 +40,7 @@ import requests
 from json import loads
 from json import dumps
 from os.path import basename
-
+from urllib.parse import quote
 from .base import NotifyBase
 from ..common import NotifyFormat
 from ..common import NotifyType
@@ -347,7 +347,10 @@ class NotifyNtfy(NotifyBase):
         self.filename = filename
 
         # A clickthrough option for notifications
-        self.click = click
+        # Support Internationalized URLs
+        self.click = None if not isinstance(click, str) else (
+            click if not any(ord(char) > 127 for char in click)
+            else quote(click, safe=':/?&=[]'))
 
         # Time delay for notifications (various string formats)
         self.delay = delay
@@ -539,7 +542,7 @@ class NotifyNtfy(NotifyBase):
             headers['X-Delay'] = self.delay
 
         if self.click is not None:
-            headers['X-Click'] = self.click
+            headers['X-Click'] = quote(self.click, safe=':/?@&=#')
 
         if self.email is not None:
             headers['X-Email'] = self.email

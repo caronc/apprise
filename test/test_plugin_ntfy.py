@@ -584,6 +584,46 @@ def test_plugin_ntfy_config_files(mock_post, mock_get):
 
 
 @mock.patch('requests.post')
+def test_plugin_ntfy_internationalized_urls(mock_post):
+    """
+    NotifyNtfy() Internationalized URL Support
+
+    """
+
+    # Prepare Mock return object
+    response = mock.Mock()
+    response.content = GOOD_RESPONSE_TEXT
+    response.status_code = requests.codes.ok
+    mock_post.return_value = response
+
+    # Our input
+    title = 'My Title'
+    body = 'My Body'
+
+    # Google Translate promised me this just says 'Apprise Example' (I hope
+    # this is the case 🙏).  Below is a URL requiring encoding so that it
+    # can be correctly passed into an http header:
+    click = 'https://通知の例'
+
+    # Prepare our object
+    obj = apprise.Apprise.instantiate(f'ntfy://ntfy.sh/topic1?click={click}')
+
+    # Send our notification
+    assert obj.notify(title=title, body=body)
+    assert mock_post.call_count == 1
+
+    assert mock_post.call_args_list[0][0][0] == 'http://ntfy.sh'
+
+    # Verify that our International URL was correctly escaped
+    assert 'https://%25E9%2580%259A%25E7%259F' \
+        '%25A5%25E3%2581%25AE%25E4%25BE%258B' in \
+        mock_post.call_args_list[0][1]['headers']['X-Click']
+
+    # Validate that we did not obstruct our URL in anyway
+    assert apprise.Apprise.instantiate(obj.url()).url() == obj.url()
+
+
+@mock.patch('requests.post')
 def test_plugin_ntfy_message_to_attach(mock_post):
     """
     NotifyNtfy() large messages converted into attachments
