@@ -1,4 +1,4 @@
-# BSD 3-Clause License
+# BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
 # Copyright (c) 2025, Chris Caron <lead2gold@gmail.com>
