@@ -102,14 +102,14 @@ apprise_url_tests = (
         'requests_response_text': 'ok',
     }),
     # You can't send to email using webhook
-    ('slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnl/user@gmail.com', {
+    ('slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/user@gmail.com', {
         'instance': NotifySlack,
         'requests_response_text': 'ok',
         # we'll have a notify response failure in this case
         'notify_response': False,
     }),
     # Specify Token on argument string (with username)
-    ('slack://bot@_/#nuxref?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnadfdajkjkfl/', {
+    ('slack://bot@_/#nuxref?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnadfdajkjkfKl/', {
         'instance': NotifySlack,
         'requests_response_text': 'ok',
     }),
@@ -452,15 +452,12 @@ def test_plugin_slack_webhook_mode(mock_request):
     mock_request.return_value.text = 'ok'
 
     # Initialize some generic (but valid) tokens
-    token_a = 'A' * 9
-    token_b = 'B' * 9
-    token_c = 'c' * 24
+    token = '{}/{}/{}'.format('A' * 9, 'B' * 9, 'c' * 24)
 
     # Support strings
     channels = 'chan1,#chan2,+BAK4K23G5,@user,,,'
 
-    obj = NotifySlack(
-        token_a=token_a, token_b=token_b, token_c=token_c, targets=channels)
+    obj = NotifySlack(token=token, targets=channels)
     assert len(obj.channels) == 4
 
     # This call includes an image with it's payload:
@@ -469,14 +466,10 @@ def test_plugin_slack_webhook_mode(mock_request):
 
     # Missing first Token
     with pytest.raises(TypeError):
-        NotifySlack(
-            token_a=None, token_b=token_b, token_c=token_c,
-            targets=channels)
+        NotifySlack(token=None)
 
     # Test include_image
-    obj = NotifySlack(
-        token_a=token_a, token_b=token_b, token_c=token_c, targets=channels,
-        include_image=True)
+    obj = NotifySlack(token=token, targets=channels, include_image=True)
 
     # This call includes an image with it's payload:
     assert obj.notify(
