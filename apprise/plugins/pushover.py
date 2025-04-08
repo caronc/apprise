@@ -380,6 +380,9 @@ class NotifyPushover(NotifyBase):
             payload['url_title'] = self.supplemental_url_title
 
         if self.notify_format == NotifyFormat.HTML:
+            # Do not escape HTML in the message as Pushover
+            # expects the text of the message to be unescaped.
+            self.notify_format = NotifyFormat.TEXT
             # https://pushover.net/api#html
             payload['html'] = 1
 
