@@ -382,7 +382,8 @@ class NotifyPushover(NotifyBase):
         if self.notify_format == NotifyFormat.HTML:
             # Do not escape HTML in the message as Pushover
             # expects the text of the message to be unescaped.
-            self.notify_format = NotifyFormat.TEXT
+            payload['message'] = convert_between(
+                NotifyFormat.HTML, NotifyFormat.TEXT, body)
             # https://pushover.net/api#html
             payload['html'] = 1
 
