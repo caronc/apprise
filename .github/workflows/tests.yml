@@ -126,7 +126,7 @@ jobs:
 
     - name: Run tests
       run: |
-        coverage run -m pytest
+        coverage run -m pytest --junitxml=test-results.xml
 
     - name: Process coverage data
       run: |
@@ -140,3 +140,10 @@ jobs:
         files: ./coverage.xml
         fail_ci_if_error: false
         token: ${{ secrets.CODECOV_TOKEN }}
+
+    - name: Upload test results
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./test-results.xml
+        fail_ci_if_error: false
+        type: test-results
