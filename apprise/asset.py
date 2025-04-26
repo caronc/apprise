@@ -149,6 +149,12 @@ class AppriseAsset:
     # if Persistent Storage was set to `memory`
     pgp_autogen = True
 
+    # Automatically generate our Privacy Enhanced Mail (PEM) keys if one isn't
+    # present and our environment configuration allows for it.
+    # For example, a case where the environment wouldn't allow for it would be
+    # if Persistent Storage was set to `memory`
+    pem_autogen = True
+
     # For more detail see CWE-312 @
     #    https://cwe.mitre.org/data/definitions/312.html
     #
