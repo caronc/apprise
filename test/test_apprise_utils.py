@@ -2752,6 +2752,30 @@ def test_cwe312_url():
         '#random') == 'slack://test@B...4/J...M/X...3/'
 
 
+def test_base64_encode_decode():
+    """
+    Utils:Base64:URLEncode & Decode
+
+    """
+    assert utils.base64.base64_urlencode(None) is None
+    assert utils.base64.base64_urlencode(42) is None
+    assert utils.base64.base64_urlencode(object) is None
+    assert utils.base64.base64_urlencode({}) is None
+    assert utils.base64.base64_urlencode("") is None
+    assert utils.base64.base64_urlencode("abc") is None
+    assert utils.base64.base64_urlencode(b"") == ''
+    assert utils.base64.base64_urlencode(b"abc") == 'YWJj'
+
+    assert utils.base64.base64_urldecode(None) is None
+    assert utils.base64.base64_urldecode(42) is None
+    assert utils.base64.base64_urldecode(object) is None
+    assert utils.base64.base64_urldecode({}) is None
+
+    assert utils.base64.base64_urldecode("abc") == b'i\xb7'
+    assert utils.base64.base64_urldecode("") == b''
+    assert utils.base64.base64_urldecode('YWJj') == b'abc'
+
+
 def test_dict_base64_codec(tmpdir):
     """
     Test encoding/decoding of base64 content
