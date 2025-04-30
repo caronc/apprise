@@ -78,7 +78,7 @@ class NotifyChanify(NotifyBase):
             'type': 'string',
             'private': True,
             'required': True,
-            'regex': (r'^[A-Z0-9_-]+$', 'i'),
+            'regex': (r'^[A-Z0-9._-]+$', 'i'),
         },
     })
 
