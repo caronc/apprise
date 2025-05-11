@@ -252,7 +252,7 @@ class NotifyZulip(NotifyBase):
 
         # prepare JSON Object
         payload = {
-            'subject': title,
+            'topic': title,
             'content': body,
         }
 
