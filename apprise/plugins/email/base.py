@@ -498,7 +498,7 @@ class NotifyEmail(NotifyBase):
 
             self.logger.trace('Login ID: {}'.format(self.user))
             if self.user and self.password:
-                # Apply Login credetials
+                # Apply Login credentials
                 self.logger.debug('Applying user credentials...')
                 socket.login(self.user, self.password)
 
@@ -588,7 +588,7 @@ class NotifyEmail(NotifyBase):
             params['smtp'] = self.smtp_host
 
         if self.secure:
-            # Mode is only requried if we're dealing with a secure connection
+            # Mode is only required if we're dealing with a secure connection
             params['mode'] = self.secure_mode
 
         if self.from_addr[0] and self.from_addr[0] != self.app_id:
@@ -677,7 +677,7 @@ class NotifyEmail(NotifyBase):
     def url_identifier(self):
         """
         Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
+        another similar one. Targets or end points should never be identified
         here.
         """
         return (
@@ -867,7 +867,7 @@ class NotifyEmail(NotifyBase):
             # Generate a host identifier (used for Message-ID Creation)
             smtp_host = from_addr[1].split('@')[1]
 
-        logger.debug('SMTP Host: {smtp_host}')
+        logger.debug(f'SMTP Host: {smtp_host}')
 
         # Create a copy of the targets list
         emails = list(to)
@@ -980,7 +980,7 @@ class NotifyEmail(NotifyBase):
                     logger.warning(msg)
                     raise AppriseEmailException(msg)
 
-                # prepare our messsage
+                # prepare our message
                 base = MIMEMultipart(
                     "encrypted", protocol="application/pgp-encrypted")
 
