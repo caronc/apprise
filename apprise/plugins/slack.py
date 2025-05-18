@@ -76,6 +76,7 @@ import re
 import requests
 from json import dumps
 from json import loads
+from json.decoder import JSONDecodeError
 from time import time
 
 from .base import NotifyBase
@@ -84,6 +85,8 @@ from ..common import NotifyType
 from ..common import NotifyFormat
 from ..utils.parse import (
     is_email, parse_bool, parse_list, validate_regex)
+from ..utils.templates import apply_template, TemplateType
+from ..apprise_attachment import AppriseAttachment
 from ..locale import gettext_lazy as _
 
 # Extend HTTP Error Messages
@@ -143,6 +146,9 @@ class NotifySlack(NotifyBase):
 
     # Support attachments
     attachment_support = True
+    # There is no reason we should exceed 35KB when reading in a JSON file.
+    # If it is more than this, then it is not accepted
+    max_slack_template_size = 35000
 
     # The maximum targets to include when doing batch transfers
     # Slack Webhook URL
@@ -276,7 +282,20 @@ class NotifySlack(NotifyBase):
             'name': _('Token'),
             'alias_of': ('access_token', 'token_a', 'token_b', 'token_c'),
         },
+        'template': {
+            'name': _('Template Path'),
+            'type': 'string',
+            'private': True,
+        },
     })
+
+    # Define our token control
+    template_kwargs = {
+        'tokens': {
+            'name': _('Template Tokens'),
+            'prefix': ':',
+        },
+    }
 
     # Formatting requirements are defined here:
     # https://api.slack.com/docs/message-formatting
@@ -314,12 +333,12 @@ class NotifySlack(NotifyBase):
 
     def __init__(self, access_token=None, token_a=None, token_b=None,
                  token_c=None, targets=None, include_image=True,
-                 include_footer=True, use_blocks=None, **kwargs):
+                 include_footer=True, use_blocks=None,
+                 template=None, tokens=None, **kwargs):
         """
         Initialize Slack Object
         """
         super().__init__(**kwargs)
-
         # Setup our mode
         self.mode = SlackMode.BOT if access_token else SlackMode.WEBHOOK
 
@@ -390,16 +409,103 @@ class NotifySlack(NotifyBase):
 
         # Place a footer with each post
         self.include_footer = include_footer
-        return
+
+        # Our template object is just an AppriseAttachment object
+        self.template = AppriseAttachment(asset=self.asset)
+        if template:
+            # Add our definition to our template
+            self.template.add(template)
+            # Enforce maximum file size
+            self.template[0].max_file_size = self.max_slack_template_size
+
+        # Template functionality
+        self.tokens = {}
+        if isinstance(tokens, dict):
+            self.tokens.update(tokens)
+
+        elif tokens:
+            msg = 'The specified Slack Template Tokens ' \
+                  '({}) are not identified as a dictionary.'.format(tokens)
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
+    def gen_content_from_template(self, body, title='', image_url=None,
+                                  notify_type=NotifyType.INFO, **kwargs):
+        """
+        This function generates our payload both if Slack uses Blocks Kit API,
+        and text.
+        """
+        template = self.template[0]
+        if not template:
+            # We could not access the attachment
+            self.logger.error(
+                'Could not access Slack template {}.'.format(
+                    template.url(privacy=True)))
+            return False
+
+        # Take a copy of our token dictionary
+        tokens = self.tokens.copy()
+
+        # Apply some defaults template values
+        tokens['app_body'] = body
+        tokens['app_title'] = title
+        tokens['app_type'] = notify_type
+        tokens['app_id'] = self.app_id
+        tokens['app_desc'] = self.app_desc
+        tokens['app_color'] = self.color(notify_type)
+        tokens['app_image_url'] = image_url
+        tokens['app_url'] = self.app_url
+
+        # If Blocks Kit API is used,
+        # we expect a JSON template
+        template_type = (TemplateType.RAW
+                         if not self.use_blocks
+                         else TemplateType.JSON)
+        tokens['app_mode'] = template_type
+        try:
+            with open(template.path, 'r') as fp:
+                content = fp.read()
+                content = apply_template(content, **tokens)
+
+        except (OSError, IOError):
+            self.logger.error(
+                'Slack template {} could not be read.'.format(
+                    template.url(privacy=True)))
+            return None
+
+        if template_type is TemplateType.RAW:
+            return content
+
+        try:
+            content = loads(content)
+        except JSONDecodeError as e:
+            self.logger.error(
+                'Slack template {} contains invalid JSON.'.format(
+                    template.url(privacy=True)))
+            self.logger.debug('JSONDecodeError: {}'.format(e))
+            return None
+
+        # Load our JSON data (if valid)
+        has_error = False
+        if 'blocks' not in content:
+            self.logger.error(
+                'Slack template {} is missing "blocks" key.'.format(
+                    template.url(privacy=True)))
+            has_error = True
+
+        return content if not has_error else None
 
     def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
              **kwargs):
         """
         Perform Slack Notification
         """
-
         # error tracking (used for function return)
         has_error = False
+
+        # Acquire our to-be footer icon if configured to do so
+        image_url = None if not self.include_image \
+            else self.image_url(notify_type)
 
         #
         # Prepare JSON Object (applicable to both WEBHOOK and BOT mode)
@@ -410,57 +516,65 @@ class NotifySlack(NotifyBase):
                 if self.notify_format == NotifyFormat.MARKDOWN \
                 else 'plain_text'
 
-            payload = {
-                'username': self.user if self.user else self.app_id,
-                'attachments': [{
-                    'blocks': [{
-                        'type': 'section',
-                        'text': {
-                            'type': _slack_format,
-                            'text': body
-                        }
-                    }],
-                    'color': self.color(notify_type),
-                }]
-            }
-
-            # Slack only accepts non-empty header sections
-            if title:
-                payload['attachments'][0]['blocks'].insert(0, {
-                    'type': 'header',
-                    'text': {
-                        'type': 'plain_text',
-                        'text': title,
-                        'emoji': True
-                    }
-                })
-
-            # Include the footer only if specified to do so
-            if self.include_footer:
-
-                # Acquire our to-be footer icon if configured to do so
-                image_url = None if not self.include_image \
-                    else self.image_url(notify_type)
-
-                # Prepare our footer based on the block structure
-                _footer = {
-                    'type': 'context',
-                    'elements': [{
-                        'type': _slack_format,
-                        'text': self.app_id
+            if not self.template:
+                payload = {
+                    'username': self.user if self.user else self.app_id,
+                    'attachments': [{
+                        'blocks': [{
+                            'type': 'section',
+                            'text': {
+                                'type': _slack_format,
+                                'text': body
+                            }
+                        }],
+                        'color': self.color(notify_type),
                     }]
                 }
 
-                if image_url:
-                    payload['icon_url'] = image_url
-
-                    _footer['elements'].insert(0, {
-                        'type': 'image',
-                        'image_url': image_url,
-                        'alt_text': notify_type
+                # Slack only accepts non-empty header sections
+                if title:
+                    payload['attachments'][0]['blocks'].insert(0, {
+                        'type': 'header',
+                        'text': {
+                            'type': 'plain_text',
+                            'text': title,
+                            'emoji': True
+                        }
                     })
 
-                payload['attachments'][0]['blocks'].append(_footer)
+                # Include the footer only if specified to do so
+                if self.include_footer:
+
+                    # Prepare our footer based on the block structure
+                    _footer = {
+                        'type': 'context',
+                        'elements': [{
+                            'type': _slack_format,
+                            'text': self.app_id
+                        }]
+                    }
+
+                    if image_url:
+                        payload['icon_url'] = image_url
+
+                        _footer['elements'].insert(0, {
+                            'type': 'image',
+                            'image_url': image_url,
+                            'alt_text': notify_type
+                        })
+
+                    payload['attachments'][0]['blocks'].append(_footer)
+
+            else:   # The case where a template is used
+                content = \
+                    self.gen_content_from_template(body, title,
+                                                   notify_type=notify_type,
+                                                   image_url=image_url,
+                                                   **kwargs)
+                payload = {
+                    'username': self.user if self.user else self.app_id,
+                    'attachments': [content]
+                }
 
         else:
             #
@@ -519,6 +633,12 @@ class NotifySlack(NotifyBase):
             title = self._re_formatting_rules.sub(  # pragma: no branch
                 lambda x: self._re_formatting_map[x.group()], title,
             )
+
+            if self.template:
+                body = self.gen_content_from_template(body, title,
+                                                      notify_type=notify_type,
+                                                      image_url=image_url,
+                                                      **kwargs)
 
             # Prepare JSON Object (applicable to both WEBHOOK and BOT mode)
             payload = {
@@ -1045,8 +1165,14 @@ class NotifySlack(NotifyBase):
             'blocks': 'yes' if self.use_blocks else 'no',
         }
 
+        if self.template:
+            params['template'] = NotifySlack.quote(
+                self.template[0].url(), safe='')
+
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+        # Store any template entries if specified
+        params.update({':{}'.format(k): v for k, v in self.tokens.items()})
 
         # Determine if there is a botname present
         botname = ''
@@ -1148,6 +1274,11 @@ class NotifySlack(NotifyBase):
                 bool, CHANNEL_LIST_DELIM.split(
                     NotifySlack.unquote(results['qsd']['to'])))]
 
+        # Template Handling
+        if 'template' in results['qsd'] and results['qsd']['template']:
+            results['template'] = \
+                NotifySlack.unquote(results['qsd']['template'])
+
         # Get Image Flag
         results['include_image'] = \
             parse_bool(results['qsd'].get('image', True))
@@ -1159,6 +1290,9 @@ class NotifySlack(NotifyBase):
         # Get Footer Flag
         results['include_footer'] = \
             parse_bool(results['qsd'].get('footer', True))
+
+        # Store our tokens
+        results['tokens'] = results['qsd:']
 
         return results
 
