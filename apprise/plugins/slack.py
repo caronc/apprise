@@ -617,14 +617,14 @@ class NotifySlack(NotifyBase):
                 # Support <url|desc>, <url> entries
                 for match in self._re_url_support.findall(body):
                     # Swap back any ampersands previously updaated
-                    url = match[1].replace('&amp;', '&')
+                    url_ = match[1].replace('&amp;', '&')
                     desc = match[2].strip()
 
                     # Update our string
                     body = re.sub(
                         re.escape(match[0]),
-                        '<{url}|{desc}>'.format(url=url, desc=desc)
-                        if desc else '<{url}>'.format(url=url),
+                        '<{url}|{desc}>'.format(url=url_, desc=desc)
+                        if desc else '<{url}>'.format(url=url_),
                         body,
                         re.IGNORECASE)
 
