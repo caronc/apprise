@@ -72,6 +72,13 @@ apprise_url_tests = (
         # configuration to load
         'notify_response': False,
     }),
+    ('vapid://user@example.com?keyfile=invalid&subfile=invalid', {
+        # Test passing keyfile and subfile on our path (even if invalid)
+        'instance': NotifyVapid,
+        # We'll fail to respond because we would not have found any
+        # configuration to load
+        'notify_response': False,
+    }),
     ('vapid://user@example.com/newuser@example.com', {
         # we don't have our subscription file or private key
         'instance': NotifyVapid,
@@ -187,19 +194,59 @@ def test_plugin_vapid_urls_with_required_assets(
             # We'll succesfully notify 2 users
             'instance': NotifyVapid,
         }),
-        ('vapid://user@example.com/default', {
+        ('vapid://user1?to=user2&from=user@example.com', {
+            # We'll succesfully notify 2 users
+            'instance': NotifyVapid,
+        }),
+        ('vapid://?to=user2&from=user@example.com', {
+            # No host provided
+            'instance': NotifyVapid,
+        }),
+        ('vapid://user@example.com?to=user2&from=user@example.com', {
+            # We'll succesfully notify 2 users
+            'instance': NotifyVapid,
+        }),
+        ('vapid://user@example.com/user1?to=user2&ttl=15', {
+            # test ttl
+            'instance': NotifyVapid,
+        }),
+        ('vapid://user@example.com/user1?to=user2&ttl=', {
+            # test ttl
+            'instance': NotifyVapid,
+        }),
+        ('vapid://user@example.com/user1?to=user2&ttl=invalid', {
+            # test ttl
+            'instance': NotifyVapid,
+        }),
+        ('vapid://user@example.com/user1?to=user2&ttl=-4000', {
+            # bad ttl
+            'instance': TypeError,
+        }),
+        ('vapid://user@example.com/user1?to=user2&mode=edge', {
+            # test mode
+            'instance': NotifyVapid,
+        }),
+        ('vapid://user@example.com/user1?to=user2&mode=', {
+            # test mode
+            'instance': TypeError,
+        }),
+        ('vapid://user@example.com/user1?to=user2&mode=invalid', {
+            # test mode more
+            'instance': TypeError,
+        }),
+        ('vapid://user@example.com/user1', {
             'instance': NotifyVapid,
             # force a failure
             'response': False,
             'requests_response_code': requests.codes.internal_server_error,
         }),
-        ('vapid://user@example.com/newuser@example.uk', {
+        ('vapid://user@example.com/user1', {
             'instance': NotifyVapid,
             # throw a bizzare code forcing us to fail to look it up
             'response': False,
             'requests_response_code': 999,
         }),
-        ('vapid://user@example.com/newuser@example.au', {
+        ('vapid://user@example.com/user1', {
             'instance': NotifyVapid,
             # Throws a series of connection and transfer exceptions
             # when this flag is set and tests that we gracfully handle them
@@ -329,6 +376,16 @@ def test_plugin_vapid_subscription_manager(tmpdir):
     # Temporary directory
     tmpdir0 = tmpdir.mkdir('tmp00')
 
+    with pytest.raises(exception.AppriseInvalidData):
+        # An invalid object
+        smgr = WebPushSubscriptionManager()
+        smgr['abc'] = 'invalid'
+
+    with pytest.raises(exception.AppriseInvalidData):
+        # An invalid object
+        smgr = WebPushSubscriptionManager()
+        smgr += 'invalid'
+
     smgr = WebPushSubscriptionManager()
 
     assert bool(smgr) is False
@@ -352,10 +409,10 @@ def test_plugin_vapid_subscription_manager(tmpdir):
     assert bool(smgr) is True
     assert len(smgr) == 1
 
-    # indexed by value added
-    smgr['abc123'] = sub
+    # This makes a copy
+    smgr['abc'] = smgr['abc123']
     assert bool(smgr) is True
-    assert len(smgr) == 1
+    assert len(smgr) == 2
 
     assert isinstance(smgr['abc123'], WebPushSubscription)
 
@@ -377,7 +434,7 @@ def test_plugin_vapid_subscription_manager(tmpdir):
     assert smgr.load(
         os.path.join(str(tmpdir0), 'subscriptions.json')) is True
     assert bool(smgr) is True
-    assert len(smgr) == 1
+    assert len(smgr) == 2
 
     # Write over our file using the standard Subscription format
     assert smgr['abc123'].write(
@@ -388,3 +445,185 @@ def test_plugin_vapid_subscription_manager(tmpdir):
         os.path.join(str(tmpdir0), 'subscriptions.json')) is True
     assert bool(smgr) is True
     assert len(smgr) == 1
+
+    smgr.clear()
+    bad_entry = {
+        "endpoint": 'https://fcm.googleapis.com/fcm/send/abc123',
+        "keys": {
+            "p256dh": 'invalid',
+            "auth": 'garbage',
+        },
+    }
+
+    subscriptions = os.path.join(str(tmpdir0), 'subscriptions.json')
+    with open(subscriptions, 'w', encoding='utf-8') as f:
+        # A bad JSON file
+        f.write('{')
+    assert smgr.load(subscriptions) is False
+
+    with open(subscriptions, 'w', encoding='utf-8') as f:
+        # not expected dictionary
+        f.write('null')
+    assert smgr.load(subscriptions) is False
+
+    subscriptions = os.path.join(str(tmpdir0), 'subscriptions.json')
+    with open(subscriptions, 'w', encoding='utf-8') as f:
+        json.dump(bad_entry, f)
+    assert smgr.load(subscriptions) is False
+
+    # Create bad data
+    bad_data = {
+        'bad1': bad_entry,
+        'bad2': bad_entry,
+        'bad3': bad_entry,
+        'bad4': bad_entry,
+    }
+    subscriptions = os.path.join(str(tmpdir0), 'subscriptions.json')
+    with open(subscriptions, 'w', encoding='utf-8') as f:
+        json.dump(bad_data, f)
+    assert smgr.load(subscriptions) is False
+    assert smgr.load('invalid-file') is False
+
+
+@mock.patch('requests.post')
+def test_plugin_vapid_initializations(mock_post, tmpdir):
+    """
+    NotifyVapid() Initializations
+
+    """
+
+    # Assign our mock object our return value
+    okay_response = requests.Request()
+    okay_response.status_code = requests.codes.ok
+    okay_response.content = ""
+    mock_post.return_value = okay_response
+
+    # Temporary directory
+    tmpdir0 = tmpdir.mkdir('tmp00')
+
+    # Write our subfile
+    smgr = WebPushSubscriptionManager()
+    sub = {
+        "endpoint": 'https://fcm.googleapis.com/fcm/send/abc123',
+        "keys": {
+            "p256dh": 'BI2RNIK2PkeCVoEfgVQNjievBi4gWvZxMiuCpOx6K6qCO'
+                      '5caru5QCPuc-nEaLplbbFkHxTrR9YzE8ZkTjie5Fq0',
+            "auth": 'k9Xzm43nBGo=',
+        },
+    }
+    subfile = os.path.join(str(tmpdir0), 'subscriptions.json')
+    assert smgr.add(sub) is True
+    assert smgr.add(smgr['abc123']) is True
+    assert os.listdir(str(tmpdir0)) == []
+
+    with mock.patch('json.dump', side_effect=OSError):
+        # We will fial to write
+        assert smgr.write(subfile) is False
+
+    assert smgr.write(subfile) is True
+    assert os.listdir(str(tmpdir0)) == ['subscriptions.json']
+    assert isinstance(smgr.json(), str)
+
+    _asset = asset.AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir0),
+        # Auto-gen our private/public key pair
+        pem_autogen=True,
+    )
+
+    # Auto-Key Generation
+    obj = NotifyVapid(
+        'user@example.ca', targets=['abc123', ], subfile=subfile,
+        asset=_asset)
+    assert isinstance(obj, NotifyVapid)
+    # Our subscription directory + our
+    # persistent store where our keys were generated
+    assert len(os.listdir(str(tmpdir0))) == 2
+
+    # Second call re-references keys previously generated
+    obj = NotifyVapid(
+        'user@example.ca', targets=['abc123', ], subfile=subfile,
+        asset=_asset)
+    assert isinstance(obj, NotifyVapid)
+    assert isinstance(obj.url(), str)
+    assert obj.send('test') is True
+    # A second message makes no difference; what is loaded into memory is used
+    assert obj.send('test') is True
+
+    obj = NotifyVapid(
+        'user@example.ca', targets=['abc123', ], subfile='/a/bad/path',
+        asset=_asset)
+    assert isinstance(obj, NotifyVapid)
+    assert isinstance(obj.url(), str)
+    assert obj.send('test') is False
+    # A second message makes no difference; what is loaded into memory is used
+    assert obj.send('test') is False
+
+    # Detect our keyfile
+    cache_dir = [x for x in os.listdir(str(tmpdir0))
+                 if not x.endswith('subscriptions.json')][0]
+
+    # Test fixed assignment to our keyfile
+    keyfile = os.path.join(str(tmpdir0), cache_dir, 'private_key.pem')
+    assert os.path.exists(keyfile)
+    obj = NotifyVapid(
+        'user@example.ca', targets=['abc123', ], keyfile=keyfile,
+        subfile=subfile, asset=_asset)
+    assert isinstance(obj, NotifyVapid)
+    assert isinstance(obj.url(), str)
+    assert obj.send('test') is True
+    # A second message makes no difference; what is loaded into memory is used
+    assert obj.send('test') is True
+
+    # Invalid Keyfile
+    obj = NotifyVapid(
+        'user@example.ca', targets=['abc123', ], keyfile=subfile,
+        subfile=subfile, asset=_asset)
+    assert isinstance(obj, NotifyVapid)
+    assert isinstance(obj.url(), str)
+    assert obj.send('test') is False
+    # A second message makes no difference; what is loaded into memory is used
+    assert obj.send('test') is False
+
+    # AutoGen Temporary directory
+    tmpdir1 = tmpdir.mkdir('tmp01')
+    _asset2 = asset.AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir1),
+        # Auto-gen our private/public key pair
+        pem_autogen=True,
+    )
+
+    assert os.listdir(str(tmpdir1)) == []
+    obj = NotifyVapid(
+        'user@example.ca', targets=['abc123', ], keyfile=keyfile,
+        asset=_asset2)
+    assert isinstance(obj, NotifyVapid)
+    assert isinstance(obj.url(), str)
+    # We have a temporary subscription file we can use
+    assert os.listdir(str(tmpdir1)) == ['00088ad3']
+    # We will have a dud configuration file, but at least it's something
+    # to help the user with
+    assert obj.send('test') is False
+    # Second instance fails as well
+    assert obj.send('test') is False
+
+    # AutoGen Temporary directory
+    tmpdir2 = tmpdir.mkdir('tmp02')
+    _asset3 = asset.AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir2),
+        # Auto-gen our private/public key pair
+        pem_autogen=True,
+    )
+
+    # Test invalid keyfile
+    assert os.path.exists(keyfile)
+    obj = NotifyVapid(
+        'user@example.ca', targets=['abc123', ], keyfile='invalid-file',
+        subfile=subfile, asset=_asset3)
+    assert isinstance(obj, NotifyVapid)
+    assert isinstance(obj.url(), str)
+    assert obj.send('test') is False
+    # A second message makes no difference; what is loaded into memory is used
+    assert obj.send('test') is False

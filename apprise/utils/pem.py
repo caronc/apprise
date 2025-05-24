@@ -154,7 +154,7 @@ class ApprisePEMController:
         self.__private_key = None
         self.__public_key = None
 
-        if not self._prv_keyfile:
+        if not self._prv_keyfile and self._prv_keyfile.sync():
             # Early exit
             logger.error(
                 'Could not access PEM Private Key {}.'.format(path))
@@ -168,8 +168,13 @@ class ApprisePEMController:
                     backend=default_backend()
                 )
 
+        except (ValueError, TypeError):
+            logger.debug(
+                'PEM Private Key file specified is not supported (%s)',
+                type(path))
+            return False
+
         except FileNotFoundError:
-            # Generate keys
             logger.debug('PEM Private Key file not found: %s', path)
             return False
 
@@ -220,7 +225,7 @@ class ApprisePEMController:
         self.__private_key = None
         self.__public_key = None
 
-        if not self._pub_keyfile:
+        if not self._pub_keyfile and self._pub_keyfile.sync():
             # Early exit
             logger.error(
                 'Could not access PEM Public Key {}.'.format(path))
@@ -232,6 +237,12 @@ class ApprisePEMController:
                     key_file.read(),
                     backend=default_backend()
                 )
+
+        except (ValueError, TypeError):
+            logger.debug(
+                'PEM Public Key file specified is not supported (%s)',
+                type(path))
+            return False
 
         except FileNotFoundError:
             # Generate keys
@@ -433,12 +444,12 @@ class ApprisePEMController:
              if os.path.isfile(os.path.join(self.path, fname))),
             None)
 
-    def public_key(self, *names, autogen=None):
+    def public_key(self, *names, autogen=None, autodetect=True):
         """
         Opens a spcified pem public file and returns the key from it which
         is used to decrypt the message
         """
-        if self.__public_key:
+        if self.__public_key or not autodetect:
             return self.__public_key
 
         path = self.public_keyfile(*names)
@@ -448,7 +459,7 @@ class ApprisePEMController:
                 path = self.public_keyfile(*names)
                 if path:
                     # We should get a hit now
-                    return self.public_key(*names)
+                    return self.public_key(autogen=False)
 
             logger.warning('No PEM Public Key could be loaded')
             return None
@@ -459,12 +470,12 @@ class ApprisePEMController:
             # public from)
             self.private_key(names=names, autogen=autogen)) else None
 
-    def private_key(self, *names, autogen=None):
+    def private_key(self, *names, autogen=None, autodetect=True):
         """
         Opens a spcified pem private file and returns the key from it which
         is used to encrypt the message
         """
-        if self.__private_key:
+        if self.__private_key or not autodetect:
             return self.__private_key
 
         path = self.private_keyfile(*names)
@@ -474,7 +485,7 @@ class ApprisePEMController:
                 path = self.private_keyfile(*names)
                 if path:
                     # We should get a hit now
-                    return self.private_key(*names)
+                    return self.private_key(autogen=False)
 
             logger.warning('No PEM Private Key could be loaded')
             return None
@@ -737,4 +748,4 @@ class ApprisePEMController:
         """
         Returns True if at least 1 key was loaded
         """
-        return True if (self.public_key() or self.private_key()) else False
+        return True if (self.private_key() or self.public_key()) else False
