@@ -79,7 +79,7 @@ class WebPushSubscription:
             try:
                 content = json.loads(content)
 
-            except json.decoder.JSONDecodeError:
+            except (json.decoder.JSONDecodeError, TypeError, OSError):
                 # Bad data
                 return False
 
@@ -263,7 +263,7 @@ class WebPushSubscriptionManager:
                 subscription = WebPushSubscription(subscription)
 
             except AppriseInvalidData:
-                return True
+                return False
 
         if name is None:
             name = str(subscription)
@@ -337,7 +337,7 @@ class WebPushSubscriptionManager:
             # Enforce maximum file size
             attach[0].max_file_size = byte_limit
 
-        if not path:
+        if not attach.sync():
             return False
 
         try:
@@ -345,8 +345,12 @@ class WebPushSubscriptionManager:
             with open(attach[0].path, 'r', encoding='utf-8') as f:
                 content = json.load(f)
 
-        except (TypeError, OSError):
+        except (json.decoder.JSONDecodeError, TypeError, OSError):
             # Could not read
+            return False
+
+        if not isinstance(content, dict):
+            # Not a list of dictionaries
             return False
 
         # Verify if we're dealing with a single element:

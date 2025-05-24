@@ -115,8 +115,14 @@ class NotifyVapid(NotifyBase):
     # If it is more than this, then it is not accepted.
     max_vapid_subfile_size = 5242880
 
-    # The maximum length of the body
-    body_maxlen = 1024
+    # The maximum length of the messge can be 4096
+    # just choosing a safe number below this to allow for padding and
+    # encryption
+    body_maxlen = 4000
+
+    # A title can not be used for SMS Messages.  Setting this to zero will
+    # cause any title (if defined) to get placed into the message body.
+    title_maxlen = 0
 
     # Our default is to no not use persistent storage beyond in-memory
     # reference; this allows us to auto-generate our config if needed
@@ -218,12 +224,11 @@ class NotifyVapid(NotifyBase):
         # default subscriptions
         self.subscriptions = {}
         self.subscriptions_loaded = False
+        self.private_key_loaded = False
 
         # Set our Time to Live Flag
-        if ttl is None:
-            self.ttl = self.template_args['ttl']['default']
-
-        else:
+        self.ttl = self.template_args['ttl']['default']
+        if ttl is not None:
             try:
                 self.ttl = int(ttl)
 
@@ -290,9 +295,8 @@ class NotifyVapid(NotifyBase):
                     self.subscriptions.write(self.subfile):
                 self.logger.info(
                     'Vapid auto-generated %s/%s',
-                    os.path.basename(
-                        self.store.path,
-                        self.vapid_subscription_file))
+                    os.path.basename(self.store.path),
+                    self.vapid_subscription_file)
 
         # Acquire our targets for parsing
         self.targets = parse_list(targets)
@@ -306,12 +310,18 @@ class NotifyVapid(NotifyBase):
         """
         Perform Vapid Notification
         """
-
-        if not self.pem and not self.pem.load_private_key(self.keyfile):
+        if not self.private_key_loaded and ((
+                self.keyfile and not self.pem.private_key(
+                    autogen=False, autodetect=False)
+                and not self.pem.load_private_key(self.keyfile))
+                or (not self.keyfile and not self.pem)):
             self.logger.warning(
                 'Provided Vapid/WebPush (PEM) Private Key file could '
                 'not be loaded.')
+            self.private_key_loaded = True
             return False
+        else:
+            self.private_key_loaded = True
 
         if not self.targets:
             # There is no one to notify; we're done
@@ -332,26 +342,19 @@ class NotifyVapid(NotifyBase):
             self.logger.warning('Vapid could not load subscriptions')
             return False
 
-        if not self.pem:
+        if not self.pem.private_key(autogen=False, autodetect=False):
             self.logger.warning(
                 'No Vapid/WebPush (PEM) Private Key file could be loaded.')
             return False
 
         # Prepare our notify URL (based on our mode)
         notify_url = VAPID_API_LOOKUP[self.mode]
-
-        jwt_token = self.jwt_token
-        if not jwt_token:
-            self.logger.warning(
-                'A Vapid JWT Token could not be generated')
-            return False
-
         headers = {
             'User-Agent': self.app_id,
             "TTL": str(self.ttl),
             "Content-Encoding": "aes128gcm",
             "Content-Type": "application/octet-stream",
-            "Authorization": f"vapid t={jwt_token}, k={self.public_key}",
+            "Authorization": f"vapid t={self.jwt_token}, k={self.public_key}",
         }
 
         has_error = False
