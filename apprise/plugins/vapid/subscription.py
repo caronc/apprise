@@ -32,7 +32,16 @@ from ...asset import AppriseAsset
 from ...utils.base64 import base64_urldecode
 from ...exception import AppriseInvalidData
 from ...apprise_attachment import AppriseAttachment
-from cryptography.hazmat.primitives.asymmetric import ec
+
+try:
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    # Cryptography Support enabled
+    CRYPTOGRAPHY_SUPPORT = True
+
+except ImportError:
+    # Cryptography Support disabled
+    CRYPTOGRAPHY_SUPPORT = False
 
 
 class WebPushSubscription:
@@ -75,6 +84,9 @@ class WebPushSubscription:
         self.__auth = None
         self.__auth_secret = None
         self.__public_key = None
+
+        if not CRYPTOGRAPHY_SUPPORT:
+            return False
 
         if isinstance(content, str):
             try:
