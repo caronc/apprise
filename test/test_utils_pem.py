@@ -89,7 +89,8 @@ def test_utils_pem_general(tmpdir):
     assert pem_c.keygen() is True
 
     # We have 2 new key files generated
-    assert os.listdir(str(tmpdir0)) == ['public_key.pem', 'private_key.pem']
+    assert 'public_key.pem' in os.listdir(str(tmpdir0))
+    assert 'private_key.pem' in os.listdir(str(tmpdir0))
     assert pem_c.public_keyfile() is not None
     assert pem_c.public_key() is not None
     assert len(pem_c.x962_str) > 20
