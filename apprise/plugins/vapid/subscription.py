@@ -27,6 +27,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import json
+from typing import Optional, Union
 from ...asset import AppriseAsset
 from ...utils.base64 import base64_urldecode
 from ...exception import AppriseInvalidData
@@ -46,7 +47,7 @@ class WebPushSubscription:
     #         "auth": "k9Xzm43nBGo=",
     #     }
     # }
-    def __init__(self, content: str | dict | None = None):
+    def __init__(self, content: Union[str, dict, None] = None) -> None:
         """
         Prepares a webpush object provided with content
         Content can be a dictionary, or JSON String
@@ -63,7 +64,7 @@ class WebPushSubscription:
             if not self.load(content):
                 raise AppriseInvalidData('Could not load subscription')
 
-    def load(self, content: str | dict | None = None):
+    def load(self, content: Union[str, dict, None] = None) -> bool:
         """
         Performs the loading/validation of the object
         """
@@ -141,23 +142,23 @@ class WebPushSubscription:
         return True
 
     @property
-    def auth(self) -> str | None:
+    def auth(self) -> Optional[str]:
         return self.__auth if self.__public_key else None
 
     @property
-    def endpoint(self) -> str | None:
+    def endpoint(self) -> Optional[str]:
         return self.__endpoint if self.__public_key else None
 
     @property
-    def p256dh(self) -> str | None:
+    def p256dh(self) -> Optional[str]:
         return self.__p256dh if self.__public_key else None
 
     @property
-    def auth_secret(self) -> bytes | None:
+    def auth_secret(self) -> Optional[bytes]:
         return self.__auth_secret if self.__public_key else None
 
     @property
-    def public_key(self) -> ec.EllipticCurvePublicKey | None:
+    def public_key(self) -> Optional['ec.EllipticCurvePublicKey']:
         return self.__public_key
 
     @property
@@ -223,7 +224,7 @@ class WebPushSubscriptionManager:
     # the file is bad
     max_load_failure_count = 3
 
-    def __init__(self, asset=None):
+    def __init__(self, asset: Optional['AppriseAsset'] = None) -> None:
         """
         Webpush Subscription Manager
         """
@@ -235,14 +236,15 @@ class WebPushSubscriptionManager:
         self.asset = \
             asset if isinstance(asset, AppriseAsset) else AppriseAsset()
 
-    def __getitem__(self, key: str) -> int:
+    def __getitem__(self, key: str) -> WebPushSubscription:
         """
         Returns our indexed value if it exists
         """
         return self.__subscriptions[key.lower()]
 
     def __setitem__(self, name: str,
-                    subscription: WebPushSubscription | str | dict) -> None:
+                    subscription: Union[WebPushSubscription, str, dict]
+                    ) -> None:
         """
         Set's our object if possible
         """
@@ -250,9 +252,8 @@ class WebPushSubscriptionManager:
         if not self.add(subscription, name=name.lower()):
             raise AppriseInvalidData('Invalid subscription provided')
 
-    def add(self,
-            subscription: WebPushSubscription | str | dict,
-            name: str | None = None) -> bool:
+    def add(self, subscription: Union[WebPushSubscription, str, dict],
+            name: Optional[str] = None) -> bool:
         """
         Add a subscription into our manager
         """
@@ -285,8 +286,8 @@ class WebPushSubscriptionManager:
         """
         return len(self.__subscriptions)
 
-    def __iadd__(self, subscription: WebPushSubscription |
-                 str | dict) -> "WebPushSubscriptionManager":
+    def __iadd__(self, subscription: Union[WebPushSubscription, str, dict]
+                 ) -> 'WebPushSubscriptionManager':
 
         if not self.add(subscription):
             raise AppriseInvalidData('Invalid subscription provided')
