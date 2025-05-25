@@ -30,6 +30,7 @@ import os
 import json
 import base64
 import struct
+from typing import Optional
 from ..utils.base64 import base64_urlencode, base64_urldecode
 from ..apprise_attachment import AppriseAttachment
 from ..asset import AppriseAsset
@@ -494,7 +495,7 @@ class ApprisePEMController:
 
     def encrypt_webpush(self, message: str | bytes,
                         # Information required
-                        public_key: ec.EllipticCurvePublicKey,
+                        public_key: 'ec.EllipticCurvePublicKey',
                         auth_secret: bytes) -> bytes:
         """
         Encrypt a WebPush message using the recipient's public key and auth
@@ -568,7 +569,7 @@ class ApprisePEMController:
 
     def encrypt(self,
                 message: str | bytes,
-                public_key: ec.EllipticCurvePublicKey | None = None,
+                public_key: 'Optional[ec.EllipticCurvePublicKey]' = None,
                 salt: bytes | None = None) -> str | None:
         """
         Encrypts a message using the recipient's public key (or self public
