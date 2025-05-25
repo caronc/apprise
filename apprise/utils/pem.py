@@ -30,7 +30,7 @@ import os
 import json
 import base64
 import struct
-from typing import Optional
+from typing import Union, Optional
 from ..utils.base64 import base64_urlencode, base64_urldecode
 from ..apprise_attachment import AppriseAttachment
 from ..asset import AppriseAsset
@@ -87,8 +87,12 @@ class ApprisePEMController:
     # Maximum Vapid Message Size
     max_webpush_record_size = 4096
 
-    def __init__(self, path, pub_keyfile=None, prv_keyfile=None,
-                 name=None, asset=None, **kwargs):
+    def __init__(self, path: str,
+                 pub_keyfile: Optional[str] = None,
+                 prv_keyfile: Optional[str] = None,
+                 name: Optional[str] = None,
+                 asset: Optional[AppriseAsset] = None,
+                 **kwargs) -> None:
         """
         Path should be the directory keys can be written and read from such as
             <notifyobject>.store.path
@@ -124,7 +128,8 @@ class ApprisePEMController:
         else:
             self._pub_keyfile = None
 
-    def load_private_key(self, path=None, *names):
+    def load_private_key(self, path: Optional[str] = None,
+                         *names: str) -> bool:
         """
         Load Private key and from that we can prepare our public key
         """
@@ -192,7 +197,7 @@ class ApprisePEMController:
         # Load our private key
         return True if self.__private_key else False
 
-    def load_public_key(self, path=None, *names):
+    def load_public_key(self, path: Optional[str] = None, *names: str) -> bool:
         """
         Load Public key only
 
@@ -248,12 +253,12 @@ class ApprisePEMController:
         except FileNotFoundError:
             # Generate keys
             logger.debug('PEM Public Key file not found: %s', path)
-            return None
+            return False
 
         except OSError as e:
             logger.warning('Error accessing PEM Public Key file %s', path)
             logger.debug(f'I/O Exception: {e}')
-            return None
+            return False
 
         # Load our private key
         return True if self.__public_key else False
@@ -349,7 +354,7 @@ class ApprisePEMController:
             os.path.basename(pub_path))
         return True
 
-    def public_keyfile(self, *names):
+    def public_keyfile(self, *names: str) -> Optional[str]:
         """
         Returns the first match of a useable public key based names provided
         """
@@ -397,7 +402,7 @@ class ApprisePEMController:
              if os.path.isfile(os.path.join(self.path, fname))),
             None)
 
-    def private_keyfile(self, *names):
+    def private_keyfile(self, *names: str) -> Optional[str]:
         """
         Returns the first match of a useable private key based names provided
         """
@@ -445,7 +450,9 @@ class ApprisePEMController:
              if os.path.isfile(os.path.join(self.path, fname))),
             None)
 
-    def public_key(self, *names, autogen=None, autodetect=True):
+    def public_key(self, *names: str, autogen: Optional[bool] = None,
+                   autodetect: bool = True
+                   ) -> Optional['ec.EllipticCurvePublicKey']:
         """
         Opens a spcified pem public file and returns the key from it which
         is used to decrypt the message
@@ -471,7 +478,9 @@ class ApprisePEMController:
             # public from)
             self.private_key(names=names, autogen=autogen)) else None
 
-    def private_key(self, *names, autogen=None, autodetect=True):
+    def private_key(self, *names: str, autogen: Optional[bool] = None,
+                    autodetect: bool = True
+                    ) -> Optional['ec.EllipticCurvePrivateKey']:
         """
         Opens a spcified pem private file and returns the key from it which
         is used to encrypt the message
@@ -493,8 +502,7 @@ class ApprisePEMController:
 
         return self.__private_key if self.load_private_key(path) else None
 
-    def encrypt_webpush(self, message: str | bytes,
-                        # Information required
+    def encrypt_webpush(self, message: Union[str, bytes],
                         public_key: 'ec.EllipticCurvePublicKey',
                         auth_secret: bytes) -> bytes:
         """
@@ -568,9 +576,9 @@ class ApprisePEMController:
         return header
 
     def encrypt(self,
-                message: str | bytes,
+                message: Union[str, bytes],
                 public_key: 'Optional[ec.EllipticCurvePublicKey]' = None,
-                salt: bytes | None = None) -> str | None:
+                salt: Optional[bytes] = None) -> Optional[str]:
         """
         Encrypts a message using the recipient's public key (or self public
         key if none provided). Message can be str or bytes.
@@ -634,8 +642,8 @@ class ApprisePEMController:
 
     def decrypt(self,
                 encrypted_payload: str,
-                private_key: ec.EllipticCurvePrivateKey | None = None,
-                salt: bytes | None = None) -> str | None:
+                private_key: 'Optional[ec.EllipticCurvePrivateKey]' = None,
+                salt: Optional[bytes] = None) -> Optional[str]:
         """
         Decrypts a message using the provided private key or fallback to
         self's private key.
@@ -691,7 +699,7 @@ class ApprisePEMController:
         # 7. Return decoded message
         return plaintext.decode('utf-8')
 
-    def sign(self, content):
+    def sign(self, content: bytes) -> Optional[bytes]:
         """
         Sign the message using ES256 (ECDSA w/ SHA256) via private key
         """
@@ -711,7 +719,7 @@ class ApprisePEMController:
             32, byteorder='big') + s.to_bytes(32, byteorder='big')
 
     @property
-    def pub_keyfile(self):
+    def pub_keyfile(self) -> Optional[Union[str, bool]]:
         """
         Returns the Public Keyfile Path if set otherwise it returns None
         This property returns False if a keyfile was provided, but was invalid
@@ -721,9 +729,9 @@ class ApprisePEMController:
                   else self._pub_keyfile[0].path)
 
     @property
-    def prv_keyfile(self):
+    def prv_keyfile(self) -> Optional[Union[str, bool]]:
         """
-        Returns the Privat Keyfile Path if set otherwise it returns None
+        Returns the Private Keyfile Path if set otherwise it returns None
         This property returns False if a keyfile was provided, but was invalid
         """
         return None if not self._prv_keyfile \
@@ -731,7 +739,7 @@ class ApprisePEMController:
                   else self._prv_keyfile[0].path)
 
     @property
-    def x962_str(self):
+    def x962_str(self) -> str:
         """
         X962 serialization based on public key
         """
@@ -745,7 +753,7 @@ class ApprisePEMController:
             # Public Key could not be generated (public_key() returned None)
             return ''
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         """
         Returns True if at least 1 key was loaded
         """
