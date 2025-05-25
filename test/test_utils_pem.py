@@ -28,6 +28,8 @@
 
 import logging
 import os
+import sys
+import pytest
 
 from apprise import AppriseAsset
 from apprise import PersistentStoreMode
@@ -40,6 +42,8 @@ logging.disable(logging.CRITICAL)
 TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), 'var')
 
 
+@pytest.mark.skipif(
+    'cryptography' not in sys.modules, reason="Requires cryptography")
 def test_utils_pem_general(tmpdir):
     """
     Utils:PEM
@@ -97,3 +101,89 @@ def test_utils_pem_general(tmpdir):
     content = pem_c.encrypt("message")
     assert isinstance(content, str)
     assert pem_c.decrypt(content) == "message"
+
+
+@pytest.mark.skipif(
+    'cryptography' in sys.modules,
+    reason="Requires that cryptography NOT be installed")
+def test_utils_pem_general_without_c(tmpdir):
+    """
+    Utils:PEM Without cryptography
+
+    """
+
+    tmpdir0 = tmpdir.mkdir('tmp00')
+
+    # Currently no files here
+    assert os.listdir(str(tmpdir0)) == []
+
+    asset = AppriseAsset(
+        storage_mode=PersistentStoreMode.MEMORY,
+        storage_path=str(tmpdir0),
+        pem_autogen=False,
+    )
+
+    # Create a PEM Controller
+    pem_c = utils.pem.ApprisePEMController(path=None, asset=asset)
+
+    # cryptography library missing poses issues with library useage
+    with pytest.raises(utils.pem.ApprisePEMException):
+        pem_c.public_keyfile()
+
+    with pytest.raises(utils.pem.ApprisePEMException):
+        pem_c.public_key()
+
+    with pytest.raises(utils.pem.ApprisePEMException):
+        pem_c.x962_str
+
+    with pytest.raises(utils.pem.ApprisePEMException):
+        pem_c.encrypt("message")
+
+    with pytest.raises(utils.pem.ApprisePEMException):
+        pem_c.keygen()
+
+    asset = AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir0),
+        pem_autogen=False,
+    )
+
+    # No new files
+    assert os.listdir(str(tmpdir0)) == []
+
+    # Our asset is now write mode, so we will be able to generate a key
+    pem_c = utils.pem.ApprisePEMController(path=str(tmpdir0), asset=asset)
+    # Nothing to lookup
+    with pytest.raises(utils.pem.ApprisePEMException):
+        pem_c.public_keyfile()
+
+    with pytest.raises(utils.pem.ApprisePEMException):
+        pem_c.public_key()
+
+    with pytest.raises(utils.pem.ApprisePEMException):
+        pem_c.x962_str
+
+    with pytest.raises(utils.pem.ApprisePEMException):
+        pem_c.encrypt("message")
+
+    # Keys can not be generated in memory mode
+    with pytest.raises(utils.pem.ApprisePEMException):
+        pem_c.keygen()
+
+    # No files loaded
+    assert os.listdir(str(tmpdir0)) == []
+
+    with pytest.raises(utils.pem.ApprisePEMException):
+        pem_c.public_keyfile()
+
+    with pytest.raises(utils.pem.ApprisePEMException):
+        pem_c.public_key()
+
+    with pytest.raises(utils.pem.ApprisePEMException):
+        pem_c.x962_str
+
+    with pytest.raises(utils.pem.ApprisePEMException):
+        pem_c.encrypt("message")
+
+    with pytest.raises(utils.pem.ApprisePEMException):
+        pem_c.decrypt("abcd==")
