@@ -268,6 +268,11 @@ class ApprisePEMController:
         Generates a set of keys based on name configured.
         """
 
+        if not PEM_SUPPORT:
+            msg = 'PEM Support unavailable; install cryptography library'
+            logger.warning(msg)
+            raise ApprisePEMException(msg)
+
         if self._pub_keyfile or not self.path:
             logger.trace(
                 'PEM keygen disabled, reason=%s',
@@ -514,6 +519,11 @@ class ApprisePEMController:
         if isinstance(message, str):
             message = message.encode('utf-8')
 
+        if not PEM_SUPPORT:
+            msg = 'PEM Support unavailable; install cryptography library'
+            logger.warning(msg)
+            raise ApprisePEMException(msg)
+
         # 1. Generate ephemeral EC private/Public key
         ephemeral_private_key = \
             ec.generate_private_key(ec.SECP256R1(), default_backend())
@@ -584,6 +594,11 @@ class ApprisePEMController:
         key if none provided). Message can be str or bytes.
         """
 
+        if not PEM_SUPPORT:
+            msg = 'PEM Support unavailable; install cryptography library'
+            logger.warning(msg)
+            raise ApprisePEMException(msg)
+
         # 1. Handle string vs bytes input
         if isinstance(message, str):
             message = message.encode('utf-8')
@@ -650,6 +665,11 @@ class ApprisePEMController:
 
         Payload is the base64-encoded JSON from encrypt().
         """
+
+        if not PEM_SUPPORT:
+            msg = 'PEM Support unavailable; install cryptography library'
+            logger.warning(msg)
+            raise ApprisePEMException(msg)
 
         # 1. Parse input
         if isinstance(encrypted_payload, str):
