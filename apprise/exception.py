@@ -53,6 +53,14 @@ class AppriseDiskIOError(AppriseException):
         super().__init__(message, error_code=error_code)
 
 
+class AppriseInvalidData(AppriseException):
+    """
+    Thrown when bad data was passed into an internal function
+    """
+    def __init__(self, message, error_code=errno.EINVAL):
+        super().__init__(message, error_code=error_code)
+
+
 class AppriseFileNotFound(AppriseDiskIOError, FileNotFoundError):
     """
     Thrown when a persistent write occured in MEMORY mode
