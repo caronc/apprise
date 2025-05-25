@@ -30,6 +30,7 @@ import os
 import requests
 from itertools import chain
 from json import dumps
+from . import subscription
 from ..base import NotifyBase
 from ...common import NotifyType
 from ...common import NotifyImageSize
@@ -39,18 +40,6 @@ from ...utils.base64 import base64_urlencode
 from ...utils import pem as _pem
 from ...locale import gettext_lazy as _
 import time
-
-# Default our global support flag
-NOTIFY_VAPID_SUPPORT_ENABLED = False
-
-try:
-    from . import subscription
-
-    NOTIFY_VAPID_SUPPORT_ENABLED = True
-
-except ImportError:
-    # cryptography is the dependency of the .subscription library
-    pass
 
 
 class VapidPushMode:
@@ -87,7 +76,7 @@ class NotifyVapid(NotifyBase):
     A wrapper for WebPush/Vapid notifications
     """
     # Set our global enabled flag
-    enabled = NOTIFY_VAPID_SUPPORT_ENABLED and _pem.PEM_SUPPORT
+    enabled = subscription.CRYPTOGRAPHY_SUPPORT and _pem.PEM_SUPPORT
 
     requirements = {
         # Define our required packaging in order to work

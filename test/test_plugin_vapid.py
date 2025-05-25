@@ -27,6 +27,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import os
+import sys
 import json
 import requests
 import pytest
@@ -152,6 +153,8 @@ def subscription_reference():
     }
 
 
+@pytest.mark.skipif(
+    'cryptography' not in sys.modules, reason="Requires cryptography")
 def test_plugin_vapid_urls():
     """
     NotifyVapid() Apprise URLs - No Config
@@ -162,6 +165,8 @@ def test_plugin_vapid_urls():
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
+@pytest.mark.skipif(
+    'cryptography' not in sys.modules, reason="Requires cryptography")
 def test_plugin_vapid_urls_with_required_assets(
         patch_persistent_store_namespace, subscription_reference):
     """
@@ -257,6 +262,8 @@ def test_plugin_vapid_urls_with_required_assets(
     AppriseURLTester(tests=tests).run_all()
 
 
+@pytest.mark.skipif(
+    'cryptography' not in sys.modules, reason="Requires cryptography")
 def test_plugin_vapid_subscriptions(tmpdir):
     """
     NotifyVapid() Subscriptions
@@ -367,6 +374,28 @@ def test_plugin_vapid_subscriptions(tmpdir):
     assert os.listdir(str(tmpdir0)) == ['subscriptions.json']
 
 
+@pytest.mark.skipif(
+    'cryptography' in sys.modules,
+    reason="Requires that cryptography NOT be installed")
+def test_plugin_vapid_subscriptions_without_c():
+    """
+    NotifyVapid() Subscriptions (no Cryptography)
+
+    """
+    with pytest.raises(exception.AppriseInvalidData):
+        # A valid key that can't be loaded because crytography is missing
+        WebPushSubscription({
+            "endpoint": 'https://fcm.googleapis.com/fcm/send/abc123',
+            "keys": {
+                "p256dh": 'BI2RNIK2PkeCVoEfgVQNjievBi4gWvZxMiuCpOx6K6qCO'
+                          '5caru5QCPuc-nEaLplbbFkHxTrR9YzE8ZkTjie5Fq0',
+                "auth": 'k9Xzm43nBGo=',
+            },
+        })
+
+
+@pytest.mark.skipif(
+    'cryptography' not in sys.modules, reason="Requires cryptography")
 def test_plugin_vapid_subscription_manager(tmpdir):
     """
     NotifyVapid() Subscription Manager
@@ -485,6 +514,8 @@ def test_plugin_vapid_subscription_manager(tmpdir):
     assert smgr.load('invalid-file') is False
 
 
+@pytest.mark.skipif(
+    'cryptography' not in sys.modules, reason="Requires cryptography")
 @mock.patch('requests.post')
 def test_plugin_vapid_initializations(mock_post, tmpdir):
     """
@@ -627,3 +658,40 @@ def test_plugin_vapid_initializations(mock_post, tmpdir):
     assert obj.send('test') is False
     # A second message makes no difference; what is loaded into memory is used
     assert obj.send('test') is False
+
+
+@pytest.mark.skipif(
+    'cryptography' in sys.modules,
+    reason="Requires that cryptography NOT be installed")
+def test_plugin_vapid_initializations_without_c(tmpdir):
+    """
+    NotifyVapid() Initializations without cryptography
+
+    """
+    # Temporary directory
+    tmpdir0 = tmpdir.mkdir('tmp00')
+
+    # Write our subfile
+    smgr = WebPushSubscriptionManager()
+    sub = {
+        "endpoint": 'https://fcm.googleapis.com/fcm/send/abc123',
+        "keys": {
+            "p256dh": 'BI2RNIK2PkeCVoEfgVQNjievBi4gWvZxMiuCpOx6K6qCO'
+                      '5caru5QCPuc-nEaLplbbFkHxTrR9YzE8ZkTjie5Fq0',
+            "auth": 'k9Xzm43nBGo=',
+        },
+    }
+    subfile = os.path.join(str(tmpdir0), 'subscriptions.json')
+    assert smgr.add(sub) is False
+    _asset = asset.AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir0),
+        # Auto-gen our private/public key pair
+        pem_autogen=True,
+    )
+
+    # Auto-Key Generation
+    obj = NotifyVapid(
+        'user@example.ca', targets=['abc123', ], subfile=subfile,
+        asset=_asset)
+    assert isinstance(obj, NotifyVapid)
