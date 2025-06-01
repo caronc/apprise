@@ -125,8 +125,8 @@ def test_utils_pem_general(tmpdir):
     # Web Push handling
     webpush_content = pem_c.encrypt_webpush(
         unencrypted_str,
-        public_key = pem_c.public_key(),
-        auth_secret = b'secret')
+        public_key=pem_c.public_key(),
+        auth_secret=b'secret')
     assert isinstance(webpush_content, bytes)
 
     # Non Bytes (garbage basically)
