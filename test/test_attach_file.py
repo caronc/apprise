@@ -248,6 +248,12 @@ def test_attach_file():
 
     # Test hosted configuration and that we can't add a valid file
     aa = AppriseAttachment(location=ContentLocation.HOSTED)
+    # No entries defined yet
+    assert bool(aa) is False
+    assert aa.sync() is False
+
+    # Entry count does not impact sync if told to act that way
+    assert aa.sync(abort_if_empty=False) is True
     assert aa.add(path) is False
 
     response = AppriseAttachment.instantiate(path)

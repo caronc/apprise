@@ -29,6 +29,7 @@
 import os
 import json
 import base64
+import binascii
 import struct
 from typing import Union, Optional
 from ..utils.base64 import base64_urlencode, base64_urldecode
@@ -43,6 +44,7 @@ try:
     from cryptography.hazmat.primitives import serialization, hashes
     from cryptography.hazmat.primitives.ciphers import (
         Cipher, algorithms, modes)
+    from cryptography.exceptions import InvalidTag
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     from cryptography.hazmat.primitives.asymmetric import ec
     from cryptography.hazmat.primitives.serialization import (
@@ -160,7 +162,7 @@ class ApprisePEMController:
         self.__private_key = None
         self.__public_key = None
 
-        if not self._prv_keyfile and self._prv_keyfile.sync():
+        if not self._prv_keyfile.sync():
             # Early exit
             logger.error(
                 'Could not access PEM Private Key {}.'.format(path))
@@ -231,7 +233,7 @@ class ApprisePEMController:
         self.__private_key = None
         self.__public_key = None
 
-        if not self._pub_keyfile and self._pub_keyfile.sync():
+        if not self._pub_keyfile.sync():
             # Early exit
             logger.error(
                 'Could not access PEM Public Key {}.'.format(path))
@@ -263,7 +265,7 @@ class ApprisePEMController:
         # Load our private key
         return True if self.__public_key else False
 
-    def keygen(self, name=None, force=False):
+    def keygen(self, name: 'Optional[str]' = None, force: bool = False):
         """
         Generates a set of keys based on name configured.
         """
@@ -273,10 +275,14 @@ class ApprisePEMController:
             logger.warning(msg)
             raise ApprisePEMException(msg)
 
-        if self._pub_keyfile or not self.path:
+        # Detect if a key has been loaded or not
+        has_key = True if self.private_key(autogen=False) \
+            or self.public_key(autogen=False) else False
+
+        if (has_key and not name) or not self.path:
             logger.trace(
                 'PEM keygen disabled, reason=%s',
-                'keyfile-defined' if not self._pub_keyfile
+                'keyfile-defined' if not has_key
                 else 'no-write-path')
             return False
 
@@ -306,11 +312,18 @@ class ApprisePEMController:
         pub_path = os.path.join(self.path, f'{file_prefix}public_key.pem')
         prv_path = os.path.join(self.path, f'{file_prefix}private_key.pem')
 
-        if os.path.isfile(pub_path) and not force:
-            logger.debug(
-                'PEM generation skipped; Public Key already exists: %s',
-                pub_path)
-            return True
+        if not force:
+            if os.path.isfile(pub_path):
+                logger.debug(
+                    'PEM generation skipped; Public Key already exists: %s/%s',
+                    os.path.dirname(pub_path), os.path.basename(pub_path))
+                return False
+
+            if os.path.isfile(prv_path):
+                logger.debug(
+                    'PEM generation skipped; Private Key already exists: %s%s',
+                    os.path.dirname(prv_path), os.path.basename(prv_path))
+                return False
 
         try:
             # Write our keys to disk
@@ -352,6 +365,13 @@ class ApprisePEMController:
                 pass
 
             return False
+
+        # Update our local file references
+        self._prv_keyfile = AppriseAttachment(asset=self.asset)
+        self._prv_keyfile.add(prv_path)
+
+        self._pub_keyfile = AppriseAttachment(asset=self.asset)
+        self._pub_keyfile.add(pub_path)
 
         logger.info(
             'Wrote Public/Private PEM key pair for %s/%s',
@@ -656,7 +676,7 @@ class ApprisePEMController:
         ).decode('utf-8')
 
     def decrypt(self,
-                encrypted_payload: str,
+                encrypted_payload: Union[str, bytes],
                 private_key: 'Optional[ec.EllipticCurvePrivateKey]' = None,
                 salt: Optional[bytes] = None) -> Optional[str]:
         """
@@ -672,12 +692,25 @@ class ApprisePEMController:
             raise ApprisePEMException(msg)
 
         # 1. Parse input
-        if isinstance(encrypted_payload, str):
-            payload_bytes = base64.b64decode(encrypted_payload.encode('utf-8'))
-        else:
-            payload_bytes = base64.b64decode(encrypted_payload)
+        try:
+            if isinstance(encrypted_payload, str):
+                payload_bytes = base64.b64decode(
+                    encrypted_payload.encode('utf-8'))
 
-        payload = json.loads(payload_bytes.decode('utf-8'))
+            else:
+                payload_bytes = base64.b64decode(encrypted_payload)
+
+        except binascii.Error:
+            # Bad Padding
+            logger.debug("Unparseable encrypted content provided")
+            return None
+
+        try:
+            payload = json.loads(payload_bytes.decode('utf-8'))
+
+        except UnicodeDecodeError:
+            logger.debug("Unparseable encrypted content provided")
+            return None
 
         ephemeral_pubkey_bytes = base64_urldecode(payload["ephemeral_pubkey"])
         iv = base64_urldecode(payload["iv"])
@@ -714,7 +747,22 @@ class ApprisePEMController:
             modes.GCM(iv, tag),
         ).decryptor()
 
-        plaintext = decryptor.update(ciphertext) + decryptor.finalize()
+        try:
+            plaintext = decryptor.update(ciphertext) + decryptor.finalize()
+
+        except InvalidTag:
+            logger.debug("Decryption failed - Authentication Mismatch")
+            # Reason for Error:
+            #   - Mismatched or missing salt
+            #   - Mismatched iv, tag, or ciphertext
+            #   - Incorrect or corrupted ephemeral_pubkey
+            #   - Wrong or incomplete key derivation
+            #   - Data being altered between encryption and decryption
+            #     (truncated/corrupted)
+
+            # Basically if we get here, we tried to decrypt encrypted content
+            # using the wrong key.
+            return None
 
         # 7. Return decoded message
         return plaintext.decode('utf-8')

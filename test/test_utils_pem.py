@@ -30,6 +30,7 @@ import logging
 import os
 import sys
 import pytest
+from unittest import mock
 
 from apprise import AppriseAsset
 from apprise import PersistentStoreMode
@@ -50,6 +51,9 @@ def test_utils_pem_general(tmpdir):
 
     """
 
+    # string to manipulate/work with
+    unencrypted_str = "message"
+
     tmpdir0 = tmpdir.mkdir('tmp00')
 
     # Currently no files here
@@ -68,9 +72,11 @@ def test_utils_pem_general(tmpdir):
     assert pem_c.public_keyfile() is None
     assert pem_c.public_key() is None
     assert pem_c.x962_str == ''
-    assert pem_c.encrypt("message") is None
+    assert pem_c.decrypt(b'data') is None
+    assert pem_c.encrypt(unencrypted_str) is None
     # Keys can not be generated in memory mode
     assert pem_c.keygen() is False
+    assert pem_c.sign(b'data') is None
 
     asset = AppriseAsset(
         storage_mode=PersistentStoreMode.FLUSH,
@@ -87,20 +93,175 @@ def test_utils_pem_general(tmpdir):
     assert pem_c.public_keyfile() is None
     assert pem_c.public_key() is None
     assert pem_c.x962_str == ''
-    assert pem_c.encrypt("message") is None
+    assert pem_c.encrypt(unencrypted_str) is None
 
-    # Keys can not be generated in memory mode
+    # Generate our keys
+    assert bool(pem_c) is False
     assert pem_c.keygen() is True
+    assert bool(pem_c) is True
 
     # We have 2 new key files generated
-    assert 'public_key.pem' in os.listdir(str(tmpdir0))
-    assert 'private_key.pem' in os.listdir(str(tmpdir0))
+    pub_keyfile = os.path.join(str(tmpdir0), 'public_key.pem')
+    prv_keyfile = os.path.join(str(tmpdir0), 'private_key.pem')
+    assert os.path.isfile(pub_keyfile)
+    assert os.path.isfile(prv_keyfile)
     assert pem_c.public_keyfile() is not None
+    assert pem_c.decrypt("garbage") is None
     assert pem_c.public_key() is not None
+    assert isinstance(pem_c.x962_str, str)
     assert len(pem_c.x962_str) > 20
-    content = pem_c.encrypt("message")
+    content = pem_c.encrypt(unencrypted_str)
+    assert pem_c.decrypt(pem_c.encrypt(unencrypted_str.encode('utf-8'))) \
+        == pem_c.decrypt(pem_c.encrypt(unencrypted_str))
+    assert pem_c.decrypt(content) == unencrypted_str
     assert isinstance(content, str)
-    assert pem_c.decrypt(content) == "message"
+    assert pem_c.decrypt(content) == unencrypted_str
+    # support str as well
+    assert pem_c.decrypt(content) == unencrypted_str
+    assert pem_c.decrypt(content.encode('utf-8')) == unencrypted_str
+    # Sign test
+    assert isinstance(pem_c.sign(content.encode('utf-8')), bytes)
+
+    # Web Push handling
+    webpush_content = pem_c.encrypt_webpush(
+        unencrypted_str,
+        public_key = pem_c.public_key(),
+        auth_secret = b'secret')
+    assert isinstance(webpush_content, bytes)
+
+    # Non Bytes (garbage basically)
+    with pytest.raises(TypeError):
+        assert pem_c.decrypt(None) is None
+
+    with pytest.raises(TypeError):
+        assert pem_c.decrypt(5) is None
+
+    with pytest.raises(TypeError):
+        assert pem_c.decrypt(False) is None
+
+    with pytest.raises(TypeError):
+        assert pem_c.decrypt(object) is None
+
+    # Test our initialization
+    pem_c = utils.pem.ApprisePEMController(
+        path=None,
+        prv_keyfile='invalid',
+        asset=asset)
+    assert pem_c.private_keyfile() is False
+    assert pem_c.public_keyfile() is None
+    assert pem_c.prv_keyfile is False
+    assert pem_c.pub_keyfile is None
+    assert pem_c.private_key() is None
+    assert pem_c.public_key() is None
+    assert pem_c.decrypt(content) is None
+
+    pem_c = utils.pem.ApprisePEMController(
+        path=None,
+        pub_keyfile='invalid',
+        asset=asset)
+    assert pem_c.private_keyfile() is None
+    assert pem_c.public_keyfile() is False
+    assert pem_c.prv_keyfile is None
+    assert pem_c.pub_keyfile is False
+    assert pem_c.private_key() is None
+    assert pem_c.public_key() is None
+    assert pem_c.decrypt(content) is None
+
+    pem_c = utils.pem.ApprisePEMController(
+        path=None,
+        prv_keyfile=prv_keyfile,
+        asset=asset)
+    assert pem_c.private_keyfile() == prv_keyfile
+    assert pem_c.public_keyfile() is None
+    assert pem_c.private_key() is not None
+    assert pem_c.prv_keyfile == prv_keyfile
+    assert pem_c.pub_keyfile is None
+    assert pem_c.public_key() is not None
+    assert pem_c.decrypt(content) == unencrypted_str
+
+    pem_c = utils.pem.ApprisePEMController(
+        path=None,
+        pub_keyfile=pub_keyfile,
+        asset=asset)
+    assert pem_c.private_keyfile() is None
+    assert pem_c.public_keyfile() == pub_keyfile
+    assert pem_c.prv_keyfile is None
+    assert pem_c.pub_keyfile == pub_keyfile
+    assert pem_c.private_key() is None
+    assert pem_c.public_key() is not None
+    assert pem_c.decrypt(content) is None
+
+    # Test our path references
+    pem_c = utils.pem.ApprisePEMController(path=str(tmpdir0), asset=asset)
+    assert pem_c.load_private_key(path=None) is True
+    assert pem_c.private_keyfile() == prv_keyfile
+    assert pem_c.prv_keyfile is None
+    assert pem_c.pub_keyfile is None
+    assert pem_c.decrypt(content) == unencrypted_str
+
+    # Generate a new key referencing another location
+    pem_c = utils.pem.ApprisePEMController(
+        name='keygen-tests',
+        path=str(tmpdir0), asset=asset)
+
+    # generate ourselves some keys
+    assert pem_c.keygen() is True
+    keygen_prv_file = pem_c.prv_keyfile
+    keygen_pub_file = pem_c.pub_keyfile
+
+    # Remove 1 (but not both)
+    os.unlink(keygen_pub_file)
+
+    pem_c = utils.pem.ApprisePEMController(
+        name='keygen-tests',
+        path=str(tmpdir0), asset=asset)
+    # Private key was found, so this does not work
+    assert pem_c.keygen() is False
+    os.unlink(keygen_prv_file)
+
+    pem_c = utils.pem.ApprisePEMController(
+        name='keygen-tests',
+        path=str(tmpdir0), asset=asset)
+    # It works now
+    assert pem_c.keygen() is True
+
+    with mock.patch('builtins.open', side_effect=OSError()):
+        assert pem_c.keygen(force=True) is False
+        with mock.patch('os.unlink', side_effect=OSError()):
+            assert pem_c.keygen(force=True) is False
+
+    # Generate a new key referencing another location
+    pem_c = utils.pem.ApprisePEMController(path=str(tmpdir0), asset=asset)
+    # We can't re-generate keys if ones already exist
+    assert pem_c.keygen() is False
+    # the keygen is the big difference here
+    assert pem_c.keygen(name='test') is True
+    # under the hood, a key is not regenerated (as one already exists)
+    assert pem_c.keygen(name='test') is False
+    # Generate it a second time by force
+    assert pem_c.keygen(name='test', force=True) is True
+
+    assert pem_c.private_keyfile() == os.path.join(
+        str(tmpdir0), 'test-private_key.pem')
+    assert pem_c.public_keyfile() == os.path.join(
+        str(tmpdir0), 'test-public_key.pem')
+    assert pem_c.private_key() is not None
+    assert pem_c.public_key() is not None
+    assert pem_c.prv_keyfile == os.path.join(
+        str(tmpdir0), 'test-private_key.pem')
+    assert pem_c.pub_keyfile == os.path.join(
+        str(tmpdir0), 'test-public_key.pem')
+    # 'content' was generated using a different key and can not be
+    # decrypted
+    assert pem_c.decrypt(content) is None
+
+    # Test Decryption files
+    pem_c = utils.pem.ApprisePEMController(path=str(tmpdir0), asset=asset)
+    # Calling decrypt triggers underlining code to auto-load
+    assert pem_c.decrypt(content) == unencrypted_str
+    # Using a private key by path
+    assert pem_c.decrypt(
+        content, private_key=pem_c.private_key()) == unencrypted_str
 
 
 @pytest.mark.skipif(

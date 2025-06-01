@@ -273,14 +273,16 @@ class AppriseAttachment:
 
         return attach_plugin
 
-    def sync(self, abort_on_error=True):
+    def sync(self, abort_on_error=True, abort_if_empty=True):
         """
         Itereates over all of the attachments and retrieves them
-        if possible.
         """
         # TODO: Change this to async for future
-        return next((False for a in self.attachments if not a), True) \
-            if abort_on_error else next((True for a in self.attachments), True)
+
+        return False if abort_if_empty and not self.attachments else (
+            next((False for a in self.attachments if not a), True)
+            if abort_on_error
+            else next((True for a in self.attachments), True))
 
     def clear(self):
         """
