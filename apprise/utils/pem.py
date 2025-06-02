@@ -541,11 +541,6 @@ class ApprisePEMController:
         if isinstance(message, str):
             message = message.encode('utf-8')
 
-        if not PEM_SUPPORT:
-            msg = 'PEM Support unavailable; install cryptography library'
-            logger.warning(msg)
-            raise ApprisePEMException(msg)
-
         # 1. Generate ephemeral EC private/Public key
         ephemeral_private_key = \
             ec.generate_private_key(ec.SECP256R1(), default_backend())
