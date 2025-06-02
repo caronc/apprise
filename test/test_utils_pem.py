@@ -108,6 +108,11 @@ def test_utils_pem_general(tmpdir):
     assert pem_c.public_keyfile() is not None
     assert pem_c.decrypt("garbage") is None
     assert pem_c.public_key() is not None
+
+    # Keys used later on as ref
+    pubkey_ref = pem_c.public_key()
+    prvkey_ref = pem_c.private_key()
+
     assert isinstance(pem_c.x962_str, str)
     assert len(pem_c.x962_str) > 20
     content = pem_c.encrypt(unencrypted_str)
@@ -357,6 +362,118 @@ def test_utils_pem_general(tmpdir):
     pem_c = utils.pem.ApprisePEMController(path=str(tmpdir1), asset=asset)
     assert pem_c.public_key() is None
     assert pem_c.private_key() is None
+
+    asset = AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir1),
+        pem_autogen=True,
+    )
+    pem_c = utils.pem.ApprisePEMController(path=str(tmpdir1), asset=asset)
+    # Generate ourselves a private key
+    assert pem_c.public_key() is not None
+    assert pem_c.private_key() is not None
+    pub_keyfile = os.path.join(str(tmpdir1), 'public_key.pem')
+    prv_keyfile = os.path.join(str(tmpdir1), 'private_key.pem')
+    assert os.path.isfile(pub_keyfile)
+    assert os.path.isfile(prv_keyfile)
+
+    with open(pub_keyfile, 'w') as f:
+        f.write('garbage')
+
+    pem_c = utils.pem.ApprisePEMController(path=str(tmpdir1), asset=asset)
+    # we can still load our data as the public key is generated
+    # from the private
+    assert pem_c.public_key() is not None
+    assert pem_c.private_key() is not None
+
+    tmpdir2 = tmpdir.mkdir('tmp02')
+    pem_c = utils.pem.ApprisePEMController(path=str(tmpdir2), asset=asset)
+    pub_keyfile = os.path.join(str(tmpdir2), 'public_key.pem')
+    prv_keyfile = os.path.join(str(tmpdir2), 'private_key.pem')
+    assert not os.path.isfile(pub_keyfile)
+    assert not os.path.isfile(prv_keyfile)
+
+    #
+    # Public Key Edge Case Tests
+    #
+    with \
+        mock.patch.object(
+            pem_c, 'public_keyfile', side_effect=[None, pub_keyfile]) \
+        as mock_keyfile, \
+        mock.patch.object(
+            pem_c, 'keygen', side_effect=lambda *_, **__: setattr(
+                pem_c, '_ApprisePEMController__public_key',
+                pubkey_ref) or True) as mock_keygen, \
+        mock.patch.object(
+            pem_c, 'load_public_key', return_value=True):
+
+        result = pem_c.public_key()
+        assert result is pubkey_ref
+        assert mock_keyfile.call_count == 2
+        mock_keygen.assert_called_once()
+
+    # - First call: None → triggers keygen
+    # - Second call (recursive): None → causes fallback
+    public_keyfile_side_effect = [None, None]
+
+    with mock.patch.object(
+            pem_c, 'public_keyfile', side_effect=public_keyfile_side_effect) \
+         as mock_keyfile, \
+         mock.patch.object(pem_c, 'keygen', return_value=True) \
+         as mock_keygen, \
+         mock.patch.object(pem_c, 'load_public_key', return_value=False) \
+         as mock_load:
+
+        # Ensure no key is preset initially
+        setattr(pem_c, '_ApprisePEMController__public_key', None)
+
+        result = pem_c.public_key()
+        assert result is None
+        # Once in outer call, once in recursive
+        assert mock_keyfile.call_count == 2
+        mock_keygen.assert_called_once()
+        mock_load.assert_not_called()
+
+    #
+    # Private Key Edge Case Tests
+    #
+    with \
+        mock.patch.object(
+            pem_c, 'private_keyfile', side_effect=[None, prv_keyfile]) \
+        as mock_keyfile, \
+        mock.patch.object(
+            pem_c, 'keygen', side_effect=lambda *_, **__: setattr(
+                pem_c, '_ApprisePEMController__private_key',
+                prvkey_ref) or True) as mock_keygen, \
+        mock.patch.object(
+            pem_c, 'load_private_key', return_value=True):
+
+        result = pem_c.private_key()
+        assert result is prvkey_ref
+        assert mock_keyfile.call_count == 2
+        mock_keygen.assert_called_once()
+
+    # - First call: None → triggers keygen
+    # - Second call (recursive): None → causes fallback
+    private_keyfile_side_effect = [None, None]
+
+    with mock.patch.object(
+            pem_c, 'private_keyfile',
+            side_effect=private_keyfile_side_effect) as mock_keyfile, \
+         mock.patch.object(pem_c, 'keygen', return_value=True) \
+         as mock_keygen, \
+         mock.patch.object(pem_c, 'load_private_key', return_value=False) \
+         as mock_load:
+
+        # Ensure no key is preset initially
+        setattr(pem_c, '_ApprisePEMController__private_key', None)
+
+        result = pem_c.private_key()
+        assert result is None
+        # Once in outer call, once in recursive
+        assert mock_keyfile.call_count == 2
+        mock_keygen.assert_called_once()
+        mock_load.assert_not_called()
 
 
 @pytest.mark.skipif(

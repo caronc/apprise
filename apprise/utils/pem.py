@@ -503,7 +503,7 @@ class ApprisePEMController:
             self.load_public_key(path) or
             # Try to see if we can load a private key (which we can generate a
             # public from)
-            self.private_key(names=names, autogen=autogen)) else None
+            self.private_key(*names, autogen=autogen)) else None
 
     def private_key(self, *names: str, autogen: Optional[bool] = None,
                     autodetect: bool = True
