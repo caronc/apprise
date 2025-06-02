@@ -113,6 +113,9 @@ def test_utils_pem_general(tmpdir):
     content = pem_c.encrypt(unencrypted_str)
     assert pem_c.decrypt(pem_c.encrypt(unencrypted_str.encode('utf-8'))) \
         == pem_c.decrypt(pem_c.encrypt(unencrypted_str))
+    assert pem_c.decrypt(
+        pem_c.encrypt(unencrypted_str, public_key=pem_c.public_key())) \
+        == pem_c.decrypt(pem_c.encrypt(unencrypted_str))
     assert pem_c.decrypt(content) == unencrypted_str
     assert isinstance(content, str)
     assert pem_c.decrypt(content) == unencrypted_str
@@ -236,6 +239,8 @@ def test_utils_pem_general(tmpdir):
         assert pem_c.keygen(force=True) is False
         with mock.patch('os.unlink', side_effect=OSError()):
             assert pem_c.keygen(force=True) is False
+        with mock.patch('os.unlink', return_value=True):
+            assert pem_c.keygen(force=True) is False
 
     # Tests private key generation
     side_effect = [
@@ -245,6 +250,9 @@ def test_utils_pem_general(tmpdir):
         assert pem_c.keygen(force=True) is False
     with mock.patch('builtins.open', side_effect=side_effect):
         with mock.patch('os.unlink', side_effect=OSError()):
+            assert pem_c.keygen(force=True) is False
+    with mock.patch('builtins.open', side_effect=side_effect):
+        with mock.patch('os.unlink', return_value=True):
             assert pem_c.keygen(force=True) is False
 
     # Generate a new key referencing another location
@@ -314,6 +322,19 @@ def test_utils_pem_general(tmpdir):
         path=str(tmpdir0), name='pub2', asset=asset)
     assert pem_c.private_key(autogen=True)
 
+    #
+    # Auto key generation turned on
+    #
+    asset = AppriseAsset(
+        storage_mode=PersistentStoreMode.MEMORY,
+        storage_path=str(tmpdir0),
+        pem_autogen=True,
+    )
+    pem_c = utils.pem.ApprisePEMController(path=str(tmpdir0), asset=asset)
+    assert pem_c.load_public_key(path=pub_keyfile) is True
+    pem_c = utils.pem.ApprisePEMController(path=None, asset=asset)
+    assert pem_c.load_public_key(path=pub_keyfile) is True
+
 
 @pytest.mark.skipif(
     'cryptography' in sys.modules,
@@ -367,10 +388,10 @@ def test_utils_pem_general_without_c(tmpdir):
     pem_c = utils.pem.ApprisePEMController(path=str(tmpdir0), asset=asset)
     # Nothing to lookup
     with pytest.raises(utils.pem.ApprisePEMException):
-        pem_c.public_keyfile()
+        pem_c.private_keyfile()
 
     with pytest.raises(utils.pem.ApprisePEMException):
-        pem_c.public_key()
+        pem_c.private_key()
 
     with pytest.raises(utils.pem.ApprisePEMException):
         pem_c.x962_str
