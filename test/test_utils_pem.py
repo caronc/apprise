@@ -290,6 +290,8 @@ def test_utils_pem_general(tmpdir):
 
     # Test different edge cases of load_private_key()
     pem_c = utils.pem.ApprisePEMController(path=str(tmpdir0), asset=asset)
+    assert pem_c.load_private_key() is True
+    pem_c = utils.pem.ApprisePEMController(path=str(tmpdir0), asset=asset)
     assert pem_c.load_private_key(path=prv_keyfile) is True
     pem_c = utils.pem.ApprisePEMController(path=str(tmpdir0), asset=asset)
     with mock.patch('builtins.open', side_effect=TypeError()):
@@ -300,6 +302,8 @@ def test_utils_pem_general(tmpdir):
         assert pem_c.load_private_key(path=prv_keyfile) is False
 
     # Test different edge cases of load_public_key()
+    pem_c = utils.pem.ApprisePEMController(path=str(tmpdir0), asset=asset)
+    assert pem_c.load_public_key() is True
     pem_c = utils.pem.ApprisePEMController(path=str(tmpdir0), asset=asset)
     assert pem_c.load_public_key(path=pub_keyfile) is True
     pem_c = utils.pem.ApprisePEMController(path=str(tmpdir0), asset=asset)
@@ -334,6 +338,25 @@ def test_utils_pem_general(tmpdir):
     assert pem_c.load_public_key(path=pub_keyfile) is True
     pem_c = utils.pem.ApprisePEMController(path=None, asset=asset)
     assert pem_c.load_public_key(path=pub_keyfile) is True
+
+    tmpdir1 = tmpdir.mkdir('tmp01')
+
+    # Currently no files here
+    assert os.listdir(str(tmpdir1)) == []
+
+    asset = AppriseAsset(
+        storage_mode=PersistentStoreMode.MEMORY,
+        storage_path=str(tmpdir1),
+        pem_autogen=False,
+    )
+
+    # Auto-Gen is turned off, so weare not successful here
+    pem_c = utils.pem.ApprisePEMController(path=None, asset=asset)
+    assert pem_c.public_key() is None
+    assert pem_c.private_key() is None
+    pem_c = utils.pem.ApprisePEMController(path=str(tmpdir1), asset=asset)
+    assert pem_c.public_key() is None
+    assert pem_c.private_key() is None
 
 
 @pytest.mark.skipif(
