@@ -279,7 +279,7 @@ class ApprisePEMController:
         has_key = True if self.private_key(autogen=False) \
             or self.public_key(autogen=False) else False
 
-        if (has_key and not name) or not self.path:
+        if (has_key and not (name or force)) or not self.path:
             logger.trace(
                 'PEM keygen disabled, reason=%s',
                 'keyfile-defined' if not has_key
@@ -341,6 +341,8 @@ class ApprisePEMController:
 
             except OSError:
                 pass
+
+            return False
 
         try:
             with open(prv_path, 'wb') as f:

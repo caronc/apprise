@@ -129,6 +129,12 @@ def test_utils_pem_general(tmpdir):
         auth_secret=b'secret')
     assert isinstance(webpush_content, bytes)
 
+    webpush_content = pem_c.encrypt_webpush(
+        unencrypted_str.encode('utf-8'),
+        public_key=pem_c.public_key(),
+        auth_secret=b'secret')
+    assert isinstance(webpush_content, bytes)
+
     # Non Bytes (garbage basically)
     with pytest.raises(TypeError):
         assert pem_c.decrypt(None) is None
@@ -225,8 +231,19 @@ def test_utils_pem_general(tmpdir):
     # It works now
     assert pem_c.keygen() is True
 
+    # Tests public_key generation failure only
     with mock.patch('builtins.open', side_effect=OSError()):
         assert pem_c.keygen(force=True) is False
+        with mock.patch('os.unlink', side_effect=OSError()):
+            assert pem_c.keygen(force=True) is False
+
+    # Tests private key generation
+    side_effect = [
+        mock.mock_open(read_data="file contents").return_value] + \
+        [OSError() for _ in range(10)]
+    with mock.patch('builtins.open', side_effect=side_effect):
+        assert pem_c.keygen(force=True) is False
+    with mock.patch('builtins.open', side_effect=side_effect):
         with mock.patch('os.unlink', side_effect=OSError()):
             assert pem_c.keygen(force=True) is False
 
@@ -262,6 +279,40 @@ def test_utils_pem_general(tmpdir):
     # Using a private key by path
     assert pem_c.decrypt(
         content, private_key=pem_c.private_key()) == unencrypted_str
+
+    # Test different edge cases of load_private_key()
+    pem_c = utils.pem.ApprisePEMController(path=str(tmpdir0), asset=asset)
+    assert pem_c.load_private_key(path=prv_keyfile) is True
+    pem_c = utils.pem.ApprisePEMController(path=str(tmpdir0), asset=asset)
+    with mock.patch('builtins.open', side_effect=TypeError()):
+        assert pem_c.load_private_key(path=prv_keyfile) is False
+    with mock.patch('builtins.open', side_effect=OSError()):
+        assert pem_c.load_private_key(path=prv_keyfile) is False
+    with mock.patch('builtins.open', side_effect=FileNotFoundError()):
+        assert pem_c.load_private_key(path=prv_keyfile) is False
+
+    # Test different edge cases of load_public_key()
+    pem_c = utils.pem.ApprisePEMController(path=str(tmpdir0), asset=asset)
+    assert pem_c.load_public_key(path=pub_keyfile) is True
+    pem_c = utils.pem.ApprisePEMController(path=str(tmpdir0), asset=asset)
+    with mock.patch('builtins.open', side_effect=TypeError()):
+        assert pem_c.load_public_key(path=pub_keyfile) is False
+    with mock.patch('builtins.open', side_effect=OSError()):
+        assert pem_c.load_public_key(path=pub_keyfile) is False
+    with mock.patch('builtins.open', side_effect=FileNotFoundError()):
+        assert pem_c.load_public_key(path=pub_keyfile) is False
+
+    pem_c = utils.pem.ApprisePEMController(path=str(tmpdir0), asset=asset)
+    assert pem_c.public_keyfile('test1', 'test2') == pub_keyfile
+    assert pem_c.private_keyfile('test1', 'test2') == prv_keyfile
+
+    pem_c = utils.pem.ApprisePEMController(
+        path=str(tmpdir0), name='pub1', asset=asset)
+    assert pem_c.public_key(autogen=True)
+
+    pem_c = utils.pem.ApprisePEMController(
+        path=str(tmpdir0), name='pub2', asset=asset)
+    assert pem_c.private_key(autogen=True)
 
 
 @pytest.mark.skipif(
