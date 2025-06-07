@@ -26,16 +26,15 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-# To use this service you will need a Clickatell account to which you can get your
-# API_TOKEN at:
+# To use this service you will need a Clickatell account to which you can get
+# your API_TOKEN at:
 #     https://www.clickatell.com/
 import requests
-
+from itertools import chain
 from .base import NotifyBase
 from ..common import NotifyType
 from ..locale import gettext_lazy as _
-from ..url import PrivacyMode
-from ..utils.parse import validate_regex, parse_phone_no
+from ..utils.parse import is_phone_no, validate_regex, parse_phone_no
 
 
 class NotifyClickatell(NotifyBase):
@@ -50,18 +49,18 @@ class NotifyClickatell(NotifyBase):
     notify_url = 'https://platform.clickatell.com/messages/http/send?apiKey={}'
 
     templates = (
-        '{schema}://{api_token}/{targets}',
-        '{schema}://{api_token}@{from_phone}/{targets}',
+        '{schema}://{apikey}/{targets}',
+        '{schema}://{source}@{apikey}/{targets}',
     )
 
     template_tokens = dict(NotifyBase.template_tokens, **{
-        'api_token': {
+        'apikey': {
             'name': _('API Token'),
             'type': 'string',
             'private': True,
             'required': True,
         },
-        'from_phone': {
+        'source': {
             'name': _('From Phone No'),
             'type': 'string',
             'regex': (r'^[0-9\s)(+-]+$', 'i'),
@@ -81,33 +80,72 @@ class NotifyClickatell(NotifyBase):
     })
 
     template_args = dict(NotifyBase.template_args, **{
-        'token': {
-            'alias_of': 'api_token'
+        'apikey': {
+            'alias_of': 'apikey'
         },
         'to': {
             'alias_of': 'targets',
         },
         'from': {
-            'alias_of': 'from_phone',
+            'alias_of': 'source',
         },
     })
 
-    def __init__(self, api_token, from_phone, targets=None, **kwargs):
+    def __init__(self, apikey, source=None, targets=None, **kwargs):
         """
         Initialize Clickatell Object
         """
 
         super().__init__(**kwargs)
 
-        self.api_token = validate_regex(api_token)
-        if not self.api_token:
+        self.apikey = validate_regex(apikey)
+        if not self.apikey:
             msg = 'An invalid Clickatell API Token ' \
-                  '({}) was specified.'.format(api_token)
+                  '({}) was specified.'.format(apikey)
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        self.from_phone = validate_regex(from_phone)
-        self.targets = parse_phone_no(targets, prefix=True)
+        self.source = None
+        if source:
+            result = is_phone_no(source)
+            if not result:
+                msg = 'The Account (From) Phone # specified ' \
+                      '({}) is invalid.'.format(source)
+                self.logger.warning(msg)
+
+                raise TypeError(msg)
+
+            # Tidy source
+            self.source = result['full']
+
+        # Used for URL generation afterwards only
+        self._invalid_targets = list()
+
+        # Parse our targets
+        self.targets = list()
+
+        for target in parse_phone_no(targets, prefix=True):
+            # Validate targets and drop bad ones:
+            result = is_phone_no(target)
+            if not result:
+                self.logger.warning(
+                    'Dropped invalid phone # '
+                    '({}) specified.'.format(target),
+                )
+                self._invalid_targets.append(target)
+                continue
+
+            # store valid phone number
+            self.targets.append(result['full'])
+
+    @property
+    def url_identifier(self):
+        """
+        Returns all of the identifiers that make this URL unique from
+        another simliar one. Targets or end points should never be identified
+        here.
+        """
+        return (self.apikey, self.source)
 
     def url(self, privacy=False, *args, **kwargs):
         """
@@ -116,11 +154,23 @@ class NotifyClickatell(NotifyBase):
 
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
-        return '{schema}://{apikey}/?{params}'.format(
+        return '{schema}://{source}{apikey}/{targets}/?{params}'.format(
             schema=self.secure_protocol,
-            apikey=self.quote(self.api_token, safe='/'),
+            source='{}@'.format(self.source) if self.source else '',
+            apikey=self.pprint(self.apikey, privacy, safe='='),
+            targets='/'.join(
+                [NotifyClickatell.quote(t, safe='')
+                 for t in chain(self.targets, self._invalid_targets)]),
             params=self.urlencode(params),
         )
+
+    def __len__(self):
+        """
+        Returns the number of targets associated with this notification
+
+        Always return 1 at least
+        """
+        return len(self.targets) if self.targets else 1
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
@@ -137,9 +187,9 @@ class NotifyClickatell(NotifyBase):
             'Content-Type': 'application/json',
         }
 
-        url = self.notify_url.format(self.api_token)
-        if self.from_phone:
-            url += '&from={}'.format(self.from_phone)
+        url = self.notify_url.format(self.apikey)
+        if self.source:
+            url += '&from={}'.format(self.source)
         url += '&to={}'.format(','.join(self.targets))
         url += '&content={}'.format(' '.join([title, body]))
 
@@ -172,6 +222,7 @@ class NotifyClickatell(NotifyBase):
                 return False
             else:
                 self.logger.info('Sent Clickatell notification.')
+
         except requests.RequestException as e:
             self.logger.warning(
                 'A Connection error occurred sending Clickatell '
@@ -192,15 +243,22 @@ class NotifyClickatell(NotifyBase):
             return results
 
         results['targets'] = NotifyClickatell.split_path(results['fullpath'])
-
-        if not results['targets']:
-            return results
+        results['apikey'] = NotifyClickatell.unquote(results['host'])
 
         if results['user']:
-            results['api_token'] = NotifyClickatell.unquote(results['user'])
-            results['from_phone'] = NotifyClickatell.unquote(results['host'])
-        else:
-            results['api_token'] = NotifyClickatell.unquote(results['host'])
-            results['from_phone'] = ''
+            results['source'] = NotifyClickatell.unquote(results['user'])
+
+        # Support the 'to' variable so that we can support targets this way too
+        # The 'to' makes it easier to use yaml configuration
+        if 'to' in results['qsd'] and len(results['qsd']['to']):
+            results['targets'] += \
+                NotifyClickatell.parse_phone_no(results['qsd']['to'])
+
+        # Support the 'from'  and 'source' variable so that we can support
+        # targets this way too.
+        # The 'from' makes it easier to use yaml configuration
+        if 'from' in results['qsd'] and len(results['qsd']['from']):
+            results['source'] = \
+                NotifyClickatell.unquote(results['qsd']['from'])
 
         return results

@@ -45,64 +45,76 @@ apprise_url_tests = (
         'instance': TypeError,
     }),
     ('clickatell:///', {
-        # invalid api_token
+        # invalid apikey
         'instance': TypeError,
     }),
     ('clickatell://@/', {
-        # invalid api_token
+        # invalid apikey
         'instance': TypeError,
+    }),
+    ('clickatell://{}@/'.format('1' * 10), {
+        # no api key provided
+        'instance': TypeError,
+    }),
+    ('clickatell://{}@{}/'.format('1' * 3, 'a' * 32), {
+        # invalid From/Source
+        'instance': TypeError
     }),
     ('clickatell://{}/'.format('a' * 32), {
         # no targets provided
-        'instance': TypeError,
+        'instance': NotifyClickatell,
+        # We have no one to notify
+        'notify_response': False,
     }),
-    ('clickatell://{}@/'.format('a' * 32), {
-        # no targets provided
-        'instance': TypeError,
-    }),
-    ('clickatell://{}@{}/'.format('a' * 32, '1' * 9), {
-        # no targets provided
-        'instance': TypeError,
-    }),
-    ('clickatell://{}@{}'.format('a' * 32, 'b' * 32, '3' * 9), {
-        # no targets provided
-        'instance': TypeError,
+    ('clickatell://{}@{}/'.format('1' * 10, 'a' * 32), {
+        # no targets provided (no one to notify)
+        'instance': NotifyClickatell,
+        # We have no one to notify
+        'notify_response': False,
     }),
     ('clickatell://{}@{}/123/{}/abcd'.format(
-        'a' * 32, '1' * 6, '3' * 11), {
-         # valid everything but target numbers
-         'instance': NotifyClickatell,
-     }),
-    ('clickatell://{}/{}'.format('a' * 32, '1' * 9), {
+        '1' * 10, 'a' * 32, '3' * 15), {
+        # valid everything but target numbers
+        'instance': NotifyClickatell,
+        # We have no one to notify
+        'notify_response': False,
+    }),
+    ('clickatell://{}/{}'.format('1' * 10, 'a' * 32), {
+        # everything valid (no source defined)
+        'instance': NotifyClickatell,
+        # We have no one to notify
+        'notify_response': False,
+    }),
+    ('clickatell://{}@{}/{}'.format('1' * 10, 'a' * 32, '1' * 10), {
         # everything valid
         'instance': NotifyClickatell,
     }),
-    ('clickatell://{}@{}/{}'.format('a' * 32, '1' * 9, '1' * 9), {
-        # everything valid
+    ('clickatell://{}/{}'.format('a' * 32, '1' * 10), {
+        # everything valid (no source)
         'instance': NotifyClickatell,
     }),
-    ('clickatell://_?token={}&from={}&to={},{}'.format(
-        'a' * 32, '1' * 9, '1' * 9, '1' * 9), {
-         # use get args to accomplish the same thing
-         'instance': NotifyClickatell,
-     }),
-    ('clickatell://_?token={}'.format('a' * 32), {
+    ('clickatell://_?apikey={}&from={}&to={},{}'.format(
+        'a' * 32, '1' * 10, '1' * 10, '1' * 10), {
+        # use get args to accomplish the same thing
+        'instance': NotifyClickatell,
+    }),
+    ('clickatell://_?apikey={}'.format('a' * 32), {
         # use get args
         'instance': NotifyClickatell,
         'notify_response': False,
     }),
-    ('clickatell://_?token={}&from={}'.format('a' * 32, '1' * 9), {
+    ('clickatell://_?apikey={}&from={}'.format('a' * 32, '1' * 10), {
         # use get args
         'instance': NotifyClickatell,
         'notify_response': False,
     }),
-    ('clickatell://{}/{}'.format('a' * 32, '1' * 9), {
+    ('clickatell://{}@{}/{}'.format('1' * 10, 'a' * 32, '1' * 10), {
         'instance': NotifyClickatell,
         # throw a bizarre code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
-    ('clickatell://{}@{}/{}'.format('a' * 32, '1' * 9, '1' * 9), {
+    ('clickatell://{}@{}/{}'.format('1' * 10, 'a' * 32, '1' * 10), {
         'instance': NotifyClickatell,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracefully handle them
@@ -133,13 +145,13 @@ def test_plugin_clickatell_edge_cases(mock_post):
     # Prepare Mock
     mock_post.return_value = response
 
-    # Initialize some generic (but valid) tokens
-    api_token = 'b' * 32
+    # Initialize some generic (but valid) apikeys
+    apikey = 'b' * 32
     from_phone = '+1 (555) 123-3456'
 
-    # No api_token specified
+    # No apikey specified
     with pytest.raises(TypeError):
-        NotifyClickatell(api_token=None, from_phone=from_phone)
+        NotifyClickatell(apikey=None, from_phone=from_phone)
 
     # a error response
     response.status_code = 400
@@ -150,7 +162,7 @@ def test_plugin_clickatell_edge_cases(mock_post):
     mock_post.return_value = response
 
     # Initialize our object
-    obj = NotifyClickatell(api_token=api_token, from_phone=from_phone)
+    obj = NotifyClickatell(apikey=apikey, from_phone=from_phone)
 
     # We will fail with the above error code
     assert obj.notify('title', 'body', 'info') is False
