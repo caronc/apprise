@@ -32,6 +32,33 @@ import typing
 import base64
 
 
+def base64_urlencode(data: bytes) -> str:
+    """
+    URL Safe Base64 Encoding
+    """
+    try:
+        return base64.urlsafe_b64encode(data).rstrip(b'=').decode('utf-8')
+
+    except TypeError:
+        # data is not supported; avoid raising exception
+        return None
+
+
+def base64_urldecode(data: str) -> bytes:
+    """
+    URL Safe Base64 Encoding
+    """
+
+    try:
+        # Normalize base64url string (remove padding, add it back)
+        padding = '=' * (-len(data) % 4)
+        return base64.urlsafe_b64decode(data + padding)
+
+    except TypeError:
+        # data is not supported; avoid raising exception
+        return None
+
+
 def decode_b64_dict(di: dict) -> dict:
     """
     decodes base64 dictionary previously encoded
