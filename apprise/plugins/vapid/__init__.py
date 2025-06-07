@@ -50,6 +50,10 @@ class VapidPushMode:
     FIREFOX = 'firefox'
     EDGE = 'edge'
     OPERA = 'opera'
+    APPLE = 'apple'
+    SAMSUNG = 'samsung'
+    BRAVE = 'brave'
+    GENERIC = 'generic'
 
 
 VAPID_API_LOOKUP = {
@@ -61,6 +65,14 @@ VAPID_API_LOOKUP = {
     'https://fcm.googleapis.com/fcm/send',  # Edge uses FCM too
     VapidPushMode.OPERA:
     'https://fcm.googleapis.com/fcm/send',  # Opera is Chromium-based
+    VapidPushMode.APPLE:
+        'https://web.push.apple.com',  # Apple Web Push base endpoint
+    VapidPushMode.BRAVE:
+    'https://fcm.googleapis.com/fcm/send',
+    VapidPushMode.SAMSUNG:
+    'https://fcm.googleapis.com/fcm/send',
+    VapidPushMode.GENERIC:
+    'https://fcm.googleapis.com/fcm/send',
 }
 
 VAPID_PUSH_MODES = (
@@ -68,6 +80,7 @@ VAPID_PUSH_MODES = (
     VapidPushMode.FIREFOX,
     VapidPushMode.EDGE,
     VapidPushMode.OPERA,
+    VapidPushMode.APPLE,
 )
 
 
