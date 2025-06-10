@@ -26,11 +26,13 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from itertools import chain
+
 # To use this service you will need a Clickatell account to which you can get
 # your API_TOKEN at:
 #     https://www.clickatell.com/
 import requests
-from itertools import chain
+
 from .base import NotifyBase
 from ..common import NotifyType
 from ..locale import gettext_lazy as _
@@ -190,38 +192,40 @@ class NotifyClickatell(NotifyBase):
         url = self.notify_url.format(self.apikey)
         if self.source:
             url += '&from={}'.format(self.source)
-        url += '&to={}'.format(','.join(self.targets))
+        url += '&to={to}'
         url += '&content={}'.format(' '.join([title, body]))
-
-        self.logger.debug('Clickatell GET URL: %s', url)
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
 
         try:
-            r = requests.get(
-                url,
-                headers=headers,
-                verify=self.verify_certificate,
-                timeout=self.request_timeout,
-            )
+            for target in self.targets:
+                new_url = url.format(to=target)
+                self.logger.debug('Clickatell GET URL: %s', new_url)
+                r = requests.get(
+                    new_url,
+                    headers=headers,
+                    verify=self.verify_certificate,
+                    timeout=self.request_timeout,
+                )
 
-            if r.status_code != requests.codes.ok \
-                    and r.status_code != requests.codes.accepted:
-                # We had a problem
-                status_str = self.http_response_code_lookup(r.status_code)
+                if r.status_code != requests.codes.ok \
+                        and r.status_code != requests.codes.accepted:
+                    # We had a problem
+                    status_str = self.http_response_code_lookup(r.status_code)
 
-                self.logger.warning(
-                    'Failed to send Clickatell notification: '
-                    '{}{}error={}.'.format(
-                        status_str,
-                        ', ' if status_str else '',
-                        r.status_code))
+                    self.logger.warning(
+                        'Failed to send Clickatell notification: '
+                        '{}{}error={}.'.format(
+                            status_str,
+                            ', ' if status_str else '',
+                            r.status_code))
 
-                self.logger.debug('Response Details:\r\n{}'.format(r.content))
-                return False
-            else:
-                self.logger.info('Sent Clickatell notification.')
+                    self.logger.debug(
+                        'Response Details:\r\n{}'.format(r.content))
+                    return False
+                else:
+                    self.logger.info('Sent Clickatell notification.')
 
         except requests.RequestException as e:
             self.logger.warning(
