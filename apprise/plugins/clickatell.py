@@ -44,11 +44,24 @@ class NotifyClickatell(NotifyBase):
     A wrapper for Clickatell Notifications
     """
 
+    # The default descriptive name associated with the Notification
     service_name = _('Clickatell')
+
+    # The services URL
     service_url = 'https://www.clickatell.com/'
+
+    # All notification requests are secure
     secure_protocol = 'clickatell'
+
+    # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_clickatell'
-    notify_url = 'https://platform.clickatell.com/messages/http/send?apiKey={}'
+
+    # Clickatell API Endpoint
+    notify_url = 'https://platform.clickatell.com/messages/http/send'
+
+    # A title can not be used for SMS Messages.  Setting this to zero will
+    # cause any title (if defined) to get placed into the message body.
+    title_maxlen = 0
 
     templates = (
         '{schema}://{apikey}/{targets}',
@@ -180,7 +193,9 @@ class NotifyClickatell(NotifyBase):
         """
 
         if not self.targets:
-            self.logger.warning('There are no valid targets to notify.')
+            # There were no targets to notify
+            self.logger.warning(
+                'There were no Clickatell targets to notify')
             return False
 
         headers = {
@@ -189,21 +204,31 @@ class NotifyClickatell(NotifyBase):
             'Content-Type': 'application/json',
         }
 
-        url = self.notify_url.format(self.apikey)
-        if self.source:
-            url += '&from={}'.format(self.source)
-        url += '&to={to}'
-        url += '&content={}'.format(' '.join([title, body]))
+        params_base = {
+            'apiKey': self.apikey,
+            'from': self.source,
+            'content': body,
+        }
 
-        # Always call throttle before any remote server i/o is made
-        self.throttle()
+        # error tracking (used for function return)
+        has_error = False
 
-        try:
-            for target in self.targets:
-                new_url = url.format(to=target)
-                self.logger.debug('Clickatell GET URL: %s', new_url)
+        for target in self.targets:
+            params = params_base.copy()
+            params['to'] = target
+
+            # Some Debug Logging
+            self.logger.debug('Clickatell GET URL: {} (cert_verify={})'.format(
+                self.notify_url, self.verify_certificate))
+            self.logger.debug('Clickatell Payload: {}' .format(params))
+
+            # Always call throttle before any remote server i/o is made
+            self.throttle()
+
+            try:
                 r = requests.get(
-                    new_url,
+                    self.notify_url,
+                    params=params,
                     headers=headers,
                     verify=self.verify_certificate,
                     timeout=self.request_timeout,
@@ -223,17 +248,24 @@ class NotifyClickatell(NotifyBase):
 
                     self.logger.debug(
                         'Response Details:\r\n{}'.format(r.content))
-                    return False
-                else:
-                    self.logger.info('Sent Clickatell notification.')
+                    # Mark our failure
+                    has_error = True
+                    continue
 
-        except requests.RequestException as e:
-            self.logger.warning(
-                'A Connection error occurred sending Clickatell '
-                'notification to %s.' % self.host)
-            self.logger.debug('Socket Exception: %s' % str(e))
-            return False
-        return True
+                else:
+                    self.logger.info(
+                        'Sent Clickatell notification to %s', target)
+
+            except requests.RequestException as e:
+                self.logger.warning(
+                    'A Connection error occurred sending Clickatell: to %s ',
+                    target)
+                self.logger.debug('Socket Exception: %s' % str(e))
+                # Mark our failure
+                has_error = True
+                continue
+
+        return not has_error
 
     @staticmethod
     def parse_url(url):
