@@ -76,6 +76,7 @@ import re
 import requests
 from json import dumps
 from json import loads
+from json import JSONDecodeError
 from time import time
 
 from .base import NotifyBase
@@ -410,18 +411,30 @@ class NotifySlack(NotifyBase):
                 if self.notify_format == NotifyFormat.MARKDOWN \
                 else 'plain_text'
 
+            # If we have to handle Blocks API serialized JSON
+            if kwargs.get('body_format', None) == 'json':
+                try:
+                    content = loads(body)
+                except JSONDecodeError:
+                    self.logger.error(
+                        "'body_format' is set as 'json',"
+                        "but body is not valid JSON string"
+                    )
+                    return False
+            # Else, we continue as before
+            else:
+                content = {'blocks': [{
+                    'type': 'section',
+                    'text': {
+                        'type': _slack_format,
+                        'text': body
+                    }
+                }]}
+            content.update({'color': self.color(notify_type)})
+
             payload = {
                 'username': self.user if self.user else self.app_id,
-                'attachments': [{
-                    'blocks': [{
-                        'type': 'section',
-                        'text': {
-                            'type': _slack_format,
-                            'text': body
-                        }
-                    }],
-                    'color': self.color(notify_type),
-                }]
+                'attachments': [content.copy()]
             }
 
             # Slack only accepts non-empty header sections
@@ -463,6 +476,14 @@ class NotifySlack(NotifyBase):
                 payload['attachments'][0]['blocks'].append(_footer)
 
         else:
+            # We do not support JSON body without the Blocks API
+            if kwargs.get('body_format', None) == 'json':
+                self.logger.error(
+                    "'body_format' is set as 'json',"
+                    "the 'blocks' URL parameter is not set"
+                )
+                return False
+
             #
             # Legacy API Formatting
             #
