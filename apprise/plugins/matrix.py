@@ -1279,6 +1279,9 @@ class NotifyMatrix(NotifyBase):
         fn = requests.post if method == 'POST' else (
             requests.put if method == 'PUT' else requests.get)
 
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+
         # Define how many attempts we'll make if we get caught in a throttle
         # event
         retries = self.default_retries if self.default_retries > 0 else 1
