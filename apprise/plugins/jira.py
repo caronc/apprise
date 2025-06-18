@@ -26,25 +26,21 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-# Signup @ https://www.opsgenie.com
-#
-# Generate your Integration API Key
-#   https://app.opsgenie.com/settings/integration/add/API/
-
-# Knowing this, you can build your Opsgenie URL as follows:
-#  opsgenie://{apikey}/
-#  opsgenie://{apikey}/@{user}
-#  opsgenie://{apikey}/*{schedule}
-#  opsgenie://{apikey}/^{escalation}
-#  opsgenie://{apikey}/#{team}
+# Knowing this, you can build your Jira URL as follows:
+#  jira://{apikey}/
+#  jira://{apikey}/@{user}
+#  jira://{apikey}/*{schedule}
+#  jira://{apikey}/^{escalation}
+#  jira://{apikey}/#{team}
 #
 # You can mix and match what you want to notify freely
-#  opsgenie://{apikey}/@{user}/#{team}/*{schedule}/^{escalation}
+#  jira://{apikey}/@{user}/#{team}/*{schedule}/^{escalation}
 #
 # If no target prefix is specified, then it is assumed to be a user.
 #
-# API Documentation: https://docs.opsgenie.com/docs/alert-api
-# API Integration Docs: https://docs.opsgenie.com/docs/api-integration
+# API Documentation: \
+#     https://developer.atlassian.com/cloud/jira/ \
+#           service-desk-ops/rest/v1/api-group-integration-events/
 
 import requests
 from json import dumps, loads
@@ -57,7 +53,7 @@ from ..utils.parse import validate_regex, is_uuid, parse_list, parse_bool
 from ..locale import gettext_lazy as _
 
 
-class OpsgenieCategory(NotifyBase):
+class JiraCategory(NotifyBase):
     """
     We define the different category types that we can notify
     """
@@ -67,15 +63,15 @@ class OpsgenieCategory(NotifyBase):
     TEAM = 'team'
 
 
-OPSGENIE_CATEGORIES = (
-    OpsgenieCategory.USER,
-    OpsgenieCategory.SCHEDULE,
-    OpsgenieCategory.ESCALATION,
-    OpsgenieCategory.TEAM,
+JIRA_CATEGORIES = (
+    JiraCategory.USER,
+    JiraCategory.SCHEDULE,
+    JiraCategory.ESCALATION,
+    JiraCategory.TEAM,
 )
 
 
-class OpsgenieAlertAction:
+class JiraAlertAction:
     """
     Defines the supported actions
     """
@@ -98,45 +94,45 @@ class OpsgenieAlertAction:
     NOTE = 'note'
 
 
-OPSGENIE_ACTIONS = (
-    OpsgenieAlertAction.MAP,
-    OpsgenieAlertAction.NEW,
-    OpsgenieAlertAction.CLOSE,
-    OpsgenieAlertAction.DELETE,
-    OpsgenieAlertAction.ACKNOWLEDGE,
-    OpsgenieAlertAction.NOTE,
+JIRA_ACTIONS = (
+    JiraAlertAction.MAP,
+    JiraAlertAction.NEW,
+    JiraAlertAction.CLOSE,
+    JiraAlertAction.DELETE,
+    JiraAlertAction.ACKNOWLEDGE,
+    JiraAlertAction.NOTE,
 )
 
-# Map all support Apprise Categories to Opsgenie Categories
-OPSGENIE_ALERT_MAP = {
-    NotifyType.INFO: OpsgenieAlertAction.CLOSE,
-    NotifyType.SUCCESS: OpsgenieAlertAction.CLOSE,
-    NotifyType.WARNING: OpsgenieAlertAction.NEW,
-    NotifyType.FAILURE: OpsgenieAlertAction.NEW,
+# Map all support Apprise Categories to Jira Categories
+JIRA_ALERT_MAP = {
+    NotifyType.INFO: JiraAlertAction.CLOSE,
+    NotifyType.SUCCESS: JiraAlertAction.CLOSE,
+    NotifyType.WARNING: JiraAlertAction.NEW,
+    NotifyType.FAILURE: JiraAlertAction.NEW,
 }
 
 
 # Regions
-class OpsgenieRegion:
+class JiraRegion:
     US = 'us'
     EU = 'eu'
 
 
-# Opsgenie APIs
-OPSGENIE_API_LOOKUP = {
-    OpsgenieRegion.US: 'https://api.opsgenie.com/v2/alerts',
-    OpsgenieRegion.EU: 'https://api.eu.opsgenie.com/v2/alerts',
+# Jira APIs (OpsGenie port - so keep us/en support for easy transition)
+JIRA_API_LOOKUP = {
+    JiraRegion.US: 'https://api.atlassian.com/jsm/ops/integration/v2/alerts',
+    JiraRegion.EU: 'https://api.atlassian.com/jsm/ops/integration/v2/alerts',
 }
 
 # A List of our regions we can use for verification
-OPSGENIE_REGIONS = (
-    OpsgenieRegion.US,
-    OpsgenieRegion.EU,
+JIRA_REGIONS = (
+    JiraRegion.US,
+    JiraRegion.EU,
 )
 
 
 # Priorities
-class OpsgeniePriority:
+class JiraPriority:
     LOW = 1
     MODERATE = 2
     NORMAL = 3
@@ -144,58 +140,58 @@ class OpsgeniePriority:
     EMERGENCY = 5
 
 
-OPSGENIE_PRIORITIES = {
+JIRA_PRIORITIES = {
     # Note: This also acts as a reverse lookup mapping
-    OpsgeniePriority.LOW: 'low',
-    OpsgeniePriority.MODERATE: 'moderate',
-    OpsgeniePriority.NORMAL: 'normal',
-    OpsgeniePriority.HIGH: 'high',
-    OpsgeniePriority.EMERGENCY: 'emergency',
+    JiraPriority.LOW: 'low',
+    JiraPriority.MODERATE: 'moderate',
+    JiraPriority.NORMAL: 'normal',
+    JiraPriority.HIGH: 'high',
+    JiraPriority.EMERGENCY: 'emergency',
 }
 
-OPSGENIE_PRIORITY_MAP = {
+JIRA_PRIORITY_MAP = {
     # Maps against string 'low'
-    'l': OpsgeniePriority.LOW,
+    'l': JiraPriority.LOW,
     # Maps against string 'moderate'
-    'm': OpsgeniePriority.MODERATE,
+    'm': JiraPriority.MODERATE,
     # Maps against string 'normal'
-    'n': OpsgeniePriority.NORMAL,
+    'n': JiraPriority.NORMAL,
     # Maps against string 'high'
-    'h': OpsgeniePriority.HIGH,
+    'h': JiraPriority.HIGH,
     # Maps against string 'emergency'
-    'e': OpsgeniePriority.EMERGENCY,
+    'e': JiraPriority.EMERGENCY,
 
-    # Entries to additionally support (so more like Opsgenie's API)
-    '1': OpsgeniePriority.LOW,
-    '2': OpsgeniePriority.MODERATE,
-    '3': OpsgeniePriority.NORMAL,
-    '4': OpsgeniePriority.HIGH,
-    '5': OpsgeniePriority.EMERGENCY,
+    # Entries to additionally support (so more like Jira's API)
+    '1': JiraPriority.LOW,
+    '2': JiraPriority.MODERATE,
+    '3': JiraPriority.NORMAL,
+    '4': JiraPriority.HIGH,
+    '5': JiraPriority.EMERGENCY,
     # Support p-prefix
-    'p1': OpsgeniePriority.LOW,
-    'p2': OpsgeniePriority.MODERATE,
-    'p3': OpsgeniePriority.NORMAL,
-    'p4': OpsgeniePriority.HIGH,
-    'p5': OpsgeniePriority.EMERGENCY,
+    'p1': JiraPriority.LOW,
+    'p2': JiraPriority.MODERATE,
+    'p3': JiraPriority.NORMAL,
+    'p4': JiraPriority.HIGH,
+    'p5': JiraPriority.EMERGENCY,
 }
 
 
-class NotifyOpsgenie(NotifyBase):
+class NotifyJira(NotifyBase):
     """
-    A wrapper for Opsgenie Notifications
+    A wrapper for Jira Notifications
     """
 
     # The default descriptive name associated with the Notification
-    service_name = 'Opsgenie'
+    service_name = 'Jira'
 
     # The services URL
-    service_url = 'https://opsgenie.com/'
+    service_url = 'https://atlassian.com/'
 
     # All notification requests are secure
-    secure_protocol = 'opsgenie'
+    secure_protocol = 'jira'
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_opsgenie'
+    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_jira'
 
     # The maximum length of the body
     body_maxlen = 15000
@@ -206,24 +202,24 @@ class NotifyOpsgenie(NotifyBase):
 
     # If we don't have the specified min length, then we don't bother using
     # the body directive
-    opsgenie_body_minlen = 130
+    jira_body_minlen = 130
 
     # The default region to use if one isn't otherwise specified
-    opsgenie_default_region = OpsgenieRegion.US
+    jira_default_region = JiraRegion.US
 
     # The maximum allowable targets within a notification
     default_batch_size = 50
 
     # Defines our default message mapping
-    opsgenie_message_map = {
+    jira_message_map = {
         # Add a note to existing alert
-        NotifyType.INFO: OpsgenieAlertAction.NOTE,
+        NotifyType.INFO: JiraAlertAction.NOTE,
         # Close existing alert
-        NotifyType.SUCCESS: OpsgenieAlertAction.CLOSE,
+        NotifyType.SUCCESS: JiraAlertAction.CLOSE,
         # Create notice
-        NotifyType.WARNING: OpsgenieAlertAction.NEW,
+        NotifyType.WARNING: JiraAlertAction.NEW,
         # Create notice
-        NotifyType.FAILURE: OpsgenieAlertAction.NEW,
+        NotifyType.FAILURE: JiraAlertAction.NEW,
     }
 
     # Define object templates
@@ -281,8 +277,8 @@ class NotifyOpsgenie(NotifyBase):
         'region': {
             'name': _('Region Name'),
             'type': 'choice:string',
-            'values': OPSGENIE_REGIONS,
-            'default': OpsgenieRegion.US,
+            'values': JIRA_REGIONS,
+            'default': JiraRegion.US,
             'map_to': 'region_name',
         },
         'batch': {
@@ -293,8 +289,8 @@ class NotifyOpsgenie(NotifyBase):
         'priority': {
             'name': _('Priority'),
             'type': 'choice:int',
-            'values': OPSGENIE_PRIORITIES,
-            'default': OpsgeniePriority.NORMAL,
+            'values': JIRA_PRIORITIES,
+            'default': JiraPriority.NORMAL,
         },
         'entity': {
             'name': _('Entity'),
@@ -314,8 +310,8 @@ class NotifyOpsgenie(NotifyBase):
         'action': {
             'name': _('Action'),
             'type': 'choice:string',
-            'values': OPSGENIE_ACTIONS,
-            'default': OPSGENIE_ACTIONS[0],
+            'values': JIRA_ACTIONS,
+            'default': JIRA_ACTIONS[0],
         }
     })
 
@@ -335,51 +331,46 @@ class NotifyOpsgenie(NotifyBase):
                  priority=None, alias=None, entity=None, batch=False,
                  tags=None, action=None, mapping=None, **kwargs):
         """
-        Initialize Opsgenie Object
+        Initialize Jira Object
         """
         super().__init__(**kwargs)
-
-        # Notify users that this plugin will require them to switch soon
-        self.logger.deprecate(
-            'Opsgenie will soon be depricated and moved to Jira; '
-            'visit https://atlassian.com/ for more details')
 
         # API Key (associated with project)
         self.apikey = validate_regex(apikey)
         if not self.apikey:
-            msg = 'An invalid Opsgenie API Key ' \
+            msg = 'An invalid Jira API Key ' \
                   '({}) was specified.'.format(apikey)
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # The Priority of the message
-        self.priority = NotifyOpsgenie.template_args['priority']['default'] \
+        self.priority = NotifyJira.template_args['priority']['default'] \
             if not priority else \
             next((
-                v for k, v in OPSGENIE_PRIORITY_MAP.items()
+                v for k, v in JIRA_PRIORITY_MAP.items()
                 if str(priority).lower().startswith(k)),
-                NotifyOpsgenie.template_args['priority']['default'])
+                NotifyJira.template_args['priority']['default'])
 
         # Store our region
         try:
-            self.region_name = self.opsgenie_default_region \
+            self.region_name = self.jira_default_region \
                 if region_name is None else region_name.lower()
 
-            if self.region_name not in OPSGENIE_REGIONS:
+            if self.region_name not in JIRA_REGIONS:
                 # allow the outer except to handle this common response
                 raise
         except:
             # Invalid region specified
-            msg = 'The Opsgenie region specified ({}) is invalid.' \
+            msg = 'The Jira region specified ({}) is invalid.' \
                   .format(region_name)
             self.logger.warning(msg)
             raise TypeError(msg)
 
         if action and isinstance(action, str):
             self.action = next(
-                (a for a in OPSGENIE_ACTIONS if a.startswith(action)), None)
-            if self.action not in OPSGENIE_ACTIONS:
-                msg = 'The Opsgenie action specified ({}) is invalid.'\
+                (a for a in JIRA_ACTIONS if a.startswith(action)), None)
+            if self.action not in JIRA_ACTIONS:
+                msg = 'The Jira action specified ({}) is invalid.'\
                     .format(action)
                 self.logger.warning(msg)
                 raise TypeError(msg)
@@ -387,22 +378,22 @@ class NotifyOpsgenie(NotifyBase):
             self.action = self.template_args['action']['default']
 
         # Store our mappings
-        self.mapping = self.opsgenie_message_map.copy()
+        self.mapping = self.jira_message_map.copy()
         if mapping and isinstance(mapping, dict):
             for _k, _v in mapping.items():
                 # Get our mapping
                 k = next((t for t in NOTIFY_TYPES if t.startswith(_k)), None)
                 if not k:
-                    msg = 'The Opsgenie mapping key specified ({}) ' \
+                    msg = 'The Jira mapping key specified ({}) ' \
                         'is invalid.'.format(_k)
                     self.logger.warning(msg)
                     raise TypeError(msg)
 
                 _v_lower = _v.lower()
-                v = next((v for v in OPSGENIE_ACTIONS[1:]
+                v = next((v for v in JIRA_ACTIONS[1:]
                           if v.startswith(_v_lower)), None)
                 if not v:
-                    msg = 'The Opsgenie mapping value (assigned to {}) ' \
+                    msg = 'The Jira mapping value (assigned to {}) ' \
                           'specified ({}) is invalid.'.format(k, _v)
                     self.logger.warning(msg)
                     raise TypeError(msg)
@@ -434,50 +425,50 @@ class NotifyOpsgenie(NotifyBase):
         for _target in parse_list(targets):
             target = _target.strip()
             if len(target) < 2:
-                self.logger.debug('Ignoring Opsgenie Entry: %s' % target)
+                self.logger.debug('Ignoring Jira Entry: %s' % target)
                 continue
 
-            if target.startswith(NotifyOpsgenie.template_tokens
+            if target.startswith(NotifyJira.template_tokens
                                  ['target_team']['prefix']):
 
                 self.targets.append(
-                    {'type': OpsgenieCategory.TEAM, 'id': target[1:]}
+                    {'type': JiraCategory.TEAM, 'id': target[1:]}
                     if is_uuid(target[1:]) else
-                    {'type': OpsgenieCategory.TEAM, 'name': target[1:]})
+                    {'type': JiraCategory.TEAM, 'name': target[1:]})
 
-            elif target.startswith(NotifyOpsgenie.template_tokens
+            elif target.startswith(NotifyJira.template_tokens
                                    ['target_schedule']['prefix']):
 
                 self.targets.append(
-                    {'type': OpsgenieCategory.SCHEDULE, 'id': target[1:]}
+                    {'type': JiraCategory.SCHEDULE, 'id': target[1:]}
                     if is_uuid(target[1:]) else
-                    {'type': OpsgenieCategory.SCHEDULE, 'name': target[1:]})
+                    {'type': JiraCategory.SCHEDULE, 'name': target[1:]})
 
-            elif target.startswith(NotifyOpsgenie.template_tokens
+            elif target.startswith(NotifyJira.template_tokens
                                    ['target_escalation']['prefix']):
 
                 self.targets.append(
-                    {'type': OpsgenieCategory.ESCALATION, 'id': target[1:]}
+                    {'type': JiraCategory.ESCALATION, 'id': target[1:]}
                     if is_uuid(target[1:]) else
-                    {'type': OpsgenieCategory.ESCALATION, 'name': target[1:]})
+                    {'type': JiraCategory.ESCALATION, 'name': target[1:]})
 
-            elif target.startswith(NotifyOpsgenie.template_tokens
+            elif target.startswith(NotifyJira.template_tokens
                                    ['target_user']['prefix']):
 
                 self.targets.append(
-                    {'type': OpsgenieCategory.USER, 'id': target[1:]}
+                    {'type': JiraCategory.USER, 'id': target[1:]}
                     if is_uuid(target[1:]) else
-                    {'type': OpsgenieCategory.USER, 'username': target[1:]})
+                    {'type': JiraCategory.USER, 'username': target[1:]})
 
             else:
                 # Ambiguious entry; treat it as a user but not before
                 # displaying a warning to the end user first:
                 self.logger.debug(
-                    'Treating ambigious Opsgenie target %s as a user', target)
+                    'Treating ambigious Jira target %s as a user', target)
                 self.targets.append(
-                    {'type': OpsgenieCategory.USER, 'id': target}
+                    {'type': JiraCategory.USER, 'id': target}
                     if is_uuid(target) else
-                    {'type': OpsgenieCategory.USER, 'username': target})
+                    {'type': JiraCategory.USER, 'username': target})
 
     def _fetch(self, method, url, payload, params=None):
         """
@@ -485,15 +476,16 @@ class NotifyOpsgenie(NotifyBase):
         """
         headers = {
             'User-Agent': self.app_id,
+            'Accepts': 'application/json',
             'Content-Type': 'application/json',
             'Authorization': 'GenieKey {}'.format(self.apikey),
         }
 
         # Some Debug Logging
         self.logger.debug(
-            'Opsgenie POST URL: {} (cert_verify={})'.format(
+            'Jira POST URL: {} (cert_verify={})'.format(
                 url, self.verify_certificate))
-        self.logger.debug('Opsgenie Payload: {}' .format(payload))
+        self.logger.debug('Jira Payload: {}' .format(payload))
 
         # Initialize our response object
         content = {}
@@ -534,7 +526,7 @@ class NotifyOpsgenie(NotifyBase):
                         r.status_code)
 
                 self.logger.warning(
-                    'Failed to send Opsgenie notification:'
+                    'Failed to send Jira notification:'
                     '{}{}error={}.'.format(
                         status_str,
                         ', ' if status_str else '',
@@ -546,7 +538,7 @@ class NotifyOpsgenie(NotifyBase):
                 return (False, content.get('requestId'))
 
             # If we reach here; the message was sent
-            self.logger.info('Sent Opsgenie notification')
+            self.logger.info('Sent Jira notification')
             self.logger.debug(
                 'Response Details:\r\n{}'.format(r.content))
 
@@ -554,7 +546,7 @@ class NotifyOpsgenie(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occurred sending Opsgenie '
+                'A Connection error occurred sending Jira '
                 'notification.')
             self.logger.debug('Socket Exception: %s' % str(e))
 
@@ -562,15 +554,15 @@ class NotifyOpsgenie(NotifyBase):
 
     def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
         """
-        Perform Opsgenie Notification
+        Perform Jira Notification
         """
 
-        # Get our Opsgenie Action
-        action = OPSGENIE_ALERT_MAP[notify_type] \
-            if self.action == OpsgenieAlertAction.MAP else self.action
+        # Get our Jira Action
+        action = JIRA_ALERT_MAP[notify_type] \
+            if self.action == JiraAlertAction.MAP else self.action
 
         # Prepare our URL as it's based on our hostname
-        notify_url = OPSGENIE_API_LOOKUP[self.region_name]
+        notify_url = JIRA_API_LOOKUP[self.region_name]
 
         # Initialize our has_error flag
         has_error = False
@@ -585,12 +577,12 @@ class NotifyOpsgenie(NotifyBase):
                     title if title else self.app_id)))
             .encode('utf-8')).hexdigest()[0:10]
 
-        # Get our Opsgenie Request IDs
+        # Get our Jira Request IDs
         request_ids = self.store.get(key, [])
         if not isinstance(request_ids, list):
             request_ids = []
 
-        if action == OpsgenieAlertAction.NEW:
+        if action == JiraAlertAction.NEW:
             # Create a copy ouf our details object
             details = self.details.copy()
             if 'type' not in details:
@@ -610,9 +602,9 @@ class NotifyOpsgenie(NotifyBase):
 
             # Use our body directive if we exceed the minimum message
             # limitation
-            if len(payload['message']) > self.opsgenie_body_minlen:
+            if len(payload['message']) > self.jira_body_minlen:
                 payload['message'] = '{}...'.format(
-                    title_body[:self.opsgenie_body_minlen - 3])
+                    title_body[:self.jira_body_minlen - 3])
 
             if self.__tags:
                 payload['tags'] = self.__tags
@@ -667,18 +659,18 @@ class NotifyOpsgenie(NotifyBase):
             }
 
             for request_id in request_ids:
-                if action == OpsgenieAlertAction.DELETE:
+                if action == JiraAlertAction.DELETE:
                     # Update our URL
                     url = f'{notify_url}/{request_id}'
                     method = requests.delete
 
-                elif action == OpsgenieAlertAction.ACKNOWLEDGE:
+                elif action == JiraAlertAction.ACKNOWLEDGE:
                     url = f'{notify_url}/{request_id}/acknowledge'
 
-                elif action == OpsgenieAlertAction.CLOSE:
+                elif action == JiraAlertAction.CLOSE:
                     url = f'{notify_url}/{request_id}/close'
 
-                else:  # action == OpsgenieAlertAction.CLOSE:
+                else:  # action == JiraAlertAction.CLOSE:
                     url = f'{notify_url}/{request_id}/notes'
 
                 # Perform our post
@@ -687,13 +679,13 @@ class NotifyOpsgenie(NotifyBase):
                 if not success:
                     has_error = True
 
-            if not has_error and action == OpsgenieAlertAction.DELETE:
+            if not has_error and action == JiraAlertAction.DELETE:
                 # Remove cached entry
                 self.store.clear(key)
 
         else:
             self.logger.info(
-                'No Opsgenie notification sent due to (nothing to %s) '
+                'No Jira notification sent due to (nothing to %s) '
                 'condition', self.action)
 
         return not has_error
@@ -717,9 +709,9 @@ class NotifyOpsgenie(NotifyBase):
             'action': self.action,
             'region': self.region_name,
             'priority':
-                OPSGENIE_PRIORITIES[self.template_args['priority']['default']]
-                if self.priority not in OPSGENIE_PRIORITIES
-                else OPSGENIE_PRIORITIES[self.priority],
+                JIRA_PRIORITIES[self.template_args['priority']['default']]
+                if self.priority not in JIRA_PRIORITIES
+                else JIRA_PRIORITIES[self.priority],
             'batch': 'yes' if self.batch_size > 1 else 'no',
         }
 
@@ -748,14 +740,14 @@ class NotifyOpsgenie(NotifyBase):
         # A map allows us to map our target types so they can be correctly
         # placed back into your URL below. Hence map the 'user' -> '@'
         __map = {
-            OpsgenieCategory.USER:
-                NotifyOpsgenie.template_tokens['target_user']['prefix'],
-            OpsgenieCategory.SCHEDULE:
-                NotifyOpsgenie.template_tokens['target_schedule']['prefix'],
-            OpsgenieCategory.ESCALATION:
-                NotifyOpsgenie.template_tokens['target_escalation']['prefix'],
-            OpsgenieCategory.TEAM:
-                NotifyOpsgenie.template_tokens['target_team']['prefix'],
+            JiraCategory.USER:
+                NotifyJira.template_tokens['target_user']['prefix'],
+            JiraCategory.SCHEDULE:
+                NotifyJira.template_tokens['target_schedule']['prefix'],
+            JiraCategory.ESCALATION:
+                NotifyJira.template_tokens['target_escalation']['prefix'],
+            JiraCategory.TEAM:
+                NotifyJira.template_tokens['target_team']['prefix'],
         }
 
         return '{schema}://{user}{apikey}/{targets}/?{params}'.format(
@@ -763,11 +755,11 @@ class NotifyOpsgenie(NotifyBase):
             user='{}@'.format(self.user) if self.user else '',
             apikey=self.pprint(self.apikey, privacy, safe=''),
             targets='/'.join(
-                [NotifyOpsgenie.quote('{}{}'.format(
+                [NotifyJira.quote('{}{}'.format(
                     __map[x['type']],
                     x.get('id', x.get('name', x.get('username')))))
                     for x in self.targets]),
-            params=NotifyOpsgenie.urlencode(params))
+            params=NotifyJira.urlencode(params))
 
     def __len__(self):
         """
@@ -796,10 +788,10 @@ class NotifyOpsgenie(NotifyBase):
             return results
 
         # The API Key is stored in the hostname
-        results['apikey'] = NotifyOpsgenie.unquote(results['host'])
+        results['apikey'] = NotifyJira.unquote(results['host'])
 
         # Get our Targets
-        results['targets'] = NotifyOpsgenie.split_path(results['fullpath'])
+        results['targets'] = NotifyJira.split_path(results['fullpath'])
 
         # Add our Meta Detail keys
         results['details'] = {NotifyBase.unquote(x): NotifyBase.unquote(y)
@@ -808,38 +800,38 @@ class NotifyOpsgenie(NotifyBase):
         # Set our priority
         if 'priority' in results['qsd'] and len(results['qsd']['priority']):
             results['priority'] = \
-                NotifyOpsgenie.unquote(results['qsd']['priority'])
+                NotifyJira.unquote(results['qsd']['priority'])
 
         # Get Batch Boolean (if set)
         results['batch'] = \
             parse_bool(
                 results['qsd'].get(
                     'batch',
-                    NotifyOpsgenie.template_args['batch']['default']))
+                    NotifyJira.template_args['batch']['default']))
 
         if 'apikey' in results['qsd'] and len(results['qsd']['apikey']):
             results['apikey'] = \
-                NotifyOpsgenie.unquote(results['qsd']['apikey'])
+                NotifyJira.unquote(results['qsd']['apikey'])
 
         if 'tags' in results['qsd'] and len(results['qsd']['tags']):
             # Extract our tags
             results['tags'] = \
-                parse_list(NotifyOpsgenie.unquote(results['qsd']['tags']))
+                parse_list(NotifyJira.unquote(results['qsd']['tags']))
 
         if 'region' in results['qsd'] and len(results['qsd']['region']):
             # Extract our region
             results['region_name'] = \
-                NotifyOpsgenie.unquote(results['qsd']['region'])
+                NotifyJira.unquote(results['qsd']['region'])
 
         if 'entity' in results['qsd'] and len(results['qsd']['entity']):
             # Extract optional entity field
             results['entity'] = \
-                NotifyOpsgenie.unquote(results['qsd']['entity'])
+                NotifyJira.unquote(results['qsd']['entity'])
 
         if 'alias' in results['qsd'] and len(results['qsd']['alias']):
             # Extract optional alias field
             results['alias'] = \
-                NotifyOpsgenie.unquote(results['qsd']['alias'])
+                NotifyJira.unquote(results['qsd']['alias'])
 
         # Handle 'to' email address
         if 'to' in results['qsd'] and len(results['qsd']['to']):
@@ -848,11 +840,11 @@ class NotifyOpsgenie(NotifyBase):
         # Store our action (if defined)
         if 'action' in results['qsd'] and len(results['qsd']['action']):
             results['action'] = \
-                NotifyOpsgenie.unquote(results['qsd']['action'])
+                NotifyJira.unquote(results['qsd']['action'])
 
         # store any custom mapping defined
         results['mapping'] = \
-            {NotifyOpsgenie.unquote(x): NotifyOpsgenie.unquote(y)
+            {NotifyJira.unquote(x): NotifyJira.unquote(y)
              for x, y in results['qsd:'].items()}
 
         return results
