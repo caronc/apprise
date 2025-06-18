@@ -759,6 +759,53 @@ def test_plugin_slack_markdown(mock_get, mock_request):
         "\n\nChannel Testing\n<!channelA>\n<!channelA|Description>\n\n"\
         "User ID Testing\n<@U1ZQL9N3Y>\n<@U1ZQL9N3Y|heheh>"
 
+@mock.patch('requests.request')
+@mock.patch('requests.get')
+def test_plugin_slack_body_format_blocks(mock_get, mock_request):
+    """
+    NotifySlack() for using Blocks API directly
+
+    """
+
+    request = mock.Mock()
+    request.content = b'ok'
+    request.status_code = requests.codes.ok
+
+    # Prepare Mock
+    mock_request.return_value = request
+    mock_get.return_value = request
+
+    # Variation Initializations
+    aobj = Apprise()
+    assert aobj.add(
+        'slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/?blocks=yes')
+
+    body_text = "Blocks API"
+    title_text = "title"
+    body = dumps({"blocks":[
+        {
+          "type": "section",
+          "text": {
+            "type": "mrkdwn",
+            "text": body_text
+          }
+        },
+    ]})
+
+    # Send our notification
+    assert aobj.notify(
+        body=body, title=title_text, notify_type=NotifyType.INFO,
+        body_format="json")
+
+    data = loads(mock_request.call_args_list[0][1]['data'])
+
+    # Our added block is not [0], as a title block
+    # has been injected by the plugin
+    title_block = data['attachments'][0]["blocks"][0]
+    added_block = data['attachments'][0]["blocks"][1]
+    assert title_block["text"]["text"] == title_text
+    assert added_block["text"]["text"] == body_text
+
 
 @mock.patch('requests.request')
 def test_plugin_slack_single_thread_reply(mock_request):
