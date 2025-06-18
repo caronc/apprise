@@ -177,7 +177,7 @@ class NotifyMatrix(NotifyBase):
     default_retries = 2
 
     # The number of micro seconds to wait if we get a 429 error code and
-    # the server doesn't remind us how long we shoul wait for
+    # the server doesn't remind us how long we should wait for
     default_wait_ms = 1000
 
     # Our default is to no not use persistent storage beyond in-memory
@@ -1279,6 +1279,9 @@ class NotifyMatrix(NotifyBase):
         fn = requests.post if method == 'POST' else (
             requests.put if method == 'PUT' else requests.get)
 
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+
         # Define how many attempts we'll make if we get caught in a throttle
         # event
         retries = self.default_retries if self.default_retries > 0 else 1
@@ -1316,25 +1319,24 @@ class NotifyMatrix(NotifyBase):
                 response = loads(r.content)
 
                 if r.status_code == requests.codes.too_many_requests:
-                    wait = self.default_wait_ms / 1000
+                    wait_ms = self.default_wait_ms
                     try:
-                        wait = response['retry_after_ms'] / 1000
+                        wait_ms = response['retry_after_ms']
 
                     except KeyError:
                         try:
                             errordata = response['error']
-                            wait = errordata['retry_after_ms'] / 1000
+                            wait_ms = errordata['retry_after_ms']
                         except KeyError:
                             pass
 
                     self.logger.warning(
-                        'Matrix server requested we throttle back {}ms; '
-                        'retries left {}.'.format(wait, retries))
-                    self.logger.debug(
-                        'Response Details:\r\n{}'.format(r.content))
+                        f'Matrix server requested we throttle back '
+                        f'{wait_ms}ms; retries left {retries}.')
+                    self.logger.debug(f'Response Details:\r\n{r.content}')
 
                     # Throttle for specified wait
-                    self.throttle(wait=wait)
+                    self.throttle(wait=wait_ms / 1000)
 
                     # Try again
                     continue
