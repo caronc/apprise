@@ -28,7 +28,7 @@
 
 import logging
 import sys
-
+from unittest import mock
 import pytest
 from apprise import Apprise
 from apprise.plugins.smpp import NotifySMPP
@@ -39,71 +39,67 @@ logging.disable(logging.CRITICAL)
 # Our Testing URLs
 apprise_url_tests = (
     ('smpp://', {
-        'instance': None,
+        'instance': TypeError,
     }),
     ('smpp:///', {
-        'instance': None,
+        'instance': TypeError,
     }),
     ('smpp://@/', {
-        'instance': None,
+        'instance': TypeError,
     }),
     ('smpp://user@/', {
-        'instance': None,
+        'instance': TypeError,
     }),
     ('smpp://user:pass/', {
-        'instance': None,
+        'instance': TypeError,
     }),
     ('smpp://user:pass@/', {
-        'instance': None,
+        'instance': TypeError,
+    }),
+    ('smpp://user@hostname', {
+        'instance': TypeError,
     }),
     ('smpp://user:pass@host:/', {
-        'instance': None,
+        'instance': TypeError,
     }),
-    ('smpp://user:pass@host:port/', {
-        'instance': None,
+    ('smpp://user:pass@host:2775/', {
+        'instance': TypeError,
     }),
-    ('smpp://user:pass@host:port/{}/{}'.format('1' * 10, 'a' * 32), {
+    ('smpp://user:pass@host:2775/{}/{}'.format('1' * 10, 'a' * 32), {
         # valid everything but target numbers
         'instance': NotifySMPP,
         # We have no one to notify
         'notify_response': False,
     }),
-    ('smpp://user:pass@host:port/{}'.format('1' * 10), {
+    ('smpp://user:pass@host:2775/{}'.format('1' * 10), {
         # everything valid
         'instance': NotifySMPP,
         # We have no one to notify
         'notify_response': False,
     }),
-    ('smpp://user:pass@host:port/{}/{}'.format('1' * 10, '1' * 10), {
+    ('smpp://user:pass@host/{}/{}'.format('1' * 10, '1' * 10), {
         'instance': NotifySMPP,
     }),
-    ('smpp://_?&from={}&to={},{}'.format(
+    ('smpps://_?&from={}&to={},{}&user=user&password=pw'.format(
         '1' * 10, '1' * 10, '1' * 10), {
         # use get args to accomplish the same thing
         'instance': NotifySMPP,
-    }),
-    ('smpp://user:pass@host:port/{}/{}'.format('1' * 10, '1' * 10), {
-        'instance': NotifySMPP,
-        # throw a bizarre code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('smpp://user:pass@host:port/{}/{}'.format('1' * 10, '1' * 10), {
-        'instance': NotifySMPP,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracefully handle them
-        'test_requests_exceptions': True,
     }),
 )
 
 
 @pytest.mark.skipif(
-    'python-smpp' in sys.modules,
-    reason="Requires that python-smpp NOT be installed")
-def test_plugin_fcm_cryptography_import_error():
+    'smpplib' in sys.modules,
+    reason="Requires that smpplib NOT be installed")
+@mock.patch('smpplib.client.Client')
+def test_plugin_smpplib_import_error(mock_client):
     """
-    NotifySimplePush() python-smpp loading failure
+    NotifySMPP() smpplib loading failure
     """
+
+    mock_client.connect.return_value = True
+    mock_client.bind_transmitter.return_value = True
+    mock_client.send_message.return_value = True
 
     # Attempt to instantiate our object
     obj = Apprise.instantiate(
@@ -114,11 +110,16 @@ def test_plugin_fcm_cryptography_import_error():
 
 
 @pytest.mark.skipif(
-    'python-smpp' not in sys.modules, reason="Requires python-smpp")
-def test_plugin_smpp_urls():
+    'smpplib' not in sys.modules, reason="Requires smpplib")
+@mock.patch('smpplib.client.Client')
+def test_plugin_smpp_urls(mock_client):
     """
     NotifySMPP() Apprise URLs
     """
+
+    mock_client.connect.return_value = True
+    mock_client.bind_transmitter.return_value = True
+    mock_client.send_message.return_value = True
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()

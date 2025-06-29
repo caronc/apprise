@@ -57,7 +57,7 @@ class NotifySMPP(NotifyBase):
 
     requirements = {
         # Define our required packaging in order to work
-        'packages_required': 'python-snpp'
+        'packages_required': 'smpplib'
     }
 
     # The default descriptive name associated with the Notification
@@ -72,6 +72,10 @@ class NotifySMPP(NotifyBase):
     # The default secure protocol
     secure_protocol = 'smpps'
 
+    # Default port setup
+    default_port = 2775
+    default_secure_port = 3550
+
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_SMPP'
 
@@ -80,6 +84,7 @@ class NotifySMPP(NotifyBase):
     title_maxlen = 0
 
     templates = (
+        '{schema}://{user}:{password}@{host}/{from_phone}/{targets}',
         '{schema}://{user}:{password}@{host}:{port}/{from_phone}/{targets}',
     )
 
@@ -105,7 +110,6 @@ class NotifySMPP(NotifyBase):
             'type': 'int',
             'min': 1,
             'max': 65535,
-            'required': True,
         },
         'from_phone': {
             'name': _('From Phone No'),
@@ -135,17 +139,25 @@ class NotifySMPP(NotifyBase):
         super().__init__(**kwargs)
 
         self.source = None
-        if source:
-            result = is_phone_no(source)
-            if not result:
-                msg = 'The Account (From) Phone # specified ' \
-                      '({}) is invalid.'.format(source)
-                self.logger.warning(msg)
+        result = is_phone_no(source)
+        if not result:
+            msg = 'The Account (From) Phone # specified ' \
+                  '({}) is invalid.'.format(source)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
-                raise TypeError(msg)
+        if not self.user:
+            msg = 'No SMPP user account was specified.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
-            # Tidy source
-            self.source = result['full']
+        if not self.host:
+            msg = 'No SMPP host was specified.'
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
+        # Tidy source
+        self.source = result['full']
 
         # Used for URL generation afterwards only
         self._invalid_targets = list()
@@ -186,13 +198,13 @@ class NotifySMPP(NotifyBase):
 
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
-        return ('{schema}://{user}:{password}@{host}:{port}/{source}/{targets}'
+        return ('{schema}://{user}:{password}@{host}/{source}/{targets}'
                 '/?{params}').format(
             schema=self.secure_protocol if self.secure else self.protocol,
             user=self.user,
             password=self.password,
-            host=self.host,
-            port=self.port,
+            host='{}:{}'.format(self.host, self.port)
+            if self.port else self.host,
             source=self.source,
             targets='/'.join(
                 [NotifySMPP.quote(t, safe='')
@@ -222,10 +234,21 @@ class NotifySMPP(NotifyBase):
         # error tracking (used for function return)
         has_error = False
 
-        client = smpplib.client.Client(self.host, self.port,
-                                       allow_unknown_opt_params=True)
-        client.connect()
-        client.bind_transmitter(system_id=self.user, password=self.password)
+        port = self.default_port if not self.secure \
+            else self.default_secure_port
+
+        client = smpplib.client.Client(
+            self.host, port, allow_unknown_opt_params=True)
+        try:
+            client.connect()
+            client.bind_transmitter(
+                system_id=self.user, password=self.password)
+
+        except smpplib.exceptions.ConnectionError as e:
+            self.logger.warning(
+                'Failed to establish connection to SMPP server {}: {}'.format(
+                    self.host, e))
+            return False
 
         for target in self.targets:
             parts, encoding, msg_type = smpplib.gsm.make_parts(body)
@@ -264,10 +287,39 @@ class NotifySMPP(NotifyBase):
         Parses the URL and returns enough arguments that can allow
         us to re-instantiate this object.
         """
-        results = NotifyBase.parse_url(url)
+        results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
+
+        if not results:
+            # We're done early as we couldn't load the results
+            return results
+
+        # Support the 'from'  and 'source' variable so that we can support
+        # targets this way too.
+        # The 'from' makes it easier to use yaml configuration
+        if 'from' in results['qsd'] and len(results['qsd']['from']):
+            results['source'] = \
+                NotifySMPP.unquote(results['qsd']['from'])
+
+            # hostname will also be a target in this case
+            results['targets'] = [
+                *NotifySMPP.parse_phone_no(results['host']),
+                *NotifySMPP.split_path(results['fullpath'])]
+
+        else:
+            # store our source
+            results['source'] = NotifySMPP.unquote(results['host'])
+
+            # store targets
+            results['targets'] = NotifySMPP.split_path(results['fullpath'])
+
+        # Support the 'to' variable so that we can support targets this way too
+        # The 'to' makes it easier to use yaml configuration
+        if 'to' in results['qsd'] and len(results['qsd']['to']):
+            results['targets'] += \
+                NotifySMPP.parse_phone_no(results['qsd']['to'])
 
         results['targets'] = NotifySMPP.split_path(results['fullpath'])
 
