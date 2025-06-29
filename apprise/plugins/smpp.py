@@ -28,9 +28,18 @@
 
 from itertools import chain
 
-import smpplib
-import smpplib.consts
-import smpplib.gsm
+try:
+    import smpplib
+    import smpplib.consts
+    import smpplib.gsm
+
+    # We're good to go!
+    NOTIFY_SMPP_ENABLED = True
+
+except ImportError:
+    # cryptography is required in order for this package to work
+    NOTIFY_SMPP_ENABLED = False
+
 
 from .base import NotifyBase
 from ..common import NotifyType
@@ -38,10 +47,18 @@ from ..locale import gettext_lazy as _
 from ..utils.parse import is_phone_no, parse_phone_no
 
 
-class NotifySmpp(NotifyBase):
+class NotifySMPP(NotifyBase):
     """
     A wrapper for SMPP Notifications
     """
+
+    # Set our global enabled flag
+    enabled = NOTIFY_SMPP_ENABLED
+
+    requirements = {
+        # Define our required packaging in order to work
+        'packages_required': 'python-snpp'
+    }
 
     # The default descriptive name associated with the Notification
     service_name = _('SMPP')
@@ -49,7 +66,10 @@ class NotifySmpp(NotifyBase):
     # The services URL
     service_url = 'https://smpp.org/'
 
+    # The default protocol
     protocol = 'smpp'
+
+    # The default secure protocol
     secure_protocol = 'smpps'
 
     # A URL that takes you to the setup/help of the specific protocol
@@ -175,7 +195,7 @@ class NotifySmpp(NotifyBase):
             port=self.port,
             source=self.source,
             targets='/'.join(
-                [NotifySmpp.quote(t, safe='')
+                [NotifySMPP.quote(t, safe='')
                  for t in chain(self.targets, self._invalid_targets)]),
             params=self.urlencode(params),
         )
@@ -249,27 +269,27 @@ class NotifySmpp(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
-        results['targets'] = NotifySmpp.split_path(results['fullpath'])
+        results['targets'] = NotifySMPP.split_path(results['fullpath'])
 
         # Support the 'to' variable so that we can support targets this way too
         # 'to' makes it easier to use yaml configuration
         if 'to' in results['qsd'] and len(results['qsd']['to']):
             results['targets'] += \
-                NotifySmpp.parse_phone_no(results['qsd']['to'])
+                NotifySMPP.parse_phone_no(results['qsd']['to'])
 
         # store any additional payload extras defined
-        results['payload'] = {NotifySmpp.unquote(x): NotifySmpp.unquote(y)
+        results['payload'] = {NotifySMPP.unquote(x): NotifySMPP.unquote(y)
                               for x, y in results['qsd:'].items()}
 
         # Add our GET parameters in the event the user wants to pass them
-        results['params'] = {NotifySmpp.unquote(x): NotifySmpp.unquote(y)
+        results['params'] = {NotifySMPP.unquote(x): NotifySMPP.unquote(y)
                              for x, y in results['qsd-'].items()}
 
         # Support the 'from' and 'source' variable so that we can support
         # targets this way too.
         # 'from' makes it easier to use yaml configuration
         if 'from' in results['qsd'] and len(results['qsd']['from']):
-            results['source'] = NotifySmpp.unquote(results['qsd']['from'])
+            results['source'] = NotifySMPP.unquote(results['qsd']['from'])
         elif results['targets']:
             # from phone number is the first entry in the list otherwise
             results['source'] = results['targets'].pop(0)

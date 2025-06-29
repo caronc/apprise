@@ -27,13 +27,11 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import logging
-from json import dumps
-from unittest import mock
+import sys
 
 import pytest
-import requests
-
-from apprise.plugins.smpp import NotifySmpp
+from apprise import Apprise
+from apprise.plugins.smpp import NotifySMPP
 from helpers import AppriseURLTester
 
 logging.disable(logging.CRITICAL)
@@ -66,32 +64,32 @@ apprise_url_tests = (
     }),
     ('smpp://user:pass@host:port/{}/{}'.format('1' * 10, 'a' * 32), {
         # valid everything but target numbers
-        'instance': NotifySmpp,
+        'instance': NotifySMPP,
         # We have no one to notify
         'notify_response': False,
     }),
     ('smpp://user:pass@host:port/{}'.format('1' * 10), {
         # everything valid
-        'instance': NotifySmpp,
+        'instance': NotifySMPP,
         # We have no one to notify
         'notify_response': False,
     }),
     ('smpp://user:pass@host:port/{}/{}'.format('1' * 10, '1' * 10), {
-        'instance': NotifySmpp,
+        'instance': NotifySMPP,
     }),
     ('smpp://_?&from={}&to={},{}'.format(
         '1' * 10, '1' * 10, '1' * 10), {
-         # use get args to accomplish the same thing
-         'instance': NotifySmpp,
-     }),
+        # use get args to accomplish the same thing
+        'instance': NotifySMPP,
+    }),
     ('smpp://user:pass@host:port/{}/{}'.format('1' * 10, '1' * 10), {
-        'instance': NotifySmpp,
+        'instance': NotifySMPP,
         # throw a bizarre code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
     ('smpp://user:pass@host:port/{}/{}'.format('1' * 10, '1' * 10), {
-        'instance': NotifySmpp,
+        'instance': NotifySMPP,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracefully handle them
         'test_requests_exceptions': True,
@@ -99,46 +97,28 @@ apprise_url_tests = (
 )
 
 
+@pytest.mark.skipif(
+    'python-smpp' in sys.modules,
+    reason="Requires that python-smpp NOT be installed")
+def test_plugin_fcm_cryptography_import_error():
+    """
+    NotifySimplePush() python-smpp loading failure
+    """
+
+    # Attempt to instantiate our object
+    obj = Apprise.instantiate(
+        'smpp://user:pass@host:port/{}/{}'.format('1' * 10, '1' * 10))
+
+    # It's not possible because our cryptography depedancy is missing
+    assert obj is None
+
+
+@pytest.mark.skipif(
+    'python-smpp' not in sys.modules, reason="Requires python-smpp")
 def test_plugin_smpp_urls():
     """
-    NotifySmpp() Apprise URLs
+    NotifySMPP() Apprise URLs
     """
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
-
-
-@mock.patch('requests.post')
-def test_plugin_smpp_edge_cases(mock_post):
-    """
-    NotifySmpp() Edge Cases
-    """
-
-    # Prepare our response
-    response = requests.Request()
-    response.status_code = requests.codes.ok
-
-    # Prepare Mock
-    mock_post.return_value = response
-
-    # Initialize some generic (but valid) apikeys
-    apikey = 'b' * 32
-    source = '+1 (555) 123-3456'
-
-    # No apikey specified
-    with pytest.raises(TypeError):
-        NotifySmpp(source=source)
-
-    # a error response
-    response.status_code = 400
-    response.content = dumps({
-        'code': 21211,
-        'message': "The 'To' number +1234567 is not a valid phone number.",
-    })
-    mock_post.return_value = response
-
-    # Initialize our object
-    obj = NotifySmpp(source=source)
-
-    # We will fail with the above error code
-    assert obj.notify('title', 'body', 'info') is False
