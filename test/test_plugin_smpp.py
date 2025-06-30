@@ -34,7 +34,13 @@ from apprise import Apprise
 from apprise.plugins.smpp import NotifySMPP
 from apprise import NotifyType
 from helpers import AppriseURLTester
-import smpplib
+
+try:
+    import smpplib
+
+except ImportError:
+    # No problem; there is no smpplib support
+    pass
 
 logging.disable(logging.CRITICAL)
 
