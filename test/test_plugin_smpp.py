@@ -99,10 +99,6 @@ def test_plugin_smpplib_import_error(mock_client):
     NotifySMPP() smpplib loading failure
     """
 
-    mock_client.connect.return_value = True
-    mock_client.bind_transmitter.return_value = True
-    mock_client.send_message.return_value = True
-
     # Attempt to instantiate our object
     obj = Apprise.instantiate(
         'smpp://user:pass@host/{}/{}'.format('1' * 10, '1' * 10))
