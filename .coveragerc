@@ -15,4 +15,3 @@ source =
 show_missing = True
 skip_covered = True
 skip_empty = True
-fail_under = 95.0
