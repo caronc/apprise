@@ -313,8 +313,8 @@ class NotifySlack(NotifyBase):
         r'|(?:>|\&gt;)))', re.IGNORECASE)
 
     def __init__(self, access_token=None, token_a=None, token_b=None,
-                 token_c=None, targets=None, include_image=True,
-                 include_footer=True, use_blocks=None, **kwargs):
+                 token_c=None, targets=None, include_image=None,
+                 include_footer=None, use_blocks=None, **kwargs):
         """
         Initialize Slack Object
         """
@@ -386,10 +386,15 @@ class NotifySlack(NotifyBase):
             re.IGNORECASE,
         )
         # Place a thumbnail image inline with the message body
-        self.include_image = include_image
+        self.include_image = \
+            self.template_args['image']['default'] \
+            if include_image is None else include_image
 
         # Place a footer with each post
-        self.include_footer = include_footer
+        self.include_footer = \
+            self.template_args['footer']['default'] \
+            if include_footer is None else include_footer
+
         return
 
     def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
@@ -1150,7 +1155,8 @@ class NotifySlack(NotifyBase):
 
         # Get Image Flag
         results['include_image'] = \
-            parse_bool(results['qsd'].get('image', True))
+            parse_bool(results['qsd'].get(
+                'image', NotifySlack.template_args['image']['default']))
 
         # Get Payload structure (use blocks?)
         if 'blocks' in results['qsd'] and len(results['qsd']['blocks']):
@@ -1158,7 +1164,8 @@ class NotifySlack(NotifyBase):
 
         # Get Footer Flag
         results['include_footer'] = \
-            parse_bool(results['qsd'].get('footer', True))
+            parse_bool(results['qsd'].get(
+                'footer', NotifySlack.template_args['footer']['default']))
 
         return results
 
