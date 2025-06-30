@@ -16,4 +16,4 @@ paho-mqtt != 2.0.*
 PGPy
 
 # Provides smpp:// support
-python-smpp
+smpplib
