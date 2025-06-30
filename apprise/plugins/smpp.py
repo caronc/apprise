@@ -147,13 +147,8 @@ class NotifySMPP(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        if not self.user:
-            msg = 'No SMPP user account was specified.'
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        if not self.host:
-            msg = 'No SMPP host was specified.'
+        if not (self.user and self.password):
+            msg = 'No SMPP user/pass combination was provided'
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -289,10 +284,6 @@ class NotifySMPP(NotifyBase):
         us to re-instantiate this object.
         """
         results = NotifyBase.parse_url(url, verify_host=False)
-        if not results:
-            # We're done early as we couldn't load the results
-            return results
-
         if not results:
             # We're done early as we couldn't load the results
             return results

@@ -32,7 +32,9 @@ from unittest import mock
 import pytest
 from apprise import Apprise
 from apprise.plugins.smpp import NotifySMPP
+from apprise import NotifyType
 from helpers import AppriseURLTester
+import smpplib
 
 logging.disable(logging.CRITICAL)
 
@@ -103,7 +105,7 @@ def test_plugin_smpplib_import_error(mock_client):
 
     # Attempt to instantiate our object
     obj = Apprise.instantiate(
-        'smpp://user:pass@host:port/{}/{}'.format('1' * 10, '1' * 10))
+        'smpp://user:pass@host/{}/{}'.format('1' * 10, '1' * 10))
 
     # It's not possible because our cryptography depedancy is missing
     assert obj is None
@@ -117,9 +119,41 @@ def test_plugin_smpp_urls(mock_client):
     NotifySMPP() Apprise URLs
     """
 
-    mock_client.connect.return_value = True
-    mock_client.bind_transmitter.return_value = True
-    mock_client.send_message.return_value = True
-
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+@pytest.mark.skipif(
+    'smpplib' not in sys.modules, reason="Requires smpplib")
+@mock.patch('smpplib.client.Client')
+def test_plugin_smpp_edge_case(mock_client_class):
+    """
+    NotifySMPP() Apprise Edge Case
+    """
+
+    mock_client_instance = mock.Mock()
+    mock_client_class.return_value = mock_client_instance
+
+    # Raise exception on connect
+    mock_client_instance.connect.side_effect = \
+        smpplib.exceptions.ConnectionError
+    mock_client_instance.bind_transmitter.return_value = True
+    mock_client_instance.send_message.return_value = True
+
+    # Instantiate our object
+    obj = Apprise.instantiate(
+        'smpp://user:pass@host/{}/{}'.format('1' * 10, '1' * 10))
+
+    # Well fail to establish a connection
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is False
+
+    # Raise exception on connect
+    mock_client_instance.connect.side_effect = None
+    mock_client_instance.bind_transmitter.return_value = True
+    mock_client_instance.send_message.side_effect = \
+        smpplib.exceptions.ConnectionError
+
+    # Well fail to deliver our message
+    assert obj.notify(
+        body='body', title='title', notify_type=NotifyType.INFO) is False
