@@ -116,6 +116,7 @@ class NotifySMPP(NotifyBase):
             'type': 'string',
             'regex': (r'^[0-9\s)(+-]+$', 'i'),
             'required': True,
+            'map_to': 'source',
         },
         'target_phone': {
             'name': _('Target Phone No'),
