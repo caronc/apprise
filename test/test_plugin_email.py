@@ -1831,6 +1831,67 @@ def test_plugin_email_variables_1087():
 
 @mock.patch('smtplib.SMTP_SSL')
 @mock.patch('smtplib.SMTP')
+def test_plugin_email_to_handling_1356(mock_smtp, mock_smtp_ssl):
+    """
+    NotifyEmail() GitHub Issue 1356
+    https://github.com/caronc/apprise/issues/1356
+    Email not correctly preparing the `to:`
+
+    """
+
+    response = mock.Mock()
+    mock_smtp_ssl.return_value = response
+    mock_smtp.return_value = response
+
+    results = email.NotifyEmail.parse_url(
+        'mailtos://smtp-relay.gmail.com?'
+        'from=user@custom-domain.casa&to=alerts@anothercustomdomain.net')
+
+    assert isinstance(results, dict)
+    assert results['user'] is None
+    assert results['password'] is None
+    assert results['host'] == 'smtp-relay.gmail.com'
+    assert results['port'] is None
+    assert results['from_addr'] == 'user@custom-domain.casa'
+    assert results['smtp_host'] == ''
+    assert 'alerts@anothercustomdomain.net' in results['targets']
+
+    obj = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(obj, email.NotifyEmail)
+
+    assert len(obj.targets) == 1
+    assert (False, 'alerts@anothercustomdomain.net') in obj.targets
+
+    assert obj.smtp_host == 'smtp-relay.gmail.com'
+    assert obj.from_addr == (False, 'user@custom-domain.casa')
+
+    assert mock_smtp.call_count == 0
+    assert mock_smtp_ssl.call_count == 0
+    assert obj.notify('body', 'title') is True
+
+    assert mock_smtp.call_count == 1
+    assert mock_smtp_ssl.call_count == 0
+    assert response.starttls.call_count == 1
+    # No login occurs as no user/pass was provided
+    assert response.login.call_count == 0
+    assert response.sendmail.call_count == 1
+
+    # Store our Sent Arguments
+    # Syntax is:
+    #  sendmail(from_addr, to_addrs, msg, mail_options=(), rcpt_options=())
+    #             [0]        [1]     [2]
+    _from = response.sendmail.call_args[0][0]
+    _to = response.sendmail.call_args[0][1]
+    _msg = response.sendmail.call_args[0][2]
+    assert _from == 'user@custom-domain.casa'
+    assert isinstance(_to, list)
+    assert len(_to) == 1
+    assert _to[0] == 'alerts@anothercustomdomain.net'
+    assert _msg.split('\n')[-3] == 'body'
+
+
+@mock.patch('smtplib.SMTP_SSL')
+@mock.patch('smtplib.SMTP')
 def test_plugin_host_detection_from_source_email(mock_smtp, mock_smtp_ssl):
     """
     NotifyEmail() Discord Issue reporting that the following did not work:
