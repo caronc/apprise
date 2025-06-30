@@ -99,8 +99,7 @@ apprise_url_tests = (
 @pytest.mark.skipif(
     'smpplib' in sys.modules,
     reason="Requires that smpplib NOT be installed")
-@mock.patch('smpplib.client.Client')
-def test_plugin_smpplib_import_error(mock_client):
+def test_plugin_smpplib_import_error():
     """
     NotifySMPP() smpplib loading failure
     """
@@ -115,47 +114,58 @@ def test_plugin_smpplib_import_error(mock_client):
 
 @pytest.mark.skipif(
     'smpplib' not in sys.modules, reason="Requires smpplib")
-@mock.patch('smpplib.client.Client')
-def test_plugin_smpp_urls(mock_client):
+def test_plugin_smpp_urls():
     """
     NotifySMPP() Apprise URLs
     """
+    # mock nested inside of outside function to avoid failing
+    # when smpplib is unavailable
+    with mock.patch('smpplib.client.Client') as mock_client_class:
+        mock_client_instance = mock.Mock()
+        mock_client_class.return_value = mock_client_instance
 
-    # Run our general tests
-    AppriseURLTester(tests=apprise_url_tests).run_all()
+        # Raise exception on connect
+        mock_client_instance.connect.return_value = True
+        mock_client_instance.bind_transmitter.return_value = True
+        mock_client_instance.send_message.return_value = True
+
+        # Run our general tests
+        AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
 @pytest.mark.skipif(
     'smpplib' not in sys.modules, reason="Requires smpplib")
-@mock.patch('smpplib.client.Client')
-def test_plugin_smpp_edge_case(mock_client_class):
+def test_plugin_smpp_edge_case():
     """
     NotifySMPP() Apprise Edge Case
     """
 
-    mock_client_instance = mock.Mock()
-    mock_client_class.return_value = mock_client_instance
+    # mock nested inside of outside function to avoid failing
+    # when smpplib is unavailable
+    with mock.patch('smpplib.client.Client') as mock_client_class:
+        mock_client_instance = mock.Mock()
+        mock_client_class.return_value = mock_client_instance
 
-    # Raise exception on connect
-    mock_client_instance.connect.side_effect = \
-        smpplib.exceptions.ConnectionError
-    mock_client_instance.bind_transmitter.return_value = True
-    mock_client_instance.send_message.return_value = True
+        # Raise exception on connect
+        mock_client_instance.connect.side_effect = \
+            smpplib.exceptions.ConnectionError
+        mock_client_instance.bind_transmitter.return_value = True
+        mock_client_instance.send_message.return_value = True
 
-    # Instantiate our object
-    obj = Apprise.instantiate(
-        'smpp://user:pass@host/{}/{}'.format('1' * 10, '1' * 10))
+        # Instantiate our object
+        obj = Apprise.instantiate(
+            'smpp://user:pass@host/{}/{}'.format('1' * 10, '1' * 10))
 
-    # Well fail to establish a connection
-    assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO) is False
+        # Well fail to establish a connection
+        assert obj.notify(
+            body='body', title='title', notify_type=NotifyType.INFO) is False
 
-    # Raise exception on connect
-    mock_client_instance.connect.side_effect = None
-    mock_client_instance.bind_transmitter.return_value = True
-    mock_client_instance.send_message.side_effect = \
-        smpplib.exceptions.ConnectionError
+        # Raise exception on connect
+        mock_client_instance.connect.side_effect = None
+        mock_client_instance.bind_transmitter.return_value = True
+        mock_client_instance.send_message.side_effect = \
+            smpplib.exceptions.ConnectionError
 
-    # Well fail to deliver our message
-    assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO) is False
+        # Well fail to deliver our message
+        assert obj.notify(
+            body='body', title='title', notify_type=NotifyType.INFO) is False
