@@ -122,10 +122,6 @@ BuildRequires: python%{python3_pkgversion}-pytest-cov
 # at this time; remove failing test until this is resolved
 %{__rm} test/test_apprise_translations.py
 
-# 2025.06.29: python-smpplib is not provided in rhel or fedora; remove test
-# to avoid build failures
-%{__rm} test/test_plugin_smpp.py
-
 %build
 %py3_build
 
