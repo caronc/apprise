@@ -140,15 +140,16 @@ class NotifySMPP(NotifyBase):
         super().__init__(**kwargs)
 
         self.source = None
+
+        if not (self.user and self.password):
+            msg = 'No SMPP user/pass combination was provided'
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
         result = is_phone_no(source)
         if not result:
             msg = 'The Account (From) Phone # specified ' \
                   '({}) is invalid.'.format(source)
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        if not (self.user and self.password):
-            msg = 'No SMPP user/pass combination was provided'
             self.logger.warning(msg)
             raise TypeError(msg)
 
