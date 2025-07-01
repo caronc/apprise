@@ -41,7 +41,7 @@ from datetime import timezone
 
 from ..base import NotifyBase
 from ...url import PrivacyMode
-from ...common import NotifyFormat, NotifyType
+from ...common import NotifyFormat, NotifyType, PersistentStoreMode
 from ...conversion import convert_between
 from ...utils import pgp as _pgp
 from ...utils.parse import (
@@ -74,6 +74,10 @@ class NotifyEmail(NotifyBase):
 
     # Support attachments
     attachment_support = True
+
+    # Our default is to no not use persistent storage beyond in-memory
+    # reference; this allows us to auto-generate our config if needed
+    storage_mode = PersistentStoreMode.AUTO
 
     # Default Notify Format
     notify_format = NotifyFormat.HTML
