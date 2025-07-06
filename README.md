@@ -79,6 +79,7 @@ The table below identifies the services this tool supports and some example serv
 | [KODI](https://github.com/caronc/apprise/wiki/Notify_kodi) | kodi:// or kodis://    | (TCP) 8080 or 443   | kodi://hostname<br />kodi://user@hostname<br />kodi://user:password@hostname:port
 | [Kumulos](https://github.com/caronc/apprise/wiki/Notify_kumulos) | kumulos:// | (TCP) 443 | kumulos://apikey/serverkey
 | [LaMetric Time](https://github.com/caronc/apprise/wiki/Notify_lametric) | lametric:// | (TCP) 443 | lametric://apikey@device_ipaddr<br/>lametric://apikey@hostname:port<br/>lametric://client_id@client_secret
+| [Lark](https://github.com/caronc/apprise/wiki/Notify_lark) | lark://  | (TCP) 443   | lark://BotToken
 | [Line](https://github.com/caronc/apprise/wiki/Notify_line) | line:// | (TCP) 443 | line://Token@User<br/>line://Token/User1/User2/UserN
 | [LunaSea](https://github.com/caronc/apprise/wiki/Notify_lunasea) | lunasea://  | (TCP) 80 or 443   | lunasea://user:pass@+FireBaseDevice/<br/>lunasea://user:pass@FireBaseUser/<br/>lunasea://user:pass@hostname/+FireBaseDevice/<br/>lunasea://user:pass@hostname/@FireBaseUser/
 | [Mailgun](https://github.com/caronc/apprise/wiki/Notify_mailgun) | mailgun:// | (TCP) 443 | mailgun://user@hostname/apikey<br />mailgun://user@hostname/apikey/email<br />mailgun://user@hostname/apikey/email1/email2/emailN<br />mailgun://user@hostname/apikey/?name="From%20User"
