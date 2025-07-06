@@ -198,7 +198,10 @@ def good_response(data=None):
         'service': [{
             'type': 'AtprotoPersonalDataServer',
             'serviceEndpoint': 'https://example.pds.io'
-        }]
+        }],
+        'ratelimit-reset': str(
+            int(datetime.now(timezone.utc).timestamp()) + 3600),
+        'ratelimit-remaining': '10',
     } if data is None else data)
 
     response.status_code = requests.codes.ok
@@ -745,9 +748,7 @@ def test_plugin_bluesky_did_web_and_plc_resolution(
 
     mock_get.side_effect = [bad_did_response]
     obj = Apprise.instantiate(bluesky_url)
-
-    with pytest.raises(RuntimeError):
-        obj.notify(body='fail due to bad scheme')
+    assert obj.notify(body='fail due to bad scheme') is False
 
 
 @patch('requests.get')
@@ -770,3 +771,26 @@ def test_plugin_bluesky_pds_resolution_failures(mock_get):
     obj = NotifyBlueSky(user='handle', password='pass')
     did, endpoint = obj.get_identifier()
     assert (did, endpoint) == (False, False)
+
+
+@patch('requests.get')
+def test_plugin_bluesky_missing_pds_endpoint(mock_get):
+    """
+    NotifyBlueSky() - test case where endpoint is missing from DID document
+    """
+    # Return a valid DID resolution
+    identity_response = good_response({'did': 'did:plc:abcdefg1234567'})
+
+    # Return DID document with a service list, but no matching PDS type
+    incomplete_pds_response = good_response({
+        'service': [
+            {
+                'type': 'SomeOtherService',
+                'serviceEndpoint': 'https://unrelated.example.com'
+            }
+        ]
+    })
+
+    mock_get.side_effect = [identity_response, incomplete_pds_response]
+    obj = NotifyBlueSky(user='handle', password='app-pw')
+    assert obj.get_identifier() == (False, False)

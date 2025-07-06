@@ -370,11 +370,15 @@ class NotifyBlueSky(NotifyBase):
             )
 
         else:
-            raise RuntimeError("Unknown BlueSky DID scheme")
+            self.logger.warning(
+                'Unknown BlueSky DID scheme detected in {}'.format(did))
+            return (False, False)
 
         # Step 3: Send to correct endpoint
         if not endpoint:
-            raise RuntimeError("Failed to resolve BlueSky PDS endpoint")
+            self.logger.warning(
+                'Failed to resolve BlueSky PDS endpoint')
+            return (False, False)
 
         self.store.set(did_key, did)
         self.store.set(endpoint_key, endpoint)
