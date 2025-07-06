@@ -53,6 +53,13 @@ apprise_url_tests = (
         # Our expected url(privacy=True) startswith() response:
         'privacy_url': 'wxteams://a...a/',
     }),
+    ('wxteams://?token={}'.format('a' * 80), {
+        # token provided - we're good
+        'instance': NotifyWebexTeams,
+
+        # Our expected url(privacy=True) startswith() response:
+        'privacy_url': 'wxteams://a...a/',
+    }),
     ('webex://{}'.format('a' * 140), {
         # token provided - we're good
         'instance': NotifyWebexTeams,
