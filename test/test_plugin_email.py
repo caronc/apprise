@@ -1798,12 +1798,12 @@ def test_plugin_email_variables_1087():
     assert isinstance(result, list)
     assert len(result) == 1
 
-    email = result[0]
-    assert email.from_addr == ['Apprise', 'testuser@alt.lan']
-    assert email.user == 'testuser@alt.lan'
-    assert email.smtp_host == 'smtp.alt.lan'
-    assert email.targets == [(False, 'alteriks@alt.lan')]
-    assert email.password == 'xxxxXXXxxx'
+    _email = result[0]
+    assert _email.from_addr == ['Apprise', 'testuser@alt.lan']
+    assert _email.user == 'testuser@alt.lan'
+    assert _email.smtp_host == 'smtp.alt.lan'
+    assert _email.targets == [(False, 'alteriks@alt.lan')]
+    assert _email.password == 'xxxxXXXxxx'
 
     # Valid Configuration
     result, _ = ConfigBase.config_parse(cleandoc("""
@@ -1821,12 +1821,12 @@ def test_plugin_email_variables_1087():
     assert isinstance(result, list)
     assert len(result) == 1
 
-    email = result[0]
-    assert email.from_addr == ['Apprise', 'joe@alt.lan']
-    assert email.user == 'joe@alt.lan'
-    assert email.smtp_host == 'smtp.alt.lan'
-    assert email.targets == [(False, 'alteriks@alt.lan')]
-    assert email.password == 'abcd'
+    _email = result[0]
+    assert _email.from_addr == ['Apprise', 'joe@alt.lan']
+    assert _email.user == 'joe@alt.lan'
+    assert _email.smtp_host == 'smtp.alt.lan'
+    assert _email.targets == [(False, 'alteriks@alt.lan')]
+    assert _email.password == 'abcd'
 
 
 @mock.patch('smtplib.SMTP_SSL')
@@ -1888,6 +1888,93 @@ def test_plugin_email_to_handling_1356(mock_smtp, mock_smtp_ssl):
     assert len(_to) == 1
     assert _to[0] == 'alerts@anothercustomdomain.net'
     assert _msg.split('\n')[-3] == 'body'
+
+
+@mock.patch('smtplib.SMTP_SSL')
+@mock.patch('smtplib.SMTP')
+def test_plugin_email_variables_1334(mock_smtp, mock_smtp_ssl):
+    """
+    NotifyEmail() GitHub Issue 1334
+    https://github.com/caronc/apprise/issues/1334
+    Localhost & Local Domain default user
+
+    """
+
+    response = mock.Mock()
+    mock_smtp_ssl.return_value = response
+    mock_smtp.return_value = response
+
+    results = email.NotifyEmail.parse_url('mailto://localhost')
+
+    assert isinstance(results, dict)
+    assert results['user'] is None
+    assert results['password'] is None
+    assert results['host'] == 'localhost'
+    assert results['port'] is None
+    assert results['from_addr'] == ''
+    assert results['smtp_host'] == ''
+    assert results['targets'] == []
+
+    obj = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(obj, email.NotifyEmail)
+
+    assert len(obj.targets) == 1
+    assert (False, 'root@localhost') in obj.targets
+
+    assert obj.smtp_host == 'localhost'
+    assert obj.secure is False
+    assert obj.from_addr == [False, 'root@localhost']
+
+    assert mock_smtp.call_count == 0
+    assert mock_smtp_ssl.call_count == 0
+    assert obj.notify('body', 'title') is True
+
+    assert mock_smtp.call_count == 1
+    assert mock_smtp_ssl.call_count == 0
+    assert response.starttls.call_count == 0
+    # No login occurs as no user/pass was provided
+    assert response.login.call_count == 0
+    assert response.sendmail.call_count == 1
+
+    #
+    # Again, but a different variation of the localhost domain
+    #
+    mock_smtp.reset_mock()
+    mock_smtp_ssl.reset_mock()
+    response.reset_mock()
+
+    results = email.NotifyEmail.parse_url(
+        'mailtos://user@localhost.localdomain')
+
+    assert isinstance(results, dict)
+    assert results['user'] == 'user'
+    assert results['password'] is None
+    assert results['host'] == 'localhost.localdomain'
+    assert results['port'] is None
+    assert results['from_addr'] == ''
+    assert results['smtp_host'] == ''
+    assert results['targets'] == []
+
+    obj = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(obj, email.NotifyEmail)
+
+    assert len(obj.targets) == 1
+    assert (False, 'user@localhost.localdomain') in obj.targets
+
+    assert obj.smtp_host == 'localhost.localdomain'
+    assert obj.secure is True
+    assert obj.from_addr == ["Apprise", 'user@localhost.localdomain']
+
+    assert mock_smtp.call_count == 0
+    assert mock_smtp_ssl.call_count == 0
+    assert obj.notify('body', 'title') is True
+
+    assert mock_smtp.call_count == 1
+    assert mock_smtp_ssl.call_count == 0
+    assert response.starttls.call_count == 1
+    # No login occurs as no user/pass was provided
+    assert response.login.call_count == 0
+    assert response.sendmail.call_count == 1
 
 
 @mock.patch('smtplib.SMTP_SSL')
