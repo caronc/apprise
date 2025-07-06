@@ -90,7 +90,12 @@ apprise_url_tests = (
         'requests_response_text': {
             'accessJwt': 'abcd',
             'refreshJwt': 'abcd',
-            'did': 'did:1234',
+            'did': 'did:plc:1234',
+            # Support plc response
+            'service': [{
+                'type': 'AtprotoPersonalDataServer',
+                'serviceEndpoint': 'https://example.pds.io'
+            }]
         },
     }),
     ('bluesky://user@app-pw3', {
@@ -100,9 +105,14 @@ apprise_url_tests = (
         'requests_response_text': {
             'accessJwt': 'abcd',
             'refreshJwt': 'abcd',
-            'did': 'did:1234',
+            'did': 'did:plc:1234',
             # For handling attachments
             'blob': 'content',
+            # Support plc response
+            'service': [{
+                'type': 'AtprotoPersonalDataServer',
+                'serviceEndpoint': 'https://example.pds.io'
+            }]
         },
     }),
     ('bluesky://user.example.ca@app-pw3', {
@@ -112,9 +122,14 @@ apprise_url_tests = (
         'requests_response_text': {
             'accessJwt': 'abcd',
             'refreshJwt': 'abcd',
-            'did': 'did:1234',
+            'did': 'did:plc:1234',
             # For handling attachments
             'blob': 'content',
+            # Support plc response
+            'service': [{
+                'type': 'AtprotoPersonalDataServer',
+                'serviceEndpoint': 'https://example.pds.io'
+            }]
         },
     }),
     # A duplicate of the entry above, this will cause cache to be referenced
@@ -125,9 +140,14 @@ apprise_url_tests = (
         'requests_response_text': {
             'accessJwt': 'abcd',
             'refreshJwt': 'abcd',
-            'did': 'did:1234',
+            'did': 'did:plc:1234',
             # For handling attachments
             'blob': 'content',
+            # Support plc response
+            'service': [{
+                'type': 'AtprotoPersonalDataServer',
+                'serviceEndpoint': 'https://example.pds.io'
+            }]
         },
     }),
     ('bluesky://user@app-pw', {
@@ -138,7 +158,12 @@ apprise_url_tests = (
         'requests_response_text': {
             'accessJwt': 'abcd',
             'refreshJwt': 'abcd',
-            'did': 'did:1234',
+            'did': 'did:plc:1234',
+            # Support plc response
+            'service': [{
+                'type': 'AtprotoPersonalDataServer',
+                'serviceEndpoint': 'https://example.pds.io'
+            }]
         },
     }),
     ('bluesky://user@app-pw', {
@@ -149,7 +174,12 @@ apprise_url_tests = (
         'requests_response_text': {
             'accessJwt': 'abcd',
             'refreshJwt': 'abcd',
-            'did': 'did:1234',
+            'did': 'did:plc:1234',
+            # Support plc response
+            'service': [{
+                'type': 'AtprotoPersonalDataServer',
+                'serviceEndpoint': 'https://example.pds.io'
+            }]
         },
     }),
 )
@@ -163,7 +193,12 @@ def good_response(data=None):
     response.content = json.dumps({
         'accessJwt': 'abcd',
         'refreshJwt': 'abcd',
-        'did': 'did:1234',
+        'did': 'did:plc:1234',
+        # Support plc response
+        'service': [{
+            'type': 'AtprotoPersonalDataServer',
+            'serviceEndpoint': 'https://example.pds.io'
+        }]
     } if data is None else data)
 
     response.status_code = requests.codes.ok
@@ -363,7 +398,12 @@ def test_plugin_bluesky_general(mocker):
     response_obj = {
         'accessJwt': 'abcd',
         'refreshJwt': 'abcd',
-        'did': 'did:1234'
+        'did': 'did:plc:1234',
+        # Support plc response
+        'service': [{
+            'type': 'AtprotoPersonalDataServer',
+            'serviceEndpoint': 'https://example.pds.io'
+        }]
     }
     request.content = json.dumps(response_obj)
 
@@ -413,16 +453,19 @@ def test_plugin_bluesky_attachments_basic(
         attach=attach) is True
 
     # Verify API calls.
-    assert mock_get.call_count == 1
+    assert mock_get.call_count == 2
     assert mock_get.call_args_list[0][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.identity.resolveHandle'
+        'https://public.api.bsky.app/xrpc/com.atproto.identity.resolveHandle'
+    assert mock_get.call_args_list[1][0][0] == \
+        'https://plc.directory/did:plc:1234'
+
     assert mock_post.call_count == 3
     assert mock_post.call_args_list[0][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.server.createSession'
+        'https://example.pds.io/xrpc/com.atproto.server.createSession'
     assert mock_post.call_args_list[1][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.repo.uploadBlob'
+        'https://example.pds.io/xrpc/com.atproto.repo.uploadBlob'
     assert mock_post.call_args_list[2][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.repo.createRecord'
+        'https://example.pds.io/xrpc/com.atproto.repo.createRecord'
 
 
 @patch('requests.post')
@@ -445,14 +488,17 @@ def test_plugin_bluesky_attachments_bad_message_response(
         attach=attach) is False
 
     # Verify API calls.
-    assert mock_get.call_count == 1
+    assert mock_get.call_count == 2
     assert mock_get.call_args_list[0][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.identity.resolveHandle'
+        'https://public.api.bsky.app/xrpc/com.atproto.identity.resolveHandle'
+    assert mock_get.call_args_list[1][0][0] == \
+        'https://plc.directory/did:plc:1234'
+
     assert mock_post.call_count == 2
     assert mock_post.call_args_list[0][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.server.createSession'
+        'https://example.pds.io/xrpc/com.atproto.server.createSession'
     assert mock_post.call_args_list[1][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.repo.uploadBlob'
+        'https://example.pds.io/xrpc/com.atproto.repo.uploadBlob'
 
 
 @patch('requests.post')
@@ -475,14 +521,17 @@ def test_plugin_bluesky_attachments_upload_fails(
         attach=attach) is False
 
     # Verify API calls.
-    assert mock_get.call_count == 1
+    assert mock_get.call_count == 2
     assert mock_get.call_args_list[0][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.identity.resolveHandle'
+        'https://public.api.bsky.app/xrpc/com.atproto.identity.resolveHandle'
+    assert mock_get.call_args_list[1][0][0] == \
+        'https://plc.directory/did:plc:1234'
+
     assert mock_post.call_count == 2
     assert mock_post.call_args_list[0][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.server.createSession'
+        'https://example.pds.io/xrpc/com.atproto.server.createSession'
     assert mock_post.call_args_list[1][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.repo.uploadBlob'
+        'https://example.pds.io/xrpc/com.atproto.repo.uploadBlob'
 
 
 @patch('requests.post')
@@ -506,14 +555,16 @@ def test_plugin_bluesky_attachments_invalid_attachment(
         attach=attach) is False
 
     # Verify API calls.
-    assert mock_get.call_count == 1
+    assert mock_get.call_count == 2
     assert mock_get.call_args_list[0][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.identity.resolveHandle'
+        'https://public.api.bsky.app/xrpc/com.atproto.identity.resolveHandle'
+    assert mock_get.call_args_list[1][0][0] == \
+        'https://plc.directory/did:plc:1234'
 
     # No post request as attachment is not good.
     assert mock_post.call_count == 1
     assert mock_post.call_args_list[0][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.server.createSession'
+        'https://example.pds.io/xrpc/com.atproto.server.createSession'
 
 
 @patch('requests.post')
@@ -546,28 +597,30 @@ def test_plugin_bluesky_attachments_multiple_batch(
         attach=attach) is True
 
     # Verify API calls.
-    assert mock_get.call_count == 1
+    assert mock_get.call_count == 2
     assert mock_get.call_args_list[0][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.identity.resolveHandle'
+        'https://public.api.bsky.app/xrpc/com.atproto.identity.resolveHandle'
+    assert mock_get.call_args_list[1][0][0] == \
+        'https://plc.directory/did:plc:1234'
     assert mock_post.call_count == 9
     assert mock_post.call_args_list[0][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.server.createSession'
+        'https://example.pds.io/xrpc/com.atproto.server.createSession'
     assert mock_post.call_args_list[1][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.repo.uploadBlob'
+        'https://example.pds.io/xrpc/com.atproto.repo.uploadBlob'
     assert mock_post.call_args_list[2][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.repo.uploadBlob'
+        'https://example.pds.io/xrpc/com.atproto.repo.uploadBlob'
     assert mock_post.call_args_list[3][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.repo.uploadBlob'
+        'https://example.pds.io/xrpc/com.atproto.repo.uploadBlob'
     assert mock_post.call_args_list[4][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.repo.uploadBlob'
+        'https://example.pds.io/xrpc/com.atproto.repo.uploadBlob'
     assert mock_post.call_args_list[5][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.repo.createRecord'
+        'https://example.pds.io/xrpc/com.atproto.repo.createRecord'
     assert mock_post.call_args_list[6][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.repo.createRecord'
+        'https://example.pds.io/xrpc/com.atproto.repo.createRecord'
     assert mock_post.call_args_list[7][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.repo.createRecord'
+        'https://example.pds.io/xrpc/com.atproto.repo.createRecord'
     assert mock_post.call_args_list[8][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.repo.createRecord'
+        'https://example.pds.io/xrpc/com.atproto.repo.createRecord'
 
     # If we call the functions again, the only difference is
     # we no longer need to resolve the handle or create a session
@@ -589,21 +642,21 @@ def test_plugin_bluesky_attachments_multiple_batch(
     assert mock_get.call_count == 0
     assert mock_post.call_count == 8
     assert mock_post.call_args_list[0][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.repo.uploadBlob'
+        'https://example.pds.io/xrpc/com.atproto.repo.uploadBlob'
     assert mock_post.call_args_list[1][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.repo.uploadBlob'
+        'https://example.pds.io/xrpc/com.atproto.repo.uploadBlob'
     assert mock_post.call_args_list[2][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.repo.uploadBlob'
+        'https://example.pds.io/xrpc/com.atproto.repo.uploadBlob'
     assert mock_post.call_args_list[3][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.repo.uploadBlob'
+        'https://example.pds.io/xrpc/com.atproto.repo.uploadBlob'
     assert mock_post.call_args_list[4][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.repo.createRecord'
+        'https://example.pds.io/xrpc/com.atproto.repo.createRecord'
     assert mock_post.call_args_list[5][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.repo.createRecord'
+        'https://example.pds.io/xrpc/com.atproto.repo.createRecord'
     assert mock_post.call_args_list[6][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.repo.createRecord'
+        'https://example.pds.io/xrpc/com.atproto.repo.createRecord'
     assert mock_post.call_args_list[7][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.repo.createRecord'
+        'https://example.pds.io/xrpc/com.atproto.repo.createRecord'
 
 
 @patch('requests.post')
@@ -622,9 +675,98 @@ def test_plugin_bluesky_auth_failure(
         body='body', title='title', notify_type=NotifyType.INFO) is False
 
     # Verify API calls.
-    assert mock_get.call_count == 1
+    assert mock_get.call_count == 2
     assert mock_get.call_args_list[0][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.identity.resolveHandle'
+        'https://public.api.bsky.app/xrpc/com.atproto.identity.resolveHandle'
+    assert mock_get.call_args_list[1][0][0] == \
+        'https://plc.directory/did:plc:1234'
     assert mock_post.call_count == 1
     assert mock_post.call_args_list[0][0][0] == \
-        'https://bsky.social/xrpc/com.atproto.server.createSession'
+        'https://example.pds.io/xrpc/com.atproto.server.createSession'
+
+
+@patch('requests.post')
+@patch('requests.get')
+def test_plugin_bluesky_did_web_and_plc_resolution(
+        mock_get, mock_post, bluesky_url, good_message_response):
+    """
+    NotifyBlueSky() - Full coverage of did:web and did:plc path
+    """
+
+    # Step 1: Identity resolution response (public.api.bsky.app)
+    identity_response = good_response({
+        'did': 'did:plc:abcdefg1234567'
+    })
+
+    # Step 2: PLC Directory lookup
+    plc_response = good_response({
+        'service': [{
+            'type': 'AtprotoPersonalDataServer',
+            'serviceEndpoint': 'https://example.pds.io'
+        }]
+    })
+
+    # Step 3: Auth session
+    session_response = good_response()
+
+    # Step 4: Create post
+    post_response = good_response()
+
+    mock_get.side_effect = [identity_response, plc_response]
+    mock_post.side_effect = [session_response, post_response]
+
+    obj = Apprise.instantiate(bluesky_url)
+    assert obj.notify(
+        body='Resolved PLC Flow') is True
+
+    # Reset for did:web test
+    identity_response = good_response({
+        'did': 'did:web:example.com'
+    })
+
+    web_did_response = good_response({
+        'service': [{
+            'type': 'AtprotoPersonalDataServer',
+            'serviceEndpoint': 'https://example.com'
+        }]
+    })
+
+    mock_get.side_effect = [identity_response, web_did_response]
+    mock_post.side_effect = [session_response, post_response]
+
+    obj = Apprise.instantiate(bluesky_url)
+    assert obj.notify(
+        body='Resolved WEB Flow') is True
+
+    # Invalid DID scheme
+    bad_did_response = good_response({
+        'did': 'did:unsupported:scheme'
+    })
+
+    mock_get.side_effect = [bad_did_response]
+    obj = Apprise.instantiate(bluesky_url)
+
+    with pytest.raises(RuntimeError):
+        obj.notify(body='fail due to bad scheme')
+
+
+@patch('requests.get')
+def test_plugin_bluesky_pds_resolution_failures(mock_get):
+    """
+    NotifyBlueSky() - Missing service field or invalid service endpoint
+    """
+    identity_response = good_response({'did': 'did:plc:missing-service'})
+    plc_no_service = good_response({'foo': 'bar'})
+
+    mock_get.side_effect = [identity_response, plc_no_service]
+    obj = NotifyBlueSky(user='handle', password='pass')
+    did, endpoint = obj.get_identifier()
+    assert (did, endpoint) == (False, False)
+
+    identity_response = good_response({'did': 'did:web:example.com'})
+    web_did_no_service = good_response({'foo': 'bar'})
+
+    mock_get.side_effect = [identity_response, web_did_no_service]
+    obj = NotifyBlueSky(user='handle', password='pass')
+    did, endpoint = obj.get_identifier()
+    assert (did, endpoint) == (False, False)
