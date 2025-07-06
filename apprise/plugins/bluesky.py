@@ -84,6 +84,7 @@ class NotifyBlueSky(NotifyBase):
     xrpc_suffix_session = "/xrpc/com.atproto.server.createSession"
     xrpc_suffix_record = "/xrpc/com.atproto.repo.createRecord"
     xrpc_suffix_blob = "/xrpc/com.atproto.repo.uploadBlob"
+    plc_directory = 'https://plc.directory/{did}'
 
     # BlueSky is kind enough to return how many more requests we're allowed to
     # continue to make within it's header response as:
@@ -138,6 +139,7 @@ class NotifyBlueSky(NotifyBase):
         self.__access_token = self.store.get('access_token')
         self.__refresh_token = None
         self.__access_token_expiry = datetime.now(timezone.utc)
+        self.__endpoint = self.store.get('endpoint')
 
         if not self.user:
             msg = 'A BlueSky UserID/Handle must be specified.'
@@ -146,6 +148,8 @@ class NotifyBlueSky(NotifyBase):
 
         # Set our default host
         self.host = self.bluesky_default_host
+        self.__endpoint = f'https://{self.host}' \
+            if not self.host else self.__endpoint
 
         # Identify our Handle (if define)
         results = HANDLE_HOST_PARSE_RE.match(self.user)
@@ -169,7 +173,7 @@ class NotifyBlueSky(NotifyBase):
         blobs = []
 
         if attach and self.attachment_support:
-            url = f'https://{self.host}{self.xrpc_suffix_blob}'
+            url = f'{self.__endpoint}{self.xrpc_suffix_blob}'
             # We need to upload our payload first so that we can source it
             # in remaining messages
             for no, attachment in enumerate(attach, start=1):
@@ -217,14 +221,15 @@ class NotifyBlueSky(NotifyBase):
                 blobs.append((response.get('blob'), filename))
 
         # Prepare our URL
-        url = f'https://{self.host}{self.xrpc_suffix_record}'
+        did, endpoint = self.get_identifier()
+        url = f'{endpoint}{self.xrpc_suffix_record}'
 
         # prepare our batch of payloads to create
         payloads = []
 
         payload = {
             "collection": "app.bsky.feed.post",
-            "repo": self.get_identifier(),
+            "repo": did,
             "record": {
                 "text": body,
                 # 'YYYY-mm-ddTHH:MM:SSZ'
@@ -286,12 +291,17 @@ class NotifyBlueSky(NotifyBase):
             user = self.user
 
         user = f'{user}.{self.host}' if '.' not in user else f'{user}'
-        key = f'did.{user}'
-        did = self.store.get(key)
-        if did:
-            return did
+        did_key = f'did.{user}'
+        endpoint_key = f'endpoint.{user}'
 
-        url = f'https://{self.host}{self.xrpc_suffix_did}'
+        did = self.store.get(did_key)
+        endpoint = self.store.get(endpoint_key)
+        if did and endpoint:
+            # Early return
+            return did, endpoint
+
+        # Step 1: Acquire DID from bsky.app
+        url = f'https://public.api.bsky.app{self.xrpc_suffix_did}'
         params = {'handle': user}
 
         # Send Login Information
@@ -305,12 +315,74 @@ class NotifyBlueSky(NotifyBase):
 
         if not postokay or not response or 'did' not in response:
             # We failed
-            return False
+            return (False, False)
 
-        # Acquire our Decentralized Identitifer
+        # Store our DID
         did = response.get('did')
-        self.store.set(key, did)
-        return did
+
+        # Step 2: Use DID to find the PDS
+        if did.startswith("did:plc:"):
+            pds_url = self.plc_directory.format(did=did)
+
+            # PDS Query
+            postokay, service_response = self._fetch(
+                pds_url,
+                method='GET',
+                # We set this boolean so internal recursion doesn't take place.
+                login=login,
+            )
+            if not postokay or not service_response or \
+                    'service' not in service_response:
+                # We failed
+                return (False, False)
+
+            endpoint = next(
+                (s["serviceEndpoint"]
+                 for s in service_response.get("service", [])
+                 if s["type"] == "AtprotoPersonalDataServer"),
+                None,
+            )
+
+        elif did.startswith("did:web:"):
+            # Convert to domain
+            domain = did[8:]
+            web_did_url = f"https://{domain}/.well-known/did.json"
+            postokay, service_response = self._fetch(
+                web_did_url,
+                method='GET',
+                # We set this boolean so internal recursion doesn't take place.
+                login=login,
+            )
+            if not postokay or not service_response or \
+                    'service' not in service_response:
+                # We failed
+                self.logger.warning(
+                    'Could not fetch DID document for did:web identity '
+                    '{}; ensure {} is available.'.format(did, web_did_url)
+                )
+                return (False, False)
+
+            endpoint = next(
+                (s["serviceEndpoint"]
+                 for s in service_response.get("service", [])
+                 if s["type"] == "AtprotoPersonalDataServer"),
+                None,
+            )
+
+        else:
+            self.logger.warning(
+                'Unknown BlueSky DID scheme detected in {}'.format(did))
+            return (False, False)
+
+        # Step 3: Send to correct endpoint
+        if not endpoint:
+            self.logger.warning(
+                'Failed to resolve BlueSky PDS endpoint')
+            return (False, False)
+
+        self.store.set(did_key, did)
+        self.store.set(endpoint_key, endpoint)
+        return (did, endpoint)
 
     def login(self):
         """
@@ -318,11 +390,11 @@ class NotifyBlueSky(NotifyBase):
         """
 
         # Acquire our Decentralized Identitifer
-        did = self.get_identifier(self.user, login=True)
+        did, self.__endpoint = self.get_identifier(self.user, login=True)
         if not did:
             return False
 
-        url = f'https://{self.host}{self.xrpc_suffix_session}'
+        url = f'{self.__endpoint}{self.xrpc_suffix_session}'
 
         payload = {
             "identifier": did,
@@ -392,6 +464,7 @@ class NotifyBlueSky(NotifyBase):
             'access_token', self.__access_token, self.__access_token_expiry)
         self.store.set(
             'refresh_token', self.__refresh_token, self.__access_token_expiry)
+        self.store.set('endpoint', self.__endpoint)
 
         self.logger.info('Authenticated to BlueSky as {}.{}'.format(
             self.user, self.host))
