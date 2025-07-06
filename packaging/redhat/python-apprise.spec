@@ -42,7 +42,7 @@ it easy to access:
 Africas Talking, Apprise API, APRS, AWS SES, AWS SNS, Bark, BlueSky, Burst SMS,
 BulkSMS, BulkVS, Chanify, Clickatell, ClickSend, DAPNET, DingTalk, Discord, E-Mail, Emby,
 FCM, Feishu, Flock, Free Mobile, Google Chat, Gotify, Growl, Guilded, Home
-Assistant, httpSMS, IFTTT, Join, Kavenegar, KODI, Kumulos, LaMetric, Line,
+Assistant, httpSMS, IFTTT, Join, Kavenegar, KODI, Kumulos, LaMetric, Lark, Line,
 MacOSX, Mailgun, Mastodon, Mattermost, Matrix, MessageBird, Microsoft
 Windows, Microsoft Teams, Misskey, MQTT, MSG91, MyAndroid, Nexmo, Nextcloud,
 NextcloudTalk, Notica, Notifiarr, Notifico, ntfy, Office365, OneSignal,
