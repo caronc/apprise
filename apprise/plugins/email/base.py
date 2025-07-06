@@ -393,7 +393,7 @@ class NotifyEmail(NotifyBase):
         it was provided.
         """
 
-        if self.smtp_host or not self.user:
+        if self.smtp_host:
             # SMTP Server was explicitly specified, therefore it is assumed
             # the caller knows what he's doing and is intentionally
             # over-riding any smarts to be applied. We also can not apply
@@ -404,7 +404,7 @@ class NotifyEmail(NotifyBase):
         from_addr = '{}@{}'.format(
             re.split(r'[\s@]+', self.user)[0],
             self.host,
-        )
+        ) if self.user else self.host
 
         for i in range(len(templates.EMAIL_TEMPLATES)):  # pragma: no branch
             self.logger.trace('Scanning %s against %s' % (
@@ -457,6 +457,14 @@ class NotifyEmail(NotifyBase):
                         # user specified but login type
                         # not supported; switch it to email
                         self.user = '{}@{}'.format(self.user, self.host)
+
+                if 'from_user' in templates.EMAIL_TEMPLATES[i][2] \
+                        and not self.from_addr[1]:
+
+                    # Update our from address if defined
+                    self.from_addr[1] = '{}@{}'.format(
+                        templates.EMAIL_TEMPLATES[i][2]['from_user'],
+                        self.host)
 
                 break
 

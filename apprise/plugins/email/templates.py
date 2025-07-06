@@ -255,6 +255,19 @@ EMAIL_TEMPLATES = (
         },
     ),
 
+    # Localhost handling
+    (
+        'Local Mail Server',
+        re.compile(
+            r'^(((?P<label>[^+]+)\+)?(?P<id>[^@]+)@)?'
+            r'(?P<domain>localhost(\.localdomain)?)$', re.I),
+        {
+            # Provide a default user if one isn't provided
+            'from_user': 'root',
+            'smtp_host': None,
+        },
+    ),
+
     # Catch All
     (
         'Custom',
