@@ -113,6 +113,7 @@ The table below identifies the services this tool supports and some example serv
 | [PushSafer](https://github.com/caronc/apprise/wiki/Notify_pushsafer)  | psafer:// or psafers://  | (TCP) 80 or 443  | psafer://privatekey<br />psafers://privatekey/DEVICE<br />psafer://privatekey/DEVICE1/DEVICE2/DEVICEN
 | [Pushy](https://github.com/caronc/apprise/wiki/Notify_pushy)  | pushy://  | (TCP) 443  | pushy://apikey/DEVICE<br />pushy://apikey/DEVICE1/DEVICE2/DEVICEN<br />pushy://apikey/TOPIC<br />pushy://apikey/TOPIC1/TOPIC2/TOPICN
 | [PushDeer](https://github.com/caronc/apprise/wiki/Notify_pushdeer) | pushdeer:// or pushdeers:// | (TCP) 80 or 443 | pushdeer://pushKey<br />pushdeer://hostname/pushKey<br />pushdeer://hostname:port/pushKey
+| [QQ Push](https://github.com/caronc/apprise/wiki/Notify_qq) | qq://  | (TCP) 443   | qq://Token
 | [Reddit](https://github.com/caronc/apprise/wiki/Notify_reddit) | reddit:// | (TCP) 443   | reddit://user:password@app_id/app_secret/subreddit<br />reddit://user:password@app_id/app_secret/sub1/sub2/subN
 | [Resend](https://github.com/caronc/apprise/wiki/Notify_resend) | resend://  | (TCP) 443   | resend://APIToken:FromEmail/<br />resend://APIToken:FromEmail/ToEmail<br />resend://APIToken:FromEmail/ToEmail1/ToEmail2/ToEmailN/
 | [Revolt](https://github.com/caronc/apprise/wiki/Notify_Revolt) | revolt:// | (TCP) 443   |  revolt://bottoken/ChannelID<br />revolt://bottoken/ChannelID1/ChannelID2/ChannelIDN |
