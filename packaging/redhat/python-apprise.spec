@@ -47,12 +47,12 @@ MacOSX, Mailgun, Mastodon, Mattermost, Matrix, MessageBird, Microsoft
 Windows, Microsoft Teams, Misskey, MQTT, MSG91, MyAndroid, Nexmo, Nextcloud,
 NextcloudTalk, Notica, Notifiarr, Notifico, ntfy, Office365, OneSignal,
 Opsgenie, PagerDuty, PagerTree, ParsePlatform, Plivo, PopcornNotify, Prowl,
-Pushalot, PushBullet, Pushjet, PushMe, Pushover, PushSafer, Pushy, PushDeer,
-Revolt, Reddit, Resend, Rocket.Chat, RSyslog, SendGrid, ServerChan, Seven, SFR,
-Signal, SimplePush, Sinch, Slack, SMPP, SMSEagle, SMS Manager, SMTP2Go,
-SparkPost, Splunk, Spike, Super Toasty, Streamlabs, Stride, Synology Chat,
-Syslog, Techulus Push, Telegram, Threema Gateway, Twilio, Twitter, Twist, Vapid,
-VictorOps, Voipms, Vonage, WebPush, WeCom Bot, WhatsApp, Webex Teams,
+Pushalot, PushBullet, Pushjet, PushMe, Pushover, Pushplus, PushSafer, Pushy,
+PushDeer, Revolt, Reddit, Resend, Rocket.Chat, RSyslog, SendGrid, ServerChan,
+Seven, SFR, Signal, SimplePush, Sinch, Slack, SMPP, SMSEagle, SMS Manager,
+SMTP2Go, SparkPost, Splunk, Spike, Super Toasty, Streamlabs, Stride, Synology
+Chat, Syslog, Techulus Push, Telegram, Threema Gateway, Twilio, Twitter, Twist,
+Vapid, VictorOps, Voipms, Vonage, WebPush, WeCom Bot, WhatsApp, Webex Teams,
 Workflows, WxPusher, XBMC}
 
 Name:           python-%{pypi_name}
