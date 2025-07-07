@@ -127,6 +127,7 @@ The table below identifies the services this tool supports and some example serv
 | [SparkPost](https://github.com/caronc/apprise/wiki/Notify_sparkpost) | sparkpost:// | (TCP) 443 | sparkpost://user@hostname/apikey<br />sparkpost://user@hostname/apikey/email<br />sparkpost://user@hostname/apikey/email1/email2/emailN<br />sparkpost://user@hostname/apikey/?name="From%20User"
 | [Spike.sh](https://github.com/caronc/apprise/wiki/Notify_spike) | spike://  | (TCP) 443   | spike://Token
 | [Splunk](https://github.com/caronc/apprise/wiki/Notify_splunk) | splunk:// or victorops:/ | (TCP) 443 | splunk://route_key@apikey<br />splunk://route_key@apikey/entity_id
+| [Spug Push](https://github.com/caronc/apprise/wiki/Notify_spugpush) | spugpush://  | (TCP) 443   | spugpush://Token
 | [Streamlabs](https://github.com/caronc/apprise/wiki/Notify_streamlabs) | strmlabs:// | (TCP) 443 | strmlabs://AccessToken/<br/>strmlabs://AccessToken/?name=name&identifier=identifier&amount=0&currency=USD
 | [Synology Chat](https://github.com/caronc/apprise/wiki/Notify_synology_chat) | synology:// or synologys:// |  (TCP) 80 or 443 | synology://hostname/token<br />synology://hostname:port/token
 | [Syslog](https://github.com/caronc/apprise/wiki/Notify_syslog) | syslog://  | n/a | syslog://<br />syslog://Facility
