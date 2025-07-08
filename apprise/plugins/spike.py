@@ -117,7 +117,6 @@ class NotifySpike(NotifyBase):
         """
         Send Spike.sh Notification
         """
-        self.throttle()
 
         payload = {
             'message': title if title else body,
@@ -128,6 +127,9 @@ class NotifySpike(NotifyBase):
             'User-Agent': self.app_id,
             'Content-Type': 'application/json',
         }
+
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
 
         try:
             response = requests.post(

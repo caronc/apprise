@@ -120,7 +120,7 @@ def test_plugin_simplepush_urls():
 @pytest.mark.skipif(
     'cryptography' in sys.modules,
     reason="Requires that cryptography NOT be installed")
-def test_plugin_fcm_cryptography_import_error():
+def test_plugin_simpepush_cryptography_import_error():
     """
     NotifySimplePush() Cryptography loading failure
     """
