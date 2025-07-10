@@ -32,6 +32,15 @@
 %bcond_without tests
 %endif
 
+# Handling of new python building structure (for backwards compatiblity)
+%global legacy_python_build 0
+%if 0%{?fedora} && 0%{?fedora} <= 29
+%global legacy_python_build 1
+%endif
+%if 0%{?rhel} && 0%{?rhel} <= 9
+%global legacy_python_build 1
+%endif
+
 %global pypi_name apprise
 
 %global common_description %{expand: \
@@ -83,7 +92,11 @@ Summary: A simple wrapper to many popular notification services used today
 
 BuildRequires: gettext
 BuildRequires: python%{python3_pkgversion}-devel
+%if %{legacy_python_build}
+# backwards compatible
 BuildRequires: python%{python3_pkgversion}-setuptools
+%endif
+BuildRequires: python%{python3_pkgversion}-wheel
 BuildRequires: python%{python3_pkgversion}-requests
 BuildRequires: python%{python3_pkgversion}-requests-oauthlib
 BuildRequires: python%{python3_pkgversion}-click >= 5.0
@@ -93,6 +106,7 @@ BuildRequires: python%{python3_pkgversion}-babel
 BuildRequires: python%{python3_pkgversion}-cryptography
 BuildRequires: python%{python3_pkgversion}-certifi
 BuildRequires: python%{python3_pkgversion}-paho-mqtt
+BuildRequires: python%{python3_pkgversion}-tox
 Requires: python%{python3_pkgversion}-requests
 Requires: python%{python3_pkgversion}-requests-oauthlib
 Requires: python%{python3_pkgversion}-markdown
@@ -108,6 +122,12 @@ BuildRequires: python%{python3_pkgversion}-pytest-runner
 BuildRequires: python%{python3_pkgversion}-pytest-cov
 %endif
 
+%if 0%{?legacy_python_build} == 0
+# Logic for non-RHEL ≤ 9 systems
+%generate_buildrequires
+%pyproject_buildrequires
+%endif
+
 %description -n python%{python3_pkgversion}-%{pypi_name} %{common_description}
 
 %prep
@@ -117,24 +137,40 @@ BuildRequires: python%{python3_pkgversion}-pytest-cov
 # section of this RPM, but works completley fine under all other circumstances.
 # As a workaround, just remove the file so it doesn't hold up the RPM
 # Preparation
-%{__rm} test/test_plugin_bulksms.py
+%{__rm} tests/test_plugin_bulksms.py
 
 # 2023.08.27: rawhide does not install translationfiles for some reason
 # at this time; remove failing test until this is resolved
-%{__rm} test/test_apprise_translations.py
+%{__rm} tests/test_apprise_translations.py
 
 %build
+%if %{legacy_python_build}
+# backwards compatible
 %py3_build
+%else
+%pyproject_wheel
+%endif
+
 
 %install
+%if %{legacy_python_build}
+# backwards compatible
 %py3_install
+%else
+%pyproject_install
+%endif
 
 %{__install} -p -D -T -m 0644 packaging/man/%{pypi_name}.1 \
    %{buildroot}%{_mandir}/man1/%{pypi_name}.1
 
 %if %{with tests}
 %check
-LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version}
+%if %{legacy_python_build}
+# backwards compatible
+LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib}:%{_builddir}/%{name}-%{version} py.test-%{python3_version}
+%else
+%pytest
+%endif
 %endif
 
 %files -n python%{python3_pkgversion}-%{pypi_name}

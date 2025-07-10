@@ -27,36 +27,23 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Base
-FROM rockylinux:9
-ENV container docker
-RUN \
-	rm -f /lib/systemd/system/multi-user.target.wants/*;\
-	rm -f /etc/systemd/system/*.wants/*;\
-	rm -f /lib/systemd/system/local-fs.target.wants/*; \
-	rm -f /lib/systemd/system/sockets.target.wants/*udev*; \
-	rm -f /lib/systemd/system/sockets.target.wants/*initctl*; \
-	rm -f /lib/systemd/system/basic.target.wants/*;\
-	rm -f /lib/systemd/system/anaconda.target.wants/*; \
-   echo "assumeyes=1" >> /etc/yum.conf; \
-   dnf install -y epel-release; \
-   dnf install -y rpm-build rpmlint python3-pip rubygem-ronn \
-                  dnf-plugins-core 'dnf-command(config-manager)' \
-                 'dnf-command(builddep)' sudo rsync rpmdevtools; \
-   dnf config-manager --set-enabled crb;
+FROM python:3.11-buster
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libdbus-1-dev libgirepository1.0-dev build-essential musl-dev bash dbus && \
+    rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir dbus-python "PyGObject==3.44.2"
 
-COPY packaging/redhat/python-apprise.spec /
-# Place our build file into the path
-COPY bin/build-rpm.sh /usr/bin
-RUN rpmspec -q --buildrequires /python-apprise.spec | cut -f1 -d' ' | \
-    xargs dnf install -y && dnf clean all
-
-# RPM Build Structure Setup
-ENV FLAVOR=rpmbuild OS=centos DIST=el9
-RUN useradd builder -u 1000 -m -G users,wheel &>/dev/null && \
-    echo "builder ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers
-
+# Apprise Setup
 VOLUME ["/apprise"]
 WORKDIR /apprise
+COPY requirements.txt /
+COPY dev-requirements.txt /
+ENV PYTHONPATH=/apprise
+ENV PYTHONPYCACHEPREFIX=/apprise/__pycache__/py311
 
-# RPMs should never be built as root
-USER builder
+RUN pip install --no-cache-dir -r /requirements.txt -r /dev-requirements.txt
+
+RUN addgroup --gid ${USER_GID:-1000} apprise
+RUN adduser --system --uid ${USER_UID:-1000} --ingroup apprise --home /apprise --no-create-home --disabled-password apprise
+
+USER apprise

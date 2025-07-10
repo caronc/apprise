@@ -38,7 +38,7 @@
 #
 # Base
 FROM fedora:rawhide
-ENV container docker
+ENV container=docker
 
 # https://bugzilla.redhat.com/show_bug.cgi?id=2216807 workaround
 RUN dnf download -y --destdir BZ2216807 --resolve dnf-data && \
