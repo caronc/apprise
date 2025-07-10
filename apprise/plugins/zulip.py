@@ -252,7 +252,7 @@ class NotifyZulip(NotifyBase):
 
         # prepare JSON Object
         payload = {
-            'subject': title,
+            'topic': title,
             'content': body,
         }
 
@@ -284,7 +284,7 @@ class NotifyZulip(NotifyBase):
             self.logger.debug('Zulip POST URL: %s (cert_verify=%r)' % (
                 url, self.verify_certificate,
             ))
-            self.logger.debug('Zulip Payload: %s' % str(payload))
+            self.logger.warning('Zulip Payload: %s' % str(payload))
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -311,8 +311,8 @@ class NotifyZulip(NotifyBase):
                             ', ' if status_str else '',
                             r.status_code))
 
-                    self.logger.debug(
-                        'Response Details:\r\n{}'.format(r.content))
+                    self.logger.warning('Response Details:\r\n{}'.format(
+                        r.content))
 
                     # Mark our failure
                     has_error = True
