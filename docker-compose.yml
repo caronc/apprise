@@ -1,58 +1,57 @@
-version: "3.3"
 services:
   test.py39:
     build:
       context: .
-      dockerfile: test/docker/Dockerfile.py39
+      dockerfile: tests/docker/Dockerfile.py39
     volumes:
       - ./:/apprise
 
   test.py310:
     build:
       context: .
-      dockerfile: test/docker/Dockerfile.py310
+      dockerfile: tests/docker/Dockerfile.py310
     volumes:
       - ./:/apprise
 
   test.py311:
     build:
       context: .
-      dockerfile: test/docker/Dockerfile.py311
+      dockerfile: tests/docker/Dockerfile.py311
     volumes:
       - ./:/apprise
 
   test.py312:
     build:
       context: .
-      dockerfile: test/docker/Dockerfile.py312
+      dockerfile: tests/docker/Dockerfile.py312
     volumes:
       - ./:/apprise
 
   rpmbuild.el9:
     build:
       context: .
-      dockerfile: test/docker/Dockerfile.el9
+      dockerfile: tests/docker/Dockerfile.el9
     volumes:
       - ./:/apprise
 
   rpmbuild.f37:
     build:
       context: .
-      dockerfile: test/docker/Dockerfile.f37
+      dockerfile: tests/docker/Dockerfile.f37
     volumes:
       - ./:/apprise
 
   rpmbuild.f39:
     build:
       context: .
-      dockerfile: test/docker/Dockerfile.f39
+      dockerfile: tests/docker/Dockerfile.f39
     volumes:
       - ./:/apprise
 
   rpmbuild.rawhide:
     build:
       context: .
-      dockerfile: test/docker/Dockerfile.rawhide
+      dockerfile: tests/docker/Dockerfile.rawhide
     volumes:
       - ./:/apprise
 

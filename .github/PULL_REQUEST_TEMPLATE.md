@@ -1,12 +1,54 @@
 ## Description:
 **Related issue (if applicable):** #<!--apprise issue number goes here-->
 
-<!-- Have anything else to describe? Define it here -->
+<!-- Have anything else to describe? Define it here; this helps build the wiki item later
+## *ServiceName* Notifications
+* **Source**: https://official.website.example.ca
+* **Icon Support**: No
+* **Message Format**: Plain Text
+* **Message Limit**: ~10,000 Characters
+
+Describe your service here..
+
+### 🛠️ Setup Instructions
+
+1. Visit [service.site](https://example.ca/) and sign in using your account credentials.
+2. Once logged in, generate and copy your **token** ...
+
+---
+
+### ✅ Apprise Support
+
+### Syntax
+
+Valid syntax is as follows:
+- `service://{variable}`
+
+---
+
+### 🔐 Parameter Breakdown
+
+| Variable  | Required |  Description   |
+|-----------|----------|----------------|
+| variable1 | Yes      | Your variable1 |
+| variable2 | No       | Your variable2 |
+
+---
+
+### 📦 Examples
+
+Sends a simple example
+```bash
+apprise -vv -t "Title" -b "Message content" \
+    service://token
+```
+
+ -->
 
 ## New Service Completion Status
 <!-- This section is only applicable if you're adding a new service -->
 * [ ] apprise/plugins/<!--new plugin name -->.py
-* [ ] KEYWORDS
+* [ ] pypackage.toml update `keywords` section to identify our new service
     - add new service into this file (alphabetically).
 * [ ] README.md
     - add entry for new service to table (as a quick reference)
@@ -17,8 +59,8 @@
 <!-- The following must be completed or your PR can't be merged -->
 * [ ] The code change is tested and works locally.
 * [ ] There is no commented out code in this PR.
-* [ ] No lint errors (use `flake8`)
-* [ ] 100% test coverage
+* [ ] No lint errors (use `tox -e lint`)
+* [ ] 100% test coverage (use `tox -e minimal`)
 
 ## Testing
 <!-- If this your code is testable by other users of the program

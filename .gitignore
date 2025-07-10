@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# left-over-files from conflicts/merges
+*.orig
+
 # C extensions
 *.so
 
@@ -49,6 +52,7 @@ coverage.xml
 
 # Translations
 *.mo
+*.pot
 
 # Django stuff:
 *.log
@@ -69,4 +73,6 @@ target/
 .project
 .pydevproject
 .settings
+
+# Others
 .DS_Store

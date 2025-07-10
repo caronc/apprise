@@ -26,90 +26,57 @@
 # CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
+#!/usr/bin/env bash
+set -e
 
-# Directory where Apprise Source Code can be found
-APPRISE_DIR="/apprise"
+# Set Apprise root directory
+APPRISE_DIR="${APPRISE_DIR:-/apprise}"
 PYTHON=python3
-PIP=pip3
-VENV_CMD="$PYTHON -m venv"
+TOX="tox -c $APPRISE_DIR/tox.ini"
+DIST_DIR="${DIST_DIR:-$PWD/dist}"
+mkdir -p "$DIST_DIR"
 
-mkenv(){
-   # Prepares RPM Environment
-   cat << _EOF > $HOME/.rpmmacros
-# macros
-%_topdir    $APPRISE_DIR
-%_sourcedir %{_topdir}/dist
-%_specdir   %{_topdir}/dist
-%_rpmdir    %{_topdir}/dist/rpm
-%_srcrpmdir %{_topdir}/dist/rpm
-%_builddir  %{_topdir}/build/rpm
-_EOF
-   # Prepare our working directories if not already present
-   mkdir -p $APPRISE_DIR/{dist/rpm,build/rpm}
-   return 0
-}
+echo "==> Cleaning previous builds"
+$TOX -e clean --notest
 
-clean(){
-   # Tidy .pyc files
-   find $APPRISE_DIR -name '*.pyc' -delete &>/dev/null
-   find $APPRISE_DIR -type d -name '__pycache__' -exec rm -rf {} \ &>/dev/null;
-   # Remove previously build details
-   [ -d "$APPRISE_DIR/apprise.egg-info" ] && rm -rf $APPRISE_DIR/apprise.egg-info
-   [ -d "$APPRISE_DIR/build" ] && rm -rf $APPRISE_DIR/build
-   [ -d "$APPRISE_DIR/BUILDROOT" ] && rm -rf $APPRISE_DIR/BUILDROOT
-}
+echo "==> Linting RPM spec"
+rpmlint "$APPRISE_DIR/packaging/redhat/python-apprise.spec"
 
-build(){
-   # Test spec file for any issues
-   rpmlint "$APPRISE_DIR/packaging/redhat/python-apprise.spec"
-   [ $? -ne 0 ] && echo "RPMLint Failed!" && return 1
+echo "==> Running tests"
+$TOX -e py312
 
-   # Prepare RPM Package
-   # Detect our version
-   local VER=$(rpmspec -q --qf "%{version}\n" \
-      "$APPRISE_DIR/packaging/redhat/python-apprise.spec" 2>/dev/null | head -n1)
-   [ -z "$VER" ] && echo "Could not detect Apprise RPM Version" && return 1
+echo "==> Generating man pages"
+ronn --roff --organization="Chris Caron <lead2gold@gmail.com>" \
+    "$APPRISE_DIR/packaging/man/apprise.md"
 
-   if [ ! -f "$APPRISE_DIR/dist/apprise-$VER.tar.gz" ]; then
-      # Build Apprise
-      if [ ! -x $HOME/dev/bin/activate ]; then
-         $VENV_CMD $HOME/dev
-         [ $? -ne 0 ] && echo "Could not create Virtual Python Environment" && return 1
-      fi
-      . $HOME/dev/bin/activate
-      $PIP install coverage babel wheel markdown
+echo "==> Extracting translations"
+$TOX -e i18n || { echo "Translation extraction failed!" ; exit 1; }
 
-      pushd $APPRISE_DIR
-      # Build Man Page
-      ronn --roff $APPRISE_DIR/packaging/man/apprise.md
-      $PYTHON setup.py extract_messages
-      $PYTHON setup.py sdist
+echo "==> Compiling translations"
+$TOX -e compile || { echo "Translation compilation failed!" ; exit 1; }
 
-      # exit from our virtual environment
-      deactivate
-   fi
+echo "==> Building source distribution"
+$TOX -e build-sdist || { echo "sdist build failed!" ; exit 1; }
 
-   # Prepare our RPM Source and SPEC dependencies
-   find "$APPRISE_DIR/packaging/man/" -type f -name '*.1' \
-         -exec cp --verbose {} "$APPRISE_DIR/dist" \;
-   find "$APPRISE_DIR/packaging/redhat" -type f -name '*.patch' \
-         -exec cp --verbose {} "$APPRISE_DIR/dist" \;
-   find "$APPRISE_DIR/packaging/redhat" -type f -name '*.spec' \
-         -exec cp --verbose {} "$APPRISE_DIR/dist" \;
+VERSION=$(rpmspec -q --qf "%{version}\n" "$APPRISE_DIR/packaging/redhat/python-apprise.spec" | head -n1)
+TARBALL="$APPRISE_DIR/dist/apprise-${VERSION}.tar.gz"
 
-   # Build and Test our RPM Package
-   rpmbuild -ba "$APPRISE_DIR/dist/python-apprise.spec"
-   return $?
-}
+if [[ ! -f "$TARBALL" ]]; then
+  echo "Tarball not found: $TARBALL"
+  exit 1
+fi
 
-# Prepare our environment
-mkenv
+echo "==> Copying tarball to SOURCES directory"
+mkdir -p "$APPRISE_DIR/SOURCES"
+cp "$TARBALL" "$APPRISE_DIR/SOURCES/"
 
-# Clean
-clean
+echo "==> Building RPM"
+rpmbuild --define "_topdir $APPRISE_DIR" \
+         --define "_sourcedir $APPRISE_DIR/SOURCES" \
+         --define "_specdir $APPRISE_DIR/packaging/redhat" \
+         --define "_srcrpmdir $APPRISE_DIR/SRPMS" \
+         --define "_rpmdir $DIST_DIR" \
+         -ba "$APPRISE_DIR/packaging/redhat/python-apprise.spec"
 
-# Build
-build
+echo "✅ RPM build completed successfully"
 
-# Return our build status
-exit $?

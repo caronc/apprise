@@ -38,8 +38,8 @@ VOLUME ["/apprise"]
 WORKDIR /apprise
 COPY requirements.txt /
 COPY dev-requirements.txt /
-ENV PYTHONPATH /apprise
-ENV PYTHONPYCACHEPREFIX /apprise/__pycache__/py312
+ENV PYTHONPATH=/apprise
+ENV PYTHONPYCACHEPREFIX=/apprise/__pycache__/py312
 
 RUN pip install --no-cache-dir -r /requirements.txt -r /dev-requirements.txt
 

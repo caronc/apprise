@@ -27,7 +27,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Base
-FROM python:3.11-buster
+FROM python:3.9-buster
 RUN apt-get update && \
     apt-get install -y --no-install-recommends libdbus-1-dev libgirepository1.0-dev build-essential musl-dev bash dbus && \
     rm -rf /var/lib/apt/lists/*
@@ -38,8 +38,8 @@ VOLUME ["/apprise"]
 WORKDIR /apprise
 COPY requirements.txt /
 COPY dev-requirements.txt /
-ENV PYTHONPATH /apprise
-ENV PYTHONPYCACHEPREFIX /apprise/__pycache__/py311
+ENV PYTHONPATH=/apprise
+ENV PYTHONPYCACHEPREFIX=/apprise/__pycache__/py39
 
 RUN pip install --no-cache-dir -r /requirements.txt -r /dev-requirements.txt
 

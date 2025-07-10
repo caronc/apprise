@@ -1,0 +1,334 @@
+[build-system]
+requires = [
+    "setuptools>=69",
+    "wheel",
+    "babel",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "apprise"
+description = "Push Notifications that work with just about every platform!"
+readme = "README.md"
+authors = [
+    { name = "Chris Caron", email = "lead2gold@gmail.com" },
+]
+dynamic = ["version"]
+
+# Not supported yet for all Distributions
+license = { text = "BSD-2-Clause" }
+
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Operating System :: OS Independent",
+    "Natural Language :: English",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+]
+
+dependencies = [
+    # Application dependencies
+    "requests",
+    "requests-oauthlib",
+    "click>=5.0",
+    "markdown",
+    "PyYAML",
+    # Root certificate authority bundle
+    "certifi",
+]
+
+# Identifies all of the supported plugins
+keywords = [
+    "Africas Talking",
+    "Alerts",
+    "Apprise API",
+    "Automated Packet Reporting System",
+    "AWS",
+    "Bark",
+    "BlueSky",
+    "BulkSMS",
+    "BulkVS",
+    "Burst SMS",
+    "Chanify",
+    "Chat",
+    "CLI",
+    "Clickatell",
+    "ClickSend",
+    "D7Networks",
+    "Dapnet",
+    "DBus",
+    "DingTalk",
+    "Discord",
+    "Email",
+    "Emby",
+    "Enigma2",
+    "FCM",
+    "Feishu",
+    "Flock",
+    "Form",
+    "Free Mobile",
+    "Gnome",
+    "Google Chat",
+    "Gotify",
+    "Growl",
+    "Guilded",
+    "Home Assistant",
+    "httpSMS",
+    "IFTTT",
+    "Join",
+    "JSON",
+    "Kavenegar",
+    "KODI",
+    "Kumulos",
+    "LaMetric",
+    "Lark",
+    "Line",
+    "MacOSX",
+    "Mailgun",
+    "Mastodon",
+    "Matrix",
+    "Mattermost",
+    "MessageBird",
+    "Microsoft",
+    "Misskey",
+    "MQTT",
+    "MSG91",
+    "MSTeams",
+    "Nextcloud",
+    "NextcloudTalk",
+    "Notica",
+    "Notifiarr",
+    "Notifico",
+    "Ntfy",
+    "Office365",
+    "OneSignal",
+    "Opsgenie",
+    "PagerDuty",
+    "PagerTree",
+    "ParsePlatform",
+    "Plivo",
+    "PopcornNotify",
+    "Power Automate",
+    "Prowl",
+    "Push Notifications",
+    "PushBullet",
+    "PushDeer",
+    "Pushed",
+    "Pushjet",
+    "PushMe",
+    "Pushover",
+    "Pushplus",
+    "PushSafer",
+    "Pushy",
+    "QQ Push",
+    "Reddit",
+    "Resend",
+    "Revolt",
+    "Rocket.Chat",
+    "RSyslog",
+    "Ryver",
+    "SendGrid",
+    "ServerChan",
+    "SES",
+    "Seven",
+    "SFR",
+    "Signal",
+    "SimplePush",
+    "Sinch",
+    "Slack",
+    "SMPP",
+    "SMS Manager",
+    "SMSEagle",
+    "SMTP2Go",
+    "SNS",
+    "SparkPost",
+    "Spike",
+    "Splunk",
+    "SpugPush",
+    "Streamlabs",
+    "Stride",
+    "Synology Chat",
+    "Syslog",
+    "Techulus",
+    "Telegram",
+    "Threema Gateway",
+    "Twilio",
+    "Twist",
+    "Twitter",
+    "Vapid",
+    "VictorOps",
+    "Voipms",
+    "Vonage",
+    "Webex",
+    "Webpush",
+    "WeCom Bot",
+    "WhatsApp",
+    "Windows",
+    "Workflows",
+    "WxPusher",
+    "XBMC",
+    "XML",
+    "Zulip",
+]
+
+[project.optional-dependencies]
+
+# All packages required to test/build against
+dev = [
+    "coverage",
+    "mock",
+    "tox",
+    "pytest",
+    "pytest-cov",
+    "pytest-mock",
+    "ruff",
+    "babel",
+    "validate-pyproject",
+]
+
+# Defines all Python libraries for Apprise to work with
+# all plugins
+all-plugins = [
+    # Used in many applications requiring cryptography
+    # such as fcm://, splush:// and much more
+    "cryptography",
+
+    # provides growl:// support
+    "gntp",
+    # Provides mqtt:// support
+    # use any version other than 2.0.x due to:
+    #  - https://github.com/eclipse/paho.mqtt.python/issues/814
+    "paho-mqtt != 2.0.*",
+
+	 # Pretty Good Privacy (PGP) Provides mailto:// and deltachat:// support
+    "PGPy",
+
+    # Provides smpp:// support
+    "smpplib",
+]
+windows = [
+    "pywin32",
+]
+
+[project.urls]
+Homepage = "https://github.com/caronc/apprise"
+Source = "https://github.com/caronc/apprise"
+Tracker = "https://github.com/caronc/apprise/issues"
+Documentation = "https://github.com/caronc/apprise/wiki"
+
+[project.scripts]
+apprise = "apprise.cli:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+apprise = [
+    "assets/NotifyXML-*.xsd",
+    "assets/themes/default/*.png",
+    "assets/themes/default/*.ico",
+    "i18n/*.py",
+    "i18n/*/LC_MESSAGES/*.mo",
+    "py.typed",
+    "*.pyi",
+    "*/*.pyi",
+]
+
+[tool.setuptools.packages.find]
+where = [
+    ".",
+]
+exclude = [
+    "tests*",
+    "tools*",
+]
+include = ["apprise*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "apprise.__version__"}
+
+[tool.ruff]
+line-length = 79  # Respecting BSD-style 79-char limit
+extend-select = ["I"]  # Automatically sort imports with isort logic
+target-version = "py38"
+exclude = [
+  "tests/data",
+  "bin",
+  "build",
+  "dist",
+  ".eggs",
+  ".tox",
+  ".local",
+  ".venv",
+  "venv",
+]
+
+[tool.ruff.lint]
+select = [
+  "E",    # pycodestyle errors
+  "F",    # pyflakes
+  "W",    # pycodestyle warnings
+  "I",    # isort
+  "UP",   # pyupgrade
+  "B",    # flake8-bugbear
+  "C4",   # flake8-comprehensions
+  "SIM",  # flake8-simplify
+  "T20",  # flake8-print (catches stray `print`)
+  "RUF",  # Ruff-native rules
+]
+
+ignore = [
+  "E501",    # line length
+  "ANN101",  # missing type on `self`
+  "D100",    # missing docstring in public module
+  "D104",    # missing docstring in public package
+  "B008",    # do not call `dict()` with keyword args
+  "E722",    # bare except (Apprise uses it reasonably)
+  "E741",    # Ambiguous variable name (e.g., l, O, I)
+  "W605",    # Invalid escape sequence
+]
+
+[tool.ruff.isort]
+known-first-party = ["apprise"]
+force-sort-within-sections = true
+combine-as-imports = true
+
+[tool.ruff.flake8-builtins]
+builtins-ignorelist = ["_"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+python_files = ["tests/test_*.py"]
+norecursedirs = ["tests/helpers", "dist"]
+filterwarnings = ["once::Warning"]
+
+[tool.coverage.run]
+branch = true
+parallel = false
+data_file = ".coverage"
+source = ["apprise"]
+relative_files = true
+
+[tool.coverage.paths]
+source = [
+    "apprise",
+    "/apprise/apprise",
+    ".tox/*/lib/python*/site-packages/apprise",
+    ".tox/pypy/site-packages/apprise"
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+skip_empty = true
