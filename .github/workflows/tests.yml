@@ -1,66 +1,136 @@
 name: Run Tests
 
 on:
+  # Run tests on push to main, master, or any release/ branch
   push:
     branches: [main, master, 'release/**']
+  # Always test on pull requests targeting main/master
   pull_request:
     branches: [main, master]
+  # Allow manual triggering via GitHub UI
   workflow_dispatch:
 
 jobs:
   test:
-    name: Test (${{ matrix.tox_env }})
+    name: Python ${{ matrix.python-version }} – ${{ matrix.tox_env }}
     runs-on: ubuntu-latest
 
     strategy:
-      fail-fast: false
+      fail-fast: false  # Let all jobs run, even if one fails
       matrix:
-        tox_env: [minimal, qa]
+        include:
+          - python-version: "3.8"
+            tox_env: qa
+            setup_python: true
+
+          # Modern Python versions (can rely on default runner environment)
+          - python-version: "3.9"
+            tox_env: qa
+            setup_python: false
+          - python-version: "3.10"
+            tox_env: qa
+            setup_python: false
+          - python-version: "3.11"
+            tox_env: qa
+            setup_python: false
+          - python-version: "3.12"
+            tox_env: qa
+            setup_python: false
+
+          # Minimal test run on latest Python only
+          - python-version: "3.12"
+            tox_env: minimal
+            setup_python: false
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Python
+      # Legacy Python versions (3.7/3.8) are no longer on GitHub-hosted runners
+      # Use setup-python to install them explicitly
+      - name: Set up Python (legacy)
+        if: matrix.setup_python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python-version }}
 
+      # Install tox for isolated environment and plugin test orchestration
       - name: Install tox
         run: python -m pip install tox
 
+      # Move all .coverage* files to .coverage-reports for consistency across distributions
+      - name: Move coverage file into reports folder
+        if: always()
+        run: |
+          mkdir -p .coverage-reports
+          find . -maxdepth 1 -type f -name ".coverage*" -exec mv {} .coverage-reports/ \;
+
+      # Run tox with the specified environment (qa, minimal, etc.)
       - name: Run tox for ${{ matrix.tox_env }}
         run: tox -e ${{ matrix.tox_env }}
 
+      # Debug step to verify .coverage.* files are created and named properly
+      - name: Debug coverage location
+        if: always()
+        run: ls -alh .coverage-reports || echo "no .coverage-reports found"
+
+      # Upload per-job .coverage.* files as artifacts, named by Python version
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-${{ matrix.tox_env }}
-          path: coverage.xml
+          name: coverage-${{ matrix.python-version }}-${{ matrix.tox_env }}
+          path: .coverage-reports/.coverage.*
 
   codecov:
     name: Upload merged coverage to Codecov
     runs-on: ubuntu-latest
-    needs: test
-    if: always()
+    needs: test  # Waits for all matrix jobs to complete
+    if: always()  # Even if a test fails, still attempt to upload what we have
 
     steps:
       - uses: actions/checkout@v4
 
+      # Download all coverage artifacts into one local folder
       - name: Download all coverage reports
         uses: actions/download-artifact@v4
         with:
           path: coverage-artifacts
 
-      - name: Combine coverage files
+      # Merge .coverage.* files into a single .coverage file
+      - name: Combine and generate coverage
         run: |
+          # Required to use coverage CLI
           pip install coverage
-          coverage combine coverage-artifacts/**/coverage.xml
-          coverage xml
+          
+          # This directory will hold merged coverage files
+          mkdir -p .coverage-reports
+          
+          # Copy all .coverage.* files from nested artifacts into .coverage-reports
+          # Files are nested due to how upload-artifact stores them
+          find coverage-artifacts -type f -name '.coverage.*' -exec cp {} .coverage-reports/ \;
 
+          # Confirm copied files for debug purposes
+          ls -alh .coverage-reports
+
+          # Combine them into a single .coverage file
+          coverage combine .coverage-reports
+
+          # Output text summary (for job logs) and XML (for Codecov)
+          coverage report
+          coverage xml -o coverage.xml
+
+      # Upload the final combined XML to GitHub (optional but useful)
+      - name: Upload final Coverage XML
+        uses: actions/upload-artifact@v4
+        with:
+          name: combined-coverage
+          path: coverage.xml
+
+      # Upload merged coverage results to Codecov for visualization
       - name: Upload to Codecov
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           file: coverage.xml
-          fail_ci_if_error: false
+          fail_ci_if_error: false  # Avoid failing job if Codecov is down
+

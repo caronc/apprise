@@ -16,10 +16,9 @@ authors = [
 dynamic = ["version"]
 
 # Not supported yet for all Distributions
-license = "BSD-2-Clause"
-license-files = ["LICENSE"]
+license = { text = "BSD-2-Clause" }
 
-requires-python = ">=3.6"
+requires-python = ">=3.8"
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
@@ -27,8 +26,6 @@ classifiers = [
     "Operating System :: OS Independent",
     "Natural Language :: English",
     "Programming Language :: Python",
-    "Programming Language :: Python :: 3.6",
-    "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
@@ -293,3 +290,23 @@ addopts = "-ra"
 python_files = ["tests/test_*.py"]
 norecursedirs = ["tests/helpers", "dist"]
 filterwarnings = ["once::Warning"]
+
+[tool.coverage.run]
+branch = true
+parallel = true
+data_file = ".coverage-reports/.coverage"
+source = ["apprise"]
+relative_files = true
+
+[tool.coverage.paths]
+source = [
+    "apprise",
+    "/apprise/apprise",
+    ".tox/*/lib/python*/site-packages/apprise",
+    ".tox/pypy/site-packages/apprise"
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+skip_empty = true

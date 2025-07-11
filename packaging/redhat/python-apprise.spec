@@ -43,26 +43,39 @@
 
 %global pypi_name apprise
 
-%global common_description %{expand: \
-Apprise is a Python package for simplifying access to all of the different
-notification services that are out there. Apprise opens the door and makes
-it easy to access:
+# Handle rpmlint false positives
+# - Prevent warnings:
+#    en_US ntfy -> notify
+#    en_US httpSMS -> HTTP
+# rpmlint: ignore-spelling httpSMS ntfy
 
-Africas Talking, Apprise API, APRS, AWS SES, AWS SNS, Bark, BlueSky, Burst SMS,
-BulkSMS, BulkVS, Chanify, Clickatell, ClickSend, DAPNET, DingTalk, Discord, E-Mail, Emby,
-FCM, Feishu, Flock, Free Mobile, Google Chat, Gotify, Growl, Guilded, Home
-Assistant, httpSMS, IFTTT, Join, Kavenegar, KODI, Kumulos, LaMetric, Lark, Line,
-MacOSX, Mailgun, Mastodon, Mattermost, Matrix, MessageBird, Microsoft
-Windows, Microsoft Teams, Misskey, MQTT, MSG91, MyAndroid, Nexmo, Nextcloud,
-NextcloudTalk, Notica, Notifiarr, Notifico, ntfy, Office365, OneSignal,
-Opsgenie, PagerDuty, PagerTree, ParsePlatform, Plivo, PopcornNotify, Prowl,
-Pushalot, PushBullet, Pushjet, PushMe, Pushover, Pushplus, PushSafer, Pushy,
-PushDeer, QQ Push, Revolt, Reddit, Resend, Rocket.Chat, RSyslog, SendGrid,
-ServerChan, Seven, SFR, Signal, SimplePush, Sinch, Slack, SMPP, SMSEagle,
-SMS Manager, SMTP2Go, SparkPost, Splunk, Spike, Spug Push, Super Toasty,
-Streamlabs, Stride, Synology Chat, Syslog, Techulus Push, Telegram, Threema
-Gateway, Twilio, Twitter, Twist, Vapid, VictorOps, Voipms, Vonage, WebPush,
-WeCom Bot, WhatsApp, Webex Teams, Workflows, WxPusher, XBMC}
+# - RHEL9 does not recognize: BSD-2-Clause which is correct
+# rpmlint: ignore invalid-license
+
+%global common_description %{expand: \
+Apprise is a Python package that simplifies access to many popular \
+notification services. It supports sending alerts to platforms such as: \
+\
+`AfricasTalking`, `Apprise API`, `APRS`, `AWS SES`, `AWS SNS`, `Bark`, \
+`BlueSky`, `Burst SMS`, `BulkSMS`, `BulkVS`, `Chanify`, `Clickatell`, \
+`ClickSend`, `DAPNET`, `DingTalk`, `Discord`, `E-Mail`, `Emby`, `FCM`, \
+`Feishu`, `Flock`, `Free Mobile`, `Google Chat`, `Gotify`, `Growl`, \
+`Guilded`, `Home Assistant`, `httpSMS`, `IFTTT`, `Join`, `Kavenegar`, `KODI`, \
+`Kumulos`, `LaMetric`, `Lark`, `Line`, `MacOSX`, `Mailgun`, `Mastodon`, \
+`Mattermost`, `Matrix`, `MessageBird`, `Microsoft Windows`, \
+`Microsoft Teams`, `Misskey`, `MQTT`, `MSG91`, `MyAndroid`, `Nexmo`, \
+`Nextcloud`, `NextcloudTalk`, `Notica`, `Notifiarr`, `Notifico`, `ntfy`, \
+`Office365`, `OneSignal`, `Opsgenie`, `PagerDuty`, `PagerTree`, \
+`ParsePlatform`, `Plivo`, `PopcornNotify`, `Prowl`, `Pushalot`, \
+`PushBullet`, `Pushjet`, `PushMe`, `Pushover`, `Pushplus`, `PushSafer`, \
+`Pushy`, `PushDeer`, `QQ Push`, `Revolt`, `Reddit`, `Resend`, `Rocket.Chat`, \
+`RSyslog`, `SendGrid`, `ServerChan`, `Seven`, `SFR`, `Signal`, \
+`SimplePush`, `Sinch`, `Slack`, `SMPP`, `SMSEagle`, `SMS Manager`, \
+`SMTP2Go`, `SparkPost`, `Splunk`, `Spike`, `Spug Push`, `Super Toasty`, \
+`Streamlabs`, `Stride`, `Synology Chat`, `Syslog`, `Techulus Push`, \
+`Telegram`, `Threema Gateway`, `Twilio`, `Twitter`, `Twist`, `Vapid`, \
+`VictorOps`, `Voipms`, `Vonage`, `WebPush`, `WeCom Bot`, `WhatsApp`, \
+`Webex Teams`, `Workflows`, `WxPusher`, and `XBMC`.}
 
 Name:           python-%{pypi_name}
 Version:        1.9.3
@@ -73,10 +86,13 @@ URL:            https://github.com/caronc/%{pypi_name}
 Source0:        %{url}/archive/v%{version}/%{pypi_name}-%{version}.tar.gz
 BuildArch:      noarch
 
+Obsoletes: python%{python3_pkgversion}-%{pypi_name} < %{version}-%{release}
+Provides: python%{python3_pkgversion}-%{pypi_name} = %{version}-%{release}
+
 %description %{common_description}
 
 %package -n %{pypi_name}
-Summary: Apprise CLI Tool
+Summary: Notify messaging platforms from the command line
 
 Requires: python%{python3_pkgversion}-click >= 5.0
 Requires: python%{python3_pkgversion}-%{pypi_name} = %{version}-%{release}
@@ -176,7 +192,8 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib}:%{_builddir}/%{name}-%{ve
 %files -n python%{python3_pkgversion}-%{pypi_name}
 %license LICENSE
 %doc README.md
-%{python3_sitelib}/%{pypi_name}
+%{python3_sitelib}/%{pypi_name}/
+%lang(en) %{python3_sitelib}/%{pypi_name}/i18n/en/LC_MESSAGES/messages.mo
 %exclude %{python3_sitelib}/%{pypi_name}/cli.*
 %{python3_sitelib}/*.egg-info
 
@@ -184,6 +201,7 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib}:%{_builddir}/%{name}-%{ve
 %{_bindir}/%{pypi_name}
 %{_mandir}/man1/%{pypi_name}.1*
 %{python3_sitelib}/%{pypi_name}/cli.*
+%{python3_sitelib}/%{pypi_name}/__pycache__/cli*.pyc
 
 %changelog
 * Sun Mar 30 2025 Chris Caron <lead2gold@gmail.com> - 1.9.3
